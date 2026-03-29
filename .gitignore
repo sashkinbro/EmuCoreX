@@ -43,6 +43,7 @@ hs_err_pid*
 IGDB/
 public/
 y/
+tools/
 app/src/main/native-tools/
 analyze_main.py
 fix_main_cpp.py
