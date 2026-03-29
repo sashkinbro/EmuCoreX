@@ -9,7 +9,7 @@ Official website: https://emucorex.web.app/
 
 ## Highlights
 
-- Native emulation core based on PCSX2, with further refinement built on ARMSX2 groundwork
+- Native emulation core built on PCSX2 and ARMSX2 groundwork, with ongoing core improvements for EmuCoreX
 - Library-first home screen with cover art, game metadata, recent games, and search
 - Guided onboarding for BIOS and game folders with recovery when folders become invalid
 - In-game overlay for renderer, aspect ratio, resolution, speedhacks, cheats, FPS, and quick actions
@@ -82,10 +82,10 @@ EmuCoreX currently targets Android with:
 
 ## Credits
 
-EmuCoreX builds on the open-source PCSX2 project and combines it with a custom Android interface, library system, runtime controls, and handheld-oriented UX work. The native core path also builds on ARMSX2 groundwork and was further refined, improved, and adapted for EmuCoreX.
+EmuCoreX builds on the open-source PCSX2 project and combines it with a custom Android interface, library system, runtime controls, and handheld-oriented UX work. The current core work also builds on ARMSX2 groundwork, with the Android bridge rewritten in Kotlin and additional core-side improvements adapted for EmuCoreX. Development is ongoing, and further work on stability, integration, and core improvements will continue.
 
 - PCSX2: https://github.com/PCSX2/pcsx2
-- Thanks to the ARMSX2 team for the groundwork, experience, and contributions that helped shape the EmuCoreX core integration path.
+- Thanks to the ARMSX2 team for the groundwork and contributions that helped shape the EmuCoreX core direction.
 
 ## Support
 
