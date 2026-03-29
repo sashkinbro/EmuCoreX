@@ -8,7 +8,7 @@ import java.util.Locale
 
 object AppLocaleManager {
     fun wrap(base: Context): Context {
-        val languageTag = AppPreferences(base).getStoredLanguageTagSync()
+        val languageTag = normalizeLanguageTag(AppPreferences(base).getStoredLanguageTagSync())
         if (languageTag.isNullOrBlank()) return base
 
         val locale = Locale.forLanguageTag(languageTag)
@@ -18,5 +18,12 @@ object AppLocaleManager {
         configuration.setLocale(locale)
         configuration.setLocales(LocaleList(locale))
         return base.createConfigurationContext(configuration)
+    }
+
+    private fun normalizeLanguageTag(tag: String?): String? {
+        return when (tag?.trim()) {
+            "zh-TW", "zh_HK", "zh-HK", "zh-Hant", "zh-Hant-TW" -> "zh"
+            else -> tag
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.sbro.emucorex.core.utils
 
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.NativeApp
+import com.sbro.emucorex.data.RetroAchievementsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -76,6 +77,7 @@ object RetroAchievementsStateManager {
     }
 
     fun refreshState() {
+        RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
         if (!EmulatorBridge.isNativeLoaded) {
             _state.update {
                 it.copy(
@@ -119,6 +121,7 @@ object RetroAchievementsStateManager {
                 storedUsername = cleanUsername
             )
         }
+        RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
         scope.launch(Dispatchers.IO) {
             runCatching { RetroAchievementsBridge.nativeLogin(cleanUsername, password) }
                 .onSuccess { error ->
@@ -137,6 +140,7 @@ object RetroAchievementsStateManager {
     }
 
     fun logout() {
+        RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
         _state.update {
             it.copy(
                 isLoading = true,
@@ -152,6 +156,7 @@ object RetroAchievementsStateManager {
     }
 
     fun setEnabled(enabled: Boolean) {
+        RetroAchievementsRepository.invalidateUnlockedAchievementsCache()
         _state.update {
             it.copy(
                 enabled = enabled,

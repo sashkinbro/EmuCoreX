@@ -39,6 +39,7 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
+import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
 import com.sbro.emucorex.ui.achievements.GameAchievementsScreen
 import com.sbro.emucorex.ui.catalog.CatalogSearchScreen
 import com.sbro.emucorex.ui.detail.GameDetailScreen
@@ -48,6 +49,7 @@ import com.sbro.emucorex.ui.home.HomeScreen
 import com.sbro.emucorex.ui.onboarding.OnboardingScreen
 import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
+import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
@@ -67,6 +69,9 @@ data class EmulationRoute(val gamePath: String? = null, val saveSlot: Int? = nul
 data class SettingsRoute(val tab: String = "general")
 
 @Serializable
+object LanguageSettingsRoute
+
+@Serializable
 object OnboardingRoute
 
 @Serializable
@@ -83,6 +88,9 @@ data class SaveManagerRoute(val gamePath: String? = null, val gameTitle: String?
 
 @Serializable
 object AchievementsRoute
+
+@Serializable
+object AccountUnlockedAchievementsRoute
 
 @Serializable
 data class GameAchievementsRoute(val gamePath: String, val gameTitle: String? = null)
@@ -661,9 +669,20 @@ fun AppNavigation() {
                     SettingsScreen(
                         initialTab = route.tab,
                         onBackClick = { navController.popBackStack() },
+                        onOpenLanguageScreen = {
+                            navController.navigate(LanguageSettingsRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         onEditControlsClick = navigateControlsEditor
                     )
                 }
+            }
+
+            composable<LanguageSettingsRoute> {
+                LanguageSettingsScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable<AchievementsRoute> {
@@ -714,9 +733,25 @@ fun AppNavigation() {
                                 launchSingleTop = true
                             }
                         },
+                        onOpenUnlockedAchievements = {
+                            navController.navigate(AccountUnlockedAchievementsRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         onBackClick = { navController.popBackStack() }
                     )
                 }
+            }
+
+            composable<AccountUnlockedAchievementsRoute> {
+                AccountUnlockedAchievementsScreen(
+                    onOpenGameAchievements = { path, title ->
+                        navController.navigate(GameAchievementsRoute(gamePath = path, gameTitle = title)) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onBackClick = { navController.popBackStack() }
+                )
             }
 
             composable<ControlsEditorRoute> {

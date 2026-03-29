@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -127,6 +128,7 @@ private enum class SettingsTab {
 fun SettingsScreen(
     initialTab: String = "general",
     onBackClick: (() -> Unit)? = null,
+    onOpenLanguageScreen: (() -> Unit)? = null,
     onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
@@ -139,7 +141,6 @@ fun SettingsScreen(
     val isAdaptiveLandscape = isLandscape && configuration.screenWidthDp >= 560
     val useWideLayout = isWide || isAdaptiveLandscape
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
-    var showLanguageSheet by remember { mutableStateOf(false) }
     val cheatRepository = remember(context) { CheatRepository(context) }
     var cheatEntries by remember { mutableStateOf(cheatRepository.listImportedCheatFiles()) }
     var cheatEditorGameKey by remember { mutableStateOf<String?>(null) }
@@ -183,7 +184,7 @@ fun SettingsScreen(
 
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(null) })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
-    val openLanguageSheet = rememberDebouncedClick(onClick = { showLanguageSheet = true })
+    val openLanguageSheet = rememberDebouncedClick(onClick = { onOpenLanguageScreen?.invoke() })
     val refreshCheatEntries = remember {
         {
             cheatEntries = cheatRepository.listImportedCheatFiles()
@@ -392,17 +393,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-
-    if (showLanguageSheet) {
-        LanguageSheet(
-            selectedTag = uiState.languageTag,
-            onDismiss = { showLanguageSheet = false },
-            onSelected = { tag ->
-                viewModel.setLanguage(tag)
-                showLanguageSheet = false
-            }
-        )
     }
 
     if (cheatEditorGameKey != null) {
@@ -693,12 +683,7 @@ private fun SettingsContent(
                         SettingsItem(
                             icon = Icons.Rounded.Language,
                             label = stringResource(R.string.settings_language),
-                            value = when (uiState.languageTag) {
-                                "en" -> stringResource(R.string.settings_language_english)
-                                "ru" -> stringResource(R.string.settings_language_russian)
-                                "uk" -> stringResource(R.string.settings_language_ukrainian)
-                                else -> stringResource(R.string.settings_language_system)
-                            },
+                            value = languageLabel(uiState.languageTag),
                             onClick = openLanguageSheet
                         )
                         ThemeSelector(
@@ -2108,68 +2093,72 @@ private fun CheatEditorSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LanguageSheet(
-    selectedTag: String?,
-    onDismiss: () -> Unit,
-    onSelected: (String?) -> Unit
+fun LanguageSettingsScreen(
+    onBackClick: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    val uiState by viewModel.uiState.collectAsState()
+    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val options = rememberLanguageOptions()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = ScreenHorizontalPadding, vertical = 12.dp)
-                .navigationBarsPadding(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = ScreenHorizontalPadding, vertical = 0.dp)
+                .padding(top = topInset, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(R.string.settings_language),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
+            NavigationBackButton(
+                onClick = onBackClick,
+                contentColor = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = stringResource(R.string.settings_language_sheet_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            LanguageOption(
-                badgeText = "SYS",
-                title = stringResource(R.string.settings_language_system),
-                selected = selectedTag == null,
-                onClick = { onSelected(null) }
-            )
-            LanguageOption(
-                badgeText = "EN",
-                title = stringResource(R.string.settings_language_english),
-                selected = selectedTag == "en",
-                onClick = { onSelected("en") }
-            )
-            LanguageOption(
-                badgeText = "UA",
-                title = stringResource(R.string.settings_language_ukrainian),
-                selected = selectedTag == "uk",
-                onClick = { onSelected("uk") }
-            )
-            LanguageOption(
-                badgeText = "RU",
-                title = stringResource(R.string.settings_language_russian),
-                selected = selectedTag == "ru",
-                onClick = { onSelected("ru") }
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            Column(modifier = Modifier.padding(start = 8.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_language),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = stringResource(R.string.settings_language_screen_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .padding(horizontal = ScreenHorizontalPadding, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            options.forEach { option ->
+                LanguageOptionCard(
+                    badgeText = option.badge,
+                    title = stringResource(option.titleRes),
+                    subtitle = option.subtitleRes?.let { stringResource(it) },
+                    selected = uiState.languageTag == option.tag,
+                    onClick = { viewModel.setLanguage(option.tag) }
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
         }
     }
 }
 
 @Composable
-private fun LanguageOption(
+private fun LanguageOptionCard(
     badgeText: String,
     title: String,
+    subtitle: String?,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -2205,14 +2194,26 @@ private fun LanguageOption(
                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 12.dp)
-            )
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                    subtitle?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
             if (selected) {
                 Box(
                     modifier = Modifier
@@ -2222,6 +2223,45 @@ private fun LanguageOption(
                 )
             }
         }
+    }
+}
+
+private data class LanguageUiOption(
+    val tag: String?,
+    val badge: String,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int? = null
+)
+
+@Composable
+private fun rememberLanguageOptions(): List<LanguageUiOption> {
+    return remember {
+        listOf(
+            LanguageUiOption(null, "SYS", R.string.settings_language_system, R.string.settings_language_system_subtitle),
+            LanguageUiOption("en", "EN", R.string.settings_language_english, R.string.settings_language_native_english),
+            LanguageUiOption("uk", "UA", R.string.settings_language_ukrainian, R.string.settings_language_native_ukrainian),
+            LanguageUiOption("ru", "RU", R.string.settings_language_russian, R.string.settings_language_native_russian),
+            LanguageUiOption("es", "ES", R.string.settings_language_spanish, R.string.settings_language_native_spanish),
+            LanguageUiOption("fr", "FR", R.string.settings_language_french, R.string.settings_language_native_french),
+            LanguageUiOption("de", "DE", R.string.settings_language_german, R.string.settings_language_native_german),
+            LanguageUiOption("pt", "PT", R.string.settings_language_portuguese, R.string.settings_language_native_portuguese),
+            LanguageUiOption("zh", "繁", R.string.settings_language_traditional_chinese, R.string.settings_language_native_traditional_chinese)
+        )
+    }
+}
+
+@Composable
+private fun languageLabel(tag: String?): String {
+    return when (tag) {
+        "en" -> stringResource(R.string.settings_language_english)
+        "uk" -> stringResource(R.string.settings_language_ukrainian)
+        "ru" -> stringResource(R.string.settings_language_russian)
+        "es" -> stringResource(R.string.settings_language_spanish)
+        "fr" -> stringResource(R.string.settings_language_french)
+        "de" -> stringResource(R.string.settings_language_german)
+        "pt" -> stringResource(R.string.settings_language_portuguese)
+        "zh", "zh-TW", "zh-Hant", "zh-Hant-TW" -> stringResource(R.string.settings_language_traditional_chinese)
+        else -> stringResource(R.string.settings_language_system)
     }
 }
 

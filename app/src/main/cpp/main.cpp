@@ -131,43 +131,29 @@ namespace
         return url;
     }
 
-    static bool ResolveElfPathForRetroAchievements(const std::string& path, std::string* out_elf_path)
+    static std::string FetchRetroAchievementGameDataJson(const std::string& path)
     {
-        if (!out_elf_path || path.empty())
-            return false;
+        std::string game_hash;
 
         if (VMManager::IsElfFileName(path))
         {
-            *out_elf_path = path;
-            return true;
+            game_hash = Achievements::GetGameHashForELF(path);
+        }
+        else if (VMManager::IsDiscFileName(path))
+        {
+            Error error;
+            CDVD = &CDVDapi_Iso;
+            if (!CDVD->open(path, &error))
+                return {};
+
+            std::string elf_path;
+            cdvdGetDiscInfo(nullptr, &elf_path, nullptr, nullptr, nullptr);
+            if (!elf_path.empty())
+                game_hash = Achievements::GetGameHashForELF(elf_path);
+
+            DoCDVDclose();
         }
 
-        if (!VMManager::IsDiscFileName(path))
-            return false;
-
-        Error error;
-        CDVD = &CDVDapi_Iso;
-        if (!CDVD->open(path, &error))
-            return false;
-
-        std::string elf_path;
-        cdvdGetDiscInfo(nullptr, &elf_path, nullptr, nullptr, nullptr);
-        DoCDVDclose();
-
-        if (elf_path.empty())
-            return false;
-
-        *out_elf_path = std::move(elf_path);
-        return true;
-    }
-
-    static std::string FetchRetroAchievementGameDataJson(const std::string& path)
-    {
-        std::string elf_path;
-        if (!ResolveElfPathForRetroAchievements(path, &elf_path))
-            return {};
-
-        const std::string game_hash = Achievements::GetGameHashForELF(elf_path);
         if (game_hash.empty())
             return {};
 
@@ -204,10 +190,17 @@ namespace
         game_params.username = username.empty() ? nullptr : username.c_str();
         game_params.api_token = token.empty() ? nullptr : token.c_str();
         game_params.game_id = resolve_response.game_id;
-        if (rc_api_init_fetch_game_data_request(&game_request, &game_params) != RC_OK)
+        const int game_request_init_result = rc_api_init_fetch_game_data_request(&game_request, &game_params);
+        if (game_request_init_result != RC_OK)
         {
+            std::string json = "{";
+            json += fmt::format("\"gameId\":{},", resolve_response.game_id);
+            json += "\"title\":\"\",";
+            json += "\"gameImageUrl\":\"\",";
+            json += "\"resolvedOnly\":true,";
+            json += "\"achievements\":[]}";
             rc_api_destroy_resolve_hash_response(&resolve_response);
-            return {};
+            return json;
         }
 
         SimpleHttpResult game_result;
@@ -215,8 +208,14 @@ namespace
         rc_api_destroy_request(&game_request);
         if (!game_ok)
         {
+            std::string json = "{";
+            json += fmt::format("\"gameId\":{},", resolve_response.game_id);
+            json += "\"title\":\"\",";
+            json += "\"gameImageUrl\":\"\",";
+            json += "\"resolvedOnly\":true,";
+            json += "\"achievements\":[]}";
             rc_api_destroy_resolve_hash_response(&resolve_response);
-            return {};
+            return json;
         }
 
         rc_api_server_response_t game_server_response = {};
@@ -228,9 +227,15 @@ namespace
         if (rc_api_process_fetch_game_data_server_response(&game_response, &game_server_response) != RC_OK ||
             !game_response.response.succeeded)
         {
+            std::string json = "{";
+            json += fmt::format("\"gameId\":{},", resolve_response.game_id);
+            json += "\"title\":\"\",";
+            json += "\"gameImageUrl\":\"\",";
+            json += "\"resolvedOnly\":true,";
+            json += "\"achievements\":[]}";
             rc_api_destroy_fetch_game_data_response(&game_response);
             rc_api_destroy_resolve_hash_response(&resolve_response);
-            return {};
+            return json;
         }
 
         std::set<uint32_t> softcore_unlocks;
@@ -283,6 +288,7 @@ namespace
         json += fmt::format("\"consoleId\":{},", game_response.console_id);
         json += fmt::format("\"gameImageUrl\":\"{}\",",
             EscapeJsonString(BuildRcImageUrl(game_response.image_name, RC_IMAGE_TYPE_GAME)));
+        json += "\"resolvedOnly\":false,";
         json += "\"achievements\":[";
 
         bool first = true;

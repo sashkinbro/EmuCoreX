@@ -4,9 +4,13 @@ import android.content.Context
 import androidx.core.net.toUri
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.NativeApp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlinx.coroutines.flow.first
 
 data class RetroAchievementEntry(
     val id: Long,
@@ -30,7 +34,8 @@ data class RetroAchievementGameData(
     val gameId: Long,
     val title: String,
     val gameImageUrl: String?,
-    val achievements: List<RetroAchievementEntry>
+    val achievements: List<RetroAchievementEntry>,
+    val resolvedOnly: Boolean
 ) {
     val earnedCount: Int
         get() = achievements.count { it.isEarned }
@@ -56,10 +61,14 @@ class RetroAchievementsRepository(private val context: Context) {
     private val preferences = AppPreferences(context)
     private val gameRepository = GameRepository()
 
-    fun loadGameData(gamePath: String): RetroAchievementGameData? {
-        val resolvedPath = DocumentPathResolver.resolveFilePath(context, gamePath) ?: gamePath
-        val raw = NativeApp.getRetroAchievementGameData(resolvedPath) ?: return null
-        return raw.toRetroAchievementGameData()
+    suspend fun loadGameData(gamePath: String): RetroAchievementGameData? {
+        if (gamePath.isBlank()) return null
+
+        return withContext(Dispatchers.IO) {
+            buildLookupCandidates(gamePath).firstNotNullOfOrNull { candidate ->
+                safeLoadGameDataCandidate(candidate)
+            }
+        }
     }
 
     suspend fun loadUnlockedAchievementsFromLibrary(
@@ -67,6 +76,11 @@ class RetroAchievementsRepository(private val context: Context) {
     ): List<LibraryUnlockedAchievement> {
         val libraryPath = preferences.gamePath.first().orEmpty()
         if (libraryPath.isBlank()) return emptyList()
+        val cacheKey = buildUnlockedCacheKey(libraryPath = libraryPath)
+        unlockedAchievementsCache[cacheKey]?.let { cached ->
+            onProgress(cached.size, cached.size)
+            return cached
+        }
 
         val games = if (libraryPath.startsWith("content://")) {
             gameRepository.scanDirectoryFromUri(libraryPath.toUri(), context)
@@ -77,7 +91,7 @@ class RetroAchievementsRepository(private val context: Context) {
         val result = mutableListOf<LibraryUnlockedAchievement>()
         games.forEachIndexed { index, game ->
             onProgress(index + 1, games.size)
-            val gameData = loadGameData(game.path) ?: return@forEachIndexed
+            val gameData = runCatching { loadGameData(game.path) }.getOrNull() ?: return@forEachIndexed
             gameData.achievements
                 .asSequence()
                 .filter { it.isEarned }
@@ -90,11 +104,48 @@ class RetroAchievementsRepository(private val context: Context) {
                 }
         }
 
-        return result.sortedWith(
+        val sorted = result.sortedWith(
             compareByDescending<LibraryUnlockedAchievement> { it.achievement.earnedHardcore }
                 .thenBy { it.gameTitle.lowercase() }
                 .thenBy { it.achievement.title.lowercase() }
         )
+        unlockedAchievementsCache[cacheKey] = sorted
+        return sorted
+    }
+
+    private fun buildLookupCandidates(gamePath: String): List<String> {
+        if (!gamePath.startsWith("content://")) {
+            return listOf(DocumentPathResolver.resolveFilePath(context, gamePath) ?: gamePath)
+        }
+
+        val displayName = runCatching { DocumentPathResolver.getDisplayName(context, gamePath) }.getOrNull()
+            ?.takeIf { it.isNotBlank() }
+        val contentCandidate = displayName?.let { "$gamePath|$it" } ?: gamePath
+        val resolvedPath = DocumentPathResolver.resolveFilePath(context, gamePath)
+        return listOfNotNull(contentCandidate, resolvedPath).distinct()
+    }
+
+    private suspend fun safeLoadGameDataCandidate(candidate: String): RetroAchievementGameData? {
+        if (candidate.isBlank()) return null
+
+        return nativeLoadMutex.withLock {
+            runCatching {
+                NativeApp.getRetroAchievementGameData(candidate)?.toRetroAchievementGameData()
+            }.getOrNull()
+        }
+    }
+
+    companion object {
+        private val unlockedAchievementsCache = mutableMapOf<String, List<LibraryUnlockedAchievement>>()
+        private val nativeLoadMutex = Mutex()
+
+        fun invalidateUnlockedAchievementsCache() {
+            unlockedAchievementsCache.clear()
+        }
+
+        private fun buildUnlockedCacheKey(libraryPath: String): String {
+            return libraryPath.trim()
+        }
     }
 }
 
@@ -106,7 +157,8 @@ private fun String.toRetroAchievementGameData(): RetroAchievementGameData? {
             gameId = root.optLong("gameId"),
             title = root.optString("title"),
             gameImageUrl = root.optString("gameImageUrl").takeIf { it.isNotBlank() },
-            achievements = achievements
+            achievements = achievements,
+            resolvedOnly = root.optBoolean("resolvedOnly")
         )
     }.getOrNull()
 }

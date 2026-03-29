@@ -104,8 +104,9 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.core.utils.RetroAchievementsGameState
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
+import com.sbro.emucorex.data.RetroAchievementGameData
+import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
 import com.sbro.emucorex.ui.common.BitmapPathImage
@@ -126,6 +127,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
+private data class DetailRetroAchievementsState(
+    val isLoading: Boolean = false,
+    val data: RetroAchievementGameData? = null
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled", "ConfigurationScreenWidthHeight")
 @Composable
@@ -140,6 +146,8 @@ fun GameDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val retroAchievementsState by RetroAchievementsStateManager.state.collectAsState()
+    val context = LocalContext.current
+    val retroAchievementsRepository = remember(context) { RetroAchievementsRepository(context) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
@@ -161,6 +169,24 @@ fun GameDetailScreen(
     val game = uiState.game
     val catalog = uiState.catalogDetails
     val heroImage = catalog?.coverUrl ?: game?.coverArtPath ?: catalog?.heroUrl
+    val selectedAchievementsPath = game?.path?.takeIf { uiState.isInstalledGame && it.isNotBlank() }
+    val retroAchievementsDetailState by androidx.compose.runtime.produceState(
+        initialValue = DetailRetroAchievementsState(isLoading = selectedAchievementsPath != null),
+        key1 = selectedAchievementsPath,
+        key2 = retroAchievementsState.user?.username,
+        key3 = retroAchievementsState.enabled
+    ) {
+        value = if (selectedAchievementsPath == null) {
+            DetailRetroAchievementsState(isLoading = false, data = null)
+        } else {
+            value = DetailRetroAchievementsState(isLoading = true, data = null)
+            val data = runCatching {
+                retroAchievementsRepository.loadGameData(selectedAchievementsPath)
+            }.getOrNull()
+            DetailRetroAchievementsState(isLoading = false, data = data)
+        }
+    }
+    val retroAchievementsData = retroAchievementsDetailState.data
 
     LaunchedEffect(uiState.isLoading, shouldRequestGamepadFocus, game?.path, catalog?.name) {
         if (!uiState.isLoading && shouldRequestGamepadFocus) {
@@ -215,13 +241,6 @@ fun GameDetailScreen(
             )
         } else {
             val title = catalog?.name ?: game?.title.orEmpty()
-            val retroAchievementsGame = retroAchievementsState.game?.takeIf {
-                retroAchievementsMatchesSelectedGame(
-                    achievementsTitle = it.title,
-                    primaryTitle = title,
-                    secondaryTitle = game?.title
-                )
-            }
             val playAction = game?.path?.takeIf { uiState.isInstalledGame }?.let { path ->
                 rememberDebouncedClick(onClick = { onPlayClick(path, null) })
             }
@@ -287,7 +306,7 @@ fun GameDetailScreen(
                     }
                 }
 
-                game?.path?.takeIf { uiState.isInstalledGame && it.isNotBlank() }?.let { achievementsPath ->
+                selectedAchievementsPath?.let { achievementsPath ->
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
@@ -295,9 +314,10 @@ fun GameDetailScreen(
                             .padding(horizontal = horizontalInset)
                     ) {
                         RetroAchievementsDetailSection(
-                            game = retroAchievementsGame,
-                            isLoading = retroAchievementsState.isLoading,
+                            gameData = retroAchievementsData,
+                            isLoading = retroAchievementsDetailState.isLoading,
                             isEnabled = retroAchievementsState.enabled,
+                            isLoggedIn = retroAchievementsState.user != null,
                             onOpenAchievements = { onOpenAchievements(achievementsPath, game.title) }
                         )
                     }
@@ -731,9 +751,10 @@ private fun GenreChip(text: String) {
 
 @Composable
 private fun RetroAchievementsDetailSection(
-    game: RetroAchievementsGameState?,
+    gameData: RetroAchievementGameData?,
     isLoading: Boolean,
     isEnabled: Boolean,
+    isLoggedIn: Boolean,
     onOpenAchievements: () -> Unit
 ) {
     Surface(
@@ -765,15 +786,11 @@ private fun RetroAchievementsDetailSection(
             }
 
             when {
-                isLoading && game == null -> {
-                    Text(
-                        text = stringResource(R.string.settings_ra_loading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                isLoading && gameData == null -> {
+                    RetroAchievementsDetailSkeleton()
                 }
 
-                game != null -> {
+                gameData != null -> {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -786,8 +803,8 @@ private fun RetroAchievementsDetailSection(
                             contentAlignment = Alignment.Center
                         ) {
                             BitmapPathImage(
-                                imagePath = game.iconPath,
-                                contentDescription = game.title,
+                                imagePath = gameData.gameImageUrl,
+                                contentDescription = gameData.title,
                                 modifier = Modifier
                                     .size(60.dp)
                                     .clip(RoundedCornerShape(16.dp)),
@@ -803,17 +820,19 @@ private fun RetroAchievementsDetailSection(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = game.title,
+                                text = gameData.title,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            if (!game.richPresence.isNullOrBlank()) {
-                                Text(
-                                    text = game.richPresence,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            Text(
+                                text = if (isLoggedIn) {
+                                    stringResource(R.string.detail_achievements_account_synced)
+                                } else {
+                                    stringResource(R.string.detail_achievements_available)
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 
@@ -821,13 +840,10 @@ private fun RetroAchievementsDetailSection(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        GenreChip(text = "${game.earnedAchievements}/${game.totalAchievements} ${stringResource(R.string.settings_ra_achievements_label)}")
-                        GenreChip(text = "${game.earnedPoints}/${game.totalPoints} ${stringResource(R.string.settings_ra_points_label)}")
-                        if (game.hardcoreMode) {
-                            GenreChip(text = stringResource(R.string.settings_ra_hardcore_badge))
-                        }
-                        if (game.leaderboardEnabled) {
-                            GenreChip(text = stringResource(R.string.settings_ra_leaderboards_badge))
+                        GenreChip(text = "${gameData.earnedCount}/${gameData.totalCount} ${stringResource(R.string.settings_ra_achievements_label)}")
+                        GenreChip(text = "${gameData.earnedPoints}/${gameData.totalPoints} ${stringResource(R.string.settings_ra_points_label)}")
+                        if (isLoggedIn) {
+                            GenreChip(text = stringResource(R.string.achievements_status_earned))
                         }
                     }
                 }
@@ -853,15 +869,51 @@ private fun RetroAchievementsDetailSection(
     }
 }
 
-private fun retroAchievementsMatchesSelectedGame(
-    achievementsTitle: String?,
-    primaryTitle: String?,
-    secondaryTitle: String?
-): Boolean {
-    val normalizedAchievements = achievementsTitle.normalizeRetroAchievementsTitle()
-    if (normalizedAchievements.isBlank()) return false
-    return normalizedAchievements == primaryTitle.normalizeRetroAchievementsTitle() ||
-        normalizedAchievements == secondaryTitle.normalizeRetroAchievementsTitle()
+@Composable
+private fun RetroAchievementsDetailSkeleton() {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SkeletonBlock(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(16.dp))
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SkeletonBlock(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+                SkeletonBlock(
+                    modifier = Modifier
+                        .fillMaxWidth(0.72f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                )
+            }
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            repeat(2) {
+                SkeletonBlock(
+                    modifier = Modifier
+                        .width(128.dp)
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                )
+            }
+        }
+    }
 }
 
 private fun String?.normalizeRetroAchievementsTitle(): String {
