@@ -82,9 +82,10 @@ EmuCoreX currently targets Android with:
 
 ## Credits
 
-EmuCoreX builds on the open-source PCSX2 project and combines it with a custom Android interface, library system, runtime controls, and handheld-oriented UX work.
+EmuCoreX builds on the open-source PCSX2 project and combines it with a custom Android interface, library system, runtime controls, and handheld-oriented UX work. The native core integration was also refined using ideas, prior work, and practical experience drawn from ARMSX2, then further improved and adapted for EmuCoreX.
 
 - PCSX2: https://github.com/PCSX2/pcsx2
+- Thanks to the ARMSX2 team for their work, experience, and helpful contributions around the core integration path.
 
 ## Support
 
