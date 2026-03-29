@@ -1,0 +1,1 @@
+put "cdiscord.h" and "discordpp.h" in this directory.
