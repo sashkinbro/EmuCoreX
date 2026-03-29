@@ -3,21 +3,21 @@
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE)
 [![Support the project](https://img.shields.io/badge/Donate-Support%20EmuCoreX-ff5f45.svg)](https://send.monobank.ua/jar/9ZocYsprhJ)
 
-EmuCoreX is a PlayStation 2 library and launcher for Android built around a PCSX2-based emulation core. The project focuses on a clean handheld-friendly UI, quick setup, practical in-game controls, and deeper runtime tuning than a typical mobile frontend.
+EmuCoreX is a PlayStation 2 library and launcher for Android. It combines a custom Android interface with an emulation core based on ARMSX2 and PCSX2 work, with a focus on clean navigation, quick setup, and practical in-game controls.
 
 Official website: https://emucorex.web.app/
 
 ## Highlights
 
 - Native emulation core based on the ARMSX2 app core
-- Library-first home screen with cover art, game metadata, recent games, and search
+- Home screen with cover art, game metadata, recent games, and search
 - Guided onboarding for BIOS and game folders with recovery when folders become invalid
 - In-game overlay for renderer, aspect ratio, resolution, speedhacks, cheats, FPS, and quick actions
-- Save state manager, BIOS boot, and drawer-based library navigation
+- Save state manager, BIOS boot, and library navigation from the side drawer
 - RetroAchievements integration and dedicated achievements screen
 - Cheat management with `.pnach` import, editing, and per-game activation in overlay
 - Advanced graphics and GS hack controls, including device-safe defaults for MediaTek
-- Physical gamepad remapping and better controller-aware UI flows
+- Physical gamepad remapping and controller-aware UI flows
 
 ## What This Repository Contains
 
@@ -28,7 +28,7 @@ This repository contains the Android app, UI, settings flows, bridge code, and t
 - Kotlin + Jetpack Compose
 - Android DataStore
 - JNI bridge to native C++
-- PCSX2-derived core and supporting native libraries
+- Emulation core derived from PCSX2, with native libraries and app-core groundwork coming from ARMSX2
 - Firebase services used by the Android app
 
 ## Current App Scope
@@ -75,10 +75,10 @@ EmuCoreX currently targets Android with:
 
 ## Credits
 
-EmuCoreX builds on the open-source PCSX2 project and combines it with a custom Android interface, library system, runtime controls, and handheld-oriented UX work. EmuCoreX is also built as its own Android fork direction on top of the ARMSX2 app core foundation, with the Android bridge rewritten in Kotlin. Further work on stability, integration, and core improvements is planned as development continues.
+EmuCoreX builds on the open-source PCSX2 project and combines it with its own Android interface, library system, runtime controls, and handheld-focused UX. The current Android build is based on the ARMSX2 app core foundation, with the Android bridge rewritten in Kotlin. Further work on stability, integration, and core improvements is planned as development continues.
 
 - PCSX2: https://github.com/PCSX2/pcsx2
-- Thanks to the ARMSX2 team for the core groundwork and contributions that helped shape the EmuCoreX foundation and direction.
+- Thanks to the ARMSX2 team for the app-core groundwork that helped form the base of EmuCoreX.
 
 ## Support
 
