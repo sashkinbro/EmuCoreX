@@ -9,7 +9,7 @@ Official website: https://emucorex.web.app/
 
 ## Highlights
 
-- Native emulation core built on PCSX2 and ARMSX2 groundwork, with ongoing core improvements for EmuCoreX
+- Native emulation core based on the ARMSX2 app core, with further refinements and ongoing improvements for EmuCoreX
 - Library-first home screen with cover art, game metadata, recent games, and search
 - Guided onboarding for BIOS and game folders with recovery when folders become invalid
 - In-game overlay for renderer, aspect ratio, resolution, speedhacks, cheats, FPS, and quick actions
