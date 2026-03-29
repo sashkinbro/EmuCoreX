@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">Excluir save?</string>
     <string name="save_manager_delete_confirm_body">%1$s, o slot %2$d será excluído permanentemente.</string>
     <string name="save_manager_load_unavailable">Arquivo do jogo não encontrado na biblioteca</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Ativa o shader de pós-processamento FXAA.</string>
+    <string name="settings_cas">Nitidez adaptativa ao contraste</string>
+    <string name="settings_cas_sharpness">Nitidez CAS</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Desativado</string>
+    <string name="settings_cas_mode_sharpen_only">Apenas nitidez</string>
+    <string name="settings_cas_mode_sharpen_resize">Nitidez + redimensionamento</string>
 </resources>

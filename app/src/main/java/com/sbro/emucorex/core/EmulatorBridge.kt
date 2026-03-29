@@ -90,6 +90,9 @@ object EmulatorBridge {
         trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
         blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
         texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+        enableFxaa: Boolean = false,
+        casMode: Int = 0,
+        casSharpness: Int = 50,
         anisotropicFiltering: Int = 0,
         enableHwMipmapping: Boolean = true,
         widescreenPatches: Boolean = false,
@@ -183,6 +186,9 @@ object EmulatorBridge {
             NativeApp.setSetting("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString())
             NativeApp.setSetting("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString())
             NativeApp.setSetting("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString())
+            NativeApp.setSetting("EmuCore/GS", "fxaa", "bool", enableFxaa.toString())
+            NativeApp.setSetting("EmuCore/GS", "CASMode", "int", casMode.toString())
+            NativeApp.setSetting("EmuCore/GS", "CASSharpness", "int", casSharpness.toString())
             NativeApp.setSetting("EmuCore/GS", "MaxAnisotropy", "int", anisotropicFiltering.toString())
             NativeApp.setSetting("EmuCore/GS", "hw_mipmap", "bool", enableHwMipmapping.toString())
             NativeApp.setSetting("EmuCore", "EnableWideScreenPatches", "bool", widescreenPatches.toString())

@@ -661,6 +661,9 @@ fun EmulationScreen(
                     onSetTrilinearFiltering = { viewModel.setTrilinearFiltering(it) },
                     onSetBlendingAccuracy = { viewModel.setBlendingAccuracy(it) },
                     onSetTexturePreloading = { viewModel.setTexturePreloading(it) },
+                    onSetEnableFxaa = { viewModel.setEnableFxaa(it) },
+                    onSetCasMode = { viewModel.setCasMode(it) },
+                    onSetCasSharpness = { viewModel.setCasSharpness(it) },
                     onSetAnisotropicFiltering = { viewModel.setAnisotropicFiltering(it) },
                     onSetEnableHwMipmapping = { viewModel.setEnableHwMipmapping(it) },
                     onSetCpuSpriteRenderSize = { viewModel.setCpuSpriteRenderSize(it) },
@@ -1416,6 +1419,9 @@ private fun EmulationSidebarMenu(
     onSetTrilinearFiltering: (Int) -> Unit,
     onSetBlendingAccuracy: (Int) -> Unit,
     onSetTexturePreloading: (Int) -> Unit,
+    onSetEnableFxaa: (Boolean) -> Unit,
+    onSetCasMode: (Int) -> Unit,
+    onSetCasSharpness: (Int) -> Unit,
     onSetAnisotropicFiltering: (Int) -> Unit,
     onSetEnableHwMipmapping: (Boolean) -> Unit,
     onSetCpuSpriteRenderSize: (Int) -> Unit,
@@ -1842,6 +1848,34 @@ private fun EmulationSidebarMenu(
                     currentValue = uiState.anisotropicFiltering,
                     onValueChange = onSetAnisotropicFiltering
                 )
+
+                SettingsToggle(
+                    title = stringResource(R.string.settings_fxaa),
+                    checked = uiState.enableFxaa,
+                    onCheckedChange = onSetEnableFxaa
+                )
+
+                LiveChipsSelectionRow(
+                    title = stringResource(R.string.settings_cas),
+                    options = listOf(
+                        0 to stringResource(R.string.settings_cas_mode_off),
+                        1 to stringResource(R.string.settings_cas_mode_sharpen_only),
+                        2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
+                    ),
+                    currentValue = uiState.casMode,
+                    onValueChange = onSetCasMode
+                )
+
+                if (uiState.casMode != 0) {
+                    LiveSliderRow(
+                        title = stringResource(R.string.settings_cas_sharpness),
+                        valueLabelForValue = { "$it%" },
+                        value = uiState.casSharpness.toFloat(),
+                        range = 0f..100f,
+                        steps = 99,
+                        onValueChange = { onSetCasSharpness(it.toInt()) }
+                    )
+                }
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_hw_mipmapping),

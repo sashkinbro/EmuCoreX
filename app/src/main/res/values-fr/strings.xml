@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">Supprimer la sauvegarde ?</string>
     <string name="save_manager_delete_confirm_body">%1$s, l\'emplacement %2$d sera définitivement supprimé.</string>
     <string name="save_manager_load_unavailable">Fichier de jeu introuvable dans la bibliothèque</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Active le shader de post-traitement FXAA.</string>
+    <string name="settings_cas">Netteté adaptative au contraste</string>
+    <string name="settings_cas_sharpness">Netteté CAS</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Désactivé</string>
+    <string name="settings_cas_mode_sharpen_only">Netteté uniquement</string>
+    <string name="settings_cas_mode_sharpen_resize">Netteté + redimensionnement</string>
 </resources>

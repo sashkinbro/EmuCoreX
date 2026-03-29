@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">Speicherstand löschen?</string>
     <string name="save_manager_delete_confirm_body">%1$s, Slot %2$d wird dauerhaft gelöscht.</string>
     <string name="save_manager_load_unavailable">Spieldatei nicht in der Bibliothek gefunden</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Aktiviert den FXAA-Post-Processing-Shader.</string>
+    <string name="settings_cas">Kontrastadaptive Schärfung</string>
+    <string name="settings_cas_sharpness">CAS-Schärfe</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Aus</string>
+    <string name="settings_cas_mode_sharpen_only">Nur schärfen</string>
+    <string name="settings_cas_mode_sharpen_resize">Schärfen + skalieren</string>
 </resources>

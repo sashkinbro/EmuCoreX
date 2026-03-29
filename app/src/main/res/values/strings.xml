@@ -648,4 +648,12 @@
     <string name="save_manager_delete_confirm_title">Delete save?</string>
     <string name="save_manager_delete_confirm_body">%1$s, slot %2$d will be deleted permanently.</string>
     <string name="save_manager_load_unavailable">Game file not found in the library</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Enables FXAA post-processing shader.</string>
+    <string name="settings_cas">Contrast Adaptive Sharpening</string>
+    <string name="settings_cas_sharpness">CAS Sharpness</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Off</string>
+    <string name="settings_cas_mode_sharpen_only">Sharpen Only</string>
+    <string name="settings_cas_mode_sharpen_resize">Sharpen + Resize</string>
 </resources>

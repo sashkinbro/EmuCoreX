@@ -48,6 +48,9 @@ data class SettingsUiState(
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
     val texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+    val enableFxaa: Boolean = false,
+    val casMode: Int = 0,
+    val casSharpness: Int = 50,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val anisotropicFiltering: Int = 0,
@@ -143,6 +146,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             launch { preferences.trilinearFiltering.collect { v -> _uiState.value = _uiState.value.copy(trilinearFiltering = v) } }
             launch { preferences.blendingAccuracy.collect { v -> _uiState.value = _uiState.value.copy(blendingAccuracy = v) } }
             launch { preferences.texturePreloading.collect { v -> _uiState.value = _uiState.value.copy(texturePreloading = v) } }
+            launch { preferences.enableFxaa.collect { v -> _uiState.value = _uiState.value.copy(enableFxaa = v) } }
+            launch { preferences.casMode.collect { v -> _uiState.value = _uiState.value.copy(casMode = v) } }
+            launch { preferences.casSharpness.collect { v -> _uiState.value = _uiState.value.copy(casSharpness = v) } }
             launch { preferences.enableWidescreenPatches.collect { v -> _uiState.value = _uiState.value.copy(enableWidescreenPatches = v) } }
             launch { preferences.enableNoInterlacingPatches.collect { v -> _uiState.value = _uiState.value.copy(enableNoInterlacingPatches = v) } }
             launch { preferences.anisotropicFiltering.collect { v -> _uiState.value = _uiState.value.copy(anisotropicFiltering = v) } }
@@ -377,6 +383,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             markPerformancePresetCustom()
             preferences.setTexturePreloading(value)
             EmulatorBridge.setSetting("EmuCore/GS", "texture_preloading", "int", value.toString())
+        }
+    }
+
+    fun setEnableFxaa(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableFxaa(enabled)
+            EmulatorBridge.setSetting("EmuCore/GS", "fxaa", "bool", enabled.toString())
+        }
+    }
+
+    fun setCasMode(value: Int) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setCasMode(value)
+            EmulatorBridge.setSetting("EmuCore/GS", "CASMode", "int", value.toString())
+        }
+    }
+
+    fun setCasSharpness(value: Int) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setCasSharpness(value)
+            EmulatorBridge.setSetting("EmuCore/GS", "CASSharpness", "int", value.toString())
         }
     }
 
@@ -760,6 +790,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 trilinearFiltering = _uiState.value.trilinearFiltering,
                 blendingAccuracy = _uiState.value.blendingAccuracy,
                 texturePreloading = _uiState.value.texturePreloading,
+                enableFxaa = _uiState.value.enableFxaa,
+                casMode = _uiState.value.casMode,
+                casSharpness = _uiState.value.casSharpness,
                 anisotropicFiltering = _uiState.value.anisotropicFiltering,
                 enableHwMipmapping = _uiState.value.enableHwMipmapping,
                 cpuSpriteRenderSize = _uiState.value.cpuSpriteRenderSize,

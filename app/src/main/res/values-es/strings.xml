@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">¿Eliminar guardado?</string>
     <string name="save_manager_delete_confirm_body">%1$s, ranura %2$d se eliminará permanentemente.</string>
     <string name="save_manager_load_unavailable">Archivo del juego no encontrado en la biblioteca</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Activa el shader de posprocesado FXAA.</string>
+    <string name="settings_cas">Nitidez adaptativa al contraste</string>
+    <string name="settings_cas_sharpness">Nitidez CAS</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Desactivado</string>
+    <string name="settings_cas_mode_sharpen_only">Solo nitidez</string>
+    <string name="settings_cas_mode_sharpen_resize">Nitidez + reescalado</string>
 </resources>

@@ -67,6 +67,9 @@ class AppPreferences(private val context: Context) {
         private val TRILINEAR_FILTERING = intPreferencesKey("trilinear_filtering")
         private val BLENDING_ACCURACY = intPreferencesKey("blending_accuracy")
         private val TEXTURE_PRELOADING = intPreferencesKey("texture_preloading")
+        private val ENABLE_FXAA = booleanPreferencesKey("enable_fxaa")
+        private val CAS_MODE = intPreferencesKey("cas_mode")
+        private val CAS_SHARPNESS = intPreferencesKey("cas_sharpness")
         private val ENABLE_WIDESCREEN_PATCHES = booleanPreferencesKey("enable_widescreen_patches")
         private val ENABLE_NO_INTERLACING_PATCHES = booleanPreferencesKey("enable_no_interlacing_patches")
         private val ANISOTROPIC_FILTERING = intPreferencesKey("anisotropic_filtering")
@@ -507,6 +510,30 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[TEXTURE_PRELOADING] = value.coerceIn(0, 2) }
     }
 
+    val enableFxaa: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_FXAA] ?: false
+    }
+
+    suspend fun setEnableFxaa(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_FXAA] = enabled }
+    }
+
+    val casMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[CAS_MODE] ?: 0
+    }
+
+    suspend fun setCasMode(value: Int) {
+        context.dataStore.edit { it[CAS_MODE] = value.coerceIn(0, 2) }
+    }
+
+    val casSharpness: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[CAS_SHARPNESS] ?: 50
+    }
+
+    suspend fun setCasSharpness(value: Int) {
+        context.dataStore.edit { it[CAS_SHARPNESS] = value.coerceIn(0, 100) }
+    }
+
     // Widescreen Patches
     val enableWidescreenPatches: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[ENABLE_WIDESCREEN_PATCHES] ?: false
@@ -913,6 +940,9 @@ class AppPreferences(private val context: Context) {
             put("trilinearFiltering", prefs[TRILINEAR_FILTERING] ?: GsHackDefaults.TRILINEAR_FILTERING_DEFAULT)
             put("blendingAccuracy", prefs[BLENDING_ACCURACY] ?: GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
             put("texturePreloading", prefs[TEXTURE_PRELOADING] ?: GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
+            put("enableFxaa", prefs[ENABLE_FXAA] ?: false)
+            put("casMode", prefs[CAS_MODE] ?: 0)
+            put("casSharpness", prefs[CAS_SHARPNESS] ?: 50)
             put("enableWidescreenPatches", prefs[ENABLE_WIDESCREEN_PATCHES] ?: false)
             put("enableNoInterlacingPatches", prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false)
             put("anisotropicFiltering", prefs[ANISOTROPIC_FILTERING] ?: 0)
@@ -997,6 +1027,9 @@ class AppPreferences(private val context: Context) {
             prefs[TRILINEAR_FILTERING] = json.optInt("trilinearFiltering", GsHackDefaults.TRILINEAR_FILTERING_DEFAULT).coerceIn(0, 3)
             prefs[BLENDING_ACCURACY] = json.optInt("blendingAccuracy", GsHackDefaults.BLENDING_ACCURACY_DEFAULT).coerceIn(0, 5)
             prefs[TEXTURE_PRELOADING] = json.optInt("texturePreloading", GsHackDefaults.TEXTURE_PRELOADING_DEFAULT).coerceIn(0, 2)
+            prefs[ENABLE_FXAA] = json.optBoolean("enableFxaa", false)
+            prefs[CAS_MODE] = json.optInt("casMode", 0).coerceIn(0, 2)
+            prefs[CAS_SHARPNESS] = json.optInt("casSharpness", 50).coerceIn(0, 100)
             prefs[ENABLE_WIDESCREEN_PATCHES] = json.optBoolean("enableWidescreenPatches", false)
             prefs[ENABLE_NO_INTERLACING_PATCHES] = json.optBoolean("enableNoInterlacingPatches", false)
             prefs[ANISOTROPIC_FILTERING] = json.optInt("anisotropicFiltering", 0)

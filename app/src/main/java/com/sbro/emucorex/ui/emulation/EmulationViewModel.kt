@@ -62,6 +62,9 @@ data class EmulationUiState(
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
     val texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+    val enableFxaa: Boolean = false,
+    val casMode: Int = 0,
+    val casSharpness: Int = 50,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = true,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -120,6 +123,9 @@ private data class EmulationLaunchConfig(
     val trilinearFiltering: Int,
     val blendingAccuracy: Int,
     val texturePreloading: Int,
+    val enableFxaa: Boolean,
+    val casMode: Int,
+    val casSharpness: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val widescreenPatches: Boolean,
@@ -169,6 +175,9 @@ private data class LiveRuntimeSnapshot(
     val trilinearFiltering: Int,
     val blendingAccuracy: Int,
     val texturePreloading: Int,
+    val enableFxaa: Boolean,
+    val casMode: Int,
+    val casSharpness: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val cpuSpriteRenderSize: Int,
@@ -310,6 +319,21 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.texturePreloading.collect { value ->
                 _uiState.value = _uiState.value.copy(texturePreloading = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.enableFxaa.collect { value ->
+                _uiState.value = _uiState.value.copy(enableFxaa = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.casMode.collect { value ->
+                _uiState.value = _uiState.value.copy(casMode = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.casSharpness.collect { value ->
+                _uiState.value = _uiState.value.copy(casSharpness = value)
             }
         }
         viewModelScope.launch {
@@ -554,6 +578,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     trilinearFiltering = config.trilinearFiltering,
                     blendingAccuracy = config.blendingAccuracy,
                     texturePreloading = config.texturePreloading,
+                    enableFxaa = config.enableFxaa,
+                    casMode = config.casMode,
+                    casSharpness = config.casSharpness,
                     anisotropicFiltering = config.anisotropicFiltering,
                     enableHwMipmapping = config.enableHwMipmapping,
                     widescreenPatches = config.widescreenPatches,
@@ -664,6 +691,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     trilinearFiltering = liveRuntime.trilinearFiltering,
                     blendingAccuracy = liveRuntime.blendingAccuracy,
                     texturePreloading = liveRuntime.texturePreloading,
+                    enableFxaa = liveRuntime.enableFxaa,
+                    casMode = liveRuntime.casMode,
+                    casSharpness = liveRuntime.casSharpness,
                     anisotropicFiltering = liveRuntime.anisotropicFiltering,
                     enableHwMipmapping = liveRuntime.enableHwMipmapping,
                     cpuSpriteRenderSize = liveRuntime.cpuSpriteRenderSize,
@@ -983,6 +1013,37 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             preferences.setTexturePreloading(value)
             _uiState.value = _uiState.value.copy(texturePreloading = value)
             EmulatorBridge.setSetting("EmuCore/GS", "texture_preloading", "int", value.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setEnableFxaa(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableFxaa(enabled)
+            _uiState.value = _uiState.value.copy(enableFxaa = enabled)
+            EmulatorBridge.setSetting("EmuCore/GS", "fxaa", "bool", enabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setCasMode(value: Int) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setCasMode(value)
+            _uiState.value = _uiState.value.copy(casMode = value)
+            EmulatorBridge.setSetting("EmuCore/GS", "CASMode", "int", value.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setCasSharpness(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(0, 100)
+            markPerformancePresetCustom()
+            preferences.setCasSharpness(clamped)
+            _uiState.value = _uiState.value.copy(casSharpness = clamped)
+            EmulatorBridge.setSetting("EmuCore/GS", "CASSharpness", "int", clamped.toString())
             updateCrashContext()
         }
     }
@@ -1441,6 +1502,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             trilinearFiltering = preferences.trilinearFiltering.first(),
             blendingAccuracy = preferences.blendingAccuracy.first(),
             texturePreloading = preferences.texturePreloading.first(),
+            enableFxaa = preferences.enableFxaa.first(),
+            casMode = preferences.casMode.first(),
+            casSharpness = preferences.casSharpness.first(),
             anisotropicFiltering = preferences.anisotropicFiltering.first(),
             enableHwMipmapping = preferences.enableHwMipmapping.first(),
             widescreenPatches = preferences.enableWidescreenPatches.first(),
@@ -1492,6 +1556,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             trilinearFiltering = preferences.trilinearFiltering.first(),
             blendingAccuracy = preferences.blendingAccuracy.first(),
             texturePreloading = preferences.texturePreloading.first(),
+            enableFxaa = preferences.enableFxaa.first(),
+            casMode = preferences.casMode.first(),
+            casSharpness = preferences.casSharpness.first(),
             anisotropicFiltering = preferences.anisotropicFiltering.first(),
             enableHwMipmapping = preferences.enableHwMipmapping.first(),
             cpuSpriteRenderSize = preferences.cpuSpriteRenderSize.first(),

@@ -768,6 +768,33 @@ private fun SettingsContent(
                             onSelect = viewModel::setAnisotropicFiltering
                         )
                         ToggleItem(
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_fxaa),
+                            subtitle = stringResource(R.string.settings_fxaa_desc),
+                            checked = uiState.enableFxaa,
+                            onCheckedChange = viewModel::setEnableFxaa
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_cas),
+                            options = casModeOptions(),
+                            selectedValue = uiState.casMode,
+                            onSelect = viewModel::setCasMode
+                        )
+                        if (uiState.casMode != 0) {
+                            SliderItem(
+                                icon = Icons.Rounded.GraphicEq,
+                                title = stringResource(R.string.settings_cas_sharpness),
+                                subtitle = stringResource(
+                                    R.string.settings_cas_sharpness_value,
+                                    uiState.casSharpness
+                                ),
+                                value = uiState.casSharpness.toFloat(),
+                                range = 0f..100f,
+                                steps = 99,
+                                onValueChange = { viewModel.setCasSharpness(it.toInt()) }
+                            )
+                        }
+                        ToggleItem(
                             icon = Icons.Rounded.Visibility,
                             title = stringResource(R.string.settings_widescreen_patches),
                             subtitle = stringResource(R.string.settings_widescreen_patches_desc),
@@ -1904,6 +1931,13 @@ private fun anisotropicFilteringOptions(): List<Pair<Int, String>> = listOf(
     4 to "4x",
     8 to "8x",
     16 to "16x"
+)
+
+@Composable
+private fun casModeOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_cas_mode_off),
+    1 to stringResource(R.string.settings_cas_mode_sharpen_only),
+    2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
 )
 
 @Composable

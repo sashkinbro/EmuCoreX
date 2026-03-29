@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">Удалить сохранение?</string>
     <string name="save_manager_delete_confirm_body">%1$s, слот %2$d будет удалён безвозвратно.</string>
     <string name="save_manager_load_unavailable">Файл игры не найден в библиотеке</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">Включает постобработку FXAA для сглаживания изображения.</string>
+    <string name="settings_cas">Контрастная адаптивная резкость</string>
+    <string name="settings_cas_sharpness">Резкость CAS</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">Выключено</string>
+    <string name="settings_cas_mode_sharpen_only">Только резкость</string>
+    <string name="settings_cas_mode_sharpen_resize">Резкость + масштабирование</string>
 </resources>

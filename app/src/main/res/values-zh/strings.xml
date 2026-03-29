@@ -635,4 +635,12 @@
     <string name="save_manager_delete_confirm_title">刪除存檔？</string>
     <string name="save_manager_delete_confirm_body">%1$s 的欄位 %2$d 將被永久刪除。</string>
     <string name="save_manager_load_unavailable">在遊戲庫中找不到遊戲檔案</string>
+    <string name="settings_fxaa">FXAA</string>
+    <string name="settings_fxaa_desc">啟用 FXAA 後處理著色器。</string>
+    <string name="settings_cas">對比自適應銳化</string>
+    <string name="settings_cas_sharpness">CAS 銳利度</string>
+    <string name="settings_cas_sharpness_value">%d%%</string>
+    <string name="settings_cas_mode_off">關閉</string>
+    <string name="settings_cas_mode_sharpen_only">僅銳化</string>
+    <string name="settings_cas_mode_sharpen_resize">銳化 + 縮放</string>
 </resources>
