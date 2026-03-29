@@ -93,3 +93,5 @@ If you want to support ongoing development:
 This project includes and derives from GPL-licensed PCSX2 code, so the repository is distributed under the GNU General Public License v3.0 or later.
 
 See [LICENSE](LICENSE) for details.
+
+2025-2026 EmuCoreX
