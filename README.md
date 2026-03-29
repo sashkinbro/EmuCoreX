@@ -5,6 +5,8 @@
 
 EmuCoreX is a PlayStation 2 library and launcher for Android built around a PCSX2-based emulation core. The project focuses on a clean handheld-friendly UI, quick setup, practical in-game controls, and deeper runtime tuning than a typical mobile frontend.
 
+Official website: https://emucorex.web.app/
+
 ## Highlights
 
 - PCSX2-based native emulation core integrated into an Android-first experience
@@ -88,6 +90,7 @@ EmuCoreX builds on the open-source PCSX2 project and combines it with a custom A
 
 If you want to support ongoing development:
 
+- Website: https://emucorex.web.app/
 - Donate: https://send.monobank.ua/jar/9ZocYsprhJ
 - More apps by the author: https://play.google.com/store/apps/dev?id=7136622298887775989
 
