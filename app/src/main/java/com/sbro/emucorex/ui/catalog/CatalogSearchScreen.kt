@@ -179,7 +179,7 @@ fun CatalogSearchScreen(
                             onValueChange = viewModel::updateQuery,
                             modifier = Modifier
                                 .fillMaxWidth(),
-                            placeholder = { Text(text = stringResource(R.string.catalog_search_hint)) },
+                            placeholder = { Text(text = stringResource(R.string.home_search)) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Rounded.Search,

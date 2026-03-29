@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -147,6 +146,11 @@ private object PadKey {
     const val RightStickRight = 121
     const val RightStickDown = 122
     const val RightStickLeft = 123
+}
+
+private enum class OverlaySettingsTab {
+    Basic,
+    Advanced
 }
 
 private data class LiveSelectionOption(
@@ -1450,6 +1454,7 @@ private fun EmulationSidebarMenu(
     val sectionSpacing = 16.dp
     val sectionLabelInset = 4.dp
     val sectionLabelTopPadding = 8.dp
+    var selectedSettingsTab by remember { mutableStateOf(OverlaySettingsTab.Basic) }
 
     Box(
         modifier = modifier
@@ -1503,14 +1508,34 @@ private fun EmulationSidebarMenu(
                     }
                 }
 
-                // Main Actions
-                MenuButton(
-                    icon = if (uiState.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                    text = stringResource(if (uiState.isPaused) R.string.emulation_resume else R.string.emulation_pause),
-                    gradientColors = if (!uiState.isPaused) listOf(GradientStart, GradientEnd) else null,
-                    onClick = onPauseToggle,
-                    enabled = !uiState.isActionInProgress
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SidebarIconActionButton(
+                            icon = if (uiState.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                            contentDescription = stringResource(if (uiState.isPaused) R.string.emulation_resume else R.string.emulation_pause),
+                            onClick = onPauseToggle,
+                            enabled = !uiState.isActionInProgress,
+                            containerColor = if (!uiState.isPaused) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                            }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        SidebarIconActionButton(
+                            icon = Icons.AutoMirrored.Rounded.ExitToApp,
+                            contentDescription = stringResource(R.string.emulation_exit),
+                            onClick = onExit,
+                            enabled = !uiState.isActionInProgress,
+                            containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.14f),
+                            iconTint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
 
                 // Save Slots
                 Surface(
@@ -1580,6 +1605,13 @@ private fun EmulationSidebarMenu(
                         )
                     }
                 }
+
+                OverlayTabSelector(
+                    selectedTab = selectedSettingsTab,
+                    onTabSelected = { selectedSettingsTab = it }
+                )
+
+                if (selectedSettingsTab == OverlaySettingsTab.Basic) {
 
                 // Live Settings Section
                 SidebarSectionTitle(
@@ -1828,6 +1860,7 @@ private fun EmulationSidebarMenu(
                     onValueChange = onSetFrameSkip
                 )
 
+                } else {
                 SidebarSectionTitle(
                     text = stringResource(R.string.settings_hardware_fixes).uppercase(),
                     color = sectionTitleColor,
@@ -2053,16 +2086,7 @@ private fun EmulationSidebarMenu(
                     onCheckedChange = onSetNativePaletteDraw
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Exit
-                MenuButton(
-                    icon = Icons.AutoMirrored.Rounded.ExitToApp,
-                    text = stringResource(R.string.emulation_exit),
-                    onClick = onExit,
-                    isDestructive = true,
-                    enabled = !uiState.isActionInProgress
-                )
+                }
             }
         }
     }
@@ -2100,6 +2124,103 @@ private fun SettingsToggle(
                     checkedThumbColor = MaterialTheme.colorScheme.primary,
                     checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                 )
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverlayTabSelector(
+    selectedTab: OverlaySettingsTab,
+    onTabSelected: (OverlaySettingsTab) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        OverlayTabButton(
+            modifier = Modifier.weight(1f),
+            label = stringResource(R.string.emulation_basic_settings),
+            selected = selectedTab == OverlaySettingsTab.Basic,
+            onClick = { onTabSelected(OverlaySettingsTab.Basic) }
+        )
+        OverlayTabButton(
+            modifier = Modifier.weight(1f),
+            label = stringResource(R.string.emulation_advanced_settings),
+            selected = selectedTab == OverlaySettingsTab.Advanced,
+            onClick = { onTabSelected(OverlaySettingsTab.Advanced) }
+        )
+    }
+}
+
+@Composable
+private fun OverlayTabButton(
+    modifier: Modifier = Modifier,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 11.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun SidebarIconActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean,
+    containerColor: Color,
+    iconTint: Color = MaterialTheme.colorScheme.primary
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
+        onClick = onClick,
+        enabled = enabled,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
             )
         }
     }

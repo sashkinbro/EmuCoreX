@@ -3,7 +3,6 @@ package com.sbro.emucorex.core
 import android.content.Context
 import android.os.Build
 import android.view.Surface
-import com.sbro.emucorex.core.DevicePerformanceProfiles
 import java.io.File
 import java.lang.ref.WeakReference
 
@@ -94,6 +93,7 @@ object EmulatorBridge {
         anisotropicFiltering: Int = 0,
         enableHwMipmapping: Boolean = true,
         widescreenPatches: Boolean = false,
+        noInterlacingPatches: Boolean = false,
         cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
         cpuSpriteRenderLevel: Int = GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
         softwareClutRender: Int = GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
@@ -186,6 +186,7 @@ object EmulatorBridge {
             NativeApp.setSetting("EmuCore/GS", "MaxAnisotropy", "int", anisotropicFiltering.toString())
             NativeApp.setSetting("EmuCore/GS", "hw_mipmap", "bool", enableHwMipmapping.toString())
             NativeApp.setSetting("EmuCore", "EnableWideScreenPatches", "bool", widescreenPatches.toString())
+            NativeApp.setSetting("EmuCore", "EnableNoInterlacingPatches", "bool", noInterlacingPatches.toString())
             val manualHardwareFixes = GsHackDefaults.shouldEnableManualHardwareFixes(
                 cpuSpriteRenderSize = cpuSpriteRenderSize,
                 cpuSpriteRenderLevel = cpuSpriteRenderLevel,

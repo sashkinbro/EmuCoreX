@@ -12,6 +12,8 @@
     <string name="home_empty_subtitle">Выберите папку с играми, чтобы создать свою библиотеку.</string>
     <string name="home_add_folder">Выбрать папку с играми</string>
     <string name="home_refresh">Обновить</string>
+    <string name="home_view_list">Показать списком</string>
+    <string name="home_view_grid">Показать сеткой</string>
     <string name="home_search">Поиск игр</string>
     <string name="home_game_count">%d игр</string>
     <string name="home_library_desc">Ваша библиотека, настройки и быстрые действия в одном месте.</string>
@@ -20,6 +22,7 @@
     <string name="home_setup_title">Завершить настройку</string>
     <string name="home_setup_subtitle">Выберите файлы BIOS и папку с играми для начала.</string>
     <string name="home_finish_setup">Открыть настройку</string>
+    <string name="home_choose_bios">Выбрать BIOS</string>
     <string name="home_sort_title">Название</string>
     <string name="home_sort_size_desc">Самые большие</string>
     <string name="home_sort_size_asc">Самые маленькие</string>
@@ -102,6 +105,8 @@
     <string name="emulation_sidebar_title">Игровое меню</string>
     <string name="emulation_performance_stats">Статистика</string>
     <string name="emulation_live_settings">Быстрые настройки</string>
+    <string name="emulation_basic_settings">Основные</string>
+    <string name="emulation_advanced_settings">Дополнительные</string>
     <string name="emulation_section_performance">Спидхаки</string>
     <string name="emulation_section_video">Опции видео</string>
     <string name="emulation_aspect_auto">Авто</string>
@@ -114,6 +119,7 @@
     <string name="settings_general_tab">Общие</string>
     <string name="settings_graphics_tab">Видео</string>
     <string name="settings_paths_tab">Файлы</string>
+    <string name="settings_data_transfer_tab">Перенос</string>
     <string name="settings_speedhacks_tab">Спидхаки</string>
     <string name="settings_advanced_tab">Больше</string>
     <string name="settings_achievements_tab">Достижения</string>
@@ -238,6 +244,13 @@
     <string name="emulation_hide_fps">Скрыть FPS</string>
     <string name="shell_setup">Настройка</string>
     <string name="shell_quick_actions">Быстрые действия</string>
+    <string name="shell_executables_section">Исполняемые файлы</string>
+    <string name="shell_launch_game">Запуск игры</string>
+    <string name="shell_app_section">Приложение</string>
+    <string name="shell_tools_section">Инструменты библиотеки</string>
+    <string name="shell_app_settings">Настройки приложения</string>
+    <string name="shell_data_transfer">Перенос данных</string>
+    <string name="shell_launch_game_unsupported">Неподдерживаемый формат образа игры.</string>
     <string name="shell_manage_folders">Управление папками</string>
     <string name="shell_save_states">Менеджер сохранений</string>
     <string name="shell_launch_bios">Запуск BIOS</string>
@@ -420,6 +433,12 @@
     <string name="settings_bilinear_upscale_force_bilinear">Force Bilinear</string>
     <string name="settings_bilinear_upscale_force_nearest">Force Nearest</string>
     <string name="settings_widescreen_patches_desc">Включить широкоформатные патчи для поддерживаемых игр</string>
+    <string name="settings_no_interlacing_patches">Патчи без чересстрочной развертки</string>
+    <string name="settings_no_interlacing_patches_desc">Включить патчи без чересстрочной развертки для поддерживаемых игр</string>
+    <string name="settings_more_options">Дополнительные действия</string>
+    <string name="settings_reset_all_title">Сбросить все настройки</string>
+    <string name="settings_reset_all_action">Сбросить все настройки</string>
+    <string name="settings_reset_all_confirm">Вы уверены, что хотите сбросить все настройки? Это восстановит стандартную конфигурацию приложения.</string>
     <string name="settings_gamepad_auto_desc">Автоматически назначать кнопки при подключении геймпада</string>
     <string name="settings_gamepad_hide_overlay_desc">Скрывать сенсорное управление при подключении физического геймпада</string>
     <string name="settings_gamepad_mapping_title">Переназначение кнопок геймпада</string>

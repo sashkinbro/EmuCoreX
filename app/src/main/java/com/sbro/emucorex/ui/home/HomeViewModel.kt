@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
@@ -26,6 +27,10 @@ import java.text.Normalizer
 
 enum class HomeSortOption {
     TITLE, SIZE_DESC, SIZE_ASC
+}
+
+enum class HomeLibraryViewMode {
+    GRID, LIST
 }
 
 data class HomeUiState(
@@ -39,7 +44,8 @@ data class HomeUiState(
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
     val searchQuery: String = "",
-    val sortOption: HomeSortOption = HomeSortOption.TITLE
+    val sortOption: HomeSortOption = HomeSortOption.TITLE,
+    val libraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -59,7 +65,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            preferences.gamePath.collect { path ->
+            preferences.gamePath.distinctUntilChanged().collect { path ->
                 val isAccessible = SetupValidator.isGameFolderAccessible(getApplication(), path)
                 _uiState.value = _uiState.value.copy(
                     gameFolderSet = isAccessible,
@@ -81,7 +87,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
-            preferences.biosPath.collect { path ->
+            preferences.biosPath.distinctUntilChanged().collect { path ->
                 _uiState.value = _uiState.value.copy(
                     biosConfigured = path != null,
                     biosValid = BiosValidator.hasUsableBiosFiles(getApplication(), path)
@@ -91,14 +97,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
-            preferences.onboardingCompleted.collect { completed ->
+            preferences.onboardingCompleted.distinctUntilChanged().collect { completed ->
                 _uiState.value = _uiState.value.copy(setupComplete = completed)
             }
         }
         viewModelScope.launch {
-            preferences.recentGames.collect { entries ->
+            preferences.recentGames.distinctUntilChanged().collect { entries ->
                 recentEntries = entries
                 publishVisibleGames()
+            }
+        }
+        viewModelScope.launch {
+            preferences.homeLibraryViewMode.distinctUntilChanged().collect { mode ->
+                _uiState.value = _uiState.value.copy(
+                    libraryViewMode = if (mode == 1) HomeLibraryViewMode.LIST else HomeLibraryViewMode.GRID
+                )
             }
         }
     }
@@ -113,6 +126,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.setGamePath(uri.toString())
             scanGamesFromUri(uri)
+        }
+    }
+
+    fun onBiosFolderSelected(uri: Uri) {
+        val context = getApplication<Application>()
+        context.contentResolver.takePersistableUriPermission(
+            uri,
+            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+        )
+
+        viewModelScope.launch {
+            preferences.setBiosPath(uri.toString())
         }
     }
 
@@ -140,6 +165,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun updateSortOption(option: HomeSortOption) {
         _uiState.value = _uiState.value.copy(sortOption = option)
         publishVisibleGames()
+    }
+
+    fun toggleLibraryViewMode() {
+        viewModelScope.launch {
+            preferences.setHomeLibraryViewMode(
+                if (_uiState.value.libraryViewMode == HomeLibraryViewMode.GRID) 1 else 0
+            )
+        }
     }
 
     private fun scanGames(path: String, isInitialLoad: Boolean = false) {

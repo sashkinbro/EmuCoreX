@@ -49,6 +49,7 @@ data class SettingsUiState(
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
     val texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
     val enableWidescreenPatches: Boolean = false,
+    val enableNoInterlacingPatches: Boolean = false,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = true,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -143,6 +144,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             launch { preferences.blendingAccuracy.collect { v -> _uiState.value = _uiState.value.copy(blendingAccuracy = v) } }
             launch { preferences.texturePreloading.collect { v -> _uiState.value = _uiState.value.copy(texturePreloading = v) } }
             launch { preferences.enableWidescreenPatches.collect { v -> _uiState.value = _uiState.value.copy(enableWidescreenPatches = v) } }
+            launch { preferences.enableNoInterlacingPatches.collect { v -> _uiState.value = _uiState.value.copy(enableNoInterlacingPatches = v) } }
             launch { preferences.anisotropicFiltering.collect { v -> _uiState.value = _uiState.value.copy(anisotropicFiltering = v) } }
             launch { preferences.enableHwMipmapping.collect { v -> _uiState.value = _uiState.value.copy(enableHwMipmapping = v) } }
             launch { preferences.cpuSpriteRenderSize.collect { v -> _uiState.value = _uiState.value.copy(cpuSpriteRenderSize = v) } }
@@ -266,6 +268,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun resetAllSettings() {
+        viewModelScope.launch {
+            preferences.resetAllSettings()
+        }
+    }
+
     fun setEnableCheats(enabled: Boolean) {
         viewModelScope.launch {
             preferences.setEnableCheats(enabled)
@@ -377,6 +385,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             markPerformancePresetCustom()
             preferences.setEnableWidescreenPatches(enabled)
             EmulatorBridge.setSetting("EmuCore", "EnableWideScreenPatches", "bool", enabled.toString())
+        }
+    }
+
+    fun setEnableNoInterlacingPatches(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableNoInterlacingPatches(enabled)
+            EmulatorBridge.setSetting("EmuCore", "EnableNoInterlacingPatches", "bool", enabled.toString())
         }
     }
 

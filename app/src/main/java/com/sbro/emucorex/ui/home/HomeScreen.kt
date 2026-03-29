@@ -46,12 +46,14 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ViewAgenda
+import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -108,8 +110,6 @@ import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
 @Composable
 fun HomeScreen(
     onGameClick: (GameItem) -> Unit,
-    onSettingsClick: () -> Unit,
-    onSetupClick: () -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -123,6 +123,7 @@ fun HomeScreen(
     val sectionInnerSpacing = 4.dp
     val minCellSize = if (isLandscape) 128 else 140
     val columnsCount = maxOf(1, (configuration.screenWidthDp + 14) / (minCellSize + 14))
+    val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val showScrollToTop = gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900
@@ -133,6 +134,11 @@ fun HomeScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let { viewModel.onFolderSelected(it) }
+    }
+    val biosPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.onBiosFolderSelected(it) }
     }
 
     var showSortMenu by remember { mutableStateOf(false) }
@@ -158,12 +164,12 @@ fun HomeScreen(
             EmptyState(
                 biosReady = uiState.biosValid,
                 gamesReady = uiState.gameFolderSet,
-                onSetupClick = onSetupClick,
+                onBiosClick = { biosPicker.launch(null) },
                 onFolderClick = { folderPicker.launch(null) },
                 topInset = topInset
             )
         } else {
-            val columns = GridCells.Fixed(columnsCount)
+            val columns = GridCells.Fixed(if (isListView) 1 else columnsCount)
 
             LazyVerticalGrid(
                 columns = columns,
@@ -258,10 +264,14 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                            IconButton(onClick = onSettingsClick) {
+                            IconButton(onClick = viewModel::toggleLibraryViewMode) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Settings,
-                                    contentDescription = stringResource(R.string.nav_settings),
+                                    imageVector = if (isListView) Icons.Rounded.ViewModule else Icons.Rounded.ViewAgenda,
+                                    contentDescription = if (isListView) {
+                                        stringResource(R.string.home_view_grid)
+                                    } else {
+                                        stringResource(R.string.home_view_list)
+                                    },
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -412,26 +422,35 @@ fun HomeScreen(
                                 .padding(horizontal = horizontalInset),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            uiState.games.chunked(columnsCount).forEach { rowGames ->
+                            uiState.games.chunked(if (isListView) 1 else columnsCount).forEach { rowGames ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     rowGames.forEach { game ->
                                         Box(modifier = Modifier.weight(1f)) {
-                                            GameCard(
-                                                modifier = if (uiState.recentGames.isEmpty() && game == uiState.games.first()) {
-                                                    Modifier.focusRequester(initialGamepadFocusRequester)
-                                                } else {
-                                                    Modifier
-                                                },
-                                                game = game,
-                                                onClick = { onGameClick(game) },
-                                                compact = isLandscape
-                                            )
+                                            val itemModifier = if (uiState.recentGames.isEmpty() && game == uiState.games.first()) {
+                                                Modifier.focusRequester(initialGamepadFocusRequester)
+                                            } else {
+                                                Modifier
+                                            }
+                                            if (isListView) {
+                                                GameListCard(
+                                                    modifier = itemModifier,
+                                                    game = game,
+                                                    onClick = { onGameClick(game) }
+                                                )
+                                            } else {
+                                                GameCard(
+                                                    modifier = itemModifier,
+                                                    game = game,
+                                                    onClick = { onGameClick(game) },
+                                                    compact = isLandscape
+                                                )
+                                            }
                                         }
                                     }
-                                    repeat(columnsCount - rowGames.size) {
+                                    repeat((if (isListView) 1 else columnsCount) - rowGames.size) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
@@ -538,7 +557,7 @@ private fun LoadingState() {
 private fun EmptyState(
     biosReady: Boolean,
     gamesReady: Boolean,
-    onSetupClick: () -> Unit,
+    onBiosClick: () -> Unit,
     onFolderClick: () -> Unit,
     topInset: androidx.compose.ui.unit.Dp
 ) {
@@ -600,16 +619,16 @@ private fun EmptyState(
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledTonalButton(
-                    onClick = onSetupClick,
+                    onClick = onBiosClick,
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Settings,
+                        imageVector = Icons.Rounded.Memory,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.settings_title))
+                    Text(stringResource(R.string.home_choose_bios))
                 }
                 FilledTonalButton(
                     onClick = onFolderClick,
@@ -621,7 +640,7 @@ private fun EmptyState(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.select_folder))
+                    Text(stringResource(R.string.settings_game_path))
                 }
             }
 
@@ -915,6 +934,114 @@ private fun GameCard(
                         rating = game.catalogRating
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GameListCard(
+    modifier: Modifier = Modifier,
+    game: GameItem,
+    onClick: () -> Unit
+) {
+    val debouncedClick = rememberDebouncedClick(onClick = onClick)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.985f else 1f, tween(100))
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .animateContentSize()
+            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        onClick = debouncedClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(92.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            ) {
+                GameCoverArt(
+                    coverPath = game.coverArtPath,
+                    fallbackTitle = game.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillHeight
+                )
+                game.pcsx2Compatibility?.let { compatibility ->
+                    CompatibilityBadge(
+                        status = compatibility.status,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .align(Alignment.TopStart)
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = game.title,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = game.fileName.substringAfterLast('.').uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                if (game.catalogYear != null || game.catalogRating != null) {
+                    CardMetaText(
+                        year = game.catalogYear,
+                        rating = game.catalogRating
+                    )
+                }
+                Text(
+                    text = game.fileName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = game.serial ?: "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

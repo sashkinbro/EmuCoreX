@@ -27,11 +27,15 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -41,11 +45,15 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +65,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadUiActions
-import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.launch
 
@@ -80,9 +87,14 @@ fun AdaptiveShell(
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
+    onNavigateCheats: (() -> Unit)? = null,
+    onNavigateControlsEditor: (() -> Unit)? = null,
+    onNavigateDataTransfer: (() -> Unit)? = null,
+    onResetAllSettings: (() -> Unit)? = null,
     onNavigateSaveManager: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onOpenManageFolders: (() -> Unit)? = null,
+    onLaunchGame: (() -> Unit)? = null,
     onLaunchBios: (() -> Unit)? = null,
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
@@ -94,8 +106,13 @@ fun AdaptiveShell(
             onNavigateFormats = onNavigateFormats,
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
+            onNavigateCheats = onNavigateCheats,
+            onNavigateControlsEditor = onNavigateControlsEditor,
+            onNavigateDataTransfer = onNavigateDataTransfer,
+            onResetAllSettings = onResetAllSettings,
             onNavigateSaveManager = onNavigateSaveManager,
             onOpenManageFolders = onOpenManageFolders,
+            onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
             onCloseDrawer = { }
         )
@@ -133,9 +150,14 @@ fun AdaptiveShell(
             onNavigateFormats = onNavigateFormats,
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
+            onNavigateCheats = onNavigateCheats,
+            onNavigateControlsEditor = onNavigateControlsEditor,
+            onNavigateDataTransfer = onNavigateDataTransfer,
+            onResetAllSettings = onResetAllSettings,
             onNavigateSaveManager = onNavigateSaveManager,
             onBackClick = onBackClick,
             onOpenManageFolders = onOpenManageFolders,
+            onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
             content = content
         )
@@ -152,9 +174,14 @@ private fun CompactAdaptiveShell(
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
+    onNavigateCheats: (() -> Unit)?,
+    onNavigateControlsEditor: (() -> Unit)?,
+    onNavigateDataTransfer: (() -> Unit)?,
+    onResetAllSettings: (() -> Unit)?,
     onNavigateSaveManager: (() -> Unit)?,
     onBackClick: (() -> Unit)?,
     onOpenManageFolders: (() -> Unit)?,
+    onLaunchGame: (() -> Unit)?,
     onLaunchBios: (() -> Unit)?,
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
@@ -234,8 +261,13 @@ private fun CompactAdaptiveShell(
                     onNavigateFormats = onNavigateFormats,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateAchievements = onNavigateAchievements,
+                    onNavigateCheats = onNavigateCheats,
+                    onNavigateControlsEditor = onNavigateControlsEditor,
+                    onNavigateDataTransfer = onNavigateDataTransfer,
+                    onResetAllSettings = onResetAllSettings,
                     onNavigateSaveManager = onNavigateSaveManager,
                     onOpenManageFolders = onOpenManageFolders,
+                    onLaunchGame = onLaunchGame,
                     onLaunchBios = onLaunchBios,
                     selectedItemFocusRequester = selectedDrawerItemFocusRequester,
                     wrapInSurface = false,
@@ -289,8 +321,13 @@ private fun SideNavigation(
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
+    onNavigateCheats: (() -> Unit)?,
+    onNavigateControlsEditor: (() -> Unit)?,
+    onNavigateDataTransfer: (() -> Unit)?,
+    onResetAllSettings: (() -> Unit)?,
     onNavigateSaveManager: (() -> Unit)?,
     onOpenManageFolders: (() -> Unit)?,
+    onLaunchGame: (() -> Unit)?,
     onLaunchBios: (() -> Unit)?,
     selectedItemFocusRequester: FocusRequester? = null,
     wrapInSurface: Boolean = true,
@@ -299,6 +336,7 @@ private fun SideNavigation(
 ) {
     val drawerInset = 18.dp
     val drawerSectionSpacing = 14.dp
+    var showResetDialog by remember { mutableStateOf(false) }
 
     val navigateHome = rememberDebouncedClick {
         onCloseDrawer()
@@ -311,6 +349,24 @@ private fun SideNavigation(
     val navigateAchievements = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateAchievements()
+    }
+    val navigateControlsEditor = onNavigateControlsEditor?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
+    }
+    val navigateDataTransfer = onNavigateDataTransfer?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
+    }
+    val resetAllSettings = onResetAllSettings?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            showResetDialog = true
+        }
     }
     val navigateSaveManager = onNavigateSaveManager?.let {
         rememberDebouncedClick {
@@ -327,6 +383,12 @@ private fun SideNavigation(
         onNavigateSearch()
     }
     val openManageFolders = onOpenManageFolders?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
+    }
+    val launchGame = onLaunchGame?.let {
         rememberDebouncedClick {
             onCloseDrawer()
             it()
@@ -378,15 +440,6 @@ private fun SideNavigation(
                 onClick = navigateSearch
             )
             ShellItem(
-                icon = Icons.Rounded.Memory,
-                label = stringResource(R.string.shell_supported_formats),
-                selected = selected == PrimaryDestination.Formats,
-                modifier = if (selected == PrimaryDestination.Formats && selectedItemFocusRequester != null) {
-                    Modifier.focusRequester(selectedItemFocusRequester)
-                } else Modifier,
-                onClick = navigateFormats
-            )
-            ShellItem(
                 icon = Icons.Rounded.Star,
                 label = stringResource(R.string.settings_achievements_tab),
                 selected = selected == PrimaryDestination.Achievements,
@@ -395,20 +448,11 @@ private fun SideNavigation(
                 } else Modifier,
                 onClick = navigateAchievements
             )
-            ShellItem(
-                icon = Icons.Rounded.Settings,
-                label = stringResource(R.string.nav_settings),
-                selected = selected == PrimaryDestination.Settings,
-                modifier = if (selected == PrimaryDestination.Settings && selectedItemFocusRequester != null) {
-                    Modifier.focusRequester(selectedItemFocusRequester)
-                } else Modifier,
-                onClick = navigateSettings
-            )
-            if (launchBios != null) {
+            if (onNavigateCheats != null) {
                 ShellAction(
-                    icon = Icons.Rounded.PlayArrow,
-                    label = stringResource(R.string.shell_launch_bios),
-                    onClick = launchBios
+                    icon = Icons.Rounded.Star,
+                    label = stringResource(R.string.settings_cheats_tab),
+                    onClick = onNavigateCheats
                 )
             }
             HorizontalDivider(
@@ -419,7 +463,88 @@ private fun SideNavigation(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.settings_paths_tab),
+                    text = stringResource(R.string.shell_executables_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                ShellItem(
+                    icon = Icons.Rounded.Memory,
+                    label = stringResource(R.string.shell_supported_formats),
+                    selected = selected == PrimaryDestination.Formats,
+                    modifier = if (selected == PrimaryDestination.Formats && selectedItemFocusRequester != null) {
+                        Modifier.focusRequester(selectedItemFocusRequester)
+                    } else Modifier,
+                    onClick = navigateFormats
+                )
+                if (launchGame != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.PlayArrow,
+                        label = stringResource(R.string.shell_launch_game),
+                        onClick = launchGame
+                    )
+                }
+                if (launchBios != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.PlayArrow,
+                        label = stringResource(R.string.shell_launch_bios),
+                        onClick = launchBios
+                    )
+                }
+            }
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.shell_app_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                ShellItem(
+                    icon = Icons.Rounded.Settings,
+                    label = stringResource(R.string.shell_app_settings),
+                    selected = selected == PrimaryDestination.Settings,
+                    modifier = if (selected == PrimaryDestination.Settings && selectedItemFocusRequester != null) {
+                        Modifier.focusRequester(selectedItemFocusRequester)
+                    } else Modifier,
+                    onClick = navigateSettings
+                )
+                if (navigateControlsEditor != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.SettingsSuggest,
+                        label = stringResource(R.string.settings_edit_controls),
+                        onClick = navigateControlsEditor
+                    )
+                }
+                if (resetAllSettings != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.Refresh,
+                        label = stringResource(R.string.settings_reset_all_action),
+                        onClick = resetAllSettings
+                    )
+                }
+                if (navigateDataTransfer != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.SwapVert,
+                        label = stringResource(R.string.shell_data_transfer),
+                        onClick = navigateDataTransfer
+                    )
+                }
+            }
+            HorizontalDivider(
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.shell_tools_section),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 4.dp)
@@ -439,6 +564,33 @@ private fun SideNavigation(
                     )
                 }
             }
+        }
+
+        if (showResetDialog && onResetAllSettings != null) {
+            AlertDialog(
+                onDismissRequest = { showResetDialog = false },
+                title = {
+                    Text(stringResource(R.string.settings_reset_all_title))
+                },
+                text = {
+                    Text(stringResource(R.string.settings_reset_all_confirm))
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showResetDialog = false
+                            onResetAllSettings()
+                        }
+                    ) {
+                        Text(stringResource(R.string.settings_reset_all_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
         }
     }
 

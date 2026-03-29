@@ -14,6 +14,8 @@
     <string name="home_empty_subtitle">Select your games folder to build your library.</string>
     <string name="home_add_folder">Choose Games Folder</string>
     <string name="home_refresh">Refresh</string>
+    <string name="home_view_list">Show as list</string>
+    <string name="home_view_grid">Show as grid</string>
     <string name="home_search">Search games</string>
     <string name="home_game_count">%d games</string>
     <string name="home_library_desc">Your library, setup, and quick actions in one place.</string>
@@ -22,6 +24,7 @@
     <string name="home_setup_title">Finish setup</string>
     <string name="home_setup_subtitle">Choose BIOS files and your games folder to get started.</string>
     <string name="home_finish_setup">Open Setup</string>
+    <string name="home_choose_bios">Choose BIOS</string>
     <string name="home_sort_title">Title</string>
     <string name="home_sort_size_desc">Largest</string>
     <string name="home_sort_size_asc">Smallest</string>
@@ -106,6 +109,8 @@
     <string name="emulation_sidebar_title">Game Menu</string>
     <string name="emulation_performance_stats">Status Overlay</string>
     <string name="emulation_live_settings">Live Settings</string>
+    <string name="emulation_basic_settings">Basic</string>
+    <string name="emulation_advanced_settings">Advanced</string>
     <string name="emulation_section_performance">Performance Hacks</string>
     <string name="emulation_section_video">Advanced Video</string>
     <string name="emulation_aspect_auto">Auto</string>
@@ -119,6 +124,7 @@
     <string name="settings_general_tab">General</string>
     <string name="settings_graphics_tab">Video</string>
     <string name="settings_paths_tab">Files</string>
+    <string name="settings_data_transfer_tab">Transfer</string>
     <string name="settings_speedhacks_tab">Speedhacks</string>
     <string name="settings_advanced_tab">More</string>
     <string name="settings_achievements_tab">Achievements</string>
@@ -243,6 +249,13 @@
     <string name="emulation_hide_fps">Hide FPS</string>
     <string name="shell_setup">Setup</string>
     <string name="shell_quick_actions">Quick actions</string>
+    <string name="shell_executables_section">Executable Files</string>
+    <string name="shell_launch_game">Launch Game</string>
+    <string name="shell_app_section">Application</string>
+    <string name="shell_tools_section">Library Tools</string>
+    <string name="shell_app_settings">App Settings</string>
+    <string name="shell_data_transfer">Data Transfer</string>
+    <string name="shell_launch_game_unsupported">Unsupported game image format.</string>
     <string name="shell_manage_folders">Manage Folders</string>
     <string name="shell_save_states">Save Manager</string>
     <string name="shell_launch_bios">Launch BIOS</string>
@@ -428,6 +441,12 @@
     <string name="settings_bilinear_upscale_force_bilinear">Force Bilinear</string>
     <string name="settings_bilinear_upscale_force_nearest">Force Nearest</string>
     <string name="settings_widescreen_patches_desc">Enable widescreen patches for supported games</string>
+    <string name="settings_no_interlacing_patches">No-Interlacing Patches</string>
+    <string name="settings_no_interlacing_patches_desc">Enable no-interlacing patches for supported games</string>
+    <string name="settings_more_options">More options</string>
+    <string name="settings_reset_all_title">Reset all settings</string>
+    <string name="settings_reset_all_action">Reset all settings</string>
+    <string name="settings_reset_all_confirm">Are you sure you want to reset all settings? This will restore the default app configuration.</string>
     <string name="settings_gamepad_auto_desc">Automatically map buttons when a gamepad is connected</string>
     <string name="settings_gamepad_hide_overlay_desc">Hide touch controls when a physical gamepad is connected</string>
     <string name="settings_gamepad_mapping_title">Gamepad Button Mapping</string>

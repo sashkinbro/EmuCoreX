@@ -49,6 +49,7 @@ class AppPreferences(private val context: Context) {
         private val COMPACT_CONTROLS = booleanPreferencesKey("compact_controls")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
+        private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
         private const val MAX_RECENT_GAMES = 8
         // Overlay customization
         private val OVERLAY_SCALE = intPreferencesKey("overlay_scale")
@@ -67,6 +68,7 @@ class AppPreferences(private val context: Context) {
         private val BLENDING_ACCURACY = intPreferencesKey("blending_accuracy")
         private val TEXTURE_PRELOADING = intPreferencesKey("texture_preloading")
         private val ENABLE_WIDESCREEN_PATCHES = booleanPreferencesKey("enable_widescreen_patches")
+        private val ENABLE_NO_INTERLACING_PATCHES = booleanPreferencesKey("enable_no_interlacing_patches")
         private val ANISOTROPIC_FILTERING = intPreferencesKey("anisotropic_filtering")
         private val ENABLE_HW_MIPMAPPING = booleanPreferencesKey("enable_hw_mipmapping")
         private val CPU_SPRITE_RENDER_SIZE = intPreferencesKey("cpu_sprite_render_size")
@@ -189,6 +191,11 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[TARGET_FPS] = value.coerceIn(20, 120) }
     }
 
+    suspend fun resetAllSettings() {
+        context.dataStore.edit { it.clear() }
+        localePrefs.edit().remove("language_tag").apply()
+    }
+
     val memoryCardSlot1: Flow<String?> = context.dataStore.data.map { prefs -> prefs[MEMORY_CARD_SLOT1] }
     val memoryCardSlot2: Flow<String?> = context.dataStore.data.map { prefs -> prefs[MEMORY_CARD_SLOT2] }
 
@@ -298,6 +305,14 @@ class AppPreferences(private val context: Context) {
 
     val recentGames: Flow<List<RecentGameEntry>> = context.dataStore.data.map { prefs ->
         decodeRecentGames(prefs[RECENT_GAMES])
+    }
+
+    val homeLibraryViewMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[HOME_LIBRARY_VIEW_MODE] ?: 0
+    }
+
+    suspend fun setHomeLibraryViewMode(mode: Int) {
+        context.dataStore.edit { it[HOME_LIBRARY_VIEW_MODE] = mode.coerceIn(0, 1) }
     }
 
     suspend fun markGameLaunched(path: String, title: String) {
@@ -499,6 +514,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setEnableWidescreenPatches(enabled: Boolean) {
         context.dataStore.edit { it[ENABLE_WIDESCREEN_PATCHES] = enabled }
+    }
+
+    val enableNoInterlacingPatches: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false
+    }
+
+    suspend fun setEnableNoInterlacingPatches(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_NO_INTERLACING_PATCHES] = enabled }
     }
 
     // Anisotropic Filtering: 0 = off, 2, 4, 8, 16
@@ -876,6 +899,7 @@ class AppPreferences(private val context: Context) {
             put("compactControls", prefs[COMPACT_CONTROLS] ?: true)
             put("keepScreenOn", prefs[KEEP_SCREEN_ON] ?: true)
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
+            put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
             put("overlayOpacity", prefs[OVERLAY_OPACITY] ?: 80)
             put("overlayShow", prefs[OVERLAY_SHOW] ?: true)
@@ -890,6 +914,7 @@ class AppPreferences(private val context: Context) {
             put("blendingAccuracy", prefs[BLENDING_ACCURACY] ?: GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
             put("texturePreloading", prefs[TEXTURE_PRELOADING] ?: GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
             put("enableWidescreenPatches", prefs[ENABLE_WIDESCREEN_PATCHES] ?: false)
+            put("enableNoInterlacingPatches", prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false)
             put("anisotropicFiltering", prefs[ANISOTROPIC_FILTERING] ?: 0)
             put("enableHwMipmapping", prefs[ENABLE_HW_MIPMAPPING] ?: true)
             put("cpuSpriteRenderSize", prefs[CPU_SPRITE_RENDER_SIZE] ?: GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT)
@@ -958,6 +983,7 @@ class AppPreferences(private val context: Context) {
             prefs[COMPACT_CONTROLS] = json.optBoolean("compactControls", true)
             prefs[KEEP_SCREEN_ON] = json.optBoolean("keepScreenOn", true)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
+            prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 1)
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
             prefs[OVERLAY_OPACITY] = json.optInt("overlayOpacity", 80)
             prefs[OVERLAY_SHOW] = json.optBoolean("overlayShow", true)
@@ -972,6 +998,7 @@ class AppPreferences(private val context: Context) {
             prefs[BLENDING_ACCURACY] = json.optInt("blendingAccuracy", GsHackDefaults.BLENDING_ACCURACY_DEFAULT).coerceIn(0, 5)
             prefs[TEXTURE_PRELOADING] = json.optInt("texturePreloading", GsHackDefaults.TEXTURE_PRELOADING_DEFAULT).coerceIn(0, 2)
             prefs[ENABLE_WIDESCREEN_PATCHES] = json.optBoolean("enableWidescreenPatches", false)
+            prefs[ENABLE_NO_INTERLACING_PATCHES] = json.optBoolean("enableNoInterlacingPatches", false)
             prefs[ANISOTROPIC_FILTERING] = json.optInt("anisotropicFiltering", 0)
             prefs[ENABLE_HW_MIPMAPPING] = json.optBoolean("enableHwMipmapping", true)
             prefs[CPU_SPRITE_RENDER_SIZE] = json.optInt("cpuSpriteRenderSize", GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT).coerceIn(0, 10)

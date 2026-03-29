@@ -45,6 +45,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAs
 import androidx.compose.material.icons.rounded.SettingsSuggest
@@ -56,9 +57,12 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -114,7 +118,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Paths, Performance, SpeedHacks, Cheats, Advanced, About
+    General, Graphics, Controls, Paths, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -142,6 +146,8 @@ fun SettingsScreen(
     var cheatEditorFileName by remember { mutableStateOf<String?>(null) }
     var cheatEditorText by remember { mutableStateOf("") }
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
+    var showTopBarMenu by remember { mutableStateOf(false) }
+    var showResetAllSettingsDialog by remember { mutableStateOf(false) }
     val selectedTabFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
     val scope = rememberCoroutineScope()
@@ -327,7 +333,13 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_title),
                     subtitle = selectedTab.label(),
                     topInset = topInset,
-                    onBackClick = onBackClick
+                    onBackClick = onBackClick,
+                    menuExpanded = showTopBarMenu,
+                    onMenuExpandedChange = { showTopBarMenu = it },
+                    onResetAllSettingsClick = {
+                        showTopBarMenu = false
+                        showResetAllSettingsDialog = true
+                    }
                 )
 
                 SettingsTabRow(
@@ -447,6 +459,33 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showResetAllSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetAllSettingsDialog = false },
+            title = {
+                Text(stringResource(R.string.settings_reset_all_title))
+            },
+            text = {
+                Text(stringResource(R.string.settings_reset_all_confirm))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetAllSettingsDialog = false
+                        viewModel.resetAllSettings()
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_reset_all_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetAllSettingsDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -454,7 +493,10 @@ private fun SettingsCompactTopBar(
     title: String,
     subtitle: String,
     topInset: androidx.compose.ui.unit.Dp,
-    onBackClick: (() -> Unit)?
+    onBackClick: (() -> Unit)?,
+    menuExpanded: Boolean,
+    onMenuExpandedChange: (Boolean) -> Unit,
+    onResetAllSettingsClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -503,6 +545,25 @@ private fun SettingsCompactTopBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+            Box {
+                IconButton(onClick = { onMenuExpandedChange(true) }) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreVert,
+                        contentDescription = stringResource(R.string.settings_more_options),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { onMenuExpandedChange(false) },
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.settings_reset_all_action)) },
+                        onClick = onResetAllSettingsClick
+                    )
+                }
             }
         }
     }
@@ -728,6 +789,13 @@ private fun SettingsContent(
                             checked = uiState.enableWidescreenPatches,
                             onCheckedChange = viewModel::setEnableWidescreenPatches
                         )
+                        ToggleItem(
+                            icon = Icons.Rounded.Visibility,
+                            title = stringResource(R.string.settings_no_interlacing_patches),
+                            subtitle = stringResource(R.string.settings_no_interlacing_patches_desc),
+                            checked = uiState.enableNoInterlacingPatches,
+                            onCheckedChange = viewModel::setEnableNoInterlacingPatches
+                        )
                     }
                 }
 
@@ -859,6 +927,9 @@ private fun SettingsContent(
                             )
                         }
                     }
+                }
+
+                SettingsTab.DataTransfer -> {
                     SettingsSection(title = stringResource(R.string.settings_backup_section_title)) {
                         SettingsItem(
                             icon = Icons.Rounded.Save,
@@ -2161,6 +2232,7 @@ private fun SettingsTab.label(): String {
         SettingsTab.Graphics -> stringResource(R.string.settings_graphics_tab)
         SettingsTab.Controls -> stringResource(R.string.settings_controls_tab)
         SettingsTab.Paths -> stringResource(R.string.settings_paths_tab)
+        SettingsTab.DataTransfer -> stringResource(R.string.settings_data_transfer_tab)
         SettingsTab.Performance -> stringResource(R.string.settings_performance_tab)
         SettingsTab.SpeedHacks -> stringResource(R.string.settings_speedhacks_tab)
         SettingsTab.Cheats -> stringResource(R.string.settings_cheats_tab)
@@ -2176,6 +2248,7 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.Graphics -> Icons.Rounded.GraphicEq
         SettingsTab.Controls -> Icons.Rounded.Gamepad
         SettingsTab.Paths -> Icons.Rounded.FolderOpen
+        SettingsTab.DataTransfer -> Icons.Rounded.SaveAs
         SettingsTab.Performance -> Icons.Rounded.Speed
         SettingsTab.SpeedHacks -> Icons.Rounded.Speed
         SettingsTab.Cheats -> Icons.Rounded.Star
@@ -2189,6 +2262,7 @@ private fun String.toSettingsTab(): SettingsTab {
         "graphics" -> SettingsTab.Graphics
         "controls" -> SettingsTab.Controls
         "paths", "files" -> SettingsTab.Paths
+        "data_transfer", "transfer", "backup", "data-transfer" -> SettingsTab.DataTransfer
         "performance" -> SettingsTab.Performance
         "speedhacks", "speed_hacks", "speed-hacks" -> SettingsTab.SpeedHacks
         "cheats", "cheat" -> SettingsTab.Cheats

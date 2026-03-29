@@ -1,5 +1,10 @@
 package com.sbro.emucorex.navigation
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.EnterTransition
@@ -19,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
@@ -27,7 +33,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.sbro.emucorex.R
 import com.sbro.emucorex.core.BiosValidator
+import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
@@ -41,6 +49,7 @@ import com.sbro.emucorex.ui.onboarding.OnboardingScreen
 import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
@@ -167,10 +176,59 @@ fun AppNavigation() {
     }
 
     val navController = rememberNavController()
+    val scope = rememberCoroutineScope()
+    val unsupportedGameImageMessage = context.getString(R.string.shell_launch_game_unsupported)
+    val launchGamePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+        val rawPath = uri.toString()
+        val displayName = DocumentPathResolver.getDisplayName(context, rawPath)
+        if (!isSupportedGameImage(displayName)) {
+            Toast.makeText(context, unsupportedGameImageMessage, Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        navController.navigate(EmulationRoute(gamePath = rawPath)) {
+            launchSingleTop = true
+        }
+    }
     val startDestination = when (startupDestination) {
         StartupDestination.ONBOARDING -> OnboardingRoute
         StartupDestination.HOME -> HomeRoute
         else -> {}
+    }
+    val navigateControlsEditor: () -> Unit = {
+        navController.navigate(SettingsRoute(tab = "controls")) {
+            launchSingleTop = true
+        }
+    }
+    val navigateCheats: () -> Unit = {
+        navController.navigate(SettingsRoute(tab = "cheats")) {
+            launchSingleTop = true
+        }
+    }
+    val navigateDataTransfer: () -> Unit = {
+        navController.navigate(SettingsRoute(tab = "data_transfer")) {
+            launchSingleTop = true
+        }
+    }
+    val launchGamePickerAction: () -> Unit = {
+        launchGamePicker.launch(arrayOf("*/*"))
+    }
+    val resetAllSettingsAndReturnHome: () -> Unit = {
+        scope.launch {
+            preferences.resetAllSettings()
+            navController.navigate(HomeRoute) {
+                launchSingleTop = true
+                popUpTo(HomeRoute) { inclusive = false }
+            }
+        }
     }
 
     Box(
@@ -388,6 +446,10 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    onNavigateCheats = navigateCheats,
+                    onNavigateControlsEditor = navigateControlsEditor,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndReturnHome,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -398,6 +460,7 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    onLaunchGame = launchGamePickerAction,
                     onLaunchBios = {
                         navController.navigate(EmulationRoute(bootBios = true)) {
                             launchSingleTop = true
@@ -407,16 +470,6 @@ fun AppNavigation() {
                     HomeScreen(
                         onGameClick = { game ->
                             navController.navigate(GameDetailRoute(gamePath = game.path, catalogGameId = game.catalogGameId)) {
-                                launchSingleTop = true
-                            }
-                        },
-                        onSettingsClick = {
-                            navController.navigate(SettingsRoute()) {
-                                launchSingleTop = true
-                            }
-                        },
-                        onSetupClick = {
-                            navController.navigate(OnboardingRoute) {
                                 launchSingleTop = true
                             }
                         },
@@ -474,6 +527,10 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    onNavigateCheats = navigateCheats,
+                    onNavigateControlsEditor = navigateControlsEditor,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndReturnHome,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -484,7 +541,8 @@ fun AppNavigation() {
                         navController.navigate(SettingsRoute(tab = "paths")) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onLaunchGame = launchGamePickerAction
                 ) {
                     CatalogSearchScreen(
                         onGameClick = { igdbId ->
@@ -534,6 +592,10 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    onNavigateCheats = navigateCheats,
+                    onNavigateControlsEditor = navigateControlsEditor,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndReturnHome,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -544,7 +606,8 @@ fun AppNavigation() {
                         navController.navigate(SettingsRoute(tab = "paths")) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onLaunchGame = launchGamePickerAction
                 ) {
                     SupportedFormatsScreen(
                         onBackClick = { navController.popBackStack() }
@@ -578,6 +641,10 @@ fun AppNavigation() {
                             launchSingleTop = true
                         }
                     },
+                    onNavigateCheats = navigateCheats,
+                    onNavigateControlsEditor = navigateControlsEditor,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndReturnHome,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -588,14 +655,13 @@ fun AppNavigation() {
                         navController.navigate(SettingsRoute(tab = "paths")) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onLaunchGame = launchGamePickerAction
                 ) {
                     SettingsScreen(
                         initialTab = route.tab,
                         onBackClick = { navController.popBackStack() },
-                        onEditControlsClick = {
-                            navController.navigate(ControlsEditorRoute)
-                        }
+                        onEditControlsClick = navigateControlsEditor
                     )
                 }
             }
@@ -625,6 +691,10 @@ fun AppNavigation() {
                         }
                     },
                     onNavigateAchievements = { },
+                    onNavigateCheats = navigateCheats,
+                    onNavigateControlsEditor = navigateControlsEditor,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndReturnHome,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -635,7 +705,8 @@ fun AppNavigation() {
                         navController.navigate(SettingsRoute(tab = "paths")) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onLaunchGame = launchGamePickerAction
                 ) {
                     AchievementsHubScreen(
                         onOpenGameAchievements = { path, title ->
@@ -678,4 +749,9 @@ fun AppNavigation() {
             }
         }
     }
+}
+
+private fun isSupportedGameImage(fileName: String): Boolean {
+    val extension = fileName.substringAfterLast('.', "").lowercase()
+    return extension in setOf("iso", "bin", "chd", "cso", "gz")
 }
