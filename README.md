@@ -11,7 +11,7 @@ Official website: https://emucorex.web.app/
 
 ## Highlights
 
-- Native emulation core based on the ARMSX2 app core
+- Native emulation core based on the ARMSX2 app core used in the ARMSX2 Android app
 - Home screen with cover art, game metadata, recent games, and search
 - BIOS and game folder setup, with recovery when folders become invalid
 - In-game overlay for renderer, aspect ratio, resolution, speedhacks, cheats, FPS, and quick actions
