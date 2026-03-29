@@ -23,13 +23,6 @@ Official website: https://emucorex.web.app/
 
 This repository contains the Android app, UI, settings flows, bridge code, and the bundled native emulation core sources used by EmuCoreX.
 
-Some internal or private project assets are intentionally excluded from version control, including:
-
-- crash and local diagnostic logs
-- private website files and support pages
-- IGDB tooling and generated data
-- local native helper tooling
-
 ## Tech Stack
 
 - Kotlin + Jetpack Compose
