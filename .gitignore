@@ -8,6 +8,8 @@
 local.properties
 /.firebase/
 .firebaserc
+firebase.json
+firestore.rules
 
 # Build outputs
 build/
