@@ -43,15 +43,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Memory
-import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SportsEsports
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material3.CircularProgressIndicator
@@ -76,14 +75,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,7 +90,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.data.GameItem
-import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
@@ -102,7 +99,6 @@ import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
-import java.util.Locale
 import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -325,10 +321,34 @@ fun HomeScreen(
                                         onDismissRequest = { showSortMenu = false }
                                     ) {
                                         SortMenuItem(
-                                            label = stringResource(R.string.home_sort_title),
-                                            isSelected = uiState.sortOption == HomeSortOption.TITLE,
+                                            label = stringResource(R.string.home_sort_title_asc),
+                                            isSelected = uiState.sortOption == HomeSortOption.TITLE_ASC,
                                             onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.TITLE)
+                                                viewModel.updateSortOption(HomeSortOption.TITLE_ASC)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                        SortMenuItem(
+                                            label = stringResource(R.string.home_sort_title_desc),
+                                            isSelected = uiState.sortOption == HomeSortOption.TITLE_DESC,
+                                            onClick = {
+                                                viewModel.updateSortOption(HomeSortOption.TITLE_DESC)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                        SortMenuItem(
+                                            label = stringResource(R.string.home_sort_recent_desc),
+                                            isSelected = uiState.sortOption == HomeSortOption.RECENT_DESC,
+                                            onClick = {
+                                                viewModel.updateSortOption(HomeSortOption.RECENT_DESC)
+                                                showSortMenu = false
+                                            }
+                                        )
+                                        SortMenuItem(
+                                            label = stringResource(R.string.home_sort_recent_asc),
+                                            isSelected = uiState.sortOption == HomeSortOption.RECENT_ASC,
+                                            onClick = {
+                                                viewModel.updateSortOption(HomeSortOption.RECENT_ASC)
                                                 showSortMenu = false
                                             }
                                         )
@@ -793,14 +813,6 @@ private fun RecentGameCard(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillHeight
                 )
-                game.pcsx2Compatibility?.let { compatibility ->
-                    CompatibilityBadge(
-                        status = compatibility.status,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .align(Alignment.TopStart)
-                    )
-                }
             }
             Column(
                 modifier = Modifier
@@ -812,33 +824,10 @@ private fun RecentGameCard(
                 Text(
                     text = game.title,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Visible,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (game.catalogYear != null || game.catalogRating != null) {
-                    CardMetaText(
-                        year = game.catalogYear,
-                        rating = game.catalogRating
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = stringResource(R.string.home_recent_label),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                SerialLabel(game = game)
             }
         }
     }
@@ -882,29 +871,6 @@ private fun GameCard(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillHeight
                 )
-                game.pcsx2Compatibility?.let { compatibility ->
-                    CompatibilityBadge(
-                        status = compatibility.status,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .align(Alignment.TopStart)
-                    )
-                }
-                // Format badge
-                Box(
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .align(Alignment.TopEnd)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = game.fileName.substringAfterLast('.').uppercase(),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
             }
             Column(
                 modifier = Modifier
@@ -923,17 +889,10 @@ private fun GameCard(
                     } else {
                         MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
                     },
-                    minLines = 2,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    overflow = TextOverflow.Visible,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                if (game.catalogYear != null || game.catalogRating != null) {
-                    CardMetaText(
-                        year = game.catalogYear,
-                        rating = game.catalogRating
-                    )
-                }
+                SerialLabel(game = game)
             }
         }
     }
@@ -982,14 +941,6 @@ private fun GameListCard(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.FillHeight
                 )
-                game.pcsx2Compatibility?.let { compatibility ->
-                    CompatibilityBadge(
-                        status = compatibility.status,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .align(Alignment.TopStart)
-                    )
-                }
             }
             Column(
                 modifier = Modifier.weight(1f),
@@ -1002,11 +953,10 @@ private fun GameListCard(
                 ) {
                     Text(
                         text = game.title,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Visible
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Box(
@@ -1022,91 +972,29 @@ private fun GameListCard(
                         )
                     }
                 }
-                if (game.catalogYear != null || game.catalogRating != null) {
-                    CardMetaText(
-                        year = game.catalogYear,
-                        rating = game.catalogRating
-                    )
-                }
                 Text(
                     text = game.fileName,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    maxLines = 3
                 )
-                Text(
-                    text = game.serial ?: "",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                SerialLabel(game = game)
             }
         }
     }
 }
 
 @Composable
-private fun CardMetaText(
-    year: Int?,
-    rating: Double?
-) {
-    val meta = buildString {
-        year?.let { append(it) }
-        rating?.let {
-            if (isNotBlank()) append(" • ")
-            append(String.format(Locale.US, "%.1f", it / 10.0))
-        }
-    }
-    if (meta.isBlank()) return
-    Text(
-        text = meta,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1
-    )
-}
-
-@Composable
-private fun CompatibilityBadge(
-    status: Pcsx2CompatibilityStatus,
+private fun SerialLabel(
+    game: GameItem,
     modifier: Modifier = Modifier
 ) {
-    val background = when (status) {
-        Pcsx2CompatibilityStatus.PERFECT -> Color(0xFF2E7D32)
-        Pcsx2CompatibilityStatus.PLAYABLE -> Color(0xFF1B5E20)
-        Pcsx2CompatibilityStatus.IN_GAME -> Color(0xFFEF6C00)
-        Pcsx2CompatibilityStatus.INTRO -> Color(0xFF8E24AA)
-        Pcsx2CompatibilityStatus.NOTHING -> Color(0xFFC62828)
-        Pcsx2CompatibilityStatus.UNKNOWN -> MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
-    }
-    val contentColor = when (status) {
-        Pcsx2CompatibilityStatus.UNKNOWN -> MaterialTheme.colorScheme.onSurface
-        else -> Color.White
-    }
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(background.copy(alpha = if (status == Pcsx2CompatibilityStatus.UNKNOWN) 1f else 0.92f))
-            .padding(horizontal = 8.dp, vertical = 3.dp)
-    ) {
-        Text(
-            text = stringResource(homeCompatibilityStatusRes(status)),
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = contentColor
-        )
-    }
-}
-
-private fun homeCompatibilityStatusRes(status: Pcsx2CompatibilityStatus): Int {
-    return when (status) {
-        Pcsx2CompatibilityStatus.UNKNOWN -> R.string.pcsx2_compatibility_unknown
-        Pcsx2CompatibilityStatus.NOTHING -> R.string.pcsx2_compatibility_nothing
-        Pcsx2CompatibilityStatus.INTRO -> R.string.pcsx2_compatibility_intro
-        Pcsx2CompatibilityStatus.IN_GAME -> R.string.pcsx2_compatibility_in_game
-        Pcsx2CompatibilityStatus.PLAYABLE -> R.string.pcsx2_compatibility_playable
-        Pcsx2CompatibilityStatus.PERFECT -> R.string.pcsx2_compatibility_perfect
-    }
+    val serial = game.serial?.takeIf { it.isNotBlank() } ?: return
+    Text(
+        modifier = modifier,
+        text = serial,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        maxLines = 1
+    )
 }

@@ -1,11 +1,17 @@
 package com.sbro.emucorex.ui.onboarding
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,6 +59,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,12 +78,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
+import com.sbro.emucorex.core.StoragePermissionHelper
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -90,6 +100,7 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
 
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenWidthDp >= 600
@@ -121,8 +132,39 @@ fun OnboardingScreen(
     ) { uri: Uri? ->
         uri?.let(viewModel::setGamePath)
     }
+    val legacyStoragePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        viewModel.refreshStoragePermissionState()
+    }
+    val manageStorageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.refreshStoragePermissionState()
+    }
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(null) })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
+    val launchStorageAccess = rememberDebouncedClick(
+        onClick = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                manageStorageLauncher.launch(StoragePermissionHelper.createStorageAccessIntent(context))
+            } else {
+                legacyStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+    )
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshStoragePermissionState()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     val continueClick = rememberDebouncedClick(
         onClick = {
@@ -149,9 +191,46 @@ fun OnboardingScreen(
         label = "onboarding-content-alpha"
     )
     val contentOffset by animateFloatAsState(
-        targetValue = if (isCompleting) -18f else 0f,
-        animationSpec = tween(durationMillis = 280),
+        targetValue = if (isCompleting) -32f else 0f,
+        animationSpec = tween(durationMillis = 320),
         label = "onboarding-content-offset"
+    )
+    val backgroundMotion = rememberInfiniteTransition(label = "onboarding-background-motion")
+    val orbOneOffsetX by backgroundMotion.animateFloat(
+        initialValue = -18f,
+        targetValue = 42f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 5200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb-one-offset-x"
+    )
+    val orbOneOffsetY by backgroundMotion.animateFloat(
+        initialValue = -12f,
+        targetValue = 34f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6100),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb-one-offset-y"
+    )
+    val orbTwoOffsetX by backgroundMotion.animateFloat(
+        initialValue = 20f,
+        targetValue = -56f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6800),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb-two-offset-x"
+    )
+    val orbTwoOffsetY by backgroundMotion.animateFloat(
+        initialValue = 0f,
+        targetValue = 58f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 5600),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb-two-offset-y"
     )
 
     Box(
@@ -171,8 +250,24 @@ fun OnboardingScreen(
             modifier = Modifier
                 .padding(start = 28.dp)
                 .size(180.dp)
+                .graphicsLayer {
+                    translationX = orbOneOffsetX
+                    translationY = orbOneOffsetY
+                }
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 96.dp, end = 20.dp)
+                .size(140.dp)
+                .graphicsLayer {
+                    translationX = orbTwoOffsetX
+                    translationY = orbTwoOffsetY
+                }
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f))
         )
 
         if (isLandscape) {
@@ -256,9 +351,12 @@ fun OnboardingScreen(
                                     gamePath = uiState.gamePath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
+                                    storagePermissionRequired = uiState.storagePermissionRequired,
+                                    storagePermissionGranted = uiState.storagePermissionGranted,
                                     context = context,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
+                                    launchStorageAccess = launchStorageAccess,
                                     endInset = 0.dp,
                                     bottomInset = 0.dp,
                                     modifier = Modifier.padding(horizontal = 32.dp)
@@ -333,9 +431,12 @@ fun OnboardingScreen(
                                     gamePath = uiState.gamePath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
+                                    storagePermissionRequired = uiState.storagePermissionRequired,
+                                    storagePermissionGranted = uiState.storagePermissionGranted,
                                     context = context,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
+                                    launchStorageAccess = launchStorageAccess,
                                     endInset = 0.dp,
                                     bottomInset = 0.dp
                                 )
@@ -664,14 +765,18 @@ private fun OnboardingSetupContent(
     gamePath: String?,
     biosValid: Boolean,
     gamePathValid: Boolean,
+    storagePermissionRequired: Boolean,
+    storagePermissionGranted: Boolean,
     context: android.content.Context,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
+    launchStorageAccess: () -> Unit,
     endInset: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     bottomInset: androidx.compose.ui.unit.Dp = 0.dp
 ) {
-    val completionProgress = listOf(biosValid, gamePathValid).count { it }
+    val storageReady = !storagePermissionRequired || storagePermissionGranted
+    val completionProgress = listOf(biosValid, gamePathValid, storageReady).count { it }
     Column(
         modifier = modifier.padding(end = endInset),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -717,6 +822,29 @@ private fun OnboardingSetupContent(
             onClick = launchGamePicker
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SetupCard(
+            icon = Icons.Rounded.CheckCircle,
+            title = stringResource(R.string.permission_storage_title),
+            description = if (storagePermissionRequired) {
+                stringResource(R.string.permission_storage_desc)
+            } else {
+                stringResource(R.string.onboarding_storage_not_needed_desc)
+            },
+            status = when {
+                !storagePermissionRequired -> stringResource(R.string.onboarding_status_not_needed)
+                storagePermissionGranted -> stringResource(R.string.onboarding_status_ready)
+                else -> stringResource(R.string.onboarding_status_required)
+            },
+            statusColor = when {
+                !storagePermissionRequired -> MaterialTheme.colorScheme.secondary
+                storagePermissionGranted -> Color(0xFF1B8A5A)
+                else -> MaterialTheme.colorScheme.tertiary
+            },
+            onClick = launchStorageAccess
+        )
+
         Spacer(modifier = Modifier.height(10.dp))
 
         Surface(
@@ -740,7 +868,7 @@ private fun OnboardingSetupContent(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = stringResource(R.string.onboarding_hint_body, completionProgress, 2),
+                    text = stringResource(R.string.onboarding_hint_body, completionProgress, 3),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -805,9 +933,7 @@ private fun SetupCard(
                     Text(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

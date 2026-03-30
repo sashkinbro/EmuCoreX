@@ -17,6 +17,9 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
 import com.sbro.emucorex.data.CheatRepository
+import com.sbro.emucorex.data.OverlayLayoutSnapshot
+import com.sbro.emucorex.data.PerGameSettings
+import com.sbro.emucorex.data.PerGameSettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +43,17 @@ data class EmulationUiState(
     val showFps: Boolean = true,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
+    val overlayScale: Int = 100,
+    val overlayOpacity: Int = 80,
+    val hideOverlayOnGamepad: Boolean = true,
+    val dpadOffset: Pair<Float, Float> = 0f to 0f,
+    val lstickOffset: Pair<Float, Float> = 0f to 0f,
+    val rstickOffset: Pair<Float, Float> = 0f to 0f,
+    val actionOffset: Pair<Float, Float> = 0f to 0f,
+    val lbtnOffset: Pair<Float, Float> = 0f to 0f,
+    val rbtnOffset: Pair<Float, Float> = 0f to 0f,
+    val centerOffset: Pair<Float, Float> = 0f to 0f,
+    val stickScale: Int = 100,
     val fps: String = "0.0",
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
     val speedPercent: String = "100",
@@ -100,7 +114,10 @@ data class EmulationUiState(
     val detectedChipsetName: String = "",
     val recommendedPresetId: Int = PerformancePresets.BALANCED,
     val frameLimitEnabled: Boolean = false,
-    val targetFps: Int = 60
+    val targetFps: Int = 60,
+    val currentGameTitle: String = "",
+    val currentGameSubtitle: String = "",
+    val gameSettingsProfileActive: Boolean = false
 )
 
 private data class EmulationLaunchConfig(
@@ -213,6 +230,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val preferences = AppPreferences(application)
     private val cheatRepository = CheatRepository(application)
+    private val perGameSettingsRepository = PerGameSettingsRepository(application)
     private val deviceProfile = DevicePerformanceProfiles.current()
     private val _uiState = MutableStateFlow(EmulationUiState())
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
@@ -223,6 +241,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var cancelPendingStart = false
     @Volatile
     private var currentGameTitle: String = ""
+    @Volatile
+    private var currentGamePath: String? = null
     @Volatile
     private var currentGameSerial: String = ""
     @Volatile
@@ -237,8 +257,18 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             recommendedPresetId = deviceProfile.recommendedPresetId
         )
         viewModelScope.launch {
+            preferences.overlayShow.collect { enabled ->
+                _uiState.value = _uiState.value.copy(controlsVisible = enabled)
+            }
+        }
+        viewModelScope.launch {
             preferences.showFps.collect { enabled ->
                 _uiState.value = _uiState.value.copy(showFps = enabled)
+            }
+        }
+        viewModelScope.launch {
+            preferences.overlayLayoutSnapshot.collect { snapshot ->
+                applyOverlayLayoutSnapshot(snapshot)
             }
         }
         viewModelScope.launch {
@@ -516,6 +546,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun startEmulation(path: String?, slotToLoad: Int? = null, bootToBios: Boolean = false) {
         if (_uiState.value.isStarting) return
         cancelPendingStart = false
+        currentGamePath = if (bootToBios) null else path?.takeIf { it.isNotBlank() }
 
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -640,15 +671,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 finalLaunchPath = launchPath
                 if (bootToBios) {
                     currentGameTitle = "PlayStation 2 BIOS"
+                    currentGamePath = null
                     currentGameSerial = ""
                     currentGameCrc = ""
                     currentGameSource = "bios_only"
                     _uiState.value = _uiState.value.copy(
+                        currentGameTitle = currentGameTitle,
+                        currentGameSubtitle = currentGameSubtitle(),
+                        gameSettingsProfileActive = false,
                         cheatsGameKey = null,
                         availableCheats = emptyList()
                     )
                 } else {
                     val safePath = path.orEmpty()
+                    val existingProfile = currentGamePath?.let(perGameSettingsRepository::get)
                     val metadata = EmulatorBridge.getGameMetadata(safePath)
                     currentGameTitle = metadata.title
                     currentGameSerial = metadata.serial.orEmpty()
@@ -659,6 +695,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         else -> "unknown"
                     }
                     refreshCurrentGameCheats(metadata)
+                    _uiState.value = _uiState.value.copy(
+                        currentGameTitle = currentGameTitle,
+                        currentGameSubtitle = currentGameSubtitle(),
+                        gameSettingsProfileActive = existingProfile != null
+                    )
+                    syncCurrentGameProfileMetadata()
                 }
                 updateCrashContext(
                     launchState = "starting",
@@ -836,31 +878,91 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun toggleControlsVisibility() {
-        _uiState.value = _uiState.value.copy(
-            controlsVisible = !_uiState.value.controlsVisible
-        )
+        viewModelScope.launch {
+            val newValue = !_uiState.value.controlsVisible
+            preferences.setOverlayShow(newValue)
+            _uiState.value = _uiState.value.copy(controlsVisible = newValue)
+        }
+    }
+
+    fun saveCurrentGameSettingsProfile() {
+        viewModelScope.launch {
+            persistRuntimeState(_uiState.value)
+        }
+    }
+
+    fun resetCurrentGameSettingsProfile() {
+        viewModelScope.launch {
+            resetCurrentGameProfile()
+        }
+    }
+
+    fun setOverlayScale(value: Int) {
+        viewModelScope.launch {
+            preferences.setOverlayScale(value)
+            _uiState.value = _uiState.value.copy(overlayScale = value.coerceIn(50, 150))
+        }
+    }
+
+    fun setOverlayOpacity(value: Int) {
+        viewModelScope.launch {
+            preferences.setOverlayOpacity(value)
+            _uiState.value = _uiState.value.copy(overlayOpacity = value.coerceIn(20, 100))
+        }
+    }
+
+    fun setHideOverlayOnGamepad(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setHideOverlayOnGamepad(enabled)
+            _uiState.value = _uiState.value.copy(hideOverlayOnGamepad = enabled)
+        }
+    }
+
+    fun setCompactControls(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setCompactControls(enabled)
+            _uiState.value = _uiState.value.copy(compactControls = enabled)
+        }
+    }
+
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setKeepScreenOn(enabled)
+            _uiState.value = _uiState.value.copy(keepScreenOn = enabled)
+        }
+    }
+
+    fun setStickScale(value: Int) {
+        viewModelScope.launch {
+            preferences.setStickScale(value)
+            _uiState.value = _uiState.value.copy(stickScale = value.coerceIn(50, 200))
+        }
     }
 
     fun toggleFpsVisibility() {
         viewModelScope.launch {
             val newValue = !_uiState.value.showFps
-            preferences.setShowFps(newValue)
-            _uiState.value = _uiState.value.copy(showFps = newValue)
+            persistRuntimeState(_uiState.value.copy(showFps = newValue)) {
+                preferences.setShowFps(newValue)
+            }
         }
     }
 
     fun setFpsOverlayMode(mode: Int) {
         viewModelScope.launch {
-            preferences.setFpsOverlayMode(mode)
-            _uiState.value = _uiState.value.copy(fpsOverlayMode = mode)
+            persistRuntimeState(_uiState.value.copy(fpsOverlayMode = mode)) {
+                preferences.setFpsOverlayMode(mode)
+            }
         }
     }
 
     fun setRenderer(renderer: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setRenderer(renderer)
-            _uiState.value = _uiState.value.copy(renderer = renderer)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(renderer = renderer)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setRenderer(renderer)
+            }
             EmulatorBridge.setRenderer(renderer)
             updateCrashContext()
         }
@@ -868,9 +970,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setUpscale(upscale: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setUpscaleMultiplier(upscale)
-            _uiState.value = _uiState.value.copy(upscale = upscale)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(upscale = upscale)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setUpscaleMultiplier(upscale)
+            }
             EmulatorBridge.setUpscaleMultiplier(upscale.toFloat())
             updateCrashContext()
         }
@@ -878,8 +982,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setAspectRatio(value: Int) {
         viewModelScope.launch {
-            preferences.setAspectRatio(value)
-            _uiState.value = _uiState.value.copy(aspectRatio = value)
+            persistRuntimeState(_uiState.value.copy(aspectRatio = value)) {
+                preferences.setAspectRatio(value)
+            }
             EmulatorBridge.setAspectRatio(value)
             updateCrashContext()
         }
@@ -887,9 +992,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setMtvu(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setEnableMtvu(enabled)
-            _uiState.value = _uiState.value.copy(enableMtvu = enabled)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableMtvu = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableMtvu(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", enabled.toString())
             updateCrashContext()
         }
@@ -897,9 +1004,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setFastCdvd(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setEnableFastCdvd(enabled)
-            _uiState.value = _uiState.value.copy(enableFastCdvd = enabled)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableFastCdvd = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableFastCdvd(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", enabled.toString())
             updateCrashContext()
         }
@@ -907,8 +1016,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEnableCheats(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setEnableCheats(enabled)
-            _uiState.value = _uiState.value.copy(enableCheats = enabled)
+            persistRuntimeState(_uiState.value.copy(enableCheats = enabled)) {
+                preferences.setEnableCheats(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", enabled.toString())
             if (enabled) {
                 syncCheatsForCurrentGame()
@@ -929,20 +1039,23 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 enabledIds = updatedBlocks.filter { it.enabled }.map { it.id }.toSet()
             )
             syncCheatsForCurrentGame(gameKey)
-            _uiState.value = _uiState.value.copy(
+            persistRuntimeState(_uiState.value.copy(
                 availableCheats = updatedBlocks,
                 enableCheats = true
-            )
-            preferences.setEnableCheats(true)
+            )) {
+                preferences.setEnableCheats(true)
+            }
             EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "true")
         }
     }
 
     fun setHwDownloadMode(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setHwDownloadMode(value)
-            _uiState.value = _uiState.value.copy(hwDownloadMode = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(hwDownloadMode = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setHwDownloadMode(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "HWDownloadMode", "int", value.toString())
             updateCrashContext()
         }
@@ -950,9 +1063,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setFrameSkip(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setFrameSkip(value)
-            _uiState.value = _uiState.value.copy(frameSkip = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(frameSkip = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setFrameSkip(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "FrameSkip", "int", value.toString())
             updateCrashContext()
         }
@@ -960,8 +1075,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setFrameLimitEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setFrameLimitEnabled(enabled)
-            _uiState.value = _uiState.value.copy(frameLimitEnabled = enabled)
+            persistRuntimeState(_uiState.value.copy(frameLimitEnabled = enabled)) {
+                preferences.setFrameLimitEnabled(enabled)
+            }
             EmulatorBridge.setFrameLimitEnabled(enabled)
             updateCrashContext()
         }
@@ -970,8 +1086,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setTargetFps(value: Int) {
         viewModelScope.launch {
             val clamped = value.coerceIn(20, 120)
-            preferences.setTargetFps(clamped)
-            _uiState.value = _uiState.value.copy(targetFps = clamped)
+            persistRuntimeState(_uiState.value.copy(targetFps = clamped)) {
+                preferences.setTargetFps(clamped)
+            }
             EmulatorBridge.setTargetFps(clamped)
             updateCrashContext()
         }
@@ -979,9 +1096,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTextureFiltering(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTextureFiltering(value)
-            _uiState.value = _uiState.value.copy(textureFiltering = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(textureFiltering = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTextureFiltering(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "filter", "int", value.toString())
             updateCrashContext()
         }
@@ -989,9 +1108,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTrilinearFiltering(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTrilinearFiltering(value)
-            _uiState.value = _uiState.value.copy(trilinearFiltering = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(trilinearFiltering = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTrilinearFiltering(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "TriFilter", "int", value.toString())
             updateCrashContext()
         }
@@ -999,9 +1120,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setBlendingAccuracy(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setBlendingAccuracy(value)
-            _uiState.value = _uiState.value.copy(blendingAccuracy = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(blendingAccuracy = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setBlendingAccuracy(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "accurate_blending_unit", "int", value.toString())
             updateCrashContext()
         }
@@ -1009,9 +1132,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTexturePreloading(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTexturePreloading(value)
-            _uiState.value = _uiState.value.copy(texturePreloading = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(texturePreloading = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTexturePreloading(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "texture_preloading", "int", value.toString())
             updateCrashContext()
         }
@@ -1019,9 +1144,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEnableFxaa(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setEnableFxaa(enabled)
-            _uiState.value = _uiState.value.copy(enableFxaa = enabled)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableFxaa = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableFxaa(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "fxaa", "bool", enabled.toString())
             updateCrashContext()
         }
@@ -1029,9 +1156,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setCasMode(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setCasMode(value)
-            _uiState.value = _uiState.value.copy(casMode = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(casMode = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setCasMode(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "CASMode", "int", value.toString())
             updateCrashContext()
         }
@@ -1040,9 +1169,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setCasSharpness(value: Int) {
         viewModelScope.launch {
             val clamped = value.coerceIn(0, 100)
-            markPerformancePresetCustom()
-            preferences.setCasSharpness(clamped)
-            _uiState.value = _uiState.value.copy(casSharpness = clamped)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(casSharpness = clamped)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setCasSharpness(clamped)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "CASSharpness", "int", clamped.toString())
             updateCrashContext()
         }
@@ -1050,9 +1181,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setAnisotropicFiltering(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setAnisotropicFiltering(value)
-            _uiState.value = _uiState.value.copy(anisotropicFiltering = value)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(anisotropicFiltering = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setAnisotropicFiltering(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "MaxAnisotropy", "int", value.toString())
             updateCrashContext()
         }
@@ -1060,9 +1193,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEnableHwMipmapping(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setEnableHwMipmapping(enabled)
-            _uiState.value = _uiState.value.copy(enableHwMipmapping = enabled)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(enableHwMipmapping = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEnableHwMipmapping(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "hw_mipmap", "bool", enabled.toString())
             updateCrashContext()
         }
@@ -1070,10 +1205,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setCpuSpriteRenderSize(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setCpuSpriteRenderSize(value)
-            val newState = _uiState.value.copy(cpuSpriteRenderSize = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(cpuSpriteRenderSize = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setCpuSpriteRenderSize(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_CPUSpriteRenderBW", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1082,10 +1218,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setCpuSpriteRenderLevel(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setCpuSpriteRenderLevel(value)
-            val newState = _uiState.value.copy(cpuSpriteRenderLevel = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(cpuSpriteRenderLevel = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setCpuSpriteRenderLevel(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_CPUSpriteRenderLevel", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1094,10 +1231,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setSoftwareClutRender(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setSoftwareClutRender(value)
-            val newState = _uiState.value.copy(softwareClutRender = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(softwareClutRender = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setSoftwareClutRender(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_CPUCLUTRender", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1106,10 +1244,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setGpuTargetClutMode(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setGpuTargetClutMode(value)
-            val newState = _uiState.value.copy(gpuTargetClutMode = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(gpuTargetClutMode = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setGpuTargetClutMode(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_GPUTargetCLUTMode", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1118,10 +1257,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setSkipDrawStart(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setSkipDrawStart(value)
-            val newState = _uiState.value.copy(skipDrawStart = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(skipDrawStart = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setSkipDrawStart(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_Start", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1130,10 +1270,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setSkipDrawEnd(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setSkipDrawEnd(value)
-            val newState = _uiState.value.copy(skipDrawEnd = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(skipDrawEnd = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setSkipDrawEnd(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1142,10 +1283,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setAutoFlushHardware(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setAutoFlushHardware(value)
-            val newState = _uiState.value.copy(autoFlushHardware = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(autoFlushHardware = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setAutoFlushHardware(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_AutoFlushLevel", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1154,10 +1296,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setCpuFramebufferConversion(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setCpuFramebufferConversion(enabled)
-            val newState = _uiState.value.copy(cpuFramebufferConversion = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(cpuFramebufferConversion = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setCpuFramebufferConversion(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_CPU_FB_Conversion", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1166,10 +1309,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDisableDepthConversion(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setDisableDepthConversion(enabled)
-            val newState = _uiState.value.copy(disableDepthConversion = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(disableDepthConversion = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setDisableDepthConversion(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_DisableDepthSupport", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1178,10 +1322,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDisableSafeFeatures(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setDisableSafeFeatures(enabled)
-            val newState = _uiState.value.copy(disableSafeFeatures = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(disableSafeFeatures = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setDisableSafeFeatures(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_Disable_Safe_Features", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1190,10 +1335,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDisableRenderFixes(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setDisableRenderFixes(enabled)
-            val newState = _uiState.value.copy(disableRenderFixes = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(disableRenderFixes = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setDisableRenderFixes(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_DisableRenderFixes", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1202,10 +1348,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setPreloadFrameData(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setPreloadFrameData(enabled)
-            val newState = _uiState.value.copy(preloadFrameData = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(preloadFrameData = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setPreloadFrameData(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "preload_frame_with_gs_data", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1214,10 +1361,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setDisablePartialInvalidation(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setDisablePartialInvalidation(enabled)
-            val newState = _uiState.value.copy(disablePartialInvalidation = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(disablePartialInvalidation = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setDisablePartialInvalidation(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_DisablePartialInvalidation", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1226,10 +1374,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTextureInsideRt(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTextureInsideRt(value)
-            val newState = _uiState.value.copy(textureInsideRt = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(textureInsideRt = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTextureInsideRt(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_TextureInsideRt", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1238,10 +1387,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setReadTargetsOnClose(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setReadTargetsOnClose(enabled)
-            val newState = _uiState.value.copy(readTargetsOnClose = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(readTargetsOnClose = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setReadTargetsOnClose(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_ReadTCOnClose", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1250,10 +1400,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEstimateTextureRegion(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setEstimateTextureRegion(enabled)
-            val newState = _uiState.value.copy(estimateTextureRegion = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(estimateTextureRegion = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setEstimateTextureRegion(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_EstimateTextureRegion", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1262,10 +1413,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setGpuPaletteConversion(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setGpuPaletteConversion(enabled)
-            val newState = _uiState.value.copy(gpuPaletteConversion = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(gpuPaletteConversion = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setGpuPaletteConversion(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "paltex", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1274,10 +1426,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setHalfPixelOffset(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setHalfPixelOffset(value)
-            val newState = _uiState.value.copy(halfPixelOffset = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(halfPixelOffset = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setHalfPixelOffset(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1286,10 +1439,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setNativeScaling(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setNativeScaling(value)
-            val newState = _uiState.value.copy(nativeScaling = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(nativeScaling = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setNativeScaling(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_native_scaling", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1298,10 +1452,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setRoundSprite(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setRoundSprite(value)
-            val newState = _uiState.value.copy(roundSprite = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(roundSprite = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setRoundSprite(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_round_sprite_offset", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1310,10 +1465,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setBilinearUpscale(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setBilinearUpscale(value)
-            val newState = _uiState.value.copy(bilinearUpscale = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(bilinearUpscale = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setBilinearUpscale(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_BilinearHack", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1322,10 +1478,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTextureOffsetX(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTextureOffsetX(value)
-            val newState = _uiState.value.copy(textureOffsetX = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(textureOffsetX = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTextureOffsetX(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_TCOffsetX", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1334,10 +1491,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTextureOffsetY(value: Int) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setTextureOffsetY(value)
-            val newState = _uiState.value.copy(textureOffsetY = value)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(textureOffsetY = value)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setTextureOffsetY(value)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_TCOffsetY", "int", value.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1346,10 +1504,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setAlignSprite(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setAlignSprite(enabled)
-            val newState = _uiState.value.copy(alignSprite = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(alignSprite = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setAlignSprite(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_align_sprite_X", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1358,10 +1517,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setMergeSprite(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setMergeSprite(enabled)
-            val newState = _uiState.value.copy(mergeSprite = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(mergeSprite = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setMergeSprite(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_merge_pp_sprite", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1370,10 +1530,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setForceEvenSpritePosition(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setForceEvenSpritePosition(enabled)
-            val newState = _uiState.value.copy(forceEvenSpritePosition = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(forceEvenSpritePosition = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setForceEvenSpritePosition(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_ForceEvenSpritePosition", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1382,10 +1543,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setNativePaletteDraw(enabled: Boolean) {
         viewModelScope.launch {
-            markPerformancePresetCustom()
-            preferences.setNativePaletteDraw(enabled)
-            val newState = _uiState.value.copy(nativePaletteDraw = enabled)
-            _uiState.value = newState
+            val newState = markPerformancePresetCustom(_uiState.value).copy(nativePaletteDraw = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setNativePaletteDraw(enabled)
+            }
             EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_NativePaletteDraw", "bool", enabled.toString())
             refreshManualHardwareFixes(newState)
             updateCrashContext()
@@ -1395,12 +1557,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun applyPerformancePreset(presetId: Int) {
         viewModelScope.launch {
             val config = PerformancePresets.configFor(presetId, deviceProfile) ?: run {
-                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                if (activePerGameKey() == null) {
+                    preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                }
                 return@launch
             }
 
-            preferences.applyPerformancePreset(config)
-            _uiState.value = _uiState.value.copy(
+            val newState = _uiState.value.copy(
                 performancePreset = config.id,
                 renderer = config.renderer,
                 upscale = config.upscaleMultiplier,
@@ -1409,6 +1572,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 frameSkip = config.frameSkip,
                 textureFiltering = config.textureFiltering
             )
+            persistRuntimeState(newState) {
+                preferences.applyPerformancePreset(config)
+            }
             applyRuntimePerformancePreset(config)
             updateCrashContext()
         }
@@ -1418,10 +1584,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         applyPerformancePreset(deviceProfile.recommendedPresetId)
     }
 
-    private suspend fun markPerformancePresetCustom() {
-        if (_uiState.value.performancePreset != PerformancePresets.CUSTOM) {
-            preferences.setPerformancePreset(PerformancePresets.CUSTOM)
-            _uiState.value = _uiState.value.copy(performancePreset = PerformancePresets.CUSTOM)
+    private fun markPerformancePresetCustom(state: EmulationUiState): EmulationUiState {
+        return if (state.performancePreset == PerformancePresets.CUSTOM) {
+            state
+        } else {
+            state.copy(performancePreset = PerformancePresets.CUSTOM)
         }
     }
 
@@ -1481,7 +1648,83 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
+    private fun applyOverlayLayoutSnapshot(snapshot: OverlayLayoutSnapshot) {
+        _uiState.value = _uiState.value.copy(
+            overlayScale = snapshot.overlayScale,
+            overlayOpacity = snapshot.overlayOpacity,
+            hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
+            dpadOffset = snapshot.dpadOffset,
+            lstickOffset = snapshot.lstickOffset,
+            rstickOffset = snapshot.rstickOffset,
+            actionOffset = snapshot.actionOffset,
+            lbtnOffset = snapshot.lbtnOffset,
+            rbtnOffset = snapshot.rbtnOffset,
+            centerOffset = snapshot.centerOffset,
+            stickScale = snapshot.stickScale
+        )
+    }
+
+    private fun currentGameSubtitle(): String = buildList {
+        currentGameSerial.takeIf { it.isNotBlank() }?.let(::add)
+        currentGameCrc.takeIf { it.isNotBlank() }?.let(::add)
+    }.joinToString("  /  ")
+
+    private fun activePerGameKey(): String? = currentGamePath?.takeIf { it.isNotBlank() }
+
+    private fun resolvePerGameTitle(state: EmulationUiState): String {
+        return state.currentGameTitle
+            .takeIf { it.isNotBlank() && it != "PlayStation 2 BIOS" }
+            ?: currentGameTitle.takeIf { it.isNotBlank() && it != "PlayStation 2 BIOS" }
+            ?: activePerGameKey()?.let { DocumentPathResolver.getDisplayName(getApplication(), it).substringBeforeLast('.') }
+            ?: "Unknown Game"
+    }
+
+    private suspend fun persistRuntimeState(
+        updatedState: EmulationUiState,
+        persistGlobal: suspend () -> Unit = {}
+    ): EmulationUiState {
+        val gameKey = activePerGameKey()
+        return if (gameKey != null) {
+            perGameSettingsRepository.save(
+                updatedState.toPerGameSettings(
+                    gameKey = gameKey,
+                    gameTitle = resolvePerGameTitle(updatedState),
+                    gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+                )
+            )
+            val finalState = updatedState.copy(gameSettingsProfileActive = true)
+            _uiState.value = finalState
+            finalState
+        } else {
+            persistGlobal()
+            _uiState.value = updatedState
+            updatedState
+        }
+    }
+
+    private suspend fun syncCurrentGameProfileMetadata() {
+        val gameKey = activePerGameKey() ?: return
+        val profile = perGameSettingsRepository.get(gameKey) ?: return
+        val resolvedTitle = resolvePerGameTitle(_uiState.value)
+        val serial = currentGameSerial.takeIf { it.isNotBlank() }
+        if (profile.gameTitle != resolvedTitle || profile.gameSerial != serial) {
+            perGameSettingsRepository.save(
+                profile.copy(
+                    gameTitle = resolvedTitle,
+                    gameSerial = serial
+                )
+            )
+        }
+    }
+
+    private suspend fun resetCurrentGameProfile() {
+        val gameKey = activePerGameKey() ?: return
+        perGameSettingsRepository.delete(gameKey)
+        _uiState.value = _uiState.value.copy(gameSettingsProfileActive = false)
+    }
+
     private suspend fun loadLaunchConfig(): EmulationLaunchConfig {
+        val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
         return EmulationLaunchConfig(
             biosPath = preferences.biosPath.first(),
             renderer = preferences.renderer.first(),
@@ -1536,10 +1779,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             mergeSprite = preferences.mergeSprite.first(),
             forceEvenSpritePosition = preferences.forceEvenSpritePosition.first(),
             nativePaletteDraw = preferences.nativePaletteDraw.first()
-        )
+        ).applyProfile(profile)
     }
 
     private suspend fun loadLiveRuntimeSnapshot(): LiveRuntimeSnapshot {
+        val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
         return LiveRuntimeSnapshot(
             renderer = preferences.renderer.first(),
             upscale = preferences.upscaleMultiplier.first(),
@@ -1588,6 +1832,180 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             mergeSprite = preferences.mergeSprite.first(),
             forceEvenSpritePosition = preferences.forceEvenSpritePosition.first(),
             nativePaletteDraw = preferences.nativePaletteDraw.first()
+        ).applyProfile(profile)
+    }
+
+    private fun EmulationLaunchConfig.applyProfile(profile: PerGameSettings?): EmulationLaunchConfig {
+        if (profile == null) return this
+        return copy(
+            renderer = profile.renderer,
+            upscaleMultiplier = profile.upscaleMultiplier,
+            aspectRatio = profile.aspectRatio,
+            mtvu = profile.enableMtvu,
+            fastCdvd = profile.enableFastCdvd,
+            enableCheats = profile.enableCheats,
+            hwDownloadMode = profile.hwDownloadMode,
+            eeCycleRate = profile.eeCycleRate,
+            eeCycleSkip = profile.eeCycleSkip,
+            frameSkip = profile.frameSkip,
+            frameLimitEnabled = profile.frameLimitEnabled,
+            targetFps = profile.targetFps,
+            textureFiltering = profile.textureFiltering,
+            trilinearFiltering = profile.trilinearFiltering,
+            blendingAccuracy = profile.blendingAccuracy,
+            texturePreloading = profile.texturePreloading,
+            enableFxaa = profile.enableFxaa,
+            casMode = profile.casMode,
+            casSharpness = profile.casSharpness,
+            anisotropicFiltering = profile.anisotropicFiltering,
+            enableHwMipmapping = profile.enableHwMipmapping,
+            widescreenPatches = profile.enableWidescreenPatches,
+            noInterlacingPatches = profile.enableNoInterlacingPatches,
+            cpuSpriteRenderSize = profile.cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = profile.cpuSpriteRenderLevel,
+            softwareClutRender = profile.softwareClutRender,
+            gpuTargetClutMode = profile.gpuTargetClutMode,
+            skipDrawStart = profile.skipDrawStart,
+            skipDrawEnd = profile.skipDrawEnd,
+            autoFlushHardware = profile.autoFlushHardware,
+            cpuFramebufferConversion = profile.cpuFramebufferConversion,
+            disableDepthConversion = profile.disableDepthConversion,
+            disableSafeFeatures = profile.disableSafeFeatures,
+            disableRenderFixes = profile.disableRenderFixes,
+            preloadFrameData = profile.preloadFrameData,
+            disablePartialInvalidation = profile.disablePartialInvalidation,
+            textureInsideRt = profile.textureInsideRt,
+            readTargetsOnClose = profile.readTargetsOnClose,
+            estimateTextureRegion = profile.estimateTextureRegion,
+            gpuPaletteConversion = profile.gpuPaletteConversion,
+            halfPixelOffset = profile.halfPixelOffset,
+            nativeScaling = profile.nativeScaling,
+            roundSprite = profile.roundSprite,
+            bilinearUpscale = profile.bilinearUpscale,
+            textureOffsetX = profile.textureOffsetX,
+            textureOffsetY = profile.textureOffsetY,
+            alignSprite = profile.alignSprite,
+            mergeSprite = profile.mergeSprite,
+            forceEvenSpritePosition = profile.forceEvenSpritePosition,
+            nativePaletteDraw = profile.nativePaletteDraw
+        )
+    }
+
+    private fun LiveRuntimeSnapshot.applyProfile(profile: PerGameSettings?): LiveRuntimeSnapshot {
+        if (profile == null) return this
+        return copy(
+            renderer = profile.renderer,
+            upscale = profile.upscaleMultiplier,
+            aspectRatio = profile.aspectRatio,
+            performancePreset = profile.performancePreset,
+            enableMtvu = profile.enableMtvu,
+            enableFastCdvd = profile.enableFastCdvd,
+            enableCheats = profile.enableCheats,
+            hwDownloadMode = profile.hwDownloadMode,
+            frameSkip = profile.frameSkip,
+            frameLimitEnabled = profile.frameLimitEnabled,
+            targetFps = profile.targetFps,
+            textureFiltering = profile.textureFiltering,
+            trilinearFiltering = profile.trilinearFiltering,
+            blendingAccuracy = profile.blendingAccuracy,
+            texturePreloading = profile.texturePreloading,
+            enableFxaa = profile.enableFxaa,
+            casMode = profile.casMode,
+            casSharpness = profile.casSharpness,
+            anisotropicFiltering = profile.anisotropicFiltering,
+            enableHwMipmapping = profile.enableHwMipmapping,
+            cpuSpriteRenderSize = profile.cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = profile.cpuSpriteRenderLevel,
+            softwareClutRender = profile.softwareClutRender,
+            gpuTargetClutMode = profile.gpuTargetClutMode,
+            skipDrawStart = profile.skipDrawStart,
+            skipDrawEnd = profile.skipDrawEnd,
+            autoFlushHardware = profile.autoFlushHardware,
+            cpuFramebufferConversion = profile.cpuFramebufferConversion,
+            disableDepthConversion = profile.disableDepthConversion,
+            disableSafeFeatures = profile.disableSafeFeatures,
+            disableRenderFixes = profile.disableRenderFixes,
+            preloadFrameData = profile.preloadFrameData,
+            disablePartialInvalidation = profile.disablePartialInvalidation,
+            textureInsideRt = profile.textureInsideRt,
+            readTargetsOnClose = profile.readTargetsOnClose,
+            estimateTextureRegion = profile.estimateTextureRegion,
+            gpuPaletteConversion = profile.gpuPaletteConversion,
+            halfPixelOffset = profile.halfPixelOffset,
+            nativeScaling = profile.nativeScaling,
+            roundSprite = profile.roundSprite,
+            bilinearUpscale = profile.bilinearUpscale,
+            textureOffsetX = profile.textureOffsetX,
+            textureOffsetY = profile.textureOffsetY,
+            alignSprite = profile.alignSprite,
+            mergeSprite = profile.mergeSprite,
+            forceEvenSpritePosition = profile.forceEvenSpritePosition,
+            nativePaletteDraw = profile.nativePaletteDraw
+        )
+    }
+
+    private suspend fun EmulationUiState.toPerGameSettings(
+        gameKey: String,
+        gameTitle: String,
+        gameSerial: String?
+    ): PerGameSettings {
+        return PerGameSettings(
+            gameKey = gameKey,
+            gameTitle = gameTitle,
+            gameSerial = gameSerial,
+            renderer = renderer,
+            upscaleMultiplier = upscale,
+            aspectRatio = aspectRatio,
+            performancePreset = performancePreset,
+            showFps = showFps,
+            fpsOverlayMode = fpsOverlayMode,
+            enableMtvu = enableMtvu,
+            enableFastCdvd = enableFastCdvd,
+            enableCheats = enableCheats,
+            hwDownloadMode = hwDownloadMode,
+            eeCycleRate = preferences.eeCycleRate.first(),
+            eeCycleSkip = preferences.eeCycleSkip.first(),
+            frameSkip = frameSkip,
+            frameLimitEnabled = frameLimitEnabled,
+            targetFps = targetFps,
+            textureFiltering = textureFiltering,
+            trilinearFiltering = trilinearFiltering,
+            blendingAccuracy = blendingAccuracy,
+            texturePreloading = texturePreloading,
+            enableFxaa = enableFxaa,
+            casMode = casMode,
+            casSharpness = casSharpness,
+            anisotropicFiltering = anisotropicFiltering,
+            enableHwMipmapping = enableHwMipmapping,
+            enableWidescreenPatches = preferences.enableWidescreenPatches.first(),
+            enableNoInterlacingPatches = preferences.enableNoInterlacingPatches.first(),
+            cpuSpriteRenderSize = cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = cpuSpriteRenderLevel,
+            softwareClutRender = softwareClutRender,
+            gpuTargetClutMode = gpuTargetClutMode,
+            skipDrawStart = skipDrawStart,
+            skipDrawEnd = skipDrawEnd,
+            autoFlushHardware = autoFlushHardware,
+            cpuFramebufferConversion = cpuFramebufferConversion,
+            disableDepthConversion = disableDepthConversion,
+            disableSafeFeatures = disableSafeFeatures,
+            disableRenderFixes = disableRenderFixes,
+            preloadFrameData = preloadFrameData,
+            disablePartialInvalidation = disablePartialInvalidation,
+            textureInsideRt = textureInsideRt,
+            readTargetsOnClose = readTargetsOnClose,
+            estimateTextureRegion = estimateTextureRegion,
+            gpuPaletteConversion = gpuPaletteConversion,
+            halfPixelOffset = halfPixelOffset,
+            nativeScaling = nativeScaling,
+            roundSprite = roundSprite,
+            bilinearUpscale = bilinearUpscale,
+            textureOffsetX = textureOffsetX,
+            textureOffsetY = textureOffsetY,
+            alignSprite = alignSprite,
+            mergeSprite = mergeSprite,
+            forceEvenSpritePosition = forceEvenSpritePosition,
+            nativePaletteDraw = nativePaletteDraw
         )
     }
 
@@ -1774,8 +2192,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun clearCrashContext() {
         currentGameTitle = ""
+        currentGamePath = null
         currentGameSerial = ""
         currentGameCrc = ""
+        _uiState.value = _uiState.value.copy(
+            currentGameTitle = "",
+            currentGameSubtitle = "",
+            gameSettingsProfileActive = false
+        )
         currentGameSource = ""
         NativeApp.setCrashContextString("emu_launch_state", "idle")
         NativeApp.setCrashContextString("emu_game_title", "")

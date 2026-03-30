@@ -33,10 +33,3 @@ data class Ps2CatalogDetails(
     val primarySerial: String? = null,
     val pcsx2Compatibility: Pcsx2CompatibilityEntry? = null
 )
-
-data class Ps2CatalogMatch(
-    val details: Ps2CatalogDetails,
-    val score: Int,
-    val matchedBySerial: Boolean,
-    val matchedBy: String = if (matchedBySerial) "serial" else "title"
-)

@@ -5,9 +5,11 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
+import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.GameItem
+import com.sbro.emucorex.data.GameLibraryCacheRepository
 import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.RecentGameEntry
 import java.util.Locale
@@ -21,12 +23,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
-import com.sbro.emucorex.data.ps2.Ps2CatalogRepository
 import kotlinx.coroutines.sync.withPermit
 import java.text.Normalizer
 
 enum class HomeSortOption {
-    TITLE, SIZE_DESC, SIZE_ASC
+    TITLE_ASC,
+    TITLE_DESC,
+    RECENT_DESC,
+    RECENT_ASC,
+    SIZE_DESC,
+    SIZE_ASC
 }
 
 enum class HomeLibraryViewMode {
@@ -44,21 +50,22 @@ data class HomeUiState(
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
     val searchQuery: String = "",
-    val sortOption: HomeSortOption = HomeSortOption.TITLE,
+    val sortOption: HomeSortOption = HomeSortOption.TITLE_ASC,
     val libraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = GameRepository()
+    private val libraryCacheRepository = GameLibraryCacheRepository(application)
     private val preferences = AppPreferences(application)
-    private val catalogRepository = Ps2CatalogRepository(application)
     private var allGames: List<GameItem> = emptyList()
     private var recentEntries: List<RecentGameEntry> = emptyList()
     private var coverSyncJob: Job? = null
     private var searchJob: Job? = null
     private var biosInitialized = false
     private var libraryInitialized = false
+    private var currentLibraryRoot: String? = null
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -66,19 +73,32 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             preferences.gamePath.distinctUntilChanged().collect { path ->
-                val isAccessible = SetupValidator.isGameFolderAccessible(getApplication(), path)
+                val context = getApplication<Application>()
+                val migratedPath = path
+                    ?.takeIf { !it.startsWith("content://") }
+                    ?.let { DocumentPathResolver.findAccessibleTreeUriForRawPath(context, it)?.toString() }
+
+                if (migratedPath != null && migratedPath != path) {
+                    preferences.setGamePath(migratedPath)
+                    return@collect
+                }
+
+                val effectivePath = migratedPath ?: path
+                currentLibraryRoot = effectivePath
+                val isAccessible = SetupValidator.isGameFolderAccessible(context, effectivePath)
                 _uiState.value = _uiState.value.copy(
                     gameFolderSet = isAccessible,
                     isLoading = isAccessible
                 )
-                if (isAccessible && path != null) {
-                    if (path.startsWith("content://")) {
-                        scanGamesFromUri(path.toUri(), isInitialLoad = !libraryInitialized)
+                if (isAccessible && effectivePath != null) {
+                    if (effectivePath.startsWith("content://")) {
+                        scanGamesFromUri(effectivePath.toUri(), isInitialLoad = !libraryInitialized)
                     } else {
-                        scanGames(path, isInitialLoad = !libraryInitialized)
+                        scanGames(effectivePath, isInitialLoad = !libraryInitialized)
                     }
                 } else {
                     allGames = emptyList()
+                    currentLibraryRoot = null
                     libraryInitialized = true
                     publishVisibleGames()
                     updateBootstrapState()
@@ -125,7 +145,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             preferences.setGamePath(uri.toString())
-            scanGamesFromUri(uri)
         }
     }
 
@@ -177,45 +196,65 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun scanGames(path: String, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            val showFullScreenLoader = isInitialLoad || allGames.isEmpty()
+            val cachedGames = resolveCachedGames(path)
+            val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
             _uiState.value = _uiState.value.copy(
                 isLoading = showFullScreenLoader,
                 isRefreshing = !showFullScreenLoader
             )
-            allGames = repository.scanDirectory(path, getApplication())
-            if (isInitialLoad) {
-                libraryInitialized = true
-            }
+            publishCachedGamesIfAvailable(path, cachedGames)
+            allGames = repository.scanDirectory(path, getApplication(), cachedGames.associateBy { it.path })
+            currentLibraryRoot = path
+            libraryInitialized = true
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 isRefreshing = false
             )
             publishVisibleGames()
             updateBootstrapState()
+            libraryCacheRepository.save(path, allGames)
             syncMissingCovers()
         }
     }
 
     private fun scanGamesFromUri(uri: Uri, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            val showFullScreenLoader = isInitialLoad || allGames.isEmpty()
+            val rootPath = uri.toString()
+            val cachedGames = resolveCachedGames(rootPath)
+            val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
             _uiState.value = _uiState.value.copy(
                 isLoading = showFullScreenLoader,
                 isRefreshing = !showFullScreenLoader
             )
+            publishCachedGamesIfAvailable(rootPath, cachedGames)
             val context = getApplication<Application>()
-            allGames = repository.scanDirectoryFromUri(uri, context)
-            if (isInitialLoad) {
-                libraryInitialized = true
-            }
+            allGames = repository.scanDirectoryFromUri(uri, context, cachedGames.associateBy { it.path })
+            currentLibraryRoot = rootPath
+            libraryInitialized = true
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 isRefreshing = false
             )
             publishVisibleGames()
             updateBootstrapState()
+            libraryCacheRepository.save(rootPath, allGames)
             syncMissingCovers()
         }
+    }
+
+    private fun resolveCachedGames(rootPath: String): List<GameItem> {
+        val inMemoryGames = allGames.takeIf { currentLibraryRoot == rootPath && it.isNotEmpty() }
+        return inMemoryGames ?: libraryCacheRepository.load(rootPath)
+    }
+
+    private fun publishCachedGamesIfAvailable(rootPath: String, cachedGames: List<GameItem>) {
+        if (cachedGames.isEmpty()) return
+        if (currentLibraryRoot == rootPath && allGames.isNotEmpty()) return
+        allGames = cachedGames
+        currentLibraryRoot = rootPath
+        libraryInitialized = true
+        publishVisibleGames()
+        updateBootstrapState()
     }
 
     private fun publishVisibleGames() {
@@ -228,9 +267,30 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 normalizeSearchToken(game.serial).contains(query)
         }
         val sorted = when (state.sortOption) {
-            HomeSortOption.TITLE -> filtered.sortedBy { it.title.lowercase(Locale.ROOT) }
-            HomeSortOption.SIZE_DESC -> filtered.sortedByDescending { it.fileSize }
-            HomeSortOption.SIZE_ASC -> filtered.sortedBy { it.fileSize }
+            HomeSortOption.TITLE_ASC -> filtered.sortedWith(
+                compareBy<GameItem> { normalizeSortToken(it.title) }
+                    .thenBy { normalizeSortToken(it.fileName) }
+            )
+            HomeSortOption.TITLE_DESC -> filtered.sortedWith(
+                compareByDescending<GameItem> { normalizeSortToken(it.title) }
+                    .thenByDescending { normalizeSortToken(it.fileName) }
+            )
+            HomeSortOption.RECENT_DESC -> filtered.sortedWith(
+                compareByDescending<GameItem> { it.lastModified }
+                    .thenBy { normalizeSortToken(it.title) }
+            )
+            HomeSortOption.RECENT_ASC -> filtered.sortedWith(
+                compareBy<GameItem> { it.lastModified }
+                    .thenBy { normalizeSortToken(it.title) }
+            )
+            HomeSortOption.SIZE_DESC -> filtered.sortedWith(
+                compareByDescending<GameItem> { it.fileSize }
+                    .thenBy { normalizeSortToken(it.title) }
+            )
+            HomeSortOption.SIZE_ASC -> filtered.sortedWith(
+                compareBy<GameItem> { it.fileSize }
+                    .thenBy { normalizeSortToken(it.title) }
+            )
         }
         val gamesByPath = allGames.associateBy { it.path }
         val recentGames = recentEntries.mapNotNull { entry ->
@@ -276,12 +336,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
             }
+            currentLibraryRoot?.let { rootPath ->
+                libraryCacheRepository.save(rootPath, allGames)
+            }
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        catalogRepository.close()
     }
 
     private fun normalizeSearchToken(value: String?): String {
@@ -291,6 +349,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
             .lowercase(Locale.ROOT)
             .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+            .trim()
+    }
+
+    private fun normalizeSortToken(value: String?): String {
+        if (value.isNullOrBlank()) return ""
+        val normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+        return normalized
+            .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
+            .lowercase(Locale.ROOT)
             .trim()
     }
 }

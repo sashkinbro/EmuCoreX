@@ -27,7 +27,6 @@ class Ps2CatalogRepository(private val context: Context) {
     private val dbFile: File by lazy { File(context.noBackupFilesDir, DB_NAME) }
     private var database: SQLiteDatabase? = null
     private val compatibilityRepository = Pcsx2CompatibilityRepository(context)
-    private val identityIndexRepository = Ps2IdentityIndexRepository(context)
 
     private val defaultSortOrder = """
         CASE WHEN rating IS NULL THEN 1 ELSE 0 END,
@@ -57,81 +56,6 @@ class Ps2CatalogRepository(private val context: Context) {
     }
 
     fun hasCatalog(): Boolean = ensureDatabaseReady()
-
-    fun findBestMatch(
-        title: String,
-        fileName: String,
-        serial: String?
-    ): Ps2CatalogMatch? {
-        if (!ensureDatabaseReady()) return null
-        val db = getDatabase() ?: return null
-
-        val candidates = linkedSetOf(
-            title,
-            fileName.substringBeforeLast('.'),
-            cleanupTitle(title),
-            cleanupTitle(fileName.substringBeforeLast('.'))
-        ).filter { it.isNotBlank() }
-
-        if (candidates.isEmpty()) return null
-
-        identityIndexRepository.findBestMatch(
-            serial = serial,
-            titleCandidates = candidates.toList()
-        )?.let { prebuiltMatch ->
-            val summary = getSummaryByIgdbId(db, prebuiltMatch.igdbId) ?: return@let
-            return Ps2CatalogMatch(
-                details = loadDetails(db, summary),
-                score = prebuiltMatch.confidence,
-                matchedBySerial = prebuiltMatch.matchedBy.startsWith("serial"),
-                matchedBy = prebuiltMatch.matchedBy
-            )
-        }
-
-        val serialMatch = serial
-            ?.let { normalizedSerial(it) }
-            ?.takeIf { it.isNotBlank() }
-            ?.let { lookupBySerial(db, it) }
-        
-        if (serialMatch != null) {
-            return Ps2CatalogMatch(
-                details = loadDetails(db, serialMatch),
-                score = 10_000,
-                matchedBySerial = true,
-                matchedBy = "serial_db"
-            )
-        }
-
-        val normalizedCandidates = candidates
-            .flatMap { buildSearchCandidates(it) }
-            .filter { it.isNotBlank() }
-            .distinct()
-
-        var best: Ps2CatalogSummary? = null
-        var bestCandidate: String? = null
-        var bestScore = Int.MIN_VALUE
-        for (candidate in normalizedCandidates) {
-            val titleMatches = lookupByNormalizedTitle(db, candidate)
-            for (summary in titleMatches) {
-                val score = calculateTitleScore(candidate, summary)
-                if (score > bestScore || (score == bestScore && (bestCandidate == null || candidate.length > bestCandidate.length))) {
-                    best = summary
-                    bestCandidate = candidate
-                    bestScore = score
-                }
-            }
-        }
-
-        val resolvedCandidate = bestCandidate
-        return best?.takeIf { resolvedCandidate != null && isConfidentTitleMatch(resolvedCandidate, it, bestScore) }?.let {
-            Ps2CatalogMatch(
-                details = loadDetails(db, it),
-                score = bestScore,
-                matchedBySerial = false,
-                matchedBy = "title_db"
-            )
-        }
-    }
 
     fun search(query: String, limit: Int = 60, offset: Int = 0): List<Ps2CatalogSummary> {
         if (!ensureDatabaseReady()) return emptyList()

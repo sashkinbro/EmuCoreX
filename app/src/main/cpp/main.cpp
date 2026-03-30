@@ -888,8 +888,10 @@ Java_com_sbro_emucorex_core_NativeApp_getGameTitle(JNIEnv *env, jclass clazz,
                                                   jstring p_szpath) {
     std::string _szPath = GetJavaString(env, p_szpath);
 
-    const GameList::Entry *entry;
-    entry = GameList::GetEntryForPath(_szPath.c_str());
+    const GameList::Entry* entry = GameList::GetEntryForPath(_szPath.c_str());
+    GameList::Entry scanned_entry;
+    if (entry == nullptr && GameList::PopulateEntryFromPath(_szPath, &scanned_entry))
+        entry = &scanned_entry;
 
     if (entry == nullptr) {
         const std::string fallbackTitle(Path::GetFileTitle(_szPath));

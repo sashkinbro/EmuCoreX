@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.DevicePerformanceProfiles
 import com.sbro.emucorex.core.GsHackDefaults
@@ -15,6 +16,7 @@ import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
@@ -24,6 +26,93 @@ data class RecentGameEntry(
     val path: String,
     val title: String,
     val lastPlayedAt: Long
+)
+
+data class SettingsSnapshot(
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val languageTag: String? = null,
+    val renderer: Int = 0,
+    val upscaleMultiplier: Int = 1,
+    val aspectRatio: Int = 1,
+    val padVibration: Boolean = true,
+    val showFps: Boolean = false,
+    val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
+    val compactControls: Boolean = true,
+    val keepScreenOn: Boolean = true,
+    val biosPath: String? = null,
+    val biosValid: Boolean = false,
+    val gamePath: String? = null,
+    val setupComplete: Boolean = false,
+    val eeCycleRate: Int = 0,
+    val eeCycleSkip: Int = 0,
+    val enableMtvu: Boolean = true,
+    val enableFastCdvd: Boolean = false,
+    val enableCheats: Boolean = true,
+    val hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
+    val frameSkip: Int = 0,
+    val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
+    val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
+    val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
+    val texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+    val enableFxaa: Boolean = false,
+    val casMode: Int = 0,
+    val casSharpness: Int = 50,
+    val enableWidescreenPatches: Boolean = false,
+    val enableNoInterlacingPatches: Boolean = false,
+    val anisotropicFiltering: Int = 0,
+    val enableHwMipmapping: Boolean = true,
+    val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
+    val cpuSpriteRenderLevel: Int = GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
+    val softwareClutRender: Int = GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
+    val gpuTargetClutMode: Int = GsHackDefaults.GPU_TARGET_CLUT_DEFAULT,
+    val skipDrawStart: Int = 0,
+    val skipDrawEnd: Int = 0,
+    val autoFlushHardware: Int = GsHackDefaults.AUTO_FLUSH_DEFAULT,
+    val cpuFramebufferConversion: Boolean = false,
+    val disableDepthConversion: Boolean = false,
+    val disableSafeFeatures: Boolean = false,
+    val disableRenderFixes: Boolean = false,
+    val preloadFrameData: Boolean = false,
+    val disablePartialInvalidation: Boolean = false,
+    val textureInsideRt: Int = GsHackDefaults.TEXTURE_INSIDE_RT_DEFAULT,
+    val readTargetsOnClose: Boolean = false,
+    val estimateTextureRegion: Boolean = false,
+    val gpuPaletteConversion: Boolean = false,
+    val halfPixelOffset: Int = GsHackDefaults.HALF_PIXEL_OFFSET_DEFAULT,
+    val nativeScaling: Int = GsHackDefaults.NATIVE_SCALING_DEFAULT,
+    val roundSprite: Int = GsHackDefaults.ROUND_SPRITE_DEFAULT,
+    val bilinearUpscale: Int = GsHackDefaults.BILINEAR_UPSCALE_DEFAULT,
+    val textureOffsetX: Int = 0,
+    val textureOffsetY: Int = 0,
+    val alignSprite: Boolean = false,
+    val mergeSprite: Boolean = false,
+    val forceEvenSpritePosition: Boolean = false,
+    val nativePaletteDraw: Boolean = false,
+    val performancePreset: Int = PerformancePresets.CUSTOM,
+    val overlayScale: Int = 100,
+    val overlayOpacity: Int = 80,
+    val overlayShow: Boolean = true,
+    val enableAutoGamepad: Boolean = true,
+    val hideOverlayOnGamepad: Boolean = true,
+    val gamepadBindings: Map<String, Int> = emptyMap(),
+    val gpuDriverType: Int = 0,
+    val customDriverPath: String? = null,
+    val frameLimitEnabled: Boolean = false,
+    val targetFps: Int = 60
+)
+
+data class OverlayLayoutSnapshot(
+    val overlayScale: Int = 100,
+    val overlayOpacity: Int = 80,
+    val hideOverlayOnGamepad: Boolean = true,
+    val dpadOffset: Pair<Float, Float> = 0f to 0f,
+    val lstickOffset: Pair<Float, Float> = 0f to 0f,
+    val rstickOffset: Pair<Float, Float> = 0f to 0f,
+    val actionOffset: Pair<Float, Float> = 0f to 0f,
+    val lbtnOffset: Pair<Float, Float> = 0f to 0f,
+    val rbtnOffset: Pair<Float, Float> = 0f to 0f,
+    val centerOffset: Pair<Float, Float> = 0f to 0f,
+    val stickScale: Int = 100
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -262,6 +351,106 @@ class AppPreferences(private val context: Context) {
         return localePrefs.getString("language_tag", null)
     }
 
+    val settingsSnapshot: Flow<SettingsSnapshot> = context.dataStore.data
+        .map { prefs ->
+            val biosPath = prefs[BIOS_PATH]
+            SettingsSnapshot(
+                themeMode = when (prefs[THEME_MODE]) {
+                    1 -> ThemeMode.LIGHT
+                    2 -> ThemeMode.DARK
+                    else -> ThemeMode.SYSTEM
+                },
+                languageTag = prefs[LANGUAGE_TAG],
+                renderer = prefs[RENDERER] ?: defaultRendererForCurrentDevice(),
+                upscaleMultiplier = prefs[UPSCALE] ?: 1,
+                aspectRatio = prefs[ASPECT_RATIO] ?: 1,
+                padVibration = prefs[PAD_VIBRATION] ?: true,
+                showFps = prefs[SHOW_FPS] ?: false,
+                fpsOverlayMode = prefs[FPS_OVERLAY_MODE] ?: FPS_OVERLAY_MODE_DETAILED,
+                compactControls = prefs[COMPACT_CONTROLS] ?: true,
+                keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
+                biosPath = biosPath,
+                biosValid = BiosValidator.hasUsableBiosFiles(context, biosPath),
+                gamePath = prefs[GAME_PATH],
+                setupComplete = prefs[ONBOARDING_COMPLETED] ?: false,
+                eeCycleRate = prefs[EE_CYCLE_RATE] ?: 0,
+                eeCycleSkip = prefs[EE_CYCLE_SKIP] ?: 0,
+                enableMtvu = prefs[ENABLE_MTVU] ?: true,
+                enableFastCdvd = prefs[ENABLE_FAST_CDVD] ?: false,
+                enableCheats = prefs[ENABLE_CHEATS] ?: true,
+                hwDownloadMode = prefs[HW_DOWNLOAD_MODE] ?: GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
+                frameSkip = prefs[FRAME_SKIP] ?: 0,
+                textureFiltering = prefs[TEXTURE_FILTERING] ?: GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
+                trilinearFiltering = prefs[TRILINEAR_FILTERING] ?: GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
+                blendingAccuracy = prefs[BLENDING_ACCURACY] ?: GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
+                texturePreloading = prefs[TEXTURE_PRELOADING] ?: GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+                enableFxaa = prefs[ENABLE_FXAA] ?: false,
+                casMode = prefs[CAS_MODE] ?: 0,
+                casSharpness = prefs[CAS_SHARPNESS] ?: 50,
+                enableWidescreenPatches = prefs[ENABLE_WIDESCREEN_PATCHES] ?: false,
+                enableNoInterlacingPatches = prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false,
+                anisotropicFiltering = prefs[ANISOTROPIC_FILTERING] ?: 0,
+                enableHwMipmapping = prefs[ENABLE_HW_MIPMAPPING] ?: true,
+                cpuSpriteRenderSize = prefs[CPU_SPRITE_RENDER_SIZE] ?: GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
+                cpuSpriteRenderLevel = prefs[CPU_SPRITE_RENDER_LEVEL] ?: GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
+                softwareClutRender = prefs[SOFTWARE_CLUT_RENDER] ?: GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
+                gpuTargetClutMode = prefs[GPU_TARGET_CLUT_MODE] ?: GsHackDefaults.GPU_TARGET_CLUT_DEFAULT,
+                skipDrawStart = prefs[SKIP_DRAW_START] ?: 0,
+                skipDrawEnd = prefs[SKIP_DRAW_END] ?: 0,
+                autoFlushHardware = prefs[AUTO_FLUSH_HARDWARE] ?: GsHackDefaults.AUTO_FLUSH_DEFAULT,
+                cpuFramebufferConversion = prefs[CPU_FRAMEBUFFER_CONVERSION] ?: false,
+                disableDepthConversion = prefs[DISABLE_DEPTH_CONVERSION] ?: false,
+                disableSafeFeatures = prefs[DISABLE_SAFE_FEATURES] ?: false,
+                disableRenderFixes = prefs[DISABLE_RENDER_FIXES] ?: false,
+                preloadFrameData = prefs[PRELOAD_FRAME_DATA] ?: false,
+                disablePartialInvalidation = prefs[DISABLE_PARTIAL_INVALIDATION] ?: false,
+                textureInsideRt = prefs[TEXTURE_INSIDE_RT] ?: GsHackDefaults.TEXTURE_INSIDE_RT_DEFAULT,
+                readTargetsOnClose = prefs[READ_TARGETS_ON_CLOSE] ?: false,
+                estimateTextureRegion = prefs[ESTIMATE_TEXTURE_REGION] ?: false,
+                gpuPaletteConversion = prefs[GPU_PALETTE_CONVERSION] ?: false,
+                halfPixelOffset = prefs[HALF_PIXEL_OFFSET] ?: GsHackDefaults.HALF_PIXEL_OFFSET_DEFAULT,
+                nativeScaling = prefs[NATIVE_SCALING] ?: GsHackDefaults.NATIVE_SCALING_DEFAULT,
+                roundSprite = prefs[ROUND_SPRITE] ?: GsHackDefaults.ROUND_SPRITE_DEFAULT,
+                bilinearUpscale = prefs[BILINEAR_UPSCALE] ?: GsHackDefaults.BILINEAR_UPSCALE_DEFAULT,
+                textureOffsetX = prefs[TEXTURE_OFFSET_X] ?: 0,
+                textureOffsetY = prefs[TEXTURE_OFFSET_Y] ?: 0,
+                alignSprite = prefs[ALIGN_SPRITE] ?: false,
+                mergeSprite = prefs[MERGE_SPRITE] ?: false,
+                forceEvenSpritePosition = prefs[FORCE_EVEN_SPRITE_POSITION] ?: false,
+                nativePaletteDraw = prefs[NATIVE_PALETTE_DRAW] ?: false,
+                performancePreset = prefs[PERFORMANCE_PRESET] ?: PerformancePresets.CUSTOM,
+                overlayScale = prefs[OVERLAY_SCALE] ?: 100,
+                overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
+                overlayShow = prefs[OVERLAY_SHOW] ?: true,
+                enableAutoGamepad = prefs[ENABLE_AUTO_GAMEPAD] ?: true,
+                hideOverlayOnGamepad = prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true,
+                gamepadBindings = decodeGamepadBindings(prefs[GAMEPAD_BINDINGS]),
+                gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
+                customDriverPath = prefs[CUSTOM_DRIVER_PATH],
+                frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: false,
+                targetFps = prefs[TARGET_FPS] ?: 60
+            )
+        }
+        .distinctUntilChanged()
+
+    val overlayLayoutSnapshot: Flow<OverlayLayoutSnapshot> = context.dataStore.data
+        .map { prefs ->
+            OverlayLayoutSnapshot(
+                overlayScale = prefs[OVERLAY_SCALE] ?: 100,
+                overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
+                hideOverlayOnGamepad = prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true,
+                dpadOffset = parseOffsetStr(prefs[DPAD_OFFSET]),
+                lstickOffset = parseOffsetStr(prefs[LSTICK_OFFSET]),
+                rstickOffset = parseOffsetStr(prefs[RSTICK_OFFSET]),
+                actionOffset = parseOffsetStr(prefs[ACTION_OFFSET]),
+                lbtnOffset = parseOffsetStr(prefs[LBTN_OFFSET]),
+                rbtnOffset = parseOffsetStr(prefs[RBTN_OFFSET]),
+                centerOffset = parseOffsetStr(prefs[CENTER_OFFSET]),
+                stickScale = prefs[STICK_SCALE] ?: 100
+            )
+        }
+        .distinctUntilChanged()
+
     val aspectRatio: Flow<Int> = context.dataStore.data.map { prefs ->
         prefs[ASPECT_RATIO] ?: 1
     }
@@ -296,6 +485,10 @@ class AppPreferences(private val context: Context) {
 
     val compactControls: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[COMPACT_CONTROLS] ?: true
+    }
+
+    suspend fun setCompactControls(enabled: Boolean) {
+        context.dataStore.edit { it[COMPACT_CONTROLS] = enabled }
     }
 
     val keepScreenOn: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -873,6 +1066,12 @@ class AppPreferences(private val context: Context) {
     val centerOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[CENTER_OFFSET]) }
     
     val stickScale: Flow<Int> = context.dataStore.data.map { it[STICK_SCALE] ?: 100 }
+
+    suspend fun setStickScale(scale: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[STICK_SCALE] = scale.coerceIn(50, 200)
+        }
+    }
 
     suspend fun setControlsLayout(
         dpadX: Float, dpadY: Float,

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -35,8 +36,8 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,6 +47,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +90,7 @@ fun AdaptiveShell(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateCheats: (() -> Unit)? = null,
+    onNavigateGameSettingsManager: (() -> Unit)? = null,
     onNavigateControlsEditor: (() -> Unit)? = null,
     onNavigateDataTransfer: (() -> Unit)? = null,
     onResetAllSettings: (() -> Unit)? = null,
@@ -107,6 +110,7 @@ fun AdaptiveShell(
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateCheats = onNavigateCheats,
+            onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateControlsEditor = onNavigateControlsEditor,
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
@@ -151,6 +155,7 @@ fun AdaptiveShell(
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateCheats = onNavigateCheats,
+            onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateControlsEditor = onNavigateControlsEditor,
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
@@ -175,6 +180,7 @@ private fun CompactAdaptiveShell(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateCheats: (() -> Unit)?,
+    onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateControlsEditor: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
@@ -190,7 +196,7 @@ private fun CompactAdaptiveShell(
     val isLandscapeCompact = configuration.screenWidthDp > configuration.screenHeightDp
     val drawerWidthFraction = if (isLandscapeCompact) 0.54f else 0.74f
     val selectedDrawerItemFocusRequester = remember { FocusRequester() }
-    val drawerState = remember { DrawerState(DrawerValue.Closed) }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     val mobileLeadingAction = if (
@@ -213,7 +219,9 @@ private fun CompactAdaptiveShell(
     }
 
     LaunchedEffect(selected, mobileLeadingAction) {
-        drawerState.close()
+        if (drawerState.isOpen) {
+            drawerState.close()
+        }
     }
     LaunchedEffect(drawerState.isOpen, mobileLeadingAction, selected) {
         if (drawerState.isOpen && mobileLeadingAction == MobileLeadingAction.Drawer) {
@@ -262,6 +270,7 @@ private fun CompactAdaptiveShell(
                     onNavigateSettings = onNavigateSettings,
                     onNavigateAchievements = onNavigateAchievements,
                     onNavigateCheats = onNavigateCheats,
+                    onNavigateGameSettingsManager = onNavigateGameSettingsManager,
                     onNavigateControlsEditor = onNavigateControlsEditor,
                     onNavigateDataTransfer = onNavigateDataTransfer,
                     onResetAllSettings = onResetAllSettings,
@@ -322,6 +331,7 @@ private fun SideNavigation(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateCheats: (() -> Unit)?,
+    onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateControlsEditor: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
@@ -336,6 +346,7 @@ private fun SideNavigation(
 ) {
     val drawerInset = 18.dp
     val drawerSectionSpacing = 14.dp
+    val drawerBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var showResetDialog by remember { mutableStateOf(false) }
 
     val navigateHome = rememberDebouncedClick {
@@ -349,6 +360,12 @@ private fun SideNavigation(
     val navigateAchievements = rememberDebouncedClick {
         onCloseDrawer()
         onNavigateAchievements()
+    }
+    val navigateGameSettingsManager = onNavigateGameSettingsManager?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
     }
     val navigateControlsEditor = onNavigateControlsEditor?.let {
         rememberDebouncedClick {
@@ -406,7 +423,12 @@ private fun SideNavigation(
             modifier = Modifier
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = drawerInset, vertical = drawerInset),
+                .padding(
+                    start = drawerInset,
+                    end = drawerInset,
+                    top = drawerInset,
+                    bottom = drawerInset + drawerBottomInset
+                ),
             verticalArrangement = Arrangement.spacedBy(drawerSectionSpacing)
         ) {
             Text(
@@ -514,6 +536,13 @@ private fun SideNavigation(
                     } else Modifier,
                     onClick = navigateSettings
                 )
+                if (navigateGameSettingsManager != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.Tune,
+                        label = stringResource(R.string.shell_game_settings_manager),
+                        onClick = navigateGameSettingsManager
+                    )
+                }
                 if (navigateControlsEditor != null) {
                     ShellAction(
                         icon = Icons.Rounded.SettingsSuggest,

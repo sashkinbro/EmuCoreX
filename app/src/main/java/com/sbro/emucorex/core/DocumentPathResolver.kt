@@ -30,6 +30,57 @@ object DocumentPathResolver {
         return resolveExternalStoragePath(rawPath.toUri())
     }
 
+    fun findAccessibleTreeUriForRawPath(context: Context, rawPath: String): Uri? {
+        if (rawPath.startsWith("content://")) return rawPath.toUri()
+
+        val normalizedRawPath = File(rawPath).absolutePath.removeSuffix("/")
+        val persistedTrees = context.contentResolver.persistedUriPermissions
+            .mapNotNull { permission ->
+                val treeUri = permission.uri
+                val treePath = resolveExternalStoragePath(treeUri)?.removeSuffix("/") ?: return@mapNotNull null
+                treeUri to treePath
+            }
+            .sortedByDescending { (_, treePath) -> treePath.length }
+
+        for ((treeUri, treePath) in persistedTrees) {
+            if (normalizedRawPath != treePath && !normalizedRawPath.startsWith("$treePath/")) {
+                continue
+            }
+
+            if (normalizedRawPath == treePath) {
+                return treeUri
+            }
+
+            val root = DocumentFile.fromTreeUri(context, treeUri) ?: continue
+            val relativeSegments = normalizedRawPath
+                .removePrefix(treePath)
+                .trim('/')
+                .split('/')
+                .filter { it.isNotBlank() }
+
+            var current = root
+            var failed = false
+            for (segment in relativeSegments) {
+                current = current.findFile(segment) ?: run {
+                    failed = true
+                    break
+                }
+            }
+            if (!failed) {
+                return current.uri
+            }
+        }
+
+        return null
+    }
+
+    fun isScopedStorageExternalPath(rawPath: String): Boolean {
+        if (rawPath.startsWith("content://")) return false
+        val normalized = File(rawPath).absolutePath
+        val primaryExternal = Environment.getExternalStorageDirectory().absolutePath
+        return normalized.startsWith(primaryExternal)
+    }
+
 
 
     fun prepareBiosDirectory(context: Context, rawPath: String?): String? {

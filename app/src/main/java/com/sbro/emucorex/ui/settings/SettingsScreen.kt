@@ -33,9 +33,8 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -152,11 +151,6 @@ fun SettingsScreen(
     val selectedTabFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
     val scope = rememberCoroutineScope()
-    val settingsTabs = remember { SettingsTab.entries.toList() }
-    val pagerState = rememberPagerState(
-        initialPage = initialTab.toSettingsTab().ordinal,
-        pageCount = { settingsTabs.size }
-    )
     val backupRepository = remember(context) {
         SettingsBackupRepository(
             context = context,
@@ -194,14 +188,6 @@ fun SettingsScreen(
     LaunchedEffect(useWideLayout, shouldRequestGamepadFocus) {
         if (shouldRequestGamepadFocus) {
             selectedTabFocusRequester.requestFocus()
-        }
-    }
-    LaunchedEffect(useWideLayout, pagerState.settledPage) {
-        if (!useWideLayout) {
-            val pageTab = settingsTabs.getOrNull(pagerState.settledPage) ?: return@LaunchedEffect
-            if (selectedTab != pageTab) {
-                selectedTab = pageTab
-            }
         }
     }
     RequestFocusOnResume(
@@ -346,51 +332,39 @@ fun SettingsScreen(
                 SettingsTabRow(
                     selectedTab = selectedTab,
                     onSelected = { tab ->
-                        if (selectedTab == tab && pagerState.settledPage == tab.ordinal) return@SettingsTabRow
+                        if (selectedTab == tab) return@SettingsTabRow
                         selectedTab = tab
-                        scope.launch {
-                            if (pagerState.currentPage != pagerState.settledPage) {
-                                pagerState.scrollToPage(pagerState.settledPage)
-                            }
-                            if (pagerState.settledPage != tab.ordinal) {
-                                pagerState.animateScrollToPage(tab.ordinal)
-                            }
-                        }
                     },
                     selectedTabFocusRequester = selectedTabFocusRequester
                 )
 
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.weight(1f),
-                    userScrollEnabled = false
-                ) { page ->
-                    SettingsContent(
-                        uiState = uiState,
-                        selectedTab = settingsTabs[page],
-                        context = context,
-                        launchBiosPicker = launchBiosPicker,
-                        launchGamePicker = launchGamePicker,
-                        launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
-                        launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
-                        launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                        launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
-                        openLanguageSheet = openLanguageSheet,
-                        cheatEntries = cheatEntries,
-                        onOpenCheatEditor = { gameKey ->
-                            cheatEditorGameKey = gameKey
-                            cheatEditorFileName = cheatRepository.listImportedCheatFiles()
-                                .firstOrNull { it.gameKey == gameKey }
-                                ?.fileName ?: "$gameKey.pnach"
-                            cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
-                        },
-                        onRequestGamepadBinding = { pendingGamepadActionId = it },
-                        onEditControlsClick = onEditControlsClick,
-                        viewModel = viewModel,
-                        topInset = 0.dp,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                SettingsContent(
+                    uiState = uiState,
+                    selectedTab = selectedTab,
+                    context = context,
+                    launchBiosPicker = launchBiosPicker,
+                    launchGamePicker = launchGamePicker,
+                    launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
+                    launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
+                    launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
+                    launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
+                    openLanguageSheet = openLanguageSheet,
+                    cheatEntries = cheatEntries,
+                    onOpenCheatEditor = { gameKey ->
+                        cheatEditorGameKey = gameKey
+                        cheatEditorFileName = cheatRepository.listImportedCheatFiles()
+                            .firstOrNull { it.gameKey == gameKey }
+                            ?.fileName ?: "$gameKey.pnach"
+                        cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
+                    },
+                    onRequestGamepadBinding = { pendingGamepadActionId = it },
+                    onEditControlsClick = onEditControlsClick,
+                    viewModel = viewModel,
+                    topInset = 0.dp,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                )
             }
         }
     }
@@ -567,26 +541,32 @@ private fun SettingsTabRail(
     selectedTabFocusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
+    val tabs = remember { SettingsTab.entries.toList() }
     Surface(
         modifier = modifier.fillMaxHeight(),
         shape = RoundedCornerShape(30.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 6.dp
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .fillMaxHeight()
+                .padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Spacer(modifier = Modifier.height(topInset))
-            Text(
-                text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-            )
-            SettingsTab.entries.forEach { tab ->
+            item(key = "topInset") {
+                Spacer(modifier = Modifier.height(topInset))
+            }
+            item(key = "title") {
+                Text(
+                    text = stringResource(R.string.settings_title),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+            }
+            items(items = tabs, key = { it.name }) { tab ->
                 FilterChip(
                     modifier = if (tab == selectedTab) {
                         Modifier.focusRequester(selectedTabFocusRequester)
@@ -615,6 +595,7 @@ private fun SettingsTabRow(
     onSelected: (SettingsTab) -> Unit,
     selectedTabFocusRequester: FocusRequester
 ) {
+    val tabs = remember { SettingsTab.entries.toList() }
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -622,7 +603,7 @@ private fun SettingsTabRow(
         contentPadding = PaddingValues(horizontal = ScreenHorizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(SettingsTab.entries) { tab ->
+        items(items = tabs, key = { it.name }) { tab ->
             FilterChip(
                 modifier = if (tab == selectedTab) {
                     Modifier.focusRequester(selectedTabFocusRequester)
@@ -856,9 +837,10 @@ private fun SettingsContent(
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_mapping_title)) {
+                        val connectedControllerName = GamepadManager.firstConnectedControllerName()
                         SettingsInlineNote(
-                            text = GamepadManager.firstConnectedControllerName()?.let {
-                                context.getString(R.string.settings_gamepad_mapping_connected, it)
+                            text = connectedControllerName?.let {
+                                stringResource(R.string.settings_gamepad_mapping_connected, it)
                             } ?: stringResource(R.string.settings_gamepad_mapping_disconnected)
                         )
                         for (action in gamepadActions) {
@@ -902,17 +884,18 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Paths -> {
-                    val biosDisplayName = remember(uiState.biosPath, context) {
+                    val notSetLabel = stringResource(R.string.settings_not_set)
+                    val biosDisplayName = remember(uiState.biosPath, context, notSetLabel) {
                         uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
-                            ?: context.getString(R.string.settings_not_set)
+                            ?: notSetLabel
                     }
-                    val gameDisplayName = remember(uiState.gamePath, context) {
+                    val gameDisplayName = remember(uiState.gamePath, context, notSetLabel) {
                         uiState.gamePath?.let { DocumentPathResolver.getDisplayName(context, it) }
-                            ?: context.getString(R.string.settings_not_set)
+                            ?: notSetLabel
                     }
-                    val driverDisplayName = remember(uiState.customDriverPath, context) {
+                    val driverDisplayName = remember(uiState.customDriverPath, context, notSetLabel) {
                         uiState.customDriverPath?.let { File(it).name }
-                            ?: context.getString(R.string.settings_not_set)
+                            ?: notSetLabel
                     }
                     SettingsSection(title = stringResource(R.string.settings_paths)) {
                         SettingsItem(
@@ -1161,14 +1144,15 @@ private fun SettingsContent(
                             )
                         } else {
                             cheatEntries.forEach { entry ->
+                                val cheatFileSummary = stringResource(
+                                    R.string.settings_cheats_file_summary,
+                                    entry.fileName,
+                                    entry.blockCount
+                                )
                                 SettingsItem(
                                     icon = Icons.Rounded.SaveAs,
                                     label = entry.displayName,
-                                    value = context.getString(
-                                        R.string.settings_cheats_file_summary,
-                                        entry.fileName,
-                                        entry.blockCount
-                                    ),
+                                    value = cheatFileSummary,
                                     onClick = { onOpenCheatEditor(entry.gameKey) }
                                 )
                             }
@@ -1576,9 +1560,7 @@ private fun SettingsItem(
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

@@ -45,6 +45,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -100,6 +101,13 @@ fun CatalogSearchScreen(
     val backFocusRequester = remember { FocusRequester() }
     val firstResultFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+
+    DisposableEffect(viewModel) {
+        viewModel.onScreenStart()
+        onDispose {
+            viewModel.onScreenStop()
+        }
+    }
 
     LaunchedEffect(uiState.isLoading, uiState.results.size, shouldRequestGamepadFocus) {
         if (!uiState.isLoading && shouldRequestGamepadFocus) {

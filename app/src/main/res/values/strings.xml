@@ -25,7 +25,10 @@
     <string name="home_setup_subtitle">Choose BIOS files and your games folder to get started.</string>
     <string name="home_finish_setup">Open Setup</string>
     <string name="home_choose_bios">Choose BIOS</string>
-    <string name="home_sort_title">Title</string>
+    <string name="home_sort_title_asc">Title A-Z</string>
+    <string name="home_sort_title_desc">Title Z-A</string>
+    <string name="home_sort_recent_desc">Recently updated</string>
+    <string name="home_sort_recent_asc">Oldest updated</string>
     <string name="home_sort_size_desc">Largest</string>
     <string name="home_sort_size_asc">Smallest</string>
     <string name="home_empty_search_title">No results</string>
@@ -111,6 +114,10 @@
     <string name="emulation_live_settings">Live Settings</string>
     <string name="emulation_basic_settings">Basic</string>
     <string name="emulation_advanced_settings">Advanced</string>
+    <string name="emulation_session_tab">Session</string>
+    <string name="emulation_overlay_tab">Overlay</string>
+    <string name="emulation_stick_scale">Stick scale</string>
+    <string name="emulation_close_menu">Close menu</string>
     <string name="emulation_section_performance">Performance Hacks</string>
     <string name="emulation_section_video">Advanced Video</string>
     <string name="emulation_aspect_auto">Auto</string>
@@ -528,8 +535,10 @@
     <string name="onboarding_status_ready">Ready</string>
     <string name="onboarding_status_invalid_bios">Files not found</string>
     <string name="onboarding_status_invalid_folder">Folder not found</string>
+    <string name="onboarding_status_not_needed">Not needed</string>
     <string name="onboarding_hint_title">Next step</string>
     <string name="onboarding_hint_body">%1$d of %2$d setup steps are complete. Once setup is finished, your games will appear in the library.</string>
+    <string name="onboarding_storage_not_needed_desc">Not required when your games folder was selected through Android folder access. Raw folders still need this so EmuCoreX can read serials and load game covers correctly.</string>
     <string name="onboarding_continue">Open Library</string>
     <string name="onboarding_finishing">Preparing your library</string>
     <string name="onboarding_next">Next</string>
@@ -547,7 +556,7 @@
     <string name="back">Back</string>
     <string name="select_folder">Select Folder</string>
     <string name="permission_storage_title">Storage access required</string>
-    <string name="permission_storage_desc">EmuCoreX needs access to your files to build your library.</string>
+    <string name="permission_storage_desc">Grant storage access so EmuCoreX can correctly read game serials, match GitHub covers, and launch games from raw library folders without permission errors.</string>
     <string name="grant_permission">Grant Access</string>
 
     <!-- Catalog Search -->
@@ -656,4 +665,38 @@
     <string name="settings_cas_mode_off">Off</string>
     <string name="settings_cas_mode_sharpen_only">Sharpen Only</string>
     <string name="settings_cas_mode_sharpen_resize">Sharpen + Resize</string>
+    <string name="shell_game_settings_manager">Game Settings Manager</string>
+    <string name="game_settings_manager_title">Game Settings Manager</string>
+    <string name="game_settings_manager_subtitle">Manage per-game profiles, edit core settings, and move them between devices.</string>
+    <string name="game_settings_manager_tools_title">Profile tools</string>
+    <string name="game_settings_manager_tools_desc">Export, import, or reset every per-game profile without touching your global defaults.</string>
+    <string name="game_settings_manager_export_title">Export profiles</string>
+    <string name="game_settings_manager_import_title">Import profiles</string>
+    <string name="game_settings_manager_reset_all_title">Reset all game profiles</string>
+    <string name="game_settings_manager_reset_all_desc">Every saved per-game settings profile will be removed. Global app settings will stay untouched.</string>
+    <string name="game_settings_manager_reset_all_confirm">Reset all</string>
+    <string name="game_settings_manager_export_success">Game settings profiles exported successfully.</string>
+    <string name="game_settings_manager_export_failure">Failed to export game settings profiles.</string>
+    <string name="game_settings_manager_import_success">Game settings profiles imported successfully.</string>
+    <string name="game_settings_manager_import_failure">Failed to import game settings profiles.</string>
+    <string name="game_settings_manager_empty_title">No game profiles yet</string>
+    <string name="game_settings_manager_empty_desc">Start tuning a game in the overlay and a dedicated profile will appear here automatically.</string>
+    <string name="game_settings_manager_delete_title">Delete game profile?</string>
+    <string name="game_settings_manager_delete_desc">%1$s will go back to your global defaults.</string>
+    <string name="game_settings_manager_reset_game_title">Reset to global</string>
+    <string name="game_settings_manager_upscale_badge">%1$dx upscale</string>
+    <string name="game_settings_manager_fps_badge">%1$d FPS</string>
+    <string name="game_settings_manager_editor_desc">These values override your global defaults for this game only.</string>
+    <string name="game_settings_manager_section_profile">Profile</string>
+    <string name="game_settings_manager_section_runtime">Runtime</string>
+    <string name="game_settings_manager_section_graphics">Graphics</string>
+    <string name="game_settings_overlay_section">Game profile</string>
+    <string name="game_settings_overlay_profile_active">This game uses its own saved settings profile.</string>
+    <string name="game_settings_overlay_profile_inactive">This game is currently using your global default settings.</string>
+    <string name="game_settings_overlay_profile_note">Changes made in the in-game menu are stored for this game instead of changing every title.</string>
+    <string name="game_settings_overlay_save">Save profile</string>
+    <string name="game_settings_overlay_reset">Reset to global</string>
+    <string name="save">Save</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
 </resources>

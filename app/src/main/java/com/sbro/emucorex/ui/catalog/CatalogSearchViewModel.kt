@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 
 data class CatalogSearchUiState(
     val query: String = "",
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val hasCatalog: Boolean = false,
     val hasMore: Boolean = false,
@@ -35,12 +35,25 @@ class CatalogSearchViewModel(application: Application) : AndroidViewModel(applic
     private val repository = Ps2CatalogRepository(application)
     private var refreshJob: Job? = null
     private var loadMoreJob: Job? = null
+    private var started = false
 
     private val _uiState = MutableStateFlow(CatalogSearchUiState())
     val uiState: StateFlow<CatalogSearchUiState> = _uiState.asStateFlow()
 
-    init {
+    fun onScreenStart() {
+        if (started) return
+        started = true
         refresh(showFullscreenLoader = true)
+    }
+
+    fun onScreenStop() {
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        repository.close()
+        started = false
+        _uiState.value = CatalogSearchUiState(
+            query = _uiState.value.query
+        )
     }
 
     fun updateQuery(query: String) {
@@ -150,5 +163,10 @@ class CatalogSearchViewModel(application: Application) : AndroidViewModel(applic
                 hasMore = nextPage.size >= PAGE_SIZE
             )
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        repository.close()
     }
 }

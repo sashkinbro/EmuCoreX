@@ -30,6 +30,7 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.sync.Semaphore
@@ -126,7 +127,7 @@ private fun putCachedBitmap(path: String, bitmap: Bitmap) {
 
 private fun loadBitmap(context: android.content.Context, coverPath: String?): Bitmap? {
     if (coverPath.isNullOrBlank()) return null
-    
+
     val reqWidth = 400
     val reqHeight = 600
 
@@ -136,11 +137,16 @@ private fun loadBitmap(context: android.content.Context, coverPath: String?): Bi
                 context.contentResolver.openInputStream(coverPath.toUri())
             }
             coverPath.startsWith("http://") || coverPath.startsWith("https://") -> {
-                val connection = URL(coverPath).openConnection() as HttpURLConnection
-                connection.connectTimeout = 8_000
-                connection.readTimeout = 12_000
-                connection.instanceFollowRedirects = true
-                connection.inputStream
+                val cachedFile = getOrCreateRemoteImageCacheFile(context, coverPath)
+                if (cachedFile != null && cachedFile.exists()) {
+                    cachedFile.inputStream()
+                } else {
+                    val connection = URL(coverPath).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 8_000
+                    connection.readTimeout = 12_000
+                    connection.instanceFollowRedirects = true
+                    connection.inputStream
+                }
             }
             else -> {
                 val file = File(coverPath)
@@ -179,4 +185,38 @@ private fun loadBitmap(context: android.content.Context, coverPath: String?): Bi
         Log.w("GameCoverArt", "Failed to load cover from $coverPath: ${e.message}")
         null
     }
+}
+
+private fun getOrCreateRemoteImageCacheFile(context: android.content.Context, url: String): File? {
+    val cacheDir = File(context.cacheDir, "remote-image-cache").apply { mkdirs() }
+    val extension = url.substringAfterLast('.', "").substringBefore('?').lowercase()
+        .takeIf { it in setOf("jpg", "jpeg", "png", "webp") }
+        ?: "img"
+    val targetFile = File(cacheDir, "${url.sha1()}.$extension")
+    if (targetFile.exists() && targetFile.length() > 0L) {
+        return targetFile
+    }
+
+    val tempFile = File(cacheDir, "${targetFile.name}.tmp")
+    return runCatching {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 8_000
+        connection.readTimeout = 12_000
+        connection.instanceFollowRedirects = true
+        connection.inputStream.use { input ->
+            tempFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        if (targetFile.exists()) {
+            targetFile.delete()
+        }
+        tempFile.renameTo(targetFile)
+        targetFile.takeIf { it.exists() && it.length() > 0L }
+    }.getOrNull()
+}
+
+private fun String.sha1(): String {
+    val digest = MessageDigest.getInstance("SHA-1")
+    return digest.digest(toByteArray()).joinToString("") { "%02x".format(it) }
 }

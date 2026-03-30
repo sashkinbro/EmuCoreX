@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.DevicePerformanceProfiles
 import com.sbro.emucorex.core.EmulatorBridge
@@ -14,6 +13,7 @@ import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
+import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -114,92 +114,90 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             recommendedPresetId = deviceProfile.recommendedPresetId
         )
         viewModelScope.launch {
-            launch { preferences.themeMode.collect { mode -> _uiState.value = _uiState.value.copy(themeMode = mode) } }
-            launch { preferences.renderer.collect { v -> _uiState.value = _uiState.value.copy(renderer = v) } }
-            launch { preferences.languageTag.collect { tag -> _uiState.value = _uiState.value.copy(languageTag = tag) } }
-            launch { preferences.upscaleMultiplier.collect { v -> _uiState.value = _uiState.value.copy(upscaleMultiplier = v) } }
-            launch { preferences.aspectRatio.collect { v -> _uiState.value = _uiState.value.copy(aspectRatio = v) } }
-            launch { preferences.padVibration.collect { v -> _uiState.value = _uiState.value.copy(padVibration = v) } }
-            launch { preferences.showFps.collect { v -> _uiState.value = _uiState.value.copy(showFps = v) } }
-            launch { preferences.fpsOverlayMode.collect { v -> _uiState.value = _uiState.value.copy(fpsOverlayMode = v) } }
-            launch { preferences.compactControls.collect { v -> _uiState.value = _uiState.value.copy(compactControls = v) } }
-            launch { preferences.keepScreenOn.collect { v -> _uiState.value = _uiState.value.copy(keepScreenOn = v) } }
-            launch {
-                preferences.biosPath.collect { path ->
-                    _uiState.value = _uiState.value.copy(
-                        biosPath = path,
-                        biosValid = BiosValidator.hasUsableBiosFiles(application, path)
-                    )
-                }
+            preferences.settingsSnapshot.collect { snapshot ->
+                applySettingsSnapshot(snapshot)
             }
-            launch { preferences.gamePath.collect { path -> _uiState.value = _uiState.value.copy(gamePath = path) } }
-            launch { preferences.onboardingCompleted.collect { v -> _uiState.value = _uiState.value.copy(setupComplete = v) } }
-            // Extended settings
-            launch { preferences.eeCycleRate.collect { v -> _uiState.value = _uiState.value.copy(eeCycleRate = v) } }
-            launch { preferences.eeCycleSkip.collect { v -> _uiState.value = _uiState.value.copy(eeCycleSkip = v) } }
-            launch { preferences.enableMtvu.collect { v -> _uiState.value = _uiState.value.copy(enableMtvu = v) } }
-            launch { preferences.enableFastCdvd.collect { v -> _uiState.value = _uiState.value.copy(enableFastCdvd = v) } }
-            launch { preferences.enableCheats.collect { v -> _uiState.value = _uiState.value.copy(enableCheats = v) } }
-            launch { preferences.hwDownloadMode.collect { v -> _uiState.value = _uiState.value.copy(hwDownloadMode = v) } }
-            launch { preferences.frameSkip.collect { v -> _uiState.value = _uiState.value.copy(frameSkip = v) } }
-            launch { preferences.textureFiltering.collect { v -> _uiState.value = _uiState.value.copy(textureFiltering = v) } }
-            launch { preferences.trilinearFiltering.collect { v -> _uiState.value = _uiState.value.copy(trilinearFiltering = v) } }
-            launch { preferences.blendingAccuracy.collect { v -> _uiState.value = _uiState.value.copy(blendingAccuracy = v) } }
-            launch { preferences.texturePreloading.collect { v -> _uiState.value = _uiState.value.copy(texturePreloading = v) } }
-            launch { preferences.enableFxaa.collect { v -> _uiState.value = _uiState.value.copy(enableFxaa = v) } }
-            launch { preferences.casMode.collect { v -> _uiState.value = _uiState.value.copy(casMode = v) } }
-            launch { preferences.casSharpness.collect { v -> _uiState.value = _uiState.value.copy(casSharpness = v) } }
-            launch { preferences.enableWidescreenPatches.collect { v -> _uiState.value = _uiState.value.copy(enableWidescreenPatches = v) } }
-            launch { preferences.enableNoInterlacingPatches.collect { v -> _uiState.value = _uiState.value.copy(enableNoInterlacingPatches = v) } }
-            launch { preferences.anisotropicFiltering.collect { v -> _uiState.value = _uiState.value.copy(anisotropicFiltering = v) } }
-            launch { preferences.enableHwMipmapping.collect { v -> _uiState.value = _uiState.value.copy(enableHwMipmapping = v) } }
-            launch { preferences.cpuSpriteRenderSize.collect { v -> _uiState.value = _uiState.value.copy(cpuSpriteRenderSize = v) } }
-            launch { preferences.cpuSpriteRenderLevel.collect { v -> _uiState.value = _uiState.value.copy(cpuSpriteRenderLevel = v) } }
-            launch { preferences.softwareClutRender.collect { v -> _uiState.value = _uiState.value.copy(softwareClutRender = v) } }
-            launch { preferences.gpuTargetClutMode.collect { v -> _uiState.value = _uiState.value.copy(gpuTargetClutMode = v) } }
-            launch { preferences.skipDrawStart.collect { v -> _uiState.value = _uiState.value.copy(skipDrawStart = v) } }
-            launch { preferences.skipDrawEnd.collect { v -> _uiState.value = _uiState.value.copy(skipDrawEnd = v) } }
-            launch { preferences.autoFlushHardware.collect { v -> _uiState.value = _uiState.value.copy(autoFlushHardware = v) } }
-            launch { preferences.cpuFramebufferConversion.collect { v -> _uiState.value = _uiState.value.copy(cpuFramebufferConversion = v) } }
-            launch { preferences.disableDepthConversion.collect { v -> _uiState.value = _uiState.value.copy(disableDepthConversion = v) } }
-            launch { preferences.disableSafeFeatures.collect { v -> _uiState.value = _uiState.value.copy(disableSafeFeatures = v) } }
-            launch { preferences.disableRenderFixes.collect { v -> _uiState.value = _uiState.value.copy(disableRenderFixes = v) } }
-            launch { preferences.preloadFrameData.collect { v -> _uiState.value = _uiState.value.copy(preloadFrameData = v) } }
-            launch { preferences.disablePartialInvalidation.collect { v -> _uiState.value = _uiState.value.copy(disablePartialInvalidation = v) } }
-            launch { preferences.textureInsideRt.collect { v -> _uiState.value = _uiState.value.copy(textureInsideRt = v) } }
-            launch { preferences.readTargetsOnClose.collect { v -> _uiState.value = _uiState.value.copy(readTargetsOnClose = v) } }
-            launch { preferences.estimateTextureRegion.collect { v -> _uiState.value = _uiState.value.copy(estimateTextureRegion = v) } }
-            launch { preferences.gpuPaletteConversion.collect { v -> _uiState.value = _uiState.value.copy(gpuPaletteConversion = v) } }
-            launch { preferences.halfPixelOffset.collect { v -> _uiState.value = _uiState.value.copy(halfPixelOffset = v) } }
-            launch { preferences.nativeScaling.collect { v -> _uiState.value = _uiState.value.copy(nativeScaling = v) } }
-            launch { preferences.roundSprite.collect { v -> _uiState.value = _uiState.value.copy(roundSprite = v) } }
-            launch { preferences.bilinearUpscale.collect { v -> _uiState.value = _uiState.value.copy(bilinearUpscale = v) } }
-            launch { preferences.textureOffsetX.collect { v -> _uiState.value = _uiState.value.copy(textureOffsetX = v) } }
-            launch { preferences.textureOffsetY.collect { v -> _uiState.value = _uiState.value.copy(textureOffsetY = v) } }
-            launch { preferences.alignSprite.collect { v -> _uiState.value = _uiState.value.copy(alignSprite = v) } }
-            launch { preferences.mergeSprite.collect { v -> _uiState.value = _uiState.value.copy(mergeSprite = v) } }
-            launch { preferences.forceEvenSpritePosition.collect { v -> _uiState.value = _uiState.value.copy(forceEvenSpritePosition = v) } }
-            launch { preferences.nativePaletteDraw.collect { v -> _uiState.value = _uiState.value.copy(nativePaletteDraw = v) } }
-            launch { preferences.performancePreset.collect { v -> _uiState.value = _uiState.value.copy(performancePreset = v) } }
-            // Overlay
-            launch { preferences.overlayScale.collect { v -> _uiState.value = _uiState.value.copy(overlayScale = v) } }
-            launch { preferences.overlayOpacity.collect { v -> _uiState.value = _uiState.value.copy(overlayOpacity = v) } }
-            launch { preferences.overlayShow.collect { v -> _uiState.value = _uiState.value.copy(overlayShow = v) } }
-            // Gamepad
-            launch { preferences.enableAutoGamepad.collect { v -> _uiState.value = _uiState.value.copy(enableAutoGamepad = v) } }
-            launch { preferences.hideOverlayOnGamepad.collect { v -> _uiState.value = _uiState.value.copy(hideOverlayOnGamepad = v) } }
-            launch { preferences.gamepadBindings.collect { v -> _uiState.value = _uiState.value.copy(gamepadBindings = v) } }
-            // GPU Driver
-            launch { preferences.gpuDriverType.collect { v -> _uiState.value = _uiState.value.copy(gpuDriverType = v) } }
-            launch { preferences.customDriverPath.collect { v -> _uiState.value = _uiState.value.copy(customDriverPath = v) } }
-            launch { preferences.frameLimitEnabled.collect { v -> _uiState.value = _uiState.value.copy(frameLimitEnabled = v) } }
-            launch { preferences.targetFps.collect { v -> _uiState.value = _uiState.value.copy(targetFps = v) } }
         }
 
         try {
             val pInfo = application.packageManager.getPackageInfo(application.packageName, 0)
             _uiState.value = _uiState.value.copy(appVersion = pInfo.versionName ?: "1.0.0")
         } catch (_: Exception) { }
+    }
+
+    private fun applySettingsSnapshot(snapshot: SettingsSnapshot) {
+        _uiState.value = _uiState.value.copy(
+            themeMode = snapshot.themeMode,
+            languageTag = snapshot.languageTag,
+            renderer = snapshot.renderer,
+            upscaleMultiplier = snapshot.upscaleMultiplier,
+            aspectRatio = snapshot.aspectRatio,
+            padVibration = snapshot.padVibration,
+            showFps = snapshot.showFps,
+            fpsOverlayMode = snapshot.fpsOverlayMode,
+            compactControls = snapshot.compactControls,
+            keepScreenOn = snapshot.keepScreenOn,
+            biosPath = snapshot.biosPath,
+            gamePath = snapshot.gamePath,
+            biosValid = snapshot.biosValid,
+            setupComplete = snapshot.setupComplete,
+            eeCycleRate = snapshot.eeCycleRate,
+            eeCycleSkip = snapshot.eeCycleSkip,
+            enableMtvu = snapshot.enableMtvu,
+            enableFastCdvd = snapshot.enableFastCdvd,
+            enableCheats = snapshot.enableCheats,
+            hwDownloadMode = snapshot.hwDownloadMode,
+            frameSkip = snapshot.frameSkip,
+            textureFiltering = snapshot.textureFiltering,
+            trilinearFiltering = snapshot.trilinearFiltering,
+            blendingAccuracy = snapshot.blendingAccuracy,
+            texturePreloading = snapshot.texturePreloading,
+            enableFxaa = snapshot.enableFxaa,
+            casMode = snapshot.casMode,
+            casSharpness = snapshot.casSharpness,
+            enableWidescreenPatches = snapshot.enableWidescreenPatches,
+            enableNoInterlacingPatches = snapshot.enableNoInterlacingPatches,
+            anisotropicFiltering = snapshot.anisotropicFiltering,
+            enableHwMipmapping = snapshot.enableHwMipmapping,
+            cpuSpriteRenderSize = snapshot.cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = snapshot.cpuSpriteRenderLevel,
+            softwareClutRender = snapshot.softwareClutRender,
+            gpuTargetClutMode = snapshot.gpuTargetClutMode,
+            skipDrawStart = snapshot.skipDrawStart,
+            skipDrawEnd = snapshot.skipDrawEnd,
+            autoFlushHardware = snapshot.autoFlushHardware,
+            cpuFramebufferConversion = snapshot.cpuFramebufferConversion,
+            disableDepthConversion = snapshot.disableDepthConversion,
+            disableSafeFeatures = snapshot.disableSafeFeatures,
+            disableRenderFixes = snapshot.disableRenderFixes,
+            preloadFrameData = snapshot.preloadFrameData,
+            disablePartialInvalidation = snapshot.disablePartialInvalidation,
+            textureInsideRt = snapshot.textureInsideRt,
+            readTargetsOnClose = snapshot.readTargetsOnClose,
+            estimateTextureRegion = snapshot.estimateTextureRegion,
+            gpuPaletteConversion = snapshot.gpuPaletteConversion,
+            halfPixelOffset = snapshot.halfPixelOffset,
+            nativeScaling = snapshot.nativeScaling,
+            roundSprite = snapshot.roundSprite,
+            bilinearUpscale = snapshot.bilinearUpscale,
+            textureOffsetX = snapshot.textureOffsetX,
+            textureOffsetY = snapshot.textureOffsetY,
+            alignSprite = snapshot.alignSprite,
+            mergeSprite = snapshot.mergeSprite,
+            forceEvenSpritePosition = snapshot.forceEvenSpritePosition,
+            nativePaletteDraw = snapshot.nativePaletteDraw,
+            performancePreset = snapshot.performancePreset,
+            overlayScale = snapshot.overlayScale,
+            overlayOpacity = snapshot.overlayOpacity,
+            overlayShow = snapshot.overlayShow,
+            enableAutoGamepad = snapshot.enableAutoGamepad,
+            hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
+            gamepadBindings = snapshot.gamepadBindings,
+            gpuDriverType = snapshot.gpuDriverType,
+            customDriverPath = snapshot.customDriverPath,
+            frameLimitEnabled = snapshot.frameLimitEnabled,
+            targetFps = snapshot.targetFps
+        )
     }
 
     fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { preferences.setThemeMode(mode) } }

@@ -50,6 +50,7 @@ import com.sbro.emucorex.ui.onboarding.OnboardingScreen
 import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
+import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
@@ -60,7 +61,7 @@ import kotlinx.serialization.Serializable
 object HomeRoute
 
 @Serializable
-data class GameDetailRoute(val gamePath: String? = null, val catalogGameId: Long? = null)
+data class GameDetailRoute(val catalogGameId: Long)
 
 @Serializable
 data class EmulationRoute(val gamePath: String? = null, val saveSlot: Int? = null, val bootBios: Boolean = false)
@@ -93,6 +94,9 @@ object AchievementsRoute
 object AccountUnlockedAchievementsRoute
 
 @Serializable
+object GameSettingsManagerRoute
+
+@Serializable
 data class GameAchievementsRoute(val gamePath: String, val gameTitle: String? = null)
 
 private enum class StartupDestination {
@@ -119,11 +123,25 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPrimaryLevelTran
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPushingIntoDetail(): Boolean {
-    return targetState.destination.hasRoute<GameDetailRoute>() || targetState.destination.hasRoute<EmulationRoute>()
+    return targetState.destination.hasRoute<GameDetailRoute>() ||
+        targetState.destination.hasRoute<EmulationRoute>() ||
+        targetState.destination.hasRoute<LanguageSettingsRoute>() ||
+        targetState.destination.hasRoute<ControlsEditorRoute>() ||
+        targetState.destination.hasRoute<GameSettingsManagerRoute>() ||
+        targetState.destination.hasRoute<AccountUnlockedAchievementsRoute>() ||
+        targetState.destination.hasRoute<GameAchievementsRoute>() ||
+        targetState.destination.hasRoute<SaveManagerRoute>()
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPoppingFromDetail(): Boolean {
-    return initialState.destination.hasRoute<GameDetailRoute>() || initialState.destination.hasRoute<EmulationRoute>()
+    return initialState.destination.hasRoute<GameDetailRoute>() ||
+        initialState.destination.hasRoute<EmulationRoute>() ||
+        initialState.destination.hasRoute<LanguageSettingsRoute>() ||
+        initialState.destination.hasRoute<ControlsEditorRoute>() ||
+        initialState.destination.hasRoute<GameSettingsManagerRoute>() ||
+        initialState.destination.hasRoute<AccountUnlockedAchievementsRoute>() ||
+        initialState.destination.hasRoute<GameAchievementsRoute>() ||
+        initialState.destination.hasRoute<SaveManagerRoute>()
 }
 
 private fun sharedAxisEnter(
@@ -165,9 +183,12 @@ fun AppNavigation() {
             preferences.biosPath,
             preferences.gamePath
         ) { onboardingCompleted, biosPath, gamePath ->
+            val hasStoredSetup = onboardingCompleted &&
+                !biosPath.isNullOrBlank() &&
+                !gamePath.isNullOrBlank()
             val biosReady = BiosValidator.hasUsableBiosFiles(context, biosPath)
-            val gameFolderReady = SetupValidator.isGameFolderAccessible(context, gamePath)
-            if (!onboardingCompleted || !biosReady || !gameFolderReady) {
+            val gameFolderPresent = SetupValidator.isGameFolderPresentForStartup(context, gamePath)
+            if (!hasStoredSetup || !biosReady || !gameFolderPresent) {
                 StartupDestination.ONBOARDING
             } else {
                 StartupDestination.HOME
@@ -212,12 +233,17 @@ fun AppNavigation() {
         else -> {}
     }
     val navigateControlsEditor: () -> Unit = {
-        navController.navigate(SettingsRoute(tab = "controls")) {
+        navController.navigate(ControlsEditorRoute) {
             launchSingleTop = true
         }
     }
     val navigateCheats: () -> Unit = {
         navController.navigate(SettingsRoute(tab = "cheats")) {
+            launchSingleTop = true
+        }
+    }
+    val navigateGameSettingsManager: () -> Unit = {
+        navController.navigate(GameSettingsManagerRoute) {
             launchSingleTop = true
         }
     }
@@ -455,6 +481,7 @@ fun AppNavigation() {
                         }
                     },
                     onNavigateCheats = navigateCheats,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndReturnHome,
@@ -477,7 +504,7 @@ fun AppNavigation() {
                 ) { openDrawer ->
                     HomeScreen(
                         onGameClick = { game ->
-                            navController.navigate(GameDetailRoute(gamePath = game.path, catalogGameId = game.catalogGameId)) {
+                            navController.navigate(EmulationRoute(gamePath = game.path)) {
                                 launchSingleTop = true
                             }
                         },
@@ -489,23 +516,7 @@ fun AppNavigation() {
             composable<GameDetailRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<GameDetailRoute>()
                 GameDetailScreen(
-                    gamePath = route.gamePath,
                     catalogGameId = route.catalogGameId,
-                    onPlayClick = { path, slot ->
-                        navController.navigate(EmulationRoute(gamePath = path, saveSlot = slot)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenSaveManager = { path, title ->
-                        navController.navigate(SaveManagerRoute(gamePath = path, gameTitle = title)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onOpenAchievements = { path, title ->
-                        navController.navigate(GameAchievementsRoute(gamePath = path, gameTitle = title)) {
-                            launchSingleTop = true
-                        }
-                    },
                     onBackClick = { navController.popBackStack() }
                 )
             }
@@ -536,6 +547,7 @@ fun AppNavigation() {
                         }
                     },
                     onNavigateCheats = navigateCheats,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndReturnHome,
@@ -554,7 +566,7 @@ fun AppNavigation() {
                 ) {
                     CatalogSearchScreen(
                         onGameClick = { igdbId ->
-                            navController.navigate(GameDetailRoute(gamePath = null, catalogGameId = igdbId)) {
+                            navController.navigate(GameDetailRoute(catalogGameId = igdbId)) {
                                 launchSingleTop = true
                             }
                         },
@@ -601,6 +613,7 @@ fun AppNavigation() {
                         }
                     },
                     onNavigateCheats = navigateCheats,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndReturnHome,
@@ -650,6 +663,7 @@ fun AppNavigation() {
                         }
                     },
                     onNavigateCheats = navigateCheats,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndReturnHome,
@@ -685,6 +699,12 @@ fun AppNavigation() {
                 )
             }
 
+            composable<GameSettingsManagerRoute> {
+                PerGameSettingsManagerScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
             composable<AchievementsRoute> {
                 AdaptiveShell(
                     selected = PrimaryDestination.Achievements,
@@ -711,6 +731,7 @@ fun AppNavigation() {
                     },
                     onNavigateAchievements = { },
                     onNavigateCheats = navigateCheats,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
                     onResetAllSettings = resetAllSettingsAndReturnHome,

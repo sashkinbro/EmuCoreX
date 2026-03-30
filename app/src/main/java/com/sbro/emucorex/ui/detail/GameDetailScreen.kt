@@ -104,50 +104,32 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
-import com.sbro.emucorex.data.RetroAchievementGameData
-import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
-import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.shimmer
-import com.sbro.emucorex.ui.theme.GradientEnd
-import com.sbro.emucorex.ui.theme.GradientStart
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
-private data class DetailRetroAchievementsState(
-    val isLoading: Boolean = false,
-    val data: RetroAchievementGameData? = null
-)
-
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled", "ConfigurationScreenWidthHeight")
 @Composable
 fun GameDetailScreen(
-    gamePath: String?,
-    catalogGameId: Long? = null,
-    onPlayClick: (String, Int?) -> Unit,
-    onOpenSaveManager: (String, String) -> Unit,
-    onOpenAchievements: (String, String) -> Unit,
+    catalogGameId: Long,
     onBackClick: () -> Unit,
     viewModel: GameDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val retroAchievementsState by RetroAchievementsStateManager.state.collectAsState()
-    val context = LocalContext.current
-    val retroAchievementsRepository = remember(context) { RetroAchievementsRepository(context) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
@@ -157,52 +139,23 @@ fun GameDetailScreen(
     val horizontalInset = ScreenHorizontalPadding
     val contentMaxWidth = if (isLandscape) 760.dp else Dp.Unspecified
     val heroMaxWidth = if (isLandscape) 240.dp else Dp.Unspecified
-    val playButtonMaxWidth = if (isLandscape) 420.dp else Dp.Unspecified
     val backFocusRequester = remember { FocusRequester() }
-    val primaryActionFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
 
-    LaunchedEffect(gamePath, catalogGameId) {
-        viewModel.loadGame(path = gamePath, catalogGameId = catalogGameId)
+    LaunchedEffect(catalogGameId) {
+        viewModel.loadGame(catalogGameId)
     }
 
-    val game = uiState.game
     val catalog = uiState.catalogDetails
-    val heroImage = catalog?.coverUrl ?: game?.coverArtPath ?: catalog?.heroUrl
-    val selectedAchievementsPath = game?.path?.takeIf { uiState.isInstalledGame && it.isNotBlank() }
-    val retroAchievementsDetailState by androidx.compose.runtime.produceState(
-        initialValue = DetailRetroAchievementsState(isLoading = selectedAchievementsPath != null),
-        key1 = selectedAchievementsPath,
-        key2 = retroAchievementsState.user?.username,
-        key3 = retroAchievementsState.enabled
-    ) {
-        value = if (selectedAchievementsPath == null) {
-            DetailRetroAchievementsState(isLoading = false, data = null)
-        } else {
-            value = DetailRetroAchievementsState(isLoading = true, data = null)
-            val data = runCatching {
-                retroAchievementsRepository.loadGameData(selectedAchievementsPath)
-            }.getOrNull()
-            DetailRetroAchievementsState(isLoading = false, data = data)
-        }
-    }
-    val retroAchievementsData = retroAchievementsDetailState.data
+    val heroImage = catalog?.coverUrl ?: catalog?.heroUrl
 
-    LaunchedEffect(uiState.isLoading, shouldRequestGamepadFocus, game?.path, catalog?.name) {
+    LaunchedEffect(uiState.isLoading, shouldRequestGamepadFocus, catalog?.name) {
         if (!uiState.isLoading && shouldRequestGamepadFocus) {
-            if (game?.path != null && uiState.isInstalledGame) {
-                primaryActionFocusRequester.requestFocus()
-            } else {
-                backFocusRequester.requestFocus()
-            }
+            backFocusRequester.requestFocus()
         }
     }
     RequestFocusOnResume(
-        focusRequester = if (game?.path != null && uiState.isInstalledGame) {
-            primaryActionFocusRequester
-        } else {
-            backFocusRequester
-        },
+        focusRequester = backFocusRequester,
         enabled = shouldRequestGamepadFocus && !uiState.isLoading
     )
 
@@ -231,19 +184,16 @@ fun GameDetailScreen(
 
         if (uiState.isLoading) {
             DetailSkeleton(
-                isInstalledGame = gamePath != null,
+                isInstalledGame = false,
                 horizontalInset = horizontalInset
             )
-        } else if (game == null && catalog == null) {
+        } else if (catalog == null) {
             EmptyDetailState(
                 isCatalogAvailable = uiState.isCatalogAvailable,
                 modifier = Modifier.padding(20.dp)
             )
         } else {
-            val title = catalog?.name ?: game?.title.orEmpty()
-            val playAction = game?.path?.takeIf { uiState.isInstalledGame }?.let { path ->
-                rememberDebouncedClick(onClick = { onPlayClick(path, null) })
-            }
+            val title = catalog.name
 
             Box(
                 modifier = Modifier
@@ -289,13 +239,13 @@ fun GameDetailScreen(
                         .padding(horizontal = horizontalInset)
                 ) {
                     MetaRow(
-                        year = catalog?.year,
-                        rating = catalog?.rating,
-                        serial = game?.serial
+                        year = catalog.year,
+                        rating = catalog.rating,
+                        serial = catalog.primarySerial
                     )
                 }
 
-                uiState.pcsx2Compatibility?.let { compatibility ->
+                catalog.pcsx2Compatibility?.let { compatibility ->
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
@@ -306,24 +256,7 @@ fun GameDetailScreen(
                     }
                 }
 
-                selectedAchievementsPath?.let { achievementsPath ->
-                    Box(
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset)
-                    ) {
-                        RetroAchievementsDetailSection(
-                            gameData = retroAchievementsData,
-                            isLoading = retroAchievementsDetailState.isLoading,
-                            isEnabled = retroAchievementsState.enabled,
-                            isLoggedIn = retroAchievementsState.user != null,
-                            onOpenAchievements = { onOpenAchievements(achievementsPath, game.title) }
-                        )
-                    }
-                }
-
-                if (catalog?.genres?.isNotEmpty() == true) {
+                if (catalog.genres.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
@@ -341,102 +274,8 @@ fun GameDetailScreen(
                     }
                 }
 
-                if (playAction != null) {
-                    Box(
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = playButtonMaxWidth)
-                            .padding(horizontal = horizontalInset)
-                    ) {
-                        PlayButton(
-                            modifier = Modifier.focusRequester(primaryActionFocusRequester),
-                            onClick = playAction
-                        )
-                    }
-                } else {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset),
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.detail_catalog_preview_only),
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                if (uiState.isInstalledGame) {
-                    Box(
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset)
-                    ) {
-                        InfoSection(
-                            label = stringResource(R.string.detail_file_path),
-                            value = game?.fileName.orEmpty()
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset)
-                    ) {
-                        InfoSection(
-                            label = stringResource(R.string.detail_file_size),
-                            value = uiState.formattedSize
-                        )
-                    }
-
-                    Text(
-                        text = stringResource(R.string.detail_save_states),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                            .widthIn(max = contentMaxWidth)
-                            .padding(horizontal = horizontalInset),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        uiState.saveSlots.forEachIndexed { index, hasSave ->
-                            SaveSlotChip(
-                                slot = index + 1,
-                                hasSave = hasSave,
-                                onClick = { game?.path?.let { onPlayClick(it, index) } },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                    game?.path?.takeIf { it.isNotBlank() }?.let { path ->
-                        TextButton(
-                            onClick = { onOpenSaveManager(path, game.title) },
-                            modifier = Modifier
-                                .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
-                                .widthIn(max = contentMaxWidth)
-                                .padding(horizontal = horizontalInset)
-                        ) {
-                            Text(text = stringResource(R.string.save_manager_open))
-                        }
-                    }
-                }
-
-                val description = catalog?.storyline?.takeIf { it.isNotBlank() }
-                    ?: catalog?.summary?.takeIf { it.isNotBlank() }
+                val description = catalog.storyline?.takeIf { it.isNotBlank() }
+                    ?: catalog.summary?.takeIf { it.isNotBlank() }
                 if (!description.isNullOrBlank()) {
                     Box(
                         modifier = Modifier
@@ -451,7 +290,7 @@ fun GameDetailScreen(
                     }
                 }
 
-                if (catalog?.screenshots?.isNotEmpty() == true) {
+                if (catalog.screenshots.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
@@ -477,7 +316,7 @@ fun GameDetailScreen(
                     }
                 }
 
-                if (catalog?.videos?.isNotEmpty() == true) {
+                if (catalog.videos.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
@@ -750,249 +589,6 @@ private fun GenreChip(text: String) {
 }
 
 @Composable
-private fun RetroAchievementsDetailSection(
-    gameData: RetroAchievementGameData?,
-    isLoading: Boolean,
-    isEnabled: Boolean,
-    isLoggedIn: Boolean,
-    onOpenAchievements: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        onClick = onOpenAchievements
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Star,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.settings_ra_overview),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            when {
-                isLoading && gameData == null -> {
-                    RetroAchievementsDetailSkeleton()
-                }
-
-                gameData != null -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            BitmapPathImage(
-                                imagePath = gameData.gameImageUrl,
-                                contentDescription = gameData.title,
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(RoundedCornerShape(16.dp)),
-                                fallback = {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Star,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = gameData.title,
-                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isLoggedIn) {
-                                    stringResource(R.string.detail_achievements_account_synced)
-                                } else {
-                                    stringResource(R.string.detail_achievements_available)
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        GenreChip(text = "${gameData.earnedCount}/${gameData.totalCount} ${stringResource(R.string.settings_ra_achievements_label)}")
-                        GenreChip(text = "${gameData.earnedPoints}/${gameData.totalPoints} ${stringResource(R.string.settings_ra_points_label)}")
-                        if (isLoggedIn) {
-                            GenreChip(text = stringResource(R.string.achievements_status_earned))
-                        }
-                    }
-                }
-
-                else -> {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = if (isEnabled) {
-                                stringResource(R.string.detail_achievements_hint)
-                            } else {
-                                stringResource(R.string.detail_achievements_hint_disabled)
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        TextButton(onClick = onOpenAchievements) {
-                            Text(text = stringResource(R.string.detail_achievements_open))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RetroAchievementsDetailSkeleton() {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SkeletonBlock(
-                modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SkeletonBlock(
-                    modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(18.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                )
-                SkeletonBlock(
-                    modifier = Modifier
-                        .fillMaxWidth(0.72f)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                )
-            }
-        }
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            repeat(2) {
-                SkeletonBlock(
-                    modifier = Modifier
-                        .width(128.dp)
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                )
-            }
-        }
-    }
-}
-
-private fun String?.normalizeRetroAchievementsTitle(): String {
-    return this.orEmpty()
-        .lowercase(Locale.ROOT)
-        .replace(Regex("[^a-z0-9]+"), "")
-}
-
-@Composable
-private fun PlayButton(
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.Transparent,
-        onClick = onClick
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(GradientStart, GradientEnd)
-                    ),
-                    shape = RoundedCornerShape(18.dp)
-                )
-                .padding(vertical = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = stringResource(R.string.detail_play),
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoSection(label: String, value: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
-
-@Composable
 private fun CompatibilitySection(
     compatibility: Pcsx2CompatibilityEntry
 ) {
@@ -1135,44 +731,6 @@ private fun ExpandableInfoSection(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SaveSlotChip(
-    slot: Int,
-    hasSave: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.gamepadFocusableCard(shape = RoundedCornerShape(14.dp)),
-        shape = RoundedCornerShape(14.dp),
-        color = if (hasSave) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        tonalElevation = if (hasSave) 2.dp else 0.dp,
-        onClick = onClick,
-        enabled = hasSave
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Save,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = if (hasSave) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = slot.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                color = if (hasSave) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-            )
         }
     }
 }

@@ -2,14 +2,12 @@ package com.sbro.emucorex.data
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.core.net.toUri
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
-import com.sbro.emucorex.data.ps2.Ps2CatalogRepository
 import java.io.File
 
 data class GameItem(
@@ -17,11 +15,9 @@ data class GameItem(
     val path: String,
     val fileName: String,
     val fileSize: Long,
+    val lastModified: Long,
     val coverArtPath: String? = null,
     val serial: String? = null,
-    val catalogGameId: Long? = null,
-    val catalogYear: Int? = null,
-    val catalogRating: Double? = null,
     val pcsx2Compatibility: Pcsx2CompatibilityEntry? = null
 )
 
@@ -34,98 +30,31 @@ class GameRepository {
     }
 
     fun scanDirectory(path: String, context: Context): List<GameItem> {
+        return scanDirectory(path, context, emptyMap())
+    }
+
+    fun scanDirectory(
+        path: String,
+        context: Context,
+        cachedGamesByPath: Map<String, GameItem>
+    ): List<GameItem> {
         val dir = File(path)
         if (!dir.exists() || !dir.isDirectory) return emptyList()
-
-        val catalogRepository = Ps2CatalogRepository(context)
-        return try {
-            scanLocalDirectory(dir, context, catalogRepository)
-                .sortedBy { it.title.lowercase() }
-        } finally {
-            catalogRepository.close()
-        }
+        return scanLocalDirectory(dir, context, cachedGamesByPath).sortedBy { it.title.lowercase() }
     }
 
     fun scanDirectoryFromUri(uri: Uri, context: Context): List<GameItem> {
-        val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
-            ?: return emptyList()
-
-        val catalogRepository = Ps2CatalogRepository(context)
-        return try {
-            scanDocumentFile(docFile, context, catalogRepository)
-                .sortedBy { it.title.lowercase() }
-        } finally {
-            catalogRepository.close()
-        }
+        return scanDirectoryFromUri(uri, context, emptyMap())
     }
 
-    private fun scanDocumentFile(
-        docFile: androidx.documentfile.provider.DocumentFile,
+    fun scanDirectoryFromUri(
+        uri: Uri,
         context: Context,
-        catalogRepository: Ps2CatalogRepository
+        cachedGamesByPath: Map<String, GameItem>
     ): List<GameItem> {
-        val items = mutableListOf<GameItem>()
-        val children = docFile.listFiles()
-        val coverCandidates = buildDocumentCoverCandidates(children)
-        val coverRepository = CoverArtRepository(context)
-        val compatibilityRepository = Pcsx2CompatibilityRepository(context)
-
-        for (file in children) {
-            if (file.isDirectory) {
-                if (normalizeBaseName(file.name.orEmpty()) !in COVER_DIRECTORY_NAMES) {
-                    items.addAll(scanDocumentFile(file, context, catalogRepository))
-                }
-            } else if (file.isFile) {
-                val name = file.name ?: continue
-                val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext in SUPPORTED_EXTENSIONS) {
-                    val uriPath = file.uri.toString()
-                    val physicalPath = DocumentPathResolver.resolveFilePath(context, uriPath)
-                    
-                    val metadata = try {
-                        physicalPath?.let { EmulatorBridge.getGameMetadata(it) }
-                            ?: com.sbro.emucorex.core.GameMetadata(normalizeBaseName(cleanGameName(name)), null)
-                    } catch (_: Exception) {
-                        com.sbro.emucorex.core.GameMetadata(normalizeBaseName(cleanGameName(name)), null)
-                    }
-
-                    if (BiosValidator.isLikelyBiosLibraryEntry(name, metadata.title, metadata.serial, file.length())) {
-                        continue
-                    }
-                    
-                    val baseName = normalizeBaseName(name.substringBeforeLast('.'))
-                    val title = metadata.title
-                    val catalogMatch = catalogRepository.findBestMatch(
-                        title = title,
-                        fileName = name,
-                        serial = metadata.serial
-                    )
-                    val compatibility = compatibilityRepository.findBest(
-                        serial = metadata.serial,
-                        title = catalogMatch?.details?.name ?: title
-                    )
-                    items.add(
-                        GameItem(
-                            title = title,
-                            path = uriPath,
-                            fileName = name,
-                            fileSize = file.length(),
-                            coverArtPath = coverCandidates[baseName]?.uri?.toString()
-                                ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.uri?.toString()
-                                ?: catalogMatch?.details?.coverUrl
-                                ?: coverRepository.findCachedCoverUri(metadata.serial),
-                            serial = metadata.serial,
-                            catalogGameId = catalogMatch?.details?.igdbId,
-                            catalogYear = catalogMatch?.details?.year,
-                            catalogRating = catalogMatch?.details?.rating,
-                            pcsx2Compatibility = compatibility
-                        )
-                    )
-                }
-            }
-        }
-
-        return items
+        val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
+            ?: return emptyList()
+        return scanDocumentFile(docFile, context, cachedGamesByPath).sortedBy { it.title.lowercase() }
     }
 
     fun formatFileSize(bytes: Long): String {
@@ -150,10 +79,23 @@ class GameRepository {
         }
     }
 
+    fun downloadCoverForGame(game: GameItem, context: Context): String? {
+        if (!game.coverArtPath.isNullOrBlank()) {
+            val coverFile = File(game.coverArtPath)
+            if (coverFile.exists()) {
+                return game.coverArtPath
+            }
+        }
+
+        return game.serial?.let { serial ->
+            CoverArtRepository(context).downloadCover(serial)
+        }
+    }
+
     private fun scanLocalDirectory(
-        dir: File, 
+        dir: File,
         context: Context,
-        catalogRepository: Ps2CatalogRepository
+        cachedGamesByPath: Map<String, GameItem>
     ): List<GameItem> {
         val items = mutableListOf<GameItem>()
         val children = dir.listFiles().orEmpty()
@@ -164,39 +106,37 @@ class GameRepository {
         children.forEach { file ->
             when {
                 file.isDirectory && normalizeBaseName(file.name) !in COVER_DIRECTORY_NAMES -> {
-                    items.addAll(scanLocalDirectory(file, context, catalogRepository))
+                    items.addAll(scanLocalDirectory(file, context, cachedGamesByPath))
                 }
+
                 file.isFile && file.extension.lowercase() in SUPPORTED_EXTENSIONS -> {
-                    val metadata = EmulatorBridge.getGameMetadata(file.absolutePath)
+                    val cachedGame = cachedGamesByPath[file.absolutePath]
+                    val metadata = if (cachedGame != null &&
+                        cachedGame.fileSize == file.length() &&
+                        cachedGame.lastModified == file.lastModified() &&
+                        cachedGame.fileName == file.name
+                    ) {
+                        com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
+                    } else {
+                        EmulatorBridge.getGameMetadata(file.absolutePath)
+                    }
                     if (BiosValidator.isLikelyBiosLibraryEntry(file.name, metadata.title, metadata.serial, file.length())) {
                         return@forEach
                     }
+
                     val title = metadata.title
-                    val catalogMatch = catalogRepository.findBestMatch(
+                    items += GameItem(
                         title = title,
+                        path = file.absolutePath,
                         fileName = file.name,
-                        serial = metadata.serial
-                    )
-                    val compatibility = compatibilityRepository.findBest(
+                        fileSize = file.length(),
+                        lastModified = file.lastModified(),
+                        coverArtPath = coverRepository.findCachedCoverPath(metadata.serial)
+                            ?: cachedGame?.coverArtPath?.takeIf { File(it).exists() }
+                            ?: coverCandidates[normalizeBaseName(file.nameWithoutExtension)]?.absolutePath
+                            ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.absolutePath,
                         serial = metadata.serial,
-                        title = catalogMatch?.details?.name ?: title
-                    )
-                    items.add(
-                        GameItem(
-                            title = title,
-                            path = file.absolutePath,
-                            fileName = file.name,
-                            fileSize = file.length(),
-                            coverArtPath = coverCandidates[normalizeBaseName(file.nameWithoutExtension)]?.absolutePath
-                                ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.absolutePath
-                                ?: catalogMatch?.details?.coverUrl
-                                ?: coverRepository.findCachedCoverPath(metadata.serial),
-                            serial = metadata.serial,
-                            catalogGameId = catalogMatch?.details?.igdbId,
-                            catalogYear = catalogMatch?.details?.year,
-                            catalogRating = catalogMatch?.details?.rating,
-                            pcsx2Compatibility = compatibility
-                        )
+                        pcsx2Compatibility = compatibilityRepository.findBySerial(metadata.serial)
                     )
                 }
             }
@@ -205,15 +145,70 @@ class GameRepository {
         return items
     }
 
-    private fun normalizeBaseName(value: String): String {
-        return value.lowercase()
-            .replace('_', ' ')
-            .replace('-', ' ')
-            .replace(Regex("""\[[^]]*]|\([^)]*\)"""), " ")
-            .replace(Regex("""\b(disc|disk|cd|dvd)\s*[0-9]+\b"""), " ")
-            .replace(Regex("""\b\(?(usa|eur|europe|japan|jpn|beta|demo|proto|prototype|rev\s*[a-z0-9]+)\)?\b"""), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+    private fun scanDocumentFile(
+        docFile: androidx.documentfile.provider.DocumentFile,
+        context: Context,
+        cachedGamesByPath: Map<String, GameItem>
+    ): List<GameItem> {
+        val items = mutableListOf<GameItem>()
+        val children = docFile.listFiles()
+        val coverCandidates = buildDocumentCoverCandidates(children)
+        val coverRepository = CoverArtRepository(context)
+        val compatibilityRepository = Pcsx2CompatibilityRepository(context)
+
+        for (file in children) {
+            if (file.isDirectory) {
+                if (normalizeBaseName(file.name.orEmpty()) !in COVER_DIRECTORY_NAMES) {
+                    items.addAll(scanDocumentFile(file, context, cachedGamesByPath))
+                }
+            } else if (file.isFile) {
+                val name = file.name ?: continue
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (ext !in SUPPORTED_EXTENSIONS) continue
+
+                val uriPath = file.uri.toString()
+                val cachedGame = cachedGamesByPath[uriPath]
+                val metadata = if (cachedGame != null &&
+                    cachedGame.fileSize == file.length() &&
+                    cachedGame.lastModified == file.lastModified() &&
+                    cachedGame.fileName == name
+                ) {
+                    com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
+                } else {
+                    val physicalPath = DocumentPathResolver.resolveFilePath(context, uriPath)
+                    try {
+                        when {
+                            physicalPath != null -> runCatching { EmulatorBridge.getGameMetadata(physicalPath) }
+                                .getOrElse { EmulatorBridge.getGameMetadata(uriPath) }
+                            else -> EmulatorBridge.getGameMetadata(uriPath)
+                        }
+                    } catch (_: Exception) {
+                        com.sbro.emucorex.core.GameMetadata(normalizeBaseName(cleanGameName(name)), null)
+                    }
+                }
+
+                if (BiosValidator.isLikelyBiosLibraryEntry(name, metadata.title, metadata.serial, file.length())) {
+                    continue
+                }
+
+                val title = metadata.title
+                items += GameItem(
+                    title = title,
+                    path = uriPath,
+                    fileName = name,
+                    fileSize = file.length(),
+                    lastModified = file.lastModified(),
+                    coverArtPath = coverRepository.findCachedCoverUri(metadata.serial)
+                        ?: cachedGame?.coverArtPath
+                        ?: coverCandidates[normalizeBaseName(name.substringBeforeLast('.'))]?.uri?.toString()
+                        ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.uri?.toString(),
+                    serial = metadata.serial,
+                    pcsx2Compatibility = compatibilityRepository.findBySerial(metadata.serial)
+                )
+            }
+        }
+
+        return items
     }
 
     private fun findLocalCover(path: String, context: Context, serial: String?, title: String?): String? {
@@ -222,9 +217,9 @@ class GameRepository {
         val baseName = normalizeBaseName(file.nameWithoutExtension)
         val titleKey = normalizeBaseName(cleanGameName(title ?: EmulatorBridge.getGameTitle(path)))
         val coverCandidates = buildLocalCoverCandidates(parent.listFiles().orEmpty())
-        return coverCandidates[baseName]?.absolutePath
+        return CoverArtRepository(context).findCachedCoverPath(serial)
+            ?: coverCandidates[baseName]?.absolutePath
             ?: coverCandidates[titleKey]?.absolutePath
-            ?: CoverArtRepository(context).findCachedCoverPath(serial)
     }
 
     private fun findDocumentCover(path: String, context: Context, serial: String?, title: String?): String? {
@@ -237,9 +232,20 @@ class GameRepository {
         val baseName = normalizeBaseName(document.name.orEmpty().substringBeforeLast('.'))
         val titleKey = normalizeBaseName(cleanGameName(title ?: document.name.orEmpty().substringBeforeLast('.')))
         val coverCandidates = buildDocumentCoverCandidates(parent.listFiles())
-        return coverCandidates[baseName]?.uri?.toString()
+        return CoverArtRepository(context).findCachedCoverUri(serial)
+            ?: coverCandidates[baseName]?.uri?.toString()
             ?: coverCandidates[titleKey]?.uri?.toString()
-            ?: CoverArtRepository(context).findCachedCoverUri(serial)
+    }
+
+    private fun normalizeBaseName(value: String): String {
+        return value.lowercase()
+            .replace('_', ' ')
+            .replace('-', ' ')
+            .replace(Regex("""\[[^]]*]|\([^)]*\)"""), " ")
+            .replace(Regex("""\b(disc|disk|cd|dvd)\s*[0-9]+\b"""), " ")
+            .replace(Regex("""\b\(?(usa|eur|europe|japan|jpn|beta|demo|proto|prototype|rev\s*[a-z0-9]+)\)?\b"""), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun cleanGameName(value: String): String {
@@ -271,28 +277,5 @@ class GameRepository {
         return (directFiles + nestedCoverFiles).associateBy {
             normalizeBaseName(cleanGameName(it.name.orEmpty().substringBeforeLast('.')))
         }
-    }
-
-    fun downloadCoverForGame(game: GameItem, context: Context): String? {
-        if (!game.coverArtPath.isNullOrBlank()) {
-            val coverFile = File(game.coverArtPath)
-            if (coverFile.exists()) {
-                return game.coverArtPath
-            }
-        }
-        
-        // Try to download cover using serial
-        val serial = game.serial
-        if (!serial.isNullOrBlank()) {
-            Log.d("GameRepository", "Attempting to download cover for serial: $serial")
-            val downloadedPath = CoverArtRepository(context).downloadCover(serial)
-            if (!downloadedPath.isNullOrBlank()) {
-                Log.d("GameRepository", "Cover downloaded successfully: $downloadedPath")
-                return downloadedPath
-            }
-            Log.d("GameRepository", "Cover download failed for serial: $serial")
-        }
-        
-        return null
     }
 }
