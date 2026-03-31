@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -85,6 +87,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
@@ -99,6 +102,7 @@ import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
+import java.util.Locale
 import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -106,6 +110,10 @@ import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
 @Composable
 fun HomeScreen(
     onGameClick: (GameItem) -> Unit,
+    onContinueGame: (GameItem) -> Unit,
+    onLoadSaveClick: (GameItem) -> Unit,
+    onManageGameClick: (GameItem) -> Unit,
+    onCreateShortcutClick: (GameItem) -> Unit,
     onMenuClick: (() -> Unit)? = null,
     viewModel: HomeViewModel = viewModel()
 ) {
@@ -117,8 +125,8 @@ fun HomeScreen(
     val horizontalInset = ScreenHorizontalPadding
     val sectionTopSpacing = 2.dp
     val sectionInnerSpacing = 4.dp
-    val minCellSize = if (isLandscape) 128 else 140
-    val columnsCount = maxOf(1, (configuration.screenWidthDp + 14) / (minCellSize + 14))
+    val minCellSize = if (isLandscape) 118 else 128
+    val columnsCount = maxOf(1, (configuration.screenWidthDp + 12) / (minCellSize + 12))
     val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
@@ -175,8 +183,8 @@ fun HomeScreen(
                     top = topInset + 4.dp,
                     bottom = 100.dp
                 ),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header item
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
@@ -275,112 +283,113 @@ fun HomeScreen(
                     }
                 }
 
-                // Search Bar item
-                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                    OutlinedTextField(
-                        value = uiState.searchQuery,
-                        onValueChange = viewModel::updateSearchQuery,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = horizontalInset)
-                            .padding(top = 0.dp, bottom = sectionTopSpacing),
-                        placeholder = {
-                            Text(
-                                stringResource(R.string.home_search),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            )
-                        },
-                        trailingIcon = {
-                            Row {
-                                if (uiState.searchQuery.isNotBlank()) {
-                                    IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = stringResource(R.string.home_search_clear),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                if (uiState.showHomeSearch) {
+                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        OutlinedTextField(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::updateSearchQuery,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalInset)
+                                .padding(top = 0.dp, bottom = sectionTopSpacing),
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.home_search),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            },
+                            trailingIcon = {
+                                Row {
+                                    if (uiState.searchQuery.isNotBlank()) {
+                                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Close,
+                                                contentDescription = stringResource(R.string.home_search_clear),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    Box {
+                                        IconButton(onClick = { showSortMenu = true }) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Rounded.Sort,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showSortMenu,
+                                            onDismissRequest = { showSortMenu = false }
+                                        ) {
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_title_asc),
+                                                isSelected = uiState.sortOption == HomeSortOption.TITLE_ASC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.TITLE_ASC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_title_desc),
+                                                isSelected = uiState.sortOption == HomeSortOption.TITLE_DESC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.TITLE_DESC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_recent_desc),
+                                                isSelected = uiState.sortOption == HomeSortOption.RECENT_DESC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.RECENT_DESC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_recent_asc),
+                                                isSelected = uiState.sortOption == HomeSortOption.RECENT_ASC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.RECENT_ASC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_size_desc),
+                                                isSelected = uiState.sortOption == HomeSortOption.SIZE_DESC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.SIZE_DESC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                            SortMenuItem(
+                                                label = stringResource(R.string.home_sort_size_asc),
+                                                isSelected = uiState.sortOption == HomeSortOption.SIZE_ASC,
+                                                onClick = {
+                                                    viewModel.updateSortOption(HomeSortOption.SIZE_ASC)
+                                                    showSortMenu = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
-                                Box {
-                                    IconButton(onClick = { showSortMenu = true }) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Rounded.Sort,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    DropdownMenu(
-                                        expanded = showSortMenu,
-                                        onDismissRequest = { showSortMenu = false }
-                                    ) {
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_title_asc),
-                                            isSelected = uiState.sortOption == HomeSortOption.TITLE_ASC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.TITLE_ASC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_title_desc),
-                                            isSelected = uiState.sortOption == HomeSortOption.TITLE_DESC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.TITLE_DESC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_recent_desc),
-                                            isSelected = uiState.sortOption == HomeSortOption.RECENT_DESC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.RECENT_DESC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_recent_asc),
-                                            isSelected = uiState.sortOption == HomeSortOption.RECENT_ASC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.RECENT_ASC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_size_desc),
-                                            isSelected = uiState.sortOption == HomeSortOption.SIZE_DESC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.SIZE_DESC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                        SortMenuItem(
-                                            label = stringResource(R.string.home_sort_size_asc),
-                                            isSelected = uiState.sortOption == HomeSortOption.SIZE_ASC,
-                                            onClick = {
-                                                viewModel.updateSortOption(HomeSortOption.SIZE_ASC)
-                                                showSortMenu = false
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(20.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(20.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
                         )
-                    )
+                    }
                 }
 
                 // Empty / Games logic
@@ -409,7 +418,7 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     rowItemsIndexed(
                                         items = uiState.recentGames,
@@ -440,12 +449,12 @@ fun HomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = horizontalInset),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             uiState.games.chunked(if (isListView) 1 else columnsCount).forEach { rowGames ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     rowGames.forEach { game ->
                                         Box(modifier = Modifier.weight(1f)) {
@@ -458,13 +467,23 @@ fun HomeScreen(
                                                 GameListCard(
                                                     modifier = itemModifier,
                                                     game = game,
-                                                    onClick = { onGameClick(game) }
+                                                    onClick = { onGameClick(game) },
+                                                    onLongClickStart = { onGameClick(game) },
+                                                    onLongClickContinue = { onContinueGame(game) },
+                                                    onLongClickLoadSave = { onLoadSaveClick(game) },
+                                                    onLongClickManage = { onManageGameClick(game) },
+                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) }
                                                 )
                                             } else {
                                                 GameCard(
                                                     modifier = itemModifier,
                                                     game = game,
                                                     onClick = { onGameClick(game) },
+                                                    onLongClickStart = { onGameClick(game) },
+                                                    onLongClickContinue = { onContinueGame(game) },
+                                                    onLongClickLoadSave = { onLoadSaveClick(game) },
+                                                    onLongClickManage = { onManageGameClick(game) },
+                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                     compact = isLandscape
                                                 )
                                             }
@@ -790,10 +809,10 @@ private fun RecentGameCard(
 
     Surface(
         modifier = modifier
-            .width(if (compact) 112.dp else 128.dp)
+            .width(if (compact) 98.dp else 108.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .gamepadFocusableCard(shape = RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
@@ -802,9 +821,10 @@ private fun RecentGameCard(
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxWidth(if (compact) 0.84f else 0.88f)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 GameCoverArt(
@@ -817,15 +837,16 @@ private fun RecentGameCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (compact) 72.dp else 78.dp)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .heightIn(min = if (compact) 58.dp else 62.dp)
+                    .padding(horizontal = 9.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = game.title,
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    overflow = TextOverflow.Visible,
-                    color = MaterialTheme.colorScheme.onSurface
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2
                 )
                 SerialLabel(game = game)
             }
@@ -838,31 +859,42 @@ private fun GameCard(
     modifier: Modifier = Modifier,
     game: GameItem,
     onClick: () -> Unit,
+    onLongClickStart: () -> Unit,
+    onLongClickContinue: () -> Unit,
+    onLongClickLoadSave: () -> Unit,
+    onLongClickManage: () -> Unit,
+    onLongClickCreateShortcut: () -> Unit,
     compact: Boolean
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, tween(100))
+    var showMenu by remember { mutableStateOf(false) }
 
-    Surface(
+    Box(modifier = modifier.fillMaxWidth()) {
+        Surface(
         modifier = modifier
-            .fillMaxWidth()
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .animateContentSize()
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = debouncedClick,
+                onLongClick = { showMenu = true }
+            )
+            .gamepadFocusableCard(shape = RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        onClick = debouncedClick
+        shadowElevation = 0.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 GameCoverArt(
@@ -875,25 +907,67 @@ private fun GameCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (compact) 60.dp else 68.dp)
+                    .heightIn(min = if (compact) 56.dp else 62.dp)
                     .padding(
-                        horizontal = if (compact) 10.dp else 12.dp,
-                        vertical = if (compact) 8.dp else 10.dp
+                        horizontal = if (compact) 9.dp else 10.dp,
+                        vertical = if (compact) 7.dp else 8.dp
                     ),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Text(
-                    text = game.title,
-                    style = if (compact) {
-                        MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                    } else {
-                        MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
-                    },
-                    overflow = TextOverflow.Visible,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = game.title,
+                        style = if (compact) {
+                            MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                        } else {
+                            MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+                        },
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    GameRegionFlag(game = game)
+                }
                 SerialLabel(game = game)
             }
+        }
+    }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 8.dp)
+        ) {
+            GameCardContextMenu(
+                expanded = showMenu,
+                offset = DpOffset(x = 0.dp, y = 10.dp),
+                onDismiss = { showMenu = false },
+                onStart = {
+                    showMenu = false
+                    onLongClickStart()
+                },
+                onContinue = {
+                    showMenu = false
+                    onLongClickContinue()
+                },
+                onLoadSave = {
+                    showMenu = false
+                    onLongClickLoadSave()
+                },
+                onManage = {
+                    showMenu = false
+                    onLongClickManage()
+                },
+                onCreateShortcut = {
+                    showMenu = false
+                    onLongClickCreateShortcut()
+                }
+            )
         }
     }
 }
@@ -902,37 +976,48 @@ private fun GameCard(
 private fun GameListCard(
     modifier: Modifier = Modifier,
     game: GameItem,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClickStart: () -> Unit,
+    onLongClickContinue: () -> Unit,
+    onLongClickLoadSave: () -> Unit,
+    onLongClickManage: () -> Unit,
+    onLongClickCreateShortcut: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.985f else 1f, tween(100))
+    var showMenu by remember { mutableStateOf(false) }
 
-    Surface(
+    Box(modifier = modifier.fillMaxWidth()) {
+        Surface(
         modifier = modifier
-            .fillMaxWidth()
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .animateContentSize()
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = debouncedClick,
+                onLongClick = { showMenu = true }
+            )
+            .gamepadFocusableCard(shape = RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        onClick = debouncedClick
+        shadowElevation = 0.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 10.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.Top
         ) {
             Box(
                 modifier = Modifier
-                    .width(92.dp)
+                    .width(62.dp)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 GameCoverArt(
@@ -943,8 +1028,10 @@ private fun GameListCard(
                 )
             }
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -956,31 +1043,107 @@ private fun GameListCard(
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
-                        overflow = TextOverflow.Visible
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 2
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = game.fileName.substringAfterLast('.').uppercase(),
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    GameRegionFlag(game = game)
                 }
                 Text(
                     text = game.fileName,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                SerialLabel(game = game)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SerialLabel(
+                        game = game,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = formatCompactFileSize(game.fileSize),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
+    }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 8.dp)
+        ) {
+            GameCardContextMenu(
+                expanded = showMenu,
+                offset = DpOffset.Zero,
+                onDismiss = { showMenu = false },
+                onStart = {
+                    showMenu = false
+                    onLongClickStart()
+                },
+                onContinue = {
+                    showMenu = false
+                    onLongClickContinue()
+                },
+                onLoadSave = {
+                    showMenu = false
+                    onLongClickLoadSave()
+                },
+                onManage = {
+                    showMenu = false
+                    onLongClickManage()
+                },
+                onCreateShortcut = {
+                    showMenu = false
+                    onLongClickCreateShortcut()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GameCardContextMenu(
+    expanded: Boolean,
+    offset: DpOffset,
+    onDismiss: () -> Unit,
+    onStart: () -> Unit,
+    onContinue: () -> Unit,
+    onLoadSave: () -> Unit,
+    onManage: () -> Unit,
+    onCreateShortcut: () -> Unit
+) {
+    DropdownMenu(
+        expanded = expanded,
+        offset = offset,
+        onDismissRequest = onDismiss
+    ) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_start)) },
+            onClick = onStart
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_continue)) },
+            onClick = onContinue
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_load_save)) },
+            onClick = onLoadSave
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_manager)) },
+            onClick = onManage
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_shortcut)) },
+            onClick = onCreateShortcut
+        )
     }
 }
 
@@ -995,6 +1158,64 @@ private fun SerialLabel(
         text = serial,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.primary,
-        maxLines = 1
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
+}
+
+@Composable
+private fun GameRegionFlag(
+    game: GameItem,
+    modifier: Modifier = Modifier
+) {
+    val flag = game.regionFlagEmoji() ?: return
+    Text(
+        text = flag,
+        modifier = modifier,
+        style = MaterialTheme.typography.titleMedium
+    )
+}
+
+private fun GameItem.regionFlagEmoji(): String? {
+    val region = pcsx2Compatibility?.region
+        ?.takeIf { it.isNotBlank() }
+        ?: inferRegionFromMetadata()
+        ?: return null
+    val normalized = region.uppercase(Locale.ROOT)
+    return when {
+        "USA" in normalized || "US" == normalized || "NTSC-U" in normalized || "NTSC U" in normalized -> "\uD83C\uDDFA\uD83C\uDDF8"
+        "JAPAN" in normalized || "JPN" in normalized || "NTSC-J" in normalized || "NTSC J" in normalized -> "\uD83C\uDDEF\uD83C\uDDF5"
+        "EUROPE" in normalized || "EUR" in normalized || "PAL" in normalized -> "\uD83C\uDDEA\uD83C\uDDFA"
+        "KOREA" in normalized || "KOR" in normalized -> "\uD83C\uDDF0\uD83C\uDDF7"
+        "ASIA" in normalized -> "\uD83C\uDF0F"
+        else -> null
+    }
+}
+
+private fun GameItem.inferRegionFromMetadata(): String? {
+    val probes = listOfNotNull(
+        serial,
+        fileName,
+        title
+    )
+    return probes.firstNotNullOfOrNull { value ->
+        val normalized = value.uppercase(Locale.ROOT)
+        when {
+            "(USA)" in normalized || "[USA]" in normalized || "SLUS" in normalized || "SCUS" in normalized -> "USA"
+            "(JAPAN)" in normalized || "[JAPAN]" in normalized || "(JPN)" in normalized || "SLPM" in normalized || "SLPS" in normalized || "SCPS" in normalized -> "JAPAN"
+            "(EUROPE)" in normalized || "[EUROPE]" in normalized || "(EUR)" in normalized || "SLES" in normalized || "SCES" in normalized -> "EUROPE"
+            "(KOREA)" in normalized || "[KOREA]" in normalized || "SLKA" in normalized || "SCKA" in normalized -> "KOREA"
+            "(ASIA)" in normalized || "[ASIA]" in normalized -> "ASIA"
+            else -> null
+        }
+    }
+}
+
+private fun formatCompactFileSize(bytes: Long): String {
+    return when {
+        bytes >= 1_073_741_824L -> String.format(Locale.US, "%.2f GB", bytes / 1_073_741_824.0)
+        bytes >= 1_048_576L -> String.format(Locale.US, "%.1f MB", bytes / 1_048_576.0)
+        bytes >= 1024L -> String.format(Locale.US, "%.0f KB", bytes / 1024.0)
+        else -> "$bytes B"
+    }
 }

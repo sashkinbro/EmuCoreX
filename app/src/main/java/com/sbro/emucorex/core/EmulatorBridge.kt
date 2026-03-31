@@ -5,6 +5,7 @@ import android.os.Build
 import android.view.Surface
 import java.io.File
 import java.lang.ref.WeakReference
+import java.util.Locale
 
 object EmulatorBridge {
 
@@ -73,7 +74,7 @@ object EmulatorBridge {
     fun applyRuntimeConfig(
         biosPath: String?,
         renderer: Int,
-        upscaleMultiplier: Int,
+        upscaleMultiplier: Float,
         gpuDriverType: Int = 0,
         customDriverPath: String? = null,
         aspectRatio: Int = 1,
@@ -147,11 +148,11 @@ object EmulatorBridge {
             val patchesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "patches").apply { mkdirs() }
 
             NativeApp.renderGpu(renderer)
-            NativeApp.renderUpscalemultiplier(upscaleMultiplier.toFloat())
+            NativeApp.renderUpscalemultiplier(upscaleMultiplier)
             NativeApp.setAspectRatio(aspectRatio)
             
             NativeApp.setSetting("EmuCore/GS", "Renderer", "int", renderer.toString())
-            NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", upscaleMultiplier.toFloat().toString())
+            NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", upscaleMultiplier.toString())
             NativeApp.setSetting(
                 "EmuCore/GS",
                 "AspectRatio",
@@ -254,7 +255,7 @@ object EmulatorBridge {
             // EmuCoreX Meta
             NativeApp.setSetting("EmuCoreX", "BiosSource", "string", biosPath.orEmpty())
             NativeApp.setSetting("EmuCoreX", "Renderer", "int", renderer.toString())
-            NativeApp.setSetting("EmuCoreX", "UpscaleMultiplier", "int", upscaleMultiplier.toString())
+            NativeApp.setSetting("EmuCoreX", "UpscaleMultiplier", "float", upscaleMultiplier.toString())
             NativeApp.setSetting("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString())
 
             // GPU Warnings & OSD
@@ -349,29 +350,59 @@ object EmulatorBridge {
     }
 
     fun getGameMetadata(path: String): GameMetadata {
-        val context = getContext()
-        var nativePath = path
-        var fallbackTitle = File(path).nameWithoutExtension
-
-        if (path.startsWith("content://") && context != null) {
-            fallbackTitle = DocumentPathResolver.getDisplayName(context, path).substringBeforeLast('.')
-            nativePath = path
+        val inferredMetadata = when {
+            path.startsWith("content://") -> {
+                val context = getContext()
+                val displayName = context?.let { DocumentPathResolver.getDisplayName(it, path) } ?: path
+                parseMetadataFromName(displayName)
+            }
+            else -> parseMetadataFromName(File(path).nameWithoutExtension)
         }
 
         if (!isNativeLoaded) {
-            return GameMetadata(title = fallbackTitle)
+            return inferredMetadata
         }
 
         return try {
-            val rawTitle = NativeApp.getGameTitle(nativePath).orEmpty()
+            val rawTitle = NativeApp.getGameTitle(path).orEmpty()
             val segments = rawTitle.split('|')
             GameMetadata(
-                title = segments.getOrNull(0)?.takeIf { it.isNotBlank() } ?: fallbackTitle,
-                serial = segments.getOrNull(1)?.takeIf { it.isNotBlank() },
-                serialWithCrc = segments.getOrNull(2)?.takeIf { it.isNotBlank() }
+                title = segments.getOrNull(0)?.takeIf { it.isNotBlank() } ?: inferredMetadata.title,
+                serial = segments.getOrNull(1)?.takeIf { it.isNotBlank() } ?: inferredMetadata.serial,
+                serialWithCrc = segments.getOrNull(2)?.takeIf { it.isNotBlank() } ?: inferredMetadata.serialWithCrc
             )
         } catch (_: Exception) {
-            GameMetadata(title = fallbackTitle)
+            inferredMetadata
+        }
+    }
+
+    fun parseMetadataFromName(rawName: String): GameMetadata {
+        val cleanName = rawName.substringBeforeLast('.').trim()
+        val serial = extractSerialFromName(cleanName)
+        val title = cleanName
+            .replace(Regex("""(?i)\b([A-Z]{4})[-_. ]?(\d{3})[-_. ]?(\d{2})\b"""), " ")
+            .replace(Regex("""(?i)\b([A-Z]{4})[-_. ]?(\d{5})\b"""), " ")
+            .replace(Regex("""\[[^]]*]|\([^)]*\)"""), " ")
+            .replace(Regex("""\b(disc|disk|cd|dvd)\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+            .replace('_', ' ')
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+            .ifBlank { cleanName }
+        return GameMetadata(
+            title = title,
+            serial = serial,
+            serialWithCrc = serial
+        )
+    }
+
+    private fun extractSerialFromName(value: String): String? {
+        val normalized = value.uppercase(Locale.ROOT)
+        val fullPattern = Regex("""\b([A-Z]{4})[-_. ]?(\d{3})[-_. ]?(\d{2})\b""")
+        val compactPattern = Regex("""\b([A-Z]{4})[-_. ]?(\d{5})\b""")
+        return fullPattern.find(normalized)?.let { match ->
+            "${match.groupValues[1]}-${match.groupValues[2]}${match.groupValues[3]}"
+        } ?: compactPattern.find(normalized)?.let { match ->
+            "${match.groupValues[1]}-${match.groupValues[2]}"
         }
     }
 

@@ -8,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.SetupValidator
-import com.sbro.emucorex.core.StoragePermissionHelper
 import com.sbro.emucorex.data.AppPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,8 +19,6 @@ data class OnboardingUiState(
     val gamePath: String? = null,
     val biosValid: Boolean = false,
     val gamePathValid: Boolean = false,
-    val storagePermissionRequired: Boolean = false,
-    val storagePermissionGranted: Boolean = true,
     val canContinue: Boolean = false,
     val currentPage: Int = 0,
     val totalPages: Int = 4
@@ -47,9 +44,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 preferences.gamePath.collect { path ->
                     updateState(
                         gamePath = path,
-                        gamePathValid = SetupValidator.isGameFolderAccessible(getApplication(), path),
-                        storagePermissionRequired = StoragePermissionHelper.needsStoragePermissionStep(path),
-                        storagePermissionGranted = StoragePermissionHelper.hasGameLibraryAccess(getApplication(), path)
+                        gamePathValid = SetupValidator.isGameFolderAccessible(getApplication(), path)
                     )
                 }
             }
@@ -68,7 +63,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             EmulatorBridge.applyRuntimeConfig(
                 biosPath = uri.toString(),
                 renderer = EmulatorBridge.getSetting("EmuCoreX", "Renderer", "int")?.toIntOrNull() ?: 0,
-                upscaleMultiplier = EmulatorBridge.getSetting("EmuCoreX", "UpscaleMultiplier", "int")?.toIntOrNull() ?: 1
+                upscaleMultiplier = EmulatorBridge.getSetting("EmuCoreX", "UpscaleMultiplier", "float")?.toFloatOrNull()
+                    ?: EmulatorBridge.getSetting("EmuCoreX", "UpscaleMultiplier", "int")?.toIntOrNull()?.toFloat()
+                    ?: 1f
             )
         }
     }
@@ -104,14 +101,6 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         _uiState.value = currentState.copy(currentPage = page.coerceIn(0, currentState.totalPages - 1))
     }
 
-    fun refreshStoragePermissionState() {
-        val state = _uiState.value
-        updateState(
-            storagePermissionRequired = StoragePermissionHelper.needsStoragePermissionStep(state.gamePath),
-            storagePermissionGranted = StoragePermissionHelper.hasGameLibraryAccess(getApplication(), state.gamePath)
-        )
-    }
-
     fun completeOnboarding(onFinished: () -> Unit) {
         if (!_uiState.value.canContinue) return
         viewModelScope.launch {
@@ -125,19 +114,14 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         gamePath: String? = _uiState.value.gamePath,
         biosValid: Boolean = _uiState.value.biosValid,
         gamePathValid: Boolean = _uiState.value.gamePathValid,
-        storagePermissionRequired: Boolean = _uiState.value.storagePermissionRequired,
-        storagePermissionGranted: Boolean = _uiState.value.storagePermissionGranted,
         currentPage: Int = _uiState.value.currentPage
     ) {
-        val storageReady = !storagePermissionRequired || storagePermissionGranted
         _uiState.value = OnboardingUiState(
             biosPath = biosPath,
             gamePath = gamePath,
             biosValid = biosValid,
             gamePathValid = gamePathValid,
-            storagePermissionRequired = storagePermissionRequired,
-            storagePermissionGranted = storagePermissionGranted,
-            canContinue = biosValid && gamePathValid && storageReady,
+            canContinue = biosValid && gamePathValid,
             currentPage = currentPage,
             totalPages = 4
         )

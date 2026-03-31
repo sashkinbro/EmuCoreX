@@ -10,6 +10,7 @@ import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameLibraryCacheRepository
+import com.sbro.emucorex.data.GameLibraryCacheSnapshot
 import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.RecentGameEntry
 import java.util.Locale
@@ -49,12 +50,18 @@ data class HomeUiState(
     val biosConfigured: Boolean = false,
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
+    val showRecentGames: Boolean = true,
+    val showHomeSearch: Boolean = true,
     val searchQuery: String = "",
     val sortOption: HomeSortOption = HomeSortOption.TITLE_ASC,
     val libraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        private const val AUTO_REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    }
 
     private val repository = GameRepository()
     private val libraryCacheRepository = GameLibraryCacheRepository(application)
@@ -128,6 +135,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            preferences.showRecentGames.distinctUntilChanged().collect { enabled ->
+                _uiState.value = _uiState.value.copy(showRecentGames = enabled)
+                publishVisibleGames()
+            }
+        }
+        viewModelScope.launch {
+            preferences.showHomeSearch.distinctUntilChanged().collect { enabled ->
+                _uiState.value = _uiState.value.copy(showHomeSearch = enabled)
+            }
+        }
+        viewModelScope.launch {
             preferences.homeLibraryViewMode.distinctUntilChanged().collect { mode ->
                 _uiState.value = _uiState.value.copy(
                     libraryViewMode = if (mode == 1) HomeLibraryViewMode.LIST else HomeLibraryViewMode.GRID
@@ -196,13 +214,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun scanGames(path: String, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            val cachedGames = resolveCachedGames(path)
+            val cacheSnapshot = resolveCacheSnapshot(path)
+            val cachedGames = cacheSnapshot.games
             val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
             _uiState.value = _uiState.value.copy(
                 isLoading = showFullScreenLoader,
                 isRefreshing = !showFullScreenLoader
             )
             publishCachedGamesIfAvailable(path, cachedGames)
+            if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                libraryInitialized = true
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isRefreshing = false
+                )
+                updateBootstrapState()
+                syncMissingCovers()
+                return@launch
+            }
             allGames = repository.scanDirectory(path, getApplication(), cachedGames.associateBy { it.path })
             currentLibraryRoot = path
             libraryInitialized = true
@@ -220,13 +249,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun scanGamesFromUri(uri: Uri, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             val rootPath = uri.toString()
-            val cachedGames = resolveCachedGames(rootPath)
+            val cacheSnapshot = resolveCacheSnapshot(rootPath)
+            val cachedGames = cacheSnapshot.games
             val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
             _uiState.value = _uiState.value.copy(
                 isLoading = showFullScreenLoader,
                 isRefreshing = !showFullScreenLoader
             )
             publishCachedGamesIfAvailable(rootPath, cachedGames)
+            if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                libraryInitialized = true
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isRefreshing = false
+                )
+                updateBootstrapState()
+                syncMissingCovers()
+                return@launch
+            }
             val context = getApplication<Application>()
             allGames = repository.scanDirectoryFromUri(uri, context, cachedGames.associateBy { it.path })
             currentLibraryRoot = rootPath
@@ -242,9 +282,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun resolveCachedGames(rootPath: String): List<GameItem> {
+    private fun resolveCacheSnapshot(rootPath: String): GameLibraryCacheSnapshot {
         val inMemoryGames = allGames.takeIf { currentLibraryRoot == rootPath && it.isNotEmpty() }
-        return inMemoryGames ?: libraryCacheRepository.load(rootPath)
+        return if (inMemoryGames != null) {
+            GameLibraryCacheSnapshot(inMemoryGames, System.currentTimeMillis())
+        } else {
+            libraryCacheRepository.loadSnapshot(rootPath)
+        }
+    }
+
+    private fun shouldSkipAutoRescan(isInitialLoad: Boolean, cacheSnapshot: GameLibraryCacheSnapshot): Boolean {
+        if (!isInitialLoad) return false
+        if (cacheSnapshot.games.isEmpty()) return false
+        val cacheAge = System.currentTimeMillis() - cacheSnapshot.savedAt
+        return cacheAge in 0 until AUTO_REFRESH_INTERVAL_MS
     }
 
     private fun publishCachedGamesIfAvailable(rootPath: String, cachedGames: List<GameItem>) {
@@ -300,7 +351,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 normalizeSearchToken(game.title).contains(query) ||
                 normalizeSearchToken(game.fileName).contains(query) ||
                 normalizeSearchToken(game.serial).contains(query)
-        }
+        }.takeIf { state.showRecentGames }.orEmpty()
         _uiState.value = _uiState.value.copy(
             games = sorted,
             recentGames = recentGames

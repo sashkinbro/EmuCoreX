@@ -6,6 +6,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
+data class GameLibraryCacheSnapshot(
+    val games: List<GameItem>,
+    val savedAt: Long
+)
+
 class GameLibraryCacheRepository(context: Context) {
 
     private val appContext = context.applicationContext
@@ -14,19 +19,24 @@ class GameLibraryCacheRepository(context: Context) {
     private val lock = Any()
 
     fun load(rootPath: String): List<GameItem> {
+        return loadSnapshot(rootPath).games
+    }
+
+    fun loadSnapshot(rootPath: String): GameLibraryCacheSnapshot {
         synchronized(lock) {
-            if (!cacheFile.exists()) return emptyList()
+            if (!cacheFile.exists()) return GameLibraryCacheSnapshot(emptyList(), 0L)
 
             return runCatching {
                 val rootObject = JSONObject(cacheFile.readText())
-                val libraries = rootObject.optJSONArray("libraries") ?: return emptyList()
+                val libraries = rootObject.optJSONArray("libraries")
+                    ?: return GameLibraryCacheSnapshot(emptyList(), 0L)
                 val libraryObject = (0 until libraries.length())
                     .mapNotNull { index -> libraries.optJSONObject(index) }
                     .firstOrNull { it.optString("root_path") == rootPath }
-                    ?: return emptyList()
+                    ?: return GameLibraryCacheSnapshot(emptyList(), 0L)
 
                 val games = libraryObject.optJSONArray("games") ?: JSONArray()
-                buildList {
+                val parsedGames = buildList {
                     for (index in 0 until games.length()) {
                         val game = games.optJSONObject(index) ?: continue
                         val serial = game.optString("serial").takeIf { it.isNotBlank() }
@@ -44,7 +54,11 @@ class GameLibraryCacheRepository(context: Context) {
                         )
                     }
                 }
-            }.getOrDefault(emptyList())
+                GameLibraryCacheSnapshot(
+                    games = parsedGames,
+                    savedAt = libraryObject.optLong("saved_at", 0L)
+                )
+            }.getOrDefault(GameLibraryCacheSnapshot(emptyList(), 0L))
         }
     }
 

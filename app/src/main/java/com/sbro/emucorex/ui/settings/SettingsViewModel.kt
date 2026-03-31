@@ -11,6 +11,7 @@ import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.SettingsSnapshot
@@ -21,16 +22,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
+    val isLoaded: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
     val renderer: Int = 0,
-    val upscaleMultiplier: Int = 1,
+    val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,
     val showFps: Boolean = true,
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
+    val fpsOverlayCorner: Int = AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
+    val showRecentGames: Boolean = true,
+    val showHomeSearch: Boolean = true,
     val biosPath: String? = null,
     val gamePath: String? = null,
     val biosValid: Boolean = false,
@@ -82,7 +87,7 @@ data class SettingsUiState(
     val mergeSprite: Boolean = false,
     val forceEvenSpritePosition: Boolean = false,
     val nativePaletteDraw: Boolean = false,
-    val performancePreset: Int = PerformancePresets.CUSTOM,
+    val performancePreset: Int = PerformancePresets.BALANCED,
     // Overlay
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
@@ -127,6 +132,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private fun applySettingsSnapshot(snapshot: SettingsSnapshot) {
         _uiState.value = _uiState.value.copy(
+            isLoaded = true,
             themeMode = snapshot.themeMode,
             languageTag = snapshot.languageTag,
             renderer = snapshot.renderer,
@@ -135,8 +141,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             padVibration = snapshot.padVibration,
             showFps = snapshot.showFps,
             fpsOverlayMode = snapshot.fpsOverlayMode,
+            fpsOverlayCorner = snapshot.fpsOverlayCorner,
             compactControls = snapshot.compactControls,
             keepScreenOn = snapshot.keepScreenOn,
+            showRecentGames = snapshot.showRecentGames,
+            showHomeSearch = snapshot.showHomeSearch,
             biosPath = snapshot.biosPath,
             gamePath = snapshot.gamePath,
             biosValid = snapshot.biosValid,
@@ -232,11 +241,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setUpscaleMultiplier(value: Int) {
+    fun setUpscaleMultiplier(value: Float) {
         viewModelScope.launch {
+            val normalizedValue = normalizeUpscale(value)
             markPerformancePresetCustom()
-            preferences.setUpscaleMultiplier(value)
-            EmulatorBridge.setUpscaleMultiplier(value.toFloat())
+            preferences.setUpscaleMultiplier(normalizedValue)
+            EmulatorBridge.setUpscaleMultiplier(normalizedValue)
         }
     }
 
@@ -287,7 +297,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setShowFps(enabled: Boolean) { viewModelScope.launch { preferences.setShowFps(enabled) } }
     fun setFpsOverlayMode(mode: Int) { viewModelScope.launch { preferences.setFpsOverlayMode(mode) } }
+    fun setFpsOverlayCorner(corner: Int) { viewModelScope.launch { preferences.setFpsOverlayCorner(corner) } }
     fun setKeepScreenOn(enabled: Boolean) { viewModelScope.launch { preferences.setKeepScreenOn(enabled) } }
+    fun setShowRecentGames(enabled: Boolean) { viewModelScope.launch { preferences.setShowRecentGames(enabled) } }
+    fun setShowHomeSearch(enabled: Boolean) { viewModelScope.launch { preferences.setShowHomeSearch(enabled) } }
 
     // Extended settings
     fun setEeCycleRate(value: Int) {
@@ -750,7 +763,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", config.skipDraw.toString())
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", config.halfPixelOffset.toString())
         EmulatorBridge.setSetting("EmuCore", "EnableWideScreenPatches", "bool", config.widescreenPatches.toString())
-        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier.toFloat())
+        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier)
         EmulatorBridge.setRenderer(config.renderer)
         refreshManualHardwareFixes(
             _uiState.value.copy(

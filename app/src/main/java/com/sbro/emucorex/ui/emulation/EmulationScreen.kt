@@ -18,6 +18,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -120,11 +121,18 @@ import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.UPSCALE_MAX
+import com.sbro.emucorex.core.UPSCALE_MIN
+import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
+import com.sbro.emucorex.core.formatUpscaleLabel
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
+import com.sbro.emucorex.data.OverlayLayoutSnapshot
+import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.theme.AccentPrimary
 import com.sbro.emucorex.ui.theme.GradientEnd
@@ -174,6 +182,31 @@ private data class LiveSelectionOption(
     val contentDescription: String = label.orEmpty()
 )
 
+@Composable
+private fun fpsOverlayCornerLiveOptions(): List<LiveSelectionOption> = listOf(
+    LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_TOP_LEFT, stringResource(R.string.settings_fps_overlay_corner_top_left)),
+    LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT, stringResource(R.string.settings_fps_overlay_corner_top_right)),
+    LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT, stringResource(R.string.settings_fps_overlay_corner_bottom_left)),
+    LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT, stringResource(R.string.settings_fps_overlay_corner_bottom_right))
+)
+
+private fun Int.toOverlayAlignment(): Alignment = when (this) {
+    AppPreferences.FPS_OVERLAY_CORNER_TOP_LEFT -> Alignment.TopStart
+    AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT -> Alignment.BottomStart
+    AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT -> Alignment.BottomEnd
+    else -> Alignment.TopEnd
+}
+
+private fun Int.isTopOverlayCorner(): Boolean {
+    return this == AppPreferences.FPS_OVERLAY_CORNER_TOP_LEFT ||
+        this == AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT
+}
+
+private fun Int.isBottomOverlayCorner(): Boolean {
+    return this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT ||
+        this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT
+}
+
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun EmulationScreen(
@@ -187,6 +220,8 @@ fun EmulationScreen(
     val retroAchievementsState by RetroAchievementsStateManager.state.collectAsState()
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
+    val globalDefaults by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val overlayDefaults by preferences.overlayLayoutSnapshot.collectAsState(initial = OverlayLayoutSnapshot())
     val gamepadBindings by preferences.gamepadBindings.collectAsState(initial = emptyMap())
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val scope = rememberCoroutineScope()
@@ -201,6 +236,10 @@ fun EmulationScreen(
     val overlayTopSafeInset = maxOf(
         rootCutoutPadding.calculateTopPadding(),
         rootNavPadding.calculateTopPadding()
+    )
+    val overlayBottomSafeInset = maxOf(
+        rootCutoutPadding.calculateBottomPadding(),
+        rootNavPadding.calculateBottomPadding()
     )
     
     val configuration = LocalConfiguration.current
@@ -374,7 +413,7 @@ fun EmulationScreen(
                 }
         )
 
-        // Top systemic overlay (FPS, Gamepad, Menu)
+        // Top systemic overlay (Gamepad, Achievements)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -407,26 +446,6 @@ fun EmulationScreen(
                     }
                 }
 
-                // Performance Metrics
-                AnimatedVisibility(
-                    visible = !uiState.showMenu && uiState.showFps,
-                    enter = fadeIn(tween(200)),
-                    exit = fadeOut(tween(200))
-                ) {
-                    if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
-                        SimpleFpsCounter(fps = uiState.fps)
-                    } else {
-                        PerformanceHud(
-                            fps = uiState.fps,
-                            speedPercent = uiState.speedPercent,
-                            cpuLoad = uiState.cpuLoad,
-                            gpuLoad = uiState.gpuLoad,
-                            frameTime = uiState.frameTime,
-                            targetFps = uiState.targetFps
-                        )
-                    }
-                }
-
                 AnimatedVisibility(
                     visible = retroAchievementsState.enabled &&
                         retroAchievementsState.game != null &&
@@ -447,6 +466,37 @@ fun EmulationScreen(
                     }
                 }
 
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !uiState.showMenu && uiState.showFps,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier
+                .align(uiState.fpsOverlayCorner.toOverlayAlignment())
+                .padding(
+                    top = if (uiState.fpsOverlayCorner.isTopOverlayCorner()) overlayTopSafeInset + 16.dp else 0.dp,
+                    bottom = if (uiState.fpsOverlayCorner.isBottomOverlayCorner()) {
+                        overlayBottomSafeInset + 16.dp + if (uiState.controlsVisible) 96.dp else 0.dp
+                    } else {
+                        0.dp
+                    },
+                    start = overlayHorizontalSafeInset + 16.dp,
+                    end = overlayHorizontalSafeInset + 16.dp
+                )
+        ) {
+            if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
+                SimpleFpsCounter(fps = uiState.fps)
+            } else {
+                PerformanceHud(
+                    fps = uiState.fps,
+                    speedPercent = uiState.speedPercent,
+                    cpuLoad = uiState.cpuLoad,
+                    gpuLoad = uiState.gpuLoad,
+                    frameTime = uiState.frameTime,
+                    targetFps = uiState.targetFps
+                )
             }
         }
 
@@ -682,6 +732,8 @@ fun EmulationScreen(
 
                 EmulationSidebarMenu(
                     uiState = uiState,
+                    globalDefaults = globalDefaults,
+                    overlayDefaults = overlayDefaults,
                     onClose = toggleMenuClick,
                     onPauseToggle = togglePauseClick,
                     onQuickSave = quickSaveClick,
@@ -692,6 +744,7 @@ fun EmulationScreen(
                     onPrevSlot = { viewModel.setSlot(uiState.currentSlot - 1) },
                     onToggleFps = { viewModel.toggleFpsVisibility() },
                     onSetFpsOverlayMode = { viewModel.setFpsOverlayMode(it) },
+                    onSetFpsOverlayCorner = { viewModel.setFpsOverlayCorner(it) },
                     onSetOverlayScale = { viewModel.setOverlayScale(it) },
                     onSetOverlayOpacity = { viewModel.setOverlayOpacity(it) },
                     onSetHideOverlayOnGamepad = { viewModel.setHideOverlayOnGamepad(it) },
@@ -1511,6 +1564,8 @@ private fun CenterButton(
 @Composable
 private fun EmulationSidebarMenu(
     uiState: EmulationUiState,
+    globalDefaults: SettingsSnapshot,
+    overlayDefaults: OverlayLayoutSnapshot,
     onClose: () -> Unit,
     onPauseToggle: () -> Unit,
     onQuickSave: () -> Unit,
@@ -1521,6 +1576,7 @@ private fun EmulationSidebarMenu(
     onPrevSlot: () -> Unit,
     onToggleFps: () -> Unit,
     onSetFpsOverlayMode: (Int) -> Unit,
+    onSetFpsOverlayCorner: (Int) -> Unit,
     onSetOverlayScale: (Int) -> Unit,
     onSetOverlayOpacity: (Int) -> Unit,
     onSetHideOverlayOnGamepad: (Boolean) -> Unit,
@@ -1533,7 +1589,7 @@ private fun EmulationSidebarMenu(
     onSetPerformancePreset: (Int) -> Unit,
     onApplyRecommendedProfile: () -> Unit,
     onSetRenderer: (Int) -> Unit,
-    onSetUpscale: (Int) -> Unit,
+    onSetUpscale: (Float) -> Unit,
     onSetAspectRatio: (Int) -> Unit,
     onSetMtvu: (Boolean) -> Unit,
     onSetFastCdvd: (Boolean) -> Unit,
@@ -1831,7 +1887,13 @@ private fun EmulationSidebarMenu(
                         SettingsToggle(
                             title = stringResource(R.string.emulation_performance_stats),
                             checked = uiState.showFps,
-                            onCheckedChange = { onToggleFps() }
+                            onCheckedChange = { onToggleFps() },
+                            helpText = stringResource(R.string.settings_help_show_fps),
+                            onResetToDefault = {
+                                if (uiState.showFps != globalDefaults.showFps) {
+                                    onToggleFps()
+                                }
+                            }
                         )
 
                         LiveSelectionRow(
@@ -1841,7 +1903,18 @@ private fun EmulationSidebarMenu(
                                 LiveSelectionOption(FPS_OVERLAY_MODE_DETAILED, stringResource(R.string.settings_fps_overlay_mode_detailed))
                             ),
                             currentValue = uiState.fpsOverlayMode,
-                            onValueChange = onSetFpsOverlayMode
+                            onValueChange = onSetFpsOverlayMode,
+                            helpText = stringResource(R.string.settings_help_fps_overlay_mode),
+                            onResetToDefault = { onSetFpsOverlayMode(globalDefaults.fpsOverlayMode) }
+                        )
+
+                        LiveSelectionRow(
+                            title = stringResource(R.string.settings_fps_overlay_position),
+                            options = fpsOverlayCornerLiveOptions(),
+                            currentValue = uiState.fpsOverlayCorner,
+                            onValueChange = onSetFpsOverlayCorner,
+                            helpText = stringResource(R.string.settings_help_fps_overlay_position),
+                            onResetToDefault = { onSetFpsOverlayCorner(globalDefaults.fpsOverlayCorner) }
                         )
                     }
 
@@ -1863,19 +1936,25 @@ private fun EmulationSidebarMenu(
                         SettingsToggle(
                             title = stringResource(R.string.settings_gamepad_hide_overlay),
                             checked = uiState.hideOverlayOnGamepad,
-                            onCheckedChange = onSetHideOverlayOnGamepad
+                            onCheckedChange = onSetHideOverlayOnGamepad,
+                            helpText = stringResource(R.string.settings_help_hide_overlay_on_gamepad),
+                            onResetToDefault = { onSetHideOverlayOnGamepad(overlayDefaults.hideOverlayOnGamepad) }
                         )
 
                         SettingsToggle(
                             title = stringResource(R.string.settings_compact_controls),
                             checked = uiState.compactControls,
-                            onCheckedChange = onSetCompactControls
+                            onCheckedChange = onSetCompactControls,
+                            helpText = stringResource(R.string.settings_help_compact_controls),
+                            onResetToDefault = { onSetCompactControls(globalDefaults.compactControls) }
                         )
 
                         SettingsToggle(
                             title = stringResource(R.string.settings_keep_screen_on),
                             checked = uiState.keepScreenOn,
-                            onCheckedChange = onSetKeepScreenOn
+                            onCheckedChange = onSetKeepScreenOn,
+                            helpText = stringResource(R.string.settings_help_keep_screen_on),
+                            onResetToDefault = { onSetKeepScreenOn(globalDefaults.keepScreenOn) }
                         )
 
                         LiveSliderRow(
@@ -1884,7 +1963,9 @@ private fun EmulationSidebarMenu(
                             value = uiState.overlayScale.toFloat(),
                             range = 50f..150f,
                             steps = 99,
-                            onValueChange = { onSetOverlayScale(it.toInt()) }
+                            onValueChange = { onSetOverlayScale(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_overlay_scale),
+                            onResetToDefault = { onSetOverlayScale(overlayDefaults.overlayScale) }
                         )
 
                         LiveSliderRow(
@@ -1893,7 +1974,9 @@ private fun EmulationSidebarMenu(
                             value = uiState.overlayOpacity.toFloat(),
                             range = 20f..100f,
                             steps = 79,
-                            onValueChange = { onSetOverlayOpacity(it.toInt()) }
+                            onValueChange = { onSetOverlayOpacity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_overlay_opacity),
+                            onResetToDefault = { onSetOverlayOpacity(overlayDefaults.overlayOpacity) }
                         )
 
                         LiveSliderRow(
@@ -1902,7 +1985,9 @@ private fun EmulationSidebarMenu(
                             value = uiState.stickScale.toFloat(),
                             range = 50f..200f,
                             steps = 149,
-                            onValueChange = { onSetStickScale(it.toInt()) }
+                            onValueChange = { onSetStickScale(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_stick_scale),
+                            onResetToDefault = { onSetStickScale(overlayDefaults.stickScale) }
                         )
 
                         MenuButton(
@@ -1933,7 +2018,9 @@ private fun EmulationSidebarMenu(
                     title = stringResource(R.string.settings_performance_preset),
                     options = performancePresetOptions(),
                     currentValue = uiState.performancePreset,
-                    onValueChange = onSetPerformancePreset
+                    onValueChange = onSetPerformancePreset,
+                    helpText = stringResource(R.string.settings_help_performance_preset),
+                    onResetToDefault = { onSetPerformancePreset(globalDefaults.performancePreset) }
                 )
 
                 Text(
@@ -1961,7 +2048,9 @@ private fun EmulationSidebarMenu(
                 SettingsToggle(
                     title = stringResource(R.string.settings_frame_limiter),
                     checked = uiState.frameLimitEnabled,
-                    onCheckedChange = onSetFrameLimitEnabled
+                    onCheckedChange = onSetFrameLimitEnabled,
+                    helpText = stringResource(R.string.settings_help_frame_limiter),
+                    onResetToDefault = { onSetFrameLimitEnabled(globalDefaults.frameLimitEnabled) }
                 )
 
                 LiveSliderRow(
@@ -1971,7 +2060,9 @@ private fun EmulationSidebarMenu(
                     value = uiState.targetFps.toFloat(),
                     range = 20f..120f,
                     steps = 99,
-                    onValueChange = { onSetTargetFps(it.toInt()) }
+                    onValueChange = { onSetTargetFps(it.toInt()) },
+                    helpText = stringResource(R.string.settings_help_target_fps),
+                    onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
                 )
 
                 // Renderer Selection (IDs: GL=12, Vulkan=14, Soft=13)
@@ -1984,19 +2075,17 @@ private fun EmulationSidebarMenu(
                     ),
                     currentValue = uiState.renderer,
                     onValueChange = onSetRenderer,
-                    allowWrap = false
+                    allowWrap = false,
+                    helpText = stringResource(R.string.settings_help_renderer),
+                    onResetToDefault = { onSetRenderer(globalDefaults.renderer) }
                 )
 
-                // Upscale Selection ( 1 -> 1x, 2 -> 2x, 3 -> 3x)
-                LiveSelectionRow(
+                LiveUpscaleSliderRow(
                     title = stringResource(R.string.settings_upscale),
-                    options = listOf(
-                        LiveSelectionOption(1, "1x"),
-                        LiveSelectionOption(2, "2x"),
-                        LiveSelectionOption(3, "3x")
-                    ),
-                    currentValue = uiState.upscale,
-                    onValueChange = onSetUpscale
+                    value = uiState.upscale,
+                    onValueChange = onSetUpscale,
+                    helpText = stringResource(R.string.settings_help_upscale),
+                    onResetToDefault = { onSetUpscale(globalDefaults.upscaleMultiplier) }
                 )
 
                 // Aspect Ratio (Core IDs: Stretch=0, Auto=1, 4:3=2, 16:9=3)
@@ -2014,7 +2103,9 @@ private fun EmulationSidebarMenu(
                     ),
                     currentValue = uiState.aspectRatio,
                     onValueChange = onSetAspectRatio,
-                    allowWrap = false
+                    allowWrap = false,
+                    helpText = stringResource(R.string.settings_help_aspect_ratio),
+                    onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
                 )
 
                 // Performance Hacks Section
@@ -2028,19 +2119,25 @@ private fun EmulationSidebarMenu(
                 SettingsToggle(
                     title = stringResource(R.string.settings_mtvu),
                     checked = uiState.enableMtvu,
-                    onCheckedChange = onSetMtvu
+                    onCheckedChange = onSetMtvu,
+                    helpText = stringResource(R.string.settings_help_mtvu),
+                    onResetToDefault = { onSetMtvu(globalDefaults.enableMtvu) }
                 )
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_fast_cdvd),
                     checked = uiState.enableFastCdvd,
-                    onCheckedChange = onSetFastCdvd
+                    onCheckedChange = onSetFastCdvd,
+                    helpText = stringResource(R.string.settings_help_fast_cdvd),
+                    onResetToDefault = { onSetFastCdvd(globalDefaults.enableFastCdvd) }
                 )
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_enable_cheats),
                     checked = uiState.enableCheats,
-                    onCheckedChange = onSetEnableCheats
+                    onCheckedChange = onSetEnableCheats,
+                    helpText = stringResource(R.string.settings_help_cheats),
+                    onResetToDefault = { onSetEnableCheats(globalDefaults.enableCheats) }
                 )
 
                 if (uiState.availableCheats.isNotEmpty()) {
@@ -2062,7 +2159,9 @@ private fun EmulationSidebarMenu(
                         LiveSelectionOption(3, stringResource(R.string.settings_hw_download_mode_disabled))
                     ),
                     currentValue = uiState.hwDownloadMode,
-                    onValueChange = onSetHwDownloadMode
+                    onValueChange = onSetHwDownloadMode,
+                    helpText = stringResource(R.string.settings_help_hw_download_mode),
+                    onResetToDefault = { onSetHwDownloadMode(globalDefaults.hwDownloadMode) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2076,7 +2175,9 @@ private fun EmulationSidebarMenu(
                         5 to stringResource(R.string.settings_blending_accuracy_maximum)
                     ),
                     currentValue = uiState.blendingAccuracy,
-                    onValueChange = onSetBlendingAccuracy
+                    onValueChange = onSetBlendingAccuracy,
+                    helpText = stringResource(R.string.settings_help_blending_accuracy),
+                    onResetToDefault = { onSetBlendingAccuracy(globalDefaults.blendingAccuracy) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2087,7 +2188,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_texture_preloading_full)
                     ),
                     currentValue = uiState.texturePreloading,
-                    onValueChange = onSetTexturePreloading
+                    onValueChange = onSetTexturePreloading,
+                    helpText = stringResource(R.string.settings_help_texture_preloading),
+                    onResetToDefault = { onSetTexturePreloading(globalDefaults.texturePreloading) }
                 )
 
                 SidebarSectionTitle(
@@ -2106,7 +2209,9 @@ private fun EmulationSidebarMenu(
                         3 to stringResource(R.string.settings_bilinear_filtering_no_sprite)
                     ),
                     currentValue = uiState.textureFiltering,
-                    onValueChange = onSetTextureFiltering
+                    onValueChange = onSetTextureFiltering,
+                    helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                    onResetToDefault = { onSetTextureFiltering(globalDefaults.textureFiltering) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2118,7 +2223,9 @@ private fun EmulationSidebarMenu(
                         3 to stringResource(R.string.settings_trilinear_filtering_forced)
                     ),
                     currentValue = uiState.trilinearFiltering,
-                    onValueChange = onSetTrilinearFiltering
+                    onValueChange = onSetTrilinearFiltering,
+                    helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                    onResetToDefault = { onSetTrilinearFiltering(globalDefaults.trilinearFiltering) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2131,13 +2238,17 @@ private fun EmulationSidebarMenu(
                         16 to "16x"
                     ),
                     currentValue = uiState.anisotropicFiltering,
-                    onValueChange = onSetAnisotropicFiltering
+                    onValueChange = onSetAnisotropicFiltering,
+                    helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                    onResetToDefault = { onSetAnisotropicFiltering(globalDefaults.anisotropicFiltering) }
                 )
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_fxaa),
                     checked = uiState.enableFxaa,
-                    onCheckedChange = onSetEnableFxaa
+                    onCheckedChange = onSetEnableFxaa,
+                    helpText = stringResource(R.string.settings_help_fxaa),
+                    onResetToDefault = { onSetEnableFxaa(globalDefaults.enableFxaa) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2148,7 +2259,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
                     ),
                     currentValue = uiState.casMode,
-                    onValueChange = onSetCasMode
+                    onValueChange = onSetCasMode,
+                    helpText = stringResource(R.string.settings_help_cas),
+                    onResetToDefault = { onSetCasMode(globalDefaults.casMode) }
                 )
 
                 if (uiState.casMode != 0) {
@@ -2158,14 +2271,18 @@ private fun EmulationSidebarMenu(
                         value = uiState.casSharpness.toFloat(),
                         range = 0f..100f,
                         steps = 99,
-                        onValueChange = { onSetCasSharpness(it.toInt()) }
+                        onValueChange = { onSetCasSharpness(it.toInt()) },
+                        helpText = stringResource(R.string.settings_help_cas_sharpness),
+                        onResetToDefault = { onSetCasSharpness(globalDefaults.casSharpness) }
                     )
                 }
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_hw_mipmapping),
                     checked = uiState.enableHwMipmapping,
-                    onCheckedChange = onSetEnableHwMipmapping
+                    onCheckedChange = onSetEnableHwMipmapping,
+                    helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                    onResetToDefault = { onSetEnableHwMipmapping(globalDefaults.enableHwMipmapping) }
                 )
 
                 LiveSelectionRow(
@@ -2176,7 +2293,9 @@ private fun EmulationSidebarMenu(
                         LiveSelectionOption(2, "1/4")
                     ),
                     currentValue = uiState.frameSkip,
-                    onValueChange = onSetFrameSkip
+                    onValueChange = onSetFrameSkip,
+                    helpText = stringResource(R.string.settings_help_frame_skip),
+                    onResetToDefault = { onSetFrameSkip(globalDefaults.frameSkip) }
                 )
                     }
 
@@ -2188,12 +2307,14 @@ private fun EmulationSidebarMenu(
                             horizontalInset = sectionLabelInset
                         )
 
-                        LiveChipsSelectionRow(
-                            title = stringResource(R.string.settings_cpu_sprite_render_size),
-                            options = (0..10).map { it to it.toString() },
-                            currentValue = uiState.cpuSpriteRenderSize,
-                            onValueChange = onSetCpuSpriteRenderSize
-                        )
+                LiveChipsSelectionRow(
+                    title = stringResource(R.string.settings_cpu_sprite_render_size),
+                    options = (0..10).map { it to it.toString() },
+                    currentValue = uiState.cpuSpriteRenderSize,
+                    onValueChange = onSetCpuSpriteRenderSize,
+                    helpText = stringResource(R.string.settings_help_cpu_sprite_render_size),
+                    onResetToDefault = { onSetCpuSpriteRenderSize(globalDefaults.cpuSpriteRenderSize) }
+                )
 
                 LiveChipsSelectionRow(
                     title = stringResource(R.string.settings_cpu_sprite_render_level),
@@ -2203,7 +2324,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_cpu_sprite_render_level_blended)
                     ),
                     currentValue = uiState.cpuSpriteRenderLevel,
-                    onValueChange = onSetCpuSpriteRenderLevel
+                    onValueChange = onSetCpuSpriteRenderLevel,
+                    helpText = stringResource(R.string.settings_help_cpu_sprite_render_level),
+                    onResetToDefault = { onSetCpuSpriteRenderLevel(globalDefaults.cpuSpriteRenderLevel) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2214,7 +2337,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_aggressive_short)
                     ),
                     currentValue = uiState.softwareClutRender,
-                    onValueChange = onSetSoftwareClutRender
+                    onValueChange = onSetSoftwareClutRender,
+                    helpText = stringResource(R.string.settings_help_software_clut_render),
+                    onResetToDefault = { onSetSoftwareClutRender(globalDefaults.softwareClutRender) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2225,7 +2350,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_gpu_target_clut_inside)
                     ),
                     currentValue = uiState.gpuTargetClutMode,
-                    onValueChange = onSetGpuTargetClutMode
+                    onValueChange = onSetGpuTargetClutMode,
+                    helpText = stringResource(R.string.settings_help_gpu_target_clut),
+                    onResetToDefault = { onSetGpuTargetClutMode(globalDefaults.gpuTargetClutMode) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2236,7 +2363,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_auto_flush_all)
                     ),
                     currentValue = uiState.autoFlushHardware,
-                    onValueChange = onSetAutoFlushHardware
+                    onValueChange = onSetAutoFlushHardware,
+                    helpText = stringResource(R.string.settings_help_auto_flush_hardware),
+                    onResetToDefault = { onSetAutoFlushHardware(globalDefaults.autoFlushHardware) }
                 )
 
                 LiveSliderRow(
@@ -2245,7 +2374,9 @@ private fun EmulationSidebarMenu(
                     value = uiState.skipDrawStart.toFloat(),
                     range = 0f..100f,
                     steps = 99,
-                    onValueChange = { onSetSkipDrawStart(it.toInt()) }
+                    onValueChange = { onSetSkipDrawStart(it.toInt()) },
+                    helpText = stringResource(R.string.settings_help_skip_draw_start),
+                    onResetToDefault = { onSetSkipDrawStart(globalDefaults.skipDrawStart) }
                 )
 
                 LiveSliderRow(
@@ -2254,38 +2385,52 @@ private fun EmulationSidebarMenu(
                     value = uiState.skipDrawEnd.toFloat(),
                     range = 0f..100f,
                     steps = 99,
-                    onValueChange = { onSetSkipDrawEnd(it.toInt()) }
+                    onValueChange = { onSetSkipDrawEnd(it.toInt()) },
+                    helpText = stringResource(R.string.settings_help_skip_draw_end),
+                    onResetToDefault = { onSetSkipDrawEnd(globalDefaults.skipDrawEnd) }
                 )
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_cpu_framebuffer_conversion),
                     checked = uiState.cpuFramebufferConversion,
-                    onCheckedChange = onSetCpuFramebufferConversion
+                    onCheckedChange = onSetCpuFramebufferConversion,
+                    helpText = stringResource(R.string.settings_help_cpu_framebuffer_conversion),
+                    onResetToDefault = { onSetCpuFramebufferConversion(globalDefaults.cpuFramebufferConversion) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_disable_depth_conversion),
                     checked = uiState.disableDepthConversion,
-                    onCheckedChange = onSetDisableDepthConversion
+                    onCheckedChange = onSetDisableDepthConversion,
+                    helpText = stringResource(R.string.settings_help_disable_depth_conversion),
+                    onResetToDefault = { onSetDisableDepthConversion(globalDefaults.disableDepthConversion) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_disable_safe_features),
                     checked = uiState.disableSafeFeatures,
-                    onCheckedChange = onSetDisableSafeFeatures
+                    onCheckedChange = onSetDisableSafeFeatures,
+                    helpText = stringResource(R.string.settings_help_disable_safe_features),
+                    onResetToDefault = { onSetDisableSafeFeatures(globalDefaults.disableSafeFeatures) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_disable_render_fixes),
                     checked = uiState.disableRenderFixes,
-                    onCheckedChange = onSetDisableRenderFixes
+                    onCheckedChange = onSetDisableRenderFixes,
+                    helpText = stringResource(R.string.settings_help_disable_render_fixes),
+                    onResetToDefault = { onSetDisableRenderFixes(globalDefaults.disableRenderFixes) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_preload_frame_data),
                     checked = uiState.preloadFrameData,
-                    onCheckedChange = onSetPreloadFrameData
+                    onCheckedChange = onSetPreloadFrameData,
+                    helpText = stringResource(R.string.settings_help_preload_frame_data),
+                    onResetToDefault = { onSetPreloadFrameData(globalDefaults.preloadFrameData) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_disable_partial_invalidation),
                     checked = uiState.disablePartialInvalidation,
-                    onCheckedChange = onSetDisablePartialInvalidation
+                    onCheckedChange = onSetDisablePartialInvalidation,
+                    helpText = stringResource(R.string.settings_help_disable_partial_invalidation),
+                    onResetToDefault = { onSetDisablePartialInvalidation(globalDefaults.disablePartialInvalidation) }
                 )
                 LiveChipsSelectionRow(
                     title = stringResource(R.string.settings_texture_inside_rt),
@@ -2295,22 +2440,30 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_texture_inside_rt_merge)
                     ),
                     currentValue = uiState.textureInsideRt,
-                    onValueChange = onSetTextureInsideRt
+                    onValueChange = onSetTextureInsideRt,
+                    helpText = stringResource(R.string.settings_help_texture_inside_rt),
+                    onResetToDefault = { onSetTextureInsideRt(globalDefaults.textureInsideRt) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_read_targets_on_close),
                     checked = uiState.readTargetsOnClose,
-                    onCheckedChange = onSetReadTargetsOnClose
+                    onCheckedChange = onSetReadTargetsOnClose,
+                    helpText = stringResource(R.string.settings_help_read_targets_on_close),
+                    onResetToDefault = { onSetReadTargetsOnClose(globalDefaults.readTargetsOnClose) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_estimate_texture_region),
                     checked = uiState.estimateTextureRegion,
-                    onCheckedChange = onSetEstimateTextureRegion
+                    onCheckedChange = onSetEstimateTextureRegion,
+                    helpText = stringResource(R.string.settings_help_estimate_texture_region),
+                    onResetToDefault = { onSetEstimateTextureRegion(globalDefaults.estimateTextureRegion) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_gpu_palette_conversion),
                     checked = uiState.gpuPaletteConversion,
-                    onCheckedChange = onSetGpuPaletteConversion
+                    onCheckedChange = onSetGpuPaletteConversion,
+                    helpText = stringResource(R.string.settings_help_gpu_palette_conversion),
+                    onResetToDefault = { onSetGpuPaletteConversion(globalDefaults.gpuPaletteConversion) }
                 )
 
                 SidebarSectionTitle(
@@ -2331,7 +2484,9 @@ private fun EmulationSidebarMenu(
                         5 to stringResource(R.string.settings_half_pixel_native_tex)
                     ),
                     currentValue = uiState.halfPixelOffset,
-                    onValueChange = onSetHalfPixelOffset
+                    onValueChange = onSetHalfPixelOffset,
+                    helpText = stringResource(R.string.settings_help_half_pixel_offset),
+                    onResetToDefault = { onSetHalfPixelOffset(globalDefaults.halfPixelOffset) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2342,7 +2497,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_native_scaling_aggressive)
                     ),
                     currentValue = uiState.nativeScaling,
-                    onValueChange = onSetNativeScaling
+                    onValueChange = onSetNativeScaling,
+                    helpText = stringResource(R.string.settings_help_native_scaling),
+                    onResetToDefault = { onSetNativeScaling(globalDefaults.nativeScaling) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2353,7 +2510,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_round_sprite_full)
                     ),
                     currentValue = uiState.roundSprite,
-                    onValueChange = onSetRoundSprite
+                    onValueChange = onSetRoundSprite,
+                    helpText = stringResource(R.string.settings_help_round_sprite),
+                    onResetToDefault = { onSetRoundSprite(globalDefaults.roundSprite) }
                 )
 
                 LiveChipsSelectionRow(
@@ -2364,7 +2523,9 @@ private fun EmulationSidebarMenu(
                         2 to stringResource(R.string.settings_bilinear_upscale_force_nearest)
                     ),
                     currentValue = uiState.bilinearUpscale,
-                    onValueChange = onSetBilinearUpscale
+                    onValueChange = onSetBilinearUpscale,
+                    helpText = stringResource(R.string.settings_help_bilinear_upscale),
+                    onResetToDefault = { onSetBilinearUpscale(globalDefaults.bilinearUpscale) }
                 )
 
                 LiveSliderRow(
@@ -2373,7 +2534,9 @@ private fun EmulationSidebarMenu(
                     value = uiState.textureOffsetX.toFloat(),
                     range = -512f..512f,
                     steps = 1023,
-                    onValueChange = { onSetTextureOffsetX(it.toInt()) }
+                    onValueChange = { onSetTextureOffsetX(it.toInt()) },
+                    helpText = stringResource(R.string.settings_help_texture_offset_x),
+                    onResetToDefault = { onSetTextureOffsetX(globalDefaults.textureOffsetX) }
                 )
 
                 LiveSliderRow(
@@ -2382,28 +2545,38 @@ private fun EmulationSidebarMenu(
                     value = uiState.textureOffsetY.toFloat(),
                     range = -512f..512f,
                     steps = 1023,
-                    onValueChange = { onSetTextureOffsetY(it.toInt()) }
+                    onValueChange = { onSetTextureOffsetY(it.toInt()) },
+                    helpText = stringResource(R.string.settings_help_texture_offset_y),
+                    onResetToDefault = { onSetTextureOffsetY(globalDefaults.textureOffsetY) }
                 )
 
                 SettingsToggle(
                     title = stringResource(R.string.settings_align_sprite),
                     checked = uiState.alignSprite,
-                    onCheckedChange = onSetAlignSprite
+                    onCheckedChange = onSetAlignSprite,
+                    helpText = stringResource(R.string.settings_help_align_sprite),
+                    onResetToDefault = { onSetAlignSprite(globalDefaults.alignSprite) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_merge_sprite),
                     checked = uiState.mergeSprite,
-                    onCheckedChange = onSetMergeSprite
+                    onCheckedChange = onSetMergeSprite,
+                    helpText = stringResource(R.string.settings_help_merge_sprite),
+                    onResetToDefault = { onSetMergeSprite(globalDefaults.mergeSprite) }
                 )
                 SettingsToggle(
                     title = stringResource(R.string.settings_force_even_sprite_position),
                     checked = uiState.forceEvenSpritePosition,
-                    onCheckedChange = onSetForceEvenSpritePosition
+                    onCheckedChange = onSetForceEvenSpritePosition,
+                    helpText = stringResource(R.string.settings_help_force_even_sprite_position),
+                    onResetToDefault = { onSetForceEvenSpritePosition(globalDefaults.forceEvenSpritePosition) }
                 )
                         SettingsToggle(
                             title = stringResource(R.string.settings_native_palette_draw),
                             checked = uiState.nativePaletteDraw,
-                            onCheckedChange = onSetNativePaletteDraw
+                            onCheckedChange = onSetNativePaletteDraw,
+                            helpText = stringResource(R.string.settings_help_native_palette_draw),
+                            onResetToDefault = { onSetNativePaletteDraw(globalDefaults.nativePaletteDraw) }
                         )
                     }
                 }
@@ -2611,10 +2784,12 @@ private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
 private fun SettingsToggle(
     title: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
-        onClick = { onCheckedChange(!checked) },
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
@@ -2622,15 +2797,30 @@ private fun SettingsToggle(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { onCheckedChange(!checked) },
+                    onLongClick = onResetToDefault
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title, 
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), 
+            Row(
                 modifier = Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onSurface
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.weight(1f, fill = false),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                helpText?.let {
+                    SettingHelpButton(title = title, description = it)
+                }
+            }
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
@@ -2668,15 +2858,34 @@ private fun LiveSelectionRow(
     options: List<LiveSelectionOption>,
     currentValue: Int,
     onValueChange: (Int) -> Unit,
-    allowWrap: Boolean = true
+    allowWrap: Boolean = true,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = title, 
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), 
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onResetToDefault
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            helpText?.let {
+                SettingHelpButton(title = title, description = it)
+            }
+        }
         if (allowWrap) {
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -2936,15 +3145,34 @@ private fun LiveChipsSelectionRow(
     title: String,
     options: List<Pair<Int, String>>,
     currentValue: Int,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onResetToDefault
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            helpText?.let {
+                SettingHelpButton(title = title, description = it)
+            }
+        }
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2987,9 +3215,12 @@ private fun LiveSliderRow(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
     var sliderValue by remember { mutableFloatStateOf(value) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     LaunchedEffect(value) {
         sliderValue = value
@@ -2997,16 +3228,32 @@ private fun LiveSliderRow(
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onResetToDefault
+                ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                helpText?.let {
+                    SettingHelpButton(title = title, description = it)
+                }
+            }
             Text(
                 text = valueLabelResId?.let { stringResource(it, sliderValue.toInt()) }
                     ?: valueLabelForValue(sliderValue.toInt()),
@@ -3020,6 +3267,69 @@ private fun LiveSliderRow(
             onValueChangeFinished = { onValueChange(sliderValue) },
             valueRange = range,
             steps = steps,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary
+            )
+        )
+    }
+}
+
+@Composable
+private fun LiveUpscaleSliderRow(
+    title: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
+) {
+    var sliderValue by remember { mutableFloatStateOf(value) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(value) {
+        sliderValue = value
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onResetToDefault
+                ),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                helpText?.let {
+                    SettingHelpButton(title = title, description = it)
+                }
+            }
+            Text(
+                text = formatUpscaleLabel(sliderValue),
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Slider(
+            value = sliderValue,
+            onValueChange = { sliderValue = it },
+            onValueChangeFinished = { onValueChange(sliderValue) },
+            valueRange = UPSCALE_MIN..UPSCALE_MAX,
+            steps = UPSCALE_SLIDER_STEPS,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary

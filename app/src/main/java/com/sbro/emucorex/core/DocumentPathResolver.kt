@@ -3,6 +3,7 @@ package com.sbro.emucorex.core
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
+import android.provider.OpenableColumns
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
@@ -112,6 +113,18 @@ object DocumentPathResolver {
         if (!rawPath.startsWith("content://")) return File(rawPath).name
 
         val uri = rawPath.toUri()
+        val fromResolver = runCatching {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(0)
+                    } else {
+                        null
+                    }
+                }
+        }.getOrNull()
+        if (!fromResolver.isNullOrBlank()) return fromResolver
+
         val fromSingle = DocumentFile.fromSingleUri(context, uri)?.name
         if (!fromSingle.isNullOrBlank()) return fromSingle
 

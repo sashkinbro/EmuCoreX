@@ -13,6 +13,7 @@ import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
@@ -43,6 +44,7 @@ data class EmulationUiState(
     val showFps: Boolean = true,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
+    val fpsOverlayCorner: Int = AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT,
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
     val hideOverlayOnGamepad: Boolean = true,
@@ -64,9 +66,9 @@ data class EmulationUiState(
     val statusMessage: String? = null,
     val currentSlot: Int = 0,
     val renderer: Int = 14, // Default to Vulkan (14)
-    val upscale: Int = 1,
+    val upscale: Float = 1f,
     val aspectRatio: Int = 1,
-    val performancePreset: Int = PerformancePresets.CUSTOM,
+    val performancePreset: Int = PerformancePresets.BALANCED,
     val enableMtvu: Boolean = true,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = true,
@@ -123,7 +125,7 @@ data class EmulationUiState(
 private data class EmulationLaunchConfig(
     val biosPath: String?,
     val renderer: Int,
-    val upscaleMultiplier: Int,
+    val upscaleMultiplier: Float,
     val gpuDriverType: Int,
     val customDriverPath: String?,
     val aspectRatio: Int,
@@ -178,7 +180,7 @@ private data class EmulationLaunchConfig(
 
 private data class LiveRuntimeSnapshot(
     val renderer: Int,
-    val upscale: Int,
+    val upscale: Float,
     val aspectRatio: Int,
     val performancePreset: Int,
     val enableMtvu: Boolean,
@@ -250,6 +252,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     @Volatile
     private var currentGameSource: String = ""
 
+    private inline fun applyGlobalRuntimePreferenceUpdate(
+        crossinline transform: (EmulationUiState) -> EmulationUiState
+    ) {
+        val current = _uiState.value
+        if (current.gameSettingsProfileActive) return
+        _uiState.value = transform(current)
+    }
+
     init {
         _uiState.value = _uiState.value.copy(
             deviceChipsetFamily = deviceProfile.family,
@@ -277,6 +287,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            preferences.fpsOverlayCorner.collect { corner ->
+                _uiState.value = _uiState.value.copy(fpsOverlayCorner = corner)
+            }
+        }
+        viewModelScope.launch {
             preferences.compactControls.collect { enabled ->
                 _uiState.value = _uiState.value.copy(compactControls = enabled)
             }
@@ -288,237 +303,237 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.performancePreset.collect { preset ->
-                _uiState.value = _uiState.value.copy(performancePreset = preset)
+                applyGlobalRuntimePreferenceUpdate { it.copy(performancePreset = preset) }
             }
         }
         viewModelScope.launch {
             preferences.hwDownloadMode.collect { value ->
-                _uiState.value = _uiState.value.copy(hwDownloadMode = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(hwDownloadMode = value) }
             }
         }
         viewModelScope.launch {
             preferences.renderer.collect { value ->
-                _uiState.value = _uiState.value.copy(renderer = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(renderer = value) }
             }
         }
         viewModelScope.launch {
             preferences.upscaleMultiplier.collect { value ->
-                _uiState.value = _uiState.value.copy(upscale = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(upscale = value) }
             }
         }
         viewModelScope.launch {
             preferences.aspectRatio.collect { value ->
-                _uiState.value = _uiState.value.copy(aspectRatio = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(aspectRatio = value) }
             }
         }
         viewModelScope.launch {
             preferences.enableMtvu.collect { value ->
-                _uiState.value = _uiState.value.copy(enableMtvu = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableMtvu = value) }
             }
         }
         viewModelScope.launch {
             preferences.enableFastCdvd.collect { value ->
-                _uiState.value = _uiState.value.copy(enableFastCdvd = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableFastCdvd = value) }
             }
         }
         viewModelScope.launch {
             preferences.enableCheats.collect { value ->
-                _uiState.value = _uiState.value.copy(enableCheats = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableCheats = value) }
             }
         }
         viewModelScope.launch {
             preferences.frameSkip.collect { value ->
-                _uiState.value = _uiState.value.copy(frameSkip = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(frameSkip = value) }
             }
         }
         viewModelScope.launch {
             preferences.textureFiltering.collect { value ->
-                _uiState.value = _uiState.value.copy(textureFiltering = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(textureFiltering = value) }
             }
         }
         viewModelScope.launch {
             preferences.trilinearFiltering.collect { value ->
-                _uiState.value = _uiState.value.copy(trilinearFiltering = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(trilinearFiltering = value) }
             }
         }
         viewModelScope.launch {
             preferences.blendingAccuracy.collect { value ->
-                _uiState.value = _uiState.value.copy(blendingAccuracy = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(blendingAccuracy = value) }
             }
         }
         viewModelScope.launch {
             preferences.texturePreloading.collect { value ->
-                _uiState.value = _uiState.value.copy(texturePreloading = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(texturePreloading = value) }
             }
         }
         viewModelScope.launch {
             preferences.enableFxaa.collect { value ->
-                _uiState.value = _uiState.value.copy(enableFxaa = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableFxaa = value) }
             }
         }
         viewModelScope.launch {
             preferences.casMode.collect { value ->
-                _uiState.value = _uiState.value.copy(casMode = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(casMode = value) }
             }
         }
         viewModelScope.launch {
             preferences.casSharpness.collect { value ->
-                _uiState.value = _uiState.value.copy(casSharpness = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(casSharpness = value) }
             }
         }
         viewModelScope.launch {
             preferences.anisotropicFiltering.collect { value ->
-                _uiState.value = _uiState.value.copy(anisotropicFiltering = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(anisotropicFiltering = value) }
             }
         }
         viewModelScope.launch {
             preferences.enableHwMipmapping.collect { value ->
-                _uiState.value = _uiState.value.copy(enableHwMipmapping = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(enableHwMipmapping = value) }
             }
         }
         viewModelScope.launch {
             preferences.cpuSpriteRenderSize.collect { value ->
-                _uiState.value = _uiState.value.copy(cpuSpriteRenderSize = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(cpuSpriteRenderSize = value) }
             }
         }
         viewModelScope.launch {
             preferences.cpuSpriteRenderLevel.collect { value ->
-                _uiState.value = _uiState.value.copy(cpuSpriteRenderLevel = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(cpuSpriteRenderLevel = value) }
             }
         }
         viewModelScope.launch {
             preferences.softwareClutRender.collect { value ->
-                _uiState.value = _uiState.value.copy(softwareClutRender = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(softwareClutRender = value) }
             }
         }
         viewModelScope.launch {
             preferences.gpuTargetClutMode.collect { value ->
-                _uiState.value = _uiState.value.copy(gpuTargetClutMode = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gpuTargetClutMode = value) }
             }
         }
         viewModelScope.launch {
             preferences.skipDrawStart.collect { value ->
-                _uiState.value = _uiState.value.copy(skipDrawStart = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(skipDrawStart = value) }
             }
         }
         viewModelScope.launch {
             preferences.skipDrawEnd.collect { value ->
-                _uiState.value = _uiState.value.copy(skipDrawEnd = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(skipDrawEnd = value) }
             }
         }
         viewModelScope.launch {
             preferences.autoFlushHardware.collect { value ->
-                _uiState.value = _uiState.value.copy(autoFlushHardware = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(autoFlushHardware = value) }
             }
         }
         viewModelScope.launch {
             preferences.cpuFramebufferConversion.collect { value ->
-                _uiState.value = _uiState.value.copy(cpuFramebufferConversion = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(cpuFramebufferConversion = value) }
             }
         }
         viewModelScope.launch {
             preferences.disableDepthConversion.collect { value ->
-                _uiState.value = _uiState.value.copy(disableDepthConversion = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(disableDepthConversion = value) }
             }
         }
         viewModelScope.launch {
             preferences.disableSafeFeatures.collect { value ->
-                _uiState.value = _uiState.value.copy(disableSafeFeatures = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(disableSafeFeatures = value) }
             }
         }
         viewModelScope.launch {
             preferences.disableRenderFixes.collect { value ->
-                _uiState.value = _uiState.value.copy(disableRenderFixes = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(disableRenderFixes = value) }
             }
         }
         viewModelScope.launch {
             preferences.preloadFrameData.collect { value ->
-                _uiState.value = _uiState.value.copy(preloadFrameData = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(preloadFrameData = value) }
             }
         }
         viewModelScope.launch {
             preferences.disablePartialInvalidation.collect { value ->
-                _uiState.value = _uiState.value.copy(disablePartialInvalidation = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(disablePartialInvalidation = value) }
             }
         }
         viewModelScope.launch {
             preferences.textureInsideRt.collect { value ->
-                _uiState.value = _uiState.value.copy(textureInsideRt = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(textureInsideRt = value) }
             }
         }
         viewModelScope.launch {
             preferences.readTargetsOnClose.collect { value ->
-                _uiState.value = _uiState.value.copy(readTargetsOnClose = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(readTargetsOnClose = value) }
             }
         }
         viewModelScope.launch {
             preferences.estimateTextureRegion.collect { value ->
-                _uiState.value = _uiState.value.copy(estimateTextureRegion = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(estimateTextureRegion = value) }
             }
         }
         viewModelScope.launch {
             preferences.gpuPaletteConversion.collect { value ->
-                _uiState.value = _uiState.value.copy(gpuPaletteConversion = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gpuPaletteConversion = value) }
             }
         }
         viewModelScope.launch {
             preferences.halfPixelOffset.collect { value ->
-                _uiState.value = _uiState.value.copy(halfPixelOffset = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(halfPixelOffset = value) }
             }
         }
         viewModelScope.launch {
             preferences.nativeScaling.collect { value ->
-                _uiState.value = _uiState.value.copy(nativeScaling = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(nativeScaling = value) }
             }
         }
         viewModelScope.launch {
             preferences.roundSprite.collect { value ->
-                _uiState.value = _uiState.value.copy(roundSprite = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(roundSprite = value) }
             }
         }
         viewModelScope.launch {
             preferences.bilinearUpscale.collect { value ->
-                _uiState.value = _uiState.value.copy(bilinearUpscale = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(bilinearUpscale = value) }
             }
         }
         viewModelScope.launch {
             preferences.textureOffsetX.collect { value ->
-                _uiState.value = _uiState.value.copy(textureOffsetX = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(textureOffsetX = value) }
             }
         }
         viewModelScope.launch {
             preferences.textureOffsetY.collect { value ->
-                _uiState.value = _uiState.value.copy(textureOffsetY = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(textureOffsetY = value) }
             }
         }
         viewModelScope.launch {
             preferences.alignSprite.collect { value ->
-                _uiState.value = _uiState.value.copy(alignSprite = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(alignSprite = value) }
             }
         }
         viewModelScope.launch {
             preferences.mergeSprite.collect { value ->
-                _uiState.value = _uiState.value.copy(mergeSprite = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(mergeSprite = value) }
             }
         }
         viewModelScope.launch {
             preferences.forceEvenSpritePosition.collect { value ->
-                _uiState.value = _uiState.value.copy(forceEvenSpritePosition = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(forceEvenSpritePosition = value) }
             }
         }
         viewModelScope.launch {
             preferences.nativePaletteDraw.collect { value ->
-                _uiState.value = _uiState.value.copy(nativePaletteDraw = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(nativePaletteDraw = value) }
             }
         }
         viewModelScope.launch {
             preferences.frameLimitEnabled.collect { enabled ->
-                _uiState.value = _uiState.value.copy(frameLimitEnabled = enabled)
+                applyGlobalRuntimePreferenceUpdate { it.copy(frameLimitEnabled = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.targetFps.collect { value ->
-                _uiState.value = _uiState.value.copy(targetFps = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(targetFps = value) }
             }
         }
         
@@ -956,6 +971,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun setFpsOverlayCorner(corner: Int) {
+        viewModelScope.launch {
+            preferences.setFpsOverlayCorner(corner)
+            _uiState.value = _uiState.value.copy(fpsOverlayCorner = corner)
+        }
+    }
+
     fun setRenderer(renderer: Int) {
         viewModelScope.launch {
             val newState = markPerformancePresetCustom(_uiState.value).copy(renderer = renderer)
@@ -968,14 +990,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun setUpscale(upscale: Int) {
+    fun setUpscale(upscale: Float) {
         viewModelScope.launch {
-            val newState = markPerformancePresetCustom(_uiState.value).copy(upscale = upscale)
+            val normalizedUpscale = normalizeUpscale(upscale)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(upscale = normalizedUpscale)
             persistRuntimeState(newState) {
                 preferences.setPerformancePreset(PerformancePresets.CUSTOM)
-                preferences.setUpscaleMultiplier(upscale)
+                preferences.setUpscaleMultiplier(normalizedUpscale)
             }
-            EmulatorBridge.setUpscaleMultiplier(upscale.toFloat())
+            EmulatorBridge.setUpscaleMultiplier(normalizedUpscale)
             updateCrashContext()
         }
     }
@@ -1637,7 +1660,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", config.skipDraw.toString())
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", config.halfPixelOffset.toString())
         EmulatorBridge.setSetting("EmuCore", "EnableWideScreenPatches", "bool", config.widescreenPatches.toString())
-        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier.toFloat())
+        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier)
         EmulatorBridge.setRenderer(config.renderer)
         refreshManualHardwareFixes(
             _uiState.value.copy(
@@ -2172,7 +2195,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             14 -> "Vulkan"
             else -> "Unknown(${state.renderer})"
         })
-        NativeApp.setCrashContextInt("emu_upscale", state.upscale)
+        NativeApp.setCrashContextString("emu_upscale", state.upscale.toString())
         NativeApp.setCrashContextInt("emu_aspect_ratio", state.aspectRatio)
         NativeApp.setCrashContextInt("emu_performance_preset", state.performancePreset)
         NativeApp.setCrashContextBool("emu_mtvu", state.enableMtvu)

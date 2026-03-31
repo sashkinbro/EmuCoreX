@@ -1,9 +1,7 @@
 package com.sbro.emucorex.ui.onboarding
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -86,7 +84,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
-import com.sbro.emucorex.core.StoragePermissionHelper
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -99,7 +96,6 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
 
@@ -132,33 +128,12 @@ fun OnboardingScreen(
     ) { uri: Uri? ->
         uri?.let(viewModel::setGamePath)
     }
-    val legacyStoragePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) {
-        viewModel.refreshStoragePermissionState()
-    }
-    val manageStorageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        viewModel.refreshStoragePermissionState()
-    }
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(null) })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
-    val launchStorageAccess = rememberDebouncedClick(
-        onClick = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                manageStorageLauncher.launch(StoragePermissionHelper.createStorageAccessIntent(context))
-            } else {
-                legacyStoragePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-    )
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshStoragePermissionState()
-            }
+            if (event == Lifecycle.Event.ON_RESUME) Unit
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
@@ -351,12 +326,9 @@ fun OnboardingScreen(
                                     gamePath = uiState.gamePath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
-                                    storagePermissionRequired = uiState.storagePermissionRequired,
-                                    storagePermissionGranted = uiState.storagePermissionGranted,
-                                    context = context,
+                                    context = LocalContext.current,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
-                                    launchStorageAccess = launchStorageAccess,
                                     endInset = 0.dp,
                                     bottomInset = 0.dp,
                                     modifier = Modifier.padding(horizontal = 32.dp)
@@ -431,12 +403,9 @@ fun OnboardingScreen(
                                     gamePath = uiState.gamePath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
-                                    storagePermissionRequired = uiState.storagePermissionRequired,
-                                    storagePermissionGranted = uiState.storagePermissionGranted,
-                                    context = context,
+                                    context = LocalContext.current,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
-                                    launchStorageAccess = launchStorageAccess,
                                     endInset = 0.dp,
                                     bottomInset = 0.dp
                                 )
@@ -581,21 +550,6 @@ private fun OnboardingHeroSetup(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.widthIn(max = 480.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(112.dp)
-                .clip(RoundedCornerShape(32.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(56.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(36.dp))
         Text(
             text = stringResource(R.string.onboarding_title),
             style = MaterialTheme.typography.displaySmall.copy(
@@ -606,7 +560,7 @@ private fun OnboardingHeroSetup(
             textAlign = TextAlign.Center
         )
         if (showSubtitle) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.onboarding_subtitle),
                 style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
@@ -765,18 +719,14 @@ private fun OnboardingSetupContent(
     gamePath: String?,
     biosValid: Boolean,
     gamePathValid: Boolean,
-    storagePermissionRequired: Boolean,
-    storagePermissionGranted: Boolean,
     context: android.content.Context,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
-    launchStorageAccess: () -> Unit,
     endInset: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     bottomInset: androidx.compose.ui.unit.Dp = 0.dp
 ) {
-    val storageReady = !storagePermissionRequired || storagePermissionGranted
-    val completionProgress = listOf(biosValid, gamePathValid, storageReady).count { it }
+    val completionProgress = listOf(biosValid, gamePathValid).count { it }
     Column(
         modifier = modifier.padding(end = endInset),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -822,29 +772,6 @@ private fun OnboardingSetupContent(
             onClick = launchGamePicker
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        SetupCard(
-            icon = Icons.Rounded.CheckCircle,
-            title = stringResource(R.string.permission_storage_title),
-            description = if (storagePermissionRequired) {
-                stringResource(R.string.permission_storage_desc)
-            } else {
-                stringResource(R.string.onboarding_storage_not_needed_desc)
-            },
-            status = when {
-                !storagePermissionRequired -> stringResource(R.string.onboarding_status_not_needed)
-                storagePermissionGranted -> stringResource(R.string.onboarding_status_ready)
-                else -> stringResource(R.string.onboarding_status_required)
-            },
-            statusColor = when {
-                !storagePermissionRequired -> MaterialTheme.colorScheme.secondary
-                storagePermissionGranted -> Color(0xFF1B8A5A)
-                else -> MaterialTheme.colorScheme.tertiary
-            },
-            onClick = launchStorageAccess
-        )
-
         Spacer(modifier = Modifier.height(10.dp))
 
         Surface(
@@ -868,7 +795,7 @@ private fun OnboardingSetupContent(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = stringResource(R.string.onboarding_hint_body, completionProgress, 3),
+                    text = stringResource(R.string.onboarding_hint_body, completionProgress, 2),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

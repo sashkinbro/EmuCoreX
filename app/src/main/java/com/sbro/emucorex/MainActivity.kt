@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
@@ -25,12 +26,15 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var appliedLanguageTag: String? = null
+    @Volatile
+    private var keepSplashVisible = true
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen().setKeepOnScreenCondition { keepSplashVisible }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 android.graphics.Color.TRANSPARENT,
@@ -63,7 +67,11 @@ class MainActivity : ComponentActivity() {
             val themeMode by preferences.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
 
             EmuCoreXTheme(themeMode = themeMode) {
-                AppNavigation()
+                AppNavigation(
+                    onStartupReady = {
+                        keepSplashVisible = false
+                    }
+                )
             }
         }
     }

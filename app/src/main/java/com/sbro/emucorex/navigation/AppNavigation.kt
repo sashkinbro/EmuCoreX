@@ -3,6 +3,7 @@ package com.sbro.emucorex.navigation
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -22,9 +23,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavBackStackEntry
@@ -36,8 +41,11 @@ import androidx.navigation.toRoute
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
+import com.sbro.emucorex.core.GameLaunchShortcut
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.GameItem
+import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
 import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
 import com.sbro.emucorex.ui.achievements.GameAchievementsScreen
@@ -51,6 +59,7 @@ import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
 import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
+import com.sbro.emucorex.ui.settings.PerGameSettingsQuickEditorDialog
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
@@ -174,9 +183,14 @@ private fun sharedAxisEnter(
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    onStartupReady: () -> Unit = {}
+) {
     val context = LocalContext.current
+    val activity = context as? ComponentActivity
     val preferences = AppPreferences(context)
+    val saveStateRepository = SaveStateRepository(context)
+    var quickGameSettingsTarget by remember { mutableStateOf<GameItem?>(null) }
     val startupDestination by produceState<StartupDestination?>(initialValue = null, key1 = preferences) {
         value = combine(
             preferences.onboardingCompleted,
@@ -204,9 +218,14 @@ fun AppNavigation() {
         return
     }
 
+    LaunchedEffect(startupDestination) {
+        onStartupReady()
+    }
+
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
     val unsupportedGameImageMessage = context.getString(R.string.shell_launch_game_unsupported)
+    val continueUnavailableMessage = context.getString(R.string.home_game_menu_continue_unavailable)
     val launchGamePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -264,6 +283,10 @@ fun AppNavigation() {
             }
         }
     }
+    val shortcutGamePath = activity?.intent?.getStringExtra(GameLaunchShortcut.EXTRA_GAME_PATH)
+    val shortcutSaveSlot = activity?.intent?.takeIf { it.hasExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT) }
+        ?.getIntExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT, -1)
+        ?.takeIf { it >= 0 }
 
     Box(
         modifier = Modifier
@@ -507,6 +530,27 @@ fun AppNavigation() {
                             navController.navigate(EmulationRoute(gamePath = game.path)) {
                                 launchSingleTop = true
                             }
+                        },
+                        onContinueGame = { game ->
+                            val saveSlot = saveStateRepository.findLatestSlot(game.path)
+                            if (saveSlot == null) {
+                                Toast.makeText(context, continueUnavailableMessage, Toast.LENGTH_SHORT).show()
+                                return@HomeScreen
+                            }
+                            navController.navigate(EmulationRoute(gamePath = game.path, saveSlot = saveSlot)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onLoadSaveClick = { game ->
+                            navController.navigate(SaveManagerRoute(gamePath = game.path, gameTitle = game.title)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onManageGameClick = { game ->
+                            quickGameSettingsTarget = game
+                        },
+                        onCreateShortcutClick = { game ->
+                            GameLaunchShortcut.requestPinnedShortcut(context, game)
                         },
                         onMenuClick = openDrawer
                     )
@@ -803,6 +847,23 @@ fun AppNavigation() {
                     onBackClick = { navController.popBackStack() }
                 )
             }
+        }
+
+        LaunchedEffect(navController, startupDestination, shortcutGamePath, shortcutSaveSlot) {
+            val gamePath = shortcutGamePath ?: return@LaunchedEffect
+            if (startupDestination != StartupDestination.HOME) return@LaunchedEffect
+            navController.navigate(EmulationRoute(gamePath = gamePath, saveSlot = shortcutSaveSlot)) {
+                launchSingleTop = true
+            }
+            activity.intent.removeExtra(GameLaunchShortcut.EXTRA_GAME_PATH)
+            activity.intent.removeExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT)
+        }
+
+        quickGameSettingsTarget?.let { game ->
+            PerGameSettingsQuickEditorDialog(
+                game = game,
+                onDismiss = { quickGameSettingsTarget = null }
+            )
         }
     }
 }

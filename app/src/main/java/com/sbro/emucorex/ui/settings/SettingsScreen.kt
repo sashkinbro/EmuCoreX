@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAs
 import androidx.compose.material.icons.rounded.SettingsSuggest
@@ -70,6 +73,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -102,16 +106,24 @@ import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.UPSCALE_MAX
+import com.sbro.emucorex.core.UPSCALE_MIN
+import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
+import com.sbro.emucorex.core.formatUpscaleLabel
+import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatFileEntry
 import com.sbro.emucorex.data.CheatRepository
+import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.SettingsBackupRepository
+import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
@@ -167,6 +179,18 @@ fun SettingsScreen(
     val cheatsImportFailureMessage = stringResource(R.string.settings_cheats_import_failed)
     val cheatsSavedMessage = stringResource(R.string.settings_cheats_saved)
     val cheatsDeletedMessage = stringResource(R.string.settings_cheats_deleted)
+
+    if (!uiState.isLoaded) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     val biosPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -646,6 +670,8 @@ private fun SettingsContent(
     modifier: Modifier = Modifier
 ) {
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
+    val defaults = remember { SettingsSnapshot() }
+    val overlayDefaults = remember { OverlayLayoutSnapshot() }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -676,7 +702,27 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_keep_screen_on),
                             subtitle = stringResource(R.string.settings_keep_screen_on_desc),
                             checked = uiState.keepScreenOn,
-                            onCheckedChange = viewModel::setKeepScreenOn
+                            onCheckedChange = viewModel::setKeepScreenOn,
+                            helpText = stringResource(R.string.settings_help_keep_screen_on),
+                            onResetToDefault = { viewModel.setKeepScreenOn(defaults.keepScreenOn) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Visibility,
+                            title = stringResource(R.string.settings_show_recent_games),
+                            subtitle = stringResource(R.string.settings_show_recent_games_desc),
+                            checked = uiState.showRecentGames,
+                            onCheckedChange = viewModel::setShowRecentGames,
+                            helpText = stringResource(R.string.settings_help_recent_games),
+                            onResetToDefault = { viewModel.setShowRecentGames(defaults.showRecentGames) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Search,
+                            title = stringResource(R.string.settings_show_home_search),
+                            subtitle = stringResource(R.string.settings_show_home_search_desc),
+                            checked = uiState.showHomeSearch,
+                            onCheckedChange = viewModel::setShowHomeSearch,
+                            helpText = stringResource(R.string.settings_help_home_search),
+                            onResetToDefault = { viewModel.setShowHomeSearch(defaults.showHomeSearch) }
                         )
                     }
                 }
@@ -691,7 +737,9 @@ private fun SettingsContent(
                                 13 to stringResource(R.string.settings_renderer_software)
                             ),
                             selectedValue = uiState.renderer,
-                            onSelect = viewModel::setRenderer
+                            onSelect = viewModel::setRenderer,
+                            helpText = stringResource(R.string.settings_help_renderer),
+                            onResetToDefault = { viewModel.setRenderer(defaults.renderer) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_gpu_driver),
@@ -700,20 +748,20 @@ private fun SettingsContent(
                                 1 to stringResource(R.string.settings_gpu_driver_custom)
                             ),
                             selectedValue = uiState.gpuDriverType,
-                            onSelect = viewModel::setGpuDriverType
+                            onSelect = viewModel::setGpuDriverType,
+                            helpText = stringResource(R.string.settings_help_gpu_driver),
+                            onResetToDefault = { viewModel.setGpuDriverType(defaults.gpuDriverType) }
                         )
-                        ChoiceSection(
+                        SliderItem(
+                            icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_upscale),
-                            options = listOf(
-                                1 to stringResource(R.string.settings_upscale_native),
-                                2 to stringResource(R.string.settings_upscale_2x),
-                                3 to stringResource(R.string.settings_upscale_3x),
-                                4 to "4x",
-                                6 to "6x",
-                                8 to "8x"
-                            ),
-                            selectedValue = uiState.upscaleMultiplier,
-                            onSelect = viewModel::setUpscaleMultiplier
+                            subtitle = formatUpscaleLabel(uiState.upscaleMultiplier),
+                            value = uiState.upscaleMultiplier,
+                            range = UPSCALE_MIN..UPSCALE_MAX,
+                            steps = UPSCALE_SLIDER_STEPS,
+                            onValueChange = viewModel::setUpscaleMultiplier,
+                            helpText = stringResource(R.string.settings_help_upscale),
+                            onResetToDefault = { viewModel.setUpscaleMultiplier(defaults.upscaleMultiplier) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_aspect_ratio),
@@ -724,7 +772,9 @@ private fun SettingsContent(
                                 0 to stringResource(R.string.emulation_aspect_stretch)
                             ),
                             selectedValue = uiState.aspectRatio,
-                            onSelect = viewModel::setAspectRatio
+                            onSelect = viewModel::setAspectRatio,
+                            helpText = stringResource(R.string.settings_help_aspect_ratio),
+                            onResetToDefault = { viewModel.setAspectRatio(defaults.aspectRatio) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_texture_filtering),
@@ -734,7 +784,9 @@ private fun SettingsContent(
                                 2 to stringResource(R.string.settings_texture_filtering_trilinear)
                             ),
                             selectedValue = uiState.textureFiltering,
-                            onSelect = viewModel::setTextureFiltering
+                            onSelect = viewModel::setTextureFiltering,
+                            helpText = stringResource(R.string.settings_help_texture_filtering),
+                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_anisotropic_filtering),
@@ -746,20 +798,26 @@ private fun SettingsContent(
                                 16 to "16x"
                             ),
                             selectedValue = uiState.anisotropicFiltering,
-                            onSelect = viewModel::setAnisotropicFiltering
+                            onSelect = viewModel::setAnisotropicFiltering,
+                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                            onResetToDefault = { viewModel.setAnisotropicFiltering(defaults.anisotropicFiltering) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_fxaa),
                             subtitle = stringResource(R.string.settings_fxaa_desc),
                             checked = uiState.enableFxaa,
-                            onCheckedChange = viewModel::setEnableFxaa
+                            onCheckedChange = viewModel::setEnableFxaa,
+                            helpText = stringResource(R.string.settings_help_fxaa),
+                            onResetToDefault = { viewModel.setEnableFxaa(defaults.enableFxaa) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_cas),
                             options = casModeOptions(),
                             selectedValue = uiState.casMode,
-                            onSelect = viewModel::setCasMode
+                            onSelect = viewModel::setCasMode,
+                            helpText = stringResource(R.string.settings_help_cas),
+                            onResetToDefault = { viewModel.setCasMode(defaults.casMode) }
                         )
                         if (uiState.casMode != 0) {
                             SliderItem(
@@ -772,7 +830,9 @@ private fun SettingsContent(
                                 value = uiState.casSharpness.toFloat(),
                                 range = 0f..100f,
                                 steps = 99,
-                                onValueChange = { viewModel.setCasSharpness(it.toInt()) }
+                                onValueChange = { viewModel.setCasSharpness(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_cas_sharpness),
+                                onResetToDefault = { viewModel.setCasSharpness(defaults.casSharpness) }
                             )
                         }
                         ToggleItem(
@@ -780,14 +840,18 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_widescreen_patches),
                             subtitle = stringResource(R.string.settings_widescreen_patches_desc),
                             checked = uiState.enableWidescreenPatches,
-                            onCheckedChange = viewModel::setEnableWidescreenPatches
+                            onCheckedChange = viewModel::setEnableWidescreenPatches,
+                            helpText = stringResource(R.string.settings_help_widescreen_patches),
+                            onResetToDefault = { viewModel.setEnableWidescreenPatches(defaults.enableWidescreenPatches) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Visibility,
                             title = stringResource(R.string.settings_no_interlacing_patches),
                             subtitle = stringResource(R.string.settings_no_interlacing_patches_desc),
                             checked = uiState.enableNoInterlacingPatches,
-                            onCheckedChange = viewModel::setEnableNoInterlacingPatches
+                            onCheckedChange = viewModel::setEnableNoInterlacingPatches,
+                            helpText = stringResource(R.string.settings_help_no_interlacing_patches),
+                            onResetToDefault = { viewModel.setEnableNoInterlacingPatches(defaults.enableNoInterlacingPatches) }
                         )
                     }
                 }
@@ -801,7 +865,9 @@ private fun SettingsContent(
                             value = uiState.overlayScale.toFloat(),
                             range = 50f..150f,
                             steps = 9,
-                            onValueChange = { viewModel.setOverlayScale(it.toInt()) }
+                            onValueChange = { viewModel.setOverlayScale(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_overlay_scale),
+                            onResetToDefault = { viewModel.setOverlayScale(overlayDefaults.overlayScale) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.Visibility,
@@ -810,7 +876,9 @@ private fun SettingsContent(
                             value = uiState.overlayOpacity.toFloat(),
                             range = 20f..100f,
                             steps = 7,
-                            onValueChange = { viewModel.setOverlayOpacity(it.toInt()) }
+                            onValueChange = { viewModel.setOverlayOpacity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_overlay_opacity),
+                            onResetToDefault = { viewModel.setOverlayOpacity(overlayDefaults.overlayOpacity) }
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_section)) {
@@ -819,21 +887,27 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_gamepad_auto),
                             subtitle = stringResource(R.string.settings_gamepad_auto_desc),
                             checked = uiState.enableAutoGamepad,
-                            onCheckedChange = viewModel::setEnableAutoGamepad
+                            onCheckedChange = viewModel::setEnableAutoGamepad,
+                            helpText = stringResource(R.string.settings_help_auto_gamepad),
+                            onResetToDefault = { viewModel.setEnableAutoGamepad(defaults.enableAutoGamepad) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Visibility,
                             title = stringResource(R.string.settings_gamepad_hide_overlay),
                             subtitle = stringResource(R.string.settings_gamepad_hide_overlay_desc),
                             checked = uiState.hideOverlayOnGamepad,
-                            onCheckedChange = viewModel::setHideOverlayOnGamepad
+                            onCheckedChange = viewModel::setHideOverlayOnGamepad,
+                            helpText = stringResource(R.string.settings_help_hide_overlay_on_gamepad),
+                            onResetToDefault = { viewModel.setHideOverlayOnGamepad(overlayDefaults.hideOverlayOnGamepad) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Vibration,
                             title = stringResource(R.string.settings_pad_vibration),
                             subtitle = stringResource(R.string.settings_pad_vibration_desc),
                             checked = uiState.padVibration,
-                            onCheckedChange = viewModel::setPadVibration
+                            onCheckedChange = viewModel::setPadVibration,
+                            helpText = stringResource(R.string.settings_help_pad_vibration),
+                            onResetToDefault = { viewModel.setPadVibration(defaults.padVibration) }
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_mapping_title)) {
@@ -967,7 +1041,9 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_performance_preset),
                             options = performancePresetOptions(),
                             selectedValue = uiState.performancePreset,
-                            onSelect = viewModel::applyPerformancePreset
+                            onSelect = viewModel::applyPerformancePreset,
+                            helpText = stringResource(R.string.settings_help_performance_preset),
+                            onResetToDefault = { viewModel.applyPerformancePreset(defaults.performancePreset) }
                         )
                         SettingsInlineNote(
                             text = stringResource(performancePresetDescription(uiState.performancePreset))
@@ -979,7 +1055,9 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_show_fps),
                             subtitle = stringResource(R.string.settings_show_fps_desc),
                             checked = uiState.showFps,
-                            onCheckedChange = viewModel::setShowFps
+                            onCheckedChange = viewModel::setShowFps,
+                            helpText = stringResource(R.string.settings_help_show_fps),
+                            onResetToDefault = { viewModel.setShowFps(defaults.showFps) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_fps_overlay_mode),
@@ -988,7 +1066,17 @@ private fun SettingsContent(
                                 FPS_OVERLAY_MODE_DETAILED to stringResource(R.string.settings_fps_overlay_mode_detailed)
                             ),
                             selectedValue = uiState.fpsOverlayMode,
-                            onSelect = viewModel::setFpsOverlayMode
+                            onSelect = viewModel::setFpsOverlayMode,
+                            helpText = stringResource(R.string.settings_help_fps_overlay_mode),
+                            onResetToDefault = { viewModel.setFpsOverlayMode(defaults.fpsOverlayMode) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_fps_overlay_position),
+                            options = fpsOverlayCornerOptions(),
+                            selectedValue = uiState.fpsOverlayCorner,
+                            onSelect = viewModel::setFpsOverlayCorner,
+                            helpText = stringResource(R.string.settings_help_fps_overlay_position),
+                            onResetToDefault = { viewModel.setFpsOverlayCorner(defaults.fpsOverlayCorner) }
                         )
                     }
                 }
@@ -1000,7 +1088,9 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_frame_limiter),
                             subtitle = stringResource(R.string.settings_frame_limiter_desc),
                             checked = uiState.frameLimitEnabled,
-                            onCheckedChange = viewModel::setFrameLimitEnabled
+                            onCheckedChange = viewModel::setFrameLimitEnabled,
+                            helpText = stringResource(R.string.settings_help_frame_limiter),
+                            onResetToDefault = { viewModel.setFrameLimitEnabled(defaults.frameLimitEnabled) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.Speed,
@@ -1012,7 +1102,9 @@ private fun SettingsContent(
                             value = uiState.targetFps.toFloat(),
                             range = 20f..120f,
                             steps = 99,
-                            onValueChange = { viewModel.setTargetFps(it.toInt()) }
+                            onValueChange = { viewModel.setTargetFps(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_target_fps),
+                            onResetToDefault = { viewModel.setTargetFps(defaults.targetFps) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_ee_cycle_rate),
@@ -1026,7 +1118,9 @@ private fun SettingsContent(
                                 3 to "300%"
                             ),
                             selectedValue = uiState.eeCycleRate,
-                            onSelect = viewModel::setEeCycleRate
+                            onSelect = viewModel::setEeCycleRate,
+                            helpText = stringResource(R.string.settings_help_ee_cycle_rate),
+                            onResetToDefault = { viewModel.setEeCycleRate(defaults.eeCycleRate) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_ee_cycle_skip),
@@ -1037,27 +1131,35 @@ private fun SettingsContent(
                                 3 to stringResource(R.string.settings_ee_cycle_maximum)
                             ),
                             selectedValue = uiState.eeCycleSkip,
-                            onSelect = viewModel::setEeCycleSkip
+                            onSelect = viewModel::setEeCycleSkip,
+                            helpText = stringResource(R.string.settings_help_ee_cycle_skip),
+                            onResetToDefault = { viewModel.setEeCycleSkip(defaults.eeCycleSkip) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_mtvu),
                             subtitle = stringResource(R.string.settings_mtvu_desc),
                             checked = uiState.enableMtvu,
-                            onCheckedChange = viewModel::setEnableMtvu
+                            onCheckedChange = viewModel::setEnableMtvu,
+                            helpText = stringResource(R.string.settings_help_mtvu),
+                            onResetToDefault = { viewModel.setEnableMtvu(defaults.enableMtvu) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_fast_cdvd),
                             subtitle = stringResource(R.string.settings_fast_cdvd_desc),
                             checked = uiState.enableFastCdvd,
-                            onCheckedChange = viewModel::setEnableFastCdvd
+                            onCheckedChange = viewModel::setEnableFastCdvd,
+                            helpText = stringResource(R.string.settings_help_fast_cdvd),
+                            onResetToDefault = { viewModel.setEnableFastCdvd(defaults.enableFastCdvd) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_hw_download_mode),
                             options = hwDownloadModeOptions(),
                             selectedValue = uiState.hwDownloadMode,
-                            onSelect = viewModel::setHwDownloadMode
+                            onSelect = viewModel::setHwDownloadMode,
+                            helpText = stringResource(R.string.settings_help_hw_download_mode),
+                            onResetToDefault = { viewModel.setHwDownloadMode(defaults.hwDownloadMode) }
                         )
                         SettingsInlineNote(
                             text = stringResource(R.string.settings_hw_download_mode_desc)
@@ -1066,38 +1168,50 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_blending_accuracy),
                             options = blendingAccuracyOptions(),
                             selectedValue = uiState.blendingAccuracy,
-                            onSelect = viewModel::setBlendingAccuracy
+                            onSelect = viewModel::setBlendingAccuracy,
+                            helpText = stringResource(R.string.settings_help_blending_accuracy),
+                            onResetToDefault = { viewModel.setBlendingAccuracy(defaults.blendingAccuracy) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_texture_preloading),
                             options = texturePreloadingOptions(),
                             selectedValue = uiState.texturePreloading,
-                            onSelect = viewModel::setTexturePreloading
+                            onSelect = viewModel::setTexturePreloading,
+                            helpText = stringResource(R.string.settings_help_texture_preloading),
+                            onResetToDefault = { viewModel.setTexturePreloading(defaults.texturePreloading) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_bilinear_filtering),
                             options = bilinearFilteringOptions(),
                             selectedValue = uiState.textureFiltering,
-                            onSelect = viewModel::setTextureFiltering
+                            onSelect = viewModel::setTextureFiltering,
+                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_trilinear_filtering),
                             options = trilinearFilteringOptions(),
                             selectedValue = uiState.trilinearFiltering,
-                            onSelect = viewModel::setTrilinearFiltering
+                            onSelect = viewModel::setTrilinearFiltering,
+                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                            onResetToDefault = { viewModel.setTrilinearFiltering(defaults.trilinearFiltering) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_anisotropic_filtering),
                             options = anisotropicFilteringOptions(),
                             selectedValue = uiState.anisotropicFiltering,
-                            onSelect = viewModel::setAnisotropicFiltering
+                            onSelect = viewModel::setAnisotropicFiltering,
+                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                            onResetToDefault = { viewModel.setAnisotropicFiltering(defaults.anisotropicFiltering) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_hw_mipmapping),
                             subtitle = stringResource(R.string.settings_hw_mipmapping_desc),
                             checked = uiState.enableHwMipmapping,
-                            onCheckedChange = viewModel::setEnableHwMipmapping
+                            onCheckedChange = viewModel::setEnableHwMipmapping,
+                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                            onResetToDefault = { viewModel.setEnableHwMipmapping(defaults.enableHwMipmapping) }
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_frame_control)) {
@@ -1111,7 +1225,9 @@ private fun SettingsContent(
                                 4 to "4"
                             ),
                             selectedValue = uiState.frameSkip,
-                            onSelect = viewModel::setFrameSkip
+                            onSelect = viewModel::setFrameSkip,
+                            helpText = stringResource(R.string.settings_help_frame_skip),
+                            onResetToDefault = { viewModel.setFrameSkip(defaults.frameSkip) }
                         )
                     }
                 }
@@ -1123,7 +1239,9 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_enable_cheats),
                             subtitle = stringResource(R.string.settings_enable_cheats_desc),
                             checked = uiState.enableCheats,
-                            onCheckedChange = viewModel::setEnableCheats
+                            onCheckedChange = viewModel::setEnableCheats,
+                            helpText = stringResource(R.string.settings_help_cheats),
+                            onResetToDefault = { viewModel.setEnableCheats(defaults.enableCheats) }
                         )
                         SettingsItem(
                             icon = Icons.Rounded.FolderOpen,
@@ -1166,31 +1284,41 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_cpu_sprite_render_size),
                             options = cpuSpriteRenderSizeOptions(),
                             selectedValue = uiState.cpuSpriteRenderSize,
-                            onSelect = viewModel::setCpuSpriteRenderSize
+                            onSelect = viewModel::setCpuSpriteRenderSize,
+                            helpText = stringResource(R.string.settings_help_cpu_sprite_render_size),
+                            onResetToDefault = { viewModel.setCpuSpriteRenderSize(defaults.cpuSpriteRenderSize) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_cpu_sprite_render_level),
                             options = cpuSpriteRenderLevelOptions(),
                             selectedValue = uiState.cpuSpriteRenderLevel,
-                            onSelect = viewModel::setCpuSpriteRenderLevel
+                            onSelect = viewModel::setCpuSpriteRenderLevel,
+                            helpText = stringResource(R.string.settings_help_cpu_sprite_render_level),
+                            onResetToDefault = { viewModel.setCpuSpriteRenderLevel(defaults.cpuSpriteRenderLevel) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_software_clut_render),
                             options = softwareClutRenderOptions(),
                             selectedValue = uiState.softwareClutRender,
-                            onSelect = viewModel::setSoftwareClutRender
+                            onSelect = viewModel::setSoftwareClutRender,
+                            helpText = stringResource(R.string.settings_help_software_clut_render),
+                            onResetToDefault = { viewModel.setSoftwareClutRender(defaults.softwareClutRender) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_gpu_target_clut),
                             options = gpuTargetClutOptions(),
                             selectedValue = uiState.gpuTargetClutMode,
-                            onSelect = viewModel::setGpuTargetClutMode
+                            onSelect = viewModel::setGpuTargetClutMode,
+                            helpText = stringResource(R.string.settings_help_gpu_target_clut),
+                            onResetToDefault = { viewModel.setGpuTargetClutMode(defaults.gpuTargetClutMode) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_auto_flush_hardware),
                             options = autoFlushHardwareOptions(),
                             selectedValue = uiState.autoFlushHardware,
-                            onSelect = viewModel::setAutoFlushHardware
+                            onSelect = viewModel::setAutoFlushHardware,
+                            helpText = stringResource(R.string.settings_help_auto_flush_hardware),
+                            onResetToDefault = { viewModel.setAutoFlushHardware(defaults.autoFlushHardware) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.SettingsSuggest,
@@ -1199,7 +1327,9 @@ private fun SettingsContent(
                             value = uiState.skipDrawStart.toFloat(),
                             range = 0f..100f,
                             steps = 99,
-                            onValueChange = { viewModel.setSkipDrawStart(it.toInt()) }
+                            onValueChange = { viewModel.setSkipDrawStart(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_skip_draw_start),
+                            onResetToDefault = { viewModel.setSkipDrawStart(defaults.skipDrawStart) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.SettingsSuggest,
@@ -1208,76 +1338,98 @@ private fun SettingsContent(
                             value = uiState.skipDrawEnd.toFloat(),
                             range = 0f..100f,
                             steps = 99,
-                            onValueChange = { viewModel.setSkipDrawEnd(it.toInt()) }
+                            onValueChange = { viewModel.setSkipDrawEnd(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_skip_draw_end),
+                            onResetToDefault = { viewModel.setSkipDrawEnd(defaults.skipDrawEnd) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_cpu_framebuffer_conversion),
                             subtitle = stringResource(R.string.settings_cpu_framebuffer_conversion_desc),
                             checked = uiState.cpuFramebufferConversion,
-                            onCheckedChange = viewModel::setCpuFramebufferConversion
+                            onCheckedChange = viewModel::setCpuFramebufferConversion,
+                            helpText = stringResource(R.string.settings_help_cpu_framebuffer_conversion),
+                            onResetToDefault = { viewModel.setCpuFramebufferConversion(defaults.cpuFramebufferConversion) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_disable_depth_conversion),
                             subtitle = stringResource(R.string.settings_disable_depth_conversion_desc),
                             checked = uiState.disableDepthConversion,
-                            onCheckedChange = viewModel::setDisableDepthConversion
+                            onCheckedChange = viewModel::setDisableDepthConversion,
+                            helpText = stringResource(R.string.settings_help_disable_depth_conversion),
+                            onResetToDefault = { viewModel.setDisableDepthConversion(defaults.disableDepthConversion) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_disable_safe_features),
                             subtitle = stringResource(R.string.settings_disable_safe_features_desc),
                             checked = uiState.disableSafeFeatures,
-                            onCheckedChange = viewModel::setDisableSafeFeatures
+                            onCheckedChange = viewModel::setDisableSafeFeatures,
+                            helpText = stringResource(R.string.settings_help_disable_safe_features),
+                            onResetToDefault = { viewModel.setDisableSafeFeatures(defaults.disableSafeFeatures) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_disable_render_fixes),
                             subtitle = stringResource(R.string.settings_disable_render_fixes_desc),
                             checked = uiState.disableRenderFixes,
-                            onCheckedChange = viewModel::setDisableRenderFixes
+                            onCheckedChange = viewModel::setDisableRenderFixes,
+                            helpText = stringResource(R.string.settings_help_disable_render_fixes),
+                            onResetToDefault = { viewModel.setDisableRenderFixes(defaults.disableRenderFixes) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_preload_frame_data),
                             subtitle = stringResource(R.string.settings_preload_frame_data_desc),
                             checked = uiState.preloadFrameData,
-                            onCheckedChange = viewModel::setPreloadFrameData
+                            onCheckedChange = viewModel::setPreloadFrameData,
+                            helpText = stringResource(R.string.settings_help_preload_frame_data),
+                            onResetToDefault = { viewModel.setPreloadFrameData(defaults.preloadFrameData) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_disable_partial_invalidation),
                             subtitle = stringResource(R.string.settings_disable_partial_invalidation_desc),
                             checked = uiState.disablePartialInvalidation,
-                            onCheckedChange = viewModel::setDisablePartialInvalidation
+                            onCheckedChange = viewModel::setDisablePartialInvalidation,
+                            helpText = stringResource(R.string.settings_help_disable_partial_invalidation),
+                            onResetToDefault = { viewModel.setDisablePartialInvalidation(defaults.disablePartialInvalidation) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_texture_inside_rt),
                             options = textureInsideRtOptions(),
                             selectedValue = uiState.textureInsideRt,
-                            onSelect = viewModel::setTextureInsideRt
+                            onSelect = viewModel::setTextureInsideRt,
+                            helpText = stringResource(R.string.settings_help_texture_inside_rt),
+                            onResetToDefault = { viewModel.setTextureInsideRt(defaults.textureInsideRt) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_read_targets_on_close),
                             subtitle = stringResource(R.string.settings_read_targets_on_close_desc),
                             checked = uiState.readTargetsOnClose,
-                            onCheckedChange = viewModel::setReadTargetsOnClose
+                            onCheckedChange = viewModel::setReadTargetsOnClose,
+                            helpText = stringResource(R.string.settings_help_read_targets_on_close),
+                            onResetToDefault = { viewModel.setReadTargetsOnClose(defaults.readTargetsOnClose) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_estimate_texture_region),
                             subtitle = stringResource(R.string.settings_estimate_texture_region_desc),
                             checked = uiState.estimateTextureRegion,
-                            onCheckedChange = viewModel::setEstimateTextureRegion
+                            onCheckedChange = viewModel::setEstimateTextureRegion,
+                            helpText = stringResource(R.string.settings_help_estimate_texture_region),
+                            onResetToDefault = { viewModel.setEstimateTextureRegion(defaults.estimateTextureRegion) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_gpu_palette_conversion),
                             subtitle = stringResource(R.string.settings_gpu_palette_conversion_desc),
                             checked = uiState.gpuPaletteConversion,
-                            onCheckedChange = viewModel::setGpuPaletteConversion
+                            onCheckedChange = viewModel::setGpuPaletteConversion,
+                            helpText = stringResource(R.string.settings_help_gpu_palette_conversion),
+                            onResetToDefault = { viewModel.setGpuPaletteConversion(defaults.gpuPaletteConversion) }
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_upscaling_fixes)) {
@@ -1285,25 +1437,33 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_half_pixel_offset),
                             options = halfPixelOffsetOptions(),
                             selectedValue = uiState.halfPixelOffset,
-                            onSelect = viewModel::setHalfPixelOffset
+                            onSelect = viewModel::setHalfPixelOffset,
+                            helpText = stringResource(R.string.settings_help_half_pixel_offset),
+                            onResetToDefault = { viewModel.setHalfPixelOffset(defaults.halfPixelOffset) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_native_scaling),
                             options = nativeScalingOptions(),
                             selectedValue = uiState.nativeScaling,
-                            onSelect = viewModel::setNativeScaling
+                            onSelect = viewModel::setNativeScaling,
+                            helpText = stringResource(R.string.settings_help_native_scaling),
+                            onResetToDefault = { viewModel.setNativeScaling(defaults.nativeScaling) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_round_sprite),
                             options = roundSpriteOptions(),
                             selectedValue = uiState.roundSprite,
-                            onSelect = viewModel::setRoundSprite
+                            onSelect = viewModel::setRoundSprite,
+                            helpText = stringResource(R.string.settings_help_round_sprite),
+                            onResetToDefault = { viewModel.setRoundSprite(defaults.roundSprite) }
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_bilinear_upscale),
                             options = bilinearUpscaleOptions(),
                             selectedValue = uiState.bilinearUpscale,
-                            onSelect = viewModel::setBilinearUpscale
+                            onSelect = viewModel::setBilinearUpscale,
+                            helpText = stringResource(R.string.settings_help_bilinear_upscale),
+                            onResetToDefault = { viewModel.setBilinearUpscale(defaults.bilinearUpscale) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.GraphicEq,
@@ -1312,7 +1472,9 @@ private fun SettingsContent(
                             value = uiState.textureOffsetX.toFloat(),
                             range = -512f..512f,
                             steps = 1023,
-                            onValueChange = { viewModel.setTextureOffsetX(it.toInt()) }
+                            onValueChange = { viewModel.setTextureOffsetX(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_texture_offset_x),
+                            onResetToDefault = { viewModel.setTextureOffsetX(defaults.textureOffsetX) }
                         )
                         SliderItem(
                             icon = Icons.Rounded.GraphicEq,
@@ -1321,35 +1483,45 @@ private fun SettingsContent(
                             value = uiState.textureOffsetY.toFloat(),
                             range = -512f..512f,
                             steps = 1023,
-                            onValueChange = { viewModel.setTextureOffsetY(it.toInt()) }
+                            onValueChange = { viewModel.setTextureOffsetY(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_texture_offset_y),
+                            onResetToDefault = { viewModel.setTextureOffsetY(defaults.textureOffsetY) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_align_sprite),
                             subtitle = stringResource(R.string.settings_align_sprite_desc),
                             checked = uiState.alignSprite,
-                            onCheckedChange = viewModel::setAlignSprite
+                            onCheckedChange = viewModel::setAlignSprite,
+                            helpText = stringResource(R.string.settings_help_align_sprite),
+                            onResetToDefault = { viewModel.setAlignSprite(defaults.alignSprite) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_merge_sprite),
                             subtitle = stringResource(R.string.settings_merge_sprite_desc),
                             checked = uiState.mergeSprite,
-                            onCheckedChange = viewModel::setMergeSprite
+                            onCheckedChange = viewModel::setMergeSprite,
+                            helpText = stringResource(R.string.settings_help_merge_sprite),
+                            onResetToDefault = { viewModel.setMergeSprite(defaults.mergeSprite) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_force_even_sprite_position),
                             subtitle = stringResource(R.string.settings_force_even_sprite_position_desc),
                             checked = uiState.forceEvenSpritePosition,
-                            onCheckedChange = viewModel::setForceEvenSpritePosition
+                            onCheckedChange = viewModel::setForceEvenSpritePosition,
+                            helpText = stringResource(R.string.settings_help_force_even_sprite_position),
+                            onResetToDefault = { viewModel.setForceEvenSpritePosition(defaults.forceEvenSpritePosition) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_native_palette_draw),
                             subtitle = stringResource(R.string.settings_native_palette_draw_desc),
                             checked = uiState.nativePaletteDraw,
-                            onCheckedChange = viewModel::setNativePaletteDraw
+                            onCheckedChange = viewModel::setNativePaletteDraw,
+                            helpText = stringResource(R.string.settings_help_native_palette_draw),
+                            onResetToDefault = { viewModel.setNativePaletteDraw(defaults.nativePaletteDraw) }
                         )
                     }
                 }
@@ -1476,6 +1648,7 @@ private fun ThemeSelector(
             ThemeMode.LIGHT -> 1
             ThemeMode.DARK -> 2
         },
+        onResetToDefault = { onSelected(ThemeMode.SYSTEM) },
         onSelect = { value ->
             onSelected(
                 when (value) {
@@ -1644,16 +1817,24 @@ private fun ToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
+            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = { onCheckedChange(!checked) },
+                onLongClick = onResetToDefault
+            ),
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-        onClick = { onCheckedChange(!checked) }
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Row(
             modifier = Modifier
@@ -1681,11 +1862,20 @@ private fun ToggleItem(
                     .weight(1f)
                     .padding(end = 16.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    helpText?.let {
+                        SettingHelpButton(title = title, description = it)
+                    }
+                }
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -1709,9 +1899,12 @@ private fun SliderItem(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
     var sliderValue by remember { mutableFloatStateOf(value) }
+    val interactionSource = remember { MutableInteractionSource() }
 
     LaunchedEffect(value) {
         sliderValue = value
@@ -1721,6 +1914,12 @@ private fun SliderItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {},
+                onLongClick = onResetToDefault
+            )
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -1739,11 +1938,20 @@ private fun SliderItem(
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    helpText?.let {
+                        SettingHelpButton(title = title, description = it)
+                    }
+                }
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
@@ -1772,15 +1980,34 @@ private fun ChoiceSection(
     title: String,
     options: List<Pair<Int, String>>,
     selectedValue: Int,
-    onSelect: (Int) -> Unit
+    onSelect: (Int) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = {},
+                    onLongClick = onResetToDefault
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            helpText?.let {
+                SettingHelpButton(title = title, description = it)
+            }
+        }
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth(),
@@ -1920,6 +2147,14 @@ private fun casModeOptions(): List<Pair<Int, String>> = listOf(
     0 to stringResource(R.string.settings_cas_mode_off),
     1 to stringResource(R.string.settings_cas_mode_sharpen_only),
     2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
+)
+
+@Composable
+private fun fpsOverlayCornerOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.FPS_OVERLAY_CORNER_TOP_LEFT to stringResource(R.string.settings_fps_overlay_corner_top_left),
+    AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT to stringResource(R.string.settings_fps_overlay_corner_top_right),
+    AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT to stringResource(R.string.settings_fps_overlay_corner_bottom_left),
+    AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT to stringResource(R.string.settings_fps_overlay_corner_bottom_right)
 )
 
 @Composable

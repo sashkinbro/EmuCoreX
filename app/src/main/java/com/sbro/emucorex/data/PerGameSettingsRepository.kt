@@ -4,6 +4,7 @@ import android.content.Context
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.normalizeUpscale
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -13,7 +14,7 @@ data class PerGameSettings(
     val gameTitle: String,
     val gameSerial: String? = null,
     val renderer: Int = 14,
-    val upscaleMultiplier: Int = 1,
+    val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val performancePreset: Int = PerformancePresets.CUSTOM,
     val showFps: Boolean = false,
@@ -143,7 +144,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         gameTitle = optString("gameTitle"),
         gameSerial = optString("gameSerial").takeIf { it.isNotBlank() },
         renderer = optInt("renderer", 14),
-        upscaleMultiplier = optInt("upscaleMultiplier", 1),
+        upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1),
         performancePreset = optInt("performancePreset", PerformancePresets.CUSTOM),
         showFps = optBoolean("showFps", false),
@@ -205,7 +206,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         put("gameTitle", gameTitle)
         put("gameSerial", gameSerial)
         put("renderer", renderer)
-        put("upscaleMultiplier", upscaleMultiplier)
+        put("upscaleMultiplier", upscaleMultiplier.toDouble())
         put("aspectRatio", aspectRatio)
         put("performancePreset", performancePreset)
         put("showFps", showFps)
@@ -259,4 +260,13 @@ private fun PerGameSettings.toJson(): JSONObject {
         put("nativePaletteDraw", nativePaletteDraw)
         put("updatedAt", updatedAt)
     }
+}
+
+private fun JSONObject.readUpscaleMultiplier(): Float {
+    val doubleValue = optDouble("upscaleMultiplier", Double.NaN)
+    return when {
+        !doubleValue.isNaN() -> doubleValue.toFloat()
+        has("upscaleMultiplier") -> optInt("upscaleMultiplier", 1).toFloat()
+        else -> 1f
+    }.let(::normalizeUpscale)
 }

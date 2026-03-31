@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.core.net.toUri
 import com.sbro.emucorex.core.BiosValidator
-import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
@@ -111,11 +110,12 @@ class GameRepository {
 
                 file.isFile && file.extension.lowercase() in SUPPORTED_EXTENSIONS -> {
                     val cachedGame = cachedGamesByPath[file.absolutePath]
-                    val metadata = if (cachedGame != null &&
+                    val canReuseCachedMetadata = cachedGame != null &&
                         cachedGame.fileSize == file.length() &&
                         cachedGame.lastModified == file.lastModified() &&
-                        cachedGame.fileName == file.name
-                    ) {
+                        cachedGame.fileName == file.name &&
+                        !cachedGame.serial.isNullOrBlank()
+                    val metadata = if (canReuseCachedMetadata) {
                         com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
                     } else {
                         EmulatorBridge.getGameMetadata(file.absolutePath)
@@ -168,23 +168,15 @@ class GameRepository {
 
                 val uriPath = file.uri.toString()
                 val cachedGame = cachedGamesByPath[uriPath]
-                val metadata = if (cachedGame != null &&
+                val canReuseCachedMetadata = cachedGame != null &&
                     cachedGame.fileSize == file.length() &&
                     cachedGame.lastModified == file.lastModified() &&
-                    cachedGame.fileName == name
-                ) {
+                    cachedGame.fileName == name &&
+                    !cachedGame.serial.isNullOrBlank()
+                val metadata = if (canReuseCachedMetadata) {
                     com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
                 } else {
-                    val physicalPath = DocumentPathResolver.resolveFilePath(context, uriPath)
-                    try {
-                        when {
-                            physicalPath != null -> runCatching { EmulatorBridge.getGameMetadata(physicalPath) }
-                                .getOrElse { EmulatorBridge.getGameMetadata(uriPath) }
-                            else -> EmulatorBridge.getGameMetadata(uriPath)
-                        }
-                    } catch (_: Exception) {
-                        com.sbro.emucorex.core.GameMetadata(normalizeBaseName(cleanGameName(name)), null)
-                    }
+                    EmulatorBridge.getGameMetadata(uriPath)
                 }
 
                 if (BiosValidator.isLikelyBiosLibraryEntry(name, metadata.title, metadata.serial, file.length())) {

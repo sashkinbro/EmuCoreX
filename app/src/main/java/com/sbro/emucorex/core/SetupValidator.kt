@@ -31,14 +31,12 @@ object SetupValidator {
                 .getOrDefault(false)
         } else {
             if (DocumentPathResolver.isScopedStorageExternalPath(rawPath)) {
-                if (StoragePermissionHelper.hasGameLibraryAccess(context, rawPath)) {
-                    val dir = File(rawPath)
-                    return dir.exists() && dir.isDirectory
-                }
                 val migratedUri = DocumentPathResolver.findAccessibleTreeUriForRawPath(context, rawPath)
-                if (migratedUri == null) {
-                    return false
+                if (migratedUri != null) {
+                    val root = DocumentFile.fromTreeUri(context, migratedUri) ?: return false
+                    return runCatching { root.isDirectory && root.exists() }.getOrDefault(false)
                 }
+                return false
             }
             val dir = File(rawPath)
             dir.exists() && dir.isDirectory

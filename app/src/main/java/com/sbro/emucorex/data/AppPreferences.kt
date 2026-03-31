@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -14,6 +15,7 @@ import com.sbro.emucorex.core.DevicePerformanceProfiles
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -32,13 +34,16 @@ data class SettingsSnapshot(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
     val renderer: Int = 0,
-    val upscaleMultiplier: Int = 1,
+    val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,
     val showFps: Boolean = false,
     val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
+    val fpsOverlayCorner: Int = AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
+    val showRecentGames: Boolean = true,
+    val showHomeSearch: Boolean = true,
     val biosPath: String? = null,
     val biosValid: Boolean = false,
     val gamePath: String? = null,
@@ -88,7 +93,7 @@ data class SettingsSnapshot(
     val mergeSprite: Boolean = false,
     val forceEvenSpritePosition: Boolean = false,
     val nativePaletteDraw: Boolean = false,
-    val performancePreset: Int = PerformancePresets.CUSTOM,
+    val performancePreset: Int = PerformancePresets.BALANCED,
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
     val overlayShow: Boolean = true,
@@ -124,9 +129,14 @@ class AppPreferences(private val context: Context) {
     companion object {
         const val FPS_OVERLAY_MODE_SIMPLE = 0
         const val FPS_OVERLAY_MODE_DETAILED = 1
+        const val FPS_OVERLAY_CORNER_TOP_LEFT = 0
+        const val FPS_OVERLAY_CORNER_TOP_RIGHT = 1
+        const val FPS_OVERLAY_CORNER_BOTTOM_LEFT = 2
+        const val FPS_OVERLAY_CORNER_BOTTOM_RIGHT = 3
         private val THEME_MODE = intPreferencesKey("theme_mode")
         private val RENDERER = intPreferencesKey("renderer")
-        private val UPSCALE = intPreferencesKey("upscale_multiplier")
+        private val UPSCALE = floatPreferencesKey("upscale_multiplier_v2")
+        private val UPSCALE_LEGACY = intPreferencesKey("upscale_multiplier")
         private val BIOS_PATH = stringPreferencesKey("bios_path")
         private val GAME_PATH = stringPreferencesKey("game_path")
         private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
@@ -135,8 +145,11 @@ class AppPreferences(private val context: Context) {
         private val PAD_VIBRATION = booleanPreferencesKey("pad_vibration")
         private val SHOW_FPS = booleanPreferencesKey("show_fps")
         private val FPS_OVERLAY_MODE = intPreferencesKey("fps_overlay_mode")
+        private val FPS_OVERLAY_CORNER = intPreferencesKey("fps_overlay_corner")
         private val COMPACT_CONTROLS = booleanPreferencesKey("compact_controls")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        private val SHOW_RECENT_GAMES = booleanPreferencesKey("show_recent_games")
+        private val SHOW_HOME_SEARCH = booleanPreferencesKey("show_home_search")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
         private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
         private const val MAX_RECENT_GAMES = 8
@@ -256,6 +269,10 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    private fun defaultPerformancePresetId(): Int {
+        return DevicePerformanceProfiles.current().recommendedPresetId
+    }
+
     suspend fun setGpuDriverType(value: Int) {
         context.dataStore.edit { it[GPU_DRIVER_TYPE] = value }
     }
@@ -298,12 +315,12 @@ class AppPreferences(private val context: Context) {
         }
     }
 
-    val upscaleMultiplier: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[UPSCALE] ?: 1
+    val upscaleMultiplier: Flow<Float> = context.dataStore.data.map { prefs ->
+        readUpscale(prefs)
     }
 
-    suspend fun setUpscaleMultiplier(value: Int) {
-        context.dataStore.edit { it[UPSCALE] = value }
+    suspend fun setUpscaleMultiplier(value: Float) {
+        context.dataStore.edit { it[UPSCALE] = normalizeUpscale(value) }
     }
 
     // BIOS Path
@@ -362,13 +379,22 @@ class AppPreferences(private val context: Context) {
                 },
                 languageTag = prefs[LANGUAGE_TAG],
                 renderer = prefs[RENDERER] ?: defaultRendererForCurrentDevice(),
-                upscaleMultiplier = prefs[UPSCALE] ?: 1,
+                upscaleMultiplier = readUpscale(prefs),
                 aspectRatio = prefs[ASPECT_RATIO] ?: 1,
                 padVibration = prefs[PAD_VIBRATION] ?: true,
                 showFps = prefs[SHOW_FPS] ?: false,
                 fpsOverlayMode = prefs[FPS_OVERLAY_MODE] ?: FPS_OVERLAY_MODE_DETAILED,
+                fpsOverlayCorner = when (prefs[FPS_OVERLAY_CORNER]) {
+                    FPS_OVERLAY_CORNER_TOP_LEFT,
+                    FPS_OVERLAY_CORNER_TOP_RIGHT,
+                    FPS_OVERLAY_CORNER_BOTTOM_LEFT,
+                    FPS_OVERLAY_CORNER_BOTTOM_RIGHT -> prefs[FPS_OVERLAY_CORNER] ?: FPS_OVERLAY_CORNER_TOP_RIGHT
+                    else -> FPS_OVERLAY_CORNER_TOP_RIGHT
+                },
                 compactControls = prefs[COMPACT_CONTROLS] ?: true,
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
+                showRecentGames = prefs[SHOW_RECENT_GAMES] ?: true,
+                showHomeSearch = prefs[SHOW_HOME_SEARCH] ?: true,
                 biosPath = biosPath,
                 biosValid = BiosValidator.hasUsableBiosFiles(context, biosPath),
                 gamePath = prefs[GAME_PATH],
@@ -418,7 +444,7 @@ class AppPreferences(private val context: Context) {
                 mergeSprite = prefs[MERGE_SPRITE] ?: false,
                 forceEvenSpritePosition = prefs[FORCE_EVEN_SPRITE_POSITION] ?: false,
                 nativePaletteDraw = prefs[NATIVE_PALETTE_DRAW] ?: false,
-                performancePreset = prefs[PERFORMANCE_PRESET] ?: PerformancePresets.CUSTOM,
+                performancePreset = prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId(),
                 overlayScale = prefs[OVERLAY_SCALE] ?: 100,
                 overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
                 overlayShow = prefs[OVERLAY_SHOW] ?: true,
@@ -483,6 +509,28 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[FPS_OVERLAY_MODE] = mode }
     }
 
+    val fpsOverlayCorner: Flow<Int> = context.dataStore.data.map { prefs ->
+        when (prefs[FPS_OVERLAY_CORNER]) {
+            FPS_OVERLAY_CORNER_TOP_LEFT,
+            FPS_OVERLAY_CORNER_TOP_RIGHT,
+            FPS_OVERLAY_CORNER_BOTTOM_LEFT,
+            FPS_OVERLAY_CORNER_BOTTOM_RIGHT -> prefs[FPS_OVERLAY_CORNER] ?: FPS_OVERLAY_CORNER_TOP_RIGHT
+            else -> FPS_OVERLAY_CORNER_TOP_RIGHT
+        }
+    }
+
+    suspend fun setFpsOverlayCorner(corner: Int) {
+        context.dataStore.edit {
+            it[FPS_OVERLAY_CORNER] = when (corner) {
+                FPS_OVERLAY_CORNER_TOP_LEFT,
+                FPS_OVERLAY_CORNER_TOP_RIGHT,
+                FPS_OVERLAY_CORNER_BOTTOM_LEFT,
+                FPS_OVERLAY_CORNER_BOTTOM_RIGHT -> corner
+                else -> FPS_OVERLAY_CORNER_TOP_RIGHT
+            }
+        }
+    }
+
     val compactControls: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[COMPACT_CONTROLS] ?: true
     }
@@ -497,6 +545,22 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setKeepScreenOn(enabled: Boolean) {
         context.dataStore.edit { it[KEEP_SCREEN_ON] = enabled }
+    }
+
+    val showRecentGames: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SHOW_RECENT_GAMES] ?: true
+    }
+
+    suspend fun setShowRecentGames(enabled: Boolean) {
+        context.dataStore.edit { it[SHOW_RECENT_GAMES] = enabled }
+    }
+
+    val showHomeSearch: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SHOW_HOME_SEARCH] ?: true
+    }
+
+    suspend fun setShowHomeSearch(enabled: Boolean) {
+        context.dataStore.edit { it[SHOW_HOME_SEARCH] = enabled }
     }
 
     val recentGames: Flow<List<RecentGameEntry>> = context.dataStore.data.map { prefs ->
@@ -978,7 +1042,7 @@ class AppPreferences(private val context: Context) {
     }
 
     val performancePreset: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[PERFORMANCE_PRESET] ?: PerformancePresets.CUSTOM
+        prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId()
     }
 
     suspend fun setPerformancePreset(value: Int) {
@@ -1113,7 +1177,7 @@ class AppPreferences(private val context: Context) {
         return JSONObject().apply {
             put("themeMode", prefs[THEME_MODE] ?: 0)
             put("renderer", prefs[RENDERER] ?: 14)
-            put("upscaleMultiplier", prefs[UPSCALE] ?: 1)
+            put("upscaleMultiplier", readUpscale(prefs).toDouble())
             put("biosPath", prefs[BIOS_PATH])
             put("gamePath", prefs[GAME_PATH])
             put("onboardingCompleted", prefs[ONBOARDING_COMPLETED] ?: false)
@@ -1122,8 +1186,11 @@ class AppPreferences(private val context: Context) {
             put("padVibration", prefs[PAD_VIBRATION] ?: true)
             put("showFps", prefs[SHOW_FPS] ?: false)
             put("fpsOverlayMode", prefs[FPS_OVERLAY_MODE] ?: FPS_OVERLAY_MODE_DETAILED)
+            put("fpsOverlayCorner", prefs[FPS_OVERLAY_CORNER] ?: FPS_OVERLAY_CORNER_TOP_RIGHT)
             put("compactControls", prefs[COMPACT_CONTROLS] ?: true)
             put("keepScreenOn", prefs[KEEP_SCREEN_ON] ?: true)
+            put("showRecentGames", prefs[SHOW_RECENT_GAMES] ?: true)
+            put("showHomeSearch", prefs[SHOW_HOME_SEARCH] ?: true)
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
@@ -1173,7 +1240,7 @@ class AppPreferences(private val context: Context) {
             put("mergeSprite", prefs[MERGE_SPRITE] ?: false)
             put("forceEvenSpritePosition", prefs[FORCE_EVEN_SPRITE_POSITION] ?: false)
             put("nativePaletteDraw", prefs[NATIVE_PALETTE_DRAW] ?: false)
-            put("performancePreset", prefs[PERFORMANCE_PRESET] ?: PerformancePresets.CUSTOM)
+            put("performancePreset", prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId())
             put("enableAutoGamepad", prefs[ENABLE_AUTO_GAMEPAD] ?: true)
             put("hideOverlayOnGamepad", prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
@@ -1200,7 +1267,7 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[THEME_MODE] = json.optInt("themeMode", 0)
             prefs[RENDERER] = json.optInt("renderer", 14)
-            prefs[UPSCALE] = json.optInt("upscaleMultiplier", 1)
+            prefs[UPSCALE] = json.readUpscaleMultiplier()
             json.optString("biosPath").takeIf { it.isNotBlank() }?.let { prefs[BIOS_PATH] = it } ?: prefs.remove(BIOS_PATH)
             json.optString("gamePath").takeIf { it.isNotBlank() }?.let { prefs[GAME_PATH] = it } ?: prefs.remove(GAME_PATH)
             prefs[ONBOARDING_COMPLETED] = json.optBoolean("onboardingCompleted", false)
@@ -1209,8 +1276,14 @@ class AppPreferences(private val context: Context) {
             prefs[PAD_VIBRATION] = json.optBoolean("padVibration", true)
             prefs[SHOW_FPS] = json.optBoolean("showFps", false)
             prefs[FPS_OVERLAY_MODE] = json.optInt("fpsOverlayMode", FPS_OVERLAY_MODE_DETAILED)
+            prefs[FPS_OVERLAY_CORNER] = json.optInt("fpsOverlayCorner", FPS_OVERLAY_CORNER_TOP_RIGHT).coerceIn(
+                FPS_OVERLAY_CORNER_TOP_LEFT,
+                FPS_OVERLAY_CORNER_BOTTOM_RIGHT
+            )
             prefs[COMPACT_CONTROLS] = json.optBoolean("compactControls", true)
             prefs[KEEP_SCREEN_ON] = json.optBoolean("keepScreenOn", true)
+            prefs[SHOW_RECENT_GAMES] = json.optBoolean("showRecentGames", true)
+            prefs[SHOW_HOME_SEARCH] = json.optBoolean("showHomeSearch", true)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 1)
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
@@ -1260,7 +1333,7 @@ class AppPreferences(private val context: Context) {
             prefs[MERGE_SPRITE] = json.optBoolean("mergeSprite", false)
             prefs[FORCE_EVEN_SPRITE_POSITION] = json.optBoolean("forceEvenSpritePosition", false)
             prefs[NATIVE_PALETTE_DRAW] = json.optBoolean("nativePaletteDraw", false)
-            prefs[PERFORMANCE_PRESET] = json.optInt("performancePreset", PerformancePresets.CUSTOM)
+            prefs[PERFORMANCE_PRESET] = json.optInt("performancePreset", defaultPerformancePresetId())
             prefs[ENABLE_AUTO_GAMEPAD] = json.optBoolean("enableAutoGamepad", true)
             prefs[HIDE_OVERLAY_ON_GAMEPAD] = json.optBoolean("hideOverlayOnGamepad", true)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
@@ -1279,5 +1352,20 @@ class AppPreferences(private val context: Context) {
             json.optString("memoryCardSlot1").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT1] = it } ?: prefs.remove(MEMORY_CARD_SLOT1)
             json.optString("memoryCardSlot2").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT2] = it } ?: prefs.remove(MEMORY_CARD_SLOT2)
         }
+    }
+
+    private fun readUpscale(prefs: Preferences): Float {
+        return (prefs[UPSCALE]
+            ?: prefs[UPSCALE_LEGACY]?.toFloat()
+            ?: 1f).let(::normalizeUpscale)
+    }
+
+    private fun JSONObject.readUpscaleMultiplier(): Float {
+        val doubleValue = optDouble("upscaleMultiplier", Double.NaN)
+        return when {
+            !doubleValue.isNaN() -> doubleValue.toFloat()
+            has("upscaleMultiplier") -> optInt("upscaleMultiplier", 1).toFloat()
+            else -> 1f
+        }.let(::normalizeUpscale)
     }
 }

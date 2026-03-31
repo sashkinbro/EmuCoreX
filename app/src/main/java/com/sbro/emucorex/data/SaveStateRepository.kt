@@ -63,6 +63,13 @@ class SaveStateRepository(private val context: Context) {
         }
     }
 
+    fun findLatestSlot(gamePath: String): Int? {
+        return listSlots(gamePath)
+            .filter { it.exists }
+            .maxByOrNull { it.lastModified }
+            ?.slot
+    }
+
     suspend fun listEntries(filterGamePath: String? = null, filterGameTitle: String? = null): List<SaveStateEntryInfo> {
         return if (filterGamePath.isNullOrBlank()) {
             listAllEntriesFast()
