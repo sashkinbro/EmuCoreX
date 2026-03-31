@@ -14,6 +14,7 @@ import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
+import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,8 @@ data class SettingsUiState(
     val showHomeSearch: Boolean = true,
     val biosPath: String? = null,
     val gamePath: String? = null,
+    val coverDownloadBaseUrl: String? = null,
+    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DISABLED,
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
     val appVersion: String = "1.0.0",
@@ -148,6 +151,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             showHomeSearch = snapshot.showHomeSearch,
             biosPath = snapshot.biosPath,
             gamePath = snapshot.gamePath,
+            coverDownloadBaseUrl = snapshot.coverDownloadBaseUrl,
+            coverArtStyle = snapshot.coverArtStyle,
             biosValid = snapshot.biosValid,
             setupComplete = snapshot.setupComplete,
             eeCycleRate = snapshot.eeCycleRate,
@@ -844,6 +849,20 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             Intent.FLAG_GRANT_READ_URI_PERMISSION
         )
         viewModelScope.launch { preferences.setGamePath(uri.toString()) }
+    }
+
+    fun setCoverDownloadBaseUrl(url: String?) {
+        viewModelScope.launch {
+            preferences.setCoverDownloadBaseUrl(url)
+            CoverArtRepository(getApplication()).clearCache()
+        }
+    }
+
+    fun setCoverArtStyle(style: Int) {
+        viewModelScope.launch {
+            preferences.setCoverArtStyle(style)
+            CoverArtRepository(getApplication()).clearCache()
+        }
     }
 
 }

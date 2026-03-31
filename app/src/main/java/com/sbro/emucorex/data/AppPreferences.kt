@@ -47,6 +47,8 @@ data class SettingsSnapshot(
     val biosPath: String? = null,
     val biosValid: Boolean = false,
     val gamePath: String? = null,
+    val coverDownloadBaseUrl: String? = null,
+    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DISABLED,
     val setupComplete: Boolean = false,
     val eeCycleRate: Int = 0,
     val eeCycleSkip: Int = 0,
@@ -127,6 +129,9 @@ class AppPreferences(private val context: Context) {
     private val localePrefs = context.getSharedPreferences("ui_locale", Context.MODE_PRIVATE)
 
     companion object {
+        const val COVER_ART_STYLE_DISABLED = -1
+        const val COVER_ART_STYLE_DEFAULT = 0
+        const val COVER_ART_STYLE_3D = 1
         const val FPS_OVERLAY_MODE_SIMPLE = 0
         const val FPS_OVERLAY_MODE_DETAILED = 1
         const val FPS_OVERLAY_CORNER_TOP_LEFT = 0
@@ -139,6 +144,8 @@ class AppPreferences(private val context: Context) {
         private val UPSCALE_LEGACY = intPreferencesKey("upscale_multiplier")
         private val BIOS_PATH = stringPreferencesKey("bios_path")
         private val GAME_PATH = stringPreferencesKey("game_path")
+        private val COVER_DOWNLOAD_BASE_URL = stringPreferencesKey("cover_download_base_url")
+        private val COVER_ART_STYLE = intPreferencesKey("cover_art_style")
         private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val LANGUAGE_TAG = stringPreferencesKey("language_tag")
         private val ASPECT_RATIO = intPreferencesKey("aspect_ratio")
@@ -341,6 +348,56 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[GAME_PATH] = path }
     }
 
+    val coverDownloadBaseUrl: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[COVER_DOWNLOAD_BASE_URL]
+    }
+
+    suspend fun setCoverDownloadBaseUrl(url: String?) {
+        context.dataStore.edit { prefs ->
+            if (url.isNullOrBlank()) {
+                prefs.remove(COVER_DOWNLOAD_BASE_URL)
+            } else {
+                prefs[COVER_DOWNLOAD_BASE_URL] = url.trim().trimEnd('/')
+            }
+        }
+    }
+
+    fun getCoverDownloadBaseUrlSync(): String? {
+        return kotlinx.coroutines.runBlocking {
+            context.dataStore.data.map { it[COVER_DOWNLOAD_BASE_URL] }.first()
+        }
+    }
+
+    val coverArtStyle: Flow<Int> = context.dataStore.data.map { prefs ->
+        when (prefs[COVER_ART_STYLE]) {
+            COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+            COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
+            else -> COVER_ART_STYLE_DISABLED
+        }
+    }
+
+    suspend fun setCoverArtStyle(style: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[COVER_ART_STYLE] = when (style) {
+                COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
+                else -> COVER_ART_STYLE_DISABLED
+            }
+        }
+    }
+
+    fun getCoverArtStyleSync(): Int {
+        return kotlinx.coroutines.runBlocking {
+            context.dataStore.data.map { prefs ->
+                when (prefs[COVER_ART_STYLE]) {
+                    COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                    COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
+                    else -> COVER_ART_STYLE_DISABLED
+                }
+            }.first()
+        }
+    }
+
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[ONBOARDING_COMPLETED] ?: false
     }
@@ -398,6 +455,12 @@ class AppPreferences(private val context: Context) {
                 biosPath = biosPath,
                 biosValid = BiosValidator.hasUsableBiosFiles(context, biosPath),
                 gamePath = prefs[GAME_PATH],
+                coverDownloadBaseUrl = prefs[COVER_DOWNLOAD_BASE_URL],
+                coverArtStyle = when (prefs[COVER_ART_STYLE]) {
+                    COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                    COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
+                    else -> COVER_ART_STYLE_DISABLED
+                },
                 setupComplete = prefs[ONBOARDING_COMPLETED] ?: false,
                 eeCycleRate = prefs[EE_CYCLE_RATE] ?: 0,
                 eeCycleSkip = prefs[EE_CYCLE_SKIP] ?: 0,
@@ -1180,6 +1243,8 @@ class AppPreferences(private val context: Context) {
             put("upscaleMultiplier", readUpscale(prefs).toDouble())
             put("biosPath", prefs[BIOS_PATH])
             put("gamePath", prefs[GAME_PATH])
+            put("coverDownloadBaseUrl", prefs[COVER_DOWNLOAD_BASE_URL])
+            put("coverArtStyle", prefs[COVER_ART_STYLE] ?: COVER_ART_STYLE_DISABLED)
             put("onboardingCompleted", prefs[ONBOARDING_COMPLETED] ?: false)
             put("languageTag", prefs[LANGUAGE_TAG])
             put("aspectRatio", prefs[ASPECT_RATIO] ?: 1)
@@ -1270,6 +1335,14 @@ class AppPreferences(private val context: Context) {
             prefs[UPSCALE] = json.readUpscaleMultiplier()
             json.optString("biosPath").takeIf { it.isNotBlank() }?.let { prefs[BIOS_PATH] = it } ?: prefs.remove(BIOS_PATH)
             json.optString("gamePath").takeIf { it.isNotBlank() }?.let { prefs[GAME_PATH] = it } ?: prefs.remove(GAME_PATH)
+            json.optString("coverDownloadBaseUrl").takeIf { it.isNotBlank() }?.let {
+                prefs[COVER_DOWNLOAD_BASE_URL] = it.trim().trimEnd('/')
+            } ?: prefs.remove(COVER_DOWNLOAD_BASE_URL)
+            prefs[COVER_ART_STYLE] = when (json.optInt("coverArtStyle", COVER_ART_STYLE_DISABLED)) {
+                COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
+                else -> COVER_ART_STYLE_DISABLED
+            }
             prefs[ONBOARDING_COMPLETED] = json.optBoolean("onboardingCompleted", false)
             languageTag?.let { prefs[LANGUAGE_TAG] = it } ?: prefs.remove(LANGUAGE_TAG)
             prefs[ASPECT_RATIO] = json.optInt("aspectRatio", 1)

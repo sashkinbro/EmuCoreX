@@ -8,6 +8,7 @@ import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameLibraryCacheRepository
 import com.sbro.emucorex.data.GameLibraryCacheSnapshot
@@ -150,6 +151,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     libraryViewMode = if (mode == 1) HomeLibraryViewMode.LIST else HomeLibraryViewMode.GRID
                 )
+            }
+        }
+        viewModelScope.launch {
+            preferences.coverArtStyle.distinctUntilChanged().collect {
+                handleCoverSourceChanged()
+            }
+        }
+        viewModelScope.launch {
+            preferences.coverDownloadBaseUrl.distinctUntilChanged().collect {
+                handleCoverSourceChanged()
             }
         }
     }
@@ -391,6 +402,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 libraryCacheRepository.save(rootPath, allGames)
             }
         }
+    }
+
+    private fun handleCoverSourceChanged() {
+        if (allGames.isEmpty()) return
+        val context = getApplication<Application>()
+        val coverRepository = CoverArtRepository(context)
+        val cachePrefix = java.io.File(context.cacheDir, "game-covers").absolutePath
+        synchronized(this) {
+            allGames = allGames.map { game ->
+                val currentPath = game.coverArtPath
+                if (currentPath != null && currentPath.startsWith(cachePrefix, ignoreCase = true)) {
+                    game.copy(coverArtPath = coverRepository.findCachedCoverPath(game.serial))
+                } else {
+                    game
+                }
+            }
+        }
+        publishVisibleGames()
+        currentLibraryRoot?.let { rootPath ->
+            libraryCacheRepository.save(rootPath, allGames)
+        }
+        syncMissingCovers()
     }
 
     private fun normalizeSearchToken(value: String?): String {

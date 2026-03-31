@@ -770,5 +770,30 @@
     <string name="settings_help_force_even_sprite_position">Прив\'язує положення спрайтів до парних координат, щоб зменшити крихітні зазори або мерехтіння між пікселями при вищих роздільних здатностях. Корисно для ігор із великою кількістю 2D, але може трохи змістити деякі елементи.</string>
     <string name="settings_help_native_palette_draw">Відмальовує ефекти на основі палітри ближче до нативної точності. Це може виправити ефекти з індексуванням кольорів, тіні палітри або інші хитрощі, що інтенсивно використовують CLUT, які ламаються під час масштабування, але також може зробити зображення у високій роздільній здатності менш чистим.</string>
     <string name="settings_help_bilinear_filtering">Керує основним режимом фільтрації текстур, який використовує рендерер. «Найближчий» (Nearest) зберігає найчіткіший необроблений вигляд, «PS2» залишається найближчим до оригінальної поведінки консолі, а примусові режими згладжують більш агресивно. Якщо гра виглядає занадто піксельною або занадто розмитою, це перша опція фільтрації, яку слід налаштувати.</string>
-
+    <string name="settings_help_bios_path">Вказує EmuCoreX на папку, що містить ваші файли BIOS PS2. Чистий дамп із вашої власної консолі — найкращий вибір. Програма може виявляти загальні файли, пов\'язані з BIOS, як-от .bin, .rom, .mec, .nvm та .elf, включаючи супутні файли ROM, такі як ROM0, ROM1, ROM2 і EROM, якщо вони присутні.</string>
+    <string name="settings_help_game_path">Вибирає папку бібліотеки, яку EmuCoreX сканує на наявність ігор. Сканування рекурсивне, тому підпапки також перевіряються. Підтримувані образи включають .iso, .bin, .chd, .cso та .gz. ISO — це найбезпечніша база, тоді як CHD зазвичай є найкращим довгостроковим форматом, оскільки він економить місце без шкоди для нормального використання.</string>
+    <string name="settings_help_cover_download_url">Перевизначає вбудоване джерело обкладинок, що використовується для автоматичного завантаження. URL-адреса має вказувати безпосередньо на папку, яка містить обкладинки у форматі JPG, названі за серійним номером гри, наприклад SLUS-20312.jpg. Змінюйте це лише в тому випадку, якщо ви розміщуєте власне дзеркало або хочете використовувати іншу сумісну бібліотеку обкладинок.</string>
+    <string name="settings_cover_download_url">URL-адреса завантаження обкладинок</string>
+    <string name="settings_cover_download_url_dialog_title">Власне джерело обкладинок</string>
+    <string name="settings_cover_download_url_dialog_body">Замініть стандартне джерело обкладинок власною прямою базовою URL-адресою. Залиште поле порожнім, щоб знову використовувати вбудоване джерело.</string>
+    <string name="settings_cover_download_url_use_default">За замовчуванням</string>
+    <string name="settings_cover_download_url_invalid">Введіть дійсну URL-адресу HTTP або HTTPS.</string>
+    <string name="settings_covers_tab">Обкладинки</string>
+    <string name="settings_search">Пошук налаштувань</string>
+    <string name="settings_search_subtitle">Знайти налаштування за назвою</string>
+    <string name="settings_search_placeholder">Пошук налаштувань</string>
+    <string name="settings_search_results_title">Результати пошуку</string>
+    <string name="settings_search_no_results">Відповідних налаштувань не знайдено.</string>
+    <string name="settings_cover_art_style">Стиль обкладинки</string>
+    <string name="settings_cover_art_style_off">Вимкнено</string>
+    <string name="settings_cover_art_style_flat">Пласка</string>
+    <string name="settings_cover_art_style_3d">3D-коробка</string>
+    <string name="settings_cover_download_url_builtin">Вбудоване джерело</string>
+    <string name="settings_cover_download_url_custom">Власне джерело</string>
+    <string name="settings_cover_download_url_disabled">Вимкнено</string>
+    <string name="settings_cover_download_url_placeholder">https://example.com/covers/default https://example.com/covers/3d</string>
+    <string name="settings_cover_download_url_example">Приклад</string>
+    <string name="settings_cover_download_url_example_hint">Торкніться, щоб вставити обидві URL-адреси для прикладу. Утримуйте, щоб скопіювати їх.</string>
+    <string name="settings_cover_download_url_copied">Приклади URL-адрес скопійовано.</string>
+    <string name="settings_help_cover_art_style">Вибирає тип обкладинки за замовчуванням, що використовується під час завантаження зображень. Пласкі обкладинки відповідають класичному вигляду передньої частини коробки, тоді як 3D-коробка використовує кутові рендери коробок, якщо джерело їх надає. 3D-обкладинки можуть виглядати більш ефектно, але їхня доступність може бути трохи гіршою, ніж у пласких зображень.</string>
 </resources>

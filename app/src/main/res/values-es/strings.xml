@@ -770,5 +770,30 @@
     <string name="settings_help_force_even_sprite_position">Ajusta las posiciones de los sprites a coordenadas pares para reducir pequeños huecos o parpadeos entre los píxeles en resoluciones altas. Útil para juegos muy 2D, pero puede desplazar ligeramente algunos elementos.</string>
     <string name="settings_help_native_palette_draw">Dibuja efectos basados en paleta más cerca de la precisión nativa. Esto puede reparar efectos indexados por color, sombras de paleta u otros trucos pesados en CLUT que se rompen al escalar, pero también puede hacer que la salida de alta resolución se vea menos limpia.</string>
     <string name="settings_help_bilinear_filtering">Controla el modo principal de filtrado de texturas utilizado por el renderizador. "Más cercano" (Nearest) mantiene el aspecto crudo más nítido, "PS2" se mantiene más fiel al comportamiento original de la consola, y los modos forzados suavizan de forma más agresiva. Si un juego se ve demasiado pixelado o demasiado borroso, esta es la primera opción de filtrado que debes ajustar.</string>
-
+    <string name="settings_help_bios_path">Dirige EmuCoreX a la carpeta que contiene tus archivos de BIOS de PS2. Un volcado limpio de tu propia consola es la mejor opción. La aplicación puede detectar archivos comunes relacionados con la BIOS como .bin, .rom, .mec, .nvm y .elf, incluyendo archivos ROM complementarios como ROM0, ROM1, ROM2 y EROM cuando están presentes.</string>
+    <string name="settings_help_game_path">Selecciona la carpeta de la biblioteca que EmuCoreX escanea en busca de juegos. El escaneo es recursivo, por lo que las subcarpetas están bien. Las imágenes compatibles incluyen .iso, .bin, .chd, .cso y .gz. ISO es la base más segura, mientras que CHD suele ser el mejor formato a largo plazo porque ahorra espacio sin renunciar al uso normal.</string>
+    <string name="settings_help_cover_download_url">Anula la fuente de carátulas integrada utilizada para las descargas automáticas. La URL debe apuntar directamente a una carpeta que contenga carátulas en formato JPG nombradas por el número de serie del juego, por ejemplo SLUS-20312.jpg. Cambia esto solo si alojas tu propio servidor (mirror) o quieres usar una biblioteca de carátulas compatible diferente.</string>
+    <string name="settings_cover_download_url">URL de descarga de carátulas</string>
+    <string name="settings_cover_download_url_dialog_title">Fuente de carátulas personalizada</string>
+    <string name="settings_cover_download_url_dialog_body">Reemplaza la fuente de carátulas predeterminada con tu propia URL base directa. Déjalo vacío para usar de nuevo la fuente integrada.</string>
+    <string name="settings_cover_download_url_use_default">Usar predeterminado</string>
+    <string name="settings_cover_download_url_invalid">Introduce una URL HTTP o HTTPS válida.</string>
+    <string name="settings_covers_tab">Carátulas</string>
+    <string name="settings_search">Buscar ajustes</string>
+    <string name="settings_search_subtitle">Encuentra un ajuste por nombre</string>
+    <string name="settings_search_placeholder">Buscar ajustes</string>
+    <string name="settings_search_results_title">Resultados de la búsqueda</string>
+    <string name="settings_search_no_results">No se encontraron ajustes coincidentes.</string>
+    <string name="settings_cover_art_style">Estilo de carátula</string>
+    <string name="settings_cover_art_style_off">Desactivado</string>
+    <string name="settings_cover_art_style_flat">Plana</string>
+    <string name="settings_cover_art_style_3d">Caja 3D</string>
+    <string name="settings_cover_download_url_builtin">Fuente integrada</string>
+    <string name="settings_cover_download_url_custom">Fuente personalizada</string>
+    <string name="settings_cover_download_url_disabled">Desactivado</string>
+    <string name="settings_cover_download_url_placeholder">https://example.com/covers/default https://example.com/covers/3d</string>
+    <string name="settings_cover_download_url_example">Ejemplo</string>
+    <string name="settings_cover_download_url_example_hint">Toca para pegar ambas URL de ejemplo. Mantén pulsado para copiarlas.</string>
+    <string name="settings_cover_download_url_copied">URL de ejemplo copiadas.</string>
+    <string name="settings_help_cover_art_style">Elige el tipo de carátula predeterminado que se utilizará al descargar imágenes. Las carátulas planas coinciden con el aspecto clásico de la parte frontal de la caja, mientras que Caja 3D utiliza renderizados de cajas en ángulo cuando la fuente los proporciona. Las carátulas en 3D pueden verse más espectaculares, pero la disponibilidad puede ser un poco peor que la del arte plano.</string>
 </resources>

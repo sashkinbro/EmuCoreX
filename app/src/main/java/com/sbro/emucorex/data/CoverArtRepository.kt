@@ -11,7 +11,8 @@ class CoverArtRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "CoverArtRepository"
-        private const val COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
+        const val DEFAULT_COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
+        const val DEFAULT_COVER_3D_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d"
         private const val CONNECT_TIMEOUT_MS = 10000
         private const val READ_TIMEOUT_MS = 15000
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
@@ -24,16 +25,36 @@ class CoverArtRepository(private val context: Context) {
         }
     }
 
+    fun clearCache() {
+        cacheDirectory.listFiles().orEmpty().forEach { file ->
+            runCatching { file.delete() }
+        }
+    }
+
     fun findCachedCoverPath(serial: String?): String? {
+        if (resolveCoverArtStyle() == AppPreferences.COVER_ART_STYLE_DISABLED) {
+            return null
+        }
         val normalizedSerial = normalizeSerial(serial)
         if (normalizedSerial == null) {
             Log.d(TAG, "No serial provided")
             return null
         }
-        val coverFile = File(cacheDirectory, "$normalizedSerial.jpg")
-        val exists = coverFile.exists()
-        Log.d(TAG, "Cached cover for $normalizedSerial: ${if (exists) "FOUND" else "NOT FOUND"}")
-        return coverFile.takeIf(File::exists)?.absolutePath
+        val style = resolveCoverArtStyle()
+        val preferredFiles = if (style == AppPreferences.COVER_ART_STYLE_3D) {
+            listOf(
+                File(cacheDirectory, "${normalizedSerial}_3d.png"),
+                File(cacheDirectory, "${normalizedSerial}_3d.jpg")
+            )
+        } else {
+            listOf(
+                File(cacheDirectory, "$normalizedSerial.jpg"),
+                File(cacheDirectory, "$normalizedSerial.png")
+            )
+        }
+        val found = preferredFiles.firstOrNull(File::exists)
+        Log.d(TAG, "Cached cover for $normalizedSerial (style=$style): ${if (found != null) "FOUND" else "NOT FOUND"}")
+        return found?.absolutePath
     }
 
     fun findCachedCoverUri(serial: String?): String? {
@@ -41,42 +62,66 @@ class CoverArtRepository(private val context: Context) {
     }
 
     fun downloadCover(serial: String?): String? {
+        if (resolveCoverArtStyle() == AppPreferences.COVER_ART_STYLE_DISABLED) {
+            Log.d(TAG, "Cover download skipped: cover art style is disabled")
+            return null
+        }
         val normalizedSerial = normalizeSerial(serial)
         if (normalizedSerial == null) {
             Log.w(TAG, "Cannot download cover: invalid serial '$serial'")
             return null
         }
+        val coverBaseUrl = resolveCoverBaseUrl()
+        val style = resolveCoverArtStyle()
+        val targetExtension = if (style == AppPreferences.COVER_ART_STYLE_3D) "png" else "jpg"
 
         Log.d(TAG, "========== COVER DOWNLOAD START ==========")
         Log.d(TAG, "Original serial: $serial")
         Log.d(TAG, "Normalized serial: $normalizedSerial")
+        Log.d(TAG, "Cover base URL: $coverBaseUrl")
+        Log.d(TAG, "Cover style: $style")
 
-        val coverFile = File(cacheDirectory, "$normalizedSerial.jpg")
+        val coverFile = File(cacheDirectory, cacheFileName(normalizedSerial, style, targetExtension))
         if (coverFile.exists()) {
             Log.d(TAG, "Cover already exists: ${coverFile.absolutePath}")
             Log.d(TAG, "========== COVER DOWNLOAD END (CACHED) ==========")
             return coverFile.absolutePath
         }
 
-        val missFile = File(cacheDirectory, "$normalizedSerial.miss")
+        val missFile = File(cacheDirectory, cacheMissFileName(normalizedSerial, style))
         if (missFile.exists() && System.currentTimeMillis() - missFile.lastModified() < MISS_TTL_MS) {
             Log.d(TAG, "Recent miss marker found, skipping (age: ${System.currentTimeMillis() - missFile.lastModified()}ms)")
             Log.d(TAG, "========== COVER DOWNLOAD END (MISS CACHED) ==========")
             return null
         }
 
-        Log.d(TAG, "Trying primary source: $COVER_BASE_URL/$normalizedSerial.jpg")
-        var result = downloadFromUrl("$COVER_BASE_URL/$normalizedSerial.jpg", coverFile, missFile, "Primary")
+        val extensionsToTry = if (style == AppPreferences.COVER_ART_STYLE_3D) listOf("png", "jpg") else listOf("jpg", "png")
+        var result: String? = null
+        for (extension in extensionsToTry) {
+            val targetFile = File(cacheDirectory, cacheFileName(normalizedSerial, style, extension))
+            Log.d(TAG, "Trying primary source: $coverBaseUrl/$normalizedSerial.$extension")
+            result = downloadFromUrl("$coverBaseUrl/$normalizedSerial.$extension", targetFile, missFile, "Primary")
+            if (result != null) {
+                break
+            }
+        }
         
         if (result == null) {
             val alternativeSerial = normalizedSerial.replace("-", "")
             if (alternativeSerial != normalizedSerial) {
                 Log.d(TAG, "Trying alternative serial format: $alternativeSerial")
-                val altCoverFile = File(cacheDirectory, "$alternativeSerial.jpg")
-                result = downloadFromUrl("$COVER_BASE_URL/$alternativeSerial.jpg", altCoverFile, missFile, "Alternative")
-                if (result != null) {
-                    altCoverFile.renameTo(coverFile)
-                    result = coverFile.absolutePath
+                for (extension in extensionsToTry) {
+                    val altCoverFile = File(cacheDirectory, cacheFileName(alternativeSerial, style, extension))
+                    result = downloadFromUrl("$coverBaseUrl/$alternativeSerial.$extension", altCoverFile, missFile, "Alternative")
+                    if (result != null) {
+                        val finalFile = File(cacheDirectory, cacheFileName(normalizedSerial, style, extension))
+                        if (altCoverFile.absolutePath != finalFile.absolutePath) {
+                            if (finalFile.exists()) finalFile.delete()
+                            altCoverFile.renameTo(finalFile)
+                        }
+                        result = finalFile.absolutePath
+                        break
+                    }
                 }
             }
         }
@@ -180,6 +225,48 @@ class CoverArtRepository(private val context: Context) {
         
         return (formatted ?: cleanSerial.replace(Regex("[^A-Z0-9_-]"), ""))
             .also { Log.d(TAG, "Normalized: '$serial' -> '$it'") }
+    }
+
+    private fun resolveCoverBaseUrl(): String {
+        val preferences = AppPreferences(context)
+        val configuredUrls = preferences.getCoverDownloadBaseUrlSync()
+            ?.split(Regex("\\s+"))
+            ?.map { it.trim().trimEnd('/') }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+        val style = preferences.getCoverArtStyleSync()
+        if (configuredUrls.isNotEmpty()) {
+            return if (style == AppPreferences.COVER_ART_STYLE_3D) {
+                configuredUrls.getOrNull(1) ?: configuredUrls.first()
+            } else {
+                configuredUrls.first()
+            }
+        }
+        return if (style == AppPreferences.COVER_ART_STYLE_3D) {
+            DEFAULT_COVER_3D_BASE_URL
+        } else {
+            DEFAULT_COVER_BASE_URL
+        }
+    }
+
+    private fun resolveCoverArtStyle(): Int {
+        return AppPreferences(context).getCoverArtStyleSync()
+    }
+
+    private fun cacheFileName(serial: String, style: Int, extension: String): String {
+        return if (style == AppPreferences.COVER_ART_STYLE_3D) {
+            "${serial}_3d.$extension"
+        } else {
+            "$serial.$extension"
+        }
+    }
+
+    private fun cacheMissFileName(serial: String, style: Int): String {
+        return if (style == AppPreferences.COVER_ART_STYLE_3D) {
+            "${serial}_3d.miss"
+        } else {
+            "$serial.miss"
+        }
     }
 
 }

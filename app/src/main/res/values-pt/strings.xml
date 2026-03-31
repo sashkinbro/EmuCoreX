@@ -770,5 +770,30 @@
     <string name="settings_help_force_even_sprite_position">Alinha as posições dos sprites a coordenadas pares para reduzir pequenas lacunas ou tremulações entre os pixels em resoluções mais altas. Útil para jogos com foco em 2D, mas pode deslocar levemente alguns elementos.</string>
     <string name="settings_help_native_palette_draw">Desenha efeitos baseados em paleta mais perto da precisão nativa. Isso pode reparar efeitos indexados por cores, sombras de paleta ou outros truques intensos de CLUT que quebram ao serem aumentados (upscaled), mas também pode fazer com que a saída de alta resolução pareça menos limpa.</string>
     <string name="settings_help_bilinear_filtering">Controla o modo principal de filtragem de textura usado pelo renderizador. "Mais próximo" (Nearest) mantém a aparência original mais nítida, "PS2" fica mais próximo do comportamento original do console, e os modos "Forçados" suavizam de forma mais agressiva. Se um jogo parecer muito quadriculado ou muito desfocado, esta é a primeira opção de filtragem a ser ajustada.</string>
-
+    <string name="settings_help_bios_path">Direciona o EmuCoreX para a pasta que contém seus arquivos de BIOS do PS2. Um dump limpo do seu próprio console é a melhor escolha. O aplicativo pode detectar arquivos comuns relacionados à BIOS, como .bin, .rom, .mec, .nvm e .elf, incluindo arquivos ROM complementares como ROM0, ROM1, ROM2 e EROM quando estiverem presentes.</string>
+    <string name="settings_help_game_path">Seleciona a pasta da biblioteca que o EmuCoreX escaneia em busca de jogos. A varredura é recursiva, portanto as subpastas não são problema. Imagens suportadas incluem .iso, .bin, .chd, .cso e .gz. ISO é a base mais segura, enquanto CHD costuma ser o melhor formato a longo prazo porque economiza espaço sem abrir mão do uso normal.</string>
+    <string name="settings_help_cover_download_url">Substitui a fonte de capas integrada usada para downloads automáticos. A URL deve apontar diretamente para uma pasta que contenha capas em JPG nomeadas pelo número de série do jogo, por exemplo SLUS-20312.jpg. Altere isso apenas se você hospedar seu próprio servidor espelho (mirror) ou quiser usar uma biblioteca de capas compatível diferente.</string>
+    <string name="settings_cover_download_url">URL de download de capas</string>
+    <string name="settings_cover_download_url_dialog_title">Fonte de capas personalizada</string>
+    <string name="settings_cover_download_url_dialog_body">Substitua a fonte de capas padrão pela sua própria URL base direta. Deixe em branco para usar a fonte integrada novamente.</string>
+    <string name="settings_cover_download_url_use_default">Usar padrão</string>
+    <string name="settings_cover_download_url_invalid">Insira um URL HTTP ou HTTPS válido.</string>
+    <string name="settings_covers_tab">Capas</string>
+    <string name="settings_search">Pesquisar configurações</string>
+    <string name="settings_search_subtitle">Encontrar uma configuração pelo nome</string>
+    <string name="settings_search_placeholder">Pesquisar configurações</string>
+    <string name="settings_search_results_title">Resultados da pesquisa</string>
+    <string name="settings_search_no_results">Nenhuma configuração correspondente encontrada.</string>
+    <string name="settings_cover_art_style">Estilo da capa</string>
+    <string name="settings_cover_art_style_off">Desligado</string>
+    <string name="settings_cover_art_style_flat">Plana</string>
+    <string name="settings_cover_art_style_3d">Caixa 3D</string>
+    <string name="settings_cover_download_url_builtin">Fonte integrada</string>
+    <string name="settings_cover_download_url_custom">Fonte personalizada</string>
+    <string name="settings_cover_download_url_disabled">Desativado</string>
+    <string name="settings_cover_download_url_placeholder">https://example.com/covers/default https://example.com/covers/3d</string>
+    <string name="settings_cover_download_url_example">Exemplo</string>
+    <string name="settings_cover_download_url_example_hint">Toque para colar os dois URLs de exemplo. Pressione e segure para copiá-los.</string>
+    <string name="settings_cover_download_url_copied">URLs de exemplo copiados.</string>
+    <string name="settings_help_cover_art_style">Escolhe o tipo de capa padrão usado ao baixar as artes. Capas planas correspondem à aparência clássica da frente da caixa, enquanto Caixa 3D usa renderizações de caixas anguladas quando a fonte as fornece. Capas 3D podem parecer mais dramáticas, mas a disponibilidade pode ser um pouco menor do que a arte plana.</string>
 </resources>

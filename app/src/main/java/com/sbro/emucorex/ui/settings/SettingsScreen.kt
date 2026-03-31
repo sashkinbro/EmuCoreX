@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.settings
 
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -41,11 +42,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
@@ -114,6 +117,7 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatFileEntry
+import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettingsRepository
@@ -130,7 +134,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Paths, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
+    General, Graphics, Controls, Paths, Covers, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -160,6 +164,10 @@ fun SettingsScreen(
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
     var showTopBarMenu by remember { mutableStateOf(false) }
     var showResetAllSettingsDialog by remember { mutableStateOf(false) }
+    var showCoverUrlDialog by remember { mutableStateOf(false) }
+    var pendingCoverUrl by remember { mutableStateOf("") }
+    var searchEnabled by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val selectedTabFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
     val scope = rememberCoroutineScope()
@@ -306,6 +314,13 @@ fun SettingsScreen(
                     onSelected = { selectedTab = it },
                     topInset = 0.dp,
                     selectedTabFocusRequester = selectedTabFocusRequester,
+                    searchEnabled = searchEnabled,
+                    searchQuery = searchQuery,
+                    onSearchEnabledChange = {
+                        searchEnabled = it
+                        if (!it) searchQuery = ""
+                    },
+                    onSearchQueryChange = { searchQuery = it },
                     modifier = Modifier.width(if (isWide) 216.dp else 188.dp)
                 )
                 SettingsContent(
@@ -314,6 +329,10 @@ fun SettingsScreen(
                     context = context,
                     launchBiosPicker = launchBiosPicker,
                     launchGamePicker = launchGamePicker,
+                    onOpenCoverUrlEditor = {
+                        pendingCoverUrl = uiState.coverDownloadBaseUrl.orEmpty()
+                        showCoverUrlDialog = true
+                    },
                     launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
                     launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
                     launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
@@ -328,6 +347,12 @@ fun SettingsScreen(
                         cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
                     },
                     onRequestGamepadBinding = { pendingGamepadActionId = it },
+                    searchQuery = searchQuery,
+                    onSearchResultSelected = { tab ->
+                        selectedTab = tab
+                        searchEnabled = false
+                        searchQuery = ""
+                    },
                     onEditControlsClick = onEditControlsClick,
                     viewModel = viewModel,
                     topInset = 0.dp,
@@ -342,7 +367,7 @@ fun SettingsScreen(
             ) {
                 SettingsCompactTopBar(
                     title = stringResource(R.string.settings_title),
-                    subtitle = selectedTab.label(),
+                    subtitle = if (searchEnabled) stringResource(R.string.settings_search_subtitle) else selectedTab.label(),
                     topInset = topInset,
                     onBackClick = onBackClick,
                     menuExpanded = showTopBarMenu,
@@ -350,7 +375,14 @@ fun SettingsScreen(
                     onResetAllSettingsClick = {
                         showTopBarMenu = false
                         showResetAllSettingsDialog = true
-                    }
+                    },
+                    searchEnabled = searchEnabled,
+                    searchQuery = searchQuery,
+                    onSearchEnabledChange = {
+                        searchEnabled = it
+                        if (!it) searchQuery = ""
+                    },
+                    onSearchQueryChange = { searchQuery = it }
                 )
 
                 SettingsTabRow(
@@ -368,6 +400,10 @@ fun SettingsScreen(
                     context = context,
                     launchBiosPicker = launchBiosPicker,
                     launchGamePicker = launchGamePicker,
+                    onOpenCoverUrlEditor = {
+                        pendingCoverUrl = uiState.coverDownloadBaseUrl.orEmpty()
+                        showCoverUrlDialog = true
+                    },
                     launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
                     launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
                     launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
@@ -382,6 +418,12 @@ fun SettingsScreen(
                         cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
                     },
                     onRequestGamepadBinding = { pendingGamepadActionId = it },
+                    searchQuery = searchQuery,
+                    onSearchResultSelected = { tab ->
+                        selectedTab = tab
+                        searchEnabled = false
+                        searchQuery = ""
+                    },
                     onEditControlsClick = onEditControlsClick,
                     viewModel = viewModel,
                     topInset = 0.dp,
@@ -474,6 +516,120 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showCoverUrlDialog) {
+        val coverUrlFocusRequester = remember { FocusRequester() }
+        val exampleBundle = remember {
+            "${CoverArtRepository.DEFAULT_COVER_BASE_URL} ${CoverArtRepository.DEFAULT_COVER_3D_BASE_URL}"
+        }
+        LaunchedEffect(showCoverUrlDialog) {
+            if (showCoverUrlDialog) {
+                coverUrlFocusRequester.requestFocus()
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showCoverUrlDialog = false },
+            title = {
+                Text(stringResource(R.string.settings_cover_download_url_dialog_title))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_cover_download_url_dialog_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = pendingCoverUrl,
+                        onValueChange = { pendingCoverUrl = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(coverUrlFocusRequester),
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = RoundedCornerShape(18.dp),
+                        label = { Text(stringResource(R.string.settings_cover_download_url)) },
+                        placeholder = { Text(stringResource(R.string.settings_cover_download_url_placeholder)) }
+                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_cover_download_url_example),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            CoverUrlExampleRow(
+                                label = stringResource(R.string.settings_cover_download_url_example_hint),
+                                onClick = {
+                                    pendingCoverUrl = exampleBundle
+                                    scope.launch { coverUrlFocusRequester.requestFocus() }
+                                },
+                                onLongClick = {
+                                    val clipboardManager = context.getSystemService(android.content.ClipboardManager::class.java)
+                                    clipboardManager?.setPrimaryClip(
+                                        ClipData.newPlainText("cover_urls", exampleBundle)
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.settings_cover_download_url_copied),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parts = pendingCoverUrl.trim()
+                            .split(Regex("\\s+"))
+                            .filter { it.isNotBlank() }
+                        val value = parts.joinToString(" ")
+                        val hasInvalidPart = parts.any {
+                            !it.startsWith("http://") && !it.startsWith("https://")
+                        }
+                        if (hasInvalidPart || parts.size > 2) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_cover_download_url_invalid),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            return@TextButton
+                        }
+                        viewModel.setCoverDownloadBaseUrl(value.ifBlank { null })
+                        showCoverUrlDialog = false
+                    }
+                ) {
+                    Text(stringResource(R.string.save))
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            pendingCoverUrl = ""
+                            viewModel.setCoverDownloadBaseUrl(null)
+                            showCoverUrlDialog = false
+                        }
+                    ) {
+                        Text(stringResource(R.string.settings_cover_download_url_use_default))
+                    }
+                    TextButton(onClick = { showCoverUrlDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -484,7 +640,11 @@ private fun SettingsCompactTopBar(
     onBackClick: (() -> Unit)?,
     menuExpanded: Boolean,
     onMenuExpandedChange: (Boolean) -> Unit,
-    onResetAllSettingsClick: () -> Unit
+    onResetAllSettingsClick: () -> Unit,
+    searchEnabled: Boolean,
+    searchQuery: String,
+    onSearchEnabledChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -519,19 +679,37 @@ private fun SettingsCompactTopBar(
                     .weight(1f)
                     .padding(start = 4.dp, end = 8.dp)
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                if (searchEnabled) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(18.dp),
+                        placeholder = { Text(stringResource(R.string.settings_search_placeholder)) }
+                    )
+                } else {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            IconButton(onClick = { onSearchEnabledChange(!searchEnabled) }) {
+                Icon(
+                    imageVector = if (searchEnabled) Icons.Rounded.Close else Icons.Rounded.Search,
+                    contentDescription = stringResource(R.string.settings_search),
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
             Box {
@@ -563,6 +741,10 @@ private fun SettingsTabRail(
     onSelected: (SettingsTab) -> Unit,
     topInset: androidx.compose.ui.unit.Dp,
     selectedTabFocusRequester: FocusRequester,
+    searchEnabled: Boolean,
+    searchQuery: String,
+    onSearchEnabledChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val tabs = remember { SettingsTab.entries.toList() }
@@ -583,12 +765,46 @@ private fun SettingsTabRail(
                 Spacer(modifier = Modifier.height(topInset))
             }
             item(key = "title") {
-                Text(
-                    text = stringResource(R.string.settings_title),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-                )
+                if (searchEnabled) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 8.dp),
+                        singleLine = true,
+                        shape = RoundedCornerShape(18.dp),
+                        placeholder = { Text(stringResource(R.string.settings_search_placeholder)) },
+                        trailingIcon = {
+                            IconButton(onClick = { onSearchEnabledChange(false) }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = stringResource(R.string.settings_search)
+                                )
+                            }
+                        }
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.settings_title),
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { onSearchEnabledChange(true) }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = stringResource(R.string.settings_search)
+                            )
+                        }
+                    }
+                }
             }
             items(items = tabs, key = { it.name }) { tab ->
                 FilterChip(
@@ -653,9 +869,11 @@ private fun SettingsTabRow(
 private fun SettingsContent(
     uiState: SettingsUiState,
     selectedTab: SettingsTab,
+    searchQuery: String,
     context: android.content.Context,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
+    onOpenCoverUrlEditor: () -> Unit,
     launchDriverPicker: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
@@ -664,6 +882,7 @@ private fun SettingsContent(
     cheatEntries: List<CheatFileEntry>,
     onOpenCheatEditor: (String) -> Unit,
     onRequestGamepadBinding: (String) -> Unit,
+    onSearchResultSelected: (SettingsTab) -> Unit,
     onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel,
     topInset: androidx.compose.ui.unit.Dp,
@@ -672,6 +891,7 @@ private fun SettingsContent(
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
+    val searchEntries = rememberSettingsSearchEntries()
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -684,7 +904,13 @@ private fun SettingsContent(
                 .padding(top = topInset + 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            when (selectedTab) {
+            if (searchQuery.isNotBlank()) {
+                SettingsSearchResults(
+                    query = searchQuery,
+                    entries = searchEntries,
+                    onOpen = onSearchResultSelected
+                )
+            } else when (selectedTab) {
                 SettingsTab.General -> {
                     SettingsSection(title = stringResource(R.string.settings_general_tab)) {
                         SettingsItem(
@@ -976,13 +1202,15 @@ private fun SettingsContent(
                             icon = Icons.Rounded.Memory,
                             label = stringResource(R.string.settings_bios_path),
                             value = biosDisplayName,
-                            onClick = launchBiosPicker
+                            onClick = launchBiosPicker,
+                            helpText = stringResource(R.string.settings_help_bios_path)
                         )
                         SettingsItem(
                             icon = Icons.Rounded.FolderOpen,
                             label = stringResource(R.string.settings_game_path),
                             value = gameDisplayName,
-                            onClick = launchGamePicker
+                            onClick = launchGamePicker,
+                            helpText = stringResource(R.string.settings_help_game_path)
                         )
                         SettingsItem(
                             icon = Icons.Rounded.Tune,
@@ -995,6 +1223,40 @@ private fun SettingsContent(
                                 text = stringResource(R.string.settings_gpu_driver_path_note)
                             )
                         }
+                    }
+                }
+
+                SettingsTab.Covers -> {
+                    val builtInCoverSourceLabel = stringResource(R.string.settings_cover_download_url_builtin)
+                    val coverDownloadDisabledLabel = stringResource(R.string.settings_cover_download_url_disabled)
+                    val customCoverSourceLabel = stringResource(R.string.settings_cover_download_url_custom)
+                    val coverUrlDisplay = if (!uiState.coverDownloadBaseUrl.isNullOrBlank()) {
+                        customCoverSourceLabel
+                    } else if (uiState.coverArtStyle == AppPreferences.COVER_ART_STYLE_DISABLED) {
+                        coverDownloadDisabledLabel
+                    } else {
+                        builtInCoverSourceLabel
+                    }
+                    SettingsSection(title = stringResource(R.string.settings_covers_tab)) {
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_cover_art_style),
+                            options = listOf(
+                                AppPreferences.COVER_ART_STYLE_DISABLED to stringResource(R.string.settings_cover_art_style_off),
+                                AppPreferences.COVER_ART_STYLE_DEFAULT to stringResource(R.string.settings_cover_art_style_flat),
+                                AppPreferences.COVER_ART_STYLE_3D to stringResource(R.string.settings_cover_art_style_3d)
+                            ),
+                            selectedValue = uiState.coverArtStyle,
+                            onSelect = viewModel::setCoverArtStyle,
+                            helpText = stringResource(R.string.settings_help_cover_art_style),
+                            onResetToDefault = { viewModel.setCoverArtStyle(AppPreferences.COVER_ART_STYLE_DISABLED) }
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.Link,
+                            label = stringResource(R.string.settings_cover_download_url),
+                            value = coverUrlDisplay,
+                            onClick = onOpenCoverUrlEditor,
+                            helpText = stringResource(R.string.settings_help_cover_download_url)
+                        )
                     }
                 }
 
@@ -1631,6 +1893,13 @@ private fun openUriInChrome(context: android.content.Context, url: String) {
     }
 }
 
+private fun normalizeSettingsSearchToken(value: String): String {
+    return value
+        .lowercase()
+        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        .trim()
+}
+
 @Composable
 private fun ThemeSelector(
     selected: ThemeMode,
@@ -1693,7 +1962,8 @@ private fun SettingsItem(
     icon: ImageVector,
     label: String,
     value: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    helpText: String? = null
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     Surface(
@@ -1725,15 +1995,153 @@ private fun SettingsItem(
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    helpText?.let {
+                        SettingHelpButton(title = label, description = it)
+                    }
+                }
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverUrlExampleRow(
+    label: String,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .gamepadFocusableCard(shape = RoundedCornerShape(14.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        )
+    }
+}
+
+private data class SettingsSearchEntry(
+    val tab: SettingsTab,
+    val title: String,
+    val summary: String
+)
+
+@Composable
+private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
+    @Composable
+    fun entry(tab: SettingsTab, @StringRes titleRes: Int): SettingsSearchEntry {
+        return SettingsSearchEntry(tab = tab, title = stringResource(titleRes), summary = tab.label())
+    }
+    return listOf(
+        entry(SettingsTab.General, R.string.settings_language),
+        entry(SettingsTab.General, R.string.settings_theme),
+        entry(SettingsTab.General, R.string.settings_keep_screen_on),
+        entry(SettingsTab.General, R.string.settings_show_recent_games),
+        entry(SettingsTab.General, R.string.settings_show_home_search),
+        entry(SettingsTab.Graphics, R.string.settings_renderer),
+        entry(SettingsTab.Graphics, R.string.settings_gpu_driver),
+        entry(SettingsTab.Graphics, R.string.settings_upscale),
+        entry(SettingsTab.Graphics, R.string.settings_aspect_ratio),
+        entry(SettingsTab.Graphics, R.string.settings_texture_filtering),
+        entry(SettingsTab.Graphics, R.string.settings_bilinear_filtering),
+        entry(SettingsTab.Graphics, R.string.settings_trilinear_filtering),
+        entry(SettingsTab.Graphics, R.string.settings_anisotropic_filtering),
+        entry(SettingsTab.Graphics, R.string.settings_fxaa),
+        entry(SettingsTab.Graphics, R.string.settings_cas),
+        entry(SettingsTab.Graphics, R.string.settings_widescreen_patches),
+        entry(SettingsTab.Graphics, R.string.settings_no_interlacing_patches),
+        entry(SettingsTab.Controls, R.string.settings_overlay_scale),
+        entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_auto),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_hide_overlay),
+        entry(SettingsTab.Controls, R.string.settings_pad_vibration),
+        entry(SettingsTab.Paths, R.string.settings_bios_path),
+        entry(SettingsTab.Paths, R.string.settings_game_path),
+        entry(SettingsTab.Paths, R.string.settings_gpu_driver_path),
+        entry(SettingsTab.Covers, R.string.settings_cover_art_style),
+        entry(SettingsTab.Covers, R.string.settings_cover_download_url),
+        entry(SettingsTab.DataTransfer, R.string.settings_backup_export_title),
+        entry(SettingsTab.DataTransfer, R.string.settings_backup_restore_title),
+        entry(SettingsTab.Performance, R.string.settings_show_fps),
+        entry(SettingsTab.Performance, R.string.settings_fps_overlay_mode),
+        entry(SettingsTab.Performance, R.string.settings_fps_overlay_position),
+        entry(SettingsTab.SpeedHacks, R.string.settings_frame_limiter),
+        entry(SettingsTab.SpeedHacks, R.string.settings_target_fps),
+        entry(SettingsTab.SpeedHacks, R.string.settings_ee_cycle_rate),
+        entry(SettingsTab.SpeedHacks, R.string.settings_ee_cycle_skip),
+        entry(SettingsTab.SpeedHacks, R.string.settings_mtvu),
+        entry(SettingsTab.SpeedHacks, R.string.settings_fast_cdvd),
+        entry(SettingsTab.Cheats, R.string.settings_enable_cheats),
+        entry(SettingsTab.Advanced, R.string.settings_hw_download_mode),
+        entry(SettingsTab.Advanced, R.string.settings_blending_accuracy),
+        entry(SettingsTab.Advanced, R.string.settings_texture_preloading),
+        entry(SettingsTab.Advanced, R.string.settings_hw_mipmapping)
+    )
+}
+
+@Composable
+private fun SettingsSearchResults(
+    query: String,
+    entries: List<SettingsSearchEntry>,
+    onOpen: (SettingsTab) -> Unit
+) {
+    val normalizedQuery = remember(query) { normalizeSettingsSearchToken(query) }
+    val filtered = remember(entries, normalizedQuery) {
+        entries.filter { entry ->
+            val haystack = normalizeSettingsSearchToken("${entry.title} ${entry.summary}")
+            haystack.contains(normalizedQuery)
+        }
+    }
+    SettingsSection(title = stringResource(R.string.settings_search_results_title)) {
+        if (filtered.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_search_no_results),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            filtered.forEach { entry ->
+                SettingsItem(
+                    icon = entry.tab.icon(),
+                    label = entry.title,
+                    value = entry.summary,
+                    onClick = { onOpen(entry.tab) }
                 )
             }
         }
@@ -2523,6 +2931,7 @@ private fun SettingsTab.label(): String {
         SettingsTab.Graphics -> stringResource(R.string.settings_graphics_tab)
         SettingsTab.Controls -> stringResource(R.string.settings_controls_tab)
         SettingsTab.Paths -> stringResource(R.string.settings_paths_tab)
+        SettingsTab.Covers -> stringResource(R.string.settings_covers_tab)
         SettingsTab.DataTransfer -> stringResource(R.string.settings_data_transfer_tab)
         SettingsTab.Performance -> stringResource(R.string.settings_performance_tab)
         SettingsTab.SpeedHacks -> stringResource(R.string.settings_speedhacks_tab)
@@ -2539,6 +2948,7 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.Graphics -> Icons.Rounded.GraphicEq
         SettingsTab.Controls -> Icons.Rounded.Gamepad
         SettingsTab.Paths -> Icons.Rounded.FolderOpen
+        SettingsTab.Covers -> Icons.Rounded.Link
         SettingsTab.DataTransfer -> Icons.Rounded.SaveAs
         SettingsTab.Performance -> Icons.Rounded.Speed
         SettingsTab.SpeedHacks -> Icons.Rounded.Speed
@@ -2553,6 +2963,7 @@ private fun String.toSettingsTab(): SettingsTab {
         "graphics" -> SettingsTab.Graphics
         "controls" -> SettingsTab.Controls
         "paths", "files" -> SettingsTab.Paths
+        "covers", "cover-art", "cover_art" -> SettingsTab.Covers
         "data_transfer", "transfer", "backup", "data-transfer" -> SettingsTab.DataTransfer
         "performance" -> SettingsTab.Performance
         "speedhacks", "speed_hacks", "speed-hacks" -> SettingsTab.SpeedHacks

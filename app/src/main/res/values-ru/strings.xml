@@ -770,5 +770,30 @@
     <string name="settings_help_force_even_sprite_position">Привязывает положения спрайтов к четным координатам, чтобы уменьшить крошечные зазоры или мерцание между пикселями при более высоких разрешениях. Полезно для игр с большим количеством 2D, но может немного сместить некоторые элементы.</string>
     <string name="settings_help_native_palette_draw">Отрисовывает эффекты на основе палитры ближе к нативной точности. Это может исправить эффекты с индексированием цветов, тени палитры или другие хитрости, интенсивно использующие CLUT, которые ломаются при масштабировании, но также может сделать изображение в высоком разрешении менее чистым.</string>
     <string name="settings_help_bilinear_filtering">Управляет основным режимом фильтрации текстур, используемым рендерером. «Ближайший» (Nearest) сохраняет наиболее четкий необработанный вид, «PS2» остается наиболее близким к оригинальному поведению консоли, а принудительные режимы сглаживают более агрессивно. Если игра выглядит слишком пиксельной или слишком размытой, это первая опция фильтрации, которую следует настроить.</string>
-
+    <string name="settings_help_bios_path">Указывает EmuCoreX на папку, содержащую файлы BIOS PS2. Чистый дамп с вашей собственной консоли — лучший выбор. Приложение может обнаруживать общие файлы, связанные с BIOS, такие как .bin, .rom, .mec, .nvm и .elf, включая сопутствующие файлы ROM, такие как ROM0, ROM1, ROM2 и EROM, если они присутствуют.</string>
+    <string name="settings_help_game_path">Выбирает папку библиотеки, которую EmuCoreX сканирует на наличие игр. Сканирование рекурсивное, поэтому подпапки также проверяются. Поддерживаемые образы включают .iso, .bin, .chd, .cso и .gz. ISO — это самая безопасная база, в то время как CHD обычно является лучшим долгосрочным форматом, поскольку он экономит место без ущерба для нормального использования.</string>
+    <string name="settings_help_cover_download_url">Переопределяет встроенный источник обложек, используемый для автоматической загрузки. URL-адрес должен указывать прямо на папку, содержащую обложки в формате JPG, названные по серийному номеру игры, например SLUS-20312.jpg. Изменяйте это только в том случае, если вы размещаете собственное зеркало или хотите использовать другую совместимую библиотеку обложек.</string>
+    <string name="settings_cover_download_url">URL-адрес загрузки обложек</string>
+    <string name="settings_cover_download_url_dialog_title">Пользовательский источник обложек</string>
+    <string name="settings_cover_download_url_dialog_body">Замените стандартный источник обложек своим собственным прямым базовым URL. Оставьте поле пустым, чтобы снова использовать встроенный источник.</string>
+    <string name="settings_cover_download_url_use_default">По умолчанию</string>
+    <string name="settings_cover_download_url_invalid">Введите действительный URL-адрес HTTP или HTTPS.</string>
+    <string name="settings_covers_tab">Обложки</string>
+    <string name="settings_search">Поиск настроек</string>
+    <string name="settings_search_subtitle">Найти настройку по имени</string>
+    <string name="settings_search_placeholder">Поиск настроек</string>
+    <string name="settings_search_results_title">Результаты поиска</string>
+    <string name="settings_search_no_results">Подходящих настроек не найдено.</string>
+    <string name="settings_cover_art_style">Стиль обложки</string>
+    <string name="settings_cover_art_style_off">Выкл.</string>
+    <string name="settings_cover_art_style_flat">Плоская</string>
+    <string name="settings_cover_art_style_3d">3D-коробка</string>
+    <string name="settings_cover_download_url_builtin">Встроенный источник</string>
+    <string name="settings_cover_download_url_custom">Пользовательский источник</string>
+    <string name="settings_cover_download_url_disabled">Отключено</string>
+    <string name="settings_cover_download_url_placeholder">https://example.com/covers/default https://example.com/covers/3d</string>
+    <string name="settings_cover_download_url_example">Пример</string>
+    <string name="settings_cover_download_url_example_hint">Нажмите, чтобы вставить оба URL-адреса для примера. Удерживайте, чтобы скопировать их.</string>
+    <string name="settings_cover_download_url_copied">Примеры URL-адресов скопированы.</string>
+    <string name="settings_help_cover_art_style">Выбирает тип обложки по умолчанию, используемый при загрузке изображений. Плоские обложки соответствуют классическому виду передней части коробки, в то время как 3D-коробка использует угловые рендеры коробок, если источник их предоставляет. 3D-обложки могут выглядеть более эффектно, но их доступность может быть немного хуже, чем у плоских изображений.</string>
 </resources>
