@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.OverlayControlLayout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +19,8 @@ data class ControlsLayoutState(
     val lbtnOffset: Pair<Float, Float> = 0f to 0f,
     val rbtnOffset: Pair<Float, Float> = 0f to 0f,
     val centerOffset: Pair<Float, Float> = 0f to 0f,
-    val stickScale: Int = 100
+    val stickScale: Int = 100,
+    val controlLayouts: Map<String, OverlayControlLayout> = emptyMap()
 )
 
 class ControlsEditorViewModel(application: Application) : AndroidViewModel(application) {
@@ -29,24 +31,18 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         viewModelScope.launch {
-            val dpad = preferences.dpadOffset.first()
-            val lstick = preferences.lstickOffset.first()
-            val rstick = preferences.rstickOffset.first()
-            val action = preferences.actionOffset.first()
-            val lbtn = preferences.lbtnOffset.first()
-            val rbtn = preferences.rbtnOffset.first()
-            val center = preferences.centerOffset.first()
-            val scale = preferences.stickScale.first()
+            val snapshot = preferences.overlayLayoutSnapshot.first()
             
             _layoutState.value = ControlsLayoutState(
-                dpadOffset = dpad,
-                lstickOffset = lstick,
-                rstickOffset = rstick,
-                actionOffset = action,
-                lbtnOffset = lbtn,
-                rbtnOffset = rbtn,
-                centerOffset = center,
-                stickScale = scale
+                dpadOffset = snapshot.dpadOffset,
+                lstickOffset = snapshot.lstickOffset,
+                rstickOffset = snapshot.rstickOffset,
+                actionOffset = snapshot.actionOffset,
+                lbtnOffset = snapshot.lbtnOffset,
+                rbtnOffset = snapshot.rbtnOffset,
+                centerOffset = snapshot.centerOffset,
+                stickScale = snapshot.stickScale,
+                controlLayouts = snapshot.controlLayouts
             )
         }
     }
@@ -83,7 +79,34 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
         _layoutState.value = _layoutState.value.copy(stickScale = scale)
     }
 
-    suspend fun saveLayout() {
+    fun updateControlOffset(controlId: String, offset: Pair<Float, Float>) {
+        val updated = _layoutState.value.controlLayouts.toMutableMap()
+        val current = updated[controlId] ?: OverlayControlLayout()
+        updated[controlId] = current.copy(offset = offset)
+        _layoutState.value = _layoutState.value.copy(controlLayouts = updated)
+    }
+
+    fun updateControlScale(controlId: String, scale: Int) {
+        val updated = _layoutState.value.controlLayouts.toMutableMap()
+        val current = updated[controlId] ?: OverlayControlLayout()
+        updated[controlId] = current.copy(scale = scale.coerceIn(50, 200))
+        _layoutState.value = _layoutState.value.copy(controlLayouts = updated)
+    }
+
+    fun setControlVisible(controlId: String, visible: Boolean) {
+        val updated = _layoutState.value.controlLayouts.toMutableMap()
+        val current = updated[controlId] ?: OverlayControlLayout()
+        updated[controlId] = current.copy(visible = visible)
+        _layoutState.value = _layoutState.value.copy(controlLayouts = updated)
+    }
+
+    fun resetControl(controlId: String) {
+        val updated = _layoutState.value.controlLayouts.toMutableMap()
+        updated.remove(controlId)
+        _layoutState.value = _layoutState.value.copy(controlLayouts = updated)
+    }
+
+    suspend fun saveLayout(controlLayouts: Map<String, OverlayControlLayout> = _layoutState.value.controlLayouts) {
         val s = _layoutState.value
         preferences.setControlsLayout(
             dpadX = s.dpadOffset.first, dpadY = s.dpadOffset.second,
@@ -93,7 +116,8 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
             lbtnX = s.lbtnOffset.first, lbtnY = s.lbtnOffset.second,
             rbtnX = s.rbtnOffset.first, rbtnY = s.rbtnOffset.second,
             centerX = s.centerOffset.first, centerY = s.centerOffset.second,
-            stickScaleVal = s.stickScale
+            stickScaleVal = s.stickScale,
+            controlLayouts = controlLayouts
         )
     }
     

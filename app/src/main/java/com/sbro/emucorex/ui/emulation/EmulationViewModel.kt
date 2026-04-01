@@ -17,6 +17,7 @@ import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
+import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettings
@@ -56,6 +57,7 @@ data class EmulationUiState(
     val rbtnOffset: Pair<Float, Float> = 0f to 0f,
     val centerOffset: Pair<Float, Float> = 0f to 0f,
     val stickScale: Int = 100,
+    val controlLayouts: Map<String, OverlayControlLayout> = emptyMap(),
     val fps: String = "0.0",
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
     val speedPercent: String = "100",
@@ -1683,7 +1685,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             lbtnOffset = snapshot.lbtnOffset,
             rbtnOffset = snapshot.rbtnOffset,
             centerOffset = snapshot.centerOffset,
-            stickScale = snapshot.stickScale
+            stickScale = snapshot.stickScale,
+            controlLayouts = snapshot.controlLayouts
         )
     }
 

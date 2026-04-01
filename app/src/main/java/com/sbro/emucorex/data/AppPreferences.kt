@@ -119,7 +119,14 @@ data class OverlayLayoutSnapshot(
     val lbtnOffset: Pair<Float, Float> = 0f to 0f,
     val rbtnOffset: Pair<Float, Float> = 0f to 0f,
     val centerOffset: Pair<Float, Float> = 0f to 0f,
-    val stickScale: Int = 100
+    val stickScale: Int = 100,
+    val controlLayouts: Map<String, OverlayControlLayout> = emptyMap()
+)
+
+data class OverlayControlLayout(
+    val offset: Pair<Float, Float> = 0f to 0f,
+    val scale: Int = 100,
+    val visible: Boolean = true
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -230,6 +237,7 @@ class AppPreferences(private val context: Context) {
         private val RBTN_OFFSET = stringPreferencesKey("rbtn_offset")
         private val CENTER_OFFSET = stringPreferencesKey("center_offset")
         private val STICK_SCALE = intPreferencesKey("stick_scale")
+        private val CONTROL_LAYOUTS = stringPreferencesKey("control_layouts")
     }
 
     // Theme
@@ -535,7 +543,8 @@ class AppPreferences(private val context: Context) {
                 lbtnOffset = parseOffsetStr(prefs[LBTN_OFFSET]),
                 rbtnOffset = parseOffsetStr(prefs[RBTN_OFFSET]),
                 centerOffset = parseOffsetStr(prefs[CENTER_OFFSET]),
-                stickScale = prefs[STICK_SCALE] ?: 100
+                stickScale = prefs[STICK_SCALE] ?: 100,
+                controlLayouts = decodeControlLayouts(prefs[CONTROL_LAYOUTS])
             )
         }
         .distinctUntilChanged()
@@ -1184,6 +1193,45 @@ class AppPreferences(private val context: Context) {
 
     private fun formatOffsetStr(x: Float, y: Float): String = "$x,$y"
 
+    private fun decodeControlLayouts(raw: String?): Map<String, OverlayControlLayout> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            val json = JSONObject(raw)
+            buildMap {
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val id = keys.next()
+                    val item = json.optJSONObject(id) ?: continue
+                    put(
+                        id,
+                        OverlayControlLayout(
+                            offset = (item.optDouble("x", 0.0).toFloat()) to (item.optDouble("y", 0.0).toFloat()),
+                            scale = item.optInt("scale", 100).coerceIn(50, 200),
+                            visible = item.optBoolean("visible", true)
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun encodeControlLayouts(layouts: Map<String, OverlayControlLayout>): String? {
+        if (layouts.isEmpty()) return null
+        return JSONObject().apply {
+            layouts.toSortedMap().forEach { (id, layout) ->
+                put(
+                    id,
+                    JSONObject().apply {
+                        put("x", layout.offset.first.toDouble())
+                        put("y", layout.offset.second.toDouble())
+                        put("scale", layout.scale.coerceIn(50, 200))
+                        put("visible", layout.visible)
+                    }
+                )
+            }
+        }.toString()
+    }
+
     val dpadOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[DPAD_OFFSET]) }
     val lstickOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[LSTICK_OFFSET]) }
     val rstickOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[RSTICK_OFFSET]) }
@@ -1208,7 +1256,8 @@ class AppPreferences(private val context: Context) {
         lbtnX: Float, lbtnY: Float,
         rbtnX: Float, rbtnY: Float,
         centerX: Float, centerY: Float,
-        stickScaleVal: Int
+        stickScaleVal: Int,
+        controlLayouts: Map<String, OverlayControlLayout> = emptyMap()
     ) {
         context.dataStore.edit { prefs ->
             prefs[DPAD_OFFSET] = formatOffsetStr(dpadX, dpadY)
@@ -1219,6 +1268,7 @@ class AppPreferences(private val context: Context) {
             prefs[RBTN_OFFSET] = formatOffsetStr(rbtnX, rbtnY)
             prefs[CENTER_OFFSET] = formatOffsetStr(centerX, centerY)
             prefs[STICK_SCALE] = stickScaleVal.coerceIn(50, 200)
+            encodeControlLayouts(controlLayouts)?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
         }
     }
 
@@ -1232,6 +1282,7 @@ class AppPreferences(private val context: Context) {
             prefs.remove(RBTN_OFFSET)
             prefs.remove(CENTER_OFFSET)
             prefs.remove(STICK_SCALE)
+            prefs.remove(CONTROL_LAYOUTS)
         }
     }
 
@@ -1321,6 +1372,7 @@ class AppPreferences(private val context: Context) {
             put("rbtnOffset", prefs[RBTN_OFFSET])
             put("centerOffset", prefs[CENTER_OFFSET])
             put("stickScale", prefs[STICK_SCALE] ?: 100)
+            put("controlLayouts", prefs[CONTROL_LAYOUTS])
             put("memoryCardSlot1", prefs[MEMORY_CARD_SLOT1])
             put("memoryCardSlot2", prefs[MEMORY_CARD_SLOT2])
         }
@@ -1422,6 +1474,7 @@ class AppPreferences(private val context: Context) {
             json.optString("rbtnOffset").takeIf { it.isNotBlank() }?.let { prefs[RBTN_OFFSET] = it } ?: prefs.remove(RBTN_OFFSET)
             json.optString("centerOffset").takeIf { it.isNotBlank() }?.let { prefs[CENTER_OFFSET] = it } ?: prefs.remove(CENTER_OFFSET)
             prefs[STICK_SCALE] = json.optInt("stickScale", 100)
+            json.optString("controlLayouts").takeIf { it.isNotBlank() }?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
             json.optString("memoryCardSlot1").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT1] = it } ?: prefs.remove(MEMORY_CARD_SLOT1)
             json.optString("memoryCardSlot2").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT2] = it } ?: prefs.remove(MEMORY_CARD_SLOT2)
         }

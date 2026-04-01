@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -92,11 +93,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
@@ -129,6 +133,7 @@ import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
+import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -174,6 +179,12 @@ private enum class EmulationMenuTab {
     Basic,
     Advanced
 }
+
+private val OverlayShoulderTopPaddingLandscape = 18.dp
+private val OverlayRightShoulderBaseOffset = (-112).dp
+private val OverlayCenterWideGap = 22.dp
+private val OverlayCenterRowGap = 8.dp
+private val OverlayCenterBottomLift = 58.dp
 
 private data class LiveSelectionOption(
     val value: Int,
@@ -250,6 +261,7 @@ fun EmulationScreen(
     var showGamepadMappingDialog by remember { mutableStateOf(false) }
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
     var showOverlayShortcut by remember { mutableStateOf(false) }
+    var resumeAfterEditor by remember { mutableStateOf(false) }
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
     var lastTapX by remember { mutableFloatStateOf(0f) }
     var lastTapY by remember { mutableFloatStateOf(0f) }
@@ -325,6 +337,16 @@ fun EmulationScreen(
         } else if (showOverlayShortcut) {
             delay(2200)
             showOverlayShortcut = false
+        }
+    }
+
+    LaunchedEffect(showControlsEditor) {
+        if (showControlsEditor && !uiState.isPaused) {
+            resumeAfterEditor = true
+            viewModel.togglePause()
+        } else if (!showControlsEditor && resumeAfterEditor && uiState.isPaused) {
+            resumeAfterEditor = false
+            viewModel.togglePause()
         }
     }
 
@@ -695,6 +717,7 @@ fun EmulationScreen(
                 lbtnOffset = uiState.lbtnOffset,
                 rbtnOffset = uiState.rbtnOffset,
                 centerOffset = uiState.centerOffset,
+                controlLayouts = uiState.controlLayouts,
                 onPadInput = { keyCode, range, pressed ->
                     viewModel.onPadInput(keyCode, range, pressed)
                 },
@@ -988,8 +1011,20 @@ fun EmulationScreen(
     }
 
     if (pendingGamepadActionId != null) {
+        val dialogFocusRequester = remember { FocusRequester() }
+
+        LaunchedEffect(Unit) {
+            dialogFocusRequester.requestFocus()
+        }
+
         AlertDialog(
             onDismissRequest = { pendingGamepadActionId = null },
+            modifier = Modifier
+                .focusRequester(dialogFocusRequester)
+                .focusable()
+                .onPreviewKeyEvent { keyEvent ->
+                    GamepadManager.handleBindingCapture(keyEvent.nativeKeyEvent)
+                },
             title = { Text(stringResource(R.string.settings_gamepad_mapping_listening_title)) },
             text = {
                 Text(
@@ -1080,6 +1115,7 @@ private fun OnScreenControls(
     lbtnOffset: Pair<Float, Float>,
     rbtnOffset: Pair<Float, Float>,
     centerOffset: Pair<Float, Float>,
+    controlLayouts: Map<String, OverlayControlLayout>,
     onPadInput: (Int, Int, Boolean) -> Unit,
     onPadInputs: (IntArray, FloatArray) -> Unit
 ) {
@@ -1106,30 +1142,80 @@ private fun OnScreenControls(
     val baseBottomPad = if (isLandscape) 24.dp else 36.dp
     val edgePadStart = baseEdgePad + safeHorizontalInset
     val edgePadEnd = baseEdgePad + safeHorizontalInset
-    val edgePadTop = maxOf(8.dp, safeTop)
+    val edgePadTop = maxOf(OverlayShoulderTopPaddingLandscape, safeTop + 4.dp)
     val bottomPad = baseBottomPad + safeBottom
+    fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
+        return controlLayouts[id] ?: OverlayControlLayout(scale = defaultScale)
+    }
 
     Box(modifier = modifier) {
-        Row(
+        Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = edgePadTop + 4.dp, start = edgePadStart)
-                .offset { IntOffset(lbtnOffset.first.roundToInt(), lbtnOffset.second.roundToInt()) },
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(top = edgePadTop, start = edgePadStart)
+                .offset { IntOffset(lbtnOffset.first.roundToInt(), lbtnOffset.second.roundToInt()) }
         ) {
-            ShoulderButton("L2", shoulderW, shoulderH) { pressed -> onPadInput(PadKey.L2, 0, pressed) }
-            ShoulderButton("L1", shoulderW, shoulderH) { pressed -> onPadInput(PadKey.L1, 0, pressed) }
+            val gap = 8.dp
+            val l2 = layoutFor("l2")
+            val l1 = layoutFor("l1")
+            if (l2.visible) {
+                ShoulderButton(
+                    label = "L2",
+                    width = shoulderW * (l2.scale / 100f),
+                    height = shoulderH * (l2.scale / 100f),
+                    modifier = Modifier.offset { IntOffset(l2.offset.first.roundToInt(), l2.offset.second.roundToInt()) }
+                ) { pressed -> onPadInput(PadKey.L2, 0, pressed) }
+            }
+            if (l1.visible) {
+                ShoulderButton(
+                    label = "L1",
+                    width = shoulderW * (l1.scale / 100f),
+                    height = shoulderH * (l1.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (shoulderW + gap).roundToPx() + l1.offset.first.roundToInt(),
+                            l1.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.L1, 0, pressed) }
+            }
         }
 
-        Row(
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = edgePadTop + 4.dp, end = edgePadEnd)
-                .offset { IntOffset(rbtnOffset.first.roundToInt(), rbtnOffset.second.roundToInt()) },
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(top = edgePadTop, end = edgePadEnd)
+                .offset { IntOffset(rbtnOffset.first.roundToInt(), rbtnOffset.second.roundToInt()) }
         ) {
-            ShoulderButton("R1", shoulderW, shoulderH) { pressed -> onPadInput(PadKey.R1, 0, pressed) }
-            ShoulderButton("R2", shoulderW, shoulderH) { pressed -> onPadInput(PadKey.R2, 0, pressed) }
+            val gap = 8.dp
+            val r1 = layoutFor("r1")
+            val r2 = layoutFor("r2")
+            if (r1.visible) {
+                ShoulderButton(
+                    label = "R1",
+                    width = shoulderW * (r1.scale / 100f),
+                    height = shoulderH * (r1.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            OverlayRightShoulderBaseOffset.roundToPx() + r1.offset.first.roundToInt(),
+                            r1.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.R1, 0, pressed) }
+            }
+            if (r2.visible) {
+                ShoulderButton(
+                    label = "R2",
+                    width = shoulderW * (r2.scale / 100f),
+                    height = shoulderH * (r2.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            OverlayRightShoulderBaseOffset.roundToPx() + (shoulderW + gap).roundToPx() + r2.offset.first.roundToInt(),
+                            r2.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.R2, 0, pressed) }
+            }
         }
 
         // Left side — D-Pad + Left Stick
@@ -1141,28 +1227,37 @@ private fun OnScreenControls(
             DPadCluster(
                 onPadInput = onPadInput,
                 clusterSize = dpadSize,
+                controlLayouts = controlLayouts,
                 modifier = Modifier
                     .padding(bottom = analogSize * 0.7f)
                     .offset { IntOffset(dpadOffset.first.roundToInt(), dpadOffset.second.roundToInt()) }
             )
-            AnalogStick(
-                analogSize = analogSize,
-                onValueChange = { x, y ->
-                    updateAnalogStick(
-                        x = x,
-                        y = y,
-                        upKey = PadKey.LeftStickUp,
-                        rightKey = PadKey.LeftStickRight,
-                        downKey = PadKey.LeftStickDown,
-                        leftKey = PadKey.LeftStickLeft,
-                        onPadInputs = onPadInputs
-                    )
-                },
-                modifier = Modifier
-                    .padding(start = dpadSize * 0.9f)
-                    .align(Alignment.BottomStart)
-                    .offset { IntOffset(lstickOffset.first.roundToInt(), lstickOffset.second.roundToInt()) }
-            )
+            val leftStick = layoutFor("left_stick", (stickScaleFactor * 100f).roundToInt())
+            if (leftStick.visible) {
+                AnalogStick(
+                    analogSize = analogSize * (leftStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
+                    onValueChange = { x, y ->
+                        updateAnalogStick(
+                            x = x,
+                            y = y,
+                            upKey = PadKey.LeftStickUp,
+                            rightKey = PadKey.LeftStickRight,
+                            downKey = PadKey.LeftStickDown,
+                            leftKey = PadKey.LeftStickLeft,
+                            onPadInputs = onPadInputs
+                        )
+                    },
+                    modifier = Modifier
+                        .padding(start = dpadSize * 0.9f)
+                        .align(Alignment.BottomStart)
+                        .offset {
+                            IntOffset(
+                                lstickOffset.first.roundToInt() + leftStick.offset.first.roundToInt(),
+                                lstickOffset.second.roundToInt() + leftStick.offset.second.roundToInt()
+                            )
+                        }
+                )
+            }
         }
 
         // Right side — Actions + Right Stick
@@ -1174,55 +1269,101 @@ private fun OnScreenControls(
             ActionCluster(
                 onPadInput = onPadInput,
                 clusterSize = actionSize,
+                controlLayouts = controlLayouts,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(bottom = analogSize * 0.7f)
                     .offset { IntOffset(actionOffset.first.roundToInt(), actionOffset.second.roundToInt()) }
             )
-            AnalogStick(
-                analogSize = analogSize,
-                onValueChange = { x, y ->
-                    updateAnalogStick(
-                        x = x,
-                        y = y,
-                        upKey = PadKey.RightStickUp,
-                        rightKey = PadKey.RightStickRight,
-                        downKey = PadKey.RightStickDown,
-                        leftKey = PadKey.RightStickLeft,
-                        onPadInputs = onPadInputs
-                    )
-                },
-                modifier = Modifier
-                    .padding(end = actionSize * 0.9f)
-                    .align(Alignment.BottomEnd)
-                    .offset { IntOffset(rstickOffset.first.roundToInt(), rstickOffset.second.roundToInt()) }
-            )
+            val rightStick = layoutFor("right_stick", (stickScaleFactor * 100f).roundToInt())
+            if (rightStick.visible) {
+                AnalogStick(
+                    analogSize = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
+                    onValueChange = { x, y ->
+                        updateAnalogStick(
+                            x = x,
+                            y = y,
+                            upKey = PadKey.RightStickUp,
+                            rightKey = PadKey.RightStickRight,
+                            downKey = PadKey.RightStickDown,
+                            leftKey = PadKey.RightStickLeft,
+                            onPadInputs = onPadInputs
+                        )
+                    },
+                    modifier = Modifier
+                        .padding(end = actionSize * 0.9f)
+                        .align(Alignment.BottomEnd)
+                        .offset {
+                            IntOffset(
+                                rstickOffset.first.roundToInt() + rightStick.offset.first.roundToInt(),
+                                rstickOffset.second.roundToInt() + rightStick.offset.second.roundToInt()
+                            )
+                        }
+                )
+            }
         }
 
-        // Center buttons
-        Column(
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPad + 6.dp)
-                .offset { IntOffset(centerOffset.first.roundToInt(), centerOffset.second.roundToInt()) },
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(bottom = bottomPad + OverlayCenterBottomLift)
+                .offset { IntOffset(centerOffset.first.roundToInt(), centerOffset.second.roundToInt()) }
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                CenterButton("SELECT", centerW * 1.25f, centerH) { pressed ->
-                    onPadInput(PadKey.Select, 0, pressed)
-                }
-                CenterButton("START", centerW * 1.25f, centerH) { pressed ->
-                    onPadInput(PadKey.Start, 0, pressed)
-                }
+            val select = layoutFor("select")
+            val start = layoutFor("start")
+            val l3 = layoutFor("l3")
+            val r3 = layoutFor("r3")
+            if (select.visible) {
+                CenterButton(
+                    label = "SELECT",
+                    width = centerW * 1.25f * (select.scale / 100f),
+                    height = centerH * (select.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (-(centerW * 1.25f + OverlayCenterWideGap / 2f)).roundToPx() + select.offset.first.roundToInt(),
+                            select.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.Select, 0, pressed) }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                CenterButton("L3", centerW, centerH) { pressed ->
-                    onPadInput(PadKey.L3, 0, pressed)
-                }
-                CenterButton("R3", centerW, centerH) { pressed ->
-                    onPadInput(PadKey.R3, 0, pressed)
-                }
+            if (start.visible) {
+                CenterButton(
+                    label = "START",
+                    width = centerW * 1.25f * (start.scale / 100f),
+                    height = centerH * (start.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (OverlayCenterWideGap / 2f).roundToPx() + start.offset.first.roundToInt(),
+                            start.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.Start, 0, pressed) }
+            }
+            if (l3.visible) {
+                CenterButton(
+                    label = "L3",
+                    width = centerW * (l3.scale / 100f),
+                    height = centerH * (l3.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (-(centerW + OverlayCenterWideGap / 2f)).roundToPx() + l3.offset.first.roundToInt(),
+                            (centerH + OverlayCenterRowGap).roundToPx() + l3.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.L3, 0, pressed) }
+            }
+            if (r3.visible) {
+                CenterButton(
+                    label = "R3",
+                    width = centerW * (r3.scale / 100f),
+                    height = centerH * (r3.scale / 100f),
+                    modifier = Modifier.offset {
+                        IntOffset(
+                            (OverlayCenterWideGap / 2f).roundToPx() + r3.offset.first.roundToInt(),
+                            (centerH + OverlayCenterRowGap).roundToPx() + r3.offset.second.roundToInt()
+                        )
+                    }
+                ) { pressed -> onPadInput(PadKey.R3, 0, pressed) }
             }
         }
     }
@@ -1247,15 +1388,20 @@ private fun updateAnalogStick(
 private fun DPadCluster(
     onPadInput: (Int, Int, Boolean) -> Unit,
     clusterSize: androidx.compose.ui.unit.Dp,
+    controlLayouts: Map<String, OverlayControlLayout>,
     modifier: Modifier = Modifier
 ) {
     val btnSize = clusterSize / 3f
 
     Box(modifier = modifier.size(clusterSize)) {
-        DPadButton("▲", Modifier.align(Alignment.TopCenter), btnSize) { pressed -> onPadInput(PadKey.Up, 0, pressed) }
-        DPadButton("▼", Modifier.align(Alignment.BottomCenter), btnSize) { pressed -> onPadInput(PadKey.Down, 0, pressed) }
-        DPadButton("◀", Modifier.align(Alignment.CenterStart), btnSize) { pressed -> onPadInput(PadKey.Left, 0, pressed) }
-        DPadButton("▶", Modifier.align(Alignment.CenterEnd), btnSize) { pressed -> onPadInput(PadKey.Right, 0, pressed) }
+        val up = controlLayouts["dpad_up"] ?: OverlayControlLayout()
+        val down = controlLayouts["dpad_down"] ?: OverlayControlLayout()
+        val left = controlLayouts["dpad_left"] ?: OverlayControlLayout()
+        val right = controlLayouts["dpad_right"] ?: OverlayControlLayout()
+        if (up.visible) DPadButton("▲", Modifier.align(Alignment.TopCenter).offset { IntOffset(up.offset.first.roundToInt(), up.offset.second.roundToInt()) }, btnSize * (up.scale / 100f)) { pressed -> onPadInput(PadKey.Up, 0, pressed) }
+        if (down.visible) DPadButton("▼", Modifier.align(Alignment.BottomCenter).offset { IntOffset(down.offset.first.roundToInt(), down.offset.second.roundToInt()) }, btnSize * (down.scale / 100f)) { pressed -> onPadInput(PadKey.Down, 0, pressed) }
+        if (left.visible) DPadButton("◀", Modifier.align(Alignment.CenterStart).offset { IntOffset(left.offset.first.roundToInt(), left.offset.second.roundToInt()) }, btnSize * (left.scale / 100f)) { pressed -> onPadInput(PadKey.Left, 0, pressed) }
+        if (right.visible) DPadButton("▶", Modifier.align(Alignment.CenterEnd).offset { IntOffset(right.offset.first.roundToInt(), right.offset.second.roundToInt()) }, btnSize * (right.scale / 100f)) { pressed -> onPadInput(PadKey.Right, 0, pressed) }
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -1270,6 +1416,7 @@ private fun DPadCluster(
 private fun ActionCluster(
     onPadInput: (Int, Int, Boolean) -> Unit,
     clusterSize: androidx.compose.ui.unit.Dp,
+    controlLayouts: Map<String, OverlayControlLayout>,
     modifier: Modifier = Modifier
 ) {
     val btnSize = clusterSize / 3.2f
@@ -1281,16 +1428,20 @@ private fun ActionCluster(
         contentAlignment = Alignment.Center
     ) {
         Box(modifier = Modifier.size(clusterSize)) {
-            ActionButton("△", Color(0xFF50D9A0), Modifier.align(Alignment.TopCenter).offset(y = -offset), btnSize) {
+            val triangle = controlLayouts["triangle"] ?: OverlayControlLayout()
+            val cross = controlLayouts["cross"] ?: OverlayControlLayout()
+            val square = controlLayouts["square"] ?: OverlayControlLayout()
+            val circle = controlLayouts["circle"] ?: OverlayControlLayout()
+            if (triangle.visible) ActionButton("△", Color(0xFF50D9A0), Modifier.align(Alignment.TopCenter).offset(y = -offset).offset { IntOffset(triangle.offset.first.roundToInt(), triangle.offset.second.roundToInt()) }, btnSize * (triangle.scale / 100f)) {
                 pressed -> onPadInput(PadKey.Triangle, 0, pressed)
             }
-            ActionButton("✕", Color(0xFF5BA8FF), Modifier.align(Alignment.BottomCenter).offset(y = offset), btnSize) {
+            if (cross.visible) ActionButton("✕", Color(0xFF5BA8FF), Modifier.align(Alignment.BottomCenter).offset(y = offset).offset { IntOffset(cross.offset.first.roundToInt(), cross.offset.second.roundToInt()) }, btnSize * (cross.scale / 100f)) {
                 pressed -> onPadInput(PadKey.Cross, 0, pressed)
             }
-            ActionButton("□", Color(0xFFA07BFF), Modifier.align(Alignment.CenterStart).offset(x = -offset), btnSize) {
+            if (square.visible) ActionButton("□", Color(0xFFA07BFF), Modifier.align(Alignment.CenterStart).offset(x = -offset).offset { IntOffset(square.offset.first.roundToInt(), square.offset.second.roundToInt()) }, btnSize * (square.scale / 100f)) {
                 pressed -> onPadInput(PadKey.Square, 0, pressed)
             }
-            ActionButton("○", Color(0xFFFF6B7A), Modifier.align(Alignment.CenterEnd).offset(x = offset), btnSize) {
+            if (circle.visible) ActionButton("○", Color(0xFFFF6B7A), Modifier.align(Alignment.CenterEnd).offset(x = offset).offset { IntOffset(circle.offset.first.roundToInt(), circle.offset.second.roundToInt()) }, btnSize * (circle.scale / 100f)) {
                 pressed -> onPadInput(PadKey.Circle, 0, pressed)
             }
         }
@@ -1302,6 +1453,7 @@ private fun ShoulderButton(
     label: String,
     width: androidx.compose.ui.unit.Dp,
     height: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
     onPressChange: (Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1311,7 +1463,7 @@ private fun ShoulderButton(
     LaunchedEffect(isPressed) { onPressChange(isPressed) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(width = width, height = height)
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .clip(RoundedCornerShape(10.dp))
@@ -1526,6 +1678,7 @@ private fun CenterButton(
     label: String,
     width: androidx.compose.ui.unit.Dp,
     height: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
     onPressChange: (Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -1535,7 +1688,7 @@ private fun CenterButton(
     LaunchedEffect(isPressed) { onPressChange(isPressed) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(width = width, height = height)
             .graphicsLayer(scaleX = scale, scaleY = scale)
             .clip(RoundedCornerShape(8.dp))

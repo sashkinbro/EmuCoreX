@@ -4,31 +4,32 @@ import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -36,11 +37,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,17 +57,70 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
-import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.data.OverlayControlLayout
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+private data class EditorControlSpec(
+    val id: String,
+    val anchor: EditorAnchor,
+    val title: String,
+    val baseOffset: Pair<Dp, Dp> = 0.dp to 0.dp,
+    val wide: Boolean = false,
+    val shape: EditorControlShape
+)
+
+private enum class EditorAnchor {
+    TopLeft, TopRight, BottomLeft, BottomRight, BottomCenter
+}
+
+private enum class EditorControlShape {
+    Dpad, Action, Stick, Shoulder, Center
+}
+
+private val EditorTopAnchorPadding = 18.dp
+private val EditorSideAnchorPadding = 28.dp
+private val EditorBottomAnchorPadding = 24.dp
+private val EditorCenterBottomPadding = 82.dp
+private val EditorRightShoulderBaseOffset = (-112).dp
+private val EditorRightShoulderGapOffset = (-39).dp
+private val EditorCenterWideLeftOffset = (-91).dp
+private val EditorCenterWideRightOffset = 11.dp
+private val EditorCenterNarrowLeftOffset = (-75).dp
+private val EditorCenterNarrowRightOffset = 11.dp
+private val EditorCenterSecondRowOffset = 40.dp
+
+@Stable
+private class EditorControlDraftState(initial: OverlayControlLayout) {
+    var offsetX by mutableFloatStateOf(initial.offset.first)
+    var offsetY by mutableFloatStateOf(initial.offset.second)
+    var scale by mutableIntStateOf(initial.scale)
+    var visible by mutableStateOf(initial.visible)
+
+    fun updateFrom(layout: OverlayControlLayout) {
+        offsetX = layout.offset.first
+        offsetY = layout.offset.second
+        scale = layout.scale
+        visible = layout.visible
+    }
+
+    fun toLayout(): OverlayControlLayout {
+        return OverlayControlLayout(
+            offset = offsetX to offsetY,
+            scale = scale,
+            visible = visible
+        )
+    }
+}
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -71,8 +131,67 @@ fun ControlsEditorScreen(
     val layoutState by viewModel.layoutState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    LocalConfiguration.current
-    LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val baseControlLayouts = remember(layoutState.controlLayouts) { layoutState.controlLayouts }
+    val dpadUpTitle = stringResource(R.string.settings_gamepad_action_dpad_up)
+    val dpadDownTitle = stringResource(R.string.settings_gamepad_action_dpad_down)
+    val dpadLeftTitle = stringResource(R.string.settings_gamepad_action_dpad_left)
+    val dpadRightTitle = stringResource(R.string.settings_gamepad_action_dpad_right)
+    val triangleTitle = stringResource(R.string.settings_gamepad_action_triangle)
+    val crossTitle = stringResource(R.string.settings_gamepad_action_cross)
+    val squareTitle = stringResource(R.string.settings_gamepad_action_square)
+    val circleTitle = stringResource(R.string.settings_gamepad_action_circle)
+    val selectTitle = stringResource(R.string.settings_gamepad_action_select)
+    val startTitle = stringResource(R.string.settings_gamepad_action_start)
+    val l3Title = stringResource(R.string.settings_gamepad_action_l3)
+    val r3Title = stringResource(R.string.settings_gamepad_action_r3)
+
+    val controls = remember(
+        dpadUpTitle, dpadDownTitle, dpadLeftTitle, dpadRightTitle,
+        triangleTitle, crossTitle, squareTitle, circleTitle,
+        selectTitle, startTitle, l3Title, r3Title
+    ) {
+        listOf(
+            EditorControlSpec("l2", EditorAnchor.TopLeft, "L2", shape = EditorControlShape.Shoulder),
+            EditorControlSpec("l1", EditorAnchor.TopLeft, "L1", baseOffset = 73.dp to 0.dp, shape = EditorControlShape.Shoulder),
+            EditorControlSpec("r1", EditorAnchor.TopRight, "R1", baseOffset = EditorRightShoulderBaseOffset to 0.dp, shape = EditorControlShape.Shoulder),
+            EditorControlSpec("r2", EditorAnchor.TopRight, "R2", baseOffset = EditorRightShoulderGapOffset to 0.dp, shape = EditorControlShape.Shoulder),
+            EditorControlSpec("dpad_up", EditorAnchor.BottomLeft, dpadUpTitle, baseOffset = 43.dp to (-140).dp, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_down", EditorAnchor.BottomLeft, dpadDownTitle, baseOffset = 43.dp to (-54).dp, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_left", EditorAnchor.BottomLeft, dpadLeftTitle, baseOffset = 0.dp to (-97).dp, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_right", EditorAnchor.BottomLeft, dpadRightTitle, baseOffset = 86.dp to (-97).dp, shape = EditorControlShape.Dpad),
+            EditorControlSpec("left_stick", EditorAnchor.BottomLeft, "Left Stick", baseOffset = 118.dp to 0.dp, shape = EditorControlShape.Stick),
+            EditorControlSpec("triangle", EditorAnchor.BottomRight, triangleTitle, baseOffset = (-43).dp to (-140).dp, shape = EditorControlShape.Action),
+            EditorControlSpec("cross", EditorAnchor.BottomRight, crossTitle, baseOffset = (-43).dp to (-54).dp, shape = EditorControlShape.Action),
+            EditorControlSpec("square", EditorAnchor.BottomRight, squareTitle, baseOffset = (-86).dp to (-97).dp, shape = EditorControlShape.Action),
+            EditorControlSpec("circle", EditorAnchor.BottomRight, circleTitle, baseOffset = 0.dp to (-97).dp, shape = EditorControlShape.Action),
+            EditorControlSpec("right_stick", EditorAnchor.BottomRight, "Right Stick", baseOffset = (-118).dp to 0.dp, shape = EditorControlShape.Stick),
+            EditorControlSpec("select", EditorAnchor.BottomCenter, selectTitle, baseOffset = EditorCenterWideLeftOffset to 0.dp, wide = true, shape = EditorControlShape.Center),
+            EditorControlSpec("start", EditorAnchor.BottomCenter, startTitle, baseOffset = EditorCenterWideRightOffset to 0.dp, wide = true, shape = EditorControlShape.Center),
+            EditorControlSpec("l3", EditorAnchor.BottomCenter, l3Title, baseOffset = EditorCenterNarrowLeftOffset to EditorCenterSecondRowOffset, shape = EditorControlShape.Center),
+            EditorControlSpec("r3", EditorAnchor.BottomCenter, r3Title, baseOffset = EditorCenterNarrowRightOffset to EditorCenterSecondRowOffset, shape = EditorControlShape.Center)
+        )
+    }
+
+    fun defaultLayoutFor(spec: EditorControlSpec): OverlayControlLayout {
+        return baseControlLayouts[spec.id]
+            ?: OverlayControlLayout(scale = if (spec.id.endsWith("stick")) layoutState.stickScale else 100)
+    }
+
+    var selectedControlId by rememberSaveable { mutableStateOf("cross") }
+    val controlDraftStates = remember(controls) {
+        controls.associate { spec ->
+            spec.id to EditorControlDraftState(defaultLayoutFor(spec))
+        }
+    }
+    LaunchedEffect(baseControlLayouts, layoutState.stickScale) {
+        controls.forEach { spec ->
+            controlDraftStates.getValue(spec.id).updateFrom(defaultLayoutFor(spec))
+        }
+    }
+    val selectedControl = controls.firstOrNull { it.id == selectedControlId } ?: controls.first()
+    val selectedLayout = controlDraftStates.getValue(selectedControl.id)
 
     LaunchedEffect(Unit) {
         val activity = context as? android.app.Activity ?: return@LaunchedEffect
@@ -87,232 +206,180 @@ fun ControlsEditorScreen(
         }
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Color(0xFF111217))
     ) {
-        maxWidth
-        maxHeight
+        val shoulderWidth = if (isLandscape) 65.dp else 72.dp
+        val shoulderHeight = if (isLandscape) 32.dp else 36.dp
+        val dpadButtonSize = if (isLandscape) 130.dp / 3f else 150.dp / 3f
+        val actionButtonSize = if (isLandscape) 130.dp / 3.2f else 150.dp / 3.2f
+        val stickSize = if (isLandscape) 120.dp else 140.dp
+        val centerWidth = if (isLandscape) 64.dp else 72.dp
+        val centerHeight = if (isLandscape) 28.dp else 32.dp
+        val wideCenterWidth = centerWidth * 1.25f
 
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(Color(0xFF1A1A1A), Color(0xFF0D0D0D))
-                    )
-                )
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
+                .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .displayCutoutPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(top = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .widthIn(min = 250.dp, max = 300.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.Black.copy(alpha = 0.78f))
+                    .padding(horizontal = 7.dp, vertical = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                NavigationBackButton(
-                    onClick = onBackClick,
-                    containerColor = Color.White.copy(alpha = 0.08f),
-                    contentColor = Color.White,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                )
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.controls_editor_title),
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
-                    )
-                }
-
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Button(
+                        onClick = onBackClick,
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(14.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedControl.title,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            controlDraftStates.getValue(selectedControl.id).visible = !selectedLayout.visible
+                        },
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (selectedLayout.visible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                viewModel.saveLayout(
+                                    buildMap {
+                                        controls.forEach { spec ->
+                                            put(spec.id, controlDraftStates.getValue(spec.id).toLayout())
+                                        }
+                                    }
+                                )
+                                onBackClick()
+                            }
+                        },
+                        modifier = Modifier.height(28.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(13.dp))
+                    }
+                }
+                Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "Size", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = Color.White.copy(alpha = 0.7f)
+                        text = "${selectedLayout.scale}%",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        modifier = Modifier.width(38.dp)
                     )
                     Slider(
-                        value = layoutState.stickScale.toFloat(),
-                        onValueChange = { viewModel.updateStickScale(it.toInt()) },
+                        value = selectedLayout.scale.toFloat(),
+                        onValueChange = {
+                            controlDraftStates.getValue(selectedControl.id).scale = it.roundToInt().coerceIn(50, 200)
+                        },
                         valueRange = 50f..200f,
-                        modifier = Modifier.width(80.dp),
-                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = MaterialTheme.colorScheme.primary)
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(max = 20.dp),
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
                     )
-                }
-
-                IconButton(
-                    onClick = { viewModel.resetLayout() },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                }
-
-                Button(
-                    onClick = { 
-                        scope.launch {
-                            try { viewModel.saveLayout(); onBackClick() } catch (_: Exception) { onBackClick() }
-                        }
-                    },
-                    modifier = Modifier.height(36.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp)
-                ) {
-                    Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.controls_editor_save), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Button(
+                        onClick = {
+                            controls.forEach { spec ->
+                                controlDraftStates.getValue(spec.id)
+                                    .updateFrom(OverlayControlLayout(scale = if (spec.id.endsWith("stick")) layoutState.stickScale else 100))
+                            }
+                            viewModel.resetLayout()
+                        },
+                        modifier = Modifier.height(24.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 1.dp)
+                    ) {
+                        Text(stringResource(R.string.controls_editor_reset), fontSize = 10.sp, maxLines = 1)
+                    }
                 }
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            DraggableControl(
-                initialOffset = layoutState.dpadOffset,
-                onOffsetChange = { viewModel.updateDpadOffset(it) },
-                modifier = Modifier.align(Alignment.BottomStart)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("D-PAD", color = Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
-                }
-            }
-            
-            // Left Stick
-            DraggableControl(
-                initialOffset = layoutState.lstickOffset,
-                onOffsetChange = { viewModel.updateLstickOffset(it) },
-                modifier = Modifier.align(Alignment.BottomStart).offset(x = 150.dp)
-            ) {
-                val size = (120 * (layoutState.stickScale / 100f)).dp
-                Box(
-                    modifier = Modifier
-                        .size(size)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("L-STICK", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
-                }
-            }
-            
-            // Right Stick
-            DraggableControl(
-                initialOffset = layoutState.rstickOffset,
-                onOffsetChange = { viewModel.updateRstickOffset(it) },
-                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-150).dp)
-            ) {
-                val size = (120 * (layoutState.stickScale / 100f)).dp
-                Box(
-                    modifier = Modifier
-                        .size(size)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("R-STICK", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
-                }
-            }
-            
-            // Actions
-            DraggableControl(
-                initialOffset = layoutState.actionOffset,
-                onOffsetChange = { viewModel.updateActionOffset(it) },
-                modifier = Modifier.align(Alignment.BottomEnd)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("ACTIONS", color = Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
-                }
-            }
-            
-            // L-Buttons (L1, L2)
-            DraggableControl(
-                initialOffset = layoutState.lbtnOffset,
-                onOffsetChange = { viewModel.updateLbtnOffset(it) },
-                modifier = Modifier.align(Alignment.TopStart).padding(top = 80.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(140.dp)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("L1 / L2", color = Color.White.copy(alpha = 0.5f))
-                }
-            }
-            
-            // R-Buttons (R1, R2)
-            DraggableControl(
-                initialOffset = layoutState.rbtnOffset,
-                onOffsetChange = { viewModel.updateRbtnOffset(it) },
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 80.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(140.dp)
-                        .height(50.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("R1 / R2", color = Color.White.copy(alpha = 0.5f))
-                }
-            }
-            
-            // Center (Start, Select)
-            DraggableControl(
-                initialOffset = layoutState.centerOffset,
-                onOffsetChange = { viewModel.updateCenterOffset(it) },
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(120.dp)
-                        .height(60.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("SELECT / START", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)
+                .fillMaxSize()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Color.White.copy(alpha = 0.018f))
+                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(22.dp))
+        ) {
+            controls.forEach { spec ->
+                key(spec.id) {
+                    val baseModifier = when (spec.anchor) {
+                        EditorAnchor.TopLeft -> Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = EditorSideAnchorPadding, top = EditorTopAnchorPadding)
+                        EditorAnchor.TopRight -> Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(end = EditorSideAnchorPadding, top = EditorTopAnchorPadding)
+                        EditorAnchor.BottomLeft -> Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = EditorSideAnchorPadding, bottom = EditorBottomAnchorPadding)
+                        EditorAnchor.BottomRight -> Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = EditorSideAnchorPadding, bottom = EditorBottomAnchorPadding)
+                        EditorAnchor.BottomCenter -> Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = EditorCenterBottomPadding)
+                    }
+                    EditorControlItem(
+                        spec = spec,
+                        controlState = controlDraftStates.getValue(spec.id),
+                        modifier = baseModifier.offset(x = spec.baseOffset.first, y = spec.baseOffset.second),
+                        selected = selectedControlId == spec.id,
+                        shoulderWidth = shoulderWidth,
+                        shoulderHeight = shoulderHeight,
+                        dpadButtonSize = dpadButtonSize,
+                        actionButtonSize = actionButtonSize,
+                        stickSize = stickSize,
+                        centerWidth = centerWidth,
+                        wideCenterWidth = wideCenterWidth,
+                        centerHeight = centerHeight,
+                        onSelect = { selectedControlId = spec.id }
+                    )
                 }
             }
         }
@@ -320,28 +387,243 @@ fun ControlsEditorScreen(
 }
 
 @Composable
-private fun DraggableControl(
-    initialOffset: Pair<Float, Float>,
+private fun EditorControlItem(
+    spec: EditorControlSpec,
+    controlState: EditorControlDraftState,
+    modifier: Modifier,
+    selected: Boolean,
+    shoulderWidth: Dp,
+    shoulderHeight: Dp,
+    dpadButtonSize: Dp,
+    actionButtonSize: Dp,
+    stickSize: Dp,
+    centerWidth: Dp,
+    wideCenterWidth: Dp,
+    centerHeight: Dp,
+    onSelect: () -> Unit
+) {
+    DraggableEditorControl(
+        offset = controlState.offsetX to controlState.offsetY,
+        onOffsetChange = {
+            controlState.offsetX = it.first
+            controlState.offsetY = it.second
+        },
+        modifier = modifier
+    ) { isDragging ->
+        EditorControlPreview(
+            spec = spec,
+            selected = selected,
+            visible = controlState.visible,
+            scale = controlState.scale / 100f,
+            shoulderWidth = shoulderWidth,
+            shoulderHeight = shoulderHeight,
+            dpadButtonSize = dpadButtonSize,
+            actionButtonSize = actionButtonSize,
+            stickSize = stickSize,
+            centerWidth = centerWidth,
+            wideCenterWidth = wideCenterWidth,
+            centerHeight = centerHeight,
+            clickEnabled = !isDragging,
+            onClick = onSelect
+        )
+    }
+}
+
+@Composable
+private fun DraggableEditorControl(
+    offset: Pair<Float, Float>,
     onOffsetChange: (Pair<Float, Float>) -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable (Boolean) -> Unit
 ) {
-    var offsetX by remember(initialOffset) { mutableFloatStateOf(initialOffset.first) }
-    var offsetY by remember(initialOffset) { mutableFloatStateOf(initialOffset.second) }
+    var dragOffsetX by remember(offset.first) { mutableFloatStateOf(offset.first) }
+    var dragOffsetY by remember(offset.second) { mutableFloatStateOf(offset.second) }
+    var isDragging by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
-            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-            .pointerInput(initialOffset) {
+            .offset { IntOffset(dragOffsetX.roundToInt(), dragOffsetY.roundToInt()) }
+            .size(128.dp)
+            .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragEnd = { onOffsetChange(offsetX to offsetY) }
+                    onDragStart = {
+                        isDragging = true
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        onOffsetChange(Pair(dragOffsetX, dragOffsetY))
+                    },
+                    onDragCancel = {
+                        isDragging = false
+                        onOffsetChange(Pair(dragOffsetX, dragOffsetY))
+                    }
                 ) { change, dragAmount ->
                     change.consume()
-                    offsetX += dragAmount.x
-                    offsetY += dragAmount.y
+                    dragOffsetX += dragAmount.x
+                    dragOffsetY += dragAmount.y
                 }
-            }
+            },
+        contentAlignment = Alignment.Center
     ) {
-        content()
+        content(isDragging)
+    }
+}
+
+@Composable
+private fun EditorControlPreview(
+    spec: EditorControlSpec,
+    selected: Boolean,
+    visible: Boolean,
+    scale: Float,
+    shoulderWidth: Dp,
+    shoulderHeight: Dp,
+    dpadButtonSize: Dp,
+    actionButtonSize: Dp,
+    stickSize: Dp,
+    centerWidth: Dp,
+    wideCenterWidth: Dp,
+    centerHeight: Dp,
+    clickEnabled: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.16f)
+    when (spec.shape) {
+        EditorControlShape.Stick -> {
+            Box(
+                modifier = Modifier
+                    .size(stickSize * scale)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = if (visible) 0.05f else 0.025f))
+                    .border(1.5.dp, Color.White.copy(alpha = if (selected) 0.22f else 0.1f), CircleShape)
+                    .clickable(enabled = clickEnabled, onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(stickSize * scale * 0.65f)
+                        .clip(CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = if (visible) 0.06f else 0.03f), CircleShape)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(stickSize * scale * 0.32f)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = if (visible) 0.35f else 0.12f))
+                        .border(1.5.dp, borderColor, CircleShape)
+                )
+            }
+        }
+        EditorControlShape.Action -> {
+            val actionColor = when (spec.id) {
+                "triangle" -> Color(0xFF50D9A0)
+                "cross" -> Color(0xFF5BA8FF)
+                "square" -> Color(0xFFA07BFF)
+                else -> Color(0xFFFF6B7A)
+            }
+            val label = when (spec.id) {
+                "triangle" -> "△"
+                "cross" -> "✕"
+                "square" -> "□"
+                else -> "○"
+            }
+            Box(
+                modifier = Modifier
+                    .size(actionButtonSize * scale)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = if (visible) listOf(
+                                actionColor.copy(alpha = 0.4f),
+                                actionColor.copy(alpha = 0.15f)
+                            ) else listOf(
+                                actionColor.copy(alpha = 0.14f),
+                                actionColor.copy(alpha = 0.05f)
+                            )
+                        )
+                    )
+                    .border(1.5.dp, if (selected) actionColor.copy(alpha = 0.75f) else actionColor.copy(alpha = 0.25f), CircleShape)
+                    .clickable(enabled = clickEnabled, onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White.copy(alpha = if (visible) 0.85f else 0.35f)
+                )
+            }
+        }
+        EditorControlShape.Dpad -> {
+            val label = when {
+                spec.id.endsWith("up") -> "▲"
+                spec.id.endsWith("down") -> "▼"
+                spec.id.endsWith("left") -> "◀"
+                else -> "▶"
+            }
+            Box(
+                modifier = Modifier
+                    .size(dpadButtonSize * scale)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = if (visible) 0.08f else 0.03f))
+                    .border(1.dp, if (selected) borderColor else Color.White.copy(alpha = if (visible) 0.08f else 0.04f), RoundedCornerShape(8.dp))
+                    .clickable(enabled = clickEnabled, onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = if (visible) 0.75f else 0.35f)
+                )
+            }
+        }
+        EditorControlShape.Shoulder -> {
+            Box(
+                modifier = Modifier
+                    .size(width = shoulderWidth * scale, height = shoulderHeight * scale)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = if (visible) listOf(
+                                Color.White.copy(alpha = 0.12f),
+                                Color.White.copy(alpha = 0.06f)
+                            ) else listOf(
+                                Color.White.copy(alpha = 0.05f),
+                                Color.White.copy(alpha = 0.025f)
+                            )
+                        )
+                    )
+                    .border(1.dp, if (selected) borderColor else Color.White.copy(alpha = if (visible) 0.1f else 0.04f), RoundedCornerShape(10.dp))
+                    .clickable(enabled = clickEnabled, onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = spec.title,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+                    color = Color.White.copy(alpha = if (visible) 0.85f else 0.35f)
+                )
+            }
+        }
+        EditorControlShape.Center -> {
+            Box(
+                modifier = Modifier
+                    .size(
+                        width = (if (spec.wide) wideCenterWidth else centerWidth) * scale,
+                        height = centerHeight * scale
+                    )
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = if (visible) 0.07f else 0.03f))
+                    .border(1.dp, if (selected) borderColor else Color.White.copy(alpha = if (visible) 0.06f else 0.03f), RoundedCornerShape(8.dp))
+                    .clickable(enabled = clickEnabled, onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    spec.title.uppercase(),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.sp
+                    ),
+                    color = Color.White.copy(alpha = if (visible) 0.7f else 0.35f)
+                )
+            }
+        }
     }
 }
