@@ -389,6 +389,7 @@ fun EmulationScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        if (!showControlsEditor) {
         // Game surface
         AndroidView(
             factory = { ctx ->
@@ -725,6 +726,7 @@ fun EmulationScreen(
                     viewModel.onPadInputs(indices, values)
                 }
             )
+        }
         }
 
         if (showControlsEditor) {

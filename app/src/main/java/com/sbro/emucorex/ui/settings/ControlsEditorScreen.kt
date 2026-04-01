@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.OverlayControlLayout
@@ -402,13 +403,23 @@ private fun EditorControlItem(
     centerHeight: Dp,
     onSelect: () -> Unit
 ) {
+    val dragHandleSize = when (spec.shape) {
+        EditorControlShape.Stick -> 148.dp
+        EditorControlShape.Action -> 96.dp
+        EditorControlShape.Dpad -> 92.dp
+        EditorControlShape.Shoulder -> 92.dp
+        EditorControlShape.Center -> 98.dp
+    }
+
     DraggableEditorControl(
         offset = controlState.offsetX to controlState.offsetY,
         onOffsetChange = {
             controlState.offsetX = it.first
             controlState.offsetY = it.second
         },
-        modifier = modifier
+        modifier = modifier,
+        draggable = selected,
+        dragHandleSize = dragHandleSize
     ) { isDragging ->
         EditorControlPreview(
             spec = spec,
@@ -434,6 +445,8 @@ private fun DraggableEditorControl(
     offset: Pair<Float, Float>,
     onOffsetChange: (Pair<Float, Float>) -> Unit,
     modifier: Modifier = Modifier,
+    draggable: Boolean,
+    dragHandleSize: Dp,
     content: @Composable (Boolean) -> Unit
 ) {
     var dragOffsetX by remember(offset.first) { mutableFloatStateOf(offset.first) }
@@ -442,32 +455,41 @@ private fun DraggableEditorControl(
 
     Box(
         modifier = modifier
+            .zIndex(if (selectedOrDragging(draggable, isDragging)) 2f else 0f)
             .offset { IntOffset(dragOffsetX.roundToInt(), dragOffsetY.roundToInt()) }
-            .size(128.dp)
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = {
-                        isDragging = true
-                    },
-                    onDragEnd = {
-                        isDragging = false
-                        onOffsetChange(Pair(dragOffsetX, dragOffsetY))
-                    },
-                    onDragCancel = {
-                        isDragging = false
-                        onOffsetChange(Pair(dragOffsetX, dragOffsetY))
+            .then(if (draggable) Modifier.size(dragHandleSize) else Modifier)
+            .then(
+                if (draggable) {
+                    Modifier.pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = {
+                                isDragging = true
+                            },
+                            onDragEnd = {
+                                isDragging = false
+                                onOffsetChange(Pair(dragOffsetX, dragOffsetY))
+                            },
+                            onDragCancel = {
+                                isDragging = false
+                                onOffsetChange(Pair(dragOffsetX, dragOffsetY))
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragOffsetX += dragAmount.x
+                            dragOffsetY += dragAmount.y
+                        }
                     }
-                ) { change, dragAmount ->
-                    change.consume()
-                    dragOffsetX += dragAmount.x
-                    dragOffsetY += dragAmount.y
+                } else {
+                    Modifier
                 }
-            },
+            ),
         contentAlignment = Alignment.Center
     ) {
         content(isDragging)
     }
 }
+
+private fun selectedOrDragging(selected: Boolean, dragging: Boolean): Boolean = selected || dragging
 
 @Composable
 private fun EditorControlPreview(
