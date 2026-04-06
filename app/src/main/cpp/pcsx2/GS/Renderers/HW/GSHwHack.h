@@ -6,12 +6,14 @@
 class GSHwHack
 {
 public:
+	static bool GSC_IRem(GSRendererHW& r, int& skip);
 	static bool GSC_Manhunt2(GSRendererHW& r, int& skip);
 	static bool GSC_SacredBlaze(GSRendererHW& r, int& skip);
 	static bool GSC_GuitarHero(GSRendererHW& r, int& skip);
 	static bool GSC_SFEX3(GSRendererHW& r, int& skip);
 	static bool GSC_DTGames(GSRendererHW& r, int& skip);
 	static bool GSC_NamcoGames(GSRendererHW& r, int& skip);
+	static bool GSC_SandGrainGames(GSRendererHW& r, int& skip);
 	static bool GSC_BurnoutGames(GSRendererHW& r, int& skip);
 	static bool GSC_BlackAndBurnoutSky(GSRendererHW& r, int& skip);
 	static bool GSC_MidnightClub3(GSRendererHW& r, int& skip);
@@ -26,6 +28,7 @@ public:
 	static bool GSC_Battlefield2(GSRendererHW& r, int& skip);
 	static bool GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip);
 	static bool GSC_MetalGearSolid3(GSRendererHW& r, int& skip);
+	static bool GSC_Turok(GSRendererHW& r, int& skip);
 	static bool GSC_HitmanBloodMoney(GSRendererHW& r, int& skip);
 
 	static bool OI_PointListPalette(GSRendererHW& r, GSTexture* rt, GSTexture* ds, GSTextureCache::Source* t);

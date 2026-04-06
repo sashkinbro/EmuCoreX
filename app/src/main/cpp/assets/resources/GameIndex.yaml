@@ -19067,6 +19067,9 @@ SLES-51897:
   compat: 5
   roundModes:
     eeDivRoundMode: 1 # Lens flare appears even when behind objects.
+  speedHacks:
+    instantVU1: 0 # Avoids boot hangs / black screen from VU desync on some builds.
+    mtvu: 0 # Keeps VU1 execution conservative for stability.
   gsHWFixes:
     minimumBlendingLevel: 2 # Improves color banding.
     halfPixelOffset: 2 # Fixes sun occlusion.
@@ -67150,6 +67153,9 @@ SLUS-20624:
   compat: 5
   roundModes:
     eeDivRoundMode: 1 # Lens flare appears even when behind objects.
+  speedHacks:
+    instantVU1: 0 # Avoids boot hangs / black screen from VU desync on some builds.
+    mtvu: 0 # Keeps VU1 execution conservative for stability.
   gsHWFixes:
     minimumBlendingLevel: 2 # Improves color banding.
     halfPixelOffset: 2 # Fixes sun occlusion.

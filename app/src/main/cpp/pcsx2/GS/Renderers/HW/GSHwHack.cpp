@@ -37,6 +37,139 @@ static bool s_nativeres;
 // Partial level, broken on all renderers.
 ////////////////////////////////////////////////////////////////////////////////
 
+bool GSHwHack::GSC_IRem(GSRendererHW& r, int& skip)
+{
+	static bool first_shuffle = false;
+
+	if (skip > 0)
+	{
+		if (skip == 1 && first_shuffle)
+		{
+			first_shuffle = false;
+
+			GIFRegTEX0 RTLookup = GIFRegTEX0::Create(RTBP0, RFBW, RFPSM);
+			GSTextureCache::Source* src = g_texture_cache->LookupSource(true, RTLookup, r.m_env.TEXA, r.m_cached_ctx.CLAMP, GSVector4i(0, 0, 1, 1), nullptr, true, false, r.m_cached_ctx.FRAME, true, true);
+
+			GSTextureCache::Target* rt = g_texture_cache->LookupTarget(GIFRegTEX0::Create(RTBP0, RFBW, RFPSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::RenderTarget, true, 0, false, false, true, true, GSVector4i(0, 0, 1, 1), true, false, true, src);
+
+			if (!rt)
+				return false;
+
+			GSLocalMemory::psm_t rt_psm = GSLocalMemory::m_psm[RFPSM];
+			const int page_offset = (RTBP0 - rt->m_TEX0.TBP0) >> 5;
+			const int vertical_offset = page_offset / std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.y;
+			const int horizontal_offset = page_offset % std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.x;
+
+			const GSVector4i draw_size = GSVector4i(0, 0, 64, 32) + GSVector4i(horizontal_offset, vertical_offset, horizontal_offset, vertical_offset);
+			rt->UnscaleRTAlpha();
+
+			GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), rt->GetTexture(), rt->GetScale(), draw_size);
+			config.ps.shuffle = 1;
+			config.ps.dst_fmt = GSLocalMemory::PSM_FMT_32;
+			config.ps.write_rg = 0;
+			config.ps.shuffle_same = 0;
+			config.ps.real16src = 0;
+			config.ps.shuffle_across = 1;
+			config.ps.process_rg = r.SHUFFLE_READWRITE;
+			config.ps.process_ba = r.SHUFFLE_READWRITE;
+			config.colormask.wrgba = 0;
+			config.colormask.wr = 1;
+			config.colormask.wb = 1;
+			config.ps.rta_correction = 0;
+			config.ps.rta_source_correction = 0;
+			config.ps.tfx = TFX_DECAL;
+			config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			rt->m_alpha_min = 0;
+			rt->m_alpha_max = 255;
+		}
+		else
+		{
+			skip--;
+			return !first_shuffle;
+		}
+	}
+
+	if (skip == 0)
+	{
+		const int get_next_ctx = r.m_env.PRIM.CTXT;
+		const GSDrawingContext& next_ctx = r.m_env.CTXT[get_next_ctx];
+
+		r.m_env.SCANMSK.MSK = 0;
+		r.m_prev_env.SCANMSK.MSK = 0;
+
+		if (RTME && RTPSM == PSMT8 && (RTBP0 + 0x20) == next_ctx.TEX0.TBP0 && RFBP == next_ctx.FRAME.Block())
+		{
+			skip = 2;
+			return false;
+		}
+
+		if (RTME && RFBP != RTBP0 && RFPSM == PSMCT16S && RTPSM == PSMCT16S)
+		{
+			if (r.m_vt.m_max.p.x == 64 && r.m_vt.m_max.p.y == 64 && r.m_index.tail == 128)
+			{
+				const GSVector4i draw_size(r.m_vt.m_min.p.x, r.m_vt.m_min.p.y / 2, r.m_vt.m_max.p.x, r.m_vt.m_max.p.y / 2);
+				const GSVector4i read_size(r.m_vt.m_min.t.x, r.m_vt.m_min.t.y / 2, r.m_vt.m_max.t.x, r.m_vt.m_max.t.y / 2);
+				r.m_cached_ctx.TEX0.PSM = PSMCT32;
+				r.m_cached_ctx.FRAME.PSM = PSMCT32;
+				r.ReplaceVerticesWithSprite(draw_size, read_size, GSVector2i(read_size.width(), read_size.height()), draw_size);
+			}
+		}
+
+		if (RTBP0 == (RFBP - 0x20) && r.m_vt.m_max.p.x == 64 && r.m_vt.m_max.p.y == 34 && r.m_index.tail == 2)
+		{
+			GSVector4i draw_size(r.m_vt.m_min.p.x, r.m_vt.m_min.p.y - 2.0f, r.m_vt.m_max.p.x, r.m_vt.m_max.p.y - 2.0f);
+			const GSVector4i read_size(r.m_vt.m_min.t.x, r.m_vt.m_min.t.y, r.m_vt.m_max.t.x, r.m_vt.m_max.t.y);
+			r.ReplaceVerticesWithSprite(draw_size, read_size, GSVector2i(read_size.width(), read_size.height()), draw_size);
+
+			GIFRegTEX0 RTLookup = GIFRegTEX0::Create(RTBP0, RFBW, RFPSM);
+			GSTextureCache::Source* src = g_texture_cache->LookupSource(true, RTLookup, r.m_env.TEXA, r.m_cached_ctx.CLAMP, GSVector4i(0, 0, 1, 1), nullptr, true, false, r.m_cached_ctx.FRAME, true, true);
+
+			GSTextureCache::Target* rt = g_texture_cache->LookupTarget(GIFRegTEX0::Create(RTBP0, RFBW, RFPSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::RenderTarget, true, 0, false, false, true, true, GSVector4i(0, 0, 1, 1), true, false, true, src);
+
+			if (!rt)
+				return false;
+
+			GSLocalMemory::psm_t rt_psm = GSLocalMemory::m_psm[RFPSM];
+			const int page_offset = (RTBP0 - rt->m_TEX0.TBP0) >> 5;
+			const int vertical_offset = page_offset / std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.y;
+			const int horizontal_offset = page_offset % std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.x;
+
+			draw_size = draw_size + GSVector4i(horizontal_offset, vertical_offset, horizontal_offset, vertical_offset);
+			rt->UnscaleRTAlpha();
+
+			GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), rt->GetTexture(), rt->GetScale(), draw_size);
+			config.ps.shuffle = 1;
+			config.ps.dst_fmt = GSLocalMemory::PSM_FMT_32;
+			config.ps.write_rg = 0;
+			config.ps.shuffle_same = 0;
+			config.ps.real16src = 0;
+			config.ps.shuffle_across = 1;
+			config.ps.process_rg = r.SHUFFLE_READWRITE;
+			config.ps.process_ba = r.SHUFFLE_READWRITE;
+			config.colormask.wrgba = 0;
+			config.colormask.wr = 1;
+			config.colormask.wb = 1;
+			config.ps.rta_correction = 0;
+			config.ps.rta_source_correction = 0;
+			config.ps.tfx = TFX_DECAL;
+			config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			rt->m_alpha_min = 0;
+			rt->m_alpha_max = 255;
+			first_shuffle = true;
+		}
+	}
+
+	return true;
+}
+
 // Channel effect not properly supported yet
 bool GSHwHack::GSC_Manhunt2(GSRendererHW& r, int& skip)
 {
@@ -205,6 +338,69 @@ bool GSHwHack::GSC_NamcoGames(GSRendererHW& r, int& skip)
 					v[i].XYZ.Y -= 0x8;
 				}
 			}
+		}
+	}
+
+	return true;
+}
+
+bool GSHwHack::GSC_SandGrainGames(GSRendererHW& r, int& skip)
+{
+	if (skip == 0)
+	{
+		const int get_next_ctx = r.m_env.PRIM.CTXT;
+		const GSDrawingContext& next_ctx = r.m_env.CTXT[get_next_ctx];
+
+		if (r.PRIM->PRIM == GS_SPRITE && RTME && RFPSM == PSMCT16S && RTPSM == PSMZ16S && next_ctx.TEX0.TBP0 == RFBP && next_ctx.TEX0.PSM == PSMT8H)
+		{
+			GSTextureCache::Target* texsrc = g_texture_cache->LookupTarget(GIFRegTEX0::Create(RTBP0, RTBW, RTPSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::DepthStencil);
+
+			if (!texsrc)
+				return false;
+
+			GSTextureCache::Target* rt = g_texture_cache->LookupTarget(GIFRegTEX0::Create(next_ctx.FRAME.Block(), next_ctx.FRAME.FBW, next_ctx.FRAME.PSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::RenderTarget);
+
+			if (!rt)
+				return false;
+
+			r.m_mem.m_clut.Read32(next_ctx.TEX0, r.m_env.TEXA);
+			std::shared_ptr<GSTextureCache::Palette> palette =
+				g_texture_cache->LookupPaletteObject(r.m_mem.m_clut, GSLocalMemory::m_psm[next_ctx.TEX0.PSM].pal, true);
+
+			if (!palette)
+				return false;
+
+			GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), texsrc->GetTexture(), texsrc->GetScale(), texsrc->GetUnscaledRect());
+			config.ps.channel = ChannelFetch_GXBY;
+			config.cb_ps.ChannelShuffle = GSVector4i(0, 0, 0xFF, 0);
+			config.ps.depth_fmt = 2;
+			config.colormask.wrgba = 8;
+			config.ps.tfx = TFX_DECAL;
+			config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			GSHWDrawConfig& modulate_config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), rt->GetTexture(), rt->GetScale(), rt->GetUnscaledRect());
+
+			modulate_config.pal = palette->GetPaletteGSTexture();
+			modulate_config.ps.aem_fmt = 0;
+			modulate_config.ps.aem = 0;
+			modulate_config.ps.pal_fmt = 3;
+			modulate_config.colormask.wrgba = 8;
+			modulate_config.ps.tfx = TFX_DECAL;
+			modulate_config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			rt->m_alpha_min = 0;
+			rt->m_alpha_max = 128;
+			rt->m_rt_alpha_scale = false;
+			rt->ScaleRTAlpha();
+
+			const int pages = (rt->m_valid.w / 32) * rt->m_TEX0.TBW;
+			skip = pages;
 		}
 	}
 
@@ -822,6 +1018,24 @@ bool GSHwHack::GSC_MetalGearSolid3(GSRendererHW& r, int& skip)
 	return true;
 }
 
+bool GSHwHack::GSC_Turok(GSRendererHW& r, int& skip)
+{
+	if (r.m_index.tail == 6 && RPRIM->PRIM == 4 && !RTME && RFBMSK == 0x00FFFFFF &&
+		floor(r.m_vt.m_max.p.x) == 512 && r.m_env.CTXT[r.m_backed_up_ctx].FRAME.FBW == 10 &&
+		RFRAME.FBW == 8 && RFPSM == PSMCT32 && RTEST.ATE && RTEST.ATST == ATST_GEQUAL)
+	{
+		int num_pages = r.m_cached_ctx.FRAME.FBW * ((floor(r.m_vt.m_max.p.y) + 31) / 32);
+		r.m_cached_ctx.FRAME.FBW = 10;
+		num_pages = ((num_pages + 9) / 10) * 10;
+
+		r.ReplaceVerticesWithSprite(
+			r.GetDrawRectForPages(r.m_cached_ctx.FRAME.FBW, r.m_cached_ctx.FRAME.PSM, num_pages),
+			GSVector2i(1, 1));
+	}
+
+	return true;
+}
+
 bool GSHwHack::GSC_HitmanBloodMoney(GSRendererHW& r, int& skip)
 {
 	// The game does a stupid thing where it backs up the last 2 pages of the framebuffer with shuffles, uploads a CT32 texture to it
@@ -1313,6 +1527,7 @@ bool GSHwHack::MV_Ico(GSRendererHW& r)
 #define CRC_F(name) { #name, &GSHwHack::name }
 
 const GSHwHack::Entry<GSRendererHW::GSC_Ptr> GSHwHack::s_get_skip_count_functions[] = {
+	CRC_F(GSC_IRem),
 	CRC_F(GSC_Manhunt2),
 	CRC_F(GSC_MidnightClub3),
 	CRC_F(GSC_SacredBlaze),
@@ -1330,9 +1545,11 @@ const GSHwHack::Entry<GSRendererHW::GSC_Ptr> GSHwHack::s_get_skip_count_function
 	CRC_F(GSC_MetalGearSolid3),
 	CRC_F(GSC_HitmanBloodMoney),
 	CRC_F(GSC_Battlefield2),
+	CRC_F(GSC_Turok),
 
 	// Channel Effect
 	CRC_F(GSC_NamcoGames),
+	CRC_F(GSC_SandGrainGames),
 	CRC_F(GSC_SteambotChronicles),
 
 	// Depth Issue
