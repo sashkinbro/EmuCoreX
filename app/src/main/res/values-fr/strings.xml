@@ -817,4 +817,5 @@
     <string name="emulation_achievements_tab">Succès</string>
     <string name="emulation_achievements_show_all">Tout afficher</string>
     <string name="emulation_achievements_show_less">Afficher moins</string>
+    <string name="emulation_session_restored_unavailable">La session d\'émulation précédente a été fermée en arrière-plan. Relancez le jeu depuis votre bibliothèque.</string>
 </resources>

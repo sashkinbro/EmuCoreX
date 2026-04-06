@@ -817,4 +817,5 @@
     <string name="emulation_achievements_tab">Достижения</string>
     <string name="emulation_achievements_show_all">Показать все</string>
     <string name="emulation_achievements_show_less">Показать меньше</string>
+    <string name="emulation_session_restored_unavailable">Предыдущий сеанс эмуляции был закрыт в фоновом режиме. Запустите игру снова из вашей библиотеки.</string>
 </resources>

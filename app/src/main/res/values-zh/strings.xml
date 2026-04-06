@@ -817,4 +817,5 @@
     <string name="emulation_achievements_tab">成就</string>
     <string name="emulation_achievements_show_all">显示全部</string>
     <string name="emulation_achievements_show_less">显示更少</string>
+    <string name="emulation_session_restored_unavailable">先前的模拟会话已在后台关闭。请从您的游戏库中再次启动该游戏。</string>
 </resources>
