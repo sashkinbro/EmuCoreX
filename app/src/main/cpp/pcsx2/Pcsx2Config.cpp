@@ -711,7 +711,7 @@ Pcsx2Config::GSOptions::GSOptions()
 {
 	bitset = 0;
 
-    AspectRatio = AspectRatioType::R16_9;
+	AspectRatio = AspectRatioType::R16_9;
 
 	PCRTCAntiBlur = true;
 	DisableInterlaceOffset = false;
@@ -751,10 +751,12 @@ Pcsx2Config::GSOptions::GSOptions()
 	PreloadFrameWithGSData = false;
 	Mipmap = true;
 	HWMipmap = true;
+	HWAccurateAlphaTest = false;
 
 	ManualUserHacks = false;
 	UserHacks_AlignSpriteX = false;
 	UserHacks_AutoFlush = GSHWAutoFlushLevel::Disabled;
+	UserHacks_Limit24BitDepth = GSLimit24BitDepth::Disabled;
 	UserHacks_CPUFBConversion = false;
 	UserHacks_ReadTCOnClose = false;
 	UserHacks_DisableDepthSupport = false;
@@ -846,6 +848,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(UserHacks_CPUCLUTRender) &&
 		OpEqu(UserHacks_GPUTargetCLUTMode) &&
 		OpEqu(UserHacks_TextureInsideRt) &&
+		OpEqu(UserHacks_Limit24BitDepth) &&
 		OpEqu(UserHacks_BilinearHack) &&
 		OpEqu(OverrideTextureBarriers) &&
 
@@ -1016,6 +1019,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapEntryEx(UpscaleMultiplier, "upscale_multiplier");
 
 	SettingsWrapBitBoolEx(HWMipmap, "hw_mipmap");
+	SettingsWrapBitBool(HWAccurateAlphaTest);
 	SettingsWrapIntEnumEx(AccurateBlendingUnit, "accurate_blending_unit");
 	SettingsWrapIntEnumEx(TextureFiltering, "filter");
 	SettingsWrapIntEnumEx(TexturePreloading, "texture_preloading");
@@ -1041,6 +1045,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitfieldEx(UserHacks_CPUSpriteRenderLevel, "UserHacks_CPUSpriteRenderLevel");
 	SettingsWrapBitfieldEx(UserHacks_CPUCLUTRender, "UserHacks_CPUCLUTRender");
 	SettingsWrapIntEnumEx(UserHacks_GPUTargetCLUTMode, "UserHacks_GPUTargetCLUTMode");
+	SettingsWrapIntEnumEx(UserHacks_Limit24BitDepth, "UserHacks_Limit24BitDepth");
 	SettingsWrapIntEnumEx(TriFilter, "TriFilter");
 	// Legacy configs can contain -1 for Automatic from older enum ordering.
 	if (static_cast<s8>(TriFilter) < static_cast<s8>(TriFiltering::Automatic) ||
@@ -1119,6 +1124,7 @@ void Pcsx2Config::GSOptions::MaskUserHacks()
 	UserHacks_CPUFBConversion = false;
 	UserHacks_ReadTCOnClose = false;
 	UserHacks_TextureInsideRt = GSTextureInRtMode::Disabled;
+	UserHacks_Limit24BitDepth = GSLimit24BitDepth::Disabled;
 	UserHacks_EstimateTextureRegion = false;
 	UserHacks_TCOffsetX = 0;
 	UserHacks_TCOffsetY = 0;

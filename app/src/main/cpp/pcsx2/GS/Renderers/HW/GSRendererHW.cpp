@@ -7555,6 +7555,14 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 			// Blending might be off, ensure it's enabled.
 			// We write the alpha pass/fail to SRC1_ALPHA, which is used to update A.
 			m_conf.ps.afail = AFAIL_RGB_ONLY;
+			if (GSConfig.HWAccurateAlphaTest)
+			{
+				// Prefer the RT feedback path for RGB-only AFAIL when requested by GameDB.
+				if (features.framebuffer_fetch)
+					m_conf.require_one_barrier = true;
+				else if (features.texture_barrier)
+					m_conf.require_full_barrier = true;
+			}
 			if ((features.framebuffer_fetch && m_conf.require_one_barrier) || m_conf.require_full_barrier)
 			{
 				// We're reading the rt anyways, use it for AFAIL

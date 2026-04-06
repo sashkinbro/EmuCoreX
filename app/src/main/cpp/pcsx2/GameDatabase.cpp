@@ -600,8 +600,7 @@ bool GameDatabaseSchema::GameEntry::configMatchesHWFix(const Pcsx2Config::GSOpti
 			return (static_cast<int>(config.UserHacks_TextureInsideRt) == value);
 
 		case GSHWFixId::Limit24BitDepth:
-			// This fork doesn't expose the upstream 24-bit depth limiter yet.
-			return true;
+			return (static_cast<int>(config.UserHacks_Limit24BitDepth) == value);
 
 		case GSHWFixId::AlignSprite:
 			return (config.UpscaleMultiplier <= 1.0f || static_cast<int>(config.UserHacks_AlignSpriteX) == value);
@@ -631,8 +630,7 @@ bool GameDatabaseSchema::GameEntry::configMatchesHWFix(const Pcsx2Config::GSOpti
 			return (static_cast<int>(config.HWMipmap) == value);
 
 		case GSHWFixId::AccurateAlphaTest:
-			// This fork doesn't expose the upstream accurate alpha test toggle yet.
-			return true;
+			return (static_cast<int>(config.HWAccurateAlphaTest) == value);
 
 		case GSHWFixId::TrilinearFiltering:
 			return (config.TriFilter == TriFiltering::Automatic || static_cast<int>(config.TriFilter) == value);
@@ -755,7 +753,10 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions&
 			break;
 
 			case GSHWFixId::Limit24BitDepth:
-				// Parsed for upstream compatibility; this fork doesn't implement the setting yet.
+			{
+				if (value >= 0 && value <= static_cast<int>(GSLimit24BitDepth::PrioritizeLower))
+					config.UserHacks_Limit24BitDepth = static_cast<GSLimit24BitDepth>(value);
+			}
 				break;
 
 			case GSHWFixId::AlignSprite:
@@ -798,7 +799,7 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions&
 				break;
 
 			case GSHWFixId::AccurateAlphaTest:
-				// Parsed for upstream compatibility; this fork doesn't implement the setting yet.
+				config.HWAccurateAlphaTest = (value > 0);
 				break;
 
 			case GSHWFixId::TrilinearFiltering:
