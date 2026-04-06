@@ -18,7 +18,7 @@ data class ControlsLayoutState(
     val actionOffset: Pair<Float, Float> = 0f to 0f,
     val lbtnOffset: Pair<Float, Float> = 0f to 0f,
     val rbtnOffset: Pair<Float, Float> = 0f to 0f,
-    val centerOffset: Pair<Float, Float> = 0f to 0f,
+    val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
     val controlLayouts: Map<String, OverlayControlLayout> = emptyMap()
 )
@@ -31,6 +31,7 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         viewModelScope.launch {
+            preferences.migrateOverlayLayoutIfNeeded()
             val snapshot = preferences.overlayLayoutSnapshot.first()
             
             _layoutState.value = ControlsLayoutState(

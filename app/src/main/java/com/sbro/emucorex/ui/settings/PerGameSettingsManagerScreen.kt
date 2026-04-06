@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
+import com.sbro.emucorex.core.EmulatorBridge
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -61,7 +62,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.sbro.emucorex.R
-import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.UPSCALE_MAX
 import com.sbro.emucorex.core.UPSCALE_MIN
 import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
@@ -396,10 +396,8 @@ private fun GameSettingsProfileCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ProfileBadge(text = stringResource(performancePresetLabel(profile.performancePreset)))
                 ProfileBadge(text = stringResource(rendererLabel(profile.renderer)))
                 ProfileBadge(text = formatUpscaleLabel(profile.upscaleMultiplier))
-                ProfileBadge(text = stringResource(R.string.game_settings_manager_fps_badge, profile.targetFps))
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -492,16 +490,9 @@ private fun GameSettingsEditorDialog(
                     ) {
                         EditorSection(title = stringResource(R.string.game_settings_manager_section_profile)) {
                             SelectionRow(
-                                title = stringResource(R.string.settings_performance_preset),
-                                options = performancePresetOptions(),
-                                selectedValue = draft.performancePreset,
-                                onSelected = { draft = draft.copy(performancePreset = it) },
-                                helpText = stringResource(R.string.settings_help_performance_preset),
-                                onResetToDefault = { draft = draft.copy(performancePreset = defaultProfile.performancePreset) }
-                            )
-                            SelectionRow(
                                 title = stringResource(R.string.settings_renderer),
                                 options = listOf(
+                                    EmulatorBridge.AUTO_RENDERER to stringResource(R.string.settings_renderer_auto),
                                     12 to stringResource(R.string.settings_renderer_opengl),
                                     14 to stringResource(R.string.settings_renderer_vulkan),
                                     13 to stringResource(R.string.settings_renderer_software)
@@ -555,6 +546,40 @@ private fun GameSettingsEditorDialog(
                                 onResetToDefault = { draft = draft.copy(fpsOverlayMode = defaultProfile.fpsOverlayMode) }
                             )
                             ToggleRow(
+                                title = stringResource(R.string.settings_frame_limiter),
+                                checked = draft.frameLimitEnabled,
+                                onCheckedChange = { draft = draft.copy(frameLimitEnabled = it) },
+                                helpText = stringResource(R.string.settings_help_frame_limiter),
+                                onResetToDefault = { draft = draft.copy(frameLimitEnabled = defaultProfile.frameLimitEnabled) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_target_fps_mode),
+                                options = listOf(
+                                    0 to stringResource(R.string.settings_target_fps_auto),
+                                    1 to stringResource(R.string.settings_target_fps_manual)
+                                ),
+                                selectedValue = if (draft.targetFps <= 0) 0 else 1,
+                                onSelected = { mode ->
+                                    draft = draft.copy(
+                                        targetFps = if (mode == 0) 0 else resolveManualTargetFps(draft.targetFps, defaultProfile.targetFps)
+                                    )
+                                },
+                                helpText = stringResource(R.string.settings_help_target_fps),
+                                onResetToDefault = { draft = draft.copy(targetFps = defaultProfile.targetFps) }
+                            )
+                            if (draft.targetFps > 0) {
+                                SliderRow(
+                                    title = stringResource(R.string.settings_target_fps),
+                                    value = draft.targetFps.toFloat(),
+                                    valueLabel = draft.targetFps.toString(),
+                                    range = 20f..120f,
+                                    steps = 99,
+                                    onValueChange = { draft = draft.copy(targetFps = it.toInt()) },
+                                    helpText = stringResource(R.string.settings_help_target_fps),
+                                    onResetToDefault = { draft = draft.copy(targetFps = defaultProfile.targetFps) }
+                                )
+                            }
+                            ToggleRow(
                                 title = stringResource(R.string.settings_mtvu),
                                 checked = draft.enableMtvu,
                                 onCheckedChange = { draft = draft.copy(enableMtvu = it) },
@@ -589,23 +614,6 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_no_interlacing_patches),
                                 onResetToDefault = { draft = draft.copy(enableNoInterlacingPatches = defaultProfile.enableNoInterlacingPatches) }
                             )
-                            ToggleRow(
-                                title = stringResource(R.string.settings_frame_limiter),
-                                checked = draft.frameLimitEnabled,
-                                onCheckedChange = { draft = draft.copy(frameLimitEnabled = it) },
-                                helpText = stringResource(R.string.settings_help_frame_limiter),
-                                onResetToDefault = { draft = draft.copy(frameLimitEnabled = defaultProfile.frameLimitEnabled) }
-                            )
-                        SliderRow(
-                            title = stringResource(R.string.settings_target_fps),
-                            value = draft.targetFps.toFloat(),
-                            valueLabel = draft.targetFps.toString(),
-                            range = 20f..120f,
-                            steps = 99,
-                            onValueChange = { draft = draft.copy(targetFps = it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_target_fps),
-                            onResetToDefault = { draft = draft.copy(targetFps = defaultProfile.targetFps) }
-                        )
                         SelectionRow(
                             title = stringResource(R.string.settings_ee_cycle_rate),
                             options = eeCycleRateOptions(),
@@ -1021,27 +1029,19 @@ private fun anisotropicFilteringOptions(): List<Pair<Int, String>> = listOf(
     16 to "16x"
 )
 
-@Composable
-private fun performancePresetOptions(): List<Pair<Int, String>> = listOf(
-    PerformancePresets.CUSTOM to stringResource(R.string.settings_performance_preset_custom),
-    PerformancePresets.BATTERY to stringResource(R.string.settings_performance_preset_battery),
-    PerformancePresets.BALANCED to stringResource(R.string.settings_performance_preset_balanced),
-    PerformancePresets.PERFORMANCE to stringResource(R.string.settings_performance_preset_performance),
-    PerformancePresets.AGGRESSIVE to stringResource(R.string.settings_performance_preset_aggressive)
-)
-
-private fun performancePresetLabel(preset: Int): Int = when (preset) {
-    PerformancePresets.BATTERY -> R.string.settings_performance_preset_battery
-    PerformancePresets.BALANCED -> R.string.settings_performance_preset_balanced
-    PerformancePresets.PERFORMANCE -> R.string.settings_performance_preset_performance
-    PerformancePresets.AGGRESSIVE -> R.string.settings_performance_preset_aggressive
-    else -> R.string.settings_performance_preset_custom
-}
-
 private fun rendererLabel(renderer: Int): Int = when (renderer) {
+    EmulatorBridge.AUTO_RENDERER -> R.string.settings_renderer_auto
     12 -> R.string.settings_renderer_opengl
     13 -> R.string.settings_renderer_software
     else -> R.string.settings_renderer_vulkan
+}
+
+private fun resolveManualTargetFps(currentTargetFps: Int, defaultTargetFps: Int): Int {
+    return when {
+        currentTargetFps > 0 -> currentTargetFps
+        defaultTargetFps > 0 -> defaultTargetFps
+        else -> 60
+    }
 }
 
 private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings {
@@ -1052,7 +1052,6 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         renderer = renderer,
         upscaleMultiplier = upscaleMultiplier,
         aspectRatio = aspectRatio,
-        performancePreset = performancePreset,
         showFps = showFps,
         fpsOverlayMode = fpsOverlayMode,
         enableMtvu = enableMtvu,

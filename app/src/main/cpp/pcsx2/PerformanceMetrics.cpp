@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <chrono>
+#include <cmath>
 #include <vector>
 
 #include "common/Timer.h"
@@ -151,13 +152,31 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 		return;
 
 	s_last_update_time.ResetTo(now_ticks);
+	const u32 presented_frames = s_unskipped_frames_since_last_update;
 	s_minimum_frame_time = std::exchange(s_minimum_frame_time_accumulator, 0.0f);
-	s_average_frame_time = std::exchange(s_average_frame_time_accumulator, 0.0f) / static_cast<float>(s_unskipped_frames_since_last_update);
 	s_maximum_frame_time = std::exchange(s_maximum_frame_time_accumulator, 0.0f);
+	if (presented_frames > 0)
+	{
+		s_average_frame_time =
+			std::exchange(s_average_frame_time_accumulator, 0.0f) / static_cast<float>(presented_frames);
+		s_average_gpu_time = s_accumulated_gpu_time / static_cast<float>(presented_frames);
+		s_gpu_usage = s_accumulated_gpu_time / (time * 10.0f);
+	}
+	else
+	{
+		s_average_frame_time_accumulator = 0.0f;
+		s_average_frame_time = 0.0f;
+		s_average_gpu_time = 0.0f;
+		s_gpu_usage = 0.0f;
+	}
 	s_fps = static_cast<float>(s_frames_since_last_update) / time;
-	s_average_gpu_time = s_accumulated_gpu_time / static_cast<float>(s_unskipped_frames_since_last_update);
-	s_gpu_usage = s_accumulated_gpu_time / (time * 10.0f);
 	s_accumulated_gpu_time = 0.0f;
+	if (!std::isfinite(s_average_frame_time))
+		s_average_frame_time = 0.0f;
+	if (!std::isfinite(s_average_gpu_time))
+		s_average_gpu_time = 0.0f;
+	if (!std::isfinite(s_gpu_usage))
+		s_gpu_usage = 0.0f;
 
 	// prefer privileged register write based framerate detection, it's less likely to have false positives
 	if (s_gs_privileged_register_writes_since_last_update > 0 && !EmuConfig.Gamefixes.BlitInternalFPSHack)

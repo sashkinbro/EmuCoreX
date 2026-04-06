@@ -15,7 +15,7 @@
     <string name="home_view_list">Als Liste anzeigen</string>
     <string name="home_view_grid">Als Raster anzeigen</string>
     <string name="home_search">Spiele suchen</string>
-    <string name="home_game_count">%d Spiele</string>
+    <string name="home_game_count">Spiele insgesamt: %d</string>
     <string name="home_library_desc">Deine Bibliothek, Einrichtung und Schnellaktionen an einem Ort.</string>
     <string name="home_recent_title">Zuletzt geöffnet</string>
     <string name="home_recent_label">Fortsetzen</string>
@@ -796,4 +796,25 @@
     <string name="settings_cover_download_url_example_hint">Tippen, um beide Beispiel-URLs einzufügen. Gedrückt halten, um sie zu kopieren.</string>
     <string name="settings_cover_download_url_copied">Beispiel-URLs kopiert.</string>
     <string name="settings_help_cover_art_style">Wählt den Standard-Cover-Typ aus, der beim Herunterladen von Grafiken verwendet wird. Flache Cover entsprechen dem klassischen Look der Box-Vorderseite, während 3D-Box abgewinkelte Box-Renderings verwendet, wenn die Quelle diese bereitstellt. 3D-Cover können dramatischer aussehen, aber die Verfügbarkeit ist möglicherweise etwas schlechter als bei flachen Grafiken.</string>
+    <string name="settings_renderer_auto">Automatisch</string>
+    <string name="settings_bios_picker_title">BIOS-Ordner auswählen</string>
+    <string name="settings_bios_picker_desc">Wähle den Ordner, der deine PlayStation 2 BIOS-Dateien enthält. Dieser Ordner wird für den normalen Spielstart und den BIOS-Start verwendet.</string>
+    <string name="settings_bios_picker_current">Aktueller BIOS-Ordner</string>
+    <string name="settings_bios_picker_action">Ordner auswählen</string>
+    <string name="settings_auto">Automatisch</string>
+    <string name="settings_target_fps_mode">Ziel-FPS-Modus</string>
+    <string name="settings_target_fps_auto">Auto-FPS</string>
+    <string name="settings_target_fps_manual">Manuelle FPS</string>
+    <string name="detail_igdb_source_note">Spielbeschreibung und Metadaten auf diesem Bildschirm werden über die IGDB-API bereitgestellt.</string>
+    <string name="settings_prefer_english_game_titles">Englische Spieltitel bevorzugen</string>
+    <string name="settings_prefer_english_game_titles_desc">Englische Namen aus der PCSX2-Spieldatenbank verwenden, sofern verfügbar.</string>
+    <string name="settings_help_prefer_english_game_titles">Verwendet englische Titel aus der GameIndex-Datenbank von PCSX2 für Spiele, die mit japanischen oder anderen regionalen Namen ausgeliefert werden. Dies hilft hauptsächlich dabei, importierte Versionen in der Bibliothek besser lesbar zu machen, während Spiele ohne englischen Datenbanktitel ihren normalen Namen behalten.</string>
+    <string name="achievements_loading">Erfolge werden geladen…</string>
+    <string name="emulation_achievements_bios_unavailable">Erfolge sind nur verfügbar, wenn ein Spiel geladen ist. Der BIOS-Start legt keine RetroAchievements-Daten offen.</string>
+    <string name="emulation_achievements_not_supported">RetroAchievements werden im aktuellen nativen Build nicht unterstützt.</string>
+    <string name="emulation_achievements_unavailable">Derzeit sind für dieses Spiel keine RetroAchievements-Daten verfügbar.</string>
+    <string name="emulation_achievements_more">%1$d weitere Erfolge in der vollständigen Spieleliste.</string>
+    <string name="emulation_achievements_tab">Erfolge</string>
+    <string name="emulation_achievements_show_all">Alle anzeigen</string>
+    <string name="emulation_achievements_show_less">Weniger anzeigen</string>
 </resources>

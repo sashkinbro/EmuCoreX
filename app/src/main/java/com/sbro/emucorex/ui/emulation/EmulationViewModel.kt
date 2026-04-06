@@ -5,13 +5,10 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
-import com.sbro.emucorex.core.DeviceChipsetFamily
-import com.sbro.emucorex.core.DevicePerformanceProfiles
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.NativeApp
-import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
@@ -55,7 +52,7 @@ data class EmulationUiState(
     val actionOffset: Pair<Float, Float> = 0f to 0f,
     val lbtnOffset: Pair<Float, Float> = 0f to 0f,
     val rbtnOffset: Pair<Float, Float> = 0f to 0f,
-    val centerOffset: Pair<Float, Float> = 0f to 0f,
+    val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
     val controlLayouts: Map<String, OverlayControlLayout> = emptyMap(),
     val fps: String = "0.0",
@@ -67,10 +64,10 @@ data class EmulationUiState(
     val toastMessage: String? = null,
     val statusMessage: String? = null,
     val currentSlot: Int = 0,
-    val renderer: Int = 14, // Default to Vulkan (14)
+    val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val upscale: Float = 1f,
     val aspectRatio: Int = 1,
-    val performancePreset: Int = PerformancePresets.BALANCED,
+    val performancePreset: Int = PerformancePresets.CUSTOM,
     val enableMtvu: Boolean = true,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = true,
@@ -114,11 +111,8 @@ data class EmulationUiState(
     val nativePaletteDraw: Boolean = false,
     val cheatsGameKey: String? = null,
     val availableCheats: List<CheatBlock> = emptyList(),
-    val deviceChipsetFamily: DeviceChipsetFamily = DeviceChipsetFamily.GENERIC,
-    val detectedChipsetName: String = "",
-    val recommendedPresetId: Int = PerformancePresets.BALANCED,
     val frameLimitEnabled: Boolean = false,
-    val targetFps: Int = 60,
+    val targetFps: Int = 0,
     val currentGameTitle: String = "",
     val currentGameSubtitle: String = "",
     val gameSettingsProfileActive: Boolean = false
@@ -235,10 +229,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private val preferences = AppPreferences(application)
     private val cheatRepository = CheatRepository(application)
     private val perGameSettingsRepository = PerGameSettingsRepository(application)
-    private val deviceProfile = DevicePerformanceProfiles.current()
     private val _uiState = MutableStateFlow(EmulationUiState())
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
     private val lifecycleMutex = Mutex()
+    private var pausedForBackground = false
     @Volatile
     private var isShuttingDown = false
     @Volatile
@@ -254,6 +248,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     @Volatile
     private var currentGameSource: String = ""
 
+    init {
+        viewModelScope.launch {
+            preferences.migrateOverlayLayoutIfNeeded()
+            if (preferences.ensureManualHardwareFixesBaseline()) {
+                perGameSettingsRepository.clearManualHardwareFixesForAllProfiles()
+            }
+        }
+    }
+
     private inline fun applyGlobalRuntimePreferenceUpdate(
         crossinline transform: (EmulationUiState) -> EmulationUiState
     ) {
@@ -263,11 +266,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     init {
-        _uiState.value = _uiState.value.copy(
-            deviceChipsetFamily = deviceProfile.family,
-            detectedChipsetName = deviceProfile.displayName,
-            recommendedPresetId = deviceProfile.recommendedPresetId
-        )
         viewModelScope.launch {
             preferences.overlayShow.collect { enabled ->
                 _uiState.value = _uiState.value.copy(controlsVisible = enabled)
@@ -563,6 +561,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun startEmulation(path: String?, slotToLoad: Int? = null, bootToBios: Boolean = false) {
         if (_uiState.value.isStarting) return
         cancelPendingStart = false
+        pausedForBackground = false
         currentGamePath = if (bootToBios) null else path?.takeIf { it.isNotBlank() }
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -866,32 +865,41 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun togglePause() {
         val isPaused = _uiState.value.isPaused
-        try {
-            if (isPaused) {
-                EmulatorBridge.resume()
-            } else {
-                EmulatorBridge.pause()
-            }
-        } catch (_: Exception) { }
+        pausedForBackground = false
         _uiState.value = _uiState.value.copy(
             isPaused = !isPaused,
             showMenu = if (isPaused) false else _uiState.value.showMenu
         )
         updateCrashContext(launchState = if (!isPaused) "paused" else "running")
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (isPaused) {
+                    EmulatorBridge.resume()
+                } else {
+                    EmulatorBridge.pause()
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     fun toggleMenu() {
         val showMenu = !_uiState.value.showMenu
-        try {
-            if (showMenu) {
-                EmulatorBridge.resetKeyStatus()
-                EmulatorBridge.pause()
-                _uiState.value = _uiState.value.copy(showMenu = true, isPaused = true)
-            } else {
-                EmulatorBridge.resume()
-                _uiState.value = _uiState.value.copy(showMenu = false, isPaused = false)
-            }
-        } catch (_: Exception) { }
+        if (showMenu) {
+            pausedForBackground = false
+            EmulatorBridge.resetKeyStatus()
+            _uiState.value = _uiState.value.copy(showMenu = true, isPaused = true)
+        } else {
+            _uiState.value = _uiState.value.copy(showMenu = false, isPaused = false)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (showMenu) {
+                    EmulatorBridge.pause()
+                } else {
+                    EmulatorBridge.resume()
+                }
+            } catch (_: Exception) { }
+        }
     }
 
     fun toggleControlsVisibility() {
@@ -1110,7 +1118,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setTargetFps(value: Int) {
         viewModelScope.launch {
-            val clamped = value.coerceIn(20, 120)
+            val clamped = if (value <= 0) 0 else value.coerceIn(20, 120)
             persistRuntimeState(_uiState.value.copy(targetFps = clamped)) {
                 preferences.setTargetFps(clamped)
             }
@@ -1579,36 +1587,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun applyPerformancePreset(presetId: Int) {
-        viewModelScope.launch {
-            val config = PerformancePresets.configFor(presetId, deviceProfile) ?: run {
-                if (activePerGameKey() == null) {
-                    preferences.setPerformancePreset(PerformancePresets.CUSTOM)
-                }
-                return@launch
-            }
-
-            val newState = _uiState.value.copy(
-                performancePreset = config.id,
-                renderer = config.renderer,
-                upscale = config.upscaleMultiplier,
-                enableMtvu = config.enableMtvu,
-                enableFastCdvd = config.enableFastCdvd,
-                frameSkip = config.frameSkip,
-                textureFiltering = config.textureFiltering
-            )
-            persistRuntimeState(newState) {
-                preferences.applyPerformancePreset(config)
-            }
-            applyRuntimePerformancePreset(config)
-            updateCrashContext()
-        }
-    }
-
-    fun applyRecommendedDeviceProfile() {
-        applyPerformancePreset(deviceProfile.recommendedPresetId)
-    }
-
     private fun markPerformancePresetCustom(state: EmulationUiState): EmulationUiState {
         return if (state.performancePreset == PerformancePresets.CUSTOM) {
             state
@@ -1617,7 +1595,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private fun refreshManualHardwareFixes(state: EmulationUiState = _uiState.value) {
+    private suspend fun refreshManualHardwareFixes(state: EmulationUiState = _uiState.value) {
         val enabled = GsHackDefaults.shouldEnableManualHardwareFixes(
             cpuSpriteRenderSize = state.cpuSpriteRenderSize,
             cpuSpriteRenderLevel = state.cpuSpriteRenderLevel,
@@ -1648,29 +1626,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             nativePaletteDraw = state.nativePaletteDraw
         )
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks", "bool", enabled.toString())
-    }
-
-    private fun applyRuntimePerformancePreset(config: PerformancePresetConfig) {
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "EECycleRate", "int", config.eeCycleRate.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "EECycleSkip", "int", config.eeCycleSkip.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", config.enableMtvu.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", config.enableFastCdvd.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "FrameSkip", "int", config.frameSkip.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "filter", "int", config.textureFiltering.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "MaxAnisotropy", "int", config.anisotropicFiltering.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_Start", "int", "0")
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", config.skipDraw.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", config.halfPixelOffset.toString())
-        EmulatorBridge.setSetting("EmuCore", "EnableWideScreenPatches", "bool", config.widescreenPatches.toString())
-        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier)
-        EmulatorBridge.setRenderer(config.renderer)
-        refreshManualHardwareFixes(
-            _uiState.value.copy(
-                skipDrawStart = 0,
-                skipDrawEnd = config.skipDraw,
-                halfPixelOffset = config.halfPixelOffset
-            )
-        )
     }
 
     private fun applyOverlayLayoutSnapshot(snapshot: OverlayLayoutSnapshot) {
@@ -1728,7 +1683,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private suspend fun syncCurrentGameProfileMetadata() {
+    private fun syncCurrentGameProfileMetadata() {
         val gameKey = activePerGameKey() ?: return
         val profile = perGameSettingsRepository.get(gameKey) ?: return
         val resolvedTitle = resolvePerGameTitle(_uiState.value)
@@ -1743,7 +1698,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    private suspend fun resetCurrentGameProfile() {
+    private fun resetCurrentGameProfile() {
         val gameKey = activePerGameKey() ?: return
         perGameSettingsRepository.delete(gameKey)
         _uiState.value = _uiState.value.copy(gameSettingsProfileActive = false)
@@ -1863,110 +1818,117 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun EmulationLaunchConfig.applyProfile(profile: PerGameSettings?): EmulationLaunchConfig {
         if (profile == null) return this
+        fun <T> pick(key: String, current: T, value: PerGameSettings.() -> T): T {
+            val keys = profile.providedKeys
+            return if (keys == null || key in keys) profile.value() else current
+        }
         return copy(
-            renderer = profile.renderer,
-            upscaleMultiplier = profile.upscaleMultiplier,
-            aspectRatio = profile.aspectRatio,
-            mtvu = profile.enableMtvu,
-            fastCdvd = profile.enableFastCdvd,
-            enableCheats = profile.enableCheats,
-            hwDownloadMode = profile.hwDownloadMode,
-            eeCycleRate = profile.eeCycleRate,
-            eeCycleSkip = profile.eeCycleSkip,
-            frameSkip = profile.frameSkip,
-            frameLimitEnabled = profile.frameLimitEnabled,
-            targetFps = profile.targetFps,
-            textureFiltering = profile.textureFiltering,
-            trilinearFiltering = profile.trilinearFiltering,
-            blendingAccuracy = profile.blendingAccuracy,
-            texturePreloading = profile.texturePreloading,
-            enableFxaa = profile.enableFxaa,
-            casMode = profile.casMode,
-            casSharpness = profile.casSharpness,
-            anisotropicFiltering = profile.anisotropicFiltering,
-            enableHwMipmapping = profile.enableHwMipmapping,
-            widescreenPatches = profile.enableWidescreenPatches,
-            noInterlacingPatches = profile.enableNoInterlacingPatches,
-            cpuSpriteRenderSize = profile.cpuSpriteRenderSize,
-            cpuSpriteRenderLevel = profile.cpuSpriteRenderLevel,
-            softwareClutRender = profile.softwareClutRender,
-            gpuTargetClutMode = profile.gpuTargetClutMode,
-            skipDrawStart = profile.skipDrawStart,
-            skipDrawEnd = profile.skipDrawEnd,
-            autoFlushHardware = profile.autoFlushHardware,
-            cpuFramebufferConversion = profile.cpuFramebufferConversion,
-            disableDepthConversion = profile.disableDepthConversion,
-            disableSafeFeatures = profile.disableSafeFeatures,
-            disableRenderFixes = profile.disableRenderFixes,
-            preloadFrameData = profile.preloadFrameData,
-            disablePartialInvalidation = profile.disablePartialInvalidation,
-            textureInsideRt = profile.textureInsideRt,
-            readTargetsOnClose = profile.readTargetsOnClose,
-            estimateTextureRegion = profile.estimateTextureRegion,
-            gpuPaletteConversion = profile.gpuPaletteConversion,
-            halfPixelOffset = profile.halfPixelOffset,
-            nativeScaling = profile.nativeScaling,
-            roundSprite = profile.roundSprite,
-            bilinearUpscale = profile.bilinearUpscale,
-            textureOffsetX = profile.textureOffsetX,
-            textureOffsetY = profile.textureOffsetY,
-            alignSprite = profile.alignSprite,
-            mergeSprite = profile.mergeSprite,
-            forceEvenSpritePosition = profile.forceEvenSpritePosition,
-            nativePaletteDraw = profile.nativePaletteDraw
+            renderer = pick("renderer", renderer) { renderer },
+            upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier) { upscaleMultiplier },
+            aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            mtvu = pick("enableMtvu", mtvu) { enableMtvu },
+            fastCdvd = pick("enableFastCdvd", fastCdvd) { enableFastCdvd },
+            enableCheats = pick("enableCheats", enableCheats) { enableCheats },
+            hwDownloadMode = pick("hwDownloadMode", hwDownloadMode) { hwDownloadMode },
+            eeCycleRate = pick("eeCycleRate", eeCycleRate) { eeCycleRate },
+            eeCycleSkip = pick("eeCycleSkip", eeCycleSkip) { eeCycleSkip },
+            frameSkip = pick("frameSkip", frameSkip) { frameSkip },
+            frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled) { frameLimitEnabled },
+            targetFps = pick("targetFps", targetFps) { targetFps },
+            textureFiltering = pick("textureFiltering", textureFiltering) { textureFiltering },
+            trilinearFiltering = pick("trilinearFiltering", trilinearFiltering) { trilinearFiltering },
+            blendingAccuracy = pick("blendingAccuracy", blendingAccuracy) { blendingAccuracy },
+            texturePreloading = pick("texturePreloading", texturePreloading) { texturePreloading },
+            enableFxaa = pick("enableFxaa", enableFxaa) { enableFxaa },
+            casMode = pick("casMode", casMode) { casMode },
+            casSharpness = pick("casSharpness", casSharpness) { casSharpness },
+            anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
+            enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
+            widescreenPatches = pick("enableWidescreenPatches", widescreenPatches) { enableWidescreenPatches },
+            noInterlacingPatches = pick("enableNoInterlacingPatches", noInterlacingPatches) { enableNoInterlacingPatches },
+            cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize) { cpuSpriteRenderSize },
+            cpuSpriteRenderLevel = pick("cpuSpriteRenderLevel", cpuSpriteRenderLevel) { cpuSpriteRenderLevel },
+            softwareClutRender = pick("softwareClutRender", softwareClutRender) { softwareClutRender },
+            gpuTargetClutMode = pick("gpuTargetClutMode", gpuTargetClutMode) { gpuTargetClutMode },
+            skipDrawStart = pick("skipDrawStart", skipDrawStart) { skipDrawStart },
+            skipDrawEnd = pick("skipDrawEnd", skipDrawEnd) { skipDrawEnd },
+            autoFlushHardware = pick("autoFlushHardware", autoFlushHardware) { autoFlushHardware },
+            cpuFramebufferConversion = pick("cpuFramebufferConversion", cpuFramebufferConversion) { cpuFramebufferConversion },
+            disableDepthConversion = pick("disableDepthConversion", disableDepthConversion) { disableDepthConversion },
+            disableSafeFeatures = pick("disableSafeFeatures", disableSafeFeatures) { disableSafeFeatures },
+            disableRenderFixes = pick("disableRenderFixes", disableRenderFixes) { disableRenderFixes },
+            preloadFrameData = pick("preloadFrameData", preloadFrameData) { preloadFrameData },
+            disablePartialInvalidation = pick("disablePartialInvalidation", disablePartialInvalidation) { disablePartialInvalidation },
+            textureInsideRt = pick("textureInsideRt", textureInsideRt) { textureInsideRt },
+            readTargetsOnClose = pick("readTargetsOnClose", readTargetsOnClose) { readTargetsOnClose },
+            estimateTextureRegion = pick("estimateTextureRegion", estimateTextureRegion) { estimateTextureRegion },
+            gpuPaletteConversion = pick("gpuPaletteConversion", gpuPaletteConversion) { gpuPaletteConversion },
+            halfPixelOffset = pick("halfPixelOffset", halfPixelOffset) { halfPixelOffset },
+            nativeScaling = pick("nativeScaling", nativeScaling) { nativeScaling },
+            roundSprite = pick("roundSprite", roundSprite) { roundSprite },
+            bilinearUpscale = pick("bilinearUpscale", bilinearUpscale) { bilinearUpscale },
+            textureOffsetX = pick("textureOffsetX", textureOffsetX) { textureOffsetX },
+            textureOffsetY = pick("textureOffsetY", textureOffsetY) { textureOffsetY },
+            alignSprite = pick("alignSprite", alignSprite) { alignSprite },
+            mergeSprite = pick("mergeSprite", mergeSprite) { mergeSprite },
+            forceEvenSpritePosition = pick("forceEvenSpritePosition", forceEvenSpritePosition) { forceEvenSpritePosition },
+            nativePaletteDraw = pick("nativePaletteDraw", nativePaletteDraw) { nativePaletteDraw }
         )
     }
 
     private fun LiveRuntimeSnapshot.applyProfile(profile: PerGameSettings?): LiveRuntimeSnapshot {
         if (profile == null) return this
+        fun <T> pick(key: String, current: T, value: PerGameSettings.() -> T): T {
+            val keys = profile.providedKeys
+            return if (keys == null || key in keys) profile.value() else current
+        }
         return copy(
-            renderer = profile.renderer,
-            upscale = profile.upscaleMultiplier,
-            aspectRatio = profile.aspectRatio,
-            performancePreset = profile.performancePreset,
-            enableMtvu = profile.enableMtvu,
-            enableFastCdvd = profile.enableFastCdvd,
-            enableCheats = profile.enableCheats,
-            hwDownloadMode = profile.hwDownloadMode,
-            frameSkip = profile.frameSkip,
-            frameLimitEnabled = profile.frameLimitEnabled,
-            targetFps = profile.targetFps,
-            textureFiltering = profile.textureFiltering,
-            trilinearFiltering = profile.trilinearFiltering,
-            blendingAccuracy = profile.blendingAccuracy,
-            texturePreloading = profile.texturePreloading,
-            enableFxaa = profile.enableFxaa,
-            casMode = profile.casMode,
-            casSharpness = profile.casSharpness,
-            anisotropicFiltering = profile.anisotropicFiltering,
-            enableHwMipmapping = profile.enableHwMipmapping,
-            cpuSpriteRenderSize = profile.cpuSpriteRenderSize,
-            cpuSpriteRenderLevel = profile.cpuSpriteRenderLevel,
-            softwareClutRender = profile.softwareClutRender,
-            gpuTargetClutMode = profile.gpuTargetClutMode,
-            skipDrawStart = profile.skipDrawStart,
-            skipDrawEnd = profile.skipDrawEnd,
-            autoFlushHardware = profile.autoFlushHardware,
-            cpuFramebufferConversion = profile.cpuFramebufferConversion,
-            disableDepthConversion = profile.disableDepthConversion,
-            disableSafeFeatures = profile.disableSafeFeatures,
-            disableRenderFixes = profile.disableRenderFixes,
-            preloadFrameData = profile.preloadFrameData,
-            disablePartialInvalidation = profile.disablePartialInvalidation,
-            textureInsideRt = profile.textureInsideRt,
-            readTargetsOnClose = profile.readTargetsOnClose,
-            estimateTextureRegion = profile.estimateTextureRegion,
-            gpuPaletteConversion = profile.gpuPaletteConversion,
-            halfPixelOffset = profile.halfPixelOffset,
-            nativeScaling = profile.nativeScaling,
-            roundSprite = profile.roundSprite,
-            bilinearUpscale = profile.bilinearUpscale,
-            textureOffsetX = profile.textureOffsetX,
-            textureOffsetY = profile.textureOffsetY,
-            alignSprite = profile.alignSprite,
-            mergeSprite = profile.mergeSprite,
-            forceEvenSpritePosition = profile.forceEvenSpritePosition,
-            nativePaletteDraw = profile.nativePaletteDraw
+            renderer = pick("renderer", renderer) { renderer },
+            upscale = pick("upscaleMultiplier", upscale) { upscaleMultiplier },
+            aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            enableMtvu = pick("enableMtvu", enableMtvu) { enableMtvu },
+            enableFastCdvd = pick("enableFastCdvd", enableFastCdvd) { enableFastCdvd },
+            enableCheats = pick("enableCheats", enableCheats) { enableCheats },
+            hwDownloadMode = pick("hwDownloadMode", hwDownloadMode) { hwDownloadMode },
+            frameSkip = pick("frameSkip", frameSkip) { frameSkip },
+            frameLimitEnabled = frameLimitEnabled,
+            targetFps = targetFps,
+            textureFiltering = pick("textureFiltering", textureFiltering) { textureFiltering },
+            trilinearFiltering = pick("trilinearFiltering", trilinearFiltering) { trilinearFiltering },
+            blendingAccuracy = pick("blendingAccuracy", blendingAccuracy) { blendingAccuracy },
+            texturePreloading = pick("texturePreloading", texturePreloading) { texturePreloading },
+            enableFxaa = pick("enableFxaa", enableFxaa) { enableFxaa },
+            casMode = pick("casMode", casMode) { casMode },
+            casSharpness = pick("casSharpness", casSharpness) { casSharpness },
+            anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
+            enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
+            cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize) { cpuSpriteRenderSize },
+            cpuSpriteRenderLevel = pick("cpuSpriteRenderLevel", cpuSpriteRenderLevel) { cpuSpriteRenderLevel },
+            softwareClutRender = pick("softwareClutRender", softwareClutRender) { softwareClutRender },
+            gpuTargetClutMode = pick("gpuTargetClutMode", gpuTargetClutMode) { gpuTargetClutMode },
+            skipDrawStart = pick("skipDrawStart", skipDrawStart) { skipDrawStart },
+            skipDrawEnd = pick("skipDrawEnd", skipDrawEnd) { skipDrawEnd },
+            autoFlushHardware = pick("autoFlushHardware", autoFlushHardware) { autoFlushHardware },
+            cpuFramebufferConversion = pick("cpuFramebufferConversion", cpuFramebufferConversion) { cpuFramebufferConversion },
+            disableDepthConversion = pick("disableDepthConversion", disableDepthConversion) { disableDepthConversion },
+            disableSafeFeatures = pick("disableSafeFeatures", disableSafeFeatures) { disableSafeFeatures },
+            disableRenderFixes = pick("disableRenderFixes", disableRenderFixes) { disableRenderFixes },
+            preloadFrameData = pick("preloadFrameData", preloadFrameData) { preloadFrameData },
+            disablePartialInvalidation = pick("disablePartialInvalidation", disablePartialInvalidation) { disablePartialInvalidation },
+            textureInsideRt = pick("textureInsideRt", textureInsideRt) { textureInsideRt },
+            readTargetsOnClose = pick("readTargetsOnClose", readTargetsOnClose) { readTargetsOnClose },
+            estimateTextureRegion = pick("estimateTextureRegion", estimateTextureRegion) { estimateTextureRegion },
+            gpuPaletteConversion = pick("gpuPaletteConversion", gpuPaletteConversion) { gpuPaletteConversion },
+            halfPixelOffset = pick("halfPixelOffset", halfPixelOffset) { halfPixelOffset },
+            nativeScaling = pick("nativeScaling", nativeScaling) { nativeScaling },
+            roundSprite = pick("roundSprite", roundSprite) { roundSprite },
+            bilinearUpscale = pick("bilinearUpscale", bilinearUpscale) { bilinearUpscale },
+            textureOffsetX = pick("textureOffsetX", textureOffsetX) { textureOffsetX },
+            textureOffsetY = pick("textureOffsetY", textureOffsetY) { textureOffsetY },
+            alignSprite = pick("alignSprite", alignSprite) { alignSprite },
+            mergeSprite = pick("mergeSprite", mergeSprite) { mergeSprite },
+            forceEvenSpritePosition = pick("forceEvenSpritePosition", forceEvenSpritePosition) { forceEvenSpritePosition },
+            nativePaletteDraw = pick("nativePaletteDraw", nativePaletteDraw) { nativePaletteDraw }
         )
     }
 
@@ -1982,7 +1944,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = renderer,
             upscaleMultiplier = upscale,
             aspectRatio = aspectRatio,
-            performancePreset = performancePreset,
             showFps = showFps,
             fpsOverlayMode = fpsOverlayMode,
             enableMtvu = enableMtvu,
@@ -2128,6 +2089,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun stopEmulation(onExit: (() -> Unit)? = null) {
         cancelPendingStart = true
+        pausedForBackground = false
         viewModelScope.launch(Dispatchers.IO) {
             performShutdown()
             if (onExit != null) {
@@ -2138,11 +2100,52 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun onHostBackgrounded() {
+        viewModelScope.launch(Dispatchers.IO) {
+            lifecycleMutex.withLock {
+                val state = _uiState.value
+                if (!state.isRunning || state.isStarting || state.isPaused || state.showMenu || isShuttingDown) {
+                    return@withLock
+                }
+                try {
+                    EmulatorBridge.pause()
+                    pausedForBackground = true
+                    _uiState.value = state.copy(isPaused = true)
+                    updateCrashContext(launchState = "paused")
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
+    fun onHostForegrounded() {
+        viewModelScope.launch(Dispatchers.IO) {
+            lifecycleMutex.withLock {
+                val state = _uiState.value
+                if (!pausedForBackground ||
+                    !state.isRunning ||
+                    state.isStarting ||
+                    !state.isPaused ||
+                    state.showMenu ||
+                    isShuttingDown
+                ) {
+                    return@withLock
+                }
+                try {
+                    EmulatorBridge.resume()
+                    pausedForBackground = false
+                    _uiState.value = state.copy(isPaused = false)
+                    updateCrashContext(launchState = "running")
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
     private suspend fun performShutdown() {
         lifecycleMutex.withLock {
             if (!_uiState.value.isRunning && !_uiState.value.isStarting) return
             if (isShuttingDown) return
             isShuttingDown = true
+            pausedForBackground = false
             try {
                 try {
                     EmulatorBridge.resetKeyStatus()
@@ -2200,7 +2203,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         })
         NativeApp.setCrashContextString("emu_upscale", state.upscale.toString())
         NativeApp.setCrashContextInt("emu_aspect_ratio", state.aspectRatio)
-        NativeApp.setCrashContextInt("emu_performance_preset", state.performancePreset)
         NativeApp.setCrashContextBool("emu_mtvu", state.enableMtvu)
         NativeApp.setCrashContextBool("emu_fast_cdvd", state.enableFastCdvd)
         NativeApp.setCrashContextBool("emu_enable_cheats", state.enableCheats)
@@ -2211,7 +2213,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         NativeApp.setCrashContextInt("emu_texture_filtering", state.textureFiltering)
         NativeApp.setCrashContextString("emu_device_model", Build.MODEL.orEmpty())
         NativeApp.setCrashContextString("emu_soc_model", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else "")
-        NativeApp.setCrashContextString("emu_device_family", deviceProfile.family.name)
         NativeApp.setCrashContextBool("emu_running", state.isRunning)
         NativeApp.setCrashContextBool("emu_paused", state.isPaused)
     }
@@ -2242,22 +2243,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         } catch (_: Exception) { }
     }
 
-    fun onPadInputs(indices: IntArray, values: FloatArray) {
-        if (indices.isEmpty() || indices.size != values.size) return
-        try {
-            EmulatorBridge.setPadParams(indices, values)
-        } catch (_: Exception) { }
-    }
-
     override fun onCleared() {
         NativeApp.setPerformanceListener(null)
-        super.onCleared()
         if (_uiState.value.isRunning) {
-            try {
-                EmulatorBridge.resetKeyStatus()
-                EmulatorBridge.shutdown()
-            } catch (_: Exception) { }
+            EmulatorBridge.resetKeyStatus()
+            runCatching {
+                kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                    EmulatorBridge.shutdown()
+                }
+            }
         }
+        super.onCleared()
     }
 }
 

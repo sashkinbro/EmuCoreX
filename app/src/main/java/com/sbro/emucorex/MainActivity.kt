@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.sbro.emucorex.core.AppLocaleManager
@@ -27,6 +29,8 @@ class MainActivity : ComponentActivity() {
     private var appliedLanguageTag: String? = null
     @Volatile
     private var keepSplashVisible = true
+    private var launchIntentVersion by mutableIntStateOf(0)
+    private var restoredFromSavedState = false
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrap(newBase))
@@ -45,6 +49,7 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
+        restoredFromSavedState = savedInstanceState != null
 
         val preferences = AppPreferences(this)
         GamepadManager.ensureInitialized(this)
@@ -67,12 +72,20 @@ class MainActivity : ComponentActivity() {
 
             EmuCoreXTheme(themeMode = themeMode) {
                 AppNavigation(
+                    launchIntentVersion = launchIntentVersion,
+                    restoredFromSavedState = restoredFromSavedState,
                     onStartupReady = {
                         keepSplashVisible = false
                     }
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        launchIntentVersion++
     }
 
     @SuppressLint("RestrictedApi", "GestureBackNavigation")

@@ -2,6 +2,7 @@ package com.sbro.emucorex.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -10,10 +11,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sbro.emucorex.core.BiosValidator
-import com.sbro.emucorex.core.DeviceChipsetFamily
-import com.sbro.emucorex.core.DevicePerformanceProfiles
+import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GsHackDefaults
-import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.ui.theme.ThemeMode
@@ -33,7 +32,7 @@ data class RecentGameEntry(
 data class SettingsSnapshot(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
-    val renderer: Int = 0,
+    val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,
@@ -44,6 +43,7 @@ data class SettingsSnapshot(
     val keepScreenOn: Boolean = true,
     val showRecentGames: Boolean = true,
     val showHomeSearch: Boolean = true,
+    val preferEnglishGameTitles: Boolean = false,
     val biosPath: String? = null,
     val biosValid: Boolean = false,
     val gamePath: String? = null,
@@ -67,7 +67,7 @@ data class SettingsSnapshot(
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val anisotropicFiltering: Int = 0,
-    val enableHwMipmapping: Boolean = true,
+    val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
     val cpuSpriteRenderLevel: Int = GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
     val softwareClutRender: Int = GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
@@ -95,7 +95,7 @@ data class SettingsSnapshot(
     val mergeSprite: Boolean = false,
     val forceEvenSpritePosition: Boolean = false,
     val nativePaletteDraw: Boolean = false,
-    val performancePreset: Int = PerformancePresets.BALANCED,
+    val performancePreset: Int = PerformancePresets.CUSTOM,
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
     val overlayShow: Boolean = true,
@@ -105,7 +105,7 @@ data class SettingsSnapshot(
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
     val frameLimitEnabled: Boolean = false,
-    val targetFps: Int = 60
+    val targetFps: Int = 0
 )
 
 data class OverlayLayoutSnapshot(
@@ -136,6 +136,8 @@ class AppPreferences(private val context: Context) {
     private val localePrefs = context.getSharedPreferences("ui_locale", Context.MODE_PRIVATE)
 
     companion object {
+        const val DEFAULT_CENTER_OFFSET_X = 0f
+        const val DEFAULT_CENTER_OFFSET_Y = 0f
         const val COVER_ART_STYLE_DISABLED = -1
         const val COVER_ART_STYLE_DEFAULT = 0
         const val COVER_ART_STYLE_3D = 1
@@ -164,6 +166,7 @@ class AppPreferences(private val context: Context) {
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val SHOW_RECENT_GAMES = booleanPreferencesKey("show_recent_games")
         private val SHOW_HOME_SEARCH = booleanPreferencesKey("show_home_search")
+        private val PREFER_ENGLISH_GAME_TITLES = booleanPreferencesKey("prefer_english_game_titles")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
         private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
         private const val MAX_RECENT_GAMES = 8
@@ -218,6 +221,7 @@ class AppPreferences(private val context: Context) {
         private val FORCE_EVEN_SPRITE_POSITION = booleanPreferencesKey("force_even_sprite_position")
         private val NATIVE_PALETTE_DRAW = booleanPreferencesKey("native_palette_draw")
         private val PERFORMANCE_PRESET = intPreferencesKey("performance_preset")
+        private val MANUAL_HACKS_BASELINE_VERSION = intPreferencesKey("manual_hacks_baseline_version")
         private val ENABLE_AUTO_GAMEPAD = booleanPreferencesKey("enable_auto_gamepad")
         private val HIDE_OVERLAY_ON_GAMEPAD = booleanPreferencesKey("hide_overlay_on_gamepad")
         private val GAMEPAD_BINDINGS = stringPreferencesKey("gamepad_bindings")
@@ -238,6 +242,7 @@ class AppPreferences(private val context: Context) {
         private val CENTER_OFFSET = stringPreferencesKey("center_offset")
         private val STICK_SCALE = intPreferencesKey("stick_scale")
         private val CONTROL_LAYOUTS = stringPreferencesKey("control_layouts")
+        private val OVERLAY_LAYOUT_VERSION = intPreferencesKey("overlay_layout_version")
     }
 
     // Theme
@@ -261,7 +266,7 @@ class AppPreferences(private val context: Context) {
 
 
     val renderer: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[RENDERER] ?: defaultRendererForCurrentDevice()
+        normalizeRendererPreference(prefs[RENDERER])
     }
 
 
@@ -274,18 +279,14 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun setRenderer(value: Int) {
-        context.dataStore.edit { it[RENDERER] = value }
+        context.dataStore.edit { it[RENDERER] = normalizeRendererPreference(value) }
     }
 
-    private fun defaultRendererForCurrentDevice(): Int {
-        return when (DevicePerformanceProfiles.current().family) {
-            DeviceChipsetFamily.MEDIATEK -> 12
-            else -> 14
+    private fun normalizeRendererPreference(value: Int?): Int {
+        return when (value) {
+            null, 0 -> EmulatorBridge.AUTO_RENDERER
+            else -> value
         }
-    }
-
-    private fun defaultPerformancePresetId(): Int {
-        return DevicePerformanceProfiles.current().recommendedPresetId
     }
 
     suspend fun setGpuDriverType(value: Int) {
@@ -308,11 +309,11 @@ class AppPreferences(private val context: Context) {
     }
 
     val targetFps: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[TARGET_FPS] ?: 60
+        prefs[TARGET_FPS] ?: 0
     }
 
     suspend fun setTargetFps(value: Int) {
-        context.dataStore.edit { it[TARGET_FPS] = value.coerceIn(20, 120) }
+        context.dataStore.edit { it[TARGET_FPS] = if (value <= 0) 0 else value.coerceIn(20, 120) }
     }
 
     suspend fun resetAllSettings() {
@@ -443,7 +444,7 @@ class AppPreferences(private val context: Context) {
                     else -> ThemeMode.SYSTEM
                 },
                 languageTag = prefs[LANGUAGE_TAG],
-                renderer = prefs[RENDERER] ?: defaultRendererForCurrentDevice(),
+                renderer = normalizeRendererPreference(prefs[RENDERER]),
                 upscaleMultiplier = readUpscale(prefs),
                 aspectRatio = prefs[ASPECT_RATIO] ?: 1,
                 padVibration = prefs[PAD_VIBRATION] ?: true,
@@ -460,6 +461,7 @@ class AppPreferences(private val context: Context) {
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
                 showRecentGames = prefs[SHOW_RECENT_GAMES] ?: true,
                 showHomeSearch = prefs[SHOW_HOME_SEARCH] ?: true,
+                preferEnglishGameTitles = prefs[PREFER_ENGLISH_GAME_TITLES] ?: false,
                 biosPath = biosPath,
                 biosValid = BiosValidator.hasUsableBiosFiles(context, biosPath),
                 gamePath = prefs[GAME_PATH],
@@ -487,7 +489,7 @@ class AppPreferences(private val context: Context) {
                 enableWidescreenPatches = prefs[ENABLE_WIDESCREEN_PATCHES] ?: false,
                 enableNoInterlacingPatches = prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false,
                 anisotropicFiltering = prefs[ANISOTROPIC_FILTERING] ?: 0,
-                enableHwMipmapping = prefs[ENABLE_HW_MIPMAPPING] ?: true,
+                enableHwMipmapping = prefs[ENABLE_HW_MIPMAPPING] ?: GsHackDefaults.HW_MIPMAPPING_DEFAULT,
                 cpuSpriteRenderSize = prefs[CPU_SPRITE_RENDER_SIZE] ?: GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
                 cpuSpriteRenderLevel = prefs[CPU_SPRITE_RENDER_LEVEL] ?: GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
                 softwareClutRender = prefs[SOFTWARE_CLUT_RENDER] ?: GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
@@ -515,7 +517,7 @@ class AppPreferences(private val context: Context) {
                 mergeSprite = prefs[MERGE_SPRITE] ?: false,
                 forceEvenSpritePosition = prefs[FORCE_EVEN_SPRITE_POSITION] ?: false,
                 nativePaletteDraw = prefs[NATIVE_PALETTE_DRAW] ?: false,
-                performancePreset = prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId(),
+                performancePreset = PerformancePresets.CUSTOM,
                 overlayScale = prefs[OVERLAY_SCALE] ?: 100,
                 overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
                 overlayShow = prefs[OVERLAY_SHOW] ?: true,
@@ -525,7 +527,7 @@ class AppPreferences(private val context: Context) {
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
                 frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: false,
-                targetFps = prefs[TARGET_FPS] ?: 60
+                targetFps = prefs[TARGET_FPS] ?: 0
             )
         }
         .distinctUntilChanged()
@@ -542,7 +544,10 @@ class AppPreferences(private val context: Context) {
                 actionOffset = parseOffsetStr(prefs[ACTION_OFFSET]),
                 lbtnOffset = parseOffsetStr(prefs[LBTN_OFFSET]),
                 rbtnOffset = parseOffsetStr(prefs[RBTN_OFFSET]),
-                centerOffset = parseOffsetStr(prefs[CENTER_OFFSET]),
+                centerOffset = parseOffsetStr(
+                    prefs[CENTER_OFFSET],
+                    DEFAULT_CENTER_OFFSET_X to DEFAULT_CENTER_OFFSET_Y
+                ),
                 stickScale = prefs[STICK_SCALE] ?: 100,
                 controlLayouts = decodeControlLayouts(prefs[CONTROL_LAYOUTS])
             )
@@ -633,6 +638,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setShowHomeSearch(enabled: Boolean) {
         context.dataStore.edit { it[SHOW_HOME_SEARCH] = enabled }
+    }
+
+    val preferEnglishGameTitles: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[PREFER_ENGLISH_GAME_TITLES] ?: false
+    }
+
+    suspend fun setPreferEnglishGameTitles(enabled: Boolean) {
+        context.dataStore.edit { it[PREFER_ENGLISH_GAME_TITLES] = enabled }
     }
 
     val recentGames: Flow<List<RecentGameEntry>> = context.dataStore.data.map { prefs ->
@@ -890,7 +903,7 @@ class AppPreferences(private val context: Context) {
     }
 
     val enableHwMipmapping: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[ENABLE_HW_MIPMAPPING] ?: true
+        prefs[ENABLE_HW_MIPMAPPING] ?: GsHackDefaults.HW_MIPMAPPING_DEFAULT
     }
 
     suspend fun setEnableHwMipmapping(enabled: Boolean) {
@@ -1114,28 +1127,55 @@ class AppPreferences(private val context: Context) {
     }
 
     val performancePreset: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId()
+        prefs[PERFORMANCE_PRESET] ?: PerformancePresets.CUSTOM
     }
 
     suspend fun setPerformancePreset(value: Int) {
         context.dataStore.edit { it[PERFORMANCE_PRESET] = value }
     }
 
-    suspend fun applyPerformancePreset(config: PerformancePresetConfig) {
+    suspend fun ensureManualHardwareFixesBaseline(version: Int = 1): Boolean {
+        var changed = false
         context.dataStore.edit { prefs ->
-            prefs[PERFORMANCE_PRESET] = config.id
-            prefs[RENDERER] = config.renderer
-            prefs[UPSCALE] = config.upscaleMultiplier
-            prefs[EE_CYCLE_RATE] = config.eeCycleRate
-            prefs[EE_CYCLE_SKIP] = config.eeCycleSkip
-            prefs[ENABLE_MTVU] = config.enableMtvu
-            prefs[ENABLE_FAST_CDVD] = config.enableFastCdvd
-            prefs[FRAME_SKIP] = config.frameSkip
-            prefs[TEXTURE_FILTERING] = config.textureFiltering
-            prefs[ANISOTROPIC_FILTERING] = config.anisotropicFiltering
-            prefs[ENABLE_WIDESCREEN_PATCHES] = config.widescreenPatches
-            prefs[HALF_PIXEL_OFFSET] = config.halfPixelOffset
+            if ((prefs[MANUAL_HACKS_BASELINE_VERSION] ?: 0) >= version) {
+                return@edit
+            }
+
+            resetManualHardwareFixes(prefs)
+            prefs[MANUAL_HACKS_BASELINE_VERSION] = version
+            changed = true
         }
+        return changed
+    }
+
+    private fun resetManualHardwareFixes(prefs: MutablePreferences) {
+        prefs[CPU_SPRITE_RENDER_SIZE] = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT
+        prefs[CPU_SPRITE_RENDER_LEVEL] = GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT
+        prefs[SOFTWARE_CLUT_RENDER] = GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT
+        prefs[GPU_TARGET_CLUT_MODE] = GsHackDefaults.GPU_TARGET_CLUT_DEFAULT
+        prefs[SKIP_DRAW_START] = 0
+        prefs[SKIP_DRAW_END] = 0
+        prefs[AUTO_FLUSH_HARDWARE] = GsHackDefaults.AUTO_FLUSH_DEFAULT
+        prefs[CPU_FRAMEBUFFER_CONVERSION] = false
+        prefs[DISABLE_DEPTH_CONVERSION] = false
+        prefs[DISABLE_SAFE_FEATURES] = false
+        prefs[DISABLE_RENDER_FIXES] = false
+        prefs[PRELOAD_FRAME_DATA] = false
+        prefs[DISABLE_PARTIAL_INVALIDATION] = false
+        prefs[TEXTURE_INSIDE_RT] = GsHackDefaults.TEXTURE_INSIDE_RT_DEFAULT
+        prefs[READ_TARGETS_ON_CLOSE] = false
+        prefs[ESTIMATE_TEXTURE_REGION] = false
+        prefs[GPU_PALETTE_CONVERSION] = false
+        prefs[HALF_PIXEL_OFFSET] = GsHackDefaults.HALF_PIXEL_OFFSET_DEFAULT
+        prefs[NATIVE_SCALING] = GsHackDefaults.NATIVE_SCALING_DEFAULT
+        prefs[ROUND_SPRITE] = GsHackDefaults.ROUND_SPRITE_DEFAULT
+        prefs[BILINEAR_UPSCALE] = GsHackDefaults.BILINEAR_UPSCALE_DEFAULT
+        prefs[TEXTURE_OFFSET_X] = 0
+        prefs[TEXTURE_OFFSET_Y] = 0
+        prefs[ALIGN_SPRITE] = false
+        prefs[MERGE_SPRITE] = false
+        prefs[FORCE_EVEN_SPRITE_POSITION] = false
+        prefs[NATIVE_PALETTE_DRAW] = false
     }
 
     // Gamepad auto-detect
@@ -1184,11 +1224,11 @@ class AppPreferences(private val context: Context) {
     }
 
     // Custom Layout Offsets
-    private fun parseOffsetStr(raw: String?): Pair<Float, Float> {
-        if (raw.isNullOrBlank()) return 0f to 0f
+    private fun parseOffsetStr(raw: String?, default: Pair<Float, Float> = 0f to 0f): Pair<Float, Float> {
+        if (raw.isNullOrBlank()) return default
         val parts = raw.split(",")
-        if (parts.size != 2) return 0f to 0f
-        return (parts[0].toFloatOrNull() ?: 0f) to (parts[1].toFloatOrNull() ?: 0f)
+        if (parts.size != 2) return default
+        return (parts[0].toFloatOrNull() ?: default.first) to (parts[1].toFloatOrNull() ?: default.second)
     }
 
     private fun formatOffsetStr(x: Float, y: Float): String = "$x,$y"
@@ -1238,7 +1278,9 @@ class AppPreferences(private val context: Context) {
     val actionOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[ACTION_OFFSET]) }
     val lbtnOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[LBTN_OFFSET]) }
     val rbtnOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[RBTN_OFFSET]) }
-    val centerOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map { parseOffsetStr(it[CENTER_OFFSET]) }
+    val centerOffset: Flow<Pair<Float, Float>> = context.dataStore.data.map {
+        parseOffsetStr(it[CENTER_OFFSET], DEFAULT_CENTER_OFFSET_X to DEFAULT_CENTER_OFFSET_Y)
+    }
     
     val stickScale: Flow<Int> = context.dataStore.data.map { it[STICK_SCALE] ?: 100 }
 
@@ -1268,6 +1310,7 @@ class AppPreferences(private val context: Context) {
             prefs[RBTN_OFFSET] = formatOffsetStr(rbtnX, rbtnY)
             prefs[CENTER_OFFSET] = formatOffsetStr(centerX, centerY)
             prefs[STICK_SCALE] = stickScaleVal.coerceIn(50, 200)
+            prefs[OVERLAY_LAYOUT_VERSION] = 2
             encodeControlLayouts(controlLayouts)?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
         }
     }
@@ -1283,6 +1326,25 @@ class AppPreferences(private val context: Context) {
             prefs.remove(CENTER_OFFSET)
             prefs.remove(STICK_SCALE)
             prefs.remove(CONTROL_LAYOUTS)
+            prefs[OVERLAY_LAYOUT_VERSION] = 2
+        }
+    }
+
+    suspend fun migrateOverlayLayoutIfNeeded() {
+        context.dataStore.edit { prefs ->
+            val currentVersion = prefs[OVERLAY_LAYOUT_VERSION] ?: 0
+            if (currentVersion >= 2) return@edit
+
+            prefs.remove(DPAD_OFFSET)
+            prefs.remove(LSTICK_OFFSET)
+            prefs.remove(RSTICK_OFFSET)
+            prefs.remove(ACTION_OFFSET)
+            prefs.remove(LBTN_OFFSET)
+            prefs.remove(RBTN_OFFSET)
+            prefs.remove(CENTER_OFFSET)
+            prefs.remove(STICK_SCALE)
+            prefs.remove(CONTROL_LAYOUTS)
+            prefs[OVERLAY_LAYOUT_VERSION] = 2
         }
     }
 
@@ -1290,7 +1352,7 @@ class AppPreferences(private val context: Context) {
         val prefs = context.dataStore.data.first()
         return JSONObject().apply {
             put("themeMode", prefs[THEME_MODE] ?: 0)
-            put("renderer", prefs[RENDERER] ?: 14)
+            put("renderer", normalizeRendererPreference(prefs[RENDERER]))
             put("upscaleMultiplier", readUpscale(prefs).toDouble())
             put("biosPath", prefs[BIOS_PATH])
             put("gamePath", prefs[GAME_PATH])
@@ -1307,6 +1369,7 @@ class AppPreferences(private val context: Context) {
             put("keepScreenOn", prefs[KEEP_SCREEN_ON] ?: true)
             put("showRecentGames", prefs[SHOW_RECENT_GAMES] ?: true)
             put("showHomeSearch", prefs[SHOW_HOME_SEARCH] ?: true)
+            put("preferEnglishGameTitles", prefs[PREFER_ENGLISH_GAME_TITLES] ?: false)
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
@@ -1328,7 +1391,7 @@ class AppPreferences(private val context: Context) {
             put("enableWidescreenPatches", prefs[ENABLE_WIDESCREEN_PATCHES] ?: false)
             put("enableNoInterlacingPatches", prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false)
             put("anisotropicFiltering", prefs[ANISOTROPIC_FILTERING] ?: 0)
-            put("enableHwMipmapping", prefs[ENABLE_HW_MIPMAPPING] ?: true)
+            put("enableHwMipmapping", prefs[ENABLE_HW_MIPMAPPING] ?: GsHackDefaults.HW_MIPMAPPING_DEFAULT)
             put("cpuSpriteRenderSize", prefs[CPU_SPRITE_RENDER_SIZE] ?: GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT)
             put("cpuSpriteRenderLevel", prefs[CPU_SPRITE_RENDER_LEVEL] ?: GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT)
             put("softwareClutRender", prefs[SOFTWARE_CLUT_RENDER] ?: GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT)
@@ -1356,14 +1419,14 @@ class AppPreferences(private val context: Context) {
             put("mergeSprite", prefs[MERGE_SPRITE] ?: false)
             put("forceEvenSpritePosition", prefs[FORCE_EVEN_SPRITE_POSITION] ?: false)
             put("nativePaletteDraw", prefs[NATIVE_PALETTE_DRAW] ?: false)
-            put("performancePreset", prefs[PERFORMANCE_PRESET] ?: defaultPerformancePresetId())
+            put("performancePreset", PerformancePresets.CUSTOM)
             put("enableAutoGamepad", prefs[ENABLE_AUTO_GAMEPAD] ?: true)
             put("hideOverlayOnGamepad", prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
             put("gpuDriverType", prefs[GPU_DRIVER_TYPE] ?: 0)
             put("customDriverPath", prefs[CUSTOM_DRIVER_PATH])
             put("frameLimitEnabled", prefs[FRAME_LIMIT_ENABLED] ?: false)
-            put("targetFps", prefs[TARGET_FPS] ?: 60)
+            put("targetFps", prefs[TARGET_FPS] ?: 0)
             put("dpadOffset", prefs[DPAD_OFFSET])
             put("lstickOffset", prefs[LSTICK_OFFSET])
             put("rstickOffset", prefs[RSTICK_OFFSET])
@@ -1383,7 +1446,7 @@ class AppPreferences(private val context: Context) {
         localePrefs.edit().putString("language_tag", languageTag).apply()
         context.dataStore.edit { prefs ->
             prefs[THEME_MODE] = json.optInt("themeMode", 0)
-            prefs[RENDERER] = json.optInt("renderer", 14)
+            prefs[RENDERER] = normalizeRendererPreference(json.optInt("renderer", EmulatorBridge.AUTO_RENDERER))
             prefs[UPSCALE] = json.readUpscaleMultiplier()
             json.optString("biosPath").takeIf { it.isNotBlank() }?.let { prefs[BIOS_PATH] = it } ?: prefs.remove(BIOS_PATH)
             json.optString("gamePath").takeIf { it.isNotBlank() }?.let { prefs[GAME_PATH] = it } ?: prefs.remove(GAME_PATH)
@@ -1409,6 +1472,7 @@ class AppPreferences(private val context: Context) {
             prefs[KEEP_SCREEN_ON] = json.optBoolean("keepScreenOn", true)
             prefs[SHOW_RECENT_GAMES] = json.optBoolean("showRecentGames", true)
             prefs[SHOW_HOME_SEARCH] = json.optBoolean("showHomeSearch", true)
+            prefs[PREFER_ENGLISH_GAME_TITLES] = json.optBoolean("preferEnglishGameTitles", false)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 1)
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
@@ -1430,7 +1494,7 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_WIDESCREEN_PATCHES] = json.optBoolean("enableWidescreenPatches", false)
             prefs[ENABLE_NO_INTERLACING_PATCHES] = json.optBoolean("enableNoInterlacingPatches", false)
             prefs[ANISOTROPIC_FILTERING] = json.optInt("anisotropicFiltering", 0)
-            prefs[ENABLE_HW_MIPMAPPING] = json.optBoolean("enableHwMipmapping", true)
+            prefs[ENABLE_HW_MIPMAPPING] = json.optBoolean("enableHwMipmapping", GsHackDefaults.HW_MIPMAPPING_DEFAULT)
             prefs[CPU_SPRITE_RENDER_SIZE] = json.optInt("cpuSpriteRenderSize", GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT).coerceIn(0, 10)
             prefs[CPU_SPRITE_RENDER_LEVEL] = json.optInt("cpuSpriteRenderLevel", GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT).coerceIn(0, 2)
             prefs[SOFTWARE_CLUT_RENDER] = json.optInt("softwareClutRender", GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT).coerceIn(0, 2)
@@ -1458,14 +1522,13 @@ class AppPreferences(private val context: Context) {
             prefs[MERGE_SPRITE] = json.optBoolean("mergeSprite", false)
             prefs[FORCE_EVEN_SPRITE_POSITION] = json.optBoolean("forceEvenSpritePosition", false)
             prefs[NATIVE_PALETTE_DRAW] = json.optBoolean("nativePaletteDraw", false)
-            prefs[PERFORMANCE_PRESET] = json.optInt("performancePreset", defaultPerformancePresetId())
             prefs[ENABLE_AUTO_GAMEPAD] = json.optBoolean("enableAutoGamepad", true)
             prefs[HIDE_OVERLAY_ON_GAMEPAD] = json.optBoolean("hideOverlayOnGamepad", true)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
             prefs[GPU_DRIVER_TYPE] = json.optInt("gpuDriverType", 0)
             json.optString("customDriverPath").takeIf { it.isNotBlank() }?.let { prefs[CUSTOM_DRIVER_PATH] = it } ?: prefs.remove(CUSTOM_DRIVER_PATH)
             prefs[FRAME_LIMIT_ENABLED] = json.optBoolean("frameLimitEnabled", false)
-            prefs[TARGET_FPS] = json.optInt("targetFps", 60)
+            prefs[TARGET_FPS] = json.optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) }
             json.optString("dpadOffset").takeIf { it.isNotBlank() }?.let { prefs[DPAD_OFFSET] = it } ?: prefs.remove(DPAD_OFFSET)
             json.optString("lstickOffset").takeIf { it.isNotBlank() }?.let { prefs[LSTICK_OFFSET] = it } ?: prefs.remove(LSTICK_OFFSET)
             json.optString("rstickOffset").takeIf { it.isNotBlank() }?.let { prefs[RSTICK_OFFSET] = it } ?: prefs.remove(RSTICK_OFFSET)

@@ -1,13 +1,24 @@
 package com.sbro.emucorex.core
 
 import android.content.Context
-import android.os.Build
 import android.view.Surface
+import com.sbro.emucorex.data.AppPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.lang.ref.WeakReference
 import java.util.Locale
 
 object EmulatorBridge {
+    const val AUTO_RENDERER = -1
+
+    private const val RECORD_SEPARATOR = '\u001e'
+    private const val FIELD_SEPARATOR = '\u001f'
 
     private val aspectRatioSettingValues = mapOf(
         0 to "Stretch",
@@ -16,6 +27,9 @@ object EmulatorBridge {
         3 to "16:9",
         4 to "10:7"
     )
+
+    private val serialDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val serialScope = CoroutineScope(SupervisorJob() + serialDispatcher)
 
     @Volatile
     var isNativeLoaded: Boolean = false
@@ -33,22 +47,11 @@ object EmulatorBridge {
     @Volatile
     private var lastSurfaceHeight: Int = 0
 
-    private val settingsCache = HashMap<String, String>()
-
     @Volatile
     private var shutdownRequested: Boolean = false
 
     private var contextRef: WeakReference<Context>? = null
-    private val nativeLock = Any()
-
-    private fun rendererName(renderer: Int): String = when (renderer) {
-        12 -> "OpenGL"
-        13 -> "Software"
-        14 -> "Vulkan"
-        15 -> "D3D12"
-        3 -> "D3D11"
-        else -> "Unknown($renderer)"
-    }
+    private val settingsCache = HashMap<String, String>()
 
     init {
         try {
@@ -59,6 +62,64 @@ object EmulatorBridge {
         }
     }
 
+    private data class RuntimeOp(val kind: String, val fields: List<String>) {
+        fun encode(): String = buildString {
+            append(kind)
+            fields.forEach {
+                append(FIELD_SEPARATOR)
+                append(it)
+            }
+        }
+    }
+
+    private fun settingOp(section: String, key: String, type: String, value: String) =
+        RuntimeOp("setting", listOf(section, key, type, value))
+
+    private fun rendererOp(renderer: Int) = RuntimeOp("renderer", listOf(renderer.toString()))
+
+    private fun upscaleOp(value: Float) = RuntimeOp("upscale", listOf(value.toString()))
+
+    private fun aspectOp(type: Int) = RuntimeOp(
+        "aspect",
+        listOf(type.toString(), aspectRatioSettingValues[type] ?: aspectRatioSettingValues.getValue(1))
+    )
+
+    private fun customDriverOp(path: String) = RuntimeOp("custom_driver", listOf(path))
+
+    private fun refreshBiosOp() = RuntimeOp("refresh_bios", emptyList())
+
+    private fun resetTargetFpsOp() = RuntimeOp("reset_target_fps", emptyList())
+
+    private suspend fun <T> runSerial(block: () -> T): T = withContext(serialDispatcher) { block() }
+
+    private fun launchSerial(block: suspend () -> Unit) {
+        serialScope.launch { block() }
+    }
+
+    private suspend fun performRuntimeOps(ops: List<RuntimeOp>) {
+        if (!isNativeLoaded || ops.isEmpty()) return
+        runSerial {
+            NativeApp.applyRuntimeOperations(
+                ops.joinToString(separator = RECORD_SEPARATOR.toString()) { it.encode() }
+            )
+        }
+    }
+
+    private fun rendererName(renderer: Int): String = when (renderer) {
+        AUTO_RENDERER -> "Auto"
+        0 -> "Auto"
+        12 -> "OpenGL"
+        13 -> "Software"
+        14 -> "Vulkan"
+        15 -> "D3D12"
+        3 -> "D3D11"
+        else -> "Unknown($renderer)"
+    }
+
+    private fun normalizeRenderer(renderer: Int): Int {
+        return if (renderer == 0) AUTO_RENDERER else renderer
+    }
+
     fun initializeOnce(context: Context) {
         contextRef = WeakReference(context)
         if (!isNativeLoaded) return
@@ -66,12 +127,16 @@ object EmulatorBridge {
         try {
             NativeApp.setNativeLibraryDir(context.applicationInfo.nativeLibraryDir ?: "")
             NativeApp.initializeOnce(context.applicationContext)
+            val preferEnglishTitles = runBlocking {
+                AppPreferences(context.applicationContext).preferEnglishGameTitles.first()
+            }
+            NativeApp.setSetting("UI", "PreferEnglishGameTitles", "bool", preferEnglishTitles.toString())
         } catch (_: Exception) { }
     }
 
     fun getContext(): Context? = contextRef?.get()
 
-    fun applyRuntimeConfig(
+    suspend fun applyRuntimeConfig(
         biosPath: String?,
         renderer: Int,
         upscaleMultiplier: Float,
@@ -86,7 +151,7 @@ object EmulatorBridge {
         eeCycleSkip: Int = 0,
         frameSkip: Int = 0,
         frameLimitEnabled: Boolean = false,
-        targetFps: Int = 60,
+        targetFps: Int = 0,
         textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
         trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
         blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -95,7 +160,7 @@ object EmulatorBridge {
         casMode: Int = 0,
         casSharpness: Int = 50,
         anisotropicFiltering: Int = 0,
-        enableHwMipmapping: Boolean = true,
+        enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
         widescreenPatches: Boolean = false,
         noInterlacingPatches: Boolean = false,
         cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -129,202 +194,169 @@ object EmulatorBridge {
         if (!isNativeLoaded) return
 
         val context = getContext() ?: return
-        try {
-            NativeApp.setCrashContextString("emu_device_family", DevicePerformanceProfiles.current().family.name)
-            NativeApp.setCrashContextString("emu_soc_model", if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL.orEmpty() else "")
-            NativeApp.setCrashContextString("emu_device_model", Build.MODEL.orEmpty())
-            NativeApp.setCrashContextString("emu_renderer_name", rendererName(renderer))
-            NativeApp.setCrashContextString("emu_gpu_driver_mode", if (gpuDriverType == 1) "custom" else "system")
-            NativeApp.logCrashBreadcrumb(
-                "applyRuntimeConfig renderer=${rendererName(renderer)}($renderer) driverType=$gpuDriverType hwDownload=$hwDownloadMode mtvu=$mtvu fastCdvd=$fastCdvd"
-            )
-            val resolvedBiosPath = DocumentPathResolver.prepareBiosDirectory(context, biosPath)
-                ?: biosPath?.let(DocumentPathResolver::resolveDirectoryPath)
-            val preferredBiosFile = DocumentPathResolver.findPreferredBiosFileName(resolvedBiosPath)
+        val resolvedRenderer = normalizeRenderer(renderer)
+        val resolvedBiosPath = DocumentPathResolver.prepareBiosDirectory(context, biosPath)
+            ?: biosPath?.let(DocumentPathResolver::resolveDirectoryPath)
+        val preferredBiosFile = DocumentPathResolver.findPreferredBiosFileName(resolvedBiosPath)
+        val savestatesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "sstates").apply { mkdirs() }
+        val memcardsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "memcards").apply { mkdirs() }
+        val cheatsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "cheats").apply { mkdirs() }
+        val patchesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "patches").apply { mkdirs() }
+        val manualHardwareFixes = GsHackDefaults.shouldEnableManualHardwareFixes(
+            cpuSpriteRenderSize = cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = cpuSpriteRenderLevel,
+            softwareClutRender = softwareClutRender,
+            gpuTargetClutMode = gpuTargetClutMode,
+            skipDrawStart = skipDrawStart,
+            skipDrawEnd = skipDrawEnd,
+            autoFlushHardware = autoFlushHardware,
+            cpuFramebufferConversion = cpuFramebufferConversion,
+            disableDepthConversion = disableDepthConversion,
+            disableSafeFeatures = disableSafeFeatures,
+            disableRenderFixes = disableRenderFixes,
+            preloadFrameData = preloadFrameData,
+            disablePartialInvalidation = disablePartialInvalidation,
+            textureInsideRt = textureInsideRt,
+            readTargetsOnClose = readTargetsOnClose,
+            estimateTextureRegion = estimateTextureRegion,
+            gpuPaletteConversion = gpuPaletteConversion,
+            halfPixelOffset = halfPixelOffset,
+            nativeScaling = nativeScaling,
+            roundSprite = roundSprite,
+            bilinearUpscale = bilinearUpscale,
+            textureOffsetX = textureOffsetX,
+            textureOffsetY = textureOffsetY,
+            alignSprite = alignSprite,
+            mergeSprite = mergeSprite,
+            forceEvenSpritePosition = forceEvenSpritePosition,
+            nativePaletteDraw = nativePaletteDraw
+        )
 
-            val savestatesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "sstates").apply { mkdirs() }
-            val memcardsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "memcards").apply { mkdirs() }
-            val cheatsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "cheats").apply { mkdirs() }
-            val patchesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "patches").apply { mkdirs() }
+        NativeApp.setCrashContextString("emu_renderer_name", rendererName(resolvedRenderer))
+        NativeApp.setCrashContextString("emu_gpu_driver_mode", if (gpuDriverType == 1) "custom" else "system")
+        NativeApp.logCrashBreadcrumb(
+            "applyRuntimeConfig renderer=${rendererName(resolvedRenderer)}($resolvedRenderer) driverType=$gpuDriverType hwDownload=$hwDownloadMode mtvu=$mtvu fastCdvd=$fastCdvd"
+        )
 
-            NativeApp.renderGpu(renderer)
-            NativeApp.renderUpscalemultiplier(upscaleMultiplier)
-            NativeApp.setAspectRatio(aspectRatio)
-            
-            NativeApp.setSetting("EmuCore/GS", "Renderer", "int", renderer.toString())
-            NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", upscaleMultiplier.toString())
-            NativeApp.setSetting(
-                "EmuCore/GS",
-                "AspectRatio",
-                "string",
-                aspectRatioSettingValues[aspectRatio] ?: aspectRatioSettingValues.getValue(1)
-            )
-            
-            // Directories
-            NativeApp.setSetting("Folders", "Bios", "string", resolvedBiosPath.orEmpty())
-            NativeApp.setSetting("Folders", "Savestates", "string", savestatesDir.absolutePath)
-            NativeApp.setSetting("Folders", "MemoryCards", "string", memcardsDir.absolutePath)
-            NativeApp.setSetting("Folders", "Cheats", "string", cheatsDir.absolutePath)
-            NativeApp.setSetting("Folders", "Patches", "string", patchesDir.absolutePath)
-            NativeApp.setSetting("Filenames", "BIOS", "string", preferredBiosFile.orEmpty())
-            NativeApp.refreshBIOS()
-            
-            // Speed Hacks
-            NativeApp.setSetting("EmuCore/Speedhacks", "vuThread", "bool", mtvu.toString())
-            NativeApp.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", fastCdvd.toString())
-            NativeApp.setSetting("EmuCore", "EnableCheats", "bool", enableCheats.toString())
-            NativeApp.setSetting("EmuCore/GS", "HWDownloadMode", "int", hwDownloadMode.toString())
-            NativeApp.setSetting("EmuCore/Speedhacks", "EECycleRate", "int", eeCycleRate.toString())
-            NativeApp.setSetting("EmuCore/Speedhacks", "EECycleSkip", "int", eeCycleSkip.toString())
-            NativeApp.setSetting("EmuCore/GS", "FrameLimitEnable", "bool", frameLimitEnabled.toString())
-            NativeApp.setSetting("EmuCore/GS", "FramerateNTSC", "float", targetFps.toFloat().toString())
-            NativeApp.setSetting("EmuCore/GS", "FrameratePAL", "float", targetFps.toFloat().toString())
-            NativeApp.setSetting("EmuCore/Framerate", "NominalScalar", "float", "1.0")
-            
-            // Video / GS Settings (others)
-            NativeApp.setSetting("EmuCore/GS", "FrameSkip", "int", frameSkip.toString())
-            NativeApp.setSetting("EmuCore/GS", "filter", "int", textureFiltering.toString())
-            NativeApp.setSetting("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString())
-            NativeApp.setSetting("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString())
-            NativeApp.setSetting("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString())
-            NativeApp.setSetting("EmuCore/GS", "fxaa", "bool", enableFxaa.toString())
-            NativeApp.setSetting("EmuCore/GS", "CASMode", "int", casMode.toString())
-            NativeApp.setSetting("EmuCore/GS", "CASSharpness", "int", casSharpness.toString())
-            NativeApp.setSetting("EmuCore/GS", "MaxAnisotropy", "int", anisotropicFiltering.toString())
-            NativeApp.setSetting("EmuCore/GS", "hw_mipmap", "bool", enableHwMipmapping.toString())
-            NativeApp.setSetting("EmuCore", "EnableWideScreenPatches", "bool", widescreenPatches.toString())
-            NativeApp.setSetting("EmuCore", "EnableNoInterlacingPatches", "bool", noInterlacingPatches.toString())
-            val manualHardwareFixes = GsHackDefaults.shouldEnableManualHardwareFixes(
-                cpuSpriteRenderSize = cpuSpriteRenderSize,
-                cpuSpriteRenderLevel = cpuSpriteRenderLevel,
-                softwareClutRender = softwareClutRender,
-                gpuTargetClutMode = gpuTargetClutMode,
-                skipDrawStart = skipDrawStart,
-                skipDrawEnd = skipDrawEnd,
-                autoFlushHardware = autoFlushHardware,
-                cpuFramebufferConversion = cpuFramebufferConversion,
-                disableDepthConversion = disableDepthConversion,
-                disableSafeFeatures = disableSafeFeatures,
-                disableRenderFixes = disableRenderFixes,
-                preloadFrameData = preloadFrameData,
-                disablePartialInvalidation = disablePartialInvalidation,
-                textureInsideRt = textureInsideRt,
-                readTargetsOnClose = readTargetsOnClose,
-                estimateTextureRegion = estimateTextureRegion,
-                gpuPaletteConversion = gpuPaletteConversion,
-                halfPixelOffset = halfPixelOffset,
-                nativeScaling = nativeScaling,
-                roundSprite = roundSprite,
-                bilinearUpscale = bilinearUpscale,
-                textureOffsetX = textureOffsetX,
-                textureOffsetY = textureOffsetY,
-                alignSprite = alignSprite,
-                mergeSprite = mergeSprite,
-                forceEvenSpritePosition = forceEvenSpritePosition,
-                nativePaletteDraw = nativePaletteDraw
-            )
-            NativeApp.setSetting("EmuCore/GS", "UserHacks", "bool", manualHardwareFixes.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_CPUSpriteRenderBW", "int", cpuSpriteRenderSize.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_CPUSpriteRenderLevel", "int", cpuSpriteRenderLevel.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_CPUCLUTRender", "int", softwareClutRender.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_GPUTargetCLUTMode", "int", gpuTargetClutMode.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_SkipDraw_Start", "int", skipDrawStart.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", skipDrawEnd.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_AutoFlushLevel", "int", autoFlushHardware.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_CPU_FB_Conversion", "bool", cpuFramebufferConversion.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_DisableDepthSupport", "bool", disableDepthConversion.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_Disable_Safe_Features", "bool", disableSafeFeatures.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_DisableRenderFixes", "bool", disableRenderFixes.toString())
-            NativeApp.setSetting("EmuCore/GS", "preload_frame_with_gs_data", "bool", preloadFrameData.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_DisablePartialInvalidation", "bool", disablePartialInvalidation.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_TextureInsideRt", "int", textureInsideRt.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_ReadTCOnClose", "bool", readTargetsOnClose.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_EstimateTextureRegion", "bool", estimateTextureRegion.toString())
-            NativeApp.setSetting("EmuCore/GS", "paltex", "bool", gpuPaletteConversion.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", halfPixelOffset.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_native_scaling", "int", nativeScaling.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_round_sprite_offset", "int", roundSprite.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_BilinearHack", "int", bilinearUpscale.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_TCOffsetX", "int", textureOffsetX.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_TCOffsetY", "int", textureOffsetY.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_align_sprite_X", "bool", alignSprite.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_merge_pp_sprite", "bool", mergeSprite.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_ForceEvenSpritePosition", "bool", forceEvenSpritePosition.toString())
-            NativeApp.setSetting("EmuCore/GS", "UserHacks_NativePaletteDraw", "bool", nativePaletteDraw.toString())
-
-            // EmuCoreX Meta
-            NativeApp.setSetting("EmuCoreX", "BiosSource", "string", biosPath.orEmpty())
-            NativeApp.setSetting("EmuCoreX", "Renderer", "int", renderer.toString())
-            NativeApp.setSetting("EmuCoreX", "UpscaleMultiplier", "float", upscaleMultiplier.toString())
-            NativeApp.setSetting("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString())
-
-            // GPU Warnings & OSD
-            NativeApp.setSetting("EmuCore", "WarnAboutUnsafeSettings", "bool", "false")
-            NativeApp.setSetting("EmuCore/GS", "OsdMessagesPos", "int", "0")
-
-            // GPU Driver
-            if (gpuDriverType == 1 && !customDriverPath.isNullOrBlank()) {
-                NativeApp.setCustomDriverPath(customDriverPath)
-            } else {
-                NativeApp.setCustomDriverPath("")
+        performRuntimeOps(
+            buildList {
+                add(rendererOp(resolvedRenderer))
+                add(upscaleOp(upscaleMultiplier))
+                add(aspectOp(aspectRatio))
+                add(settingOp("Folders", "Bios", "string", resolvedBiosPath.orEmpty()))
+                add(settingOp("Folders", "Savestates", "string", savestatesDir.absolutePath))
+                add(settingOp("Folders", "MemoryCards", "string", memcardsDir.absolutePath))
+                add(settingOp("Folders", "Cheats", "string", cheatsDir.absolutePath))
+                add(settingOp("Folders", "Patches", "string", patchesDir.absolutePath))
+                add(settingOp("Filenames", "BIOS", "string", preferredBiosFile.orEmpty()))
+                add(refreshBiosOp())
+                add(settingOp("EmuCore/Speedhacks", "vuThread", "bool", mtvu.toString()))
+                add(settingOp("EmuCore/Speedhacks", "fastCDVD", "bool", fastCdvd.toString()))
+                add(settingOp("EmuCore", "EnableCheats", "bool", enableCheats.toString()))
+                add(settingOp("EmuCore/GS", "HWDownloadMode", "int", hwDownloadMode.toString()))
+                add(settingOp("EmuCore/Speedhacks", "EECycleRate", "int", eeCycleRate.toString()))
+                add(settingOp("EmuCore/Speedhacks", "EECycleSkip", "int", eeCycleSkip.toString()))
+                add(settingOp("EmuCore/GS", "FrameLimitEnable", "bool", frameLimitEnabled.toString()))
+                addAll(targetFpsOps(targetFps))
+                add(settingOp("EmuCore/Framerate", "NominalScalar", "float", "1.0"))
+                add(settingOp("EmuCore/GS", "FrameSkip", "int", frameSkip.toString()))
+                add(settingOp("EmuCore/GS", "filter", "int", textureFiltering.toString()))
+                add(settingOp("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString()))
+                add(settingOp("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString()))
+                add(settingOp("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString()))
+                add(settingOp("EmuCore/GS", "fxaa", "bool", enableFxaa.toString()))
+                add(settingOp("EmuCore/GS", "CASMode", "int", casMode.toString()))
+                add(settingOp("EmuCore/GS", "CASSharpness", "int", casSharpness.toString()))
+                add(settingOp("EmuCore/GS", "MaxAnisotropy", "int", anisotropicFiltering.toString()))
+                add(settingOp("EmuCore/GS", "hw_mipmap", "bool", enableHwMipmapping.toString()))
+                add(settingOp("EmuCore", "EnableWideScreenPatches", "bool", widescreenPatches.toString()))
+                add(settingOp("EmuCore", "EnableNoInterlacingPatches", "bool", noInterlacingPatches.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks", "bool", manualHardwareFixes.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_CPUSpriteRenderBW", "int", cpuSpriteRenderSize.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_CPUSpriteRenderLevel", "int", cpuSpriteRenderLevel.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_CPUCLUTRender", "int", softwareClutRender.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_GPUTargetCLUTMode", "int", gpuTargetClutMode.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_SkipDraw_Start", "int", skipDrawStart.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_SkipDraw_End", "int", skipDrawEnd.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_AutoFlushLevel", "int", autoFlushHardware.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_CPU_FB_Conversion", "bool", cpuFramebufferConversion.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_DisableDepthSupport", "bool", disableDepthConversion.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_Disable_Safe_Features", "bool", disableSafeFeatures.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_DisableRenderFixes", "bool", disableRenderFixes.toString()))
+                add(settingOp("EmuCore/GS", "preload_frame_with_gs_data", "bool", preloadFrameData.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_DisablePartialInvalidation", "bool", disablePartialInvalidation.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_TextureInsideRt", "int", textureInsideRt.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_ReadTCOnClose", "bool", readTargetsOnClose.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_EstimateTextureRegion", "bool", estimateTextureRegion.toString()))
+                add(settingOp("EmuCore/GS", "paltex", "bool", gpuPaletteConversion.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", halfPixelOffset.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_native_scaling", "int", nativeScaling.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_round_sprite_offset", "int", roundSprite.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_BilinearHack", "int", bilinearUpscale.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_TCOffsetX", "int", textureOffsetX.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_TCOffsetY", "int", textureOffsetY.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_align_sprite_X", "bool", alignSprite.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_merge_pp_sprite", "bool", mergeSprite.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_ForceEvenSpritePosition", "bool", forceEvenSpritePosition.toString()))
+                add(settingOp("EmuCore/GS", "UserHacks_NativePaletteDraw", "bool", nativePaletteDraw.toString()))
+                add(settingOp("EmuCoreX", "BiosSource", "string", biosPath.orEmpty()))
+                add(settingOp("EmuCoreX", "Renderer", "int", resolvedRenderer.toString()))
+                add(settingOp("EmuCoreX", "UpscaleMultiplier", "float", upscaleMultiplier.toString()))
+                add(settingOp("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString()))
+                add(settingOp("EmuCore", "WarnAboutUnsafeSettings", "bool", "false"))
+                add(settingOp("EmuCore/GS", "OsdMessagesPos", "int", "0"))
+                add(customDriverOp(if (gpuDriverType == 1) customDriverPath.orEmpty() else ""))
             }
-        } catch (_: Exception) { }
+        )
     }
 
-    // region VM Lifecycle
-    fun startEmulation(path: String): Boolean {
+    suspend fun startEmulation(path: String): Boolean {
         if (!isNativeLoaded) return false
         val pathType = when {
             path.startsWith("content://") -> "content"
             path.isBlank() -> "bios"
             else -> "file"
         }
-        NativeApp.logCrashBreadcrumb(
-            "startEmulation requested pathType=$pathType vmActive=$isVmActive"
-        )
-        
-        // Ensure the previous native thread is fully destroyed
-        var waitTime = 0
-        while (isVmActive && waitTime < 5000) {
-            try {
-                Thread.sleep(50)
-                waitTime += 50
-            } catch (_: Exception) { break }
-        }
-        
-        synchronized(nativeLock) {
+        NativeApp.logCrashBreadcrumb("startEmulation requested pathType=$pathType vmActive=$isVmActive")
+
+        return withContext(Dispatchers.IO) {
             isVmActive = true
             shutdownRequested = false
-        }
-        
-        val result = try {
-            NativeApp.logCrashBreadcrumb("startEmulation entering native runVMThread")
-            NativeApp.runVMThread(path)
-        } catch (_: Exception) {
-            NativeApp.logCrashBreadcrumb("startEmulation exception before native start returned")
-            false
-        }
-        
-        synchronized(nativeLock) {
+            val result = try {
+                NativeApp.logCrashBreadcrumb("startEmulation entering native runVMThread")
+                NativeApp.runVMThread(path)
+            } catch (_: Exception) {
+                NativeApp.logCrashBreadcrumb("startEmulation exception before native start returned")
+                false
+            }
             isVmActive = false
+            NativeApp.logCrashBreadcrumb("startEmulation finished result=$result")
+            result
         }
-        NativeApp.logCrashBreadcrumb("startEmulation finished result=$result")
-        return result
     }
 
-    fun pause() {
+    suspend fun pause() {
         if (!isNativeLoaded || !isVmActive) return
-        try { NativeApp.pause() } catch (_: Exception) { }
+        runSerial {
+            try {
+                NativeApp.pause()
+            } catch (_: Exception) { }
+        }
     }
 
-    fun resume() {
+    suspend fun resume() {
         if (!isNativeLoaded || !isVmActive) return
-        try { NativeApp.resume() } catch (_: Exception) { }
+        runSerial {
+            try {
+                NativeApp.resume()
+            } catch (_: Exception) { }
+        }
     }
 
-    fun shutdown() {
-        synchronized(nativeLock) {
-            if (!isNativeLoaded || !isVmActive || shutdownRequested) return
+    suspend fun shutdown() {
+        if (!isNativeLoaded || !isVmActive || shutdownRequested) return
+        runSerial {
+            if (!isVmActive || shutdownRequested) return@runSerial
             shutdownRequested = true
             try {
                 NativeApp.shutdown()
@@ -342,12 +374,8 @@ object EmulatorBridge {
     }
 
     fun isVmActive(): Boolean = isVmActive
-    // endregion
 
-    // region Game Info
-    fun getGameTitle(path: String): String {
-        return getGameMetadata(path).title
-    }
+    fun getGameTitle(path: String): String = getGameMetadata(path).title
 
     fun getGameMetadata(path: String): GameMetadata {
         val inferredMetadata = when {
@@ -359,9 +387,7 @@ object EmulatorBridge {
             else -> parseMetadataFromName(File(path).nameWithoutExtension)
         }
 
-        if (!isNativeLoaded) {
-            return inferredMetadata
-        }
+        if (!isNativeLoaded) return inferredMetadata
 
         return try {
             val rawTitle = NativeApp.getGameTitle(path).orEmpty()
@@ -388,11 +414,7 @@ object EmulatorBridge {
             .replace(Regex("""\s+"""), " ")
             .trim()
             .ifBlank { cleanName }
-        return GameMetadata(
-            title = title,
-            serial = serial,
-            serialWithCrc = serial
-        )
+        return GameMetadata(title = title, serial = serial, serialWithCrc = serial)
     }
 
     private fun extractSerialFromName(value: String): String? {
@@ -406,134 +428,109 @@ object EmulatorBridge {
         }
     }
 
-    // endregion
-
-    // region Save States
-    fun saveState(slot: Int): Boolean {
+    suspend fun saveState(slot: Int): Boolean {
         if (!isNativeLoaded || !isVmActive) return false
-        return try { NativeApp.saveStateToSlot(slot) } catch (_: Exception) { false }
+        return runSerial {
+            try {
+                NativeApp.saveStateToSlot(slot)
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
-    fun loadState(slot: Int): Boolean {
+    suspend fun loadState(slot: Int): Boolean {
         if (!isNativeLoaded || !isVmActive) return false
-        return try {
-            NativeApp.loadStateFromSlot(slot).also { success ->
-                if (success) {
-                    rebindSurface()
-                    Thread.sleep(30)
-                    NativeApp.resume()
+        return runSerial {
+            try {
+                NativeApp.loadStateFromSlot(slot).also { success ->
+                    if (success) {
+                        rebindSurface()
+                        NativeApp.resume()
+                    }
                 }
+            } catch (_: Exception) {
+                false
             }
-        } catch (_: Exception) { false }
+        }
     }
 
     fun hasSaveStateForGame(path: String, slot: Int): Boolean {
         if (!isNativeLoaded) return false
-        getContext()
-
         if (path.startsWith("/") && !File(path).exists()) return false
-
         val statePath = try {
             NativeApp.getSaveStatePathForFile(path, slot)
         } catch (_: Exception) {
             null
         } ?: return false
-
         return File(statePath).exists()
     }
-    // endregion
 
-    // region Rendering Settings
-    fun setRenderer(gpuType: Int) {
-        if (!isNativeLoaded) return
-        try { 
-            NativeApp.setSetting("EmuCore/GS", "Renderer", "int", gpuType.toString())
-            NativeApp.renderGpu(gpuType) 
-        } catch (_: Exception) { }
+    suspend fun setRenderer(gpuType: Int) {
+        val resolvedRenderer = normalizeRenderer(gpuType)
+        settingsCache["EmuCore/GS:Renderer"] = resolvedRenderer.toString()
+        performRuntimeOps(listOf(rendererOp(resolvedRenderer), settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString())))
     }
 
-    fun setUpscaleMultiplier(multiplier: Float) {
-        if (!isNativeLoaded) return
-        try { 
-            NativeApp.setSetting("EmuCore/GS", "upscale_multiplier", "float", multiplier.toString())
-            NativeApp.renderUpscalemultiplier(multiplier) 
-            
-            // Force renderer to re-initialize with new multiplier
-            getSetting("EmuCore/GS", "Renderer", "int")?.toIntOrNull()?.let { 
-                NativeApp.renderGpu(it) 
+    suspend fun setUpscaleMultiplier(multiplier: Float) {
+        val normalized = normalizeUpscale(multiplier)
+        settingsCache["EmuCore/GS:upscale_multiplier"] = normalized.toString()
+        performRuntimeOps(listOf(upscaleOp(normalized), settingOp("EmuCore/GS", "upscale_multiplier", "float", normalized.toString())))
+    }
+
+    suspend fun setAspectRatio(type: Int) {
+        val value = aspectRatioSettingValues[type] ?: aspectRatioSettingValues.getValue(1)
+        settingsCache["EmuCore/GS:AspectRatio"] = value
+        performRuntimeOps(listOf(aspectOp(type)))
+    }
+
+    suspend fun setCustomDriverPath(path: String) {
+        settingsCache["EmuCore/GS:CustomDriverPath"] = path
+        performRuntimeOps(listOf(customDriverOp(path)))
+    }
+
+    suspend fun setFrameLimitEnabled(enabled: Boolean) {
+        setSetting("EmuCore/GS", "FrameLimitEnable", "bool", enabled.toString())
+    }
+
+    suspend fun setTargetFps(targetFps: Int) {
+        performRuntimeOps(
+            buildList {
+                addAll(targetFpsOps(targetFps))
+                add(settingOp("EmuCore/Framerate", "NominalScalar", "float", "1.0"))
             }
-        } catch (_: Exception) { }
+        )
     }
 
-    fun setAspectRatio(type: Int) {
-        if (!isNativeLoaded) return
-        try { 
-            NativeApp.setSetting(
-                "EmuCore/GS",
-                "AspectRatio",
-                "string",
-                aspectRatioSettingValues[type] ?: aspectRatioSettingValues.getValue(1)
-            )
-            NativeApp.setAspectRatio(type) 
-            
-            // Force renderer refresh
-            getSetting("EmuCore/GS", "Renderer", "int")?.toIntOrNull()?.let { 
-                NativeApp.renderGpu(it) 
-            }
-        } catch (_: Exception) { }
-    }
-
-    fun setCustomDriverPath(path: String) {
-        if (!isNativeLoaded) return
-        try { NativeApp.setCustomDriverPath(path) } catch (_: Exception) { }
-    }
-
-    fun setFrameLimitEnabled(enabled: Boolean) {
-        if (!isNativeLoaded) return
-        try {
-            NativeApp.setSetting("EmuCore/GS", "FrameLimitEnable", "bool", enabled.toString())
-        } catch (_: Exception) { }
-    }
-
-    fun setTargetFps(targetFps: Int) {
-        if (!isNativeLoaded) return
-        try {
-            val clampedFps = targetFps.coerceIn(20, 120)
-            NativeApp.setSetting("EmuCore/GS", "FramerateNTSC", "float", clampedFps.toFloat().toString())
-            NativeApp.setSetting("EmuCore/GS", "FrameratePAL", "float", clampedFps.toFloat().toString())
-            NativeApp.setSetting("EmuCore/Framerate", "NominalScalar", "float", "1.0")
-        } catch (_: Exception) { }
-    }
-    // endregion
-
-    // region Input
     fun setPadButton(index: Int, range: Int, pressed: Boolean) {
         if (!isNativeLoaded) return
-        try { NativeApp.setPadButton(index, range, pressed) } catch (_: Exception) { }
-    }
-
-    fun setPadParams(indices: IntArray, values: FloatArray) {
-        if (!isNativeLoaded) return
-        try { NativeApp.setPadParams(indices, values) } catch (_: Exception) { }
+        try {
+            NativeApp.setPadButton(index, range, pressed)
+        } catch (_: Exception) { }
     }
 
     fun resetKeyStatus() {
         if (!isNativeLoaded) return
-        try { NativeApp.resetKeyStatus() } catch (_: Exception) { }
+        launchSerial {
+            try {
+                NativeApp.resetKeyStatus()
+            } catch (_: Exception) { }
+        }
     }
 
-    fun setPadVibration(enabled: Boolean) {
-        if (!isNativeLoaded) return
-        try { NativeApp.setPadVibration(enabled) } catch (_: Exception) { }
+    suspend fun setPadVibration(enabled: Boolean) {
+        setSetting("InputSources", "PadVibration", "bool", enabled.toString())
     }
-    // endregion
 
-    // region Surface
     fun onSurfaceCreated() {
         if (!isNativeLoaded) return
         NativeApp.setCrashContextString("emu_surface_state", "created")
         NativeApp.logCrashBreadcrumb("surfaceCreated")
-        try { NativeApp.onNativeSurfaceCreated() } catch (_: Exception) { }
+        launchSerial {
+            try {
+                NativeApp.onNativeSurfaceCreated()
+            } catch (_: Exception) { }
+        }
     }
 
     fun onSurfaceChanged(surface: Surface, width: Int, height: Int) {
@@ -546,7 +543,11 @@ object EmulatorBridge {
         NativeApp.setCrashContextInt("emu_surface_height", height)
         NativeApp.setCrashContextBool("emu_surface_valid", surface.isValid)
         NativeApp.logCrashBreadcrumb("surfaceChanged width=$width height=$height valid=${surface.isValid}")
-        try { NativeApp.onNativeSurfaceChanged(surface, width, height) } catch (_: Exception) { }
+        launchSerial {
+            try {
+                NativeApp.onNativeSurfaceChanged(surface, width, height)
+            } catch (_: Exception) { }
+        }
     }
 
     fun onSurfaceDestroyed() {
@@ -556,9 +557,12 @@ object EmulatorBridge {
         lastSurface = null
         lastSurfaceWidth = 0
         lastSurfaceHeight = 0
-        try { NativeApp.onNativeSurfaceDestroyed() } catch (_: Exception) { }
+        launchSerial {
+            try {
+                NativeApp.onNativeSurfaceDestroyed()
+            } catch (_: Exception) { }
+        }
     }
-    // endregion
 
     private fun rebindSurface() {
         val surface = lastSurface ?: return
@@ -566,25 +570,37 @@ object EmulatorBridge {
         val height = lastSurfaceHeight
         if (!surface.isValid || width <= 0 || height <= 0) return
         NativeApp.logCrashBreadcrumb("rebindSurface width=$width height=$height")
-        try { NativeApp.onNativeSurfaceChanged(surface, width, height) } catch (_: Exception) { }
+        try {
+            NativeApp.onNativeSurfaceChanged(surface, width, height)
+        } catch (_: Exception) { }
     }
 
-    // region Settings
-    fun setSetting(section: String, key: String, type: String, value: String) {
+    suspend fun setSetting(section: String, key: String, type: String, value: String) {
         if (!isNativeLoaded) return
         val cacheKey = "$section:$key"
         if (settingsCache[cacheKey] == value) return
-
-        try {
-            NativeApp.setSetting(section, key, type, value)
-            settingsCache[cacheKey] = value
-        } catch (_: Exception) { }
+        performRuntimeOps(listOf(settingOp(section, key, type, value)))
+        settingsCache[cacheKey] = value
     }
 
     fun getSetting(section: String, key: String, type: String): String? {
         if (!isNativeLoaded) return null
-        return try { NativeApp.getSetting(section, key, type) } catch (_: Exception) { null }
+        return try {
+            NativeApp.getSetting(section, key, type)
+        } catch (_: Exception) {
+            null
+        }
     }
 
-    // endregion
+    private fun targetFpsOps(targetFps: Int): List<RuntimeOp> {
+        if (targetFps <= 0) {
+            return listOf(resetTargetFpsOp())
+        }
+
+        val manualFps = targetFps.coerceIn(20, 120).toFloat()
+        return listOf(
+            settingOp("EmuCore/GS", "FramerateNTSC", "float", manualFps.toString()),
+            settingOp("EmuCore/GS", "FrameratePAL", "float", manualFps.toString())
+        )
+    }
 }

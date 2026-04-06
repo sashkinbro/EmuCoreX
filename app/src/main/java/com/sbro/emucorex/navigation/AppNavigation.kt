@@ -36,6 +36,7 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.sbro.emucorex.R
@@ -184,6 +185,8 @@ private fun sharedAxisEnter(
 
 @Composable
 fun AppNavigation(
+    launchIntentVersion: Int = 0,
+    restoredFromSavedState: Boolean = false,
     onStartupReady: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -196,13 +199,15 @@ fun AppNavigation(
             preferences.onboardingCompleted,
             preferences.biosPath,
             preferences.gamePath
-        ) { onboardingCompleted, biosPath, gamePath ->
-            val hasStoredSetup = onboardingCompleted &&
+        ) { _, biosPath, gamePath ->
+            val hasRequiredPaths =
                 !biosPath.isNullOrBlank() &&
                 !gamePath.isNullOrBlank()
             val biosReady = BiosValidator.hasUsableBiosFiles(context, biosPath)
             val gameFolderPresent = SetupValidator.isGameFolderPresentForStartup(context, gamePath)
-            if (!hasStoredSetup || !biosReady || !gameFolderPresent) {
+            val setupReadyFromStoredPaths = hasRequiredPaths && biosReady && gameFolderPresent
+            val shouldOpenHome = setupReadyFromStoredPaths
+            if (!shouldOpenHome) {
                 StartupDestination.ONBOARDING
             } else {
                 StartupDestination.HOME
@@ -223,9 +228,20 @@ fun AppNavigation(
     }
 
     val navController = rememberNavController()
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val scope = rememberCoroutineScope()
+    var blockRestoredEmulationRoute by remember(restoredFromSavedState) {
+        mutableStateOf(restoredFromSavedState)
+    }
     val unsupportedGameImageMessage = context.getString(R.string.shell_launch_game_unsupported)
     val continueUnavailableMessage = context.getString(R.string.home_game_menu_continue_unavailable)
+    LaunchedEffect(currentBackStackEntry?.destination, restoredFromSavedState) {
+        if (!restoredFromSavedState) return@LaunchedEffect
+        val destination = currentBackStackEntry?.destination ?: return@LaunchedEffect
+        if (!destination.hasRoute<EmulationRoute>()) {
+            blockRestoredEmulationRoute = false
+        }
+    }
     val launchGamePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -274,20 +290,15 @@ fun AppNavigation(
     val launchGamePickerAction: () -> Unit = {
         launchGamePicker.launch(arrayOf("*/*"))
     }
-    val resetAllSettingsAndReturnHome: () -> Unit = {
+    val resetAllSettingsAndOpenOnboarding: () -> Unit = {
         scope.launch {
             preferences.resetAllSettings()
-            navController.navigate(HomeRoute) {
+            navController.navigate(OnboardingRoute) {
                 launchSingleTop = true
-                popUpTo(HomeRoute) { inclusive = false }
+                popUpTo(navController.graph.id) { inclusive = true }
             }
         }
     }
-    val shortcutGamePath = activity?.intent?.getStringExtra(GameLaunchShortcut.EXTRA_GAME_PATH)
-    val shortcutSaveSlot = activity?.intent?.takeIf { it.hasExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT) }
-        ?.getIntExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT, -1)
-        ?.takeIf { it >= 0 }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -507,7 +518,7 @@ fun AppNavigation(
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndReturnHome,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -594,7 +605,7 @@ fun AppNavigation(
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndReturnHome,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -625,8 +636,14 @@ fun AppNavigation(
                     gamePath = route.gamePath,
                     bootToBios = route.bootBios,
                     saveSlot = route.saveSlot,
+                    restoredAfterProcessDeath = blockRestoredEmulationRoute,
                     onExit = {
-                        navController.popBackStack(HomeRoute, inclusive = false)
+                        if (!navController.popBackStack(HomeRoute, inclusive = false)) {
+                            navController.navigate(HomeRoute) {
+                                launchSingleTop = true
+                                popUpTo(navController.graph.startDestinationId) { inclusive = false }
+                            }
+                        }
                     }
                 )
             }
@@ -660,7 +677,7 @@ fun AppNavigation(
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndReturnHome,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -710,7 +727,7 @@ fun AppNavigation(
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndReturnHome,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -778,7 +795,7 @@ fun AppNavigation(
                     onNavigateGameSettingsManager = navigateGameSettingsManager,
                     onNavigateControlsEditor = navigateControlsEditor,
                     onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndReturnHome,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
                     onNavigateSaveManager = {
                         navController.navigate(SaveManagerRoute()) {
                             launchSingleTop = true
@@ -849,14 +866,19 @@ fun AppNavigation(
             }
         }
 
-        LaunchedEffect(navController, startupDestination, shortcutGamePath, shortcutSaveSlot) {
-            val gamePath = shortcutGamePath ?: return@LaunchedEffect
+        LaunchedEffect(navController, startupDestination, launchIntentVersion) {
+            val launchRequest = GameLaunchShortcut.parseLaunchRequest(activity?.intent) ?: return@LaunchedEffect
             if (startupDestination != StartupDestination.HOME) return@LaunchedEffect
-            navController.navigate(EmulationRoute(gamePath = gamePath, saveSlot = shortcutSaveSlot)) {
+            navController.navigate(
+                EmulationRoute(
+                    gamePath = launchRequest.gamePath,
+                    saveSlot = launchRequest.saveSlot,
+                    bootBios = launchRequest.bootBios
+                )
+            ) {
                 launchSingleTop = true
             }
-            activity.intent.removeExtra(GameLaunchShortcut.EXTRA_GAME_PATH)
-            activity.intent.removeExtra(GameLaunchShortcut.EXTRA_SAVE_SLOT)
+            GameLaunchShortcut.clearLaunchRequest(activity?.intent)
         }
 
         quickGameSettingsTarget?.let { game ->

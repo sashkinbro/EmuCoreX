@@ -12,8 +12,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -37,9 +36,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -125,7 +126,7 @@ fun HomeScreen(
     val horizontalInset = ScreenHorizontalPadding
     val sectionTopSpacing = 2.dp
     val sectionInnerSpacing = 4.dp
-    val minCellSize = if (isLandscape) 118 else 128
+    val minCellSize = if (isLandscape) 94 else 102
     val columnsCount = maxOf(1, (configuration.screenWidthDp + 12) / (minCellSize + 12))
     val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val gridState = rememberLazyGridState()
@@ -483,8 +484,7 @@ fun HomeScreen(
                                                     onLongClickContinue = { onContinueGame(game) },
                                                     onLongClickLoadSave = { onLoadSaveClick(game) },
                                                     onLongClickManage = { onManageGameClick(game) },
-                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) },
-                                                    compact = isLandscape
+                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) }
                                                 )
                                             }
                                         }
@@ -600,9 +600,11 @@ private fun EmptyState(
     onFolderClick: () -> Unit,
     topInset: androidx.compose.ui.unit.Dp
 ) {
+    val scrollState = rememberScrollState()
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(
                 top = topInset,
                 start = ScreenHorizontalPadding,
@@ -612,6 +614,7 @@ private fun EmptyState(
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -656,7 +659,10 @@ private fun EmptyState(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 FilledTonalButton(
                     onClick = onBiosClick,
                     modifier = Modifier.weight(1f)
@@ -818,38 +824,18 @@ private fun RecentGameCard(
         shadowElevation = 0.dp,
         onClick = debouncedClick
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(if (compact) 0.84f else 0.88f)
-                    .aspectRatio(2f / 3f)
-                    .align(Alignment.CenterHorizontally)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            ) {
-                GameCoverArt(
-                    coverPath = game.coverArtPath,
-                    fallbackTitle = game.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillHeight
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = if (compact) 58.dp else 62.dp)
-                    .padding(horizontal = 9.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = game.title,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2
-                )
-                SerialLabel(game = game)
-            }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            GameCoverArt(
+                coverPath = game.coverArtPath,
+                fallbackTitle = game.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
     }
 }
@@ -863,8 +849,7 @@ private fun GameCard(
     onLongClickContinue: () -> Unit,
     onLongClickLoadSave: () -> Unit,
     onLongClickManage: () -> Unit,
-    onLongClickCreateShortcut: () -> Unit,
-    compact: Boolean
+    onLongClickCreateShortcut: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -889,53 +874,18 @@ private fun GameCard(
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            ) {
-                GameCoverArt(
-                    coverPath = game.coverArtPath,
-                    fallbackTitle = game.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillHeight
-                )
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = if (compact) 56.dp else 62.dp)
-                    .padding(
-                        horizontal = if (compact) 9.dp else 10.dp,
-                        vertical = if (compact) 7.dp else 8.dp
-                    ),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = game.title,
-                        style = if (compact) {
-                            MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
-                        } else {
-                            MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
-                        },
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    GameRegionFlag(game = game)
-                }
-                SerialLabel(game = game)
-            }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            GameCoverArt(
+                coverPath = game.coverArtPath,
+                fallbackTitle = game.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
     }
         Box(
@@ -1015,7 +965,7 @@ private fun GameListCard(
         ) {
             Box(
                 modifier = Modifier
-                    .width(62.dp)
+                    .width(52.dp)
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
@@ -1030,25 +980,18 @@ private fun GameListCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .heightIn(min = 78.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Row(
+                Text(
+                    text = game.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = game.title,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        overflow = TextOverflow.Ellipsis,
-                        maxLines = 2
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    GameRegionFlag(game = game)
-                }
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 2
+                )
+                SerialLabel(game = game)
                 Text(
                     text = game.fileName,
                     style = MaterialTheme.typography.bodySmall,
@@ -1056,21 +999,13 @@ private fun GameListCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SerialLabel(
-                        game = game,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = formatCompactFileSize(game.fileSize),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = formatCompactFileSize(game.fileSize),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.End)
+                )
             }
         }
     }
@@ -1163,53 +1098,7 @@ private fun SerialLabel(
     )
 }
 
-@Composable
-private fun GameRegionFlag(
-    game: GameItem,
-    modifier: Modifier = Modifier
-) {
-    val flag = game.regionFlagEmoji() ?: return
-    Text(
-        text = flag,
-        modifier = modifier,
-        style = MaterialTheme.typography.titleMedium
-    )
-}
 
-private fun GameItem.regionFlagEmoji(): String? {
-    val region = pcsx2Compatibility?.region
-        ?.takeIf { it.isNotBlank() }
-        ?: inferRegionFromMetadata()
-        ?: return null
-    val normalized = region.uppercase(Locale.ROOT)
-    return when {
-        "USA" in normalized || "US" == normalized || "NTSC-U" in normalized || "NTSC U" in normalized -> "\uD83C\uDDFA\uD83C\uDDF8"
-        "JAPAN" in normalized || "JPN" in normalized || "NTSC-J" in normalized || "NTSC J" in normalized -> "\uD83C\uDDEF\uD83C\uDDF5"
-        "EUROPE" in normalized || "EUR" in normalized || "PAL" in normalized -> "\uD83C\uDDEA\uD83C\uDDFA"
-        "KOREA" in normalized || "KOR" in normalized -> "\uD83C\uDDF0\uD83C\uDDF7"
-        "ASIA" in normalized -> "\uD83C\uDF0F"
-        else -> null
-    }
-}
-
-private fun GameItem.inferRegionFromMetadata(): String? {
-    val probes = listOfNotNull(
-        serial,
-        fileName,
-        title
-    )
-    return probes.firstNotNullOfOrNull { value ->
-        val normalized = value.uppercase(Locale.ROOT)
-        when {
-            "(USA)" in normalized || "[USA]" in normalized || "SLUS" in normalized || "SCUS" in normalized -> "USA"
-            "(JAPAN)" in normalized || "[JAPAN]" in normalized || "(JPN)" in normalized || "SLPM" in normalized || "SLPS" in normalized || "SCPS" in normalized -> "JAPAN"
-            "(EUROPE)" in normalized || "[EUROPE]" in normalized || "(EUR)" in normalized || "SLES" in normalized || "SCES" in normalized -> "EUROPE"
-            "(KOREA)" in normalized || "[KOREA]" in normalized || "SLKA" in normalized || "SCKA" in normalized -> "KOREA"
-            "(ASIA)" in normalized || "[ASIA]" in normalized -> "ASIA"
-            else -> null
-        }
-    }
-}
 
 private fun formatCompactFileSize(bytes: Long): String {
     return when {

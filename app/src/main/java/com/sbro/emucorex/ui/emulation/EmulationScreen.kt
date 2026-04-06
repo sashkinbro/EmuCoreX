@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.emulation
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.widget.Toast
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -55,6 +56,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -67,6 +69,7 @@ import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -86,6 +89,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -120,11 +124,12 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.R
-import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.UPSCALE_MAX
 import com.sbro.emucorex.core.UPSCALE_MIN
 import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
@@ -135,15 +140,39 @@ import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
+import com.sbro.emucorex.data.RetroAchievementEntry
+import com.sbro.emucorex.data.RetroAchievementGameData
+import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.data.SettingsSnapshot
+import com.sbro.emucorex.ui.common.BitmapPathImage
+import com.sbro.emucorex.ui.common.OverlayBottomAnchorPadding
+import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
+import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
+import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
+import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
+import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
+import com.sbro.emucorex.ui.common.OverlayLeftStickBaseOffset
+import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
+import com.sbro.emucorex.ui.common.OverlayRightStickBaseOffset
+import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.overlayActionOffset
+import com.sbro.emucorex.ui.common.overlayClusterStep
+import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
+import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
+import com.sbro.emucorex.ui.common.overlayDpadOffset
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.theme.AccentPrimary
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private object PadKey {
@@ -177,14 +206,16 @@ private enum class EmulationMenuTab {
     Session,
     Overlay,
     Basic,
-    Advanced
+    Advanced,
+    Achievements
 }
 
-private val OverlayShoulderTopPaddingLandscape = 18.dp
-private val OverlayRightShoulderBaseOffset = (-112).dp
-private val OverlayCenterWideGap = 22.dp
-private val OverlayCenterRowGap = 8.dp
-private val OverlayCenterBottomLift = 58.dp
+private data class OverlayAchievementsContentState(
+    val isLoading: Boolean = false,
+    val gameData: RetroAchievementGameData? = null
+)
+
+private const val RETRO_ACHIEVEMENTS_HUD_DURATION_MS = 6_000L
 
 private data class LiveSelectionOption(
     val value: Int,
@@ -218,18 +249,28 @@ private fun Int.isBottomOverlayCorner(): Boolean {
         this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT
 }
 
+private fun resolveManualTargetFps(currentTargetFps: Int, defaultTargetFps: Int): Int {
+    return when {
+        currentTargetFps > 0 -> currentTargetFps
+        defaultTargetFps > 0 -> defaultTargetFps
+        else -> 60
+    }
+}
+
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun EmulationScreen(
     gamePath: String? = null,
     bootToBios: Boolean = false,
     saveSlot: Int? = null,
+    restoredAfterProcessDeath: Boolean = false,
     onExit: () -> Unit,
     viewModel: EmulationViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val retroAchievementsState by RetroAchievementsStateManager.state.collectAsState()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val preferences = remember(context) { AppPreferences(context) }
     val globalDefaults by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val overlayDefaults by preferences.overlayLayoutSnapshot.collectAsState(initial = OverlayLayoutSnapshot())
@@ -252,8 +293,8 @@ fun EmulationScreen(
         rootCutoutPadding.calculateBottomPadding(),
         rootNavPadding.calculateBottomPadding()
     )
-    
-    val configuration = LocalConfiguration.current
+
+    LocalConfiguration.current
     val view = LocalView.current
     var showExitDialog by remember { mutableStateOf(false) }
     var showCheatsDialog by remember { mutableStateOf(false) }
@@ -267,6 +308,7 @@ fun EmulationScreen(
     var lastTapY by remember { mutableFloatStateOf(0f) }
     val gamepadConnected = remember { mutableStateOf(GamepadManager.isGamepadConnected()) }
     var showGamepadIndicator by remember { mutableStateOf(gamepadConnected.value) }
+    var showRetroAchievementsHud by remember { mutableStateOf(false) }
 
     val shouldShowOverlay = uiState.controlsVisible &&
             !(uiState.hideOverlayOnGamepad && gamepadConnected.value)
@@ -285,6 +327,16 @@ fun EmulationScreen(
 
     BackHandler(enabled = true) {
         toggleMenuClick()
+    }
+
+    LaunchedEffect(restoredAfterProcessDeath) {
+        if (!restoredAfterProcessDeath) return@LaunchedEffect
+        Toast.makeText(
+            context,
+            context.getString(R.string.emulation_session_restored_unavailable),
+            Toast.LENGTH_LONG
+        ).show()
+        onExit()
     }
 
     LaunchedEffect(Unit) {
@@ -317,7 +369,35 @@ fun EmulationScreen(
         }
     }
 
-    LaunchedEffect(gamePath, bootToBios) {
+    DisposableEffect(lifecycleOwner, context, showControlsEditor, uiState.showMenu) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START,
+                Lifecycle.Event.ON_RESUME -> {
+                    if (!showControlsEditor && !uiState.showMenu) {
+                        viewModel.onHostForegrounded()
+                    }
+                }
+
+                Lifecycle.Event.ON_STOP -> {
+                    val activity = context as? android.app.Activity
+                    if (showControlsEditor || activity?.isChangingConfigurations == true) {
+                        return@LifecycleEventObserver
+                    }
+                    viewModel.onHostBackgrounded()
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(gamePath, bootToBios, restoredAfterProcessDeath) {
+        if (restoredAfterProcessDeath) return@LaunchedEffect
         viewModel.startEmulation(gamePath, saveSlot, bootToBios)
     }
 
@@ -338,6 +418,27 @@ fun EmulationScreen(
             delay(2200)
             showOverlayShortcut = false
         }
+    }
+
+    LaunchedEffect(
+        uiState.showMenu,
+        retroAchievementsState.enabled,
+        retroAchievementsState.hardcoreActive,
+        retroAchievementsState.game?.gameId,
+        retroAchievementsState.game?.title,
+        retroAchievementsState.game?.richPresence,
+        retroAchievementsState.game?.earnedAchievements,
+        retroAchievementsState.game?.totalAchievements,
+        retroAchievementsState.game?.earnedPoints,
+        retroAchievementsState.game?.totalPoints
+    ) {
+        if (uiState.showMenu || !retroAchievementsState.enabled || retroAchievementsState.game == null) {
+            showRetroAchievementsHud = false
+            return@LaunchedEffect
+        }
+        showRetroAchievementsHud = true
+        delay(RETRO_ACHIEVEMENTS_HUD_DURATION_MS)
+        showRetroAchievementsHud = false
     }
 
     LaunchedEffect(showControlsEditor) {
@@ -472,6 +573,7 @@ fun EmulationScreen(
                 AnimatedVisibility(
                     visible = retroAchievementsState.enabled &&
                         retroAchievementsState.game != null &&
+                        showRetroAchievementsHud &&
                         !uiState.showMenu,
                     enter = fadeIn(tween(220)),
                     exit = fadeOut(tween(180))
@@ -721,9 +823,6 @@ fun EmulationScreen(
                 controlLayouts = uiState.controlLayouts,
                 onPadInput = { keyCode, range, pressed ->
                     viewModel.onPadInput(keyCode, range, pressed)
-                },
-                onPadInputs = { indices, values ->
-                    viewModel.onPadInputs(indices, values)
                 }
             )
         }
@@ -731,7 +830,8 @@ fun EmulationScreen(
 
         if (showControlsEditor) {
             ControlsEditorScreen(
-                onBackClick = { showControlsEditor = false }
+                onBackClick = { showControlsEditor = false },
+                manageActivityOrientation = false
             )
         }
 
@@ -757,6 +857,8 @@ fun EmulationScreen(
 
                 EmulationSidebarMenu(
                     uiState = uiState,
+                    currentGamePath = gamePath,
+                    retroState = retroAchievementsState,
                     globalDefaults = globalDefaults,
                     overlayDefaults = overlayDefaults,
                     onClose = toggleMenuClick,
@@ -779,8 +881,6 @@ fun EmulationScreen(
                     onToggleControls = toggleControlsClick,
                     onOpenControlsEditor = { showControlsEditor = true },
                     onOpenGamepadMapping = { showGamepadMappingDialog = true },
-                    onSetPerformancePreset = { viewModel.applyPerformancePreset(it) },
-                    onApplyRecommendedProfile = { viewModel.applyRecommendedDeviceProfile() },
                     onSetRenderer = { viewModel.setRenderer(it) },
                     onSetUpscale = { viewModel.setUpscale(it) },
                     onSetAspectRatio = { viewModel.setAspectRatio(it) },
@@ -960,7 +1060,7 @@ fun EmulationScreen(
                             )
                             val isCustomBinding = gamepadBindings.containsKey(action.id)
                             EmulationGamepadBindingRow(
-                                title = stringResource(gamepadActionLabelRes(action.id)),
+                                title = gamepadActionLabel(action.id),
                                 value = assignedKeyCode?.let(GamepadManager::keyCodeLabel)
                                     ?: stringResource(R.string.settings_not_set),
                                 autoLabel = if (isCustomBinding) null else stringResource(R.string.settings_gamepad_mapping_auto_format),
@@ -1032,7 +1132,7 @@ fun EmulationScreen(
                 Text(
                     stringResource(
                         R.string.settings_gamepad_mapping_listening_desc,
-                        stringResource(gamepadActionLabelRes(pendingGamepadActionId.orEmpty()))
+                        gamepadActionLabel(pendingGamepadActionId.orEmpty())
                     )
                 )
             },
@@ -1118,8 +1218,7 @@ private fun OnScreenControls(
     rbtnOffset: Pair<Float, Float>,
     centerOffset: Pair<Float, Float>,
     controlLayouts: Map<String, OverlayControlLayout>,
-    onPadInput: (Int, Int, Boolean) -> Unit,
-    onPadInputs: (IntArray, FloatArray) -> Unit
+    onPadInput: (Int, Int, Boolean) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -1139,12 +1238,15 @@ private fun OnScreenControls(
     val shoulderH = ((if (isLandscape) 32 else 36) * scaleFactor).dp
     val centerW = ((if (isLandscape) 64 else 72) * scaleFactor).dp
     val centerH = ((if (isLandscape) 28 else 32) * scaleFactor).dp
+    val wideCenterW = centerW * 1.25f
+    val centerColumnGap = (if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait) * scaleFactor
+    val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
 
     val baseEdgePad = if (isLandscape) 28.dp else 12.dp
     val baseBottomPad = if (isLandscape) 24.dp else 36.dp
     val edgePadStart = baseEdgePad + safeHorizontalInset
     val edgePadEnd = baseEdgePad + safeHorizontalInset
-    val edgePadTop = maxOf(OverlayShoulderTopPaddingLandscape, safeTop + 4.dp)
+    val edgePadTop = maxOf(OverlayShoulderTopPadding, safeTop + 4.dp)
     val bottomPad = baseBottomPad + safeBottom
     fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
         return controlLayouts[id] ?: OverlayControlLayout(scale = defaultScale)
@@ -1231,7 +1333,6 @@ private fun OnScreenControls(
                 clusterSize = dpadSize,
                 controlLayouts = controlLayouts,
                 modifier = Modifier
-                    .padding(bottom = analogSize * 0.7f)
                     .offset { IntOffset(dpadOffset.first.roundToInt(), dpadOffset.second.roundToInt()) }
             )
             val leftStick = layoutFor("left_stick", (stickScaleFactor * 100f).roundToInt())
@@ -1246,11 +1347,11 @@ private fun OnScreenControls(
                             rightKey = PadKey.LeftStickRight,
                             downKey = PadKey.LeftStickDown,
                             leftKey = PadKey.LeftStickLeft,
-                            onPadInputs = onPadInputs
+                            onPadInput = onPadInput
                         )
                     },
                     modifier = Modifier
-                        .padding(start = dpadSize * 0.9f)
+                        .padding(start = OverlayLeftStickBaseOffset)
                         .align(Alignment.BottomStart)
                         .offset {
                             IntOffset(
@@ -1274,7 +1375,6 @@ private fun OnScreenControls(
                 controlLayouts = controlLayouts,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(bottom = analogSize * 0.7f)
                     .offset { IntOffset(actionOffset.first.roundToInt(), actionOffset.second.roundToInt()) }
             )
             val rightStick = layoutFor("right_stick", (stickScaleFactor * 100f).roundToInt())
@@ -1289,11 +1389,11 @@ private fun OnScreenControls(
                             rightKey = PadKey.RightStickRight,
                             downKey = PadKey.RightStickDown,
                             leftKey = PadKey.RightStickLeft,
-                            onPadInputs = onPadInputs
+                            onPadInput = onPadInput
                         )
                     },
                     modifier = Modifier
-                        .padding(end = actionSize * 0.9f)
+                        .padding(end = -OverlayRightStickBaseOffset)
                         .align(Alignment.BottomEnd)
                         .offset {
                             IntOffset(
@@ -1308,8 +1408,13 @@ private fun OnScreenControls(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPad + OverlayCenterBottomLift)
-                .offset { IntOffset(centerOffset.first.roundToInt(), centerOffset.second.roundToInt()) }
+                .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
+                .offset {
+                    IntOffset(
+                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt(),
+                        centerOffset.second.roundToInt()
+                    )
+                }
         ) {
             val select = layoutFor("select")
             val start = layoutFor("start")
@@ -1318,11 +1423,16 @@ private fun OnScreenControls(
             if (select.visible) {
                 CenterButton(
                     label = "SELECT",
-                    width = centerW * 1.25f * (select.scale / 100f),
+                    width = wideCenterW * (select.scale / 100f),
                     height = centerH * (select.scale / 100f),
                     modifier = Modifier.offset {
                         IntOffset(
-                            (-(centerW * 1.25f + OverlayCenterWideGap / 2f)).roundToPx() + select.offset.first.roundToInt(),
+                            overlayCenterButtonOffset(
+                                buttonWidth = wideCenterW * (select.scale / 100f),
+                                columnWidth = wideCenterW,
+                                gap = centerColumnGap,
+                                leftColumn = true
+                            ).roundToPx() + select.offset.first.roundToInt(),
                             select.offset.second.roundToInt()
                         )
                     }
@@ -1331,11 +1441,16 @@ private fun OnScreenControls(
             if (start.visible) {
                 CenterButton(
                     label = "START",
-                    width = centerW * 1.25f * (start.scale / 100f),
+                    width = wideCenterW * (start.scale / 100f),
                     height = centerH * (start.scale / 100f),
                     modifier = Modifier.offset {
                         IntOffset(
-                            (OverlayCenterWideGap / 2f).roundToPx() + start.offset.first.roundToInt(),
+                            overlayCenterButtonOffset(
+                                buttonWidth = wideCenterW * (start.scale / 100f),
+                                columnWidth = wideCenterW,
+                                gap = centerColumnGap,
+                                leftColumn = false
+                            ).roundToPx() + start.offset.first.roundToInt(),
                             start.offset.second.roundToInt()
                         )
                     }
@@ -1348,8 +1463,16 @@ private fun OnScreenControls(
                     height = centerH * (l3.scale / 100f),
                     modifier = Modifier.offset {
                         IntOffset(
-                            (-(centerW + OverlayCenterWideGap / 2f)).roundToPx() + l3.offset.first.roundToInt(),
-                            (centerH + OverlayCenterRowGap).roundToPx() + l3.offset.second.roundToInt()
+                            overlayCenterButtonOffset(
+                                buttonWidth = centerW * (l3.scale / 100f),
+                                columnWidth = wideCenterW,
+                                gap = centerColumnGap,
+                                leftColumn = true
+                            ).roundToPx() + l3.offset.first.roundToInt(),
+                            overlayCenterSecondRowOffset(
+                                buttonHeight = centerH * (l3.scale / 100f),
+                                rowGap = centerRowGap
+                            ).roundToPx() + l3.offset.second.roundToInt()
                         )
                     }
                 ) { pressed -> onPadInput(PadKey.L3, 0, pressed) }
@@ -1361,8 +1484,16 @@ private fun OnScreenControls(
                     height = centerH * (r3.scale / 100f),
                     modifier = Modifier.offset {
                         IntOffset(
-                            (OverlayCenterWideGap / 2f).roundToPx() + r3.offset.first.roundToInt(),
-                            (centerH + OverlayCenterRowGap).roundToPx() + r3.offset.second.roundToInt()
+                            overlayCenterButtonOffset(
+                                buttonWidth = centerW * (r3.scale / 100f),
+                                columnWidth = wideCenterW,
+                                gap = centerColumnGap,
+                                leftColumn = false
+                            ).roundToPx() + r3.offset.first.roundToInt(),
+                            overlayCenterSecondRowOffset(
+                                buttonHeight = centerH * (r3.scale / 100f),
+                                rowGap = centerRowGap
+                            ).roundToPx() + r3.offset.second.roundToInt()
                         )
                     }
                 ) { pressed -> onPadInput(PadKey.R3, 0, pressed) }
@@ -1374,18 +1505,19 @@ private fun OnScreenControls(
 private fun updateAnalogStick(
     x: Float, y: Float,
     upKey: Int, rightKey: Int, downKey: Int, leftKey: Int,
-    onPadInputs: (IntArray, FloatArray) -> Unit
+    onPadInput: (Int, Int, Boolean) -> Unit
 ) {
     val right = (x.coerceAtLeast(0f) * 255f).roundToInt()
     val left = ((-x).coerceAtLeast(0f) * 255f).roundToInt()
     val down = (y.coerceAtLeast(0f) * 255f).roundToInt()
     val up = ((-y).coerceAtLeast(0f) * 255f).roundToInt()
-    onPadInputs(
-        intArrayOf(upKey, rightKey, downKey, leftKey),
-        floatArrayOf(up / 255f, right / 255f, down / 255f, left / 255f)
-    )
+    onPadInput(upKey, up, up > 0)
+    onPadInput(rightKey, right, right > 0)
+    onPadInput(downKey, down, down > 0)
+    onPadInput(leftKey, left, left > 0)
 }
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 private fun DPadCluster(
     onPadInput: (Int, Int, Boolean) -> Unit,
@@ -1394,19 +1526,25 @@ private fun DPadCluster(
     modifier: Modifier = Modifier
 ) {
     val btnSize = clusterSize / 3f
+    val clusterGap = if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp) {
+        OverlayClusterGapLandscape
+    } else {
+        OverlayClusterGapPortrait
+    }
+    val step = overlayClusterStep(btnSize, clusterGap)
 
-    Box(modifier = modifier.size(clusterSize)) {
+    Box(modifier = modifier) {
         val up = controlLayouts["dpad_up"] ?: OverlayControlLayout()
         val down = controlLayouts["dpad_down"] ?: OverlayControlLayout()
         val left = controlLayouts["dpad_left"] ?: OverlayControlLayout()
         val right = controlLayouts["dpad_right"] ?: OverlayControlLayout()
-        if (up.visible) DPadButton("▲", Modifier.align(Alignment.TopCenter).offset { IntOffset(up.offset.first.roundToInt(), up.offset.second.roundToInt()) }, btnSize * (up.scale / 100f)) { pressed -> onPadInput(PadKey.Up, 0, pressed) }
-        if (down.visible) DPadButton("▼", Modifier.align(Alignment.BottomCenter).offset { IntOffset(down.offset.first.roundToInt(), down.offset.second.roundToInt()) }, btnSize * (down.scale / 100f)) { pressed -> onPadInput(PadKey.Down, 0, pressed) }
-        if (left.visible) DPadButton("◀", Modifier.align(Alignment.CenterStart).offset { IntOffset(left.offset.first.roundToInt(), left.offset.second.roundToInt()) }, btnSize * (left.scale / 100f)) { pressed -> onPadInput(PadKey.Left, 0, pressed) }
-        if (right.visible) DPadButton("▶", Modifier.align(Alignment.CenterEnd).offset { IntOffset(right.offset.first.roundToInt(), right.offset.second.roundToInt()) }, btnSize * (right.scale / 100f)) { pressed -> onPadInput(PadKey.Right, 0, pressed) }
+        if (up.visible) DPadButton("▲", Modifier.offset { IntOffset(overlayDpadOffset(step, "up").first.roundToPx() + up.offset.first.roundToInt(), overlayDpadOffset(step, "up").second.roundToPx() + up.offset.second.roundToInt()) }, btnSize * (up.scale / 100f)) { pressed -> onPadInput(PadKey.Up, 0, pressed) }
+        if (down.visible) DPadButton("▼", Modifier.offset { IntOffset(overlayDpadOffset(step, "down").first.roundToPx() + down.offset.first.roundToInt(), overlayDpadOffset(step, "down").second.roundToPx() + down.offset.second.roundToInt()) }, btnSize * (down.scale / 100f)) { pressed -> onPadInput(PadKey.Down, 0, pressed) }
+        if (left.visible) DPadButton("◀", Modifier.offset { IntOffset(overlayDpadOffset(step, "left").first.roundToPx() + left.offset.first.roundToInt(), overlayDpadOffset(step, "left").second.roundToPx() + left.offset.second.roundToInt()) }, btnSize * (left.scale / 100f)) { pressed -> onPadInput(PadKey.Left, 0, pressed) }
+        if (right.visible) DPadButton("▶", Modifier.offset { IntOffset(overlayDpadOffset(step, "right").first.roundToPx() + right.offset.first.roundToInt(), overlayDpadOffset(step, "right").second.roundToPx() + right.offset.second.roundToInt()) }, btnSize * (right.scale / 100f)) { pressed -> onPadInput(PadKey.Right, 0, pressed) }
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
+                .offset { IntOffset((step / 2f).roundToPx(), (0.dp - step + 7.dp).roundToPx()) }
                 .size(btnSize * 0.7f)
                 .clip(RoundedCornerShape(6.dp))
                 .background(Color.White.copy(alpha = 0.04f))
@@ -1414,6 +1552,7 @@ private fun DPadCluster(
     }
 }
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 private fun ActionCluster(
     onPadInput: (Int, Int, Boolean) -> Unit,
@@ -1422,30 +1561,31 @@ private fun ActionCluster(
     modifier: Modifier = Modifier
 ) {
     val btnSize = clusterSize / 3.2f
-    val offset = btnSize / 3f
-    val totalSize = clusterSize + offset * 2
+    val clusterGap = if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp) {
+        OverlayClusterGapLandscape
+    } else {
+        OverlayClusterGapPortrait
+    }
+    val step = overlayClusterStep(btnSize, clusterGap)
 
     Box(
-        modifier = modifier.size(totalSize),
-        contentAlignment = Alignment.Center
+        modifier = modifier
     ) {
-        Box(modifier = Modifier.size(clusterSize)) {
-            val triangle = controlLayouts["triangle"] ?: OverlayControlLayout()
-            val cross = controlLayouts["cross"] ?: OverlayControlLayout()
-            val square = controlLayouts["square"] ?: OverlayControlLayout()
-            val circle = controlLayouts["circle"] ?: OverlayControlLayout()
-            if (triangle.visible) ActionButton("△", Color(0xFF50D9A0), Modifier.align(Alignment.TopCenter).offset(y = -offset).offset { IntOffset(triangle.offset.first.roundToInt(), triangle.offset.second.roundToInt()) }, btnSize * (triangle.scale / 100f)) {
-                pressed -> onPadInput(PadKey.Triangle, 0, pressed)
-            }
-            if (cross.visible) ActionButton("✕", Color(0xFF5BA8FF), Modifier.align(Alignment.BottomCenter).offset(y = offset).offset { IntOffset(cross.offset.first.roundToInt(), cross.offset.second.roundToInt()) }, btnSize * (cross.scale / 100f)) {
-                pressed -> onPadInput(PadKey.Cross, 0, pressed)
-            }
-            if (square.visible) ActionButton("□", Color(0xFFA07BFF), Modifier.align(Alignment.CenterStart).offset(x = -offset).offset { IntOffset(square.offset.first.roundToInt(), square.offset.second.roundToInt()) }, btnSize * (square.scale / 100f)) {
-                pressed -> onPadInput(PadKey.Square, 0, pressed)
-            }
-            if (circle.visible) ActionButton("○", Color(0xFFFF6B7A), Modifier.align(Alignment.CenterEnd).offset(x = offset).offset { IntOffset(circle.offset.first.roundToInt(), circle.offset.second.roundToInt()) }, btnSize * (circle.scale / 100f)) {
-                pressed -> onPadInput(PadKey.Circle, 0, pressed)
-            }
+        val triangle = controlLayouts["triangle"] ?: OverlayControlLayout()
+        val cross = controlLayouts["cross"] ?: OverlayControlLayout()
+        val square = controlLayouts["square"] ?: OverlayControlLayout()
+        val circle = controlLayouts["circle"] ?: OverlayControlLayout()
+        if (triangle.visible) ActionButton("△", Color(0xFF50D9A0), Modifier.offset { IntOffset(overlayActionOffset(step, "triangle").first.roundToPx() + triangle.offset.first.roundToInt(), overlayActionOffset(step, "triangle").second.roundToPx() + triangle.offset.second.roundToInt()) }, btnSize * (triangle.scale / 100f)) {
+            pressed -> onPadInput(PadKey.Triangle, 0, pressed)
+        }
+        if (cross.visible) ActionButton("×", Color(0xFF5BA8FF), Modifier.offset { IntOffset(overlayActionOffset(step, "cross").first.roundToPx() + cross.offset.first.roundToInt(), overlayActionOffset(step, "cross").second.roundToPx() + cross.offset.second.roundToInt()) }, btnSize * (cross.scale / 100f)) {
+            pressed -> onPadInput(PadKey.Cross, 0, pressed)
+        }
+        if (square.visible) ActionButton("□", Color(0xFFA07BFF), Modifier.offset { IntOffset(overlayActionOffset(step, "square").first.roundToPx() + square.offset.first.roundToInt(), overlayActionOffset(step, "square").second.roundToPx() + square.offset.second.roundToInt()) }, btnSize * (square.scale / 100f)) {
+            pressed -> onPadInput(PadKey.Square, 0, pressed)
+        }
+        if (circle.visible) ActionButton("○", Color(0xFFFF6B7A), Modifier.offset { IntOffset(overlayActionOffset(step, "circle").first.roundToPx() + circle.offset.first.roundToInt(), overlayActionOffset(step, "circle").second.roundToPx() + circle.offset.second.roundToInt()) }, btnSize * (circle.scale / 100f)) {
+            pressed -> onPadInput(PadKey.Circle, 0, pressed)
         }
     }
 }
@@ -1572,7 +1712,6 @@ private fun AnalogStick(
         )
         Box(
             modifier = Modifier
-                .offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) }
                 .size(analogSize * 0.32f)
                 .clip(CircleShape)
                 .background(
@@ -1719,6 +1858,8 @@ private fun CenterButton(
 @Composable
 private fun EmulationSidebarMenu(
     uiState: EmulationUiState,
+    currentGamePath: String?,
+    retroState: com.sbro.emucorex.core.utils.RetroAchievementsUiState,
     globalDefaults: SettingsSnapshot,
     overlayDefaults: OverlayLayoutSnapshot,
     onClose: () -> Unit,
@@ -1741,8 +1882,6 @@ private fun EmulationSidebarMenu(
     onToggleControls: () -> Unit,
     onOpenControlsEditor: () -> Unit,
     onOpenGamepadMapping: () -> Unit,
-    onSetPerformancePreset: (Int) -> Unit,
-    onApplyRecommendedProfile: () -> Unit,
     onSetRenderer: (Int) -> Unit,
     onSetUpscale: (Float) -> Unit,
     onSetAspectRatio: (Int) -> Unit,
@@ -2169,37 +2308,6 @@ private fun EmulationSidebarMenu(
                     horizontalInset = sectionLabelInset
                 )
 
-                LiveChipsSelectionRow(
-                    title = stringResource(R.string.settings_performance_preset),
-                    options = performancePresetOptions(),
-                    currentValue = uiState.performancePreset,
-                    onValueChange = onSetPerformancePreset,
-                    helpText = stringResource(R.string.settings_help_performance_preset),
-                    onResetToDefault = { onSetPerformancePreset(globalDefaults.performancePreset) }
-                )
-
-                Text(
-                    text = stringResource(performancePresetDescription(uiState.performancePreset)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = sectionLabelInset)
-                )
-
-                MenuButton(
-                    icon = Icons.Rounded.SettingsSuggest,
-                    text = stringResource(R.string.settings_device_profile_apply),
-                    onClick = onApplyRecommendedProfile,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                    enabled = true
-                )
-
-                Text(
-                    text = stringResource(deviceProfileDescription(uiState.deviceChipsetFamily)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = sectionLabelInset)
-                )
-
                 SettingsToggle(
                     title = stringResource(R.string.settings_frame_limiter),
                     checked = uiState.frameLimitEnabled,
@@ -2207,23 +2315,39 @@ private fun EmulationSidebarMenu(
                     helpText = stringResource(R.string.settings_help_frame_limiter),
                     onResetToDefault = { onSetFrameLimitEnabled(globalDefaults.frameLimitEnabled) }
                 )
-
-                LiveSliderRow(
-                    title = stringResource(R.string.settings_target_fps),
-                    valueLabelResId = R.string.settings_target_fps_desc,
-                    valueLabelForValue = { fps -> fps.toString() },
-                    value = uiState.targetFps.toFloat(),
-                    range = 20f..120f,
-                    steps = 99,
-                    onValueChange = { onSetTargetFps(it.toInt()) },
+                LiveSelectionRow(
+                    title = stringResource(R.string.settings_target_fps_mode),
+                    options = listOf(
+                        LiveSelectionOption(0, stringResource(R.string.settings_target_fps_auto)),
+                        LiveSelectionOption(1, stringResource(R.string.settings_target_fps_manual))
+                    ),
+                    currentValue = if (uiState.targetFps <= 0) 0 else 1,
+                    onValueChange = { mode ->
+                        onSetTargetFps(
+                            if (mode == 0) 0 else resolveManualTargetFps(uiState.targetFps, globalDefaults.targetFps)
+                        )
+                    },
+                    allowWrap = false,
                     helpText = stringResource(R.string.settings_help_target_fps),
                     onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
                 )
-
-                // Renderer Selection (IDs: GL=12, Vulkan=14, Soft=13)
+                if (uiState.targetFps > 0) {
+                    LiveSliderRow(
+                        title = stringResource(R.string.settings_target_fps),
+                        valueLabelResId = R.string.settings_target_fps_desc,
+                        valueLabelForValue = { fps -> fps.toString() },
+                        value = uiState.targetFps.toFloat(),
+                        range = 20f..120f,
+                        steps = 99,
+                        onValueChange = { onSetTargetFps(it.toInt()) },
+                        helpText = stringResource(R.string.settings_help_target_fps),
+                        onResetToDefault = { onSetTargetFps(globalDefaults.targetFps) }
+                    )
+                }
                 LiveSelectionRow(
                     title = stringResource(R.string.settings_renderer),
                     options = listOf(
+                        LiveSelectionOption(EmulatorBridge.AUTO_RENDERER, stringResource(R.string.settings_renderer_auto)),
                         LiveSelectionOption(12, stringResource(R.string.settings_renderer_opengl)),
                         LiveSelectionOption(14, stringResource(R.string.settings_renderer_vulkan)),
                         LiveSelectionOption(13, stringResource(R.string.settings_renderer_software))
@@ -2734,6 +2858,14 @@ private fun EmulationSidebarMenu(
                             onResetToDefault = { onSetNativePaletteDraw(globalDefaults.nativePaletteDraw) }
                         )
                     }
+
+                    EmulationMenuTab.Achievements -> {
+                        OverlayAchievementsPane(
+                            gamePath = currentGamePath,
+                            currentGameTitle = uiState.currentGameTitle,
+                            retroState = retroState
+                        )
+                    }
                 }
             }
         }
@@ -2748,9 +2880,11 @@ private fun EmulationSidebarMenu(
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f))
         ) {
+            val railScrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(railScrollState)
                     .padding(vertical = 16.dp, horizontal = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -2779,6 +2913,12 @@ private fun EmulationSidebarMenu(
                     selected = selectedMenuTab == EmulationMenuTab.Advanced,
                     onClick = { selectedMenuTab = EmulationMenuTab.Advanced }
                 )
+                EmulationMenuRailButton(
+                    icon = Icons.Rounded.LockOpen,
+                    contentDescription = stringResource(R.string.emulation_achievements_tab),
+                    selected = selectedMenuTab == EmulationMenuTab.Achievements,
+                    onClick = { selectedMenuTab = EmulationMenuTab.Achievements }
+                )
                 Spacer(modifier = Modifier.weight(1f))
                 EmulationMenuRailButton(
                     icon = Icons.AutoMirrored.Rounded.ExitToApp,
@@ -2786,6 +2926,303 @@ private fun EmulationSidebarMenu(
                     selected = false,
                     onClick = onClose,
                     isDestructive = true
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayAchievementsPane(
+    gamePath: String?,
+    currentGameTitle: String,
+    retroState: com.sbro.emucorex.core.utils.RetroAchievementsUiState
+) {
+    val context = LocalContext.current
+    val repository = remember(context) { RetroAchievementsRepository(context) }
+    val contentState by produceState(
+        initialValue = OverlayAchievementsContentState(
+            isLoading = gamePath != null && retroState.enabled && retroState.user != null
+        ),
+        key1 = gamePath,
+        key2 = retroState.enabled,
+        key3 = retroState.user?.username
+    ) {
+        if (gamePath.isNullOrBlank() || !retroState.enabled || retroState.user == null) {
+            value = OverlayAchievementsContentState(isLoading = false, gameData = null)
+            return@produceState
+        }
+        value = OverlayAchievementsContentState(isLoading = true, gameData = null)
+        value = withContext(Dispatchers.IO) {
+            OverlayAchievementsContentState(
+                isLoading = false,
+                gameData = runCatching { repository.loadGameData(gamePath) }.getOrNull()
+            )
+        }
+    }
+
+    SidebarSectionTitle(
+        text = stringResource(R.string.emulation_achievements_tab).uppercase(),
+        color = MaterialTheme.colorScheme.primary,
+        topPadding = 8.dp,
+        horizontalInset = 4.dp
+    )
+
+    when {
+        gamePath.isNullOrBlank() -> {
+            OverlayAchievementsNotice(stringResource(R.string.emulation_achievements_bios_unavailable))
+        }
+
+        !retroState.isSupported -> {
+            OverlayAchievementsNotice(stringResource(R.string.emulation_achievements_not_supported))
+        }
+
+        !retroState.enabled -> {
+            OverlayAchievementsNotice(stringResource(R.string.settings_ra_empty_disabled))
+        }
+
+        retroState.user == null -> {
+            OverlayAchievementsNotice(stringResource(R.string.achievements_login_to_sync))
+        }
+
+        contentState.isLoading -> {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = stringResource(R.string.achievements_loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        contentState.gameData == null -> {
+            OverlayAchievementsNotice(stringResource(R.string.emulation_achievements_unavailable))
+        }
+
+        else -> {
+            val gameData = contentState.gameData
+            val subtitle = retroState.game?.richPresence?.takeIf { it.isNotBlank() }
+                ?: gameData?.title
+                ?: currentGameTitle
+            var showAllAchievements by remember(gameData?.gameId) { mutableStateOf(false) }
+            val sortedAchievements = remember(gameData) {
+                gameData?.achievements
+                    ?.sortedWith(
+                        compareByDescending<RetroAchievementEntry> { it.isEarned }
+                            .thenBy { it.title.lowercase() }
+                    )
+                    .orEmpty()
+            }
+            val visibleAchievements = remember(sortedAchievements, showAllAchievements) {
+                if (showAllAchievements) sortedAchievements else sortedAchievements.take(8)
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = gameData?.title?.ifBlank { currentGameTitle }
+                            ?: currentGameTitle.ifBlank { stringResource(R.string.emulation_achievements_tab) },
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    subtitle.takeIf { !it.isNullOrBlank() && it != gameData?.title }?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OverlayAchievementsMetricCard(
+                            modifier = Modifier.weight(1f),
+                            value = "${gameData?.earnedCount ?: 0}/${gameData?.totalCount ?: 0}",
+                            label = stringResource(R.string.settings_ra_achievements_label)
+                        )
+                        OverlayAchievementsMetricCard(
+                            modifier = Modifier.weight(1f),
+                            value = "${gameData?.earnedPoints ?: 0}/${gameData?.totalPoints ?: 0}",
+                            label = stringResource(R.string.settings_ra_points_label)
+                        )
+                    }
+                    if (visibleAchievements.isEmpty()) {
+                        OverlayAchievementsNotice(stringResource(R.string.achievements_game_empty))
+                    } else {
+                        visibleAchievements.forEach { achievement ->
+                            OverlayAchievementRow(achievement = achievement)
+                        }
+                        val hiddenCount = sortedAchievements.size - visibleAchievements.size
+                        if (hiddenCount > 0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.emulation_achievements_more, hiddenCount),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(onClick = { showAllAchievements = true }) {
+                                    Text(text = stringResource(R.string.emulation_achievements_show_all))
+                                }
+                            }
+                        } else if (showAllAchievements && sortedAchievements.size > 8) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { showAllAchievements = false }) {
+                                    Text(text = stringResource(R.string.emulation_achievements_show_less))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverlayAchievementsMetricCard(
+    modifier: Modifier = Modifier,
+    value: String,
+    label: String
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun OverlayAchievementsNotice(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun OverlayAchievementRow(achievement: RetroAchievementEntry) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BitmapPathImage(
+                imagePath = if (achievement.isEarned) {
+                    achievement.badgeUrl ?: achievement.badgeLockedUrl
+                } else {
+                    achievement.badgeLockedUrl ?: achievement.badgeUrl
+                },
+                contentDescription = achievement.title,
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                fallback = {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        tint = if (achievement.isEarned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = achievement.title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = achievement.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = achievement.points.toString(),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = stringResource(
+                        if (achievement.isEarned) R.string.achievements_status_earned
+                        else R.string.achievements_status_locked
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (achievement.isEarned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -2933,6 +3370,15 @@ private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "dpad_left" -> R.string.settings_gamepad_action_dpad_left
     "dpad_right" -> R.string.settings_gamepad_action_dpad_right
     else -> R.string.settings_gamepad_section
+}
+
+@Composable
+private fun gamepadActionLabel(actionId: String): String = when (actionId) {
+    "cross" -> "\u2715"
+    "circle" -> "\u25cb"
+    "square" -> "\u25a1"
+    "triangle" -> "\u25b3"
+    else -> stringResource(gamepadActionLabelRes(actionId))
 }
 
 @Composable
@@ -3251,8 +3697,12 @@ private fun PerformanceHud(
             )
             PerformanceHudMetric(
                 modifier = Modifier.widthIn(min = 54.dp),
-                label = stringResource(R.string.emulation_target_fps_badge, targetFps),
-                value = targetFps.toString()
+                label = if (targetFps > 0) {
+                    stringResource(R.string.emulation_target_fps_badge, targetFps)
+                } else {
+                    stringResource(R.string.settings_target_fps_auto)
+                },
+                value = if (targetFps > 0) targetFps.toString() else stringResource(R.string.settings_auto)
             )
         }
     }
@@ -3342,24 +3792,6 @@ private fun LiveChipsSelectionRow(
             } 
         }
     }
-}
-
-@Composable
-private fun performancePresetOptions(): List<Pair<Int, String>> = listOf(
-    PerformancePresets.CUSTOM to stringResource(R.string.settings_performance_preset_custom),
-    PerformancePresets.BATTERY to stringResource(R.string.settings_performance_preset_battery),
-    PerformancePresets.BALANCED to stringResource(R.string.settings_performance_preset_balanced),
-    PerformancePresets.PERFORMANCE to stringResource(R.string.settings_performance_preset_performance),
-    PerformancePresets.AGGRESSIVE to stringResource(R.string.settings_performance_preset_aggressive)
-)
-
-@androidx.annotation.StringRes
-private fun performancePresetDescription(preset: Int): Int = when (preset) {
-    PerformancePresets.BATTERY -> R.string.settings_performance_preset_battery_desc
-    PerformancePresets.BALANCED -> R.string.settings_performance_preset_balanced_desc
-    PerformancePresets.PERFORMANCE -> R.string.settings_performance_preset_performance_desc
-    PerformancePresets.AGGRESSIVE -> R.string.settings_performance_preset_aggressive_desc
-    else -> R.string.settings_performance_preset_custom_desc
 }
 
 @Composable
@@ -3491,15 +3923,6 @@ private fun LiveUpscaleSliderRow(
             )
         )
     }
-}
-
-@androidx.annotation.StringRes
-private fun deviceProfileDescription(family: DeviceChipsetFamily): Int = when (family) {
-    DeviceChipsetFamily.MEDIATEK -> R.string.settings_device_profile_desc_mediatek
-    DeviceChipsetFamily.SNAPDRAGON -> R.string.settings_device_profile_desc_snapdragon
-    DeviceChipsetFamily.EXYNOS -> R.string.settings_device_profile_desc_generic
-    DeviceChipsetFamily.TENSOR -> R.string.settings_device_profile_desc_generic
-    DeviceChipsetFamily.GENERIC -> R.string.settings_device_profile_desc_generic
 }
 
 @Composable

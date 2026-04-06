@@ -648,7 +648,7 @@ std::string VMManager::GetTitle(bool prefer_en)
 {
 	std::unique_lock lock(s_info_mutex);
 	std::string out = s_title;
-	if (!s_title_en_search.empty())
+	if (prefer_en && !s_title_en_search.empty())
 	{
 		size_t pos = out.find(s_title_en_search);
 		if (pos != std::string::npos)

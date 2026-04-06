@@ -8,7 +8,8 @@ import java.io.File
 
 data class GameLibraryCacheSnapshot(
     val games: List<GameItem>,
-    val savedAt: Long
+    val savedAt: Long,
+    val preferEnglishTitles: Boolean = false
 )
 
 class GameLibraryCacheRepository(context: Context) {
@@ -22,7 +23,7 @@ class GameLibraryCacheRepository(context: Context) {
         return loadSnapshot(rootPath).games
     }
 
-    fun loadSnapshot(rootPath: String): GameLibraryCacheSnapshot {
+    fun loadSnapshot(rootPath: String, preferEnglishTitles: Boolean? = null): GameLibraryCacheSnapshot {
         synchronized(lock) {
             if (!cacheFile.exists()) return GameLibraryCacheSnapshot(emptyList(), 0L)
 
@@ -34,6 +35,10 @@ class GameLibraryCacheRepository(context: Context) {
                     .mapNotNull { index -> libraries.optJSONObject(index) }
                     .firstOrNull { it.optString("root_path") == rootPath }
                     ?: return GameLibraryCacheSnapshot(emptyList(), 0L)
+                val cachedPreference = libraryObject.optBoolean("prefer_english_titles", false)
+                if (preferEnglishTitles != null && cachedPreference != preferEnglishTitles) {
+                    return GameLibraryCacheSnapshot(emptyList(), 0L, cachedPreference)
+                }
 
                 val games = libraryObject.optJSONArray("games") ?: JSONArray()
                 val parsedGames = buildList {
@@ -56,13 +61,14 @@ class GameLibraryCacheRepository(context: Context) {
                 }
                 GameLibraryCacheSnapshot(
                     games = parsedGames,
-                    savedAt = libraryObject.optLong("saved_at", 0L)
+                    savedAt = libraryObject.optLong("saved_at", 0L),
+                    preferEnglishTitles = cachedPreference
                 )
             }.getOrDefault(GameLibraryCacheSnapshot(emptyList(), 0L))
         }
     }
 
-    fun save(rootPath: String, games: List<GameItem>) {
+    fun save(rootPath: String, games: List<GameItem>, preferEnglishTitles: Boolean = false) {
         synchronized(lock) {
             runCatching {
                 cacheFile.parentFile?.mkdirs()
@@ -85,6 +91,7 @@ class GameLibraryCacheRepository(context: Context) {
                     JSONObject().apply {
                         put("root_path", rootPath)
                         put("saved_at", System.currentTimeMillis())
+                        put("prefer_english_titles", preferEnglishTitles)
                         put(
                             "games",
                             JSONArray().apply {

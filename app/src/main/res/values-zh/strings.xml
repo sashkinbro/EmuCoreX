@@ -15,7 +15,7 @@
     <string name="home_view_list">以清單顯示</string>
     <string name="home_view_grid">以網格顯示</string>
     <string name="home_search">搜尋遊戲</string>
-    <string name="home_game_count">%d 款遊戲</string>
+    <string name="home_game_count">遊戲總數: %d</string>
     <string name="home_library_desc">您的遊戲庫、設定和快速操作都在這裡。</string>
     <string name="home_recent_title">最近開啟</string>
     <string name="home_recent_label">繼續</string>
@@ -796,4 +796,25 @@
     <string name="settings_cover_download_url_example_hint">点击以粘贴两个示例 URL。长按进行复制。</string>
     <string name="settings_cover_download_url_copied">已复制示例 URL。</string>
     <string name="settings_help_cover_art_style">选择下载封面时使用的默认封面类型。平面封面与经典的包装盒正面外观相匹配，而 3D 包装盒则在来源提供时使用带有角度的包装盒渲染图。3D 封面看起来更具视觉冲击力，但其可用性可能略低于平面封面。</string>
+    <string name="settings_renderer_auto">自动</string>
+    <string name="settings_bios_picker_title">选择 BIOS 文件夹</string>
+    <string name="settings_bios_picker_desc">选择包含您的 PlayStation 2 BIOS 文件的文件夹。此文件夹将用于正常的游戏启动和 BIOS 启动。</string>
+    <string name="settings_bios_picker_current">当前 BIOS 文件夹</string>
+    <string name="settings_bios_picker_action">选择文件夹</string>
+    <string name="settings_auto">自动</string>
+    <string name="settings_target_fps_mode">目标帧率模式</string>
+    <string name="settings_target_fps_auto">自动帧率</string>
+    <string name="settings_target_fps_manual">手动帧率</string>
+    <string name="detail_igdb_source_note">此屏幕上的游戏描述和元数据通过 IGDB API 提供。</string>
+    <string name="settings_prefer_english_game_titles">首选英文游戏名</string>
+    <string name="settings_prefer_english_game_titles_desc">在可用时使用 PCSX2 游戏数据库中的英文名称。</string>
+    <string name="settings_help_prefer_english_game_titles">对于使用日语或其他地区名称发布的游戏，使用来自 PCSX2 的 GameIndex 数据库的英文名称。这主要是为了让导入的游戏在游戏库中显示得更清晰，而在数据库中没有英文名称的游戏则保留其原始名称。</string>
+    <string name="achievements_loading">正在加载成就…</string>
+    <string name="emulation_achievements_bios_unavailable">成就仅在加载游戏时可用。BIOS 启动不会公开 RetroAchievements 数据。</string>
+    <string name="emulation_achievements_not_supported">当前原生版本不支持 RetroAchievements。</string>
+    <string name="emulation_achievements_unavailable">目前没有此游戏的 RetroAchievements 数据可用。</string>
+    <string name="emulation_achievements_more">完整游戏列表中还有 %1$d 个成就。</string>
+    <string name="emulation_achievements_tab">成就</string>
+    <string name="emulation_achievements_show_all">显示全部</string>
+    <string name="emulation_achievements_show_less">显示更少</string>
 </resources>

@@ -3,10 +3,10 @@ package com.sbro.emucorex.core
 import java.util.Locale
 import kotlin.math.roundToInt
 
-const val UPSCALE_MIN = 0.5f
+const val UPSCALE_MIN = 1.0f
 const val UPSCALE_MAX = 4.0f
 const val UPSCALE_STEP = 0.25f
-const val UPSCALE_SLIDER_STEPS = 13
+const val UPSCALE_SLIDER_STEPS = 11
 
 fun normalizeUpscale(value: Float): Float {
     val snapped = (value / UPSCALE_STEP).roundToInt() * UPSCALE_STEP

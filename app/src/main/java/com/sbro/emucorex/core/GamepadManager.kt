@@ -194,24 +194,19 @@ object GamepadManager {
         if (!isGameController(event.device)) return false
         if (event.action != MotionEvent.ACTION_MOVE) return false
 
-        val indices = IntArray(14)
-        val values = FloatArray(14)
-        var count = 0
-
-        fun addUpdate(index: Int, value: Float) {
-            indices[count] = index
-            values[count] = value
-            count++
-        }
-
         // Left stick
         val leftX = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_X))
         val leftY = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_Y))
 
         if (leftX != prevLeftX || leftY != prevLeftY) {
-            collectAnalogStickUpdates(leftX, leftY, 
-                PadKey.LeftStickUp, PadKey.LeftStickRight, PadKey.LeftStickDown, PadKey.LeftStickLeft,
-                ::addUpdate)
+            dispatchAnalogStick(
+                x = leftX,
+                y = leftY,
+                upKey = PadKey.LeftStickUp,
+                rightKey = PadKey.LeftStickRight,
+                downKey = PadKey.LeftStickDown,
+                leftKey = PadKey.LeftStickLeft
+            )
             prevLeftX = leftX
             prevLeftY = leftY
         }
@@ -221,9 +216,14 @@ object GamepadManager {
         val rightY = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_RZ))
 
         if (rightX != prevRightX || rightY != prevRightY) {
-            collectAnalogStickUpdates(rightX, rightY,
-                PadKey.RightStickUp, PadKey.RightStickRight, PadKey.RightStickDown, PadKey.RightStickLeft,
-                ::addUpdate)
+            dispatchAnalogStick(
+                x = rightX,
+                y = rightY,
+                upKey = PadKey.RightStickUp,
+                rightKey = PadKey.RightStickRight,
+                downKey = PadKey.RightStickDown,
+                leftKey = PadKey.RightStickLeft
+            )
             prevRightX = rightX
             prevRightY = rightY
         }
@@ -233,13 +233,11 @@ object GamepadManager {
         val rt = event.getAxisValue(MotionEvent.AXIS_RTRIGGER)
 
         if (lt != prevLT) {
-            val value = (lt * 255f).toInt().coerceIn(0, 255)
-            addUpdate(PadKey.L2, value / 255f)
+            dispatchAnalogButton(PadKey.L2, lt)
             prevLT = lt
         }
         if (rt != prevRT) {
-            val value = (rt * 255f).toInt().coerceIn(0, 255)
-            addUpdate(PadKey.R2, value / 255f)
+            dispatchAnalogButton(PadKey.R2, rt)
             prevRT = rt
         }
 
@@ -248,35 +246,30 @@ object GamepadManager {
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
 
         if (hatX != prevHatX || hatY != prevHatY) {
-            addUpdate(PadKey.Left, if (hatX < -0.5f) 1.0f else 0.0f)
-            addUpdate(PadKey.Right, if (hatX > 0.5f) 1.0f else 0.0f)
-            addUpdate(PadKey.Up, if (hatY < -0.5f) 1.0f else 0.0f)
-            addUpdate(PadKey.Down, if (hatY > 0.5f) 1.0f else 0.0f)
+            EmulatorBridge.setPadButton(PadKey.Left, 0, hatX < -0.5f)
+            EmulatorBridge.setPadButton(PadKey.Right, 0, hatX > 0.5f)
+            EmulatorBridge.setPadButton(PadKey.Up, 0, hatY < -0.5f)
+            EmulatorBridge.setPadButton(PadKey.Down, 0, hatY > 0.5f)
             prevHatX = hatX
             prevHatY = hatY
-        }
-
-        if (count > 0) {
-            EmulatorBridge.setPadParams(indices.copyOf(count), values.copyOf(count))
         }
 
         return true
     }
 
-    private fun collectAnalogStickUpdates(
+    private fun dispatchAnalogStick(
         x: Float, y: Float,
-        upKey: Int, rightKey: Int, downKey: Int, leftKey: Int,
-        addUpdate: (Int, Float) -> Unit
+        upKey: Int, rightKey: Int, downKey: Int, leftKey: Int
     ) {
-        val right = (x.coerceAtLeast(0f) * 255f).toInt().coerceIn(0, 255)
-        val left = ((-x).coerceAtLeast(0f) * 255f).toInt().coerceIn(0, 255)
-        val down = (y.coerceAtLeast(0f) * 255f).toInt().coerceIn(0, 255)
-        val up = ((-y).coerceAtLeast(0f) * 255f).toInt().coerceIn(0, 255)
+        dispatchAnalogButton(upKey, (-y).coerceAtLeast(0f))
+        dispatchAnalogButton(rightKey, x.coerceAtLeast(0f))
+        dispatchAnalogButton(downKey, y.coerceAtLeast(0f))
+        dispatchAnalogButton(leftKey, (-x).coerceAtLeast(0f))
+    }
 
-        addUpdate(upKey, up / 255f)
-        addUpdate(rightKey, right / 255f)
-        addUpdate(downKey, down / 255f)
-        addUpdate(leftKey, left / 255f)
+    private fun dispatchAnalogButton(key: Int, value: Float) {
+        val range = (value.coerceIn(0f, 1f) * 255f).toInt().coerceIn(0, 255)
+        EmulatorBridge.setPadButton(key, range, range > 0)
     }
 
     private fun mapKeyCodeToPadKey(keyCode: Int): Int? {

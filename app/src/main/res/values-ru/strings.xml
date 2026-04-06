@@ -15,7 +15,7 @@
     <string name="home_view_list">Показать списком</string>
     <string name="home_view_grid">Показать сеткой</string>
     <string name="home_search">Поиск игр</string>
-    <string name="home_game_count">%d игр</string>
+    <string name="home_game_count">Всего игр: %d</string>
     <string name="home_library_desc">Ваша библиотека, настройки и быстрые действия в одном месте.</string>
     <string name="home_recent_title">Недавно открытые</string>
     <string name="home_recent_label">Продолжить</string>
@@ -796,4 +796,25 @@
     <string name="settings_cover_download_url_example_hint">Нажмите, чтобы вставить оба URL-адреса для примера. Удерживайте, чтобы скопировать их.</string>
     <string name="settings_cover_download_url_copied">Примеры URL-адресов скопированы.</string>
     <string name="settings_help_cover_art_style">Выбирает тип обложки по умолчанию, используемый при загрузке изображений. Плоские обложки соответствуют классическому виду передней части коробки, в то время как 3D-коробка использует угловые рендеры коробок, если источник их предоставляет. 3D-обложки могут выглядеть более эффектно, но их доступность может быть немного хуже, чем у плоских изображений.</string>
+    <string name="settings_renderer_auto">Авто</string>
+    <string name="settings_bios_picker_title">Выбрать папку BIOS</string>
+    <string name="settings_bios_picker_desc">Выберите папку, содержащую файлы BIOS PlayStation 2. Эта папка будет использоваться для обычного запуска игр и запуска BIOS.</string>
+    <string name="settings_bios_picker_current">Текущая папка BIOS</string>
+    <string name="settings_bios_picker_action">Выбрать папку</string>
+    <string name="settings_auto">Авто</string>
+    <string name="settings_target_fps_mode">Режим целевого FPS</string>
+    <string name="settings_target_fps_auto">Авто FPS</string>
+    <string name="settings_target_fps_manual">Ручной FPS</string>
+    <string name="detail_igdb_source_note">Описание игры и метаданные на этом экране предоставляются через API IGDB.</string>
+    <string name="settings_prefer_english_game_titles">Предпочитать английские названия игр</string>
+    <string name="settings_prefer_english_game_titles_desc">Использовать английские названия из базы данных игр PCSX2, если они доступны.</string>
+    <string name="settings_help_prefer_english_game_titles">Использует английские названия из базы данных GameIndex PCSX2 для игр, которые поставляются с японскими или другими региональными названиями. Это в первую очередь помогает сделать импортированные релизы более понятными в библиотеке, в то время как игры без английского названия в базе данных сохраняют свое обычное имя.</string>
+    <string name="achievements_loading">Загрузка достижений…</string>
+    <string name="emulation_achievements_bios_unavailable">Достижения доступны только при загруженной игре. При запуске BIOS данные RetroAchievements не передаются.</string>
+    <string name="emulation_achievements_not_supported">RetroAchievements не поддерживаются в текущей нативной сборке.</string>
+    <string name="emulation_achievements_unavailable">В данный момент данные RetroAchievements для этой игры недоступны.</string>
+    <string name="emulation_achievements_more">Еще %1$d достижений в полном списке игры.</string>
+    <string name="emulation_achievements_tab">Достижения</string>
+    <string name="emulation_achievements_show_all">Показать все</string>
+    <string name="emulation_achievements_show_less">Показать меньше</string>
 </resources>

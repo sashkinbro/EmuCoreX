@@ -1,9 +1,9 @@
 package com.sbro.emucorex.data
 
 import android.content.Context
+import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GsHackDefaults
-import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import org.json.JSONArray
 import org.json.JSONObject
@@ -13,10 +13,9 @@ data class PerGameSettings(
     val gameKey: String,
     val gameTitle: String,
     val gameSerial: String? = null,
-    val renderer: Int = 14,
+    val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
-    val performancePreset: Int = PerformancePresets.CUSTOM,
     val showFps: Boolean = false,
     val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
     val enableMtvu: Boolean = true,
@@ -27,7 +26,7 @@ data class PerGameSettings(
     val eeCycleSkip: Int = 0,
     val frameSkip: Int = 0,
     val frameLimitEnabled: Boolean = false,
-    val targetFps: Int = 60,
+    val targetFps: Int = 0,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -36,7 +35,7 @@ data class PerGameSettings(
     val casMode: Int = 0,
     val casSharpness: Int = 50,
     val anisotropicFiltering: Int = 0,
-    val enableHwMipmapping: Boolean = true,
+    val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -66,6 +65,7 @@ data class PerGameSettings(
     val mergeSprite: Boolean = false,
     val forceEvenSpritePosition: Boolean = false,
     val nativePaletteDraw: Boolean = false,
+    val providedKeys: Set<String>? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )
 
@@ -89,6 +89,17 @@ class PerGameSettingsRepository(context: Context) {
 
     fun deleteAll() {
         writeAll(emptyList())
+    }
+
+    fun clearManualHardwareFixesForAllProfiles(): Boolean {
+        val items = loadAll()
+        if (items.isEmpty()) return false
+
+        val normalized = items.map { it.withManualHardwareFixesCleared() }
+        if (normalized == items) return false
+
+        writeAll(normalized.sortedBy { it.gameTitle.lowercase() })
+        return true
     }
 
     fun exportJson(): JSONObject {
@@ -139,14 +150,14 @@ class PerGameSettingsRepository(context: Context) {
 }
 
 private fun JSONObject.toPerGameSettings(): PerGameSettings {
+    val providedKeys = keys().asSequence().toSet()
     return PerGameSettings(
         gameKey = optString("gameKey"),
         gameTitle = optString("gameTitle"),
         gameSerial = optString("gameSerial").takeIf { it.isNotBlank() },
-        renderer = optInt("renderer", 14),
+        renderer = optInt("renderer", EmulatorBridge.AUTO_RENDERER).let { if (it == 0) EmulatorBridge.AUTO_RENDERER else it },
         upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1),
-        performancePreset = optInt("performancePreset", PerformancePresets.CUSTOM),
         showFps = optBoolean("showFps", false),
         fpsOverlayMode = optInt("fpsOverlayMode", AppPreferences.FPS_OVERLAY_MODE_DETAILED),
         enableMtvu = optBoolean("enableMtvu", true),
@@ -157,7 +168,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         eeCycleSkip = optInt("eeCycleSkip", 0),
         frameSkip = optInt("frameSkip", 0),
         frameLimitEnabled = optBoolean("frameLimitEnabled", false),
-        targetFps = optInt("targetFps", 60),
+        targetFps = optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) },
         textureFiltering = optInt("textureFiltering", GsHackDefaults.BILINEAR_FILTERING_DEFAULT),
         trilinearFiltering = optInt("trilinearFiltering", GsHackDefaults.TRILINEAR_FILTERING_DEFAULT),
         blendingAccuracy = optInt("blendingAccuracy", GsHackDefaults.BLENDING_ACCURACY_DEFAULT),
@@ -166,7 +177,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         casMode = optInt("casMode", 0),
         casSharpness = optInt("casSharpness", 50),
         anisotropicFiltering = optInt("anisotropicFiltering", 0),
-        enableHwMipmapping = optBoolean("enableHwMipmapping", true),
+        enableHwMipmapping = optBoolean("enableHwMipmapping", GsHackDefaults.HW_MIPMAPPING_DEFAULT),
         enableWidescreenPatches = optBoolean("enableWidescreenPatches", false),
         enableNoInterlacingPatches = optBoolean("enableNoInterlacingPatches", false),
         cpuSpriteRenderSize = optInt("cpuSpriteRenderSize", GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT),
@@ -196,6 +207,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         mergeSprite = optBoolean("mergeSprite", false),
         forceEvenSpritePosition = optBoolean("forceEvenSpritePosition", false),
         nativePaletteDraw = optBoolean("nativePaletteDraw", false),
+        providedKeys = providedKeys,
         updatedAt = optLong("updatedAt", System.currentTimeMillis())
     )
 }
@@ -208,7 +220,6 @@ private fun PerGameSettings.toJson(): JSONObject {
         put("renderer", renderer)
         put("upscaleMultiplier", upscaleMultiplier.toDouble())
         put("aspectRatio", aspectRatio)
-        put("performancePreset", performancePreset)
         put("showFps", showFps)
         put("fpsOverlayMode", fpsOverlayMode)
         put("enableMtvu", enableMtvu)
@@ -269,4 +280,36 @@ private fun JSONObject.readUpscaleMultiplier(): Float {
         has("upscaleMultiplier") -> optInt("upscaleMultiplier", 1).toFloat()
         else -> 1f
     }.let(::normalizeUpscale)
+}
+
+private fun PerGameSettings.withManualHardwareFixesCleared(): PerGameSettings {
+    return copy(
+        cpuSpriteRenderSize = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
+        cpuSpriteRenderLevel = GsHackDefaults.CPU_SPRITE_RENDER_LEVEL_DEFAULT,
+        softwareClutRender = GsHackDefaults.SOFTWARE_CLUT_RENDER_DEFAULT,
+        gpuTargetClutMode = GsHackDefaults.GPU_TARGET_CLUT_DEFAULT,
+        skipDrawStart = 0,
+        skipDrawEnd = 0,
+        autoFlushHardware = GsHackDefaults.AUTO_FLUSH_DEFAULT,
+        cpuFramebufferConversion = false,
+        disableDepthConversion = false,
+        disableSafeFeatures = false,
+        disableRenderFixes = false,
+        preloadFrameData = false,
+        disablePartialInvalidation = false,
+        textureInsideRt = GsHackDefaults.TEXTURE_INSIDE_RT_DEFAULT,
+        readTargetsOnClose = false,
+        estimateTextureRegion = false,
+        gpuPaletteConversion = false,
+        halfPixelOffset = GsHackDefaults.HALF_PIXEL_OFFSET_DEFAULT,
+        nativeScaling = GsHackDefaults.NATIVE_SCALING_DEFAULT,
+        roundSprite = GsHackDefaults.ROUND_SPRITE_DEFAULT,
+        bilinearUpscale = GsHackDefaults.BILINEAR_UPSCALE_DEFAULT,
+        textureOffsetX = 0,
+        textureOffsetY = 0,
+        alignSprite = false,
+        mergeSprite = false,
+        forceEvenSpritePosition = false,
+        nativePaletteDraw = false
+    )
 }

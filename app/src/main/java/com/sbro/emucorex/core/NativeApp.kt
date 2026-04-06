@@ -52,7 +52,6 @@ object NativeApp {
     @JvmStatic external fun getGameTitle(path: String): String?
     @JvmStatic external fun setPadVibration(enabled: Boolean)
     @JvmStatic external fun setPadButton(index: Int, range: Int, pressed: Boolean)
-    @JvmStatic external fun setPadParams(indices: IntArray, values: FloatArray)
     @JvmStatic external fun resetKeyStatus()
     @JvmStatic external fun setAspectRatio(type: Int)
     @JvmStatic external fun renderUpscalemultiplier(value: Float)
@@ -60,6 +59,7 @@ object NativeApp {
     @JvmStatic external fun setCustomDriverPath(path: String)
     @JvmStatic external fun setNativeLibraryDir(path: String)
     @JvmStatic external fun setSetting(section: String, key: String, type: String, value: String)
+    @JvmStatic external fun applyRuntimeOperations(payload: String)
     @JvmStatic external fun getSetting(section: String, key: String, type: String): String?
     @JvmStatic external fun onNativeSurfaceCreated()
     @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int)

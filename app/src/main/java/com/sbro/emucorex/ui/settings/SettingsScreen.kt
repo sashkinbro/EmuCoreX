@@ -33,7 +33,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -106,10 +105,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
-import com.sbro.emucorex.core.DeviceChipsetFamily
 import com.sbro.emucorex.core.DocumentPathResolver
+import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.UPSCALE_MAX
 import com.sbro.emucorex.core.UPSCALE_MIN
 import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
@@ -152,10 +150,6 @@ fun SettingsScreen(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val isWide = configuration.screenWidthDp >= 900
-    val isAdaptiveLandscape = isLandscape && configuration.screenWidthDp >= 560
-    val useWideLayout = isWide || isAdaptiveLandscape
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
     val cheatRepository = remember(context) { CheatRepository(context) }
     var cheatEntries by remember { mutableStateOf(cheatRepository.listImportedCheatFiles()) }
@@ -166,6 +160,7 @@ fun SettingsScreen(
     var showTopBarMenu by remember { mutableStateOf(false) }
     var showResetAllSettingsDialog by remember { mutableStateOf(false) }
     var showCoverUrlDialog by remember { mutableStateOf(false) }
+    var showBiosDialog by remember { mutableStateOf(false) }
     var pendingCoverUrl by remember { mutableStateOf("") }
     var searchEnabled by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -188,6 +183,10 @@ fun SettingsScreen(
     val cheatsImportFailureMessage = stringResource(R.string.settings_cheats_import_failed)
     val cheatsSavedMessage = stringResource(R.string.settings_cheats_saved)
     val cheatsDeletedMessage = stringResource(R.string.settings_cheats_deleted)
+    val coverUrlCopiedMessage = stringResource(R.string.settings_cover_download_url_copied)
+    val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
+    val notSetLabel = stringResource(R.string.settings_not_set)
+    val settingsScrollState = rememberScrollState()
 
     if (!uiState.isLoaded) {
         Box(
@@ -210,6 +209,7 @@ fun SettingsScreen(
     ) { uri: Uri? -> uri?.let(viewModel::setGamePath) }
 
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(null) })
+    val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog = true })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
     val openLanguageSheet = rememberDebouncedClick(onClick = { onOpenLanguageScreen?.invoke() })
     val refreshCheatEntries = remember {
@@ -218,7 +218,7 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(useWideLayout, shouldRequestGamepadFocus) {
+    LaunchedEffect(shouldRequestGamepadFocus) {
         if (shouldRequestGamepadFocus) {
             selectedTabFocusRequester.requestFocus()
         }
@@ -301,138 +301,77 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        if (useWideLayout) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .padding(horizontal = ScreenHorizontalPadding),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SettingsTabRail(
-                    selectedTab = selectedTab,
-                    onSelected = { selectedTab = it },
-                    topInset = 0.dp,
-                    selectedTabFocusRequester = selectedTabFocusRequester,
-                    searchEnabled = searchEnabled,
-                    searchQuery = searchQuery,
-                    onSearchEnabledChange = {
-                        searchEnabled = it
-                        if (!it) searchQuery = ""
-                    },
-                    onSearchQueryChange = { searchQuery = it },
-                    modifier = Modifier.width(if (isWide) 216.dp else 188.dp)
-                )
-                SettingsContent(
-                    uiState = uiState,
-                    selectedTab = selectedTab,
-                    context = context,
-                    launchBiosPicker = launchBiosPicker,
-                    launchGamePicker = launchGamePicker,
-                    onOpenCoverUrlEditor = {
-                        pendingCoverUrl = uiState.coverDownloadBaseUrl.orEmpty()
-                        showCoverUrlDialog = true
-                    },
-                    launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
-                    launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
-                    launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                    launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
-                    openLanguageSheet = openLanguageSheet,
-                    cheatEntries = cheatEntries,
-                    onOpenCheatEditor = { gameKey ->
-                        cheatEditorGameKey = gameKey
-                        cheatEditorFileName = cheatRepository.listImportedCheatFiles()
-                            .firstOrNull { it.gameKey == gameKey }
-                            ?.fileName ?: "$gameKey.pnach"
-                        cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
-                    },
-                    onRequestGamepadBinding = { pendingGamepadActionId = it },
-                    searchQuery = searchQuery,
-                    onSearchResultSelected = { tab ->
-                        selectedTab = tab
-                        searchEnabled = false
-                        searchQuery = ""
-                    },
-                    onEditControlsClick = onEditControlsClick,
-                    viewModel = viewModel,
-                    topInset = 0.dp,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .navigationBarsPadding()
-            ) {
-                SettingsCompactTopBar(
-                    title = stringResource(R.string.settings_title),
-                    subtitle = if (searchEnabled) stringResource(R.string.settings_search_subtitle) else selectedTab.label(),
-                    topInset = topInset,
-                    onBackClick = onBackClick,
-                    menuExpanded = showTopBarMenu,
-                    onMenuExpandedChange = { showTopBarMenu = it },
-                    onResetAllSettingsClick = {
-                        showTopBarMenu = false
-                        showResetAllSettingsDialog = true
-                    },
-                    searchEnabled = searchEnabled,
-                    searchQuery = searchQuery,
-                    onSearchEnabledChange = {
-                        searchEnabled = it
-                        if (!it) searchQuery = ""
-                    },
-                    onSearchQueryChange = { searchQuery = it }
-                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+                .verticalScroll(settingsScrollState)
+        ) {
+            SettingsCompactTopBar(
+                title = stringResource(R.string.settings_title),
+                subtitle = if (searchEnabled) stringResource(R.string.settings_search_subtitle) else selectedTab.label(),
+                topInset = topInset,
+                onBackClick = onBackClick,
+                menuExpanded = showTopBarMenu,
+                onMenuExpandedChange = { showTopBarMenu = it },
+                onResetAllSettingsClick = {
+                    showTopBarMenu = false
+                    showResetAllSettingsDialog = true
+                },
+                searchEnabled = searchEnabled,
+                searchQuery = searchQuery,
+                onSearchEnabledChange = {
+                    searchEnabled = it
+                    if (!it) searchQuery = ""
+                },
+                onSearchQueryChange = { searchQuery = it }
+            )
 
-                SettingsTabRow(
-                    selectedTab = selectedTab,
-                    onSelected = { tab ->
-                        if (selectedTab == tab) return@SettingsTabRow
-                        selectedTab = tab
-                    },
-                    selectedTabFocusRequester = selectedTabFocusRequester
-                )
+            SettingsTabRow(
+                selectedTab = selectedTab,
+                onSelected = { tab ->
+                    if (selectedTab == tab) return@SettingsTabRow
+                    selectedTab = tab
+                },
+                selectedTabFocusRequester = selectedTabFocusRequester
+            )
 
-                SettingsContent(
-                    uiState = uiState,
-                    selectedTab = selectedTab,
-                    context = context,
-                    launchBiosPicker = launchBiosPicker,
-                    launchGamePicker = launchGamePicker,
-                    onOpenCoverUrlEditor = {
-                        pendingCoverUrl = uiState.coverDownloadBaseUrl.orEmpty()
-                        showCoverUrlDialog = true
-                    },
-                    launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
-                    launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
-                    launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                    launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
-                    openLanguageSheet = openLanguageSheet,
-                    cheatEntries = cheatEntries,
-                    onOpenCheatEditor = { gameKey ->
-                        cheatEditorGameKey = gameKey
-                        cheatEditorFileName = cheatRepository.listImportedCheatFiles()
-                            .firstOrNull { it.gameKey == gameKey }
-                            ?.fileName ?: "$gameKey.pnach"
-                        cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
-                    },
-                    onRequestGamepadBinding = { pendingGamepadActionId = it },
-                    searchQuery = searchQuery,
-                    onSearchResultSelected = { tab ->
-                        selectedTab = tab
-                        searchEnabled = false
-                        searchQuery = ""
-                    },
-                    onEditControlsClick = onEditControlsClick,
-                    viewModel = viewModel,
-                    topInset = 0.dp,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                )
-            }
+            SettingsContent(
+                uiState = uiState,
+                selectedTab = selectedTab,
+                context = context,
+                launchBiosPicker = openBiosDialog,
+                launchGamePicker = launchGamePicker,
+                onOpenCoverUrlEditor = {
+                    pendingCoverUrl = uiState.coverDownloadBaseUrl.orEmpty()
+                    showCoverUrlDialog = true
+                },
+                launchDriverPicker = { driverPicker.launch(arrayOf("*/*")) },
+                launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
+                launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
+                launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
+                openLanguageSheet = openLanguageSheet,
+                cheatEntries = cheatEntries,
+                onOpenCheatEditor = { gameKey ->
+                    cheatEditorGameKey = gameKey
+                    cheatEditorFileName = cheatRepository.listImportedCheatFiles()
+                        .firstOrNull { it.gameKey == gameKey }
+                        ?.fileName ?: "$gameKey.pnach"
+                    cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
+                },
+                onRequestGamepadBinding = { pendingGamepadActionId = it },
+                searchQuery = searchQuery,
+                onSearchResultSelected = { tab ->
+                    selectedTab = tab
+                    searchEnabled = false
+                    searchQuery = ""
+                },
+                onEditControlsClick = onEditControlsClick,
+                viewModel = viewModel,
+                topInset = 0.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+            )
         }
     }
 
@@ -491,7 +430,7 @@ fun SettingsScreen(
                 Text(
                     stringResource(
                         R.string.settings_gamepad_mapping_listening_desc,
-                        stringResource(gamepadActionLabelRes(pendingGamepadActionId.orEmpty()))
+                        gamepadActionLabel(pendingGamepadActionId.orEmpty())
                     )
                 )
             },
@@ -524,6 +463,62 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetAllSettingsDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showBiosDialog) {
+        val biosDisplayName = uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
+            ?: stringResource(R.string.settings_not_set)
+        AlertDialog(
+            onDismissRequest = { showBiosDialog = false },
+            title = {
+                Text(stringResource(R.string.settings_bios_picker_title))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_bios_picker_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.settings_bios_picker_current),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = biosDisplayName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBiosDialog = false
+                        launchBiosPicker()
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_bios_picker_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBiosDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -591,7 +586,7 @@ fun SettingsScreen(
                                     )
                                     Toast.makeText(
                                         context,
-                                        context.getString(R.string.settings_cover_download_url_copied),
+                                        coverUrlCopiedMessage,
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -613,7 +608,7 @@ fun SettingsScreen(
                         if (hasInvalidPart || parts.size > 2) {
                             Toast.makeText(
                                 context,
-                                context.getString(R.string.settings_cover_download_url_invalid),
+                                coverUrlInvalidMessage,
                                 Toast.LENGTH_SHORT
                             ).show()
                             return@TextButton
@@ -905,15 +900,15 @@ private fun SettingsContent(
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
     val searchEntries = rememberSettingsSearchEntries()
+    val notSetLabel = stringResource(R.string.settings_not_set)
     Box(
         modifier = modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .imePadding()
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
                 .padding(top = topInset + 12.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -963,6 +958,15 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_home_search),
                             onResetToDefault = { viewModel.setShowHomeSearch(defaults.showHomeSearch) }
                         )
+                        ToggleItem(
+                            icon = Icons.Rounded.Language,
+                            title = stringResource(R.string.settings_prefer_english_game_titles),
+                            subtitle = stringResource(R.string.settings_prefer_english_game_titles_desc),
+                            checked = uiState.preferEnglishGameTitles,
+                            onCheckedChange = viewModel::setPreferEnglishGameTitles,
+                            helpText = stringResource(R.string.settings_help_prefer_english_game_titles),
+                            onResetToDefault = { viewModel.setPreferEnglishGameTitles(defaults.preferEnglishGameTitles) }
+                        )
                     }
                 }
 
@@ -971,6 +975,7 @@ private fun SettingsContent(
                         ChoiceSection(
                             title = stringResource(R.string.settings_renderer),
                             options = listOf(
+                                EmulatorBridge.AUTO_RENDERER to stringResource(R.string.settings_renderer_auto),
                                 14 to stringResource(R.string.settings_renderer_vulkan),
                                 12 to stringResource(R.string.settings_renderer_opengl),
                                 13 to stringResource(R.string.settings_renderer_software)
@@ -991,6 +996,18 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_gpu_driver),
                             onResetToDefault = { viewModel.setGpuDriverType(defaults.gpuDriverType) }
                         )
+                        if (uiState.gpuDriverType == 1) {
+                            val driverDisplayName = remember(uiState.customDriverPath, notSetLabel) {
+                                uiState.customDriverPath?.let { File(it).name }
+                                    ?: notSetLabel
+                            }
+                            SettingsItem(
+                                icon = Icons.Rounded.Tune,
+                                label = stringResource(R.string.settings_gpu_driver_path),
+                                value = driverDisplayName,
+                                onClick = launchDriverPicker
+                            )
+                        }
                         SliderItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_upscale),
@@ -1163,7 +1180,7 @@ private fun SettingsContent(
                             )
                             val isCustomBinding = uiState.gamepadBindings.containsKey(action.id)
                             GamepadBindingRow(
-                                title = stringResource(gamepadActionLabelRes(action.id)),
+                                title = gamepadActionLabel(action.id),
                                 value = assignedKeyCode?.let(GamepadManager::keyCodeLabel)
                                     ?: stringResource(R.string.settings_not_set),
                                 autoLabel = if (isCustomBinding) null else {
@@ -1197,17 +1214,12 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Paths -> {
-                    val notSetLabel = stringResource(R.string.settings_not_set)
                     val biosDisplayName = remember(uiState.biosPath, context, notSetLabel) {
                         uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
                             ?: notSetLabel
                     }
                     val gameDisplayName = remember(uiState.gamePath, context, notSetLabel) {
                         uiState.gamePath?.let { DocumentPathResolver.getDisplayName(context, it) }
-                            ?: notSetLabel
-                    }
-                    val driverDisplayName = remember(uiState.customDriverPath, context, notSetLabel) {
-                        uiState.customDriverPath?.let { File(it).name }
                             ?: notSetLabel
                     }
                     SettingsSection(title = stringResource(R.string.settings_paths)) {
@@ -1225,17 +1237,6 @@ private fun SettingsContent(
                             onClick = launchGamePicker,
                             helpText = stringResource(R.string.settings_help_game_path)
                         )
-                        SettingsItem(
-                            icon = Icons.Rounded.Tune,
-                            label = stringResource(R.string.settings_gpu_driver_path),
-                            value = driverDisplayName,
-                            onClick = launchDriverPicker
-                        )
-                        if (uiState.gpuDriverType == 0) {
-                            SettingsInlineNote(
-                                text = stringResource(R.string.settings_gpu_driver_path_note)
-                            )
-                        }
                     }
                 }
 
@@ -1291,39 +1292,6 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Performance -> {
-                    SettingsSection(title = stringResource(R.string.settings_device_profile_title)) {
-                        SettingsItem(
-                            icon = Icons.Rounded.Memory,
-                            label = stringResource(R.string.settings_device_profile_chipset),
-                            value = chipsetDisplayLabel(
-                                family = uiState.deviceChipsetFamily,
-                                detectedName = uiState.detectedChipsetName
-                            ),
-                            onClick = { }
-                        )
-                        SettingsItem(
-                            icon = Icons.Rounded.SettingsSuggest,
-                            label = stringResource(R.string.settings_device_profile_apply),
-                            value = stringResource(deviceProfileDescription(uiState.deviceChipsetFamily)),
-                            onClick = viewModel::applyRecommendedDeviceProfile
-                        )
-                        SettingsInlineNote(
-                            text = stringResource(R.string.settings_device_profile_note)
-                        )
-                    }
-                    SettingsSection(title = stringResource(R.string.settings_performance_preset)) {
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_performance_preset),
-                            options = performancePresetOptions(),
-                            selectedValue = uiState.performancePreset,
-                            onSelect = viewModel::applyPerformancePreset,
-                            helpText = stringResource(R.string.settings_help_performance_preset),
-                            onResetToDefault = { viewModel.applyPerformancePreset(defaults.performancePreset) }
-                        )
-                        SettingsInlineNote(
-                            text = stringResource(performancePresetDescription(uiState.performancePreset))
-                        )
-                    }
                     SettingsSection(title = stringResource(R.string.emulation_performance_stats)) {
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -1367,20 +1335,37 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_frame_limiter),
                             onResetToDefault = { viewModel.setFrameLimitEnabled(defaults.frameLimitEnabled) }
                         )
-                        SliderItem(
-                            icon = Icons.Rounded.Speed,
-                            title = stringResource(R.string.settings_target_fps),
-                            subtitle = stringResource(
-                                R.string.settings_target_fps_desc,
-                                uiState.targetFps
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_target_fps_mode),
+                            options = listOf(
+                                0 to stringResource(R.string.settings_target_fps_auto),
+                                1 to stringResource(R.string.settings_target_fps_manual)
                             ),
-                            value = uiState.targetFps.toFloat(),
-                            range = 20f..120f,
-                            steps = 99,
-                            onValueChange = { viewModel.setTargetFps(it.toInt()) },
+                            selectedValue = if (uiState.targetFps <= 0) 0 else 1,
+                            onSelect = { mode ->
+                                viewModel.setTargetFps(
+                                    if (mode == 0) 0 else resolveManualTargetFps(uiState.targetFps, defaults.targetFps)
+                                )
+                            },
                             helpText = stringResource(R.string.settings_help_target_fps),
                             onResetToDefault = { viewModel.setTargetFps(defaults.targetFps) }
                         )
+                        if (uiState.targetFps > 0) {
+                            SliderItem(
+                                icon = Icons.Rounded.Speed,
+                                title = stringResource(R.string.settings_target_fps),
+                                subtitle = stringResource(
+                                    R.string.settings_target_fps_desc,
+                                    uiState.targetFps
+                                ),
+                                value = uiState.targetFps.toFloat(),
+                                range = 20f..120f,
+                                steps = 99,
+                                onValueChange = { viewModel.setTargetFps(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_target_fps),
+                                onResetToDefault = { viewModel.setTargetFps(defaults.targetFps) }
+                            )
+                        }
                         ChoiceSection(
                             title = stringResource(R.string.settings_ee_cycle_rate),
                             options = listOf(
@@ -2080,6 +2065,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_keep_screen_on),
         entry(SettingsTab.General, R.string.settings_show_recent_games),
         entry(SettingsTab.General, R.string.settings_show_home_search),
+        entry(SettingsTab.General, R.string.settings_prefer_english_game_titles),
         entry(SettingsTab.Graphics, R.string.settings_renderer),
         entry(SettingsTab.Graphics, R.string.settings_gpu_driver),
         entry(SettingsTab.Graphics, R.string.settings_upscale),
@@ -2099,7 +2085,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_pad_vibration),
         entry(SettingsTab.Paths, R.string.settings_bios_path),
         entry(SettingsTab.Paths, R.string.settings_game_path),
-        entry(SettingsTab.Paths, R.string.settings_gpu_driver_path),
+        entry(SettingsTab.Graphics, R.string.settings_gpu_driver_path),
         entry(SettingsTab.Covers, R.string.settings_cover_art_style),
         entry(SettingsTab.Covers, R.string.settings_cover_download_url),
         entry(SettingsTab.DataTransfer, R.string.settings_backup_export_title),
@@ -2505,15 +2491,6 @@ private fun CheatEmptyState(
 }
 
 @Composable
-private fun performancePresetOptions(): List<Pair<Int, String>> = listOf(
-    PerformancePresets.CUSTOM to stringResource(R.string.settings_performance_preset_custom),
-    PerformancePresets.BATTERY to stringResource(R.string.settings_performance_preset_battery),
-    PerformancePresets.BALANCED to stringResource(R.string.settings_performance_preset_balanced),
-    PerformancePresets.PERFORMANCE to stringResource(R.string.settings_performance_preset_performance),
-    PerformancePresets.AGGRESSIVE to stringResource(R.string.settings_performance_preset_aggressive)
-)
-
-@Composable
 private fun hwDownloadModeOptions(): List<Pair<Int, String>> = listOf(
     0 to stringResource(R.string.settings_hw_download_mode_accurate),
     1 to stringResource(R.string.settings_hw_download_mode_no_readbacks),
@@ -2536,6 +2513,14 @@ private fun trilinearFilteringOptions(): List<Pair<Int, String>> = listOf(
     2 to stringResource(R.string.settings_trilinear_filtering_ps2),
     3 to stringResource(R.string.settings_trilinear_filtering_forced)
 )
+
+private fun resolveManualTargetFps(currentTargetFps: Int, defaultTargetFps: Int): Int {
+    return when {
+        currentTargetFps > 0 -> currentTargetFps
+        defaultTargetFps > 0 -> defaultTargetFps
+        else -> 60
+    }
+}
 
 @Composable
 private fun blendingAccuracyOptions(): List<Pair<Int, String>> = listOf(
@@ -2650,39 +2635,6 @@ private fun bilinearUpscaleOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @StringRes
-private fun performancePresetDescription(preset: Int): Int = when (preset) {
-    PerformancePresets.BATTERY -> R.string.settings_performance_preset_battery_desc
-    PerformancePresets.BALANCED -> R.string.settings_performance_preset_balanced_desc
-    PerformancePresets.PERFORMANCE -> R.string.settings_performance_preset_performance_desc
-    PerformancePresets.AGGRESSIVE -> R.string.settings_performance_preset_aggressive_desc
-    else -> R.string.settings_performance_preset_custom_desc
-}
-
-@Composable
-private fun chipsetDisplayLabel(
-    family: DeviceChipsetFamily,
-    detectedName: String
-): String {
-    val familyLabel = when (family) {
-        DeviceChipsetFamily.MEDIATEK -> stringResource(R.string.settings_device_profile_family_mediatek)
-        DeviceChipsetFamily.SNAPDRAGON -> stringResource(R.string.settings_device_profile_family_snapdragon)
-        DeviceChipsetFamily.EXYNOS -> stringResource(R.string.settings_device_profile_family_exynos)
-        DeviceChipsetFamily.TENSOR -> stringResource(R.string.settings_device_profile_family_tensor)
-        DeviceChipsetFamily.GENERIC -> stringResource(R.string.settings_device_profile_family_generic)
-    }
-    return if (detectedName.isBlank()) familyLabel else "$familyLabel • $detectedName"
-}
-
-@StringRes
-private fun deviceProfileDescription(family: DeviceChipsetFamily): Int = when (family) {
-    DeviceChipsetFamily.MEDIATEK -> R.string.settings_device_profile_desc_mediatek
-    DeviceChipsetFamily.SNAPDRAGON -> R.string.settings_device_profile_desc_snapdragon
-    DeviceChipsetFamily.EXYNOS -> R.string.settings_device_profile_desc_generic
-    DeviceChipsetFamily.TENSOR -> R.string.settings_device_profile_desc_generic
-    DeviceChipsetFamily.GENERIC -> R.string.settings_device_profile_desc_generic
-}
-
-@StringRes
 private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "cross" -> R.string.settings_gamepad_action_cross
     "circle" -> R.string.settings_gamepad_action_circle
@@ -2701,6 +2653,15 @@ private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "dpad_left" -> R.string.settings_gamepad_action_dpad_left
     "dpad_right" -> R.string.settings_gamepad_action_dpad_right
     else -> R.string.settings_gamepad_section
+}
+
+@Composable
+private fun gamepadActionLabel(actionId: String): String = when (actionId) {
+    "cross" -> "\u2715"
+    "circle" -> "\u25cb"
+    "square" -> "\u25a1"
+    "triangle" -> "\u25b3"
+    else -> stringResource(gamepadActionLabelRes(actionId))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

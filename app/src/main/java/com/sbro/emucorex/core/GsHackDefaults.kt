@@ -3,9 +3,10 @@ package com.sbro.emucorex.core
 object GsHackDefaults {
     const val BILINEAR_FILTERING_DEFAULT = 2
     const val TRILINEAR_FILTERING_DEFAULT = 0
-    const val BLENDING_ACCURACY_DEFAULT = 1
+    const val BLENDING_ACCURACY_DEFAULT = 0
     const val TEXTURE_PRELOADING_DEFAULT = 1
     const val ANISOTROPIC_FILTERING_DEFAULT = 0
+    const val HW_MIPMAPPING_DEFAULT = false
     const val HW_DOWNLOAD_MODE_DEFAULT = 0
     const val HALF_PIXEL_OFFSET_DEFAULT = 0
     const val NATIVE_SCALING_DEFAULT = 0

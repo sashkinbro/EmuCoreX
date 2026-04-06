@@ -17,7 +17,7 @@
     <string name="home_view_list">Show as list</string>
     <string name="home_view_grid">Show as grid</string>
     <string name="home_search">Search games</string>
-    <string name="home_game_count">%d games</string>
+    <string name="home_game_count">Total games: %d</string>
     <string name="home_library_desc">Your library, setup, and quick actions in one place.</string>
     <string name="home_recent_title">Recently opened</string>
     <string name="home_recent_label">Continue</string>
@@ -50,6 +50,7 @@
     <string name="detail_file_size">File Size</string>
     <string name="detail_save_states">Saves</string>
     <string name="detail_overview">Overview</string>
+    <string name="detail_igdb_source_note">Game description and metadata on this screen are provided via the IGDB API.</string>
     <string name="detail_screenshots">Screenshots</string>
     <string name="detail_videos">Videos</string>
     <string name="detail_show_more">Show more</string>
@@ -86,6 +87,7 @@
     <string name="emulation_bios_missing">Add BIOS files first.</string>
     <string name="emulation_launch_failed">Unable to open this game.</string>
     <string name="emulation_launch_path_error">Unable to open this file.</string>
+    <string name="emulation_session_restored_unavailable">The previous emulation session was closed in the background. Launch the game again from your library.</string>
     <string name="emulation_show_controls">Show controls</string>
     <string name="emulation_hide_controls">Hide controls</string>
     <string name="emulation_show_quick_actions">Show actions</string>
@@ -114,10 +116,17 @@
     <string name="emulation_live_settings">Live Settings</string>
     <string name="emulation_basic_settings">Basic</string>
     <string name="emulation_advanced_settings">Advanced</string>
+    <string name="emulation_achievements_tab">Achievements</string>
     <string name="emulation_session_tab">Session</string>
     <string name="emulation_overlay_tab">Overlay</string>
     <string name="emulation_stick_scale">Stick scale</string>
     <string name="emulation_close_menu">Close menu</string>
+    <string name="emulation_achievements_bios_unavailable">Achievements are only available while a game is loaded. BIOS boot does not expose RetroAchievements data.</string>
+    <string name="emulation_achievements_not_supported">RetroAchievements are not supported in the current native build.</string>
+    <string name="emulation_achievements_unavailable">No RetroAchievements data is available for this game right now.</string>
+    <string name="emulation_achievements_more">%1$d more achievements in the full game list.</string>
+    <string name="emulation_achievements_show_all">Show all</string>
+    <string name="emulation_achievements_show_less">Show less</string>
     <string name="emulation_section_performance">Performance Hacks</string>
     <string name="emulation_section_video">Advanced Video</string>
     <string name="emulation_aspect_auto">Auto</string>
@@ -169,6 +178,7 @@
     <string name="settings_language_native_traditional_chinese">繁體中文</string>
     <string name="settings_graphics">Video</string>
     <string name="settings_renderer">Graphics Mode</string>
+    <string name="settings_renderer_auto">Auto</string>
     <string name="settings_renderer_vulkan">Vulkan</string>
     <string name="settings_renderer_opengl">OpenGL</string>
     <string name="settings_renderer_software">Software</string>
@@ -225,6 +235,7 @@
     <string name="achievements_points_progress">Points</string>
     <string name="achievements_game_logged_out_hint">The full list is available without sign-in, but unlocked marks sync only after account login.</string>
     <string name="achievements_game_empty">There are no achievements for this game yet.</string>
+    <string name="achievements_loading">Loading achievements…</string>
     <string name="achievements_game_resolved_only">This game was recognized, but its achievement list is not available right now.</string>
     <string name="achievements_status_earned">Unlocked</string>
     <string name="achievements_status_locked">Locked</string>
@@ -240,6 +251,10 @@
     <string name="settings_paths">Files</string>
     <string name="settings_bios_path">BIOS Folder</string>
     <string name="settings_bios_path_desc">Select the folder with BIOS files needed to start games.</string>
+    <string name="settings_bios_picker_title">Choose BIOS Folder</string>
+    <string name="settings_bios_picker_desc">Pick the folder that contains your PlayStation 2 BIOS files. This folder will be used for normal game boot and BIOS boot.</string>
+    <string name="settings_bios_picker_current">Current BIOS folder</string>
+    <string name="settings_bios_picker_action">Select Folder</string>
     <string name="settings_game_path">Games Folder</string>
     <string name="settings_game_path_desc">Select the folder that contains your games.</string>
     <string name="settings_cover_download_url">Cover Download URL</string>
@@ -259,6 +274,7 @@
     <string name="settings_cover_download_url_invalid">Enter a valid HTTP or HTTPS URL.</string>
     <string name="settings_cover_download_url_copied">Example URLs copied.</string>
     <string name="settings_not_set">Not set</string>
+    <string name="settings_auto">Auto</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_emulator_core">Emulation Core</string>
@@ -295,12 +311,15 @@
     <string name="settings_show_recent_games_desc">Display the recently played games section on the home screen.</string>
     <string name="settings_show_home_search">Show home search</string>
     <string name="settings_show_home_search_desc">Display the search bar on the home screen.</string>
+    <string name="settings_prefer_english_game_titles">Prefer English game titles</string>
+    <string name="settings_prefer_english_game_titles_desc">Use English names from the PCSX2 game database when they are available.</string>
     <string name="settings_help_content_description">Show setting details</string>
     <string name="settings_help_auto_gamepad">Automatically switches to a connected controller when one is detected. Keep it on if you move between touch controls and a pad often; turn it off only if you want to keep the current input layout fixed.</string>
     <string name="settings_help_keep_screen_on">Prevents Android from dimming or locking the screen during play. Useful for long sessions and games with cutscenes, but it will use a little more battery if you leave the app open.</string>
     <string name="settings_help_pad_vibration">Lets supported games trigger controller rumble. It adds useful feedback in racing, combat, and impact-heavy games, but it can drain battery faster and some wireless pads may vibrate weakly or with slight delay.</string>
     <string name="settings_help_recent_games">Shows a quick-access row for the games you played last. Good if you bounce between a few titles often; turn it off if you want a cleaner home screen.</string>
     <string name="settings_help_home_search">Shows the library search bar directly on the home screen. Leave it on for big libraries; turn it off if you prefer a cleaner layout and rarely search by name.</string>
+    <string name="settings_help_prefer_english_game_titles">Uses English titles from PCSX2\'s GameIndex database for games that ship with Japanese or other regional names. This mainly helps imported releases read more clearly in the library, while games without an English database title keep their normal name.</string>
     <string name="settings_help_bios_path">Points EmuCoreX to the folder that contains your PS2 BIOS files. A clean dump from your own console is the best choice. The app can detect common BIOS-related files such as .bin, .rom, .mec, .nvm, and .elf, including companion ROM files like ROM0, ROM1, ROM2, and EROM when they are present.</string>
     <string name="settings_help_game_path">Selects the library folder that EmuCoreX scans for games. The scan is recursive, so subfolders are fine. Supported images include .iso, .bin, .chd, .cso, and .gz. ISO is the safest baseline, while CHD is usually the best long-term format because it saves space without giving up normal usage.</string>
     <string name="settings_help_cover_art_style">Chooses the default cover type used when downloading artwork. Flat covers match the classic front-box look, while 3D Box uses angled box renders when the source provides them. 3D covers can look more dramatic, but availability may be slightly worse than flat art.</string>
@@ -477,6 +496,9 @@
     <string name="settings_frame_limiter_desc">Keeps the game closer to the selected target speed instead of running fully uncapped.</string>
     <string name="settings_target_fps">Target FPS</string>
     <string name="settings_target_fps_desc">Current frame cap: %1$d FPS</string>
+    <string name="settings_target_fps_mode">Target FPS Mode</string>
+    <string name="settings_target_fps_auto">Auto FPS</string>
+    <string name="settings_target_fps_manual">Manual FPS</string>
     <string name="settings_hardware_fixes">Hardware Fixes</string>
     <string name="settings_upscaling_fixes">Upscaling Fixes</string>
     <string name="settings_blending_accuracy">Blending Accuracy</string>

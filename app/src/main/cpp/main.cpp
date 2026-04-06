@@ -43,6 +43,9 @@
 #include <chrono>
 #include <set>
 #include <mutex>
+#include <deque>
+#include <condition_variable>
+#include <thread>
 
 namespace
 {
@@ -60,6 +63,107 @@ namespace
 	static jmethodID s_ra_notify_state_changed = nullptr;
 	static jmethodID s_ra_notify_hardcore_changed = nullptr;
 	static std::mutex s_ra_bridge_mutex;
+    static std::mutex s_cpu_thread_queue_mutex;
+    static std::condition_variable s_cpu_thread_queue_cv;
+    static std::deque<std::pair<std::function<void()>, std::shared_ptr<std::promise<void>>>> s_cpu_thread_queue;
+    static std::thread::id s_cpu_thread_id{};
+    static bool s_cpu_thread_running = false;
+
+    static void RunQueuedCPUThreadTasks()
+    {
+        if (std::this_thread::get_id() != s_cpu_thread_id)
+            return;
+
+        for (;;)
+        {
+            std::pair<std::function<void()>, std::shared_ptr<std::promise<void>>> task;
+            {
+                std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
+                if (s_cpu_thread_queue.empty())
+                    break;
+                task = std::move(s_cpu_thread_queue.front());
+                s_cpu_thread_queue.pop_front();
+            }
+
+            if (task.first)
+                task.first();
+            if (task.second)
+                task.second->set_value();
+        }
+    }
+
+    static void EnqueueCPUThreadTask(std::function<void()> function, bool block)
+    {
+        if (!function)
+            return;
+
+        if (s_cpu_thread_running && std::this_thread::get_id() == s_cpu_thread_id)
+        {
+            function();
+            return;
+        }
+
+        auto completion = block ? std::make_shared<std::promise<void>>() : nullptr;
+        std::future<void> future = completion ? completion->get_future() : std::future<void>();
+
+        {
+            std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
+            s_cpu_thread_queue.emplace_back(std::move(function), completion);
+        }
+        s_cpu_thread_queue_cv.notify_one();
+
+        if (completion)
+            future.get();
+    }
+
+    static void ApplySettingValue(INISettingsInterface& si, const std::string& section, const std::string& key,
+                                  const std::string& type, const std::string& value)
+    {
+        if (type == "bool")
+        {
+            const bool b = (value == "1" || value == "true" || value == "TRUE" || value == "True");
+            si.SetBoolValue(section.c_str(), key.c_str(), b);
+        }
+        else if (type == "int")
+        {
+            si.SetIntValue(section.c_str(), key.c_str(), static_cast<s32>(std::strtol(value.c_str(), nullptr, 10)));
+        }
+        else if (type == "uint")
+        {
+            si.SetUIntValue(section.c_str(), key.c_str(), static_cast<u32>(std::strtoul(value.c_str(), nullptr, 10)));
+        }
+        else if (type == "float")
+        {
+            si.SetFloatValue(section.c_str(), key.c_str(), std::strtof(value.c_str(), nullptr));
+        }
+        else if (type == "double")
+        {
+            si.SetDoubleValue(section.c_str(), key.c_str(), std::strtod(value.c_str(), nullptr));
+        }
+        else
+        {
+            si.SetStringValue(section.c_str(), key.c_str(), value.c_str());
+        }
+    }
+
+    static std::vector<std::string> SplitOperation(std::string_view value, const char delimiter)
+    {
+        std::vector<std::string> parts;
+        size_t start = 0;
+        while (start <= value.size())
+        {
+            const size_t pos = value.find(delimiter, start);
+            if (pos == std::string_view::npos)
+            {
+                parts.emplace_back(value.substr(start));
+                break;
+            }
+
+            parts.emplace_back(value.substr(start, pos - start));
+            start = pos + 1;
+        }
+        return parts;
+    }
 
     static std::string EscapeJsonString(std::string_view value)
     {
@@ -546,8 +650,107 @@ bool s_execute_exit;
 int s_window_width = 0;
 int s_window_height = 0;
 ANativeWindow* s_window = nullptr;
+std::mutex s_surface_mutex;
 
 static std::unique_ptr<INISettingsInterface> s_settings_interface;
+
+static void ApplyRuntimeOperationsPayload(const std::string& payload)
+{
+    if (!s_settings_interface || payload.empty())
+        return;
+
+    constexpr char RECORD_SEPARATOR = '\x1e';
+    constexpr char FIELD_SEPARATOR = '\x1f';
+
+    bool should_apply_settings = false;
+    bool should_refresh_folders = false;
+    bool settings_dirty = false;
+    INISettingsInterface& si = *s_settings_interface;
+
+    size_t start = 0;
+    while (start <= payload.size())
+    {
+        const size_t end = payload.find(RECORD_SEPARATOR, start);
+        const std::string_view record = (end == std::string::npos) ?
+            std::string_view(payload).substr(start) :
+            std::string_view(payload).substr(start, end - start);
+
+        if (!record.empty())
+        {
+            const std::vector<std::string> parts = SplitOperation(record, FIELD_SEPARATOR);
+            if (!parts.empty())
+            {
+                const std::string& kind = parts[0];
+                if (kind == "setting" && parts.size() >= 5)
+                {
+                    ApplySettingValue(si, parts[1], parts[2], parts[3], parts[4]);
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                    if (parts[1] == "Folders")
+                        should_refresh_folders = true;
+                }
+                else if (kind == "renderer" && parts.size() >= 2)
+                {
+                    const auto renderer = static_cast<GSRendererType>(std::strtol(parts[1].c_str(), nullptr, 10));
+                    si.SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(renderer));
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                }
+                else if (kind == "upscale" && parts.size() >= 2)
+                {
+                    const float multiplier = std::strtof(parts[1].c_str(), nullptr);
+                    si.SetFloatValue("EmuCore/GS", "upscale_multiplier", multiplier);
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                }
+                else if (kind == "aspect" && parts.size() >= 3)
+                {
+                    si.SetStringValue("EmuCore/GS", "AspectRatio", parts[2].c_str());
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                }
+                else if (kind == "custom_driver" && parts.size() >= 2)
+                {
+                    if (parts[1].empty())
+                        si.DeleteValue("EmuCore/GS", "CustomDriverPath");
+                    else
+                        si.SetStringValue("EmuCore/GS", "CustomDriverPath", parts[1].c_str());
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                }
+                else if (kind == "refresh_bios")
+                {
+                    should_refresh_folders = true;
+                }
+                else if (kind == "reset_target_fps")
+                {
+                    si.SetFloatValue("EmuCore/GS", "FramerateNTSC", Pcsx2Config::GSOptions::DEFAULT_FRAME_RATE_NTSC);
+                    si.SetFloatValue("EmuCore/GS", "FrameratePAL", Pcsx2Config::GSOptions::DEFAULT_FRAME_RATE_PAL);
+                    settings_dirty = true;
+                    should_apply_settings = true;
+                }
+            }
+        }
+
+        if (end == std::string::npos)
+            break;
+        start = end + 1;
+    }
+
+    if (settings_dirty)
+        si.Save();
+
+    if (should_refresh_folders)
+        VMManager::Internal::UpdateEmuFolders();
+
+    if (should_apply_settings)
+    {
+        VMManager::ApplySettings();
+        if (MTGS::IsOpen())
+            MTGS::ApplySettings();
+    }
+}
+
 static bool IsFullscreenUIEnabled()
 {
     if (!s_settings_interface)
@@ -627,6 +830,11 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
                 s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
                 needs_save = true;
             }
+            if (!s_settings_interface->ContainsValue("UI", "PreferEnglishGameTitles"))
+            {
+                s_settings_interface->SetBoolValue("UI", "PreferEnglishGameTitles", false);
+                needs_save = true;
+            }
             if (needs_save)
                 s_settings_interface->Save();
         }
@@ -690,6 +898,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
         s_settings_interface->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0);
         s_settings_interface->SetBoolValue("UI", "EnableFullscreenUI", false);
         s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+        s_settings_interface->SetBoolValue("UI", "PreferEnglishGameTitles", false);
         s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
         s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
         s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
@@ -713,6 +922,11 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
         if (!s_settings_interface->ContainsValue("UI", "ExpandIntoDisplayCutout"))
         {
             s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+            needs_save = true;
+        }
+        if (!s_settings_interface->ContainsValue("UI", "PreferEnglishGameTitles"))
+        {
+            s_settings_interface->SetBoolValue("UI", "PreferEnglishGameTitles", false);
             needs_save = true;
         }
         if (needs_save)
@@ -777,30 +991,6 @@ Java_com_sbro_emucorex_core_NativeApp_setPadButton(JNIEnv *env, jclass clazz,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_sbro_emucorex_core_NativeApp_setPadParams(JNIEnv *env, jclass clazz,
-                                                   jintArray p_indices, jfloatArray p_values) {
-    if (VMManager::HasValidVM()) {
-        jsize len = env->GetArrayLength(p_indices);
-        jsize valLen = env->GetArrayLength(p_values);
-        if (len == 0 || len != valLen) return;
-
-        jint* indices = env->GetIntArrayElements(p_indices, nullptr);
-        jfloat* values = env->GetFloatArrayElements(p_values, nullptr);
-
-        if (indices && values) {
-            for (jsize i = 0; i < len; i++) {
-                const GenericInputBinding generic_key = AndroidKeyToGeneric(indices[i]);
-                SetPadButtonState(0, generic_key, values[i]);
-            }
-        }
-
-        if (indices) env->ReleaseIntArrayElements(p_indices, indices, JNI_ABORT);
-        if (values) env->ReleaseFloatArrayElements(p_values, values, JNI_ABORT);
-    }
-}
-
-extern "C"
-JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_resetKeyStatus(JNIEnv *env, jclass clazz) {
     if (VMManager::HasValidVM()) {
         PadBase* pad = Pad::GetPad(0);
@@ -827,17 +1017,6 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_setAspectRatio(JNIEnv *env, jclass clazz,
                                                     jint p_type) {
-    EmuConfig.GS.AspectRatio = static_cast<AspectRatioType>(p_type);
-    GSConfig.AspectRatio = static_cast<AspectRatioType>(p_type);
-    
-    // Crucial for Android: we need to update the runtime state as well
-    // and reset any custom ratio set by widescreen patches
-    EmuConfig.CurrentAspectRatio = static_cast<AspectRatioType>(p_type);
-    EmuConfig.CurrentCustomAspectRatio = 0.0f;
-
-    VMManager::ApplySettings();
-    if (MTGS::IsOpen())
-        MTGS::ApplySettings();
     if (s_settings_interface)
     {
         const auto aspect_ratio_index = static_cast<size_t>(p_type);
@@ -848,23 +1027,23 @@ Java_com_sbro_emucorex_core_NativeApp_setAspectRatio(JNIEnv *env, jclass clazz,
         s_settings_interface->SetStringValue("EmuCore/GS", "AspectRatio", aspect_ratio_name);
         s_settings_interface->Save();
     }
+    VMManager::ApplySettings();
+    if (MTGS::IsOpen())
+        MTGS::ApplySettings();
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_renderUpscalemultiplier(JNIEnv *env, jclass clazz,
                                                               jfloat p_value) {
-    EmuConfig.GS.UpscaleMultiplier = p_value;
-    GSConfig.UpscaleMultiplier = p_value;
-
-    VMManager::ApplySettings();
-    if (MTGS::IsOpen())
-        MTGS::ApplySettings();
     if (s_settings_interface)
     {
         s_settings_interface->SetFloatValue("EmuCore/GS", "upscale_multiplier", p_value);
         s_settings_interface->Save();
     }
+    VMManager::ApplySettings();
+    if (MTGS::IsOpen())
+        MTGS::ApplySettings();
 }
 
 extern "C"
@@ -888,6 +1067,14 @@ Java_com_sbro_emucorex_core_NativeApp_getGameTitle(JNIEnv *env, jclass clazz,
                                                   jstring p_szpath) {
     std::string _szPath = GetJavaString(env, p_szpath);
 
+    const bool prefer_english_titles =
+        s_settings_interface && s_settings_interface->GetBoolValue("UI", "PreferEnglishGameTitles", false);
+
+    std::string resolved_title;
+    std::string resolved_serial;
+    std::string resolved_serial_crc;
+
+    auto game_list_lock = GameList::GetLock();
     const GameList::Entry* entry = GameList::GetEntryForPath(_szPath.c_str());
     GameList::Entry scanned_entry;
     if (entry == nullptr && GameList::PopulateEntryFromPath(_szPath, &scanned_entry))
@@ -898,12 +1085,21 @@ Java_com_sbro_emucorex_core_NativeApp_getGameTitle(JNIEnv *env, jclass clazz,
         return env->NewStringUTF(fallbackTitle.c_str());
     }
 
+    resolved_title = entry->GetTitle(prefer_english_titles);
+    if (resolved_title.empty())
+        resolved_title = entry->title;
+    if (resolved_title.empty())
+        resolved_title = Path::GetFileTitle(_szPath);
+    resolved_serial = entry->serial;
+    resolved_serial_crc = StringUtil::StdStringFromFormat("%s (%08X)", entry->serial.c_str(), entry->crc);
+    game_list_lock.unlock();
+
     std::string ret;
-    ret.append(entry->title);
+    ret.append(resolved_title);
     ret.append("|");
-    ret.append(entry->serial);
+    ret.append(resolved_serial);
     ret.append("|");
-    ret.append(StringUtil::StdStringFromFormat("%s (%08X)", entry->serial.c_str(), entry->crc));
+    ret.append(resolved_serial_crc);
 
     return env->NewStringUTF(ret.c_str());
 }
@@ -976,17 +1172,14 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_renderGpu(JNIEnv *env, jclass clazz,
                                                jint p_value) {
-    EmuConfig.GS.Renderer = static_cast<GSRendererType>(p_value);
-    GSConfig.Renderer = static_cast<GSRendererType>(p_value);
-
-    VMManager::ApplySettings();
-    if (MTGS::IsOpen())
-        MTGS::ApplySettings();
     if (s_settings_interface)
     {
         s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(p_value));
         s_settings_interface->Save();
     }
+    VMManager::ApplySettings();
+    if (MTGS::IsOpen())
+        MTGS::ApplySettings();
 }
 
 extern "C"
@@ -994,13 +1187,6 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_setCustomDriverPath(JNIEnv *env, jclass clazz,
                                                           jstring p_path) {
     std::string driver_path = GetJavaString(env, p_path);
-    
-    // Store old config to check if restart is needed
-    Pcsx2Config::GSOptions old_gs_config = GSConfig;
-    std::string old_emu_config_path = EmuConfig.GS.CustomDriverPath;
-
-    EmuConfig.GS.CustomDriverPath = driver_path;
-    GSConfig.CustomDriverPath = driver_path;
 
     if (s_settings_interface)
     {
@@ -1010,19 +1196,9 @@ Java_com_sbro_emucorex_core_NativeApp_setCustomDriverPath(JNIEnv *env, jclass cl
             s_settings_interface->SetStringValue("EmuCore/GS", "CustomDriverPath", driver_path.c_str());
         s_settings_interface->Save();
     }
-    
-    // If graphics device is already initialized and driver path changed, trigger restart
-    if (old_gs_config.CustomDriverPath != driver_path || old_emu_config_path != driver_path)
-    {
-        // Ensure GSConfig matches EmuConfig (they should already match, but be explicit)
-        GSConfig.CustomDriverPath = EmuConfig.GS.CustomDriverPath;
-        
-        // Trigger graphics restart if device is already open
-        if (MTGS::IsOpen())
-        {
-            MTGS::ApplySettings();
-        }
-    }
+    VMManager::ApplySettings();
+    if (MTGS::IsOpen())
+        MTGS::ApplySettings();
 }
 
 extern "C"
@@ -1067,32 +1243,7 @@ Java_com_sbro_emucorex_core_NativeApp_setSetting(JNIEnv* env, jclass, jstring j_
     if (!s_settings_interface)
         return; 
     INISettingsInterface& si = *s_settings_interface;
-
-    if (type == "bool")
-    {
-        const bool b = (value == "1" || value == "true" || value == "TRUE" || value == "True");
-        si.SetBoolValue(section.c_str(), key.c_str(), b);
-    }
-    else if (type == "int")
-    {
-        si.SetIntValue(section.c_str(), key.c_str(), static_cast<s32>(std::strtol(value.c_str(), nullptr, 10)));
-    }
-    else if (type == "uint")
-    {
-        si.SetUIntValue(section.c_str(), key.c_str(), static_cast<u32>(std::strtoul(value.c_str(), nullptr, 10)));
-    }
-    else if (type == "float")
-    {
-        si.SetFloatValue(section.c_str(), key.c_str(), std::strtof(value.c_str(), nullptr));
-    }
-    else if (type == "double")
-    {
-        si.SetDoubleValue(section.c_str(), key.c_str(), std::strtod(value.c_str(), nullptr));
-    }
-    else // string
-    {
-        si.SetStringValue(section.c_str(), key.c_str(), value.c_str());
-    }
+    ApplySettingValue(si, section, key, type, value);
 
     // Apply live where it makes sense
     VMManager::ApplySettings();
@@ -1111,6 +1262,20 @@ Java_com_sbro_emucorex_core_NativeApp_setSetting(JNIEnv* env, jclass, jstring j_
     }
 
     si.Save();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_core_NativeApp_applyRuntimeOperations(JNIEnv* env, jclass, jstring j_payload)
+{
+    const std::string payload = GetJavaString(env, j_payload);
+    if (payload.empty())
+        return;
+
+    if (VMManager::HasValidVM())
+        Host::RunOnCPUThread([payload]() { ApplyRuntimeOperationsPayload(payload); }, true);
+    else
+        ApplyRuntimeOperationsPayload(payload);
 }
 
 extern "C"
@@ -1181,22 +1346,32 @@ Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass
                       StringUtil::StdStringFromFormat("Android surface changed: %dx%d surface=%p",
                                                       static_cast<int>(p_width), static_cast<int>(p_height),
                                                       p_surface));
-    if(s_window) {
-        ANativeWindow_release(s_window);
-        s_window = nullptr;
-    }
-
-    if(p_surface != nullptr) {
-        s_window = ANativeWindow_fromSurface(env, p_surface);
-    }
-
-    if(p_width > 0 && p_height > 0) {
-        s_window_width = p_width;
-        s_window_height = p_height;
-        if(MTGS::IsOpen()) {
-            NativeLogCallback(LOGLEVEL_INFO, Color_White, "MTGS open during surface change, updating display window");
-            MTGS::UpdateDisplayWindow();
+    bool should_update_display_window = false;
+    {
+        std::lock_guard<std::mutex> lock(s_surface_mutex);
+        if (s_window) {
+            ANativeWindow_release(s_window);
+            s_window = nullptr;
         }
+
+        if (p_surface != nullptr) {
+            s_window = ANativeWindow_fromSurface(env, p_surface);
+        }
+
+        if (p_width > 0 && p_height > 0 && s_window != nullptr) {
+            s_window_width = p_width;
+            s_window_height = p_height;
+        } else {
+            s_window_width = 0;
+            s_window_height = 0;
+        }
+
+        should_update_display_window = MTGS::IsOpen();
+    }
+
+    if (should_update_display_window) {
+        NativeLogCallback(LOGLEVEL_INFO, Color_White, "MTGS open during surface change, updating display window");
+        MTGS::UpdateDisplayWindow();
     }
 }
 
@@ -1204,35 +1379,66 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv *env, jclass clazz) {
     NativeLogCallback(LOGLEVEL_INFO, Color_White, "Android surface destroyed");
-    if(s_window) {
-        ANativeWindow_release(s_window);
-        s_window = nullptr;
+    bool should_update_display_window = false;
+    {
+        std::lock_guard<std::mutex> lock(s_surface_mutex);
+        if (s_window) {
+            ANativeWindow_release(s_window);
+            s_window = nullptr;
+        }
+        s_window_width = 0;
+        s_window_height = 0;
+        should_update_display_window = MTGS::IsOpen();
+    }
+
+    if (should_update_display_window) {
+        NativeLogCallback(LOGLEVEL_INFO, Color_White, "MTGS open during surface destroy, switching to surfaceless window");
+        MTGS::UpdateDisplayWindow();
     }
 }
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
+    ANativeWindow* window = nullptr;
+    int window_width = 0;
+    int window_height = 0;
+    {
+        std::lock_guard<std::mutex> lock(s_surface_mutex);
+        window = s_window;
+        window_width = s_window_width;
+        window_height = s_window_height;
+    }
+
     NativeLogCallback(LOGLEVEL_INFO, Color_White,
                       StringUtil::StdStringFromFormat("AcquireRenderWindow recreate=%d window=%p size=%dx%d",
-                                                      recreate_window ? 1 : 0, s_window,
-                                                      static_cast<int>(s_window_width),
-                                                      static_cast<int>(s_window_height)));
+                                                      recreate_window ? 1 : 0, window,
+                                                      static_cast<int>(window_width),
+                                                      static_cast<int>(window_height)));
     float _fScale = 1.0;
-    if (s_window_width > 0 && s_window_height > 0) {
-        int _nSize = s_window_width;
-        if (s_window_width <= s_window_height) {
-            _nSize = s_window_height;
+    if (window_width > 0 && window_height > 0) {
+        int _nSize = window_width;
+        if (window_width <= window_height) {
+            _nSize = window_height;
         }
         _fScale = (float)_nSize / 800.0f;
     }
-    ////
+
     WindowInfo _windowInfo;
     memset(&_windowInfo, 0, sizeof(_windowInfo));
+    if (window == nullptr || window_width <= 0 || window_height <= 0) {
+        _windowInfo.type = WindowInfo::Type::Surfaceless;
+        _windowInfo.surface_width = 0;
+        _windowInfo.surface_height = 0;
+        _windowInfo.surface_scale = 1.0f;
+        _windowInfo.window_handle = nullptr;
+        return _windowInfo;
+    }
+
     _windowInfo.type = WindowInfo::Type::Android;
-    _windowInfo.surface_width = s_window_width;
-    _windowInfo.surface_height = s_window_height;
+    _windowInfo.surface_width = window_width;
+    _windowInfo.surface_height = window_height;
     _windowInfo.surface_scale = _fScale;
-    _windowInfo.window_handle = s_window;
+    _windowInfo.window_handle = window;
 
     return _windowInfo;
 }
@@ -1263,6 +1469,11 @@ static u64 s_total_readbacks = 0;
 static u32 s_total_frames = 0;
 static u32 s_total_drawn_frames = 0;
 
+static float SanitizeMetric(float value)
+{
+    return std::isfinite(value) ? value : 0.0f;
+}
+
 void Host::BeginPresentFrame() {
     if (GSIsHardwareRenderer())
     {
@@ -1280,38 +1491,51 @@ void Host::BeginPresentFrame() {
         update_stat(GSPerfMon::DrawCalls, s_total_draws, s_last_draws);
         
         s_total_frames++;
-
-        // Push metrics to Java every 500ms
-        const auto now = std::chrono::steady_clock::now();
-        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - s_last_fps_sample_time).count();
-        if (elapsed >= 500) {
-            s_last_fps_sample_time = now;
-
-            auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-            if (env && s_native_app_class && s_on_performance_metrics) {
-                float fps = PerformanceMetrics::GetFPS();
-                if (fps <= 0.0f) fps = PerformanceMetrics::GetInternalFPS();
-                const float speed = PerformanceMetrics::GetSpeed();
-                float frame_time = PerformanceMetrics::GetAverageFrameTime();
-                const float cpu_load = static_cast<float>(PerformanceMetrics::GetCPUThreadUsage());
-                float gpu_load = PerformanceMetrics::GetGPUUsage();
-                if (gpu_load <= 0.0f)
-                    gpu_load = PerformanceMetrics::GetGSThreadUsage();
-
-                env->CallStaticVoidMethod(
-                    s_native_app_class,
-                    s_on_performance_metrics,
-                    fps,
-                    speed,
-                    frame_time,
-                    cpu_load,
-                    gpu_load
-                );
-            }
-        }
-
-        std::atomic_thread_fence(std::memory_order_release);
     }
+
+    // Push metrics to Java every 500ms for both hardware and software renderers.
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - s_last_fps_sample_time).count();
+    if (elapsed >= 500) {
+        s_last_fps_sample_time = now;
+
+        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+        if (env && s_native_app_class && s_on_performance_metrics) {
+            float fps = SanitizeMetric(PerformanceMetrics::GetFPS());
+            if (fps <= 0.0f)
+                fps = PerformanceMetrics::GetInternalFPS();
+            fps = SanitizeMetric(fps);
+            const float speed = SanitizeMetric(PerformanceMetrics::GetSpeed());
+            float frame_time = SanitizeMetric(PerformanceMetrics::GetAverageFrameTime());
+            const float cpu_load = SanitizeMetric(static_cast<float>(PerformanceMetrics::GetCPUThreadUsage()));
+            float gpu_load = SanitizeMetric(PerformanceMetrics::GetGPUUsage());
+            if (GSGetCurrentRenderer() == GSRendererType::SW)
+            {
+                gpu_load = SanitizeMetric(PerformanceMetrics::GetGSThreadUsage());
+                const u32 sw_thread_count = PerformanceMetrics::GetGSSWThreadCount();
+                for (u32 i = 0; i < sw_thread_count; i++)
+                    gpu_load += SanitizeMetric(static_cast<float>(PerformanceMetrics::GetGSSWThreadUsage(i)));
+            }
+            else if (gpu_load <= 0.0f)
+            {
+                gpu_load = SanitizeMetric(PerformanceMetrics::GetGSThreadUsage());
+            }
+            frame_time = std::max(frame_time, 0.0f);
+            gpu_load = std::max(gpu_load, 0.0f);
+
+            env->CallStaticVoidMethod(
+                s_native_app_class,
+                s_on_performance_metrics,
+                fps,
+                speed,
+                frame_time,
+                cpu_load,
+                gpu_load
+            );
+        }
+    }
+
+    std::atomic_thread_fence(std::memory_order_release);
 }
 
 void Host::OnGameChanged(const std::string& title, const std::string& elf_override, const std::string& disc_path,
@@ -1319,6 +1543,7 @@ void Host::OnGameChanged(const std::string& title, const std::string& elf_overri
 }
 
 void Host::PumpMessagesOnCPUThread() {
+    RunQueuedCPUThreadTasks();
 }
 
 int FileSystem::OpenFDFileContent(const char* filename)
@@ -1419,6 +1644,11 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     }
 
     s_execute_exit = false;
+    {
+        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
+        s_cpu_thread_id = std::this_thread::get_id();
+        s_cpu_thread_running = true;
+    }
 
 //    const char* error;
 //    if (!VMManager::PerformEarlyHardwareChecks(&error)) {
@@ -1442,6 +1672,7 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
         VMManager::SetState(_vmState);
         ////
         while (true) {
+            RunQueuedCPUThreadTasks();
             _vmState = VMManager::GetState();
             if (_vmState == VMState::Stopping || _vmState == VMState::Shutdown) {
                 break;
@@ -1449,7 +1680,9 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
                 s_execute_exit = false;
                 VMManager::Execute();
                 s_execute_exit = true;
+                RunQueuedCPUThreadTasks();
             } else {
+                RunQueuedCPUThreadTasks();
                 usleep(250000);
             }
         }
@@ -1457,7 +1690,15 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
         VMManager::Shutdown(false);
     }
     ////
+    RunQueuedCPUThreadTasks();
     VMManager::Internal::CPUThreadShutdown();
+    {
+        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
+        s_cpu_thread_running = false;
+        s_cpu_thread_id = std::thread::id();
+        s_cpu_thread_queue.clear();
+    }
+    s_cpu_thread_queue_cv.notify_all();
 
     return true;
 }
@@ -1465,25 +1706,22 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_pause(JNIEnv *env, jclass clazz) {
-    std::thread([] {
-        VMManager::SetPaused(true);
-    }).detach();
+    if (VMManager::HasValidVM())
+        Host::RunOnCPUThread([] { VMManager::SetPaused(true); }, false);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_resume(JNIEnv *env, jclass clazz) {
-    std::thread([] {
-        VMManager::SetPaused(false);
-    }).detach();
+    if (VMManager::HasValidVM())
+        Host::RunOnCPUThread([] { VMManager::SetPaused(false); }, false);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_shutdown(JNIEnv *env, jclass clazz) {
-    std::thread([] {
-        VMManager::SetState(VMState::Stopping);
-    }).detach();
+    if (VMManager::HasValidVM())
+        Host::RunOnCPUThread([] { VMManager::SetState(VMState::Stopping); }, false);
 }
 
 extern "C"
@@ -1948,7 +2186,7 @@ void Host::OnSaveStateSaved(const std::string_view filename)
 
 void Host::RunOnCPUThread(std::function<void()> function, bool block /* = false */)
 {
-    pxFailRel("Not implemented");
+    EnqueueCPUThreadTask(std::move(function), block);
 }
 
 void Host::RefreshGameListAsync(bool invalidate_cache)

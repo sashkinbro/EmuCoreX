@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,7 +41,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -62,12 +65,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.OverlayControlLayout
+import com.sbro.emucorex.ui.common.OverlayBottomAnchorPadding
+import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
+import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
+import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
+import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
+import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
+import com.sbro.emucorex.ui.common.OverlayLeftStickBaseOffset
+import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
+import com.sbro.emucorex.ui.common.OverlayRightShoulderGapOffset
+import com.sbro.emucorex.ui.common.OverlayRightStickBaseOffset
+import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
+import com.sbro.emucorex.ui.common.overlayActionOffset
+import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
+import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
+import com.sbro.emucorex.ui.common.overlayClusterStep
+import com.sbro.emucorex.ui.common.overlayDpadOffset
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -87,18 +110,6 @@ private enum class EditorAnchor {
 private enum class EditorControlShape {
     Dpad, Action, Stick, Shoulder, Center
 }
-
-private val EditorTopAnchorPadding = 18.dp
-private val EditorSideAnchorPadding = 28.dp
-private val EditorBottomAnchorPadding = 24.dp
-private val EditorCenterBottomPadding = 82.dp
-private val EditorRightShoulderBaseOffset = (-112).dp
-private val EditorRightShoulderGapOffset = (-39).dp
-private val EditorCenterWideLeftOffset = (-91).dp
-private val EditorCenterWideRightOffset = 11.dp
-private val EditorCenterNarrowLeftOffset = (-75).dp
-private val EditorCenterNarrowRightOffset = 11.dp
-private val EditorCenterSecondRowOffset = 40.dp
 
 @Stable
 private class EditorControlDraftState(initial: OverlayControlLayout) {
@@ -127,6 +138,7 @@ private class EditorControlDraftState(initial: OverlayControlLayout) {
 @Composable
 fun ControlsEditorScreen(
     onBackClick: () -> Unit,
+    manageActivityOrientation: Boolean = true,
     viewModel: ControlsEditorViewModel = viewModel()
 ) {
     val layoutState by viewModel.layoutState.collectAsState()
@@ -156,22 +168,22 @@ fun ControlsEditorScreen(
         listOf(
             EditorControlSpec("l2", EditorAnchor.TopLeft, "L2", shape = EditorControlShape.Shoulder),
             EditorControlSpec("l1", EditorAnchor.TopLeft, "L1", baseOffset = 73.dp to 0.dp, shape = EditorControlShape.Shoulder),
-            EditorControlSpec("r1", EditorAnchor.TopRight, "R1", baseOffset = EditorRightShoulderBaseOffset to 0.dp, shape = EditorControlShape.Shoulder),
-            EditorControlSpec("r2", EditorAnchor.TopRight, "R2", baseOffset = EditorRightShoulderGapOffset to 0.dp, shape = EditorControlShape.Shoulder),
-            EditorControlSpec("dpad_up", EditorAnchor.BottomLeft, dpadUpTitle, baseOffset = 43.dp to (-140).dp, shape = EditorControlShape.Dpad),
-            EditorControlSpec("dpad_down", EditorAnchor.BottomLeft, dpadDownTitle, baseOffset = 43.dp to (-54).dp, shape = EditorControlShape.Dpad),
-            EditorControlSpec("dpad_left", EditorAnchor.BottomLeft, dpadLeftTitle, baseOffset = 0.dp to (-97).dp, shape = EditorControlShape.Dpad),
-            EditorControlSpec("dpad_right", EditorAnchor.BottomLeft, dpadRightTitle, baseOffset = 86.dp to (-97).dp, shape = EditorControlShape.Dpad),
-            EditorControlSpec("left_stick", EditorAnchor.BottomLeft, "Left Stick", baseOffset = 118.dp to 0.dp, shape = EditorControlShape.Stick),
-            EditorControlSpec("triangle", EditorAnchor.BottomRight, triangleTitle, baseOffset = (-43).dp to (-140).dp, shape = EditorControlShape.Action),
-            EditorControlSpec("cross", EditorAnchor.BottomRight, crossTitle, baseOffset = (-43).dp to (-54).dp, shape = EditorControlShape.Action),
-            EditorControlSpec("square", EditorAnchor.BottomRight, squareTitle, baseOffset = (-86).dp to (-97).dp, shape = EditorControlShape.Action),
-            EditorControlSpec("circle", EditorAnchor.BottomRight, circleTitle, baseOffset = 0.dp to (-97).dp, shape = EditorControlShape.Action),
-            EditorControlSpec("right_stick", EditorAnchor.BottomRight, "Right Stick", baseOffset = (-118).dp to 0.dp, shape = EditorControlShape.Stick),
-            EditorControlSpec("select", EditorAnchor.BottomCenter, selectTitle, baseOffset = EditorCenterWideLeftOffset to 0.dp, wide = true, shape = EditorControlShape.Center),
-            EditorControlSpec("start", EditorAnchor.BottomCenter, startTitle, baseOffset = EditorCenterWideRightOffset to 0.dp, wide = true, shape = EditorControlShape.Center),
-            EditorControlSpec("l3", EditorAnchor.BottomCenter, l3Title, baseOffset = EditorCenterNarrowLeftOffset to EditorCenterSecondRowOffset, shape = EditorControlShape.Center),
-            EditorControlSpec("r3", EditorAnchor.BottomCenter, r3Title, baseOffset = EditorCenterNarrowRightOffset to EditorCenterSecondRowOffset, shape = EditorControlShape.Center)
+            EditorControlSpec("r1", EditorAnchor.TopRight, "R1", baseOffset = OverlayRightShoulderBaseOffset to 0.dp, shape = EditorControlShape.Shoulder),
+            EditorControlSpec("r2", EditorAnchor.TopRight, "R2", baseOffset = OverlayRightShoulderGapOffset to 0.dp, shape = EditorControlShape.Shoulder),
+            EditorControlSpec("dpad_up", EditorAnchor.BottomLeft, dpadUpTitle, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_down", EditorAnchor.BottomLeft, dpadDownTitle, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_left", EditorAnchor.BottomLeft, dpadLeftTitle, shape = EditorControlShape.Dpad),
+            EditorControlSpec("dpad_right", EditorAnchor.BottomLeft, dpadRightTitle, shape = EditorControlShape.Dpad),
+            EditorControlSpec("left_stick", EditorAnchor.BottomLeft, "Left Stick", baseOffset = OverlayLeftStickBaseOffset to 0.dp, shape = EditorControlShape.Stick),
+            EditorControlSpec("triangle", EditorAnchor.BottomRight, triangleTitle, shape = EditorControlShape.Action),
+            EditorControlSpec("cross", EditorAnchor.BottomRight, crossTitle, shape = EditorControlShape.Action),
+            EditorControlSpec("square", EditorAnchor.BottomRight, squareTitle, shape = EditorControlShape.Action),
+            EditorControlSpec("circle", EditorAnchor.BottomRight, circleTitle, shape = EditorControlShape.Action),
+            EditorControlSpec("right_stick", EditorAnchor.BottomRight, "Right Stick", baseOffset = OverlayRightStickBaseOffset to 0.dp, shape = EditorControlShape.Stick),
+            EditorControlSpec("select", EditorAnchor.BottomCenter, selectTitle, wide = true, shape = EditorControlShape.Center),
+            EditorControlSpec("start", EditorAnchor.BottomCenter, startTitle, wide = true, shape = EditorControlShape.Center),
+            EditorControlSpec("l3", EditorAnchor.BottomCenter, l3Title, shape = EditorControlShape.Center),
+            EditorControlSpec("r3", EditorAnchor.BottomCenter, r3Title, shape = EditorControlShape.Center)
         )
     }
 
@@ -194,16 +206,18 @@ fun ControlsEditorScreen(
     val selectedControl = controls.firstOrNull { it.id == selectedControlId } ?: controls.first()
     val selectedLayout = controlDraftStates.getValue(selectedControl.id)
 
-    LaunchedEffect(Unit) {
-        val activity = context as? android.app.Activity ?: return@LaunchedEffect
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-    }
+    if (manageActivityOrientation) {
+        LaunchedEffect(Unit) {
+            val activity = context as? android.app.Activity ?: return@LaunchedEffect
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
 
-    DisposableEffect(Unit) {
-        val activity = context as? android.app.Activity
-        val originalOrientation = activity?.requestedOrientation
-        onDispose {
-            activity?.requestedOrientation = originalOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        DisposableEffect(Unit) {
+            val activity = context as? android.app.Activity
+            val originalOrientation = activity?.requestedOrientation
+            onDispose {
+                activity?.requestedOrientation = originalOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 
@@ -220,6 +234,30 @@ fun ControlsEditorScreen(
         val centerWidth = if (isLandscape) 64.dp else 72.dp
         val centerHeight = if (isLandscape) 28.dp else 32.dp
         val wideCenterWidth = centerWidth * 1.25f
+        val centerColumnGap = if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait
+        val centerRowGap = if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait
+        val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
+        val dpadStep = overlayClusterStep(dpadButtonSize, clusterGap)
+        val actionStep = overlayClusterStep(actionButtonSize, clusterGap)
+        val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
+        val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
+        val safeLeft = maxOf(
+            cutoutPadding.calculateLeftPadding(LayoutDirection.Ltr),
+            navBarPadding.calculateLeftPadding(LayoutDirection.Ltr)
+        )
+        val safeRight = maxOf(
+            cutoutPadding.calculateRightPadding(LayoutDirection.Ltr),
+            navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
+        )
+        val safeTop = maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
+        val safeBottom = maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
+        val safeHorizontalInset = maxOf(safeLeft, safeRight)
+        val baseEdgePad = if (isLandscape) 28.dp else 12.dp
+        val baseBottomPad = if (isLandscape) 24.dp else 36.dp
+        val edgePadStart = baseEdgePad + safeHorizontalInset
+        val edgePadEnd = baseEdgePad + safeHorizontalInset
+        val edgePadTop = maxOf(OverlayShoulderTopPadding, safeTop + 4.dp)
+        val bottomPad = baseBottomPad + safeBottom
 
         Column(
             modifier = Modifier
@@ -352,24 +390,61 @@ fun ControlsEditorScreen(
                     val baseModifier = when (spec.anchor) {
                         EditorAnchor.TopLeft -> Modifier
                             .align(Alignment.TopStart)
-                            .padding(start = EditorSideAnchorPadding, top = EditorTopAnchorPadding)
+                            .padding(start = edgePadStart, top = edgePadTop)
                         EditorAnchor.TopRight -> Modifier
                             .align(Alignment.TopEnd)
-                            .padding(end = EditorSideAnchorPadding, top = EditorTopAnchorPadding)
+                            .padding(end = edgePadEnd, top = edgePadTop)
                         EditorAnchor.BottomLeft -> Modifier
                             .align(Alignment.BottomStart)
-                            .padding(start = EditorSideAnchorPadding, bottom = EditorBottomAnchorPadding)
+                            .padding(start = edgePadStart, bottom = bottomPad)
                         EditorAnchor.BottomRight -> Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = EditorSideAnchorPadding, bottom = EditorBottomAnchorPadding)
+                            .padding(end = edgePadEnd, bottom = bottomPad)
                         EditorAnchor.BottomCenter -> Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = EditorCenterBottomPadding)
+                            .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
+                    }
+                    val resolvedBaseOffset = when (spec.id) {
+                        "dpad_up" -> overlayDpadOffset(dpadStep, "up")
+                        "dpad_down" -> overlayDpadOffset(dpadStep, "down")
+                        "dpad_left" -> overlayDpadOffset(dpadStep, "left")
+                        "dpad_right" -> overlayDpadOffset(dpadStep, "right")
+                        "triangle" -> overlayActionOffset(actionStep, "triangle")
+                        "cross" -> overlayActionOffset(actionStep, "cross")
+                        "square" -> overlayActionOffset(actionStep, "square")
+                        "circle" -> overlayActionOffset(actionStep, "circle")
+                        "select" -> overlayCenterButtonOffset(
+                            buttonWidth = wideCenterWidth,
+                            columnWidth = wideCenterWidth,
+                            gap = centerColumnGap,
+                            leftColumn = true
+                        ) + OverlayCenterBaseShiftX to 0.dp
+                        "start" -> overlayCenterButtonOffset(
+                            buttonWidth = wideCenterWidth,
+                            columnWidth = wideCenterWidth,
+                            gap = centerColumnGap,
+                            leftColumn = false
+                        ) + OverlayCenterBaseShiftX to 0.dp
+                        "l3" -> overlayCenterButtonOffset(
+                            buttonWidth = centerWidth,
+                            columnWidth = wideCenterWidth,
+                            gap = centerColumnGap,
+                            leftColumn = true
+                        ) + OverlayCenterBaseShiftX to
+                            overlayCenterSecondRowOffset(centerHeight, centerRowGap)
+                        "r3" -> overlayCenterButtonOffset(
+                            buttonWidth = centerWidth,
+                            columnWidth = wideCenterWidth,
+                            gap = centerColumnGap,
+                            leftColumn = false
+                        ) + OverlayCenterBaseShiftX to
+                            overlayCenterSecondRowOffset(centerHeight, centerRowGap)
+                        else -> spec.baseOffset
                     }
                     EditorControlItem(
                         spec = spec,
                         controlState = controlDraftStates.getValue(spec.id),
-                        modifier = baseModifier.offset(x = spec.baseOffset.first, y = spec.baseOffset.second),
+                        modifier = baseModifier.offset(x = resolvedBaseOffset.first, y = resolvedBaseOffset.second),
                         selected = selectedControlId == spec.id,
                         shoulderWidth = shoulderWidth,
                         shoulderHeight = shoulderHeight,
@@ -544,7 +619,7 @@ private fun EditorControlPreview(
             }
             val label = when (spec.id) {
                 "triangle" -> "△"
-                "cross" -> "✕"
+                "cross" -> "×"
                 "square" -> "□"
                 else -> "○"
             }

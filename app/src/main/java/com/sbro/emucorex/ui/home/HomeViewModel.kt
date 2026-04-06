@@ -25,7 +25,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.withLock
 import java.text.Normalizer
 
 enum class HomeSortOption {
@@ -74,6 +76,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var biosInitialized = false
     private var libraryInitialized = false
     private var currentLibraryRoot: String? = null
+    private var preferEnglishGameTitles = false
+    private var titlesPreferenceInitialized = false
+    private val scanMutex = Mutex()
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -127,6 +132,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             preferences.onboardingCompleted.distinctUntilChanged().collect { completed ->
                 _uiState.value = _uiState.value.copy(setupComplete = completed)
+            }
+        }
+        viewModelScope.launch {
+            preferences.preferEnglishGameTitles.distinctUntilChanged().collect { enabled ->
+                val shouldRefreshLibrary = titlesPreferenceInitialized && preferEnglishGameTitles != enabled
+                preferEnglishGameTitles = enabled
+                titlesPreferenceInitialized = true
+                if (!shouldRefreshLibrary) return@collect
+                val rootPath = currentLibraryRoot ?: return@collect
+                allGames = emptyList()
+                if (rootPath.startsWith("content://")) {
+                    scanGamesFromUri(rootPath.toUri())
+                } else {
+                    scanGames(rootPath)
+                }
             }
         }
         viewModelScope.launch {
@@ -225,6 +245,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun scanGames(path: String, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
+            scanMutex.withLock {
             val cacheSnapshot = resolveCacheSnapshot(path)
             val cachedGames = cacheSnapshot.games
             val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
@@ -252,13 +273,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             publishVisibleGames()
             updateBootstrapState()
-            libraryCacheRepository.save(path, allGames)
+            libraryCacheRepository.save(path, allGames, preferEnglishGameTitles)
             syncMissingCovers()
+            }
         }
     }
 
     private fun scanGamesFromUri(uri: Uri, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
+            scanMutex.withLock {
             val rootPath = uri.toString()
             val cacheSnapshot = resolveCacheSnapshot(rootPath)
             val cachedGames = cacheSnapshot.games
@@ -288,8 +311,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             )
             publishVisibleGames()
             updateBootstrapState()
-            libraryCacheRepository.save(rootPath, allGames)
+            libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
             syncMissingCovers()
+            }
         }
     }
 
@@ -298,7 +322,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return if (inMemoryGames != null) {
             GameLibraryCacheSnapshot(inMemoryGames, System.currentTimeMillis())
         } else {
-            libraryCacheRepository.loadSnapshot(rootPath)
+            libraryCacheRepository.loadSnapshot(rootPath, preferEnglishGameTitles)
         }
     }
 
@@ -399,7 +423,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             currentLibraryRoot?.let { rootPath ->
-                libraryCacheRepository.save(rootPath, allGames)
+                libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
             }
         }
     }
@@ -421,7 +445,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         publishVisibleGames()
         currentLibraryRoot?.let { rootPath ->
-            libraryCacheRepository.save(rootPath, allGames)
+            libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
         }
         syncMissingCovers()
     }

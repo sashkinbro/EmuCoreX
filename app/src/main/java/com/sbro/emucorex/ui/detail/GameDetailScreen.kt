@@ -288,6 +288,16 @@ fun GameDetailScreen(
                             value = description
                         )
                     }
+                    Box(
+                        modifier = Modifier
+                            .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
+                            .widthIn(max = contentMaxWidth)
+                            .padding(horizontal = horizontalInset)
+                    ) {
+                        DetailSourceCard(
+                            text = stringResource(R.string.detail_igdb_source_note)
+                        )
+                    }
                 }
 
                 if (catalog.screenshots.isNotEmpty()) {
@@ -732,6 +742,27 @@ private fun ExpandableInfoSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailSourceCard(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        )
     }
 }
 

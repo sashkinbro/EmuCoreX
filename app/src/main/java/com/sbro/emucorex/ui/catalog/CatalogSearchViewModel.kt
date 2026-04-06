@@ -43,17 +43,15 @@ class CatalogSearchViewModel(application: Application) : AndroidViewModel(applic
     fun onScreenStart() {
         if (started) return
         started = true
-        refresh(showFullscreenLoader = true)
+        if (_uiState.value.results.isEmpty() && !_uiState.value.hasCatalog) {
+            refresh(showFullscreenLoader = true)
+        }
     }
 
     fun onScreenStop() {
         refreshJob?.cancel()
         loadMoreJob?.cancel()
-        repository.close()
         started = false
-        _uiState.value = CatalogSearchUiState(
-            query = _uiState.value.query
-        )
     }
 
     fun updateQuery(query: String) {

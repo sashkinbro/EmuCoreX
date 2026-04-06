@@ -5,11 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.sbro.emucorex.core.DeviceChipsetFamily
-import com.sbro.emucorex.core.DevicePerformanceProfiles
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GsHackDefaults
-import com.sbro.emucorex.core.PerformancePresetConfig
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
@@ -26,7 +23,7 @@ data class SettingsUiState(
     val isLoaded: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
-    val renderer: Int = 0,
+    val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,
@@ -37,6 +34,7 @@ data class SettingsUiState(
     val keepScreenOn: Boolean = true,
     val showRecentGames: Boolean = true,
     val showHomeSearch: Boolean = true,
+    val preferEnglishGameTitles: Boolean = false,
     val biosPath: String? = null,
     val gamePath: String? = null,
     val coverDownloadBaseUrl: String? = null,
@@ -90,7 +88,7 @@ data class SettingsUiState(
     val mergeSprite: Boolean = false,
     val forceEvenSpritePosition: Boolean = false,
     val nativePaletteDraw: Boolean = false,
-    val performancePreset: Int = PerformancePresets.BALANCED,
+    val performancePreset: Int = PerformancePresets.CUSTOM,
     // Overlay
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
@@ -101,26 +99,20 @@ data class SettingsUiState(
     val gamepadBindings: Map<String, Int> = emptyMap(),
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
-    val deviceChipsetFamily: DeviceChipsetFamily = DeviceChipsetFamily.GENERIC,
-    val detectedChipsetName: String = "",
-    val recommendedPresetId: Int = PerformancePresets.BALANCED,
     val frameLimitEnabled: Boolean = false,
-    val targetFps: Int = 60
+    val targetFps: Int = 0
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val preferences = AppPreferences(application)
-    private val deviceProfile = DevicePerformanceProfiles.current()
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        _uiState.value = _uiState.value.copy(
-            deviceChipsetFamily = deviceProfile.family,
-            detectedChipsetName = deviceProfile.displayName,
-            recommendedPresetId = deviceProfile.recommendedPresetId
-        )
+        viewModelScope.launch {
+            preferences.ensureManualHardwareFixesBaseline()
+        }
         viewModelScope.launch {
             preferences.settingsSnapshot.collect { snapshot ->
                 applySettingsSnapshot(snapshot)
@@ -149,6 +141,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             keepScreenOn = snapshot.keepScreenOn,
             showRecentGames = snapshot.showRecentGames,
             showHomeSearch = snapshot.showHomeSearch,
+            preferEnglishGameTitles = snapshot.preferEnglishGameTitles,
             biosPath = snapshot.biosPath,
             gamePath = snapshot.gamePath,
             coverDownloadBaseUrl = snapshot.coverDownloadBaseUrl,
@@ -306,6 +299,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setKeepScreenOn(enabled: Boolean) { viewModelScope.launch { preferences.setKeepScreenOn(enabled) } }
     fun setShowRecentGames(enabled: Boolean) { viewModelScope.launch { preferences.setShowRecentGames(enabled) } }
     fun setShowHomeSearch(enabled: Boolean) { viewModelScope.launch { preferences.setShowHomeSearch(enabled) } }
+    fun setPreferEnglishGameTitles(enabled: Boolean) {
+        viewModelScope.launch {
+            EmulatorBridge.setSetting("UI", "PreferEnglishGameTitles", "bool", enabled.toString())
+            preferences.setPreferEnglishGameTitles(enabled)
+        }
+    }
 
     // Extended settings
     fun setEeCycleRate(value: Int) {
@@ -365,7 +364,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setTargetFps(value: Int) {
         viewModelScope.launch {
-            preferences.setTargetFps(value)
+            preferences.setTargetFps(if (value <= 0) 0 else value)
             EmulatorBridge.setTargetFps(value)
         }
     }
@@ -701,29 +700,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun applyPerformancePreset(presetId: Int) {
-        viewModelScope.launch {
-            val config = PerformancePresets.configFor(presetId, deviceProfile) ?: run {
-                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
-                return@launch
-            }
-
-            preferences.applyPerformancePreset(config)
-            applyRuntimePerformancePreset(config)
-        }
-    }
-
-    fun applyRecommendedDeviceProfile() {
-        applyPerformancePreset(deviceProfile.recommendedPresetId)
-    }
-
     private suspend fun markPerformancePresetCustom() {
         if (_uiState.value.performancePreset != PerformancePresets.CUSTOM) {
             preferences.setPerformancePreset(PerformancePresets.CUSTOM)
         }
     }
 
-    private fun refreshManualHardwareFixes(state: SettingsUiState = _uiState.value) {
+    private suspend fun refreshManualHardwareFixes(state: SettingsUiState = _uiState.value) {
         val enabled = GsHackDefaults.shouldEnableManualHardwareFixes(
             cpuSpriteRenderSize = state.cpuSpriteRenderSize,
             cpuSpriteRenderLevel = state.cpuSpriteRenderLevel,
@@ -754,29 +737,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             nativePaletteDraw = state.nativePaletteDraw
         )
         EmulatorBridge.setSetting("EmuCore/GS", "UserHacks", "bool", enabled.toString())
-    }
-
-    private fun applyRuntimePerformancePreset(config: PerformancePresetConfig) {
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "EECycleRate", "int", config.eeCycleRate.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "EECycleSkip", "int", config.eeCycleSkip.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", config.enableMtvu.toString())
-        EmulatorBridge.setSetting("EmuCore/Speedhacks", "fastCDVD", "bool", config.enableFastCdvd.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "FrameSkip", "int", config.frameSkip.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "filter", "int", config.textureFiltering.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "MaxAnisotropy", "int", config.anisotropicFiltering.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_Start", "int", "0")
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_SkipDraw_End", "int", config.skipDraw.toString())
-        EmulatorBridge.setSetting("EmuCore/GS", "UserHacks_HalfPixelOffset", "int", config.halfPixelOffset.toString())
-        EmulatorBridge.setSetting("EmuCore", "EnableWideScreenPatches", "bool", config.widescreenPatches.toString())
-        EmulatorBridge.setUpscaleMultiplier(config.upscaleMultiplier)
-        EmulatorBridge.setRenderer(config.renderer)
-        refreshManualHardwareFixes(
-            _uiState.value.copy(
-                skipDrawStart = 0,
-                skipDrawEnd = config.skipDraw,
-                halfPixelOffset = config.halfPixelOffset
-            )
-        )
     }
 
     // Overlay
