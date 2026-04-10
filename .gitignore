@@ -1,0 +1,66 @@
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.gradle/
+.kotlin/
+.android/
+
+# Local machine config
+local.properties
+.firebase/
+app/google-services.json
+
+# Build outputs
+build/
+app/build/
+.cxx/
+app/.cxx/
+.externalNativeBuild/
+captures/
+out/
+dist/
+app/release/
+**/target/
+
+# Release artifacts
+*.apk
+*.aab
+*.ap_
+*.aar
+*.keystore
+*.jks
+*.idsig
+*.hprof
+*.prof
+
+# Logs / diagnostics
+Logs/
+*.log
+hs_err_pid*
+
+# Nested repositories and local vendor metadata
+**/.git/
+app/src/main/native-tools/
+
+# Private / generated local data
+IGDB/
+pcsx2_official/
+public/
+tools/
+y/
+.firebaserc
+firebase.json
+firestore.rules
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Node / web tooling
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.orig

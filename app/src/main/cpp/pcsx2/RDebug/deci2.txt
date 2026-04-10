@@ -1,0 +1,27 @@
+pcsx2 log->debugger tty mapping
+�������������������������������������������������������Ŀ
+Bios                    �EE�  0   �IOP�  Bios           �
+CPU & MMI & COP0 & FPU  �EE�  1   �IOP�  IOP cpu        �
+VU0 & VUMicro           �EE�  2   �IOP�  HW             �
+VIF                     �EE�  3   �IOP�  GTE            �
+GIF                     �EE�  4   �IOP�  GPU            �
+DMA                     �EE�  5   �IOP�  DMA            �
+HW & Unknown Memory     �EE�  6   �IOP�  Unknown Memory �
+ELF & Scratch pad       �EE�  7   �IOP�  PAD            �
+IPU                     �EE�  8   �IOP�  CDR            �
+SIF & RPC services      �EE�  9   �IOP�                 �
+                        �  �      �   �                 �
+SysMessage              �EE�Kernel�IOP�  SysMessage     �
+���������������������������������������������������������
+PRODG: 230,130,    120,121,122,110-119,11F,210-219,21F,410
+CW:    230,130,150,120,121,    210-219,21F,110-119,11F
+
+0400 PROTO_NETMP
+0001 PROTO_DCMP
+     PROTO_MTWKS
+012? PROTO_DRFP (%s)
+0230 PROTO_ESDBG
+0130 PROTO_ISDBG
+011? PROTO_I%dTTY
+021? PROTO_E%dTTY
+
