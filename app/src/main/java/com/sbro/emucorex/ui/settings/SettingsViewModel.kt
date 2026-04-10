@@ -18,6 +18,7 @@ import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
@@ -763,6 +764,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             preferences.setBiosPath(uri.toString())
             EmulatorBridge.applyRuntimeConfig(
                 biosPath = uri.toString(),
+                memoryCardSlot1 = preferences.memoryCardSlot1.first(),
+                memoryCardSlot2 = preferences.memoryCardSlot2.first(),
                 renderer = _uiState.value.renderer,
                 upscaleMultiplier = _uiState.value.upscaleMultiplier,
                 gpuDriverType = _uiState.value.gpuDriverType,

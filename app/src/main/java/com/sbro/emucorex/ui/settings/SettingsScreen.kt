@@ -119,6 +119,7 @@ import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatFileEntry
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.CoverArtRepository
+import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.SettingsBackupRepository
@@ -134,7 +135,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Paths, Covers, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
+    General, Graphics, Controls, Paths, MemoryCards, Covers, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -144,6 +145,7 @@ fun SettingsScreen(
     initialTab: String = "general",
     onBackClick: (() -> Unit)? = null,
     onOpenLanguageScreen: (() -> Unit)? = null,
+    onOpenMemoryCardManager: (() -> Unit)? = null,
     onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
@@ -367,6 +369,7 @@ fun SettingsScreen(
                     searchEnabled = false
                     searchQuery = ""
                 },
+                onOpenMemoryCardManager = onOpenMemoryCardManager,
                 onEditControlsClick = onEditControlsClick,
                 viewModel = viewModel,
                 topInset = 0.dp,
@@ -892,6 +895,7 @@ private fun SettingsContent(
     onOpenCheatEditor: (String) -> Unit,
     onRequestGamepadBinding: (String) -> Unit,
     onSearchResultSelected: (SettingsTab) -> Unit,
+    onOpenMemoryCardManager: (() -> Unit)? = null,
     onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel,
     topInset: androidx.compose.ui.unit.Dp,
@@ -1226,6 +1230,40 @@ private fun SettingsContent(
                             value = gameDisplayName,
                             onClick = launchGamePicker,
                             helpText = stringResource(R.string.settings_help_game_path)
+                        )
+                    }
+                }
+
+                SettingsTab.MemoryCards -> {
+                    val repository = remember(context) {
+                        MemoryCardRepository(context, AppPreferences(context))
+                    }
+                    var memoryCardCount by remember { mutableStateOf(0) }
+                    var slot1Name by remember { mutableStateOf<String?>(null) }
+                    var slot2Name by remember { mutableStateOf<String?>(null) }
+
+                    LaunchedEffect(repository) {
+                        val assignments = repository.ensureDefaultCardsAssigned()
+                        val cards = repository.listCards()
+                        memoryCardCount = cards.size
+                        slot1Name = assignments.slot1
+                        slot2Name = assignments.slot2
+                    }
+
+                    SettingsSection(title = stringResource(R.string.settings_memory_cards_tab)) {
+                        SettingsItem(
+                            icon = Icons.Rounded.Memory,
+                            label = stringResource(R.string.settings_memory_cards_open),
+                            value = stringResource(R.string.settings_memory_cards_open_desc),
+                            onClick = { onOpenMemoryCardManager?.invoke() }
+                        )
+                        SettingsInlineNote(
+                            text = stringResource(
+                                R.string.settings_memory_cards_summary,
+                                memoryCardCount,
+                                slot1Name ?: stringResource(R.string.memory_card_slot_empty),
+                                slot2Name ?: stringResource(R.string.memory_card_slot_empty)
+                            )
                         )
                     }
                 }
@@ -2086,6 +2124,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_pad_vibration),
         entry(SettingsTab.Paths, R.string.settings_bios_path),
         entry(SettingsTab.Paths, R.string.settings_game_path),
+        entry(SettingsTab.MemoryCards, R.string.settings_memory_cards_tab),
         entry(SettingsTab.Graphics, R.string.settings_gpu_driver_path),
         entry(SettingsTab.Covers, R.string.settings_cover_art_style),
         entry(SettingsTab.Covers, R.string.settings_cover_download_url),
@@ -2906,6 +2945,7 @@ private fun SettingsTab.label(): String {
         SettingsTab.Graphics -> stringResource(R.string.settings_graphics_tab)
         SettingsTab.Controls -> stringResource(R.string.settings_controls_tab)
         SettingsTab.Paths -> stringResource(R.string.settings_paths_tab)
+        SettingsTab.MemoryCards -> stringResource(R.string.settings_memory_cards_tab)
         SettingsTab.Covers -> stringResource(R.string.settings_covers_tab)
         SettingsTab.DataTransfer -> stringResource(R.string.settings_data_transfer_tab)
         SettingsTab.Performance -> stringResource(R.string.settings_performance_tab)
@@ -2923,6 +2963,7 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.Graphics -> Icons.Rounded.GraphicEq
         SettingsTab.Controls -> Icons.Rounded.Gamepad
         SettingsTab.Paths -> Icons.Rounded.FolderOpen
+        SettingsTab.MemoryCards -> Icons.Rounded.Memory
         SettingsTab.Covers -> Icons.Rounded.Link
         SettingsTab.DataTransfer -> Icons.Rounded.SaveAs
         SettingsTab.Performance -> Icons.Rounded.Speed
@@ -2938,6 +2979,7 @@ private fun String.toSettingsTab(): SettingsTab {
         "graphics" -> SettingsTab.Graphics
         "controls" -> SettingsTab.Controls
         "paths", "files" -> SettingsTab.Paths
+        "memorycards", "memory_cards", "memory-cards", "memcards" -> SettingsTab.MemoryCards
         "covers", "cover-art", "cover_art" -> SettingsTab.Covers
         "data_transfer", "transfer", "backup", "data-transfer" -> SettingsTab.DataTransfer
         "performance" -> SettingsTab.Performance

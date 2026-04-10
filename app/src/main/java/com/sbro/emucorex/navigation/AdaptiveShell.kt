@@ -95,6 +95,7 @@ fun AdaptiveShell(
     onNavigateDataTransfer: (() -> Unit)? = null,
     onResetAllSettings: (() -> Unit)? = null,
     onNavigateSaveManager: (() -> Unit)? = null,
+    onNavigateMemoryCardManager: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onOpenManageFolders: (() -> Unit)? = null,
     onLaunchGame: (() -> Unit)? = null,
@@ -115,6 +116,7 @@ fun AdaptiveShell(
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
             onNavigateSaveManager = onNavigateSaveManager,
+            onNavigateMemoryCardManager = onNavigateMemoryCardManager,
             onOpenManageFolders = onOpenManageFolders,
             onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
@@ -160,6 +162,7 @@ fun AdaptiveShell(
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
             onNavigateSaveManager = onNavigateSaveManager,
+            onNavigateMemoryCardManager = onNavigateMemoryCardManager,
             onBackClick = onBackClick,
             onOpenManageFolders = onOpenManageFolders,
             onLaunchGame = onLaunchGame,
@@ -185,6 +188,7 @@ private fun CompactAdaptiveShell(
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
     onNavigateSaveManager: (() -> Unit)?,
+    onNavigateMemoryCardManager: (() -> Unit)?,
     onBackClick: (() -> Unit)?,
     onOpenManageFolders: (() -> Unit)?,
     onLaunchGame: (() -> Unit)?,
@@ -275,6 +279,7 @@ private fun CompactAdaptiveShell(
                     onNavigateDataTransfer = onNavigateDataTransfer,
                     onResetAllSettings = onResetAllSettings,
                     onNavigateSaveManager = onNavigateSaveManager,
+                    onNavigateMemoryCardManager = onNavigateMemoryCardManager,
                     onOpenManageFolders = onOpenManageFolders,
                     onLaunchGame = onLaunchGame,
                     onLaunchBios = onLaunchBios,
@@ -336,6 +341,7 @@ private fun SideNavigation(
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
     onNavigateSaveManager: (() -> Unit)?,
+    onNavigateMemoryCardManager: (() -> Unit)?,
     onOpenManageFolders: (() -> Unit)?,
     onLaunchGame: (() -> Unit)?,
     onLaunchBios: (() -> Unit)?,
@@ -386,6 +392,12 @@ private fun SideNavigation(
         }
     }
     val navigateSaveManager = onNavigateSaveManager?.let {
+        rememberDebouncedClick {
+            onCloseDrawer()
+            it()
+        }
+    }
+    val navigateMemoryCardManager = onNavigateMemoryCardManager?.let {
         rememberDebouncedClick {
             onCloseDrawer()
             it()
@@ -590,6 +602,13 @@ private fun SideNavigation(
                         icon = Icons.Rounded.Save,
                         label = stringResource(R.string.shell_save_states),
                         onClick = navigateSaveManager
+                    )
+                }
+                if (navigateMemoryCardManager != null) {
+                    ShellAction(
+                        icon = Icons.Rounded.Memory,
+                        label = stringResource(R.string.shell_memory_cards),
+                        onClick = navigateMemoryCardManager
                     )
                 }
             }

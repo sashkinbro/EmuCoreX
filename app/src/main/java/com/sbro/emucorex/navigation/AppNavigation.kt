@@ -55,6 +55,7 @@ import com.sbro.emucorex.ui.detail.GameDetailScreen
 import com.sbro.emucorex.ui.emulation.EmulationScreen
 import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
 import com.sbro.emucorex.ui.home.HomeScreen
+import com.sbro.emucorex.ui.memorycards.MemoryCardManagerScreen
 import com.sbro.emucorex.ui.onboarding.OnboardingScreen
 import com.sbro.emucorex.ui.saves.SaveManagerScreen
 import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
@@ -95,6 +96,9 @@ object ControlsEditorRoute
 
 @Serializable
 data class SaveManagerRoute(val gamePath: String? = null, val gameTitle: String? = null)
+
+@Serializable
+object MemoryCardManagerRoute
 
 @Serializable
 object AchievementsRoute
@@ -139,7 +143,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPushingIntoDetai
         targetState.destination.hasRoute<GameSettingsManagerRoute>() ||
         targetState.destination.hasRoute<AccountUnlockedAchievementsRoute>() ||
         targetState.destination.hasRoute<GameAchievementsRoute>() ||
-        targetState.destination.hasRoute<SaveManagerRoute>()
+        targetState.destination.hasRoute<SaveManagerRoute>() ||
+        targetState.destination.hasRoute<MemoryCardManagerRoute>()
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPoppingFromDetail(): Boolean {
@@ -150,7 +155,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.isPoppingFromDetai
         initialState.destination.hasRoute<GameSettingsManagerRoute>() ||
         initialState.destination.hasRoute<AccountUnlockedAchievementsRoute>() ||
         initialState.destination.hasRoute<GameAchievementsRoute>() ||
-        initialState.destination.hasRoute<SaveManagerRoute>()
+        initialState.destination.hasRoute<SaveManagerRoute>() ||
+        initialState.destination.hasRoute<MemoryCardManagerRoute>()
 }
 
 private fun sharedAxisEnter(
@@ -277,6 +283,11 @@ fun AppNavigation(
     }
     val navigateDataTransfer: () -> Unit = {
         navController.navigate(SettingsRoute(tab = "data_transfer")) {
+            launchSingleTop = true
+        }
+    }
+    val navigateMemoryCardManager: () -> Unit = {
+        navController.navigate(MemoryCardManagerRoute) {
             launchSingleTop = true
         }
     }
@@ -516,6 +527,7 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onOpenManageFolders = {
                         navController.navigate(SettingsRoute(tab = "paths")) {
                             launchSingleTop = true
@@ -602,6 +614,7 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onBackClick = { navController.popBackStack() },
                     onOpenManageFolders = {
                         navController.navigate(SettingsRoute(tab = "paths")) {
@@ -673,6 +686,7 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onBackClick = { navController.popBackStack() },
                     onOpenManageFolders = {
                         navController.navigate(SettingsRoute(tab = "paths")) {
@@ -722,6 +736,7 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onBackClick = { navController.popBackStack() },
                     onOpenManageFolders = {
                         navController.navigate(SettingsRoute(tab = "paths")) {
@@ -733,6 +748,7 @@ fun AppNavigation(
                     SettingsScreen(
                         initialTab = route.tab,
                         onBackClick = { navController.popBackStack() },
+                        onOpenMemoryCardManager = navigateMemoryCardManager,
                         onOpenLanguageScreen = {
                             navController.navigate(LanguageSettingsRoute) {
                                 launchSingleTop = true
@@ -788,6 +804,7 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onBackClick = { navController.popBackStack() },
                     onOpenManageFolders = {
                         navController.navigate(SettingsRoute(tab = "paths")) {
@@ -842,6 +859,12 @@ fun AppNavigation(
                             launchSingleTop = true
                         }
                     },
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            composable<MemoryCardManagerRoute> {
+                MemoryCardManagerScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

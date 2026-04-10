@@ -17,6 +17,7 @@ import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.CheatRepository
+import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
@@ -58,10 +59,8 @@ data class EmulationUiState(
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
     val fps: String = "0.0",
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
-    val speedPercent: String = "100",
-    val frameTime: String = "0.00",
-    val cpuLoad: String = "0",
-    val gpuLoad: String = "0",
+    val performanceOverlayText: String = "",
+    val speedPercent: Float = 100f,
     val toastMessage: String? = null,
     val statusMessage: String? = null,
     val currentSlot: Int = 0,
@@ -121,6 +120,8 @@ data class EmulationUiState(
 
 private data class EmulationLaunchConfig(
     val biosPath: String?,
+    val memoryCardSlot1: String?,
+    val memoryCardSlot2: String?,
     val renderer: Int,
     val upscaleMultiplier: Float,
     val gpuDriverType: Int,
@@ -232,6 +233,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val preferences = AppPreferences(application)
     private val cheatRepository = CheatRepository(application)
+    private val memoryCardRepository = MemoryCardRepository(application, preferences)
     private val perGameSettingsRepository = PerGameSettingsRepository(application)
     private val _uiState = MutableStateFlow(EmulationUiState())
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
@@ -540,19 +542,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         
         NativeApp.setPerformanceListener(object : NativeApp.PerformanceListener {
             override fun onMetricsUpdate(
+                overlayText: String,
                 fps: Float,
-                speedPercent: Float,
-                frameTime: Float,
-                cpuLoad: Float,
-                gpuLoad: Float
+                speedPercent: Float
             ) {
                 if (_uiState.value.isRunning && !isShuttingDown && !_uiState.value.isPaused) {
                     _uiState.value = _uiState.value.copy(
+                        performanceOverlayText = overlayText,
                         fps = "%.1f".format(fps),
-                        speedPercent = "%.0f".format(speedPercent.coerceAtLeast(0f)),
-                        frameTime = "%.2f".format(frameTime),
-                        cpuLoad = "%.0f".format(cpuLoad.coerceAtLeast(0f)),
-                        gpuLoad = "%.0f".format(gpuLoad.coerceAtLeast(0f))
+                        speedPercent = speedPercent
                     )
                 }
             }
@@ -608,6 +606,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
                 EmulatorBridge.applyRuntimeConfig(
                     biosPath = config.biosPath,
+                    memoryCardSlot1 = config.memoryCardSlot1,
+                    memoryCardSlot2 = config.memoryCardSlot2,
                     renderer = config.renderer,
                     upscaleMultiplier = config.upscaleMultiplier,
                     gpuDriverType = config.gpuDriverType,
@@ -1781,9 +1781,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private suspend fun loadLaunchConfig(): EmulationLaunchConfig {
         val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+        val ensuredAssignments = memoryCardRepository.ensureDefaultCardsAssigned()
         val profileConfig = PerformanceProfiles.configFor(preferences.performanceProfile.first())
         return EmulationLaunchConfig(
             biosPath = preferences.biosPath.first(),
+            memoryCardSlot1 = ensuredAssignments.slot1,
+            memoryCardSlot2 = ensuredAssignments.slot2,
             renderer = preferences.renderer.first(),
             upscaleMultiplier = preferences.upscaleMultiplier.first(),
             gpuDriverType = preferences.gpuDriverType.first(),
@@ -2313,10 +2316,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     isActionInProgress = false,
                     actionLabel = null,
                     fps = "0",
-                    speedPercent = "100",
-                    frameTime = "0.00",
-                    cpuLoad = "0",
-                    gpuLoad = "0",
+                    performanceOverlayText = "",
+                    speedPercent = 100f,
                     statusMessage = null
                 )
                 clearCrashContext()

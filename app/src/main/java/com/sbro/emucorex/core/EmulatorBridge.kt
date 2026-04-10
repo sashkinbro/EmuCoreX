@@ -84,6 +84,11 @@ object EmulatorBridge {
 
     private fun resetTargetFpsOp() = RuntimeOp("reset_target_fps", emptyList())
 
+    private fun memoryCardSlotOp(slot: Int, fileName: String?) = RuntimeOp(
+        "memory_card_slot",
+        listOf(slot.toString(), fileName.orEmpty())
+    )
+
     private suspend fun <T> runSerial(block: () -> T): T = withContext(serialDispatcher) { block() }
 
     private fun launchSerial(block: suspend () -> Unit) {
@@ -125,6 +130,14 @@ object EmulatorBridge {
                         "reset_target_fps" -> {
                             NativeApp.setSetting("EmuCore/GS", "FramerateNTSC", "float", "59.94")
                             NativeApp.setSetting("EmuCore/GS", "FrameratePAL", "float", "50.0")
+                        }
+                        "memory_card_slot" -> {
+                            val slot = op.fields.getOrNull(0)?.toIntOrNull() ?: return@forEach
+                            val slotIndex = slot.coerceIn(1, 2)
+                            val fileName = op.fields.getOrNull(1).orEmpty()
+                            val hasCard = fileName.isNotBlank()
+                            NativeApp.setSetting("MemoryCards", "Slot${slotIndex}_Enable", "bool", hasCard.toString())
+                            NativeApp.setSetting("MemoryCards", "Slot${slotIndex}_Filename", "string", fileName)
                         }
                     }
                 }
@@ -240,6 +253,8 @@ object EmulatorBridge {
         mergeSprite: Boolean = false,
         forceEvenSpritePosition: Boolean = false,
         nativePaletteDraw: Boolean = false,
+        memoryCardSlot1: String? = null,
+        memoryCardSlot2: String? = null,
         fpuClampMode: Int = 1,
         disableHardwareReadbacks: Boolean = false,
         fpuCorrectAddSub: Boolean = true
@@ -303,6 +318,8 @@ object EmulatorBridge {
                 add(settingOp("Folders", "Cheats", "string", cheatsDir.absolutePath))
                 add(settingOp("Folders", "Patches", "string", patchesDir.absolutePath))
                 add(settingOp("Folders", "Logs", "string", logDir.absolutePath))
+                add(memoryCardSlotOp(1, memoryCardSlot1))
+                add(memoryCardSlotOp(2, memoryCardSlot2))
                 add(settingOp("Filenames", "BIOS", "string", preferredBiosFile.orEmpty()))
                 add(refreshBiosOp())
                 add(settingOp("EmuCoreX", "OpenGLTextureDebugLog", "bool", (resolvedRenderer == 12).toString()))
@@ -366,6 +383,15 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "OsdMessagesPos", "int", "0"))
                 add(customDriverOp(if (gpuDriverType == 1) customDriverPath.orEmpty() else ""))
             }
+        )
+    }
+
+    suspend fun setMemoryCardAssignments(slot1: String?, slot2: String?) {
+        performRuntimeOps(
+            listOf(
+                memoryCardSlotOp(1, slot1),
+                memoryCardSlotOp(2, slot2)
+            )
         )
     }
 

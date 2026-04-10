@@ -13,6 +13,7 @@
 #include "pcsx2/BuildVersion.h"
 #include "pcsx2/VMManager.h"
 #include "pcsx2/Config.h"
+#include "pcsx2/Counters.h"
 #include "pcsx2/SIO/Memcard/MemoryCardFile.h"
 #include "pcsx2/SIO/Pad/Pad.h" // For GenericInputBinding
 
@@ -20,6 +21,7 @@
 #include "PerformanceMetrics.h"
 #include "GameList.h"
 #include "GS/GSPerfMon.h"
+#include "GS/GSCapture.h"
 #include "GSDumpReplayer.h"
 #include "Host/AudioStream.h"
 #include "ImGui/ImGuiManager.h"
@@ -117,6 +119,114 @@ namespace
             }
         }
         return escaped;
+    }
+
+    static void AppendProcessorStat(std::string& text, std::string_view label, double usage, double time_ms)
+    {
+        if (!text.empty())
+            text.push_back('\n');
+
+        if (usage >= 99.95)
+            text += fmt::format("{}: 100% ({:.2f}ms)", label, time_ms);
+        else
+            text += fmt::format("{}: {:.1f}% ({:.2f}ms)", label, usage, time_ms);
+    }
+
+    static std::string BuildAndroidPerformanceOverlayText()
+    {
+        std::string text;
+
+        switch (PerformanceMetrics::GetInternalFPSMethod())
+        {
+            case PerformanceMetrics::InternalFPSMethod::GSPrivilegedRegister:
+                text += fmt::format("FPS: {:.2f} [P]", PerformanceMetrics::GetInternalFPS());
+                break;
+
+            case PerformanceMetrics::InternalFPSMethod::DISPFBBlit:
+                text += fmt::format("FPS: {:.2f} [B]", PerformanceMetrics::GetInternalFPS());
+                break;
+
+            case PerformanceMetrics::InternalFPSMethod::None:
+            default:
+                text += "FPS: N/A";
+                break;
+        }
+
+        text += fmt::format(" | VPS: {:.2f}", PerformanceMetrics::GetFPS());
+
+        const float speed = PerformanceMetrics::GetSpeed();
+        text += fmt::format(" | Speed: {}%", static_cast<u32>(std::round(speed)));
+
+        const float target_speed = VMManager::GetTargetSpeed();
+        if (target_speed == 0.0f)
+            text += " (T: Max)";
+        else
+            text += fmt::format(" (T: {:.0f}%)", target_speed * 100.0f);
+
+        SmallString gs_stats_line;
+        SmallString gs_memory_stats_line;
+        GSgetStats(gs_stats_line);
+        GSgetMemoryStats(gs_memory_stats_line);
+        if (!gs_stats_line.empty())
+            text += fmt::format("\n{}", gs_stats_line.view());
+        if (!gs_memory_stats_line.empty())
+            text += fmt::format("\n{}", gs_memory_stats_line.view());
+
+        int iwidth = 0;
+        int iheight = 0;
+        GSgetInternalResolution(&iwidth, &iheight);
+        text += fmt::format(
+            "\n{}x{} {} {} | QF: {} | Frame: {:.2f}/{:.2f}/{:.2f} ms",
+            iwidth,
+            iheight,
+            ReportVideoMode(),
+            ReportInterlaceMode(),
+            MTGS::GetCurrentVsyncQueueSize() > 0 ? (MTGS::GetCurrentVsyncQueueSize() - 1) : 0,
+            PerformanceMetrics::GetMinimumFrameTime(),
+            PerformanceMetrics::GetAverageFrameTime(),
+            PerformanceMetrics::GetMaximumFrameTime());
+
+        if (EmuConfig.Speedhacks.EECycleRate != 0 || EmuConfig.Speedhacks.EECycleSkip != 0)
+        {
+            AppendProcessorStat(
+                text,
+                fmt::format("EE[{}/{}]", EmuConfig.Speedhacks.EECycleRate, EmuConfig.Speedhacks.EECycleSkip),
+                PerformanceMetrics::GetCPUThreadUsage(),
+                PerformanceMetrics::GetCPUThreadAverageTime());
+        }
+        else
+        {
+            AppendProcessorStat(
+                text,
+                "EE",
+                PerformanceMetrics::GetCPUThreadUsage(),
+                PerformanceMetrics::GetCPUThreadAverageTime());
+        }
+
+        AppendProcessorStat(text, "GS", PerformanceMetrics::GetGSThreadUsage(), PerformanceMetrics::GetGSThreadAverageTime());
+
+        if (THREAD_VU1)
+            AppendProcessorStat(text, "VU", PerformanceMetrics::GetVUThreadUsage(), PerformanceMetrics::GetVUThreadAverageTime());
+
+        const u32 gs_sw_threads = PerformanceMetrics::GetGSSWThreadCount();
+        for (u32 thread = 0; thread < gs_sw_threads; thread++)
+        {
+            AppendProcessorStat(
+                text,
+                fmt::format("SW-{}", thread),
+                PerformanceMetrics::GetGSSWThreadUsage(thread),
+                PerformanceMetrics::GetGSSWThreadAverageTime(thread));
+        }
+
+        if (GSCapture::IsCapturing())
+            AppendProcessorStat(text, "CAP", PerformanceMetrics::GetCaptureThreadUsage(), PerformanceMetrics::GetCaptureThreadAverageTime());
+
+        const float gpu_usage = PerformanceMetrics::GetGPUUsage();
+        const float gpu_time = PerformanceMetrics::GetGPUAverageTime();
+        if (gpu_usage > 0.05f || gpu_time > 0.05f)
+            AppendProcessorStat(text, "GPU", gpu_usage, gpu_time);
+
+        return text;
     }
 
     struct SimpleHttpResult
@@ -401,7 +511,7 @@ namespace
             s_native_open_content_uri = env->GetStaticMethodID(s_native_app_class, "openContentUri", "(Ljava/lang/String;)I");
 
         if (!s_on_performance_metrics)
-            s_on_performance_metrics = env->GetStaticMethodID(s_native_app_class, "onPerformanceMetrics", "(FFFFF)V");
+            s_on_performance_metrics = env->GetStaticMethodID(s_native_app_class, "onPerformanceMetrics", "(Ljava/lang/String;FF)V");
 
         ClearJNIExceptions(env);
         return s_native_app_class != nullptr;
@@ -1841,50 +1951,35 @@ void Host::BeginPresentFrame() {
         update_stat(GSPerfMon::DrawCalls, s_total_draws, s_last_draws);
         
         s_total_frames++;
-
-        // Push metrics to Java every 500ms
-        const auto now = std::chrono::steady_clock::now();
-        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - s_last_fps_sample_time).count();
-        if (elapsed >= 500) {
-            s_last_fps_sample_time = now;
-
-            auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-            if (env && s_native_app_class && s_on_performance_metrics) {
-                float fps = PerformanceMetrics::GetFPS();
-                if (fps <= 0.0f) fps = PerformanceMetrics::GetInternalFPS();
-                if (fps <= 0.0f && VMManager::HasValidVM())
-                    fps = VMManager::GetFrameRate();
-                const float speed = PerformanceMetrics::GetSpeed();
-                float frame_time = PerformanceMetrics::GetAverageFrameTime();
-                if (frame_time <= 0.0f && fps > 0.0f)
-                    frame_time = 1000.0f / fps;
-                const float cpu_load = static_cast<float>(PerformanceMetrics::GetCPUThreadUsage());
-                float gpu_load = PerformanceMetrics::GetGPUUsage();
-                if (GSGetCurrentRenderer() == GSRendererType::SW)
-                {
-                    gpu_load = PerformanceMetrics::GetGSThreadUsage();
-                    const u32 sw_threads = PerformanceMetrics::GetGSSWThreadCount();
-                    for (u32 i = 0; i < sw_threads; i++)
-                        gpu_load += static_cast<float>(PerformanceMetrics::GetGSSWThreadUsage(i));
-                }
-                else if (gpu_load <= 0.0f)
-                {
-                    gpu_load = PerformanceMetrics::GetGSThreadUsage();
-                }
-
-                env->CallStaticVoidMethod(
-                    s_native_app_class,
-                    s_on_performance_metrics,
-                    fps,
-                    speed,
-                    frame_time,
-                    cpu_load,
-                    gpu_load
-                );
-            }
-        }
-
         std::atomic_thread_fence(std::memory_order_release);
+    }
+
+    // Push metrics to Java every 500ms for both HW and SW renderers.
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - s_last_fps_sample_time).count();
+    if (elapsed >= 500) {
+        s_last_fps_sample_time = now;
+
+        auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+        if (env && s_native_app_class && s_on_performance_metrics) {
+            float fps = PerformanceMetrics::GetFPS();
+            if (fps <= 0.0f) fps = PerformanceMetrics::GetInternalFPS();
+            if (fps <= 0.0f && VMManager::HasValidVM())
+                fps = VMManager::GetFrameRate();
+            const float speed = PerformanceMetrics::GetSpeed();
+
+            const std::string overlay_text_utf8 = BuildAndroidPerformanceOverlayText();
+            jstring overlay_text = env->NewStringUTF(overlay_text_utf8.c_str());
+
+            env->CallStaticVoidMethod(
+                s_native_app_class,
+                s_on_performance_metrics,
+                overlay_text,
+                fps,
+                speed
+            );
+            env->DeleteLocalRef(overlay_text);
+        }
     }
 }
 
@@ -2360,6 +2455,14 @@ Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetEnabled(JNIEn
         return;
     }
 
+    if (!VMManager::HasValidVM())
+    {
+        Host::SetBaseBoolSettingValue("Achievements", "Enabled", enable);
+        Host::CommitBaseSettingChanges();
+        NotifyRetroAchievementsState();
+        return;
+    }
+
     Host::RunOnCPUThread([enable]() {
         if (EmuConfig.Achievements.Enabled == enable)
         {
@@ -2375,7 +2478,7 @@ Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetEnabled(JNIEn
         Host::CommitBaseSettingChanges();
         Achievements::UpdateSettings(old_config);
         NotifyRetroAchievementsState();
-    }, true);
+    }, false);
 }
 
 extern "C"
@@ -2397,6 +2500,14 @@ Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetHardcore(JNIE
         return;
     }
 
+    if (!VMManager::HasValidVM())
+    {
+        Host::SetBaseBoolSettingValue("Achievements", "ChallengeMode", enable);
+        Host::CommitBaseSettingChanges();
+        NotifyRetroAchievementsState();
+        return;
+    }
+
     Host::RunOnCPUThread([enable]() {
         if (EmuConfig.Achievements.HardcoreMode == enable)
         {
@@ -2412,7 +2523,7 @@ Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetHardcore(JNIE
         Host::CommitBaseSettingChanges();
         Achievements::UpdateSettings(old_config);
         NotifyRetroAchievementsState();
-    }, true);
+    }, false);
 }
 
 
