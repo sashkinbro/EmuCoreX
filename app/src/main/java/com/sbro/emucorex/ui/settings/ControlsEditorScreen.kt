@@ -67,6 +67,11 @@ import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
 import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
 import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
 import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterInlineGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterInlineGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterSelectOpticalNudgeX
+import com.sbro.emucorex.ui.common.OverlayCenterStartOpticalNudgeX
+import com.sbro.emucorex.ui.common.OverlayCenterToggleOpticalNudgeY
 import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
 import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
 import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
@@ -80,6 +85,7 @@ import com.sbro.emucorex.ui.common.VectorAnalogStick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.overlayActionOffset
 import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
+import com.sbro.emucorex.ui.common.overlayInlineGroupOffset
 import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
 import com.sbro.emucorex.ui.common.overlayClusterStep
 import com.sbro.emucorex.ui.common.overlayDpadOffset
@@ -349,6 +355,7 @@ private fun PreviewLayout(
     val centerH = ((if (isLandscape) 26 else 30) * scaleFactor).dp
     val wideCenterW = centerW * 1.2f
     val centerColumnGap = (if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait) * scaleFactor
+    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
     val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
@@ -541,6 +548,22 @@ private fun PreviewLayout(
             }
         }
 
+            val selectLayout = layoutFor("select")
+            val toggleLayout = layoutFor("left_input_toggle")
+            val startLayout = layoutFor("start")
+            val l3Layout = layoutFor("l3")
+            val selectWidth = wideCenterW * (selectLayout.scale / 100f)
+            val toggleSize = centerH * (toggleLayout.scale / 100f)
+            val startWidth = wideCenterW * (startLayout.scale / 100f)
+            val centerInlineWidths = listOf(selectWidth, toggleSize, startWidth)
+            val leftColumnX = overlayCenterButtonOffset(
+                buttonWidth = centerW * (l3Layout.scale / 100f),
+                columnWidth = wideCenterW,
+                gap = centerColumnGap,
+                leftColumn = true
+            ) + l3Layout.offset.first.dp
+            val selectX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 0) +
+                OverlayCenterSelectOpticalNudgeX
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -556,12 +579,10 @@ private fun PreviewLayout(
                 PreviewCenter(
                     id = "select",
                     layout = layout,
-                    width = wideCenterW,
+                    width = selectWidth,
                     height = centerH,
-                    columnWidth = wideCenterW,
+                    x = selectX,
                     selected = selectedControlId == "select",
-                    leftColumn = true,
-                    gap = centerColumnGap,
                     y = 0.dp,
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
@@ -572,13 +593,11 @@ private fun PreviewLayout(
                 PreviewCenter(
                     id = "left_input_toggle",
                     layout = layout,
-                    width = centerH,
+                    width = toggleSize,
                     height = centerH,
-                    columnWidth = centerH,
+                    x = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 1),
                     selected = selectedControlId == "left_input_toggle",
-                    leftColumn = false,
-                    gap = 0.dp,
-                    y = 0.dp,
+                    y = OverlayCenterToggleOpticalNudgeY,
                     isToggle = true,
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
@@ -589,12 +608,11 @@ private fun PreviewLayout(
                 PreviewCenter(
                     id = "start",
                     layout = layout,
-                    width = wideCenterW,
+                    width = startWidth,
                     height = centerH,
-                    columnWidth = wideCenterW,
+                    x = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 2) +
+                        OverlayCenterStartOpticalNudgeX,
                     selected = selectedControlId == "start",
-                    leftColumn = false,
-                    gap = centerColumnGap,
                     y = 0.dp,
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
@@ -607,10 +625,8 @@ private fun PreviewLayout(
                     layout = layout,
                     width = centerW,
                     height = centerH,
-                    columnWidth = wideCenterW,
+                    x = leftColumnX,
                     selected = selectedControlId == "l3",
-                    leftColumn = true,
-                    gap = centerColumnGap,
                     y = overlayCenterSecondRowOffset(centerH * (layout.scale / 100f), centerRowGap),
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
@@ -623,10 +639,13 @@ private fun PreviewLayout(
                     layout = layout,
                     width = centerW,
                     height = centerH,
-                    columnWidth = wideCenterW,
+                    x = overlayCenterButtonOffset(
+                        buttonWidth = centerW * (layout.scale / 100f),
+                        columnWidth = wideCenterW,
+                        gap = centerColumnGap,
+                        leftColumn = false
+                    ),
                     selected = selectedControlId == "r3",
-                    leftColumn = false,
-                    gap = centerColumnGap,
                     y = overlayCenterSecondRowOffset(centerH * (layout.scale / 100f), centerRowGap),
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
@@ -653,6 +672,7 @@ private fun PreviewLayout(
                     centerH = centerH,
                     wideCenterW = wideCenterW,
                     centerColumnGap = centerColumnGap,
+                    centerInlineGap = centerInlineGap,
                     centerRowGap = centerRowGap,
                     stickScaleFactor = stickScaleFactor,
                     layoutFor = ::layoutFor,
@@ -678,6 +698,7 @@ private fun HiddenPreviewControls(
     centerH: Dp,
     wideCenterW: Dp,
     centerColumnGap: Dp,
+    centerInlineGap: Dp,
     centerRowGap: Dp,
     stickScaleFactor: Float,
     layoutFor: (String, Int) -> OverlayControlLayout,
@@ -685,6 +706,13 @@ private fun HiddenPreviewControls(
     onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit
 ) {
+    val hiddenSelectLayout = layoutFor("select", 100)
+    val hiddenToggleLayout = layoutFor("left_input_toggle", 100)
+    val hiddenStartLayout = layoutFor("start", 100)
+    val hiddenSelectWidth = wideCenterW * (hiddenSelectLayout.scale / 100f)
+    val hiddenToggleSize = centerH * (hiddenToggleLayout.scale / 100f)
+    val hiddenStartWidth = wideCenterW * (hiddenStartLayout.scale / 100f)
+    val hiddenInlineWidths = listOf(hiddenSelectWidth, hiddenToggleSize, hiddenStartWidth)
     val hiddenIds = listOf(
         "l2", "l1", "r2", "r1",
         "dpad_up", "dpad_down", "dpad_left", "dpad_right",
@@ -710,11 +738,11 @@ private fun HiddenPreviewControls(
             "square" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 124.dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
             "circle" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 236.dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
             "right_stick" -> PreviewStick(id, layoutFor(id, state.stickScale), selectedControlId == id, analogSize * (layoutFor(id, state.stickScale).scale / (stickScaleFactor * 100f).coerceAtLeast(1f)), x = 180.dp, y = 132.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "select" -> PreviewCenter(id, layoutFor(id, 100), wideCenterW, centerH, wideCenterW, selectedControlId == id, leftColumn = true, gap = centerColumnGap, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "left_input_toggle" -> PreviewCenter(id, layoutFor(id, 100), centerH, centerH, centerH, selectedControlId == id, leftColumn = false, gap = 0.dp, y = 214.dp, isToggle = true, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "start" -> PreviewCenter(id, layoutFor(id, 100), wideCenterW, centerH, wideCenterW, selectedControlId == id, leftColumn = false, gap = centerColumnGap, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "l3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, wideCenterW, selectedControlId == id, leftColumn = true, gap = centerColumnGap, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "r3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, wideCenterW, selectedControlId == id, leftColumn = false, gap = centerColumnGap, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
+            "select" -> PreviewCenter(id, layoutFor(id, 100), hiddenSelectWidth, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 0) + OverlayCenterSelectOpticalNudgeX, selectedControlId == id, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
+            "left_input_toggle" -> PreviewCenter(id, layoutFor(id, 100), hiddenToggleSize, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 1), selectedControlId == id, y = 214.dp + OverlayCenterToggleOpticalNudgeY, isToggle = true, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
+            "start" -> PreviewCenter(id, layoutFor(id, 100), hiddenStartWidth, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 2) + OverlayCenterStartOpticalNudgeX, selectedControlId == id, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
+            "l3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, overlayCenterButtonOffset(buttonWidth = centerW * (layoutFor(id, 100).scale / 100f), columnWidth = wideCenterW, gap = centerColumnGap, leftColumn = true), selectedControlId == id, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
+            "r3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, overlayCenterButtonOffset(buttonWidth = centerW * (layoutFor(id, 100).scale / 100f), columnWidth = wideCenterW, gap = centerColumnGap, leftColumn = false), selectedControlId == id, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
         }
     }
 }
@@ -873,10 +901,8 @@ private fun PreviewCenter(
     layout: OverlayControlLayout,
     width: Dp,
     height: Dp,
-    columnWidth: Dp,
+    x: Dp,
     selected: Boolean,
-    leftColumn: Boolean,
-    gap: Dp,
     y: Dp,
     isToggle: Boolean = false,
     onSelectControl: (String) -> Unit,
@@ -885,16 +911,6 @@ private fun PreviewCenter(
 ) {
     val scaledWidth = width * (layout.scale / 100f)
     val scaledHeight = height * (layout.scale / 100f)
-    val baseX = if (isToggle) {
-        -(scaledHeight / 2f)
-    } else {
-        overlayCenterButtonOffset(
-            buttonWidth = scaledWidth,
-            columnWidth = columnWidth,
-            gap = gap,
-            leftColumn = leftColumn
-        )
-    }
     DraggableControl(
         id = id,
         selected = selected,
@@ -903,7 +919,7 @@ private fun PreviewCenter(
         onCommitControlPosition = onCommitControlPosition,
         modifier = Modifier.offset {
             IntOffset(
-                baseX.roundToPx() + layout.offset.first.roundToInt(),
+                x.roundToPx() + layout.offset.first.roundToInt(),
                 y.roundToPx() + layout.offset.second.roundToInt()
             )
         }

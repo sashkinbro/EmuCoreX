@@ -30,11 +30,9 @@ object NativeApp {
 
     interface PerformanceListener {
         fun onMetricsUpdate(
+            overlayText: String,
             fps: Float,
-            speedPercent: Float,
-            frameTime: Float,
-            cpuLoad: Float,
-            gpuLoad: Float
+            speedPercent: Float
         )
     }
 
@@ -132,13 +130,11 @@ object NativeApp {
 
     @JvmStatic
     fun onPerformanceMetrics(
+        overlayText: String,
         fps: Float,
-        speedPercent: Float,
-        frameTime: Float,
-        cpuLoad: Float,
-        gpuLoad: Float
+        speedPercent: Float
     ) {
-        performanceListener?.onMetricsUpdate(fps, speedPercent, frameTime, cpuLoad, gpuLoad)
+        performanceListener?.onMetricsUpdate(overlayText, fps, speedPercent)
     }
 
     @JvmStatic

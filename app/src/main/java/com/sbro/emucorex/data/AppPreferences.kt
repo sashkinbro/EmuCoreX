@@ -138,6 +138,7 @@ class AppPreferences(private val context: Context) {
     private val localePrefs = context.getSharedPreferences("ui_locale", Context.MODE_PRIVATE)
 
     companion object {
+        private const val CURRENT_OVERLAY_LAYOUT_VERSION = 15
         private const val LEGACY_DEFAULT_LSTICK_OFFSET_X = 18f
         private const val LEGACY_DEFAULT_LSTICK_OFFSET_Y = -214f
         private const val LEFT_SIDE_LAYOUT_SHIFT_X = -8f
@@ -155,7 +156,9 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_LBTN_OFFSET_Y = 78f
         const val DEFAULT_RBTN_OFFSET_X = -74f
         const val DEFAULT_RBTN_OFFSET_Y = 78f
-        const val DEFAULT_CENTER_OFFSET_X = 32f
+        private const val PREVIOUS_DEFAULT_CENTER_OFFSET_X = 32f
+        private const val PREVIOUS_DEFAULT_CENTER_OFFSET_Y = 10f
+        const val DEFAULT_CENTER_OFFSET_X = 0f
         const val DEFAULT_CENTER_OFFSET_Y = 10f
         const val COVER_ART_STYLE_DISABLED = -1
         const val COVER_ART_STYLE_DEFAULT = 0
@@ -182,9 +185,9 @@ class AppPreferences(private val context: Context) {
             "square" to OverlayControlLayout(),
             "circle" to OverlayControlLayout(),
             "right_stick" to OverlayControlLayout(scale = stickScale, visible = false),
-            "select" to OverlayControlLayout(),
-            "left_input_toggle" to OverlayControlLayout(visible = true),
-            "start" to OverlayControlLayout(),
+            "select" to OverlayControlLayout(scale = 80),
+            "left_input_toggle" to OverlayControlLayout(scale = 80, visible = true),
+            "start" to OverlayControlLayout(scale = 80),
             "l3" to OverlayControlLayout(visible = false),
             "r3" to OverlayControlLayout(visible = false)
         )
@@ -1401,7 +1404,7 @@ class AppPreferences(private val context: Context) {
             prefs[RBTN_OFFSET] = formatOffsetStr(rbtnX, rbtnY)
             prefs[CENTER_OFFSET] = formatOffsetStr(centerX, centerY)
             prefs[STICK_SCALE] = stickScaleVal.coerceIn(50, 200)
-            prefs[OVERLAY_LAYOUT_VERSION] = 12
+            prefs[OVERLAY_LAYOUT_VERSION] = CURRENT_OVERLAY_LAYOUT_VERSION
             encodeControlLayouts(controlLayouts)?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
         }
     }
@@ -1417,14 +1420,14 @@ class AppPreferences(private val context: Context) {
             prefs.remove(CENTER_OFFSET)
             prefs.remove(STICK_SCALE)
             prefs.remove(CONTROL_LAYOUTS)
-            prefs[OVERLAY_LAYOUT_VERSION] = 12
+            prefs[OVERLAY_LAYOUT_VERSION] = CURRENT_OVERLAY_LAYOUT_VERSION
         }
     }
 
     suspend fun migrateOverlayLayoutIfNeeded() {
         context.dataStore.edit { prefs ->
             val currentVersion = prefs[OVERLAY_LAYOUT_VERSION] ?: 0
-            if (currentVersion >= 13) return@edit
+            if (currentVersion >= CURRENT_OVERLAY_LAYOUT_VERSION) return@edit
 
             if (currentVersion < 10) {
                 prefs.remove(DPAD_OFFSET)
@@ -1477,7 +1480,35 @@ class AppPreferences(private val context: Context) {
                     prefs[LSTICK_OFFSET] = formatOffsetStr(DEFAULT_LSTICK_OFFSET_X, DEFAULT_LSTICK_OFFSET_Y)
                 }
             }
-            prefs[OVERLAY_LAYOUT_VERSION] = 13
+            if (currentVersion < 14) {
+                val savedCenterOffset = parseOffsetStr(
+                    prefs[CENTER_OFFSET],
+                    PREVIOUS_DEFAULT_CENTER_OFFSET_X to PREVIOUS_DEFAULT_CENTER_OFFSET_Y
+                )
+                if (savedCenterOffset == (PREVIOUS_DEFAULT_CENTER_OFFSET_X to PREVIOUS_DEFAULT_CENTER_OFFSET_Y)) {
+                    prefs[CENTER_OFFSET] = formatOffsetStr(DEFAULT_CENTER_OFFSET_X, DEFAULT_CENTER_OFFSET_Y)
+                }
+            }
+            if (currentVersion < 15) {
+                val layouts = decodeControlLayouts(prefs[CONTROL_LAYOUTS]).toMutableMap()
+                val select = layouts["select"]
+                val toggle = layouts["left_input_toggle"]
+                val start = layouts["start"]
+
+                val hasDefaultCenterControls = listOf(select, toggle, start).all { layout ->
+                    layout == null || (
+                        layout.offset == (0f to 0f) &&
+                            layout.scale == 80 &&
+                            layout.visible
+                        )
+                }
+
+                if (hasDefaultCenterControls) {
+                    prefs.remove(CENTER_OFFSET)
+                    prefs.remove(CONTROL_LAYOUTS)
+                }
+            }
+            prefs[OVERLAY_LAYOUT_VERSION] = CURRENT_OVERLAY_LAYOUT_VERSION
         }
     }
 

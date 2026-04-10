@@ -88,6 +88,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -100,9 +101,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
@@ -110,10 +113,15 @@ import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -152,6 +160,11 @@ import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
 import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
 import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
 import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterInlineGapLandscape
+import com.sbro.emucorex.ui.common.OverlayCenterInlineGapPortrait
+import com.sbro.emucorex.ui.common.OverlayCenterSelectOpticalNudgeX
+import com.sbro.emucorex.ui.common.OverlayCenterStartOpticalNudgeX
+import com.sbro.emucorex.ui.common.OverlayCenterToggleOpticalNudgeY
 import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
 import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
 import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
@@ -168,6 +181,7 @@ import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.overlayActionOffset
 import com.sbro.emucorex.ui.common.overlayClusterStep
 import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
+import com.sbro.emucorex.ui.common.overlayInlineGroupOffset
 import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
 import com.sbro.emucorex.ui.common.overlayDrawableForControl
 import com.sbro.emucorex.ui.common.overlayDpadOffset
@@ -223,6 +237,18 @@ private data class OverlayAchievementsContentState(
 
 private const val RETRO_ACHIEVEMENTS_HUD_DURATION_MS = 6_000L
 
+private data class TouchButtonSpec(
+    val id: String,
+    val drawableRes: Int,
+    val width: androidx.compose.ui.unit.Dp,
+    val height: androidx.compose.ui.unit.Dp,
+    val x: androidx.compose.ui.unit.Dp,
+    val y: androidx.compose.ui.unit.Dp,
+    val shape: androidx.compose.ui.graphics.Shape,
+    val onPressChange: ((Boolean) -> Unit)? = null,
+    val onClick: (() -> Unit)? = null
+)
+
 private data class LiveSelectionOption(
     val value: Int,
     val label: String? = null,
@@ -252,6 +278,11 @@ private fun Int.isTopOverlayCorner(): Boolean {
 
 private fun Int.isBottomOverlayCorner(): Boolean {
     return this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT ||
+        this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT
+}
+
+private fun Int.isRightOverlayCorner(): Boolean {
+    return this == AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT ||
         this == AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT
 }
 
@@ -431,8 +462,6 @@ fun EmulationScreen(
         retroAchievementsState.enabled,
         retroAchievementsState.hardcoreActive,
         retroAchievementsState.game?.gameId,
-        retroAchievementsState.game?.title,
-        retroAchievementsState.game?.richPresence,
         retroAchievementsState.game?.earnedAchievements,
         retroAchievementsState.game?.totalAchievements,
         retroAchievementsState.game?.earnedPoints,
@@ -607,26 +636,25 @@ fun EmulationScreen(
             modifier = Modifier
                 .align(uiState.fpsOverlayCorner.toOverlayAlignment())
                 .padding(
-                    top = if (uiState.fpsOverlayCorner.isTopOverlayCorner()) overlayTopSafeInset + 16.dp else 0.dp,
+                    top = if (uiState.fpsOverlayCorner.isTopOverlayCorner()) overlayTopSafeInset + 8.dp else 0.dp,
                     bottom = if (uiState.fpsOverlayCorner.isBottomOverlayCorner()) {
-                        overlayBottomSafeInset + 16.dp + if (uiState.controlsVisible) 96.dp else 0.dp
+                        overlayBottomSafeInset + 8.dp + if (uiState.controlsVisible) 96.dp else 0.dp
                     } else {
                         0.dp
                     },
-                    start = overlayHorizontalSafeInset + 16.dp,
-                    end = overlayHorizontalSafeInset + 16.dp
+                    start = overlayHorizontalSafeInset + 6.dp,
+                    end = overlayHorizontalSafeInset + 6.dp
                 )
         ) {
             if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
                 SimpleFpsCounter(fps = uiState.fps)
             } else {
-                PerformanceHud(
-                    fps = uiState.fps,
+                SystemPerformanceHud(
+                    alignToEnd = uiState.fpsOverlayCorner.isRightOverlayCorner(),
                     speedPercent = uiState.speedPercent,
-                    cpuLoad = uiState.cpuLoad,
-                    gpuLoad = uiState.gpuLoad,
-                    frameTime = uiState.frameTime,
-                    targetFps = uiState.targetFps
+                    text = uiState.performanceOverlayText.ifBlank {
+                        "VPS: ${uiState.fps}"
+                    }
                 )
             }
         }
@@ -1233,6 +1261,7 @@ private fun OnScreenControls(
     onPadInput: (Int, Int, Boolean) -> Unit
 ) {
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
@@ -1252,6 +1281,7 @@ private fun OnScreenControls(
     val centerH = ((if (isLandscape) 26 else 30) * scaleFactor).dp
     val wideCenterW = centerW * 1.2f
     val centerColumnGap = (if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait) * scaleFactor
+    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
     val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
@@ -1277,30 +1307,38 @@ private fun OnScreenControls(
         ) {
             val l2 = layoutFor("l2")
             val l1 = layoutFor("l1")
-            if (l2.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("l2")),
-                    width = shoulderW * (l2.scale / 100f),
-                    height = shoulderH * (l2.scale / 100f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
-                    modifier = Modifier.offset { IntOffset(l2.offset.first.roundToInt(), l2.offset.second.roundToInt()) }
-                ) { pressed -> onPadInput(PadKey.L2, 0, pressed) }
-            }
-            if (l1.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("l1")),
-                    width = shoulderW * (l1.scale / 100f),
-                    height = shoulderH * (l1.scale / 100f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            l1.offset.first.roundToInt(),
-                            OverlayShoulderVerticalGap.roundToPx() + l1.offset.second.roundToInt()
+            TouchButtonGroup(
+                specs = buildList {
+                    if (l2.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "l2",
+                                drawableRes = requireNotNull(overlayDrawableForControl("l2")),
+                                width = shoulderW * (l2.scale / 100f),
+                                height = shoulderH * (l2.scale / 100f),
+                                x = l2.offset.first.dp,
+                                y = l2.offset.second.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.L2, 0, pressed) }
+                            )
                         )
                     }
-                ) { pressed -> onPadInput(PadKey.L1, 0, pressed) }
-            }
+                    if (l1.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "l1",
+                                drawableRes = requireNotNull(overlayDrawableForControl("l1")),
+                                width = shoulderW * (l1.scale / 100f),
+                                height = shoulderH * (l1.scale / 100f),
+                                x = l1.offset.first.dp,
+                                y = OverlayShoulderVerticalGap + l1.offset.second.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.L1, 0, pressed) }
+                            )
+                        )
+                    }
+                }
+            )
         }
 
         Box(
@@ -1309,38 +1347,40 @@ private fun OnScreenControls(
                 .padding(top = edgePadTop, end = edgePadEnd)
                 .offset { IntOffset(rbtnOffset.first.roundToInt(), rbtnOffset.second.roundToInt()) }
         ) {
-            val gap = 8.dp
             val r1 = layoutFor("r1")
             val r2 = layoutFor("r2")
-            if (r2.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("r2")),
-                    width = shoulderW * (r2.scale / 100f),
-                    height = shoulderH * (r2.scale / 100f),
-                    shape = RoundedCornerShape(10.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            OverlayRightShoulderBaseOffset.roundToPx() + r2.offset.first.roundToInt(),
-                            r2.offset.second.roundToInt()
+            TouchButtonGroup(
+                specs = buildList {
+                    if (r2.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "r2",
+                                drawableRes = requireNotNull(overlayDrawableForControl("r2")),
+                                width = shoulderW * (r2.scale / 100f),
+                                height = shoulderH * (r2.scale / 100f),
+                                x = OverlayRightShoulderBaseOffset + r2.offset.first.dp,
+                                y = r2.offset.second.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.R2, 0, pressed) }
+                            )
                         )
                     }
-                ) { pressed -> onPadInput(PadKey.R2, 0, pressed) }
-            }
-            if (r1.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("r1")),
-                    width = shoulderW * (r1.scale / 100f),
-                    height = shoulderH * (r1.scale / 100f),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            OverlayRightShoulderBaseOffset.roundToPx() + r1.offset.first.roundToInt(),
-                            OverlayRightShoulderGapOffset.roundToPx() + r1.offset.second.roundToInt()
+                    if (r1.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "r1",
+                                drawableRes = requireNotNull(overlayDrawableForControl("r1")),
+                                width = shoulderW * (r1.scale / 100f),
+                                height = shoulderH * (r1.scale / 100f),
+                                x = OverlayRightShoulderBaseOffset + r1.offset.first.dp,
+                                y = OverlayRightShoulderGapOffset + r1.offset.second.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.R1, 0, pressed) }
+                            )
                         )
                     }
-                ) { pressed -> onPadInput(PadKey.R1, 0, pressed) }
-            }
+                }
+            )
         }
 
         // Left side — D-Pad + Left Stick
@@ -1423,119 +1463,258 @@ private fun OnScreenControls(
             }
         }
 
+            val select = layoutFor("select")
+            val toggle = layoutFor("left_input_toggle")
+            val start = layoutFor("start")
+            val l3 = layoutFor("l3")
+            val r3 = layoutFor("r3")
+            val selectWidth = wideCenterW * (select.scale / 100f)
+            val toggleSize = centerH * (toggle.scale / 100f)
+            val startWidth = wideCenterW * (start.scale / 100f)
+            val centerInlineWidths = listOf(selectWidth, toggleSize, startWidth)
+            val selectX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 0) +
+                OverlayCenterSelectOpticalNudgeX + select.offset.first.dp
+            val toggleX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 1) + toggle.offset.first.dp
+            val startX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 2) +
+                OverlayCenterStartOpticalNudgeX + start.offset.first.dp
+            val leftColumnX = overlayCenterButtonOffset(
+                buttonWidth = centerW * (l3.scale / 100f),
+                columnWidth = wideCenterW,
+                gap = centerColumnGap,
+                leftColumn = true
+            ) + l3.offset.first.dp
+            val centerAnchorShift = with(density) { (-minOf(selectX, leftColumnX)).roundToPx() }
+
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
                 .offset {
                     IntOffset(
-                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt(),
+                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt() + centerAnchorShift,
                         centerOffset.second.roundToInt()
                     )
                 }
         ) {
-            val select = layoutFor("select")
-            val toggle = layoutFor("left_input_toggle")
-            val start = layoutFor("start")
-            val l3 = layoutFor("l3")
-            val r3 = layoutFor("r3")
-            if (select.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("select")),
-                    width = wideCenterW * (select.scale / 100f),
-                    height = centerH * (select.scale / 100f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            overlayCenterButtonOffset(
-                                buttonWidth = wideCenterW * (select.scale / 100f),
-                                columnWidth = wideCenterW,
-                                gap = centerColumnGap,
-                                leftColumn = true
-                            ).roundToPx() + select.offset.first.roundToInt(),
-                            select.offset.second.roundToInt()
+            TouchButtonGroup(
+                specs = buildList {
+                    if (select.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "select",
+                                drawableRes = requireNotNull(overlayDrawableForControl("select")),
+                                width = selectWidth,
+                                height = centerH * (select.scale / 100f),
+                                x = selectX,
+                                y = select.offset.second.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.Select, 0, pressed) }
+                            )
                         )
                     }
-                ) { pressed -> onPadInput(PadKey.Select, 0, pressed) }
-            }
-            if (toggle.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("left_input_toggle")),
-                    width = centerH * (toggle.scale / 100f),
-                    height = centerH * (toggle.scale / 100f),
-                    shape = CircleShape,
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            (-centerH * (toggle.scale / 100f) / 2f).roundToPx() + toggle.offset.first.roundToInt(),
-                            toggle.offset.second.roundToInt()
+                    if (toggle.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "left_input_toggle",
+                                drawableRes = requireNotNull(overlayDrawableForControl("left_input_toggle")),
+                                width = toggleSize,
+                                height = toggleSize,
+                                x = toggleX,
+                                y = OverlayCenterToggleOpticalNudgeY + toggle.offset.second.dp,
+                                shape = CircleShape,
+                                onClick = onToggleLeftInputMode
+                            )
                         )
-                    },
-                    onClick = onToggleLeftInputMode
+                    }
+                    if (start.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "start",
+                                drawableRes = requireNotNull(overlayDrawableForControl("start")),
+                                width = startWidth,
+                                height = centerH * (start.scale / 100f),
+                                x = startX,
+                                y = start.offset.second.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.Start, 0, pressed) }
+                            )
+                        )
+                    }
+                    if (l3.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "l3",
+                                drawableRes = requireNotNull(overlayDrawableForControl("l3")),
+                                width = centerW * (l3.scale / 100f),
+                                height = centerH * (l3.scale / 100f),
+                                x = leftColumnX,
+                                y = overlayCenterSecondRowOffset(
+                                    buttonHeight = centerH * (l3.scale / 100f),
+                                    rowGap = centerRowGap
+                                ) + l3.offset.second.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.L3, 0, pressed) }
+                            )
+                        )
+                    }
+                    if (r3.visible) {
+                        add(
+                            TouchButtonSpec(
+                                id = "r3",
+                                drawableRes = requireNotNull(overlayDrawableForControl("r3")),
+                                width = centerW * (r3.scale / 100f),
+                                height = centerH * (r3.scale / 100f),
+                                x = overlayCenterButtonOffset(
+                                    buttonWidth = centerW * (r3.scale / 100f),
+                                    columnWidth = wideCenterW,
+                                    gap = centerColumnGap,
+                                    leftColumn = false
+                                ) + r3.offset.first.dp,
+                                y = overlayCenterSecondRowOffset(
+                                    buttonHeight = centerH * (r3.scale / 100f),
+                                    rowGap = centerRowGap
+                                ) + r3.offset.second.dp,
+                                shape = RoundedCornerShape(8.dp),
+                                onPressChange = { pressed -> onPadInput(PadKey.R3, 0, pressed) }
+                            )
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TouchButtonGroup(
+    specs: List<TouchButtonSpec>,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val activeTargets = remember { mutableStateMapOf<Int, String>() }
+    val downTargets = remember { mutableMapOf<Int, String?>() }
+    val specById = remember(specs) { specs.associateBy { it.id } }
+    val bounds = remember(specs, density) {
+        with(density) {
+            val rects = specs.associate { spec ->
+                spec.id to Rect(
+                    left = spec.x.toPx(),
+                    top = spec.y.toPx(),
+                    right = spec.x.toPx() + spec.width.toPx(),
+                    bottom = spec.y.toPx() + spec.height.toPx()
                 )
             }
-            if (start.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("start")),
-                    width = wideCenterW * (start.scale / 100f),
-                    height = centerH * (start.scale / 100f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            overlayCenterButtonOffset(
-                                buttonWidth = wideCenterW * (start.scale / 100f),
-                                columnWidth = wideCenterW,
-                                gap = centerColumnGap,
-                                leftColumn = false
-                            ).roundToPx() + start.offset.first.roundToInt(),
-                            start.offset.second.roundToInt()
-                        )
-                    }
-                ) { pressed -> onPadInput(PadKey.Start, 0, pressed) }
+            val left = rects.values.minOfOrNull { it.left } ?: 0f
+            val top = rects.values.minOfOrNull { it.top } ?: 0f
+            val right = rects.values.maxOfOrNull { it.right } ?: 0f
+            val bottom = rects.values.maxOfOrNull { it.bottom } ?: 0f
+            Triple(rects, Rect(left = left, top = top, right = right, bottom = bottom), Unit)
+        }
+    }
+    val rects = bounds.first
+    val groupRect = bounds.second
+    val groupWidth = with(density) { (groupRect.right - groupRect.left).coerceAtLeast(0f).toDp() }
+    val groupHeight = with(density) { (groupRect.bottom - groupRect.top).coerceAtLeast(0f).toDp() }
+
+    fun hitTarget(x: Float, y: Float): String? =
+        specs.lastOrNull { spec -> rects.getValue(spec.id).contains(Offset(x, y)) }?.id
+
+    fun updatePointerTarget(pointerId: Int, newTarget: String?) {
+        val oldTarget = activeTargets[pointerId]
+        if (oldTarget == newTarget) return
+
+        if (oldTarget != null) {
+            activeTargets.remove(pointerId)
+            if (!activeTargets.containsValue(oldTarget)) {
+                specById[oldTarget]?.onPressChange?.invoke(false)
             }
-            if (l3.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("l3")),
-                    width = centerW * (l3.scale / 100f),
-                    height = centerH * (l3.scale / 100f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            overlayCenterButtonOffset(
-                                buttonWidth = centerW * (l3.scale / 100f),
-                                columnWidth = wideCenterW,
-                                gap = centerColumnGap,
-                                leftColumn = true
-                            ).roundToPx() + l3.offset.first.roundToInt(),
-                            overlayCenterSecondRowOffset(
-                                buttonHeight = centerH * (l3.scale / 100f),
-                                rowGap = centerRowGap
-                            ).roundToPx() + l3.offset.second.roundToInt()
-                        )
-                    }
-                ) { pressed -> onPadInput(PadKey.L3, 0, pressed) }
+        }
+
+        if (newTarget != null) {
+            val alreadyActive = activeTargets.containsValue(newTarget)
+            activeTargets[pointerId] = newTarget
+            if (!alreadyActive) {
+                specById[newTarget]?.onPressChange?.invoke(true)
             }
-            if (r3.visible) {
-                VectorOverlayButton(
-                    drawableRes = requireNotNull(overlayDrawableForControl("r3")),
-                    width = centerW * (r3.scale / 100f),
-                    height = centerH * (r3.scale / 100f),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.offset {
-                        IntOffset(
-                            overlayCenterButtonOffset(
-                                buttonWidth = centerW * (r3.scale / 100f),
-                                columnWidth = wideCenterW,
-                                gap = centerColumnGap,
-                                leftColumn = false
-                            ).roundToPx() + r3.offset.first.roundToInt(),
-                            overlayCenterSecondRowOffset(
-                                buttonHeight = centerH * (r3.scale / 100f),
-                                rowGap = centerRowGap
-                            ).roundToPx() + r3.offset.second.roundToInt()
-                        )
-                    }
-                ) { pressed -> onPadInput(PadKey.R3, 0, pressed) }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .offset {
+                IntOffset(groupRect.left.roundToInt(), groupRect.top.roundToInt())
             }
+            .size(groupWidth, groupHeight)
+            .pointerInteropFilter { event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                        val index = event.actionIndex
+                        val pointerId = event.getPointerId(index)
+                        val target = hitTarget(
+                            event.getX(index) + groupRect.left,
+                            event.getY(index) + groupRect.top
+                        )
+                        downTargets[pointerId] = target
+                        updatePointerTarget(pointerId, target)
+                        target != null
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        var handled = false
+                        for (index in 0 until event.pointerCount) {
+                            val pointerId = event.getPointerId(index)
+                            val currentTarget = activeTargets[pointerId]
+                            val target = hitTarget(
+                                event.getX(index) + groupRect.left,
+                                event.getY(index) + groupRect.top
+                            )
+                            updatePointerTarget(pointerId, target)
+                            handled = handled || target != null || currentTarget != null
+                        }
+                        handled
+                    }
+
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                        val index = event.actionIndex
+                        val pointerId = event.getPointerId(index)
+                        val downTarget = downTargets.remove(pointerId)
+                        val upTarget = hitTarget(
+                            event.getX(index) + groupRect.left,
+                            event.getY(index) + groupRect.top
+                        )
+                        if (downTarget != null && downTarget == upTarget) {
+                            specById[downTarget]?.onClick?.invoke()
+                        }
+                        updatePointerTarget(pointerId, null)
+                        downTarget != null || upTarget != null
+                    }
+
+                    MotionEvent.ACTION_CANCEL -> {
+                        val activePointerIds = activeTargets.keys.toList()
+                        activePointerIds.forEach { updatePointerTarget(it, null) }
+                        downTargets.clear()
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+    ) {
+        specs.forEach { spec ->
+            VectorOverlayButton(
+                drawableRes = spec.drawableRes,
+                width = spec.width,
+                height = spec.height,
+                shape = spec.shape,
+                interactive = false,
+                pressed = activeTargets.containsValue(spec.id),
+                modifier = Modifier.offset {
+                    IntOffset(
+                        (spec.x.roundToPx() - groupRect.left.roundToInt()),
+                        (spec.y.roundToPx() - groupRect.top.roundToInt())
+                    )
+                }
+            )
         }
     }
 }
@@ -1570,6 +1749,8 @@ private fun DPadCluster(
         OverlayClusterGapPortrait
     }
     val step = overlayClusterStep(btnSize, clusterGap)
+    val clusterExtent = step + btnSize
+    val centerOffset = (clusterExtent - btnSize) / 2f
 
     Box(modifier = modifier) {
         val defaults = AppPreferences.defaultOverlayControlLayouts()
@@ -1577,62 +1758,66 @@ private fun DPadCluster(
         val down = controlLayouts["dpad_down"] ?: defaults["dpad_down"] ?: OverlayControlLayout()
         val left = controlLayouts["dpad_left"] ?: defaults["dpad_left"] ?: OverlayControlLayout()
         val right = controlLayouts["dpad_right"] ?: defaults["dpad_right"] ?: OverlayControlLayout()
-        if (up.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("dpad_up")),
-                width = btnSize * (up.scale / 100f),
-                height = btnSize * (up.scale / 100f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayDpadOffset(step, "up").first.roundToPx() + up.offset.first.roundToInt(),
-                        overlayDpadOffset(step, "up").second.roundToPx() + up.offset.second.roundToInt()
+        TouchButtonGroup(
+            specs = buildList {
+                if (up.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "dpad_up",
+                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_up")),
+                            width = btnSize * (up.scale / 100f),
+                            height = btnSize * (up.scale / 100f),
+                            x = centerOffset + up.offset.first.dp,
+                            y = 0.dp + up.offset.second.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            onPressChange = { pressed -> onPadInput(PadKey.Up, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Up, 0, pressed) }
-        }
-        if (down.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("dpad_down")),
-                width = btnSize * (down.scale / 100f),
-                height = btnSize * (down.scale / 100f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayDpadOffset(step, "down").first.roundToPx() + down.offset.first.roundToInt(),
-                        overlayDpadOffset(step, "down").second.roundToPx() + down.offset.second.roundToInt()
+                if (down.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "dpad_down",
+                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_down")),
+                            width = btnSize * (down.scale / 100f),
+                            height = btnSize * (down.scale / 100f),
+                            x = centerOffset + down.offset.first.dp,
+                            y = step + down.offset.second.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            onPressChange = { pressed -> onPadInput(PadKey.Down, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Down, 0, pressed) }
-        }
-        if (left.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("dpad_left")),
-                width = btnSize * (left.scale / 100f),
-                height = btnSize * (left.scale / 100f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayDpadOffset(step, "left").first.roundToPx() + left.offset.first.roundToInt(),
-                        overlayDpadOffset(step, "left").second.roundToPx() + left.offset.second.roundToInt()
+                if (left.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "dpad_left",
+                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_left")),
+                            width = btnSize * (left.scale / 100f),
+                            height = btnSize * (left.scale / 100f),
+                            x = 0.dp + left.offset.first.dp,
+                            y = centerOffset + left.offset.second.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            onPressChange = { pressed -> onPadInput(PadKey.Left, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Left, 0, pressed) }
-        }
-        if (right.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("dpad_right")),
-                width = btnSize * (right.scale / 100f),
-                height = btnSize * (right.scale / 100f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayDpadOffset(step, "right").first.roundToPx() + right.offset.first.roundToInt(),
-                        overlayDpadOffset(step, "right").second.roundToPx() + right.offset.second.roundToInt()
+                if (right.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "dpad_right",
+                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_right")),
+                            width = btnSize * (right.scale / 100f),
+                            height = btnSize * (right.scale / 100f),
+                            x = step + right.offset.first.dp,
+                            y = centerOffset + right.offset.second.dp,
+                            shape = RoundedCornerShape(8.dp),
+                            onPressChange = { pressed -> onPadInput(PadKey.Right, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Right, 0, pressed) }
-        }
+            }
+        )
     }
 }
 
@@ -1646,11 +1831,13 @@ private fun ActionCluster(
 ) {
     val btnSize = clusterSize / 3.1f
     val clusterGap = if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp) {
-        OverlayClusterGapLandscape
+        OverlayActionGapLandscape
     } else {
-        OverlayClusterGapPortrait
+        OverlayActionGapPortrait
     }
     val step = overlayClusterStep(btnSize, clusterGap)
+    val clusterExtent = step + btnSize
+    val centerOffset = (clusterExtent - btnSize) / 2f
 
     Box(
         modifier = modifier
@@ -1659,62 +1846,66 @@ private fun ActionCluster(
         val cross = controlLayouts["cross"] ?: OverlayControlLayout()
         val square = controlLayouts["square"] ?: OverlayControlLayout()
         val circle = controlLayouts["circle"] ?: OverlayControlLayout()
-        if (triangle.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("triangle")),
-                width = btnSize * (triangle.scale / 100f),
-                height = btnSize * (triangle.scale / 100f),
-                shape = CircleShape,
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayActionOffset(step, "triangle").first.roundToPx() + triangle.offset.first.roundToInt(),
-                        overlayActionOffset(step, "triangle").second.roundToPx() + triangle.offset.second.roundToInt()
+        TouchButtonGroup(
+            specs = buildList {
+                if (triangle.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "triangle",
+                            drawableRes = requireNotNull(overlayDrawableForControl("triangle")),
+                            width = btnSize * (triangle.scale / 100f),
+                            height = btnSize * (triangle.scale / 100f),
+                            x = centerOffset + triangle.offset.first.dp,
+                            y = 0.dp + triangle.offset.second.dp,
+                            shape = CircleShape,
+                            onPressChange = { pressed -> onPadInput(PadKey.Triangle, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Triangle, 0, pressed) }
-        }
-        if (cross.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("cross")),
-                width = btnSize * (cross.scale / 100f),
-                height = btnSize * (cross.scale / 100f),
-                shape = CircleShape,
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayActionOffset(step, "cross").first.roundToPx() + cross.offset.first.roundToInt(),
-                        overlayActionOffset(step, "cross").second.roundToPx() + cross.offset.second.roundToInt()
+                if (cross.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "cross",
+                            drawableRes = requireNotNull(overlayDrawableForControl("cross")),
+                            width = btnSize * (cross.scale / 100f),
+                            height = btnSize * (cross.scale / 100f),
+                            x = centerOffset + cross.offset.first.dp,
+                            y = step + cross.offset.second.dp,
+                            shape = CircleShape,
+                            onPressChange = { pressed -> onPadInput(PadKey.Cross, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Cross, 0, pressed) }
-        }
-        if (square.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("square")),
-                width = btnSize * (square.scale / 100f),
-                height = btnSize * (square.scale / 100f),
-                shape = CircleShape,
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayActionOffset(step, "square").first.roundToPx() + square.offset.first.roundToInt(),
-                        overlayActionOffset(step, "square").second.roundToPx() + square.offset.second.roundToInt()
+                if (square.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "square",
+                            drawableRes = requireNotNull(overlayDrawableForControl("square")),
+                            width = btnSize * (square.scale / 100f),
+                            height = btnSize * (square.scale / 100f),
+                            x = 0.dp + square.offset.first.dp,
+                            y = centerOffset + square.offset.second.dp,
+                            shape = CircleShape,
+                            onPressChange = { pressed -> onPadInput(PadKey.Square, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Square, 0, pressed) }
-        }
-        if (circle.visible) {
-            VectorOverlayButton(
-                drawableRes = requireNotNull(overlayDrawableForControl("circle")),
-                width = btnSize * (circle.scale / 100f),
-                height = btnSize * (circle.scale / 100f),
-                shape = CircleShape,
-                modifier = Modifier.offset {
-                    IntOffset(
-                        overlayActionOffset(step, "circle").first.roundToPx() + circle.offset.first.roundToInt(),
-                        overlayActionOffset(step, "circle").second.roundToPx() + circle.offset.second.roundToInt()
+                if (circle.visible) {
+                    add(
+                        TouchButtonSpec(
+                            id = "circle",
+                            drawableRes = requireNotNull(overlayDrawableForControl("circle")),
+                            width = btnSize * (circle.scale / 100f),
+                            height = btnSize * (circle.scale / 100f),
+                            x = step + circle.offset.first.dp,
+                            y = centerOffset + circle.offset.second.dp,
+                            shape = CircleShape,
+                            onPressChange = { pressed -> onPadInput(PadKey.Circle, 0, pressed) }
+                        )
                     )
                 }
-            ) { pressed -> onPadInput(PadKey.Circle, 0, pressed) }
-        }
+            }
+        )
     }
 }
 
@@ -3475,118 +3666,55 @@ private fun SimpleFpsCounter(fps: String) {
 }
 
 @Composable
-private fun PerformanceHud(
-    fps: String,
-    speedPercent: String,
-    cpuLoad: String,
-    gpuLoad: String,
-    frameTime: String,
-    targetFps: Int
+private fun SystemPerformanceHud(
+    alignToEnd: Boolean,
+    speedPercent: Float,
+    text: String
 ) {
-    Column(
-        modifier = Modifier
-            .widthIn(max = 220.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 0.62f),
-                        Color.Black.copy(alpha = 0.46f)
-                    )
-                )
-            )
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.08f),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 60.dp),
-                label = stringResource(R.string.emulation_hud_fps_label),
-                value = fps,
-                accentColor = if (fps.toFloatOrNull()?.let { it >= 55f } == true) {
-                    Color(0xFF50D9A0)
-                } else {
-                    Color(0xFFFFB85C)
-                }
-            )
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 62.dp),
-                label = stringResource(R.string.emulation_hud_speed_label),
-                value = "$speedPercent%"
-            )
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 58.dp),
-                label = stringResource(R.string.emulation_hud_cpu_label),
-                value = "$cpuLoad%"
-            )
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 58.dp),
-                label = stringResource(R.string.emulation_hud_gpu_label),
-                value = "$gpuLoad%"
-            )
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 74.dp),
-                label = stringResource(R.string.emulation_hud_frame_time_label),
-                value = "${frameTime}ms"
-            )
-            PerformanceHudMetric(
-                modifier = Modifier.widthIn(min = 54.dp),
-                label = if (targetFps > 0) {
-                    stringResource(R.string.emulation_target_fps_badge, targetFps)
-                } else {
-                    stringResource(R.string.settings_target_fps_auto)
-                },
-                value = if (targetFps > 0) targetFps.toString() else stringResource(R.string.settings_auto)
-            )
-        }
+    val displayText = remember(text, speedPercent) {
+        buildSpeedAnnotatedText(text, speedPercent)
     }
+    Text(
+        text = displayText,
+        modifier = Modifier,
+        style = MaterialTheme.typography.labelMedium.copy(
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Medium,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            letterSpacing = 0.sp,
+            shadow = Shadow(
+                color = Color.Black.copy(alpha = 0.9f),
+                offset = Offset(1.5f, 1.5f),
+                blurRadius = 2f
+            )
+        ),
+        color = Color.White,
+        textAlign = if (alignToEnd) TextAlign.End else TextAlign.Start
+    )
 }
 
-@Composable
-private fun PerformanceHudMetric(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String,
-    accentColor: Color = Color.White
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(Color.White.copy(alpha = 0.045f))
-            .padding(horizontal = 7.dp, vertical = 5.dp),
-        verticalArrangement = Arrangement.spacedBy(1.dp)
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.2.sp,
-                fontSize = 9.sp
-            ),
-            color = Color.White.copy(alpha = 0.62f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 0.sp,
-                fontSize = 11.sp
-            ),
-            color = accentColor
+private fun buildSpeedAnnotatedText(text: String, speedPercent: Float): AnnotatedString {
+    val speedColor = when {
+        speedPercent < 90f -> Color(0xFFFF5A5A)
+        speedPercent < 99f -> Color(0xFFFFC04D)
+        speedPercent <= 101f -> Color(0xFF7CFF7C)
+        speedPercent <= 110f -> Color(0xFF9BE870)
+        else -> Color(0xFF59D2FF)
+    }
+
+    val speedLabel = "Speed:"
+    val speedStart = text.indexOf(speedLabel)
+    if (speedStart < 0) return AnnotatedString(text)
+
+    val valueStart = speedStart + speedLabel.length
+    val valueEnd = text.indexOf('\n', startIndex = valueStart).let { if (it == -1) text.length else it }
+    return buildAnnotatedString {
+        append(text)
+        addStyle(
+            style = SpanStyle(color = speedColor),
+            start = valueStart,
+            end = valueEnd
         )
     }
 }

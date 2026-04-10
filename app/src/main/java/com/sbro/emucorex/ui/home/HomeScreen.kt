@@ -470,6 +470,7 @@ fun HomeScreen(
                                                 GameListCard(
                                                     modifier = itemModifier,
                                                     game = game,
+                                                    isCoverArtDisabled = uiState.isCoverArtDisabled,
                                                     onClick = { onGameClick(game) },
                                                     onLongClickStart = { onGameClick(game) },
                                                     onLongClickContinue = { onContinueGame(game) },
@@ -961,6 +962,7 @@ private fun GameCard(
 private fun GameListCard(
     modifier: Modifier = Modifier,
     game: GameItem,
+    isCoverArtDisabled: Boolean,
     onClick: () -> Unit,
     onLongClickStart: () -> Unit,
     onLongClickContinue: () -> Unit,
@@ -1005,12 +1007,14 @@ private fun GameListCard(
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
-                GameCoverArt(
-                    coverPath = game.coverArtPath,
-                    fallbackTitle = game.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.FillHeight
-                )
+                if (!isCoverArtDisabled) {
+                    GameCoverArt(
+                        coverPath = game.coverArtPath,
+                        fallbackTitle = game.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillHeight
+                    )
+                }
             }
             Column(
                 modifier = Modifier

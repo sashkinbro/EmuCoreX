@@ -13,13 +13,18 @@ val OverlayLeftStickBaseOffset = 32.dp
 val OverlayRightStickBaseOffset = (-24).dp
 val OverlayClusterGapLandscape = 32.dp
 val OverlayClusterGapPortrait = 34.dp
-val OverlayActionGapLandscape = 104.dp
-val OverlayActionGapPortrait = 112.dp
-val OverlayCenterBaseShiftX = 24.dp
-val OverlayCenterColumnGapLandscape = 34.dp
-val OverlayCenterColumnGapPortrait = 36.dp
-val OverlayCenterRowGapLandscape = 8.dp
-val OverlayCenterRowGapPortrait = 10.dp
+val OverlayActionGapLandscape = 48.dp
+val OverlayActionGapPortrait = 52.dp
+val OverlayCenterBaseShiftX = 0.dp
+val OverlayCenterColumnGapLandscape = 24.dp
+val OverlayCenterColumnGapPortrait = 26.dp
+val OverlayCenterInlineGapLandscape = 10.dp
+val OverlayCenterInlineGapPortrait = 12.dp
+val OverlayCenterSelectOpticalNudgeX = (-2).dp
+val OverlayCenterToggleOpticalNudgeY = 0.dp
+val OverlayCenterStartOpticalNudgeX = 8.dp
+val OverlayCenterRowGapLandscape = 4.dp
+val OverlayCenterRowGapPortrait = 6.dp
 val OverlayShoulderVerticalGap = 40.dp
 
 fun overlayCenterButtonOffset(
@@ -40,6 +45,18 @@ fun overlayCenterSecondRowOffset(
     buttonHeight: Dp,
     rowGap: Dp
 ): Dp = buttonHeight + rowGap
+
+fun overlayInlineGroupOffset(
+    widths: List<Dp>,
+    gap: Dp,
+    index: Int
+): Dp {
+    val totalWidth = widths.fold(0.dp) { acc, width -> acc + width } +
+        gap * (widths.size - 1).coerceAtLeast(0)
+    val precedingWidth = widths.take(index).fold(0.dp) { acc, width -> acc + width } +
+        gap * index.coerceAtLeast(0)
+    return -(totalWidth / 2f) + precedingWidth
+}
 
 fun overlayClusterStep(buttonSize: Dp, gap: Dp): Dp = buttonSize + gap
 

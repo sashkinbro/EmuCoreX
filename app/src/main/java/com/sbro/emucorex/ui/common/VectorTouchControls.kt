@@ -75,6 +75,7 @@ fun VectorOverlayButton(
     contentScale: ContentScale = ContentScale.Fit,
     alpha: Float = 1f,
     selected: Boolean = false,
+    pressed: Boolean = false,
     interactive: Boolean = true,
     pressedScale: Float = 0.9f,
     onClick: (() -> Unit)? = null,
@@ -83,7 +84,7 @@ fun VectorOverlayButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (interactive && isPressed) pressedScale else 1f,
+        targetValue = if ((interactive && isPressed) || pressed) pressedScale else 1f,
         animationSpec = tween(durationMillis = 80),
         label = "vector_overlay_button_scale"
     )
