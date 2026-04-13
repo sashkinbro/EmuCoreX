@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">El progreso no guardado se perderá.</string>
     <string name="emulation_saved">Guardado</string>
     <string name="emulation_loaded">Cargado</string>
+    <string name="emulation_load_failed">No se pudo cargar el guardado.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Añade los archivos BIOS primero.</string>
     <string name="emulation_launch_failed">No se pudo abrir este juego.</string>

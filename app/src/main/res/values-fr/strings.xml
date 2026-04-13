@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">La progression non sauvegardée sera perdue.</string>
     <string name="emulation_saved">Sauvegardé</string>
     <string name="emulation_loaded">Chargé</string>
+    <string name="emulation_load_failed">Impossible de charger la sauvegarde.</string>
     <string name="emulation_fps">FPS : %s</string>
     <string name="emulation_bios_missing">Ajoutez d\'abord les fichiers BIOS.</string>
     <string name="emulation_launch_failed">Impossible d\'ouvrir ce jeu.</string>

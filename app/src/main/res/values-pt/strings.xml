@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">O progresso não salvo será perdido.</string>
     <string name="emulation_saved">Salvo</string>
     <string name="emulation_loaded">Carregado</string>
+    <string name="emulation_load_failed">Não foi possível carregar o save state.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Adicione os arquivos da BIOS primeiro.</string>
     <string name="emulation_launch_failed">Não foi possível abrir este jogo.</string>

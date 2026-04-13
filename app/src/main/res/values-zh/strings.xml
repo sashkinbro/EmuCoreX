@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">未儲存的進度將會遺失。</string>
     <string name="emulation_saved">已儲存</string>
     <string name="emulation_loaded">已載入</string>
+    <string name="emulation_load_failed">無法載入即時存檔。</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">請先新增 BIOS 檔案。</string>
     <string name="emulation_launch_failed">無法開啟此遊戲。</string>

@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">Nicht gespeicherter Fortschritt geht verloren.</string>
     <string name="emulation_saved">Gespeichert</string>
     <string name="emulation_loaded">Geladen</string>
+    <string name="emulation_load_failed">Speicherstand konnte nicht geladen werden.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Füge zuerst BIOS-Dateien hinzu.</string>
     <string name="emulation_launch_failed">Dieses Spiel konnte nicht geöffnet werden.</string>
