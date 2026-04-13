@@ -78,7 +78,6 @@ import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
 import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
 import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
 import com.sbro.emucorex.ui.common.OverlayRightShoulderGapOffset
-import com.sbro.emucorex.ui.common.OverlayRightStickBaseOffset
 import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
 import com.sbro.emucorex.ui.common.OverlayShoulderVerticalGap
 import com.sbro.emucorex.ui.common.VectorAnalogStick
@@ -360,6 +359,9 @@ private fun PreviewLayout(
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
     val actionStep = overlayClusterStep(actionSize / 3.1f, clusterGap)
+    val actionButtonSize = actionSize / 3.1f
+    val actionClusterExtent = actionStep + actionButtonSize
+    val rightStickBaseX = -(actionClusterExtent + 12.dp)
 
     val baseEdgePad = if (isLandscape) 28.dp else 12.dp
     val baseBottomPad = if (isLandscape) 24.dp else 36.dp
@@ -531,7 +533,13 @@ private fun PreviewLayout(
                     )
                 }
             }
+        }
 
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = edgePadEnd, bottom = bottomPad)
+        ) {
             val rightStick = layoutFor("right_stick", state.stickScale)
             if (rightStick.visible) {
                 PreviewStick(
@@ -539,7 +547,7 @@ private fun PreviewLayout(
                     layout = rightStick,
                     selected = selectedControlId == "right_stick",
                     size = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
-                    x = OverlayRightStickBaseOffset + state.rstickOffset.first.pxToDp(),
+                    x = rightStickBaseX + state.rstickOffset.first.pxToDp(),
                     y = state.rstickOffset.second.pxToDp(),
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,

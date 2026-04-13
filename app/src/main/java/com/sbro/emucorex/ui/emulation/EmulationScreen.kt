@@ -169,7 +169,6 @@ import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
 import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
 import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
 import com.sbro.emucorex.ui.common.OverlayRightShoulderGapOffset
-import com.sbro.emucorex.ui.common.OverlayRightStickBaseOffset
 import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
 import com.sbro.emucorex.ui.common.OverlayShoulderVerticalGap
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -1285,6 +1284,10 @@ private fun OnScreenControls(
     val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
+    val actionButtonSize = actionSize / 3.1f
+    val actionStep = overlayClusterStep(actionButtonSize, clusterGap)
+    val actionClusterExtent = actionStep + actionButtonSize
+    val rightStickBaseX = -(actionClusterExtent + 12.dp)
 
     val baseEdgePad = if (isLandscape) 28.dp else 12.dp
     val baseBottomPad = if (isLandscape) 24.dp else 36.dp
@@ -1455,7 +1458,7 @@ private fun OnScreenControls(
                     modifier = Modifier
                         .offset {
                             IntOffset(
-                                OverlayRightStickBaseOffset.roundToPx() + rstickOffset.first.roundToInt() + rightStick.offset.first.roundToInt(),
+                                rightStickBaseX.roundToPx() + rstickOffset.first.roundToInt() + rightStick.offset.first.roundToInt(),
                                 rstickOffset.second.roundToInt() + rightStick.offset.second.roundToInt()
                             )
                         }
