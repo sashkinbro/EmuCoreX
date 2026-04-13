@@ -757,12 +757,11 @@ void VMManager::ApplyGameFixes()
 	game->applyGSHardwareFixes(EmuConfig.GS);
 
 #ifdef __ANDROID__
-	if ((EmuConfig.GS.Renderer == GSRendererType::OGL || EmuConfig.GS.Renderer == GSRendererType::VK) &&
+	if (EmuConfig.GS.Renderer == GSRendererType::VK &&
 		EmuConfig.GS.GPUPaletteConversion)
 	{
 		EmuConfig.GS.GPUPaletteConversion = false;
-		Console.Warning("VMManager: Forcing gpuPaletteConversion off on Android %s after GameDB fixes.",
-			(EmuConfig.GS.Renderer == GSRendererType::VK) ? "Vulkan" : "OpenGL");
+		Console.Warning("VMManager: Forcing gpuPaletteConversion off on Android Vulkan after GameDB fixes.");
 	}
 #endif
 

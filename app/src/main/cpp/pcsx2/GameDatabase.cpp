@@ -874,10 +874,9 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions&
 			case GSHWFixId::GPUPaletteConversion:
 			{
 #ifdef __ANDROID__
-				if (config.Renderer == GSRendererType::OGL || config.Renderer == GSRendererType::VK)
+				if (config.Renderer == GSRendererType::VK)
 				{
-					Console.Warning("GameDB: Skipping gpuPaletteConversion on Android %s due to indexed texture corruption risk.",
-						(config.Renderer == GSRendererType::VK) ? "Vulkan" : "OpenGL");
+					Console.Warning("GameDB: Skipping gpuPaletteConversion on Android Vulkan due to indexed texture corruption risk.");
 					break;
 				}
 #endif

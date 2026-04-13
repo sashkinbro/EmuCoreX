@@ -178,6 +178,9 @@ vec4 sample_from_depth()
 #endif
 }
 
+float raw_depth_scale();
+float raw_depth_rcp_scale();
+
 #if NEEDS_TEX
 
 vec4 sample_c(vec2 uv)
@@ -361,24 +364,6 @@ mat4 sample_4p(uvec4 u)
 	c[3] = sample_p(u.w);
 
 	return c;
-}
-
-float raw_depth_scale()
-{
-#if HAS_CLIP_CONTROL
-	return exp2(32.0f);
-#else
-	return exp2(24.0f);
-#endif
-}
-
-float raw_depth_rcp_scale()
-{
-#if HAS_CLIP_CONTROL
-	return exp2(-32.0f);
-#else
-	return exp2(-24.0f);
-#endif
 }
 
 uint fetch_raw_depth()
@@ -666,6 +651,24 @@ vec4 sample_color(vec2 st)
 }
 
 #endif // NEEDS_TEX
+
+float raw_depth_scale()
+{
+#if HAS_CLIP_CONTROL
+	return exp2(32.0f);
+#else
+	return exp2(24.0f);
+#endif
+}
+
+float raw_depth_rcp_scale()
+{
+#if HAS_CLIP_CONTROL
+	return exp2(-32.0f);
+#else
+	return exp2(-24.0f);
+#endif
+}
 
 vec4 tfx(vec4 T, vec4 C)
 {
