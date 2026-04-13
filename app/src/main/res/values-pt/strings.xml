@@ -360,6 +360,8 @@
     <string name="settings_frame_skip_off">Desligado</string>
     <string name="settings_frame_limiter">Limitador de quadros</string>
     <string name="settings_frame_limiter_desc">Mantém o jogo mais próximo da velocidade alvo selecionada em vez de rodar totalmente sem limite.</string>
+    <string name="settings_skip_duplicate_frames">Pular quadros duplicados</string>
+    <string name="settings_skip_duplicate_frames_desc">Evita apresentar o mesmo quadro várias vezes seguidas.</string>
     <string name="settings_target_fps">FPS Alvo</string>
     <string name="settings_target_fps_desc">Limite de quadros atual: %1$d FPS</string>
     <string name="settings_hardware_fixes">Correções de Hardware</string>
@@ -728,6 +730,7 @@
     <string name="settings_help_stick_scale">Altera o tamanho das áreas de toque do controle analógico. Valores maiores tornam-nas mais fáceis de segurar em jogos com muita ação, enquanto valores menores deixam mais espaço para a imagem e os botões próximos.</string>
     <string name="settings_help_performance_preset">Aplica um grupo testado de configurações de gráficos e velocidade em uma única etapa. Comece por aqui antes de ajustar manualmente: predefinições (presets) mais baixas favorecem a estabilidade e a bateria, enquanto predefinições mais rápidas trocam a qualidade da imagem ou a compatibilidade pela velocidade.</string>
     <string name="settings_help_frame_limiter">Mantém a velocidade do jogo atrelada à taxa de quadros alvo selecionada em vez de rodar o mais rápido possível. Deixe a opção ativada para o jogo normal; desative-a apenas para testes, comportamentos não limitados ou casos de uso muito específicos.</string>
+    <string name="settings_help_skip_duplicate_frames">Pula a apresentação de quadros idênticos quando o jogo desenha a mesma imagem repetidamente. Isso pode reduzir a carga da GPU e a latência de entrada em alguns títulos de 25/30 FPS, mas também pode piorar o frame pacing ou o timing em jogos que esperam cada apresentação. Portanto, deixe desativado por padrão e ative apenas quando um jogo realmente se beneficiar.</string>
     <string name="settings_help_target_fps">Define a meta de velocidade usada pelo limitador. A maioria dos jogos deve permanecer em seu limite nativo, portanto, altere essa opção apenas se souber que o jogo ou o patch oferece suporte a uma meta diferente com segurança.</string>
     <string name="settings_help_ee_cycle_rate">Ajusta a quantidade de tempo de CPU de EE que o emulador fornece ao jogo em cada quadro. Valores mais baixos podem resgatar o desempenho no limite em dispositivos fracos, mas também tornam o tempo de resposta do jogo menos preciso e podem causar lentidão, problemas de áudio ou falhas na lógica.</string>
     <string name="settings_help_ee_cycle_skip">Permite que o emulador pule parte da carga de trabalho do EE para ganhar velocidade. É mais forte e arriscado que a Taxa de Ciclo: útil quando um jogo está próximo da velocidade máxima, mas valores agressivos podem causar gagueira (stutter), atraso na entrada (input delay), efeitos ausentes ou comportamento instável.</string>

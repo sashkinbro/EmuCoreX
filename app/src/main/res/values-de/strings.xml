@@ -360,6 +360,8 @@
     <string name="settings_frame_skip_off">Aus</string>
     <string name="settings_frame_limiter">Frame-Limiter</string>
     <string name="settings_frame_limiter_desc">Hält das Spiel näher an der ausgewählten Zielgeschwindigkeit, anstatt völlig unbegrenzt zu laufen.</string>
+    <string name="settings_skip_duplicate_frames">Doppelte Frames überspringen</string>
+    <string name="settings_skip_duplicate_frames_desc">Verhindert, dass identische Frames mehrfach hintereinander präsentiert werden.</string>
     <string name="settings_target_fps">Ziel-FPS</string>
     <string name="settings_target_fps_desc">Aktuelles Frame-Limit: %1$d FPS</string>
     <string name="settings_hardware_fixes">Hardware-Fixes</string>
@@ -728,6 +730,7 @@
     <string name="settings_help_stick_scale">Ändert die Größe der Touch-Bereiche für die Analog-Sticks. Größere Werte erleichtern das Greifen während actionreicher Spiele, während kleinere Werte mehr Platz für das Bild und nahegelegene Tasten lassen.</string>
     <string name="settings_help_performance_preset">Wendet eine getestete Gruppe von Grafik- und Geschwindigkeitseinstellungen in einem Schritt an. Beginne hier, bevor du manuell abstimmst: Niedrigere Presets bevorzugen Stabilität und Akku, während schnellere Presets Bildqualität oder Kompatibilität gegen Geschwindigkeit eintauschen.</string>
     <string name="settings_help_frame_limiter">Hält die Spielgeschwindigkeit an die gewählte Ziel-Framerate gebunden, anstatt so schnell wie möglich zu laufen. Lass es für normales Spielen aktiviert; deaktiviere es nur für Tests, ungekapptes Verhalten oder sehr spezifische Anwendungsfälle.</string>
+    <string name="settings_help_skip_duplicate_frames">Überspringt die Ausgabe identischer Frames, wenn ein Spiel wiederholt dasselbe Bild zeichnet. Das kann in manchen 25/30-FPS-Titeln die GPU-Last und Eingabelatenz senken, kann aber Frame-Pacing oder Timing verschlechtern, wenn ein Spiel jede Präsentation erwartet. Daher standardmäßig ausgeschaltet lassen und nur bei klar erkennbarem Nutzen einschalten.</string>
     <string name="settings_help_target_fps">Legt das vom Limiter verwendete Geschwindigkeitsziel fest. Die meisten Spiele sollten bei ihrem nativen Limit bleiben, ändere dies also nur, wenn du weißt, dass das Spiel oder der Patch ein anderes Ziel sicher unterstützt.</string>
     <string name="settings_help_ee_cycle_rate">Passt an, wie viel EE-CPU-Zeit der Emulator dem Spiel pro Frame gibt. Niedrigere Werte können eine grenzwertige Leistung auf schwachen Geräten retten, aber sie machen auch das Timing des Spiels ungenauer und können Ruckler, Audioprobleme oder fehlerhafte Logik verursachen.</string>
     <string name="settings_help_ee_cycle_skip">Lässt den Emulator einen Teil der EE-Auslastung überspringen, um Geschwindigkeit zu gewinnen. Es ist stärker und riskanter als die Zyklusrate: Nützlich, wenn ein Spiel nah an der vollen Geschwindigkeit ist, aber aggressive Werte können Stottern, Eingabeverzögerungen, fehlende Effekte oder instabiles Verhalten verursachen.</string>

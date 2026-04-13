@@ -360,6 +360,8 @@
     <string name="settings_frame_skip_off">Desactivado</string>
     <string name="settings_frame_limiter">Limitador de fotogramas</string>
     <string name="settings_frame_limiter_desc">Mantiene el juego más cerca de la velocidad objetivo seleccionada en lugar de ejecutarse totalmente sin límite.</string>
+    <string name="settings_skip_duplicate_frames">Omitir fotogramas duplicados</string>
+    <string name="settings_skip_duplicate_frames_desc">Evita presentar varias veces seguidas el mismo fotograma.</string>
     <string name="settings_target_fps">FPS objetivo</string>
     <string name="settings_target_fps_desc">Límite de fotogramas actual: %1$d FPS</string>
     <string name="settings_hardware_fixes">Correcciones de hardware</string>
@@ -728,6 +730,7 @@
     <string name="settings_help_stick_scale">Cambia el tamaño de las áreas táctiles de los sticks analógicos. Valores más grandes facilitan su agarre durante juegos de mucha acción, mientras que valores más pequeños dejan más espacio para la imagen y los botones cercanos.</string>
     <string name="settings_help_performance_preset">Aplica un grupo probado de ajustes de gráficos y velocidad en un solo paso. Empieza por aquí antes de ajustar manualmente: los preajustes más bajos favorecen la estabilidad y la batería, mientras que los más rápidos sacrifican la calidad de imagen o la compatibilidad por velocidad.</string>
     <string name="settings_help_frame_limiter">Mantiene la velocidad del juego vinculada a la tasa de fotogramas objetivo seleccionada en lugar de funcionar lo más rápido posible. Déjalo activado para jugar normalmente; desactívalo solo para pruebas, comportamiento sin límite o casos de uso muy específicos.</string>
+    <string name="settings_help_skip_duplicate_frames">Omite la presentación de fotogramas idénticos cuando el juego dibuja la misma imagen repetidamente. Puede reducir la carga de la GPU y la latencia de entrada en algunos títulos de 25/30 FPS, pero también puede empeorar el ritmo de fotogramas o el timing en juegos que esperan cada presentación, así que déjalo desactivado por defecto y actívalo solo cuando un juego realmente se beneficie.</string>
     <string name="settings_help_target_fps">Establece el objetivo de velocidad utilizado por el limitador. La mayoría de los juegos deben mantenerse en su límite nativo, así que cambia esto solo si sabes que el juego o el parche admiten un objetivo diferente de forma segura.</string>
     <string name="settings_help_ee_cycle_rate">Ajusta la cantidad de tiempo de CPU de la EE que el emulador le da al juego en cada fotograma. Valores más bajos pueden salvar un rendimiento límite en dispositivos débiles, pero también hacen que la sincronización del juego sea menos precisa y pueden causar ralentizaciones, problemas de audio o fallos de lógica.</string>
     <string name="settings_help_ee_cycle_skip">Permite al emulador saltarse parte de la carga de trabajo de la EE para ganar velocidad. Es más fuerte y arriesgado que la Tasa de ciclo: útil cuando un juego está cerca de su velocidad máxima, pero valores agresivos pueden causar tirones, retraso de entrada, falta de efectos o un comportamiento inestable.</string>

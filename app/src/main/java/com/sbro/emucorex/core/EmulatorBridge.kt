@@ -213,6 +213,7 @@ object EmulatorBridge {
         eeCycleRate: Int = 0,
         eeCycleSkip: Int = 0,
         frameSkip: Int = 0,
+        skipDuplicateFrames: Boolean = false,
         frameLimitEnabled: Boolean = false,
         targetFps: Int = 0,
         textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
@@ -336,6 +337,7 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "disable_hw_readbacks", "bool", disableHardwareReadbacks.toString()))
                 add(settingOp("EmuCore/CPU/Recompiler", "fpuCorrectAddSub", "bool", fpuCorrectAddSub.toString()))
                 add(settingOp("EmuCore/GS", "FrameSkip", "int", frameSkip.toString()))
+                add(settingOp("EmuCore/GS", "SkipDuplicateFrames", "bool", skipDuplicateFrames.toString()))
                 add(settingOp("EmuCore/GS", "filter", "int", textureFiltering.toString()))
                 add(settingOp("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString()))
                 add(settingOp("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString()))
@@ -577,6 +579,10 @@ object EmulatorBridge {
 
     suspend fun setFrameLimitEnabled(enabled: Boolean) {
         setSetting("EmuCore/GS", "FrameLimitEnable", "bool", enabled.toString())
+    }
+
+    suspend fun setSkipDuplicateFrames(enabled: Boolean) {
+        setSetting("EmuCore/GS", "SkipDuplicateFrames", "bool", enabled.toString())
     }
 
     suspend fun setTargetFps(targetFps: Int) {

@@ -928,6 +928,7 @@ fun EmulationScreen(
                     onOpenCheats = { showCheatsDialog = true },
                     onSetHwDownloadMode = { viewModel.setHwDownloadMode(it) },
                     onSetFrameSkip = { viewModel.setFrameSkip(it) },
+                    onSetSkipDuplicateFrames = { viewModel.setSkipDuplicateFrames(it) },
                     onSetFrameLimitEnabled = { viewModel.setFrameLimitEnabled(it) },
                     onSetTargetFps = { viewModel.setTargetFps(it) },
                     onSetTextureFiltering = { viewModel.setTextureFiltering(it) },
@@ -1944,6 +1945,7 @@ private fun EmulationSidebarMenu(
     onOpenCheats: () -> Unit,
     onSetHwDownloadMode: (Int) -> Unit,
     onSetFrameSkip: (Int) -> Unit,
+    onSetSkipDuplicateFrames: (Boolean) -> Unit,
     onSetFrameLimitEnabled: (Boolean) -> Unit,
     onSetTargetFps: (Int) -> Unit,
     onSetTextureFiltering: (Int) -> Unit,
@@ -2462,6 +2464,14 @@ private fun EmulationSidebarMenu(
                     onCheckedChange = onSetFastCdvd,
                     helpText = stringResource(R.string.settings_help_fast_cdvd),
                     onResetToDefault = { onSetFastCdvd(globalDefaults.enableFastCdvd) }
+                )
+
+                SettingsToggle(
+                    title = stringResource(R.string.settings_skip_duplicate_frames),
+                    checked = uiState.skipDuplicateFrames,
+                    onCheckedChange = onSetSkipDuplicateFrames,
+                    helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
+                    onResetToDefault = { onSetSkipDuplicateFrames(globalDefaults.skipDuplicateFrames) }
                 )
 
                 SettingsToggle(

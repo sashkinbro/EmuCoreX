@@ -60,6 +60,7 @@ data class SettingsSnapshot(
     val enableCheats: Boolean = true,
     val hwDownloadMode: Int = PerformanceProfiles.safeConfig.hwDownloadMode,
     val frameSkip: Int = 0,
+    val skipDuplicateFrames: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -229,6 +230,7 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_CHEATS = booleanPreferencesKey("enable_cheats")
         private val HW_DOWNLOAD_MODE = intPreferencesKey("hw_download_mode")
         private val FRAME_SKIP = intPreferencesKey("frame_skip")
+        private val SKIP_DUPLICATE_FRAMES = booleanPreferencesKey("skip_duplicate_frames")
         private val TEXTURE_FILTERING = intPreferencesKey("texture_filtering")
         private val TRILINEAR_FILTERING = intPreferencesKey("trilinear_filtering")
         private val BLENDING_ACCURACY = intPreferencesKey("blending_accuracy")
@@ -376,6 +378,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setTargetFps(value: Int) {
         context.dataStore.edit { it[TARGET_FPS] = if (value <= 0) 0 else value.coerceIn(20, 120) }
+    }
+
+    val skipDuplicateFrames: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SKIP_DUPLICATE_FRAMES] ?: false
+    }
+
+    suspend fun setSkipDuplicateFrames(enabled: Boolean) {
+        context.dataStore.edit { it[SKIP_DUPLICATE_FRAMES] = enabled }
     }
 
     suspend fun resetAllSettings() {
@@ -544,6 +554,7 @@ class AppPreferences(private val context: Context) {
                 enableCheats = prefs[ENABLE_CHEATS] ?: true,
                 hwDownloadMode = prefs[HW_DOWNLOAD_MODE] ?: profileConfig.hwDownloadMode,
                 frameSkip = prefs[FRAME_SKIP] ?: 0,
+                skipDuplicateFrames = prefs[SKIP_DUPLICATE_FRAMES] ?: false,
                 textureFiltering = prefs[TEXTURE_FILTERING] ?: GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
                 trilinearFiltering = prefs[TRILINEAR_FILTERING] ?: GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
                 blendingAccuracy = prefs[BLENDING_ACCURACY] ?: GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -1550,6 +1561,7 @@ class AppPreferences(private val context: Context) {
             put("enableFastCdvd", prefs[ENABLE_FAST_CDVD] ?: false)
             put("hwDownloadMode", prefs[HW_DOWNLOAD_MODE] ?: 0)
             put("frameSkip", prefs[FRAME_SKIP] ?: 0)
+            put("skipDuplicateFrames", prefs[SKIP_DUPLICATE_FRAMES] ?: false)
             put("textureFiltering", prefs[TEXTURE_FILTERING] ?: GsHackDefaults.BILINEAR_FILTERING_DEFAULT)
             put("trilinearFiltering", prefs[TRILINEAR_FILTERING] ?: GsHackDefaults.TRILINEAR_FILTERING_DEFAULT)
             put("blendingAccuracy", prefs[BLENDING_ACCURACY] ?: GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
@@ -1657,6 +1669,7 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_FAST_CDVD] = json.optBoolean("enableFastCdvd", false)
             prefs[HW_DOWNLOAD_MODE] = json.optInt("hwDownloadMode", 0).coerceIn(0, 3)
             prefs[FRAME_SKIP] = json.optInt("frameSkip", 0)
+            prefs[SKIP_DUPLICATE_FRAMES] = json.optBoolean("skipDuplicateFrames", false)
             prefs[TEXTURE_FILTERING] = json.optInt("textureFiltering", GsHackDefaults.BILINEAR_FILTERING_DEFAULT).coerceIn(0, 3)
             prefs[TRILINEAR_FILTERING] = json.optInt("trilinearFiltering", GsHackDefaults.TRILINEAR_FILTERING_DEFAULT).coerceIn(0, 3)
             prefs[BLENDING_ACCURACY] = json.optInt("blendingAccuracy", GsHackDefaults.BLENDING_ACCURACY_DEFAULT).coerceIn(0, 5)

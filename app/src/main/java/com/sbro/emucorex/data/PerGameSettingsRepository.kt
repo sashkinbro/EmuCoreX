@@ -25,6 +25,7 @@ data class PerGameSettings(
     val eeCycleRate: Int = 0,
     val eeCycleSkip: Int = 0,
     val frameSkip: Int = 0,
+    val skipDuplicateFrames: Boolean = false,
     val frameLimitEnabled: Boolean = false,
     val targetFps: Int = 0,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
@@ -167,6 +168,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         eeCycleRate = optInt("eeCycleRate", 0),
         eeCycleSkip = optInt("eeCycleSkip", 0),
         frameSkip = optInt("frameSkip", 0),
+        skipDuplicateFrames = optBoolean("skipDuplicateFrames", false),
         frameLimitEnabled = optBoolean("frameLimitEnabled", false),
         targetFps = optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) },
         textureFiltering = optInt("textureFiltering", GsHackDefaults.BILINEAR_FILTERING_DEFAULT),
@@ -231,6 +233,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("eeCycleRate")) put("eeCycleRate", eeCycleRate)
         if (shouldWrite("eeCycleSkip")) put("eeCycleSkip", eeCycleSkip)
         if (shouldWrite("frameSkip")) put("frameSkip", frameSkip)
+        if (shouldWrite("skipDuplicateFrames")) put("skipDuplicateFrames", skipDuplicateFrames)
         if (shouldWrite("frameLimitEnabled")) put("frameLimitEnabled", frameLimitEnabled)
         if (shouldWrite("targetFps")) put("targetFps", targetFps)
         if (shouldWrite("textureFiltering")) put("textureFiltering", textureFiltering)

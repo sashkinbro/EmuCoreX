@@ -596,6 +596,13 @@ private fun GameSettingsEditorDialog(
                                 onResetToDefault = { draft = draft.copy(enableFastCdvd = defaultProfile.enableFastCdvd) }
                             )
                             ToggleRow(
+                                title = stringResource(R.string.settings_skip_duplicate_frames),
+                                checked = draft.skipDuplicateFrames,
+                                onCheckedChange = { draft = draft.copy(skipDuplicateFrames = it) },
+                                helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
+                                onResetToDefault = { draft = draft.copy(skipDuplicateFrames = defaultProfile.skipDuplicateFrames) }
+                            )
+                            ToggleRow(
                                 title = stringResource(R.string.settings_enable_cheats),
                                 checked = draft.enableCheats,
                                 onCheckedChange = { draft = draft.copy(enableCheats = it) },
@@ -1063,6 +1070,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         eeCycleRate = eeCycleRate,
         eeCycleSkip = eeCycleSkip,
         frameSkip = frameSkip,
+        skipDuplicateFrames = skipDuplicateFrames,
         frameLimitEnabled = frameLimitEnabled,
         targetFps = targetFps,
         textureFiltering = textureFiltering,

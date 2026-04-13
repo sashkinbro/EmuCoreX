@@ -360,6 +360,8 @@
     <string name="settings_frame_skip_off">關閉</string>
     <string name="settings_frame_limiter">幀數限制器</string>
     <string name="settings_frame_limiter_desc">讓遊戲保持接近所選的目標速度，而不是完全無上限地運行。</string>
+    <string name="settings_skip_duplicate_frames">跳過重複幀</string>
+    <string name="settings_skip_duplicate_frames_desc">避免連續多次顯示完全相同的畫面。</string>
     <string name="settings_target_fps">目標 FPS</string>
     <string name="settings_target_fps_desc">目前幀數上限：%1$d FPS</string>
     <string name="settings_hardware_fixes">硬體修正</string>
@@ -728,6 +730,7 @@
     <string name="settings_help_stick_scale">更改模拟摇杆触摸区域的大小。较大的值使它们在动作密集型游戏中更容易抓住，而较小的值为画面和附近的按钮留下更多空间。</string>
     <string name="settings_help_performance_preset">一步应用经过测试的图形和速度设置组。在手动调整之前从这里开始：较低的预设有利于稳定性和电池，而较快的预设则以牺牲图像质量或兼容性来换取速度。</string>
     <string name="settings_help_frame_limiter">将游戏速度与选定的目标帧率绑定，而不是尽可能快地运行。在正常游戏中保持启用状态；仅出于测试、无上限行为或非常特定的用例而禁用它。</string>
+    <string name="settings_help_skip_duplicate_frames">当游戏反复绘制同一画面时，跳过显示重复帧。在某些 25/30 FPS 游戏中，这可能降低 GPU 负载和输入延迟，但也可能让依赖每次呈现的游戏出现更差的帧节奏或时序问题，因此默认建议关闭，只在确认某款游戏确实受益时再开启。</string>
     <string name="settings_help_target_fps">设置限制器使用的速度目标。大多数游戏应保持在其原生的上限，因此只有在您知道游戏或补丁可以安全支持不同目标时才更改此设置。</string>
     <string name="settings_help_ee_cycle_rate">调整模拟器在每一帧分配给游戏的 EE CPU 时间量。较低的值可以挽救弱设备上处于边缘的性能，但它们也会使游戏计时变得不那么准确，并可能导致减速、音频问题或逻辑损坏。</string>
     <string name="settings_help_ee_cycle_skip">让模拟器跳过部分 EE 工作负载以提高速度。它比循环率 (Cycle Rate) 更强也更有风险：当游戏接近全速时很有用，但激进的值可能会导致卡顿、输入延迟、缺少特效或行为不稳定。</string>

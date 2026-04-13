@@ -1431,6 +1431,15 @@ private fun SettingsContent(
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_skip_duplicate_frames),
+                            subtitle = stringResource(R.string.settings_skip_duplicate_frames_desc),
+                            checked = uiState.skipDuplicateFrames,
+                            onCheckedChange = viewModel::setSkipDuplicateFrames,
+                            helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
+                            onResetToDefault = { viewModel.setSkipDuplicateFrames(defaults.skipDuplicateFrames) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_mtvu),
                             subtitle = stringResource(R.string.settings_mtvu_desc),
                             checked = uiState.enableMtvu,

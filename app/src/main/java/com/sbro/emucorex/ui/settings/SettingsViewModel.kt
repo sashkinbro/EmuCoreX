@@ -53,6 +53,7 @@ data class SettingsUiState(
     val enableCheats: Boolean = true,
     val hwDownloadMode: Int = 0,
     val frameSkip: Int = 0,
+    val skipDuplicateFrames: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -156,6 +157,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableCheats = snapshot.enableCheats,
             hwDownloadMode = snapshot.hwDownloadMode,
             frameSkip = snapshot.frameSkip,
+            skipDuplicateFrames = snapshot.skipDuplicateFrames,
             textureFiltering = snapshot.textureFiltering,
             trilinearFiltering = snapshot.trilinearFiltering,
             blendingAccuracy = snapshot.blendingAccuracy,
@@ -359,6 +361,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             markPerformancePresetCustom()
             preferences.setFrameSkip(value)
             EmulatorBridge.setSetting("EmuCore/GS", "FrameSkip", "int", value.toString())
+        }
+    }
+
+    fun setSkipDuplicateFrames(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setSkipDuplicateFrames(enabled)
+            EmulatorBridge.setSkipDuplicateFrames(enabled)
         }
     }
 

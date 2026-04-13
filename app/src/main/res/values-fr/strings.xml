@@ -360,6 +360,8 @@
     <string name="settings_frame_skip_off">Désactivé</string>
     <string name="settings_frame_limiter">Limiteur de fréquence d\'images</string>
     <string name="settings_frame_limiter_desc">Maintient le jeu plus près de la vitesse cible sélectionnée au lieu de s\'exécuter de manière totalement illimitée.</string>
+    <string name="settings_skip_duplicate_frames">Ignorer les images dupliquées</string>
+    <string name="settings_skip_duplicate_frames_desc">Évite d\'afficher plusieurs fois de suite une image identique.</string>
     <string name="settings_target_fps">Cible FPS</string>
     <string name="settings_target_fps_desc">Limite actuelle : %1$d FPS</string>
     <string name="settings_hardware_fixes">Correctifs matériels</string>
@@ -728,6 +730,7 @@
     <string name="settings_help_stick_scale">Modifie la taille des zones tactiles du stick analogique. Des valeurs plus grandes facilitent leur prise en main lors de jeux d\'action intense, tandis que des valeurs plus petites laissent plus d\'espace pour l\'image et les boutons à proximité.</string>
     <string name="settings_help_performance_preset">Applique un groupe testé de paramètres graphiques et de vitesse en une seule étape. Commencez par ici avant d\'effectuer des réglages manuels : les préréglages inférieurs favorisent la stabilité et la batterie, tandis que les préréglages plus rapides sacrifient la qualité d\'image ou la compatibilité au profit de la vitesse.</string>
     <string name="settings_help_frame_limiter">Maintient la vitesse du jeu liée à la fréquence d\'images cible sélectionnée au lieu de fonctionner aussi vite que possible. Laissez-le activé pour un jeu normal ; ne le désactivez que pour des tests, un comportement non limité ou des cas d\'utilisation très spécifiques.</string>
+    <string name="settings_help_skip_duplicate_frames">Évite d\'afficher des images identiques quand le jeu redessine plusieurs fois la même image. Cela peut réduire la charge GPU et la latence d\'entrée dans certains jeux à 25/30 FPS, mais peut aussi dégrader le frame pacing ou le timing dans les jeux qui attendent chaque présentation. Laissez donc cette option désactivée par défaut et activez-la seulement lorsqu\'un jeu en profite clairement.</string>
     <string name="settings_help_target_fps">Définit l\'objectif de vitesse utilisé par le limiteur. La plupart des jeux devraient rester à leur limite native, ne modifiez cela que si vous savez que le jeu ou le patch prend en charge un objectif différent en toute sécurité.</string>
     <string name="settings_help_ee_cycle_rate">Ajuste la quantité de temps processeur de l\'EE que l\'émulateur accorde au jeu à chaque image. Des valeurs plus faibles peuvent sauver des performances limites sur des appareils peu puissants, mais elles rendent également le timing du jeu moins précis et peuvent provoquer des ralentissements, des problèmes audio ou une logique défaillante.</string>
     <string name="settings_help_ee_cycle_skip">Permet à l\'émulateur de sauter une partie de la charge de travail de l\'EE pour gagner en vitesse. C\'est plus fort et plus risqué que le "Cycle Rate" : utile lorsqu\'un jeu est proche de sa pleine vitesse, mais des valeurs agressives peuvent provoquer des saccades, un retard d\'entrée, des effets manquants ou un comportement instable.</string>

@@ -73,6 +73,7 @@ data class EmulationUiState(
     val enableCheats: Boolean = true,
     val hwDownloadMode: Int = 0,
     val frameSkip: Int = 0,
+    val skipDuplicateFrames: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -134,6 +135,7 @@ private data class EmulationLaunchConfig(
     val eeCycleRate: Int,
     val eeCycleSkip: Int,
     val frameSkip: Int,
+    val skipDuplicateFrames: Boolean,
     val frameLimitEnabled: Boolean,
     val targetFps: Int,
     val textureFiltering: Int,
@@ -189,6 +191,7 @@ private data class LiveRuntimeSnapshot(
     val enableCheats: Boolean,
     val hwDownloadMode: Int,
     val frameSkip: Int,
+    val skipDuplicateFrames: Boolean,
     val frameLimitEnabled: Boolean,
     val targetFps: Int,
     val textureFiltering: Int,
@@ -347,6 +350,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.frameSkip.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(frameSkip = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.skipDuplicateFrames.collect { enabled ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(skipDuplicateFrames = enabled) }
             }
         }
         viewModelScope.launch {
@@ -622,6 +630,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     eeCycleRate = config.eeCycleRate,
                     eeCycleSkip = config.eeCycleSkip,
                     frameSkip = config.frameSkip,
+                    skipDuplicateFrames = config.skipDuplicateFrames,
                     frameLimitEnabled = config.frameLimitEnabled,
                     targetFps = config.targetFps,
                     textureFiltering = config.textureFiltering,
@@ -756,6 +765,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     enableCheats = liveRuntime.enableCheats,
                     hwDownloadMode = liveRuntime.hwDownloadMode,
                     frameSkip = liveRuntime.frameSkip,
+                    skipDuplicateFrames = liveRuntime.skipDuplicateFrames,
                     textureFiltering = liveRuntime.textureFiltering,
                     trilinearFiltering = liveRuntime.trilinearFiltering,
                     blendingAccuracy = liveRuntime.blendingAccuracy,
@@ -1211,6 +1221,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setFrameSkip(value)
             }
             EmulatorBridge.setSetting("EmuCore/GS", "FrameSkip", "int", value.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setSkipDuplicateFrames(enabled: Boolean) {
+        viewModelScope.launch {
+            persistRuntimeState(_uiState.value.copy(skipDuplicateFrames = enabled)) {
+                preferences.setSkipDuplicateFrames(enabled)
+            }
+            EmulatorBridge.setSkipDuplicateFrames(enabled)
             updateCrashContext()
         }
     }
@@ -1833,6 +1853,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleRate = preferences.eeCycleRate.first(),
             eeCycleSkip = preferences.eeCycleSkip.first(),
             frameSkip = preferences.frameSkip.first(),
+            skipDuplicateFrames = preferences.skipDuplicateFrames.first(),
             frameLimitEnabled = preferences.frameLimitEnabled.first(),
             targetFps = preferences.targetFps.first(),
             textureFiltering = preferences.textureFiltering.first(),
@@ -1891,6 +1912,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableCheats = preferences.enableCheats.first(),
             hwDownloadMode = preferences.hwDownloadMode.first(),
             frameSkip = preferences.frameSkip.first(),
+            skipDuplicateFrames = preferences.skipDuplicateFrames.first(),
             frameLimitEnabled = preferences.frameLimitEnabled.first(),
             targetFps = preferences.targetFps.first(),
             textureFiltering = preferences.textureFiltering.first(),
@@ -1949,6 +1971,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleRate = pick("eeCycleRate", eeCycleRate) { eeCycleRate },
             eeCycleSkip = pick("eeCycleSkip", eeCycleSkip) { eeCycleSkip },
             frameSkip = pick("frameSkip", frameSkip) { frameSkip },
+            skipDuplicateFrames = pick("skipDuplicateFrames", skipDuplicateFrames) { skipDuplicateFrames },
             frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled) { frameLimitEnabled },
             targetFps = pick("targetFps", targetFps) { targetFps },
             textureFiltering = pick("textureFiltering", textureFiltering) { textureFiltering },
@@ -2007,6 +2030,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableCheats = pick("enableCheats", enableCheats) { enableCheats },
             hwDownloadMode = pick("hwDownloadMode", hwDownloadMode) { hwDownloadMode },
             frameSkip = pick("frameSkip", frameSkip) { frameSkip },
+            skipDuplicateFrames = pick("skipDuplicateFrames", skipDuplicateFrames) { skipDuplicateFrames },
             frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled) { frameLimitEnabled },
             targetFps = pick("targetFps", targetFps) { targetFps },
             textureFiltering = pick("textureFiltering", textureFiltering) { textureFiltering },
@@ -2061,6 +2085,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val globalHwDownloadMode = preferences.hwDownloadMode.first()
         val globalEeCycleRate = preferences.eeCycleRate.first()
         val globalEeCycleSkip = preferences.eeCycleSkip.first()
+        val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
         val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
         val globalTargetFps = preferences.targetFps.first()
         val globalWidescreenPatches = preferences.enableWidescreenPatches.first()
@@ -2082,6 +2107,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleRate = globalEeCycleRate,
             eeCycleSkip = globalEeCycleSkip,
             frameSkip = frameSkip,
+            skipDuplicateFrames = skipDuplicateFrames,
             frameLimitEnabled = frameLimitEnabled,
             targetFps = targetFps,
             textureFiltering = textureFiltering,
@@ -2135,6 +2161,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (enableCheats != globalEnableCheats) add("enableCheats")
             if (hwDownloadMode != globalHwDownloadMode) add("hwDownloadMode")
             if (profile.frameSkip != preferences.frameSkip.first()) add("frameSkip")
+            if (skipDuplicateFrames != globalSkipDuplicateFrames) add("skipDuplicateFrames")
             if (frameLimitEnabled != globalFrameLimitEnabled) add("frameLimitEnabled")
             if (targetFps != globalTargetFps) add("targetFps")
             if (textureFiltering != preferences.textureFiltering.first()) add("textureFiltering")
@@ -2392,6 +2419,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         NativeApp.setCrashContextBool("emu_enable_cheats", state.enableCheats)
         NativeApp.setCrashContextInt("emu_hw_download_mode", state.hwDownloadMode)
         NativeApp.setCrashContextInt("emu_frame_skip", state.frameSkip)
+        NativeApp.setCrashContextBool("emu_skip_duplicate_frames", state.skipDuplicateFrames)
         NativeApp.setCrashContextBool("emu_frame_limit_enabled", state.frameLimitEnabled)
         NativeApp.setCrashContextInt("emu_target_fps", state.targetFps)
         NativeApp.setCrashContextInt("emu_texture_filtering", state.textureFiltering)

@@ -343,6 +343,7 @@
     <string name="settings_help_stick_scale">Changes the size of the analog stick touch areas. Larger values make them easier to grab during action-heavy games, while smaller values leave more room for the picture and nearby buttons.</string>
     <string name="settings_help_performance_preset">Applies a tested group of graphics and speed settings in one step. Start here before tuning manually: lower presets favor stability and battery, while faster presets trade image quality or compatibility for speed.</string>
     <string name="settings_help_frame_limiter">Keeps game speed tied to the selected target frame rate instead of running as fast as possible. Leave it enabled for normal play; disable it only for testing, uncapped behavior, or very specific use cases.</string>
+    <string name="settings_help_skip_duplicate_frames">Skips presenting identical frames when the game keeps drawing the same image repeatedly. It can lower GPU work and input latency in some 25/30 FPS titles, but it may worsen frame pacing or timing in games that expect every present, so leave it off unless a game clearly benefits.</string>
     <string name="settings_help_target_fps">Sets the speed target used by the limiter. Most games should stay at their native cap, so change this only if you know the game or patch supports a different target safely.</string>
     <string name="settings_help_ee_cycle_rate">Adjusts how much EE CPU time the emulator gives the game each frame. Lower values can rescue borderline performance on weak devices, but they also make game timing less accurate and can cause slowdown, audio issues, or broken logic.</string>
     <string name="settings_help_ee_cycle_skip">Lets the emulator skip part of the EE workload to gain speed. It is stronger and riskier than Cycle Rate: useful when a game is close to full speed, but aggressive values can cause stutter, input delay, missing effects, or unstable behavior.</string>
@@ -499,6 +500,8 @@
     <string name="settings_frame_skip_off">Off</string>
     <string name="settings_frame_limiter">Frame limiter</string>
     <string name="settings_frame_limiter_desc">Keeps the game closer to the selected target speed instead of running fully uncapped.</string>
+    <string name="settings_skip_duplicate_frames">Skip duplicate frames</string>
+    <string name="settings_skip_duplicate_frames_desc">Avoids presenting identical frames multiple times in a row.</string>
     <string name="settings_target_fps">Target FPS</string>
     <string name="settings_target_fps_desc">Current frame cap: %1$d FPS</string>
     <string name="settings_target_fps_mode">Target FPS Mode</string>
