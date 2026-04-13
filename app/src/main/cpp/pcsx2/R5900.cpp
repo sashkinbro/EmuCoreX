@@ -7,6 +7,7 @@
 #include "ps2/BiosTools.h"
 #include "R5900.h"
 #include "R3000A.h"
+#include "arm64/cpuRegistersPack.h"
 #include "ps2/pgif.h" // pgif init
 #include "VUmicro.h"
 #include "COP0.h"
@@ -18,7 +19,6 @@
 
 #include "Elfheader.h"
 #include "CDVD/CDVD.h"
-#include "vtlb.h"
 #include "Patch.h"
 #include "GameDatabase.h"
 #include "GSDumpReplayer.h"
@@ -35,7 +35,10 @@ using namespace R5900;	// for R5900 disasm tools
 s32 EEsCycle;		// used to sync the IOP to the EE
 u64 EEoCycle;
 
-alignas(64) cpuRegistersPack g_cpuRegistersPack;
+alignas(64) Arm64CpuRuntimePack g_cpuRegistersPack;
+static_assert(offsetof(Arm64CpuRuntimePack, cpuRegs) == offsetof(cpuRegistersPack, cpuRegs));
+static_assert(offsetof(Arm64CpuRuntimePack, fpuRegs) == offsetof(cpuRegistersPack, fpuRegs));
+cpuRegistersPack& _cpuRegistersPack = reinterpret_cast<cpuRegistersPack&>(g_cpuRegistersPack);
 alignas(16) tlbs tlb[48];
 cachedTlbs_t cachedTlbs;
 
@@ -59,10 +62,6 @@ uptr g_argPtrs[kMaxArgs];
 
 void cpuReset()
 {
-	//// cpuRegistersPack -> VIFregisters
-	g_cpuRegistersPack.vifRegs[0] = vif0Regs;
-	g_cpuRegistersPack.vifRegs[1] = vif1Regs;
-	////
 	std::memset(&cpuRegs, 0, sizeof(cpuRegs));
 	std::memset(&fpuRegs, 0, sizeof(fpuRegs));
 	std::memset(&tlb, 0, sizeof(tlb));
@@ -333,6 +332,7 @@ static __fi void _cpuTestTIMR()
 	if ( (cpuRegs.CP0.n.Status.val & 0x8000) &&
 		cpuRegs.CP0.n.Count >= cpuRegs.CP0.n.Compare && cpuRegs.CP0.n.Count < cpuRegs.CP0.n.Compare+1000 )
 	{
+		Console.WriteLn( Color_Magenta, "timr intr: %x, %x", cpuRegs.CP0.n.Count, cpuRegs.CP0.n.Compare);
 		cpuException(0x808000, cpuRegs.branch);
 	}
 }

@@ -24,7 +24,10 @@ bool GSTexture::Save(const std::string& fn)
 	{
 		GSTexture* temp = g_gs_device->CreateRenderTarget(GetWidth(), GetHeight(), Format::Color, false);
 		if (!temp)
+		{
+			Console.Error("Failed to allocate %dx%d texture for depth conversion", GetWidth(), GetHeight());
 			return false;
+		}
 
 		g_gs_device->StretchRect(this, GSVector4::cxpr(0.0f, 0.0f, 1.0f, 1.0f), temp, GSVector4(GetRect()), ShaderConvert::FLOAT32_TO_RGBA8, false);
 		const bool res = temp->Save(fn);
@@ -42,13 +45,17 @@ bool GSTexture::Save(const std::string& fn)
 		case Format::Color:
 			break;
 		default:
+			Console.Error("Format %d not saved to image", static_cast<int>(m_format));
 			return false;
 	}
 
 	const GSVector4i rc(0, 0, m_size.x, m_size.y);
 	std::unique_ptr<GSDownloadTexture> dl(g_gs_device->CreateDownloadTexture(m_size.x, m_size.y, m_format));
 	if (!dl || (dl->CopyFromTexture(rc, this, rc, 0), dl->Flush(), !dl->Map(rc)))
+	{
+		Console.Error("(GSTexture) DownloadTexture() failed.");
 		return false;
+	}
 
 	const int compression = GSConfig.PNGCompressionLevel;
 	return GSPng::Save(format, fn, dl->GetMapPointer(), m_size.x, m_size.y, dl->GetMapPitch(), compression, false);

@@ -52,7 +52,6 @@ private:
 	VmaAllocation m_allocation = VK_NULL_HANDLE;
 	VkBuffer m_buffer = VK_NULL_HANDLE;
 	u8* m_host_pointer = nullptr;
-	bool m_allocation_is_coherent = false;
 
 	// List of fences and the corresponding positions in the buffer
 	std::deque<std::pair<u64, u32>> m_tracked_fences;

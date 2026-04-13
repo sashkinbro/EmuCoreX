@@ -158,17 +158,9 @@ void psxSYSCALL() {
 }
 
 void psxRFE() {
-	static u32 s_psx_rfe_log_count = 0;
 //	Console.WriteLn("RFE\n");
-	const u32 old_status = psxRegs.CP0.n.Status;
 	psxRegs.CP0.n.Status = (psxRegs.CP0.n.Status & 0xfffffff0) |
 						  ((psxRegs.CP0.n.Status & 0x3c) >> 2);
-	if (s_psx_rfe_log_count < 32)
-	{
-		Console.WriteLn("psxRFE: oldStatus=%08x newStatus=%08x pc=%08x cycle=%u",
-			old_status, psxRegs.CP0.n.Status, psxRegs.pc, psxRegs.cycle);
-		s_psx_rfe_log_count++;
-	}
 //	Log=0;
 }
 

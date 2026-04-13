@@ -35,13 +35,13 @@ public:
 
 	struct OptionalExtensions
 	{
-		bool vk_khr_push_descriptor : 1;
 		bool vk_ext_provoking_vertex : 1;
 		bool vk_ext_memory_budget : 1;
 		bool vk_ext_calibrated_timestamps : 1;
 		bool vk_ext_rasterization_order_attachment_access : 1;
 		bool vk_ext_full_screen_exclusive : 1;
 		bool vk_ext_line_rasterization : 1;
+		bool vk_khr_push_descriptor : 1;
 		bool vk_swapchain_maintenance1 : 1;
 		bool vk_swapchain_maintenance1_is_khr : 1;
 		bool vk_khr_driver_properties : 1;
@@ -82,9 +82,6 @@ public:
 	/// Returns true if running on an AMD GPU.
 	__fi bool IsDeviceAMD() const { return (m_device_properties.vendorID == 0x1002); }
 
-	/// Returns true if running on a Qualcomm GPU.
-	__fi bool IsDeviceQualcomm() const { return (m_device_properties.vendorID == 0x5143); }
-	__fi bool IsDeviceARM() const { return (m_device_properties.vendorID == 0x13B5); }
 	// Creates a simple render pass.
 	VkRenderPass GetRenderPass(VkFormat color_format, VkFormat depth_format,
 		VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD,
@@ -333,10 +330,7 @@ public:
 
 		__fi bool IsRTFeedbackLoop() const { return ((feedback_loop_flags & FeedbackLoopFlag_ReadAndWriteRT) != 0); }
 		__fi bool IsDepthFeedbackLoop() const { return ((feedback_loop_flags & FeedbackLoopFlag_ReadAndWriteDepth) != 0); }
-		__fi bool IsTestingAndSamplingDepth() const
-		{
-			return ((feedback_loop_flags & (FeedbackLoopFlag_ReadDepth | FeedbackLoopFlag_ReadAndWriteDepth)) != 0);
-		}
+		__fi bool IsTestingAndSamplingDepth() const { return ((feedback_loop_flags & (FeedbackLoopFlag_ReadDepth | FeedbackLoopFlag_ReadAndWriteDepth)) != 0); }
 	};
 	static_assert(sizeof(PipelineSelector) == 24, "Pipeline selector is 24 bytes");
 

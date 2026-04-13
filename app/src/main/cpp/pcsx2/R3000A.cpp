@@ -3,6 +3,7 @@
 
 #include "R3000A.h"
 #include "Common.h"
+#include "arm64/cpuRegistersPack.h"
 
 #include "SIO/Sio0.h"
 #include "Sif.h"
@@ -31,6 +32,8 @@ bool iopEventAction = false;
 static constexpr uint iopWaitCycles = 384; // Keep inline with EE wait cycle max.
 
 bool iopEventTestIsActive = false;
+
+psxRegisters& psxRegs = g_cpuRegistersPack.psxRegs;
 
 void psxReset()
 {

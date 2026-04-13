@@ -711,6 +711,8 @@ Pcsx2Config::GSOptions::GSOptions()
 	bitsets[0] = 0;
 	bitsets[1] = 0;
 
+	AspectRatio = AspectRatioType::R16_9;
+
 	PCRTCAntiBlur = true;
 	DisableInterlaceOffset = false;
 	PCRTCOffsets = false;
@@ -725,22 +727,22 @@ Pcsx2Config::GSOptions::GSOptions()
 	SkipDuplicateFrames = false;
 	OsdMessagesPos = OsdOverlayPos::TopLeft;
 	OsdPerformancePos = OsdOverlayPos::TopRight;
-	OsdShowSpeed = false;
-	OsdShowFPS = false;
-	OsdShowVPS = false;
-	OsdShowResolution = false;
+	OsdShowSpeed = true;
+	OsdShowFPS = true;
+	OsdShowVPS = true;
+	OsdShowResolution = true;
 	OsdShowGSStats = false;
-	OsdShowCPU = false;
+	OsdShowCPU = true;
 	OsdShowGPU = false;
-	OsdShowIndicators = false;
-	OsdShowFrameTimes = false;
-	OsdShowHardwareInfo = false;
-	OsdShowVersion = false;
+	OsdShowIndicators = true;
+	OsdShowFrameTimes = true;
+	OsdShowHardwareInfo = true;
+	OsdShowVersion = true;
 	OsdShowSettings = false;
 	OsdshowPatches = false;
 	OsdShowInputs = false;
-	OsdShowVideoCapture = false;
-	OsdShowInputRec = false;
+	OsdShowVideoCapture = true;
+	OsdShowInputRec = true;
 	OsdShowTextureReplacements = false;
 
 	HWDownloadMode = GSHardwareDownloadMode::Enabled;
@@ -771,15 +773,15 @@ Pcsx2Config::GSOptions::GSOptions()
 	DumpReplaceableTextures = false;
 	DumpReplaceableMipmaps = false;
 	DumpTexturesWithFMVActive = false;
-	DumpDirectTextures = false;
-	DumpPaletteTextures = false;
+	DumpDirectTextures = true;
+	DumpPaletteTextures = true;
 	LoadTextureReplacements = false;
 	LoadTextureReplacementsAsync = true;
 	PrecacheTextureReplacements = false;
 
-	EnableVideoCapture = false;
+	EnableVideoCapture = true;
 	EnableVideoCaptureParameters = false;
-	EnableAudioCapture = false;
+	EnableAudioCapture = true;
 	EnableAudioCaptureParameters = false;
 }
 
@@ -923,7 +925,6 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 
 	SettingsWrapBitBool(VsyncEnable);
 	SettingsWrapBitBool(DisableMailboxPresentation);
-	SettingsWrapBitBool(ExtendedUpscalingMultipliers);
 
 	SettingsWrapEntry(VsyncQueueSize);
 

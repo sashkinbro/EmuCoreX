@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for text editor detection
@@ -75,9 +75,10 @@ void vs_main()
 	gl_Position.w = 1.0f;
 
 #if HAS_CLIP_CONTROL
-	gl_Position.z = float(z) * exp_min32;
+    gl_Position.z = float(z) * exp_min32;
 #else
-	// GLES path without clip control needs legacy depth remap to avoid severe Z instability.
+	// GLES doesn't support ARB_clip_control, so remap it to -1..1. This isn't lossless, but
+	// gets rid of really bad Z-fighting.
 	gl_Position.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
 #endif
 
@@ -118,7 +119,11 @@ struct ProcessedVertex
 
 ProcessedVertex load_vertex(uint index)
 {
+#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
+	RawVertex rvtx = vertex_buffer[index + gl_BaseVertexARB];
+#else
 	RawVertex rvtx = vertex_buffer[index];
+#endif
 
 	vec2 i_st = rvtx.ST;
 	vec4 i_c = vec4(uvec4(bitfieldExtract(rvtx.RGBA, 0, 8), bitfieldExtract(rvtx.RGBA, 8, 8),
@@ -134,13 +139,8 @@ ProcessedVertex load_vertex(uint index)
 	uint z = min(i_z, MaxDepth);
 	vtx.p.xy = vec2(i_p) - vec2(0.05f, 0.05f);
 	vtx.p.xy = vtx.p.xy * VertexScale - VertexOffset;
-	vtx.p.w = 1.0f;
-
-#if HAS_CLIP_CONTROL
 	vtx.p.z = float(z) * exp_min32;
-#else
-	vtx.p.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
-#endif
+	vtx.p.w = 1.0f;
 
 	vec2 uv = vec2(i_uv) - TextureOffset;
 	vec2 st = i_st - TextureOffset;
@@ -165,7 +165,11 @@ void main()
 {
 	ProcessedVertex vtx;
 
+#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
+	uint vid = uint(gl_VertexID - gl_BaseVertexARB);
+#else
 	uint vid = uint(gl_VertexID);
+#endif
 
 #if VS_EXPAND == 1 // Point
 

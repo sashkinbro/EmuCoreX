@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for editor detection
@@ -76,13 +76,13 @@ uniform float StepMultiplier;
 
 void ps_downsample_copy()
 {
+	int step = int(StepMultiplier);
 	ivec2 coord = max(ivec2(gl_FragCoord.xy) * DownsampleFactor, ClampMin);
 	vec4 result = vec4(0);
 	for (int yoff = 0; yoff < DownsampleFactor; yoff++)
 	{
 		for (int xoff = 0; xoff < DownsampleFactor; xoff++)
-			result += texelFetch(TextureSampler,
-				coord + ivec2(int(float(xoff) * StepMultiplier), int(float(yoff) * StepMultiplier)), 0);
+			result += texelFetch(TextureSampler, coord + ivec2(xoff * step, yoff * step), 0);
 	}
 	SV_Target0 = result / Weight;
 }
@@ -102,7 +102,11 @@ void ps_convert_rgba8_16bits()
 void ps_convert_float32_32bits()
 {
 	// Convert a GL_FLOAT32 depth texture into a 32 bits UINT texture
+#if HAS_CLIP_CONTROL
 	SV_Target1 = uint(exp2(32.0f) * sample_c().r);
+#else
+	SV_Target1 = uint(exp2(24.0f) * sample_c().r);
+#endif
 }
 #endif
 
@@ -110,7 +114,11 @@ void ps_convert_float32_32bits()
 void ps_convert_float32_rgba8()
 {
 	// Convert a GL_FLOAT32 depth texture into a RGBA color texture
+#if HAS_CLIP_CONTROL
 	uint d = uint(sample_c().r * exp2(32.0f));
+#else
+	uint d = uint(sample_c().r * exp2(24.0f));
+#endif
 	SV_Target0 = vec4(uvec4((d & 0xFFu), ((d >> 8) & 0xFFu), ((d >> 16) & 0xFFu), (d >> 24))) / vec4(255.0);
 }
 #endif
@@ -119,7 +127,11 @@ void ps_convert_float32_rgba8()
 void ps_convert_float16_rgb5a1()
 {
 	// Convert a GL_FLOAT32 (only 16 lsb) depth into a RGB5A1 color texture
+#if HAS_CLIP_CONTROL
 	uint d = uint(sample_c().r * exp2(32.0f));
+#else
+	uint d = uint(sample_c().r * exp2(24.0f));
+#endif
 	SV_Target0 = vec4(uvec4(d << 3, d >> 2, d >> 7, d >> 8) & uvec4(0xf8, 0xf8, 0xf8, 0x80)) / 255.0f;
 }
 #endif
@@ -127,25 +139,41 @@ void ps_convert_float16_rgb5a1()
 float rgba8_to_depth32(vec4 unorm)
 {
 	uvec4 c = uvec4(unorm * vec4(255.5f));
+#if HAS_CLIP_CONTROL
 	return float(c.r | (c.g << 8) | (c.b << 16) | (c.a << 24)) * exp2(-32.0f);
+#else
+	return float(c.r | (c.g << 8) | (c.b << 16) | (c.a << 24)) * exp2(-24.0f);
+#endif
 }
 
 float rgba8_to_depth24(vec4 unorm)
 {
 	uvec3 c = uvec3(unorm.rgb * vec3(255.5f));
+#if HAS_CLIP_CONTROL
 	return float(c.r | (c.g << 8) | (c.b << 16)) * exp2(-32.0f);
+#else
+	return float(c.r | (c.g << 8) | (c.b << 16)) * exp2(-24.0f);
+#endif
 }
 
 float rgba8_to_depth16(vec4 unorm)
 {
 	uvec2 c = uvec2(unorm.rg * vec2(255.5f));
+#if HAS_CLIP_CONTROL
 	return float(c.r | (c.g << 8)) * exp2(-32.0f);
+#else
+    return float(c.r | (c.g << 8)) * exp2(-24.0f);
+#endif
 }
 
 float rgb5a1_to_depth16(vec4 unorm)
 {
 	uvec4 c = uvec4(unorm * vec4(255.5f));
+#if HAS_CLIP_CONTROL
 	return float(((c.r & 0xF8u) >> 3) | ((c.g & 0xF8u) << 2) | ((c.b & 0xF8u) << 7) | ((c.a & 0x80u) << 8)) * exp2(-32.0f);
+#else
+	return float(((c.r & 0xF8u) >> 3) | ((c.g & 0xF8u) << 2) | ((c.b & 0xF8u) << 7) | ((c.a & 0x80u) << 8)) * exp2(-24.0f);
+#endif
 }
 
 #ifdef ps_convert_float32_depth_to_color
@@ -166,8 +194,13 @@ void ps_convert_float32_color_to_depth()
 void ps_convert_float32_float24()
 {
 	// Truncates depth value to 24bits
+#if HAS_CLIP_CONTROL
 	uint d = uint(sample_c().r * exp2(32.0f)) & 0xFFFFFFu;
 	gl_FragDepth = float(d) * exp2(-32.0f);
+#else
+	uint d = uint(sample_c().r * exp2(24.0f)) & 0xFFFFFFu;
+    gl_FragDepth = float(d) * exp2(-24.0f);
+#endif
 }
 #endif
 
@@ -272,11 +305,11 @@ void ps_convert_rgb5a1_8i()
 	// 1: 16 R5G2
 	// 2: 16 G2B5A1
 	// 3: 16 G2B5A1
-	
+
 	uvec2 pos = uvec2(gl_FragCoord.xy);
 
 	// Collapse separate R G B A areas into their base pixel
-	uvec2 column = (pos & ~uvec2(0u, 3u)) / uvec2(1u, 2u);
+	uvec2 column = (pos & ~uvec2(0u, 3u)) / uvec2(1,2);
 	uvec2 subcolumn = (pos & uvec2(0u, 1u));
 	column.x -= (column.x / 128u) * 64u;
 	column.y += (column.y / 32u) * 32u;
@@ -360,17 +393,19 @@ void ps_convert_rgb5a1_8i()
 	{
 		uint red = (denorm_c.r >> 3) & 0x1Fu;
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
+		float sel0 = float(((green << 5) | red) & 0xFFu) / 255.0f;
 		
-		SV_Target0 = vec4(float(((green << 5) | red) & 0xFFu) / 255.0f);
+		SV_Target0 = vec4(sel0);
 	}
 	else
 	{
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
 		uint blue = (denorm_c.b >> 3) & 0x1Fu;
 		uint alpha = denorm_c.a & 0x80u;
+		float sel0 = float((alpha | (blue << 2) | (green >> 3)) & 0xFFu) / 255.0f;
 
-		SV_Target0 = vec4(float((alpha | (blue << 2) | (green >> 3)) & 0xFFu) / 255.0f);
-	}
+		SV_Target0 = vec4(sel0);
+	} 
 }
 #endif
 

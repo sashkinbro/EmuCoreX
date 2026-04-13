@@ -392,6 +392,7 @@ float GSState::GetTvRefreshRate()
 		case GSVideoMode::HDTV_1080I:
 			return 60;
 		default:
+			Console.Error("GS: Unknown video mode. Please report: https://github.com/PCSX2/pcsx2/issues");
 			return 0;
 	}
 
@@ -920,6 +921,10 @@ void GSState::GIFPackedRegHandlerSTQ(const GIFPackedReg* RESTRICT r)
 	GSVector4::store(&m_q, GSVector4::cast(q));
 
 	// hide behind a define for now to avoid spam in the above cases for users
+#if defined(PCSX2_DEVBUILD) || defined(_DEBUG)
+	if (std::isnan(m_v.ST.S) || std::isnan(m_v.ST.T))
+		Console.Warning("S or T is nan");
+#endif
 }
 
 void GSState::GIFPackedRegHandlerUV(const GIFPackedReg* RESTRICT r)
@@ -1114,6 +1119,10 @@ void GSState::GIFRegHandlerST(const GIFReg* RESTRICT r)
 {
 	m_v.ST = r->ST;
 
+#if defined(PCSX2_DEVBUILD) || defined(_DEBUG)
+	if (std::isnan(m_v.ST.S) || std::isnan(m_v.ST.T))
+		Console.Warning("S or T is nan");
+#endif
 }
 
 void GSState::GIFRegHandlerUV(const GIFReg* RESTRICT r)
@@ -2065,9 +2074,10 @@ void GSState::FlushPrim()
 		// we can ignore the Z format, since it won't be used in the draw (Star Ocean 3 transitions)
 #ifdef PCSX2_DEVBUILD
 		const bool ignoreZ = m_context->ZBUF.ZMSK && m_context->TEST.ZTST == 1;
-		[[maybe_unused]] const bool invalid_draw =
-			(GSLocalMemory::m_psm[m_context->FRAME.PSM].fmt >= 3 ||
-				(GSLocalMemory::m_psm[m_context->ZBUF.PSM].fmt >= 3 && !ignoreZ));
+		if (GSLocalMemory::m_psm[m_context->FRAME.PSM].fmt >= 3 || (GSLocalMemory::m_psm[m_context->ZBUF.PSM].fmt >= 3 && !ignoreZ))
+		{
+			Console.Warning("GS: Possible invalid draw, Frame PSM %x ZPSM %x", m_context->FRAME.PSM, m_context->ZBUF.PSM);
+		}
 #endif
 		// Update scissor, it may have been modified by a previous draw
 		m_env.CTXT[PRIM->CTXT].UpdateScissor();
@@ -2483,6 +2493,11 @@ void GSState::Read(u8* mem, int len)
 
 	if (!m_tr.Update(w, h, bpp, len))
 		return;
+
+	const u64 draw = s_n;
+
+	if (draw != s_n)
+		DevCon.Warning("Warning! Possible incorrect data download");
 
 	// If it wraps memory, we need to break it up so we don't read out of bounds.
 	if ((m_tr.end + len) > m_mem.m_vmsize)
@@ -3112,7 +3127,10 @@ int GSState::Defrost(const freezeData* fd)
 		return -1;
 
 	if (version > STATE_VERSION)
+	{
+		Console.Error("GS: Savestate version is incompatible.  Load aborted.");
 		return -1;
+	}
 
 	Flush(GSFlushReason::LOADSTATE);
 
@@ -3306,12 +3324,18 @@ void GSState::GrowVertexBuffer()
 		{reinterpret_cast<void**>(&m_draw_index.buff),  old_index_size,  new_index_size}
 	}};
 
+	// For logging
+	u32 total_size = 0;
+	for (const auto& desc : alloc_desc)
+		total_size += desc.new_size;
+
 	// Reallocate each of the needed buffers
 	for (const auto [pbuff, old_size, new_size] : alloc_desc)
 	{
 		void* new_buff = _aligned_malloc(new_size, 32);
 		if (!new_buff)
 		{
+			Console.Error("GS: failed to allocate %zu bytes for vertices and indices.", total_size);
 			pxFailRel("Memory allocation failed");
 		}
 		if (*pbuff)
@@ -5901,7 +5925,7 @@ GIFRegTEX0 GSState::GetTex0Layer(u32 lod)
 			TEX0.TBW = m_context->MIPTBP2.TBW6;
 			break;
 		default:
-			break;
+			Console.Error("GS: Invalid guest lod setting. Please report: https://github.com/PCSX2/pcsx2/issues");
 	}
 
 	// Correct the texture size
@@ -5961,6 +5985,9 @@ bool GSState::GSTransferBuffer::Update(int tw, int th, int bpp, int& len)
 	{
 		if (len > packet_size)
 		{
+#if defined(_DEBUG)
+			Console.Warning("GS transfer buffer overflow len %d remaining %d, tex_size %d tw %d th %d bpp %d", len, remaining, tex_size, tw, th, bpp);
+#endif
 		}
 
 		len = remaining;

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #ifdef VERTEX_SHADER
@@ -73,14 +73,13 @@ layout(push_constant) uniform cb10
 };
 void ps_downsample_copy()
 {
+	int step = int(step_multiplier);
 	ivec2 coord = max(ivec2(gl_FragCoord.xy) * DownsampleFactor, ClampMin);
 	vec4 result = vec4(0);
 	for (int yoff = 0; yoff < DownsampleFactor; yoff++)
 	{
 		for (int xoff = 0; xoff < DownsampleFactor; xoff++)
-		{
-			result += texelFetch(samp0, coord + ivec2(xoff * step_multiplier, yoff * step_multiplier), 0);
-		}
+			result += texelFetch(samp0, coord + ivec2(xoff * step, yoff * step), 0);
 	}
 	o_col0 = result / Weight;
 }
@@ -351,62 +350,62 @@ void ps_convert_rgb5a1_8i()
 	uvec2 pos = uvec2(gl_FragCoord.xy);
 
 	// Collapse separate R G B A areas into their base pixel
-	uvec2 column = (pos & ~uvec2(0u, 3u)) / uvec2(1u, 2u);
+	uvec2 column = (pos & ~uvec2(0u, 3u)) / uvec2(1,2);
 	uvec2 subcolumn = (pos & uvec2(0u, 1u));
-	column.x -= (column.x / 128u) * 64u;
-	column.y += (column.y / 32u) * 32u;
+	column.x -= (column.x / 128) * 64;
+	column.y += (column.y / 32) * 32;
 	
 	// Deal with swizzling differences
-	if ((PSM & 0x8u) != 0u) // PSMCT16S
+	if ((PSM & 0x8) != 0) // PSMCT16S
 	{
-		if ((pos.x & 32u) != 0u)
+		if ((pos.x & 32) != 0)
 		{
-			column.y += 32u; // 4 columns high times 4 to get bottom 4 blocks
-			column.x &= ~32u;
+			column.y += 32; // 4 columns high times 4 to get bottom 4 blocks
+			column.x &= ~32;
 		}
 		
-		if ((pos.x & 64u) != 0u)
+		if ((pos.x & 64) != 0)
 		{
-			column.x -= 32u;
+			column.x -= 32;
 		}
 		
-		if (((pos.x & 16u) != 0u) != ((pos.y & 16u) != 0u))
+		if (((pos.x & 16) != 0) != ((pos.y & 16) != 0))
 		{
-			column.x ^= 16u; 
-			column.y ^= 8u;
+			column.x ^= 16; 
+			column.y ^= 8;
 		}
 		
-		if ((PSM & 0x30u) != 0u) // PSMZ16S - Untested but hopefully ok if anything uses it.
+		if ((PSM & 0x30) != 0) // PSMZ16S - Untested but hopefully ok if anything uses it.
 		{
-			column.x ^= 32u;
-			column.y ^= 16u;
+			column.x ^= 32;
+			column.y ^= 16;
 		}
 	}
 	else // PSMCT16
 	{
-		if ((pos.y & 32u) != 0u)
+		if ((pos.y & 32) != 0)
 		{
-			column.y -= 16u;
-			column.x += 32u;
+			column.y -= 16;
+			column.x += 32;
 		}
 		
-		if ((pos.x & 96u) != 0u)
+		if ((pos.x & 96) != 0)
 		{
-			uint multi = (pos.x & 96u) / 32u;
-			column.y += 16u * multi; // 4 columns high times 4 to get bottom 4 blocks
-			column.x -= (pos.x & 96u);
+			uint multi = (pos.x & 96) / 32;
+			column.y += 16 * multi; // 4 columns high times 4 to get bottom 4 blocks
+			column.x -= (pos.x & 96);
 		}
 		
-		if (((pos.x & 16u) != 0u) != ((pos.y & 16u) != 0u))
+		if (((pos.x & 16) != 0) != ((pos.y & 16) != 0))
 		{
-			column.x ^= 16u; 
-			column.y ^= 8u;
+			column.x ^= 16; 
+			column.y ^= 8;
 		}
 		
-		if ((PSM & 0x30u) != 0u) // PSMZ16 - Untested but hopefully ok if anything uses it.
+		if ((PSM & 0x30) != 0) // PSMZ16 - Untested but hopefully ok if anything uses it.
 		{
-			column.x ^= 32u;
-			column.y ^= 32u;
+			column.x ^= 32;
+			column.y ^= 32;
 		}
 	}
 	uvec2 coord = column | subcolumn;
@@ -429,22 +428,23 @@ void ps_convert_rgb5a1_8i()
 		coord *= uvec2(ScaleFactor);
 
 	vec4 pixel = texelFetch(samp0, ivec2(coord), 0);
-	
 	uvec4 denorm_c = uvec4(pixel * 255.5f);
 	if ((pos.y & 2u) == 0u)
 	{
 		uint red = (denorm_c.r >> 3) & 0x1Fu;
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
+		float sel0 = float(((green << 5) | red) & 0xFF) / 255.0f;
 		
-		o_col0 = vec4(float(((green << 5) | red) & 0xFFu) / 255.0f);
+		o_col0 = vec4(sel0);
 	}
 	else
 	{
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
 		uint blue = (denorm_c.b >> 3) & 0x1Fu;
 		uint alpha = denorm_c.a & 0x80u;
+		float sel0 = float((alpha | (blue << 2) | (green >> 3)) & 0xFF) / 255.0f;
 
-		o_col0 = vec4(float((alpha | (blue << 2) | (green >> 3)) & 0xFFu) / 255.0f);
+		o_col0 = vec4(sel0);
 	}
 }
 #endif

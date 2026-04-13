@@ -32,6 +32,10 @@
 #define PS_ATST_NOTEQUAL 4
 #endif
 
+#ifndef PS_POINT_SAMPLER
+#define PS_POINT_SAMPLER 0
+#endif
+
 // TEX_COORD_DEBUG output the uv coordinate as color. It is useful
 // to detect bad sampling due to upscaling
 //#define TEX_COORD_DEBUG
@@ -50,9 +54,19 @@
 #define NEEDS_DEPTH_FOR_AFAIL (PS_AFAIL == AFAIL_FB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY)
 #define NEEDS_DEPTH_FOR_ZTST (PS_ZTST == ZTST_GEQUAL || PS_ZTST == ZTST_GREATER)
 
-#define NEEDS_RT (NEEDS_RT_EARLY || NEEDS_RT_FOR_AFAIL || (!PS_PRIMID_INIT && (PS_FBMASK || SW_BLEND_NEEDS_RT || SW_AD_TO_HW)) || PS_COLOR_FEEDBACK)
-#define NEEDS_TEX (PS_TFX != 4)
-#define NEEDS_DEPTH (PS_DEPTH_FEEDBACK && (NEEDS_DEPTH_FOR_AFAIL || NEEDS_DEPTH_FOR_ZTST))
+#ifndef PS_NEEDS_RT
+#define PS_NEEDS_RT (NEEDS_RT_EARLY || NEEDS_RT_FOR_AFAIL || (!PS_PRIMID_INIT && (PS_FBMASK || SW_BLEND_NEEDS_RT || SW_AD_TO_HW)) || PS_COLOR_FEEDBACK)
+#endif
+#ifndef PS_NEEDS_TEX
+#define PS_NEEDS_TEX (PS_TFX != 4)
+#endif
+#ifndef PS_NEEDS_DEPTH
+#define PS_NEEDS_DEPTH (PS_DEPTH_FEEDBACK && (NEEDS_DEPTH_FOR_AFAIL || NEEDS_DEPTH_FOR_ZTST))
+#endif
+
+#define NEEDS_RT PS_NEEDS_RT
+#define NEEDS_TEX PS_NEEDS_TEX
+#define NEEDS_DEPTH PS_NEEDS_DEPTH
 
 layout(std140, binding = 0) uniform cb21
 {
@@ -101,16 +115,26 @@ in SHADER
 
 // Only enable framebuffer fetch when we actually need it.
 #if HAS_FRAMEBUFFER_FETCH && NEEDS_RT
-	// We need to force the colour to be defined here, to read from it.
-	// Basically the only scenario where this'll happen is RGBA masked and DATE is active.
-	#undef PS_NO_COLOR
-	#define PS_NO_COLOR 0
-	#if defined(GL_EXT_shader_framebuffer_fetch)
-		#undef TARGET_0_QUALIFIER
-		#define TARGET_0_QUALIFIER inout
-		#define LAST_FRAG_COLOR SV_Target0
-	#elif defined(GL_ARM_shader_framebuffer_fetch)
-		#define LAST_FRAG_COLOR gl_LastFragColorARM
+	#if GPU_PROFILE_MALI
+		// We need to force the colour to be defined here, to read from it.
+		// Basically the only scenario where this'll happen is RGBA masked and DATE is active.
+		#undef PS_NO_COLOR
+		#define PS_NO_COLOR 0
+		#if HAS_ARM_SHADER_FRAMEBUFFER_FETCH
+			#define LAST_FRAG_COLOR gl_LastFragColorARM
+		#endif
+	#else
+		// We need to force the colour to be defined here, to read from it.
+		// Basically the only scenario where this'll happen is RGBA masked and DATE is active.
+		#undef PS_NO_COLOR
+		#define PS_NO_COLOR 0
+		#if HAS_EXT_SHADER_FRAMEBUFFER_FETCH || HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE
+			#undef TARGET_0_QUALIFIER
+			#define TARGET_0_QUALIFIER inout
+			#define LAST_FRAG_COLOR SV_Target0
+		#elif HAS_ARM_SHADER_FRAMEBUFFER_FETCH
+			#define LAST_FRAG_COLOR gl_LastFragColorARM
+		#endif
 	#endif
 #endif
 
@@ -187,6 +211,12 @@ vec4 sample_c(vec2 uv)
 #elif PS_REGION_RECT
 	return texelFetch(TextureSampler, ivec2(uv), 0);
 #else
+
+#if PS_POINT_SAMPLER
+	// Some GLES drivers occasionally round nearest sampling up to a neighbor texel.
+	// Snap coordinates to texel centers before sampling to keep motion stable.
+	uv = (trunc(uv * WH.zw) + vec2(0.5f, 0.5f)) / WH.zw;
+#endif
 
 #if !PS_ADJS && !PS_ADJT
 	uv *= STScale;
@@ -365,7 +395,11 @@ mat4 sample_4p(uvec4 u)
 
 uint fetch_raw_depth()
 {
+#if HAS_CLIP_CONTROL
 	float multiplier = exp2(32.0f);
+#else
+	float multiplier = exp2(24.0f);
+#endif
 
 #if PS_TEX_IS_FB == 1
 	return uint(sample_from_rt().r * multiplier);

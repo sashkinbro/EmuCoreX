@@ -165,6 +165,14 @@ REC_SYS(MTC0);
 
 void recMFC0()
 {
+	static bool s_logged_first_recMFC0 = false;
+	if (!s_logged_first_recMFC0 && cpuRegs.pc == 0xbfc00004)
+	{
+		s_logged_first_recMFC0 = true;
+		Console.WriteLn("(EErec/COP0) recMFC0 enter: code=0x%08x rt=%u rd=%u imm=0x%x",
+			cpuRegs.code, _Rt_, _Rd_, _Imm_);
+	}
+
 	if (_Rd_ == 9)
 	{
 		// This case needs to be handled even if the write-back is ignored (_Rt_ == 0 )
@@ -239,8 +247,16 @@ void recMFC0()
 	}
 
 	const int regt = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_WRITE);
+	if (cpuRegs.pc == 0xbfc00004)
+	{
+		Console.WriteLn("(EErec/COP0) recMFC0 allocated host reg=%d for rt=%u", regt, _Rt_);
+	}
 //	xMOVSX(xRegister64(regt), ptr32[&cpuRegs.CP0.r[_Rd_]]);
     armLoadsw(a64::XRegister(regt), PTR_CPU(cpuRegs.CP0.r[_Rd_]));
+	if (cpuRegs.pc == 0xbfc00004)
+	{
+		Console.WriteLn("(EErec/COP0) recMFC0 emitted load from CP0.r[%u]", _Rd_);
+	}
 }
 
 void recMTC0()

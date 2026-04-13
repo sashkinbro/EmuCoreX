@@ -172,6 +172,7 @@ static void _vu0Exec(VURegs* VU)
 
 			if (VU->takedelaybranch)
 			{
+				DevCon.Warning("VU0 - Branch/Jump in Delay Slot");
 				VU->branch = 1;
 				VU->branchpc = VU->delaybranchpc;
 				VU->takedelaybranch = false;
@@ -200,6 +201,17 @@ void vu0Exec(VURegs* VU)
 	VU0.VI[REG_TPC].UL &= VU0_PROGMASK;
 	VU->cycle++;
 	_vu0Exec(VU);
+
+	if (VU->VI[0].UL != 0)
+		DbgCon.Error("VI[0] != 0!!!!\n");
+	if (VU->VF[0].f.x != 0.0f)
+		DbgCon.Error("VF[0].x != 0.0!!!!\n");
+	if (VU->VF[0].f.y != 0.0f)
+		DbgCon.Error("VF[0].y != 0.0!!!!\n");
+	if (VU->VF[0].f.z != 0.0f)
+		DbgCon.Error("VF[0].z != 0.0!!!!\n");
+	if (VU->VF[0].f.w != 1.0f)
+		DbgCon.Error("VF[0].w != 1.0!!!!\n");
 }
 
 // --------------------------------------------------------------------------------------
@@ -216,6 +228,7 @@ InterpVU0::InterpVU0()
 
 void InterpVU0::Reset()
 {
+	DevCon.Warning("VU0 Int Reset");
 	VU0.fmacwritepos = 0;
 	VU0.fmacreadpos = 0;
 	VU0.fmaccount = 0;

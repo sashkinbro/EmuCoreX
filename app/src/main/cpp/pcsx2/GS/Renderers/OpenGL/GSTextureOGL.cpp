@@ -13,8 +13,6 @@
 #include "common/AlignedMalloc.h"
 #include "common/StringUtil.h"
 
-#include <vector>
-
 // Looking across a range of GPUs, the optimal copy alignment for Vulkan drivers seems
 // to be between 1 (AMD/NV) and 64 (Intel). So, we'll go with 64 here.
 static constexpr u32 TEXTURE_UPLOAD_ALIGNMENT = 64;
@@ -213,39 +211,20 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 
 	// Don't use PBOs for huge texture uploads, let the driver sort it out.
 	// Otherwise we'll just be syncing, or worse, crashing because the PBO routine above isn't great.
-	GSDeviceOGL* const device = GSDeviceOGL::GetInstance();
-	GLStreamBuffer* const sb = device->GetTextureUploadBuffer();
+	GLStreamBuffer* const sb = GSDeviceOGL::GetInstance()->GetTextureUploadBuffer();
 	if (IsCompressedFormat())
 	{
 		const u32 row_length = CalcUploadRowLengthFromPitch(pitch);
-		const u32 upload_size_local = CalcUploadSize(r.height(), pitch);
+		const u32 upload_size = CalcUploadSize(r.height(), pitch);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length);
-		glCompressedTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, upload_size_local, data);
+		glCompressedTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, upload_size, data);
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	}
 	else if (!sb || map_size > sb->GetChunkSize())
 	{
-		const bool safe_gles_direct_upload = device->IsGLESDevice() && device->IsAdrenoGPUProfile();
-		const u32 tight_pitch = static_cast<u32>(r.width()) << m_int_shift;
-		if (safe_gles_direct_upload)
-		{
-			if (static_cast<u32>(pitch) == tight_pitch)
-			{
-				glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, data);
-			}
-			else
-			{
-				std::vector<u8> tight_upload(CalcUploadSize(r.height(), tight_pitch));
-				StringUtil::StrideMemCpy(tight_upload.data(), tight_pitch, data, pitch, tight_pitch, r.height());
-				glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, tight_upload.data());
-			}
-		}
-		else
-		{
-			glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch >> m_int_shift);
-			glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, data);
-			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // Restore default behavior
-		}
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch >> m_int_shift);
+		glTextureSubImage2D(m_texture_id, layer, r.x, r.y, r.width(), r.height(), m_int_format, m_int_type, data);
+		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0); // Restore default behavior
 	}
 	else
 	{
@@ -288,7 +267,7 @@ bool GSTextureOGL::Map(GSMap& m, const GSVector4i* _r, int layer)
 	if (m_type == Type::Texture || m_type == Type::RenderTarget)
 	{
 		const u32 upload_size = CalcUploadSize(r.height(), pitch);
-		GLStreamBuffer* const sb = GSDeviceOGL::GetInstance()->GetTextureUploadBuffer();
+		GLStreamBuffer* sb = GSDeviceOGL::GetInstance()->GetTextureUploadBuffer();
 		if (!sb || upload_size > sb->GetChunkSize())
 			return false;
 

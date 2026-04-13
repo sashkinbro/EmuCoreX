@@ -18,12 +18,12 @@
 
 #include "Common.h"
 #include "vtlb.h"
+#include "arm64/cpuRegistersPack.h"
 #include "COP0.h"
 #include "Cache.h"
 #include "IopMem.h"
 #include "Host.h"
 #include "VMManager.h"
-#include "DebugTools/Debug.h"
 
 #include "common/BitUtils.h"
 #include "common/Error.h"
@@ -47,10 +47,6 @@ using namespace vtlb_private;
 
 namespace vtlb_private
 {
-	// Local ARM64 divergence: vtlb state is aliased through g_cpuRegistersPack so
-	// recVTLB/fastmem/helper code can reach it through PTR_CPU(vtlbdata.*) offset
-	// loads. Do not split this back into a standalone global without auditing the
-	// ARM64 helper layer and generated memory-access code together.
 	MapData& vtlbdata = g_cpuRegistersPack.vtlbdata;
 } // namespace vtlb_private
 
@@ -252,6 +248,7 @@ template <typename DataType>
 void vtlb_memWrite(u32 addr, DataType data)
 {
 	static const uint DataSize = sizeof(DataType) * 8;
+
 	auto vmv = vtlbdata.vmap[addr >> VTLB_PAGE_BITS];
 
 	if (!vmv.isHandler(addr))
@@ -514,6 +511,7 @@ void GoemonUnloadTlb(u32 key)
 	}
 }
 
+// Generates a tlbMiss Exception
 static __ri void vtlb_Miss(u32 addr, u32 mode)
 {
 	if (EmuConfig.Gamefixes.GoemonTlbHack)

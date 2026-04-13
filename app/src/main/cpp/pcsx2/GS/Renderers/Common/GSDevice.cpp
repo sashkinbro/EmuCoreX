@@ -367,11 +367,10 @@ void GSDevice::Destroy()
 
 bool GSDevice::AcquireWindow(bool recreate_window)
 {
-	Host::ReleaseRenderWindow();
-
 	std::optional<WindowInfo> wi = Host::AcquireRenderWindow(recreate_window);
 	if (!wi.has_value())
 	{
+		Console.Error("Failed to acquire render window.");
 		Host::ReportErrorAsync("Error", "Failed to acquire render window. The log may have more information.");
 		return false;
 	}
@@ -623,10 +622,14 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, i
 			t = CreateSurface(type, size.x, size.y, levels, format);
 			if (!t)
 			{
+				ERROR_LOG("GS: Memory allocation failure for {}x{} texture. Purging pool and retrying.", size.x, size.y);
 				PurgePool();
 				t = CreateSurface(type, size.x, size.y, levels, format);
 				if (!t)
+				{
+					ERROR_LOG("GS: Memory allocation failure for {}x{} texture after purging pool.", size.x, size.y);
 					return nullptr;
+				}
 			}
 
 #ifdef PCSX2_DEVBUILD
@@ -908,7 +911,6 @@ void GSDevice::Interlace(const GSVector2i& ds, int field, int mode, float yoffse
 			m_current = m_merge;
 			break;
 	}
-
 }
 
 void GSDevice::FXAA()
@@ -981,7 +983,10 @@ bool GSDevice::ResizeRenderTarget(GSTexture** t, int w, int h, bool preserve_con
 	const bool really_preserve_contents = (preserve_contents && orig_tex);
 	GSTexture* new_tex = FetchSurface(GSTexture::Type::RenderTarget, w, h, 1, fmt, !really_preserve_contents, true);
 	if (!new_tex)
+	{
+		Console.WriteLn("%dx%d texture allocation failed in ResizeTexture()", w, h);
 		return false;
+	}
 
 	if (really_preserve_contents)
 	{
@@ -1048,7 +1053,10 @@ void GSDevice::CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, con
 		delete m_cas;
 		m_cas = CreateSurface(GSTexture::Type::RWTexture, dst_width, dst_height, 1, GSTexture::Format::Color);
 		if (!m_cas)
+		{
+			Console.Error("Failed to allocate CAS RW texture.");
 			return;
+		}
 	}
 
 	std::array<u32, NUM_CAS_CONSTANTS> consts;
@@ -1061,6 +1069,7 @@ void GSDevice::CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, con
 	if (!DoCAS(src_tex, m_cas, sharpen_only, consts))
 	{
 		// leave textures intact if we failed
+		Console.Warning("Applying CAS failed.");
 		return;
 	}
 

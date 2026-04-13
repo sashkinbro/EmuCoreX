@@ -1467,13 +1467,14 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_renderUpscalemultiplier(JNIEnv *env, jclass clazz,
                                                               jfloat p_value) {
-    RunGSRuntimeChange([p_value]() {
-        EmuConfig.GS.UpscaleMultiplier = p_value;
-        GSConfig.UpscaleMultiplier = p_value;
+    const float normalized_value = std::clamp(std::round(p_value), 1.0f, 6.0f);
+    RunGSRuntimeChange([normalized_value]() {
+        EmuConfig.GS.UpscaleMultiplier = normalized_value;
+        GSConfig.UpscaleMultiplier = normalized_value;
     });
     if (s_settings_interface)
     {
-        s_settings_interface->SetFloatValue("EmuCore/GS", "upscale_multiplier", p_value);
+        s_settings_interface->SetFloatValue("EmuCore/GS", "upscale_multiplier", normalized_value);
         s_settings_interface->Save();
     }
 }
@@ -2117,9 +2118,13 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
         ResetPadState(0);
         InputManager::PauseVibration();
 
+        Console.WriteLn("runVMThread: VMManager::Initialize() returned StartupSuccess.");
         VMState _vmState = VMState::Running;
+        Console.WriteLn("runVMThread: calling VMManager::SetState(Running).");
         VMManager::SetState(_vmState);
+        Console.WriteLn("runVMThread: VMManager::SetState(Running) returned.");
         ////
+        bool logged_first_execute = false;
         while (true) {
             Host::PumpMessagesOnCPUThread();
             _vmState = VMManager::GetState();
@@ -2128,6 +2133,10 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
                     (_vmState == VMState::Stopping) ? "Stopping" : "Shutdown");
                 break;
             } else if (_vmState == VMState::Running) {
+                if (!logged_first_execute) {
+                    logged_first_execute = true;
+                    Console.WriteLn("runVMThread: first VMManager::Execute() call.");
+                }
                 s_execute_exit = false;
                 VMManager::Execute();
                 s_execute_exit = true;

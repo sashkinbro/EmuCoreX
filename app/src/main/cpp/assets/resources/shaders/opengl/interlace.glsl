@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for editor detection
@@ -15,33 +15,16 @@ layout(binding = 0) uniform sampler2D TextureSampler;
 
 layout(location = 0) out vec4 SV_Target0;
 
-int interlace_vpos()
-{
-	// Match the top-left style field parity used by the other backends.
-	// OpenGL fragment coordinates are bottom-left based for FBO rendering.
-	return int(ZrH.z) - 1 - int(gl_FragCoord.y);
-}
-
-ivec2 interlace_texel(vec2 uv)
-{
-	ivec2 size = textureSize(TextureSampler, 0);
-	return clamp(ivec2(uv * vec2(size)), ivec2(0), size - 1);
-}
-
-vec4 interlace_sample(vec2 uv)
-{
-	return texelFetch(TextureSampler, interlace_texel(uv), 0);
-}
 
 // Weave shader
 void ps_main0()
 {
 	int idx   = int(ZrH.x);          // buffer index passed from CPU
 	int field = idx & 1;             // current field
-	int vpos  = interlace_vpos();    // vertical position of destination texture
+	int vpos  = int(gl_FragCoord.y); // vertical position of destination texture
 
 	if ((vpos & 1) == field)
-		SV_Target0 = interlace_sample(PSin_t);
+		SV_Target0 = textureLod(TextureSampler, PSin_t, 0.0f);
 	else
 		discard;
 }
@@ -50,7 +33,7 @@ void ps_main0()
 // Bob shader
 void ps_main1()
 {
-	SV_Target0 = interlace_sample(PSin_t);
+	SV_Target0 = textureLod(TextureSampler, PSin_t, 0.0f);
 }
 
 
@@ -58,9 +41,9 @@ void ps_main1()
 void ps_main2()
 {
 	vec2 vstep = vec2(0.0f, ZrH.y);
-	vec4 c0 = interlace_sample(PSin_t - vstep);
-	vec4 c1 = interlace_sample(PSin_t);
-	vec4 c2 = interlace_sample(PSin_t + vstep);
+	vec4 c0 = textureLod(TextureSampler, PSin_t - vstep, 0.0f);
+	vec4 c1 = textureLod(TextureSampler, PSin_t, 0.0f);
+	vec4 c2 = textureLod(TextureSampler, PSin_t + vstep, 0.0f);
 
 	SV_Target0 = (c0 + c1 * 2.0f + c2) / 4.0f;
 }
@@ -81,12 +64,12 @@ void ps_main3()
 	int  field  = idx & 1;                                   // current field
 	int  vres   = int(ZrH.z) >> 1;                           // vertical resolution of source texture
 	int  lofs   = ((((vres + 1) >> 1) << 1) - vres) & bank;  // line alignment offset for bank 1
-	int  vpos   = interlace_vpos() + lofs;                   // vertical position of destination texture
+	int  vpos   = int(gl_FragCoord.y) + lofs;                // vertical position of destination texture
 
 	// if the index of current destination line belongs to the current fiels we update it, otherwise
 	// we leave the old line in the destination buffer
 	if ((vpos & 1) == field)
-		SV_Target0 = interlace_sample(PSin_t);
+		SV_Target0 = textureLod(TextureSampler, PSin_t, 0.0f);
 	else
 		discard;
 }
@@ -99,7 +82,7 @@ void ps_main4()
 
 	int   idx          = int(ZrH.x);                         // buffer index passed from CPU
 	int   field        = idx & 1;                            // current field
-	int   vpos         = interlace_vpos();                   // vertical position of destination texture
+	int   vpos         = int(gl_FragCoord.y);                // vertical position of destination texture
 	float sensitivity  = ZrH.w;                              // passed from CPU, higher values mean more likely to use weave
 	vec3  motion_thr   = vec3(1.0, 1.0, 1.0) * sensitivity;  //
 	vec2  bofs         = vec2(0.0f, 0.5f);                   // position of the bank 1 relative to source texture size
@@ -144,13 +127,13 @@ void ps_main4()
 	// calculating motion, only relevant for missing lines where the "center line" is pointed
 	// by p_t1
 
-	vec4 hn = interlace_sample(p_t0 - lofs); // new high pixel
-	vec4 cn = interlace_sample(p_t1);        // new center pixel
-	vec4 ln = interlace_sample(p_t0 + lofs); // new low pixel
+	vec4 hn = textureLod(TextureSampler, p_t0 - lofs, 0.0f); // new high pixel
+	vec4 cn = textureLod(TextureSampler, p_t1, 0.0f);        // new center pixel
+	vec4 ln = textureLod(TextureSampler, p_t0 + lofs, 0.0f); // new low pixel
 
-	vec4 ho = interlace_sample(p_t2 - lofs); // old high pixel
-	vec4 co = interlace_sample(p_t3);        // old center pixel
-	vec4 lo = interlace_sample(p_t2 + lofs); // old low pixel
+	vec4 ho = textureLod(TextureSampler, p_t2 - lofs, 0.0f); // old high pixel
+	vec4 co = textureLod(TextureSampler, p_t3, 0.0f);        // old center pixel
+	vec4 lo = textureLod(TextureSampler, p_t2 + lofs, 0.0f); // old low pixel
 
 	vec3 mh = hn.rgb - ho.rgb; // high pixel motion
 	vec3 mc = cn.rgb - co.rgb; // center pixel motion
@@ -176,7 +159,7 @@ void ps_main4()
 	if ((vpos & 1) == field)
 	{
 		// output coordinate present on current field
-		SV_Target0 = interlace_sample(p_t0);
+		SV_Target0 = textureLod(TextureSampler, p_t0, 0.0f);
 	}
 	else if ((iptr.y > 0.5f - lofs.y) || (iptr.y < 0.0 + lofs.y))
 	{
@@ -190,32 +173,8 @@ void ps_main4()
 			// high motion -> interpolate pixels above and below
 			SV_Target0 = (hn + ln) / 2.0f;
 		else
-		{
-			// Check if it's completely static first, we don't need to mess with any of that.
-			if((mh_max != -motion_thr.x) || (ml_max != -motion_thr.x) || (mc_max != -motion_thr.x))
-			{
-				// Check the diff with the above and below lines, if the difference is smaller between the new high and low lines
-				// compared to the new centre line and the high line (with some threshold of about 25 color steps), then reconstruct.
-				vec3 mhln = hn.rgb - ln.rgb;
-				vec3 mchn = hn.rgb - cn.rgb;
-				
-				mhln = max(mhln, -mhln) - motion_thr;
-				mchn = max(mchn, -mchn) - motion_thr;
-				
-				float mhln_max = max(max(mhln.x, mhln.y), mhln.z);
-				float mchn_max = max(max(mchn.x, mchn.y), mchn.z);
-
-				// The new centre line is a fair chunk different from those surrounding it, so quite likely incorrect.
-				if (mhln_max < 0.0f && mchn_max >= (mhln_max * 0.90f))
-					SV_Target0 = (hn + ln) / 2.0f;
-				else
-					// low motion -> weave
-					SV_Target0 = cn;
-			}
-			else
-				// low motion -> weave
-				SV_Target0 = cn;
-		}
+			// low motion -> weave
+			SV_Target0 = cn;
 	}
 }
 

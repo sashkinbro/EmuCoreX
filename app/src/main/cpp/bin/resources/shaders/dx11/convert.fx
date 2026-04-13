@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 struct VS_INPUT
@@ -82,6 +82,7 @@ PS_OUTPUT ps_downsample_copy(PS_INPUT input)
 	float Weight = BGColor.x;
 	float step_multiplier = BGColor.y;
 
+	const int step = int(step_multiplier);
 	int2 coord = max(int2(input.p.xy) * DownsampleFactor, ClampMin);
 
 	PS_OUTPUT output;
@@ -89,7 +90,7 @@ PS_OUTPUT ps_downsample_copy(PS_INPUT input)
 	for (int yoff = 0; yoff < DownsampleFactor; yoff++)
 	{
 		for (int xoff = 0; xoff < DownsampleFactor; xoff++)
-			output.c += Texture.Load(int3(coord + int2(xoff * step_multiplier, yoff * step_multiplier), 0));
+			output.c += Texture.Load(int3(coord + int2(xoff * step, yoff * step), 0));
 	}
 	output.c /= Weight;
 	return output;
@@ -316,64 +317,64 @@ PS_OUTPUT ps_convert_rgb5a1_8i(PS_INPUT input)
 	uint2 pos = uint2(input.p.xy);
 
 	// Collapse separate R G B A areas into their base pixel
-	uint2 column = (pos & ~uint2(0u, 3u)) / uint2(1u, 2u);
+	uint2 column = (pos & ~uint2(0u, 3u)) / uint2(1,2);
 	uint2 subcolumn = (pos & uint2(0u, 1u));
-	column.x -= (column.x / 128u) * 64u;
-	column.y += (column.y / 32u) * 32u;
+	column.x -= (column.x / 128) * 64;
+	column.y += (column.y / 32) * 32;
 	
 	uint PSM = uint(DOFFSET);
 	
 	// Deal with swizzling differences
-	if ((PSM & 0x8u) != 0u) // PSMCT16S
+	if ((PSM & 0x8) != 0) // PSMCT16S
 	{
-		if ((pos.x & 32u) != 0u)
+		if ((pos.x & 32) != 0)
 		{
-			column.y += 32u; // 4 columns high times 4 to get bottom 4 blocks
-			column.x &= ~32u;
+			column.y += 32; // 4 columns high times 4 to get bottom 4 blocks
+			column.x &= ~32;
 		}
 		
-		if ((pos.x & 64u) != 0u)
+		if ((pos.x & 64) != 0)
 		{
-			column.x -= 32u;
+			column.x -= 32;
 		}
 		
-		if (((pos.x & 16u) != 0u) != ((pos.y & 16u) != 0u))
+		if (((pos.x & 16) != 0) != ((pos.y & 16) != 0))
 		{
-			column.x ^= 16u; 
-			column.y ^= 8u;
+			column.x ^= 16; 
+			column.y ^= 8;
 		}
 		
-		if ((PSM & 0x30u) != 0u) // PSMZ16S - Untested but hopefully ok if anything uses it.
+		if ((PSM & 0x30) != 0) // PSMZ16S - Untested but hopefully ok if anything uses it.
 		{
-			column.x ^= 32u;
-			column.y ^= 16u;
+			column.x ^= 32;
+			column.y ^= 16;
 		}
 	}
 	else // PSMCT16
 	{
-		if ((pos.y & 32u) != 0u)
+		if ((pos.y & 32) != 0)
 		{
-			column.y -= 16u;
-			column.x += 32u;
+			column.y -= 16;
+			column.x += 32;
 		}
 		
-		if ((pos.x & 96u) != 0u)
+		if ((pos.x & 96) != 0)
 		{
-			uint multi = (pos.x & 96u) / 32u;
-			column.y += 16u * multi; // 4 columns high times 4 to get bottom 4 blocks
-			column.x -= (pos.x & 96u);
+			uint multi = (pos.x & 96) / 32;
+			column.y += 16 * multi; // 4 columns high times 4 to get bottom 4 blocks
+			column.x -= (pos.x & 96);
 		}
 		
-		if (((pos.x & 16u) != 0u) != ((pos.y & 16) != 0))
+		if (((pos.x & 16) != 0) != ((pos.y & 16) != 0))
 		{
-			column.x ^= 16u; 
-			column.y ^= 8u;
+			column.x ^= 16; 
+			column.y ^= 8;
 		}
 		
-		if ((PSM & 0x30u) != 0u) // PSMZ16 - Untested but hopefully ok if anything uses it.
+		if ((PSM & 0x30) != 0) // PSMZ16 - Untested but hopefully ok if anything uses it.
 		{
-			column.x ^= 32u;
-			column.y ^= 32u;
+			column.x ^= 32;
+			column.y ^= 32;
 		}
 	}
 	
@@ -382,10 +383,10 @@ PS_OUTPUT ps_convert_rgb5a1_8i(PS_INPUT input)
 	// Compensate for potentially differing page pitch.
 	uint SBW = uint(EMODA);
 	uint DBW = uint(EMODC);
-	uint2 block_xy = coord / uint2(64u, 64u);
-	uint block_num = (block_xy.y * (DBW / 128u)) + block_xy.x;
-	uint2 block_offset = uint2((block_num % (SBW / 64u)) * 64u, (block_num / (SBW / 64u)) * 64u);
-	coord = (coord % uint2(64u, 64u)) + block_offset;
+	uint2 block_xy = coord / uint2(64,64);
+	uint block_num = (block_xy.y * (DBW / 128)) + block_xy.x;
+	uint2 block_offset = uint2((block_num % (SBW / 64)) * 64, (block_num / (SBW / 64)) * 64);
+	coord = (coord % uint2(64, 64)) + block_offset;
 
 	// Apply offset to cols 1 and 2
 	uint is_col23 = pos.y & 4u;
@@ -405,16 +406,18 @@ PS_OUTPUT ps_convert_rgb5a1_8i(PS_INPUT input)
 	{
 		uint red = (denorm_c.r >> 3) & 0x1Fu;
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
+		float sel0 = (float)(((green << 5) | red) & 0xFF) / 255.0f;
 		
-		output.c = (float4)(((float)(((green << 5) | red) & 0xFFu)) / 255.0f);
+		output.c = (float4)(sel0);
 	}
 	else
 	{
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
 		uint blue = (denorm_c.b >> 3) & 0x1Fu;
 		uint alpha = denorm_c.a & 0x80u;
+		float sel0 = (float)((alpha | (blue << 2) | (green >> 3)) & 0xFF) / 255.0f;
 
-		output.c = (float4)(((float)((alpha | (blue << 2) | (green >> 3)) & 0xFFu)) / 255.0f);
+		output.c = (float4)(sel0);
 	}
 	return output;
 }

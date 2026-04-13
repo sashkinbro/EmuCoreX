@@ -56,7 +56,6 @@ static ProcessorFeatures getProcessorFeatures()
 	cpuinfo_initialize();
 
 	ProcessorFeatures features = {};
-	features.vectorISA = ProcessorFeatures::VectorISA::SSE4;
 #if defined(_M_X86)
 	features.vectorISA = getCurrentISA();
 	features.hasFMA = cpuinfo_has_x86_fma3();

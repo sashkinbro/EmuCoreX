@@ -210,10 +210,12 @@
     <string name="achievements_status_earned">已解鎖</string>
     <string name="achievements_status_locked">未解鎖</string>
     <string name="settings_upscale">影像品質</string>
-    <string name="settings_upscale_native">原始 (1x)</string>
+    <string name="settings_upscale_native">原生</string>
     <string name="settings_upscale_2x">2x</string>
     <string name="settings_upscale_3x">3x</string>
     <string name="settings_upscale_4x">4x</string>
+    <string name="settings_upscale_5x">5x</string>
+    <string name="settings_upscale_6x">6x</string>
     <string name="settings_aspect_ratio">螢幕比例</string>
     <string name="settings_aspect_ratio_auto">自動</string>
     <string name="settings_aspect_ratio_43">4:3</string>
@@ -339,7 +341,7 @@
     <string name="settings_device_profile_family_exynos">Exynos</string>
     <string name="settings_device_profile_family_tensor">Tensor</string>
     <string name="settings_device_profile_family_generic">通用 Android</string>
-    <string name="settings_device_profile_desc_mediatek">推薦給聯發科：切換至 OpenGL，保持 1 倍解析度，降低過濾負載，並使用更安全的速度修正來減少崩潰並改善幀生成時間。</string>
+    <string name="settings_device_profile_desc_mediatek">推薦給聯發科：切換至 OpenGL，保持原生解析度，降低過濾負載，並使用更安全的速度修正來減少崩潰並改善幀生成時間。</string>
     <string name="settings_device_profile_desc_snapdragon">推薦給驍龍：保留快速的預設路徑並重新套用平衡預設，以獲得穩定的效能。</string>
     <string name="settings_device_profile_desc_generic">為尚未有特定晶片組設定檔的裝置套用平衡的相容性預設。</string>
     <string name="settings_ee_cycle_disabled">停用</string>
@@ -710,7 +712,7 @@
     <string name="settings_help_recent_games">为您最后玩过的游戏显示一个快速访问行。如果您经常在几个游戏之间切换，这很好；如果您想要一个更干净的主屏幕，请将其关闭。</string>
     <string name="settings_help_home_search">直接在主屏幕上显示库搜索栏。对于大型游戏库，请保持开启；如果您喜欢更干净的布局并且很少按名称搜索，请将其关闭。</string>
     <string name="settings_help_renderer">选择用于硬件渲染的图形后端。Vulkan 在现代设备上通常是最快的，OpenGL 在某些 GPU 上的兼容性可能更安全，而 Software（软件）渲染主要作为测试后备或用于在硬件模式下严重损坏的游戏。</string>
-    <string name="settings_help_upscale">将游戏的内部渲染分辨率提高到原生 PS2 输出之上。它使 3D 场景看起来干净得多，但 GPU 负载攀升很快，并且一些游戏在较高值时会显示额外的接缝、模糊或损坏的效果。如果游戏看起来不对劲，请先降回 1x。</string>
+    <string name="settings_help_upscale">将游戏的内部渲染分辨率提高到原生 PS2 输出之上。它使 3D 场景看起来干净得多，但 GPU 负载攀升很快，并且一些游戏在较高值时会显示额外的接缝、模糊或损坏的效果。如果游戏看起来不对劲，请先降回原生分辨率。</string>
     <string name="settings_help_aspect_ratio">控制最终图像在显示器上的取景方式。Auto（自动）跟随游戏，4:3 为大多数 PS2 游戏保留了原始外观，16:9 适合带有宽屏补丁的游戏，只有在您不介意几何失真的情况下才应使用 Stretch（拉伸）。</string>
     <string name="settings_help_anisotropic_filtering">锐化以陡峭角度观看的纹理，尤其是道路、地板、田野和长墙。它通常比提高分辨率的成本小，因此如果游戏已经运行良好，这是一个很好的画质升级。</string>
     <string name="settings_help_fxaa">在渲染后应用轻量级的后期处理抗锯齿通道。它可以平滑有闪烁感的游戏中锯齿状边缘，但它也会柔化 UI 文本和精细细节，因此只有在更干净的图像值得这种模糊感时才使用它。</string>
@@ -751,7 +753,7 @@
     <string name="settings_help_skip_draw_end">设置被跳过的绘制调用范围的终点。它与“跳过绘制起点”配合使用，旨在进行外科手术般的、针对特定游戏的修复，而不是一般性的调整。</string>
     <string name="settings_help_texture_inside_rt">更改硬件渲染器检测存储在渲染目标内部纹理的方式。这可以修复某些游戏中缺失的 HUD、视频或基于帧缓冲器的效果，但更强的模式更重，仅应在需要时使用。</string>
     <string name="settings_help_half_pixel_offset">调整采样以补偿 PS2 与现代图形 API 之间的半像素舍入差异。这通常是尝试修复偏移的泛光 (bloom)、双重图像、轮廓或在升频时看起来偏移的后期处理的第一个首选修复方法。</string>
-    <string name="settings_help_native_scaling">即使在游戏以高于 1x 的分辨率渲染时，也使某些精灵图和 2D 绘制更接近原生 PS2 的缩放。这有助于解决仅在图像升频时才会损坏的 HUD 对齐、文本和后期处理层问题。</string>
+    <string name="settings_help_native_scaling">即使在游戏以高于原生分辨率渲染时，也使某些精灵图和 2D 绘制更接近原生 PS2 的缩放。这有助于解决仅在图像升频时才会损坏的 HUD 对齐、文本和后期处理层问题。</string>
     <string name="settings_help_round_sprite">四舍五入精灵图坐标以减少 2D 元素和 HUD 上细小的接缝、间隙或闪烁的线条。这在只有在以高于原生分辨率渲染时才显示网格线的游戏中特别有用。</string>
     <string name="settings_help_bilinear_upscale">将双线性过滤应用于某些效果使用的升频过程。它可以柔化后期处理层中刺眼的缩放伪影，但这也可能会使图像比您希望的更柔和。</string>
     <string name="settings_help_texture_offset_x">水平偏移纹理采样。这是一种精度修复，适用于文字、HUD 或后期处理层在升频后似乎向左或向右偏移的游戏。</string>

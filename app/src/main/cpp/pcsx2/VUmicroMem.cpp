@@ -4,8 +4,9 @@
 #include "Common.h"
 #include "VUmicro.h"
 #include "MTVU.h"
+#include "arm64/cpuRegistersPack.h"
 
-//alignas(16) VURegs vuRegs[2];
+VURegs (&vuRegs)[2] = g_cpuRegistersPack.vuRegs;
 
 void vuMemAllocate()
 {

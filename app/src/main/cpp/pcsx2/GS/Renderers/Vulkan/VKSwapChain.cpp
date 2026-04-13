@@ -223,6 +223,7 @@ std::optional<VkSurfaceFormatKHR> VKSwapChain::SelectSurfaceFormat(VkSurfaceKHR 
 		return VkSurfaceFormatKHR{GetLinearFormat(surface_format.format), VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 	}
 
+	Console.Error("Failed to find a suitable format for swap chain buffers.");
 	return std::nullopt;
 }
 
@@ -288,11 +289,13 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 			}
 			else if (CheckForMode(VK_PRESENT_MODE_MAILBOX_KHR))
 			{
+				WARNING_LOG("Immediate not supported for vsync-disabled, using mailbox.");
 				*present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
 				*vsync_mode = GSVSyncMode::Mailbox;
 			}
 			else
 			{
+				WARNING_LOG("Mailbox not supported for vsync-disabled, using FIFO.");
 				*present_mode = VK_PRESENT_MODE_FIFO_KHR;
 				*vsync_mode = GSVSyncMode::FIFO;
 			}
@@ -315,6 +318,7 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 			}
 			else
 			{
+				WARNING_LOG("Mailbox not supported for vsync-mailbox, using FIFO.");
 				*present_mode = VK_PRESENT_MODE_FIFO_KHR;
 				*vsync_mode = GSVSyncMode::FIFO;
 			}
@@ -349,6 +353,7 @@ bool VKSwapChain::CreateSwapChain()
 	u32 image_count = std::clamp<u32>(
 		(m_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) ? 3 : 2, surface_capabilities.minImageCount,
 		(surface_capabilities.maxImageCount == 0) ? std::numeric_limits<u32>::max() : surface_capabilities.maxImageCount);
+	DEV_LOG("Creating a swap chain with {} images in present mode {}", image_count, PresentModeToString(m_present_mode));
 
 	// Determine the dimensions of the swap chain. Values of -1 indicate the size we specify here
 	// determines window size?
@@ -379,7 +384,10 @@ bool VKSwapChain::CreateSwapChain()
 	// Select swap chain flags, we only need a colour attachment
 	VkImageUsageFlags image_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	if ((surface_capabilities.supportedUsageFlags & image_usage) != image_usage)
+	{
+		Console.Error("Vulkan: Swap chain does not support usage as color attachment");
 		return false;
+	}
 
 	// Store the old/current swap chain when recreating for resize
 	// Old swap chain is destroyed regardless of whether the create call succeeds
@@ -430,15 +438,20 @@ bool VKSwapChain::CreateSwapChain()
 
 			exclusive_win32_info.hmonitor =
 				MonitorFromWindow(reinterpret_cast<HWND>(m_window_info.window_handle), MONITOR_DEFAULTTONEAREST);
+			if (!exclusive_win32_info.hmonitor)
+				Console.Error("MonitorFromWindow() for exclusive fullscreen exclusive override failed.");
 
 			Vulkan::AddPointerToChain(&swap_chain_info, &exclusive_info);
 			Vulkan::AddPointerToChain(&swap_chain_info, &exclusive_win32_info);
 		}
+		else
+		{
+			Console.Error("Exclusive fullscreen control requested, but VK_EXT_full_screen_exclusive is not supported.");
+		}
 	}
 #else
 	if (m_exclusive_fullscreen_control.has_value())
-	{
-	}
+		Console.Error("Exclusive fullscreen control requested, but is not supported on this platform.");
 #endif
 
 	res = vkCreateSwapchainKHR(GSDeviceVK::GetInstance()->GetDevice(), &swap_chain_info, nullptr, &m_swap_chain);
@@ -632,6 +645,7 @@ bool VKSwapChain::SetPresentMode(VkPresentModeKHR present_mode)
 	m_present_mode = present_mode;
 
 	// Recreate the swap chain with the new present mode.
+	INFO_LOG("Recreating swap chain to change present mode.");
 	ReleaseCurrentImage();
 	DestroySwapChainImages();
 	if (!CreateSwapChain())

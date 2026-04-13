@@ -20,7 +20,8 @@ uniform uvec4 const0;
 uniform uvec4 const1;
 uniform ivec2 srcOffset;
 
-layout(binding=0) uniform sampler2D imgSrc;
+// Sampler binding defaults to 0 if not explicitly set; texture unit 0 is used in code.
+uniform sampler2D imgSrc;
 layout(binding=0, rgba8) uniform writeonly image2D imgDst;
 
 #define A_GPU 1

@@ -2,17 +2,12 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
-#include "MTVU.h"
 #include "Vif_Dma.h"
 #include "Vif_Dynarec.h"
 
 //------------------------------------------------------------------
 // VifCode Transfer Interpreter (Vif0/Vif1)
 //------------------------------------------------------------------
-
-namespace
-{
-}
 
 // Interprets packet
 _vifT void vifTransferLoop(u32* &data) {
@@ -28,6 +23,7 @@ _vifT void vifTransferLoop(u32* &data) {
 	while (pSize > 0 && !vifX.vifstalled.enabled) {
 
 		if(!vifX.cmd) { // Get new VifCode
+
 			if(!vifXRegs.err.MII)
 			{
 				if(vifX.irq && !CHECK_VIF1STALLHACK)
@@ -39,6 +35,8 @@ _vifT void vifTransferLoop(u32* &data) {
 			vifXRegs.code = data[0];
 			vifX.cmd	  = data[0] >> 24;
 
+
+			VIF_LOG("New VifCMD %x tagsize %x irq %d", vifX.cmd, vifX.tag.size, vifX.irq);
 			if (IsDevBuild && TraceLogging.EE.VIFcode.IsActive()) {
 				// Pass 2 means "log it"
 				vifCmdHandler[idx][vifX.cmd & 0x7f](2, data);
@@ -48,6 +46,12 @@ _vifT void vifTransferLoop(u32* &data) {
 		ret = vifCmdHandler[idx][vifX.cmd & 0x7f](vifX.pass, data);
 		data   += ret;
 		pSize  -= ret;
+		if (vifX.vifstalled.enabled)
+		{
+			int current_STR = idx ? vif1ch.chcr.STR : vif0ch.chcr.STR;
+			if (!current_STR)
+				DevCon.Warning("Warning! VIF%d stalled during FIFO transfer!", idx);
+		}
 	}
 }
 
@@ -70,6 +74,7 @@ _vifT static __fi bool vifTransfer(u32 *data, int size, bool TTE) {
 	vifX.irqoffset.value = transferred % 4; // cannot lose the offset
 
 	if (vifX.irq && vifX.cmd == 0) {
+		VIF_LOG("Vif%d IRQ Triggering", idx);
 		//Always needs to be set to return to the correct offset if there is data left.
 		vifX.vifstalled.enabled = VifStallEnable(vifXch);
 		vifX.vifstalled.value = VIF_IRQ_STALL;

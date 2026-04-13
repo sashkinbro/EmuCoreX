@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for text editor detection
@@ -72,8 +72,15 @@ void vs_main()
 	// example: 133.0625 (133 + 1/16) should start from line 134, ceil(133.0625 - 0.05) still above 133
 	gl_Position.xy = vec2(i_p) - vec2(0.05f, 0.05f);
 	gl_Position.xy = gl_Position.xy * VertexScale - VertexOffset;
-	gl_Position.z = float(z) * exp_min32;
 	gl_Position.w = 1.0f;
+
+#if HAS_CLIP_CONTROL
+    gl_Position.z = float(z) * exp_min32;
+#else
+	// GLES doesn't support ARB_clip_control, so remap it to -1..1. This isn't lossless, but
+	// gets rid of really bad Z-fighting.
+	gl_Position.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
+#endif
 
 	texture_coord();
 
@@ -112,7 +119,11 @@ struct ProcessedVertex
 
 ProcessedVertex load_vertex(uint index)
 {
+#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
+	RawVertex rvtx = vertex_buffer[index + gl_BaseVertexARB];
+#else
 	RawVertex rvtx = vertex_buffer[index];
+#endif
 
 	vec2 i_st = rvtx.ST;
 	vec4 i_c = vec4(uvec4(bitfieldExtract(rvtx.RGBA, 0, 8), bitfieldExtract(rvtx.RGBA, 8, 8),
@@ -154,7 +165,11 @@ void main()
 {
 	ProcessedVertex vtx;
 
+#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
+	uint vid = uint(gl_VertexID - gl_BaseVertexARB);
+#else
 	uint vid = uint(gl_VertexID);
+#endif
 
 #if VS_EXPAND == 1 // Point
 

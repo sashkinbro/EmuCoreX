@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "arm64/VixlHelpers.h"
 #include "common/emitter/x86emitter.h"
 #include "VUmicro.h"
 

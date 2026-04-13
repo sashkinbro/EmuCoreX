@@ -167,6 +167,17 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 		}
 #endif
 	}
+
+	if (!s_vulkan_library.IsOpen())
+	{
+		const char* android_native_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
+		if (android_native_lib_dir)
+		{
+			const std::string custom_lib_path = std::string(android_native_lib_dir) + "/libvulkan.so";
+			if (s_vulkan_library.Open(custom_lib_path.c_str(), error))
+				Console.WriteLn(Color_StrongGreen, "Vulkan: Loaded bundled libvulkan from app directory");
+		}
+	}
 #endif
 
 #ifdef __APPLE__

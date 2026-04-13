@@ -32,6 +32,7 @@ void GSVertexTrace::Update(const void* vertex, const u16* index, int v_count, in
 	// that feel big enough.
 	if (!fst && !m_accurate_stq && m_min.t.z > 1e30)
 	{
+		Console.Warning("Vertex Trace: float overflow detected ! min %e max %e", m_min.t.z, m_max.t.z);
 		m_accurate_stq = true;
 	}
 

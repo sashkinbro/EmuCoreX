@@ -82,6 +82,7 @@ static __fi void vuExecMicro(int idx, u32 addr, bool requires_wait)
 
 	if (vifRegs.itops > (idx ? 0x3ffu : 0xffu))
 	{
+		Console.WriteLn("VIF%d ITOP overrun! %x", idx, vifRegs.itops);
 		vifRegs.itops &= (idx ? 0x3ffu : 0xffu);
 	}
 
@@ -150,6 +151,7 @@ __fi int _vifCode_Direct(int pass, const u8* data, bool isDirectHL)
 	}
 	pass2
 	{
+		const char* name = isDirectHL ? "DirectHL" : "Direct";
 		const GIF_TRANSFER_TYPE tranType = isDirectHL ? GIF_TRANS_DIRECTHL : GIF_TRANS_DIRECT;
 		const uint size = std::min(vif1.vifpacketsize, vif1.tag.size) * 4; // Get size in bytes
 		const uint ret = gifUnit.TransferGSPacketData(tranType, (u8*)data, size);
@@ -157,8 +159,13 @@ __fi int _vifCode_Direct(int pass, const u8* data, bool isDirectHL)
 		vif1.tag.size -= ret / 4; // Convert to u32's
 		vif1Regs.stat.VGW = false;
 
+		if (ret & 3)
+			DevCon.Warning("Vif %s: Ret wasn't a multiple of 4!", name); // Shouldn't happen
+		if (size == 0)
+			DevCon.Warning("Vif %s: No Data Transfer?", name); // Can this happen?
 		if (size != ret)
 		{ // Stall if gif didn't process all the data (path2 queued)
+			GUNIT_WARN("Vif %s: Stall! [size=%d][ret=%d]", name, size, ret);
 			//gifUnit.PrintInfo();
 			vif1.vifstalled.enabled = VifStallEnable(vif1ch);
 			vif1.vifstalled.value = VIF_TIMING_BREAK;
@@ -200,6 +207,7 @@ vifOp(vifCode_Flush)
 		vifFlush(idx);
 		if (gifUnit.checkPaths(1, 1, 0) || p1or2)
 		{
+			GUNIT_WARN("Vif Flush: Stall!");
 			//gifUnit.PrintInfo();
 			vif1Regs.stat.VGW = true;
 			vif1.vifstalled.enabled = VifStallEnable(vif1ch);
@@ -233,6 +241,7 @@ vifOp(vifCode_FlushA)
 
 		if (gifBusy)
 		{
+			GUNIT_WARN("Vif FlushA: Stall!");
 			vif1Regs.stat.VGW = true;
 			vif1.vifstalled.enabled = VifStallEnable(vif1ch);
 			vif1.vifstalled.value = VIF_TIMING_BREAK;
@@ -448,6 +457,7 @@ vifOp(vifCode_MSCALF)
 		vifFlush(idx);
 		if ([[maybe_unused]] const u32 a = gifUnit.checkPaths(1, 1, 0))
 		{
+			GUNIT_WARN("Vif MSCALF: Stall! [%d,%d]", !!(a & 1), !!(a & 2));
 			vif1Regs.stat.VGW = true;
 			vifX.vifstalled.enabled = VifStallEnable(vifXch);
 			vifX.vifstalled.value = VIF_TIMING_BREAK;
@@ -504,8 +514,10 @@ vifOp(vifCode_MskPath3)
 	{
 		vif1Regs.mskpath3 = (vif1Regs.code >> 15) & 0x1;
 		gifRegs.stat.M3P = (vif1Regs.code >> 15) & 0x1;
+		GUNIT_LOG("Vif1 - MskPath3 [p3 = %s]", vif1Regs.mskpath3 ? "masked" : "enabled");
 		if (!vif1Regs.mskpath3)
 		{
+			GUNIT_WARN("VIF MSKPATH3 off Path3 triggering!");
 			gifInterrupt();
 		}
 		vif1.cmd = 0;
@@ -545,6 +557,7 @@ vifOp(vifCode_Null)
 		// if ME1, then force the vif to interrupt
 		if (!(vifXRegs.err.ME1))
 		{ // Ignore vifcode and tag mismatch error
+			Console.WriteLn("Vif%d: Unknown VifCmd! [%x]", idx, vifX.cmd);
 			vifXRegs.stat.ER1 = true;
 			vifX.vifstalled.enabled = VifStallEnable(vifXch);
 			vifX.vifstalled.value = VIF_IRQ_STALL;
@@ -557,6 +570,7 @@ vifOp(vifCode_Null)
 		if (vifXRegs.code & 0x80000000)
 			vifX.irq = 0;
 	}
+	pass2 { Console.Error("Vif%d bad vifcode! [CMD = %x]", idx, vifX.cmd); }
 	pass3 { VifCodeLog("Null"); }
 	return 1;
 }

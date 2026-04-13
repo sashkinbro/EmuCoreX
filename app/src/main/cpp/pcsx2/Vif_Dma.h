@@ -123,6 +123,7 @@ extern void vif0Reset();
 extern void vif1Interrupt();
 extern void vif1VUFinish();
 extern void vif1Reset();
+
 typedef int FnType_VifCmdHandler(int pass, const u32 *data);
 typedef FnType_VifCmdHandler* Fnptr_VifCmdHandler;
 

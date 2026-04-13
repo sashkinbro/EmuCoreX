@@ -9,7 +9,6 @@
 
 #include <cmath>
 u32 laststall = 0;
-
 //Lower/Upper instructions can use that..
 #define _Ft_ ((VU->code >> 16) & 0x1F)  // The rt part of the instruction register
 #define _Fs_ ((VU->code >> 11) & 0x1F)  // The rd part of the instruction register
@@ -39,12 +38,17 @@ static __ri bool _vuFMACflush(VURegs* VU)
 {
 	bool didflush = false;
 
+	VUM_LOG("Flushing FMACs");
+
 	for (int i = VU->fmacreadpos; VU->fmaccount > 0; i = (i + 1) & 3)
 	{
 		if ((VU->cycle - VU->fmac[i].sCycle) < VU->fmac[i].Cycle)
 		{
+			VUM_LOG("Not flushing FMAC pipe[%d] (macflag=%x clipflag=%x statusflag=%x) r %d w %d", i, VU->fmac[i].macflag, VU->fmac[i].clipflag, VU->fmac[i].statusflag, VU->fmacreadpos, VU->fmacwritepos);
 			return didflush;
 		}
+
+		VUM_LOG("flushing FMAC pipe[%d] (macflag=%x clipflag=%x statusflag=%x) r %d w %d", i, VU->fmac[i].macflag, VU->fmac[i].clipflag, VU->fmac[i].statusflag, VU->fmacreadpos, VU->fmacwritepos);
 
 		// Clip flags (Affected by CLIP instruction)
 		if (VU->fmac[i].flagreg & (1 << REG_CLIP_FLAG))
@@ -71,6 +75,8 @@ static __ri bool _vuIALUflush(VURegs* VU)
 {
 	bool didflush = false;
 
+	VUM_LOG("Flushing ALU stalls");
+
 	for (int i = VU->ialureadpos; VU->ialucount > 0; i = (i + 1) & 3)
 	{
 		if ((VU->cycle - VU->ialu[i].sCycle) < VU->ialu[i].Cycle)
@@ -90,6 +96,8 @@ static __ri bool _vuFDIVflush(VURegs* VU)
 
 	if ((VU->cycle - VU->fdiv.sCycle) >= VU->fdiv.Cycle)
 	{
+		VUM_LOG("flushing FDIV pipe");
+
 		VU->fdiv.enable = 0;
 		VU->VI[REG_Q].UL = VU->fdiv.reg.UL;
 		// FDIV only affects D/I
@@ -107,6 +115,8 @@ static __ri bool _vuEFUflush(VURegs* VU)
 
 	if ((VU->cycle - VU->efu.sCycle) >= VU->efu.Cycle)
 	{
+		VUM_LOG("flushing EFU pipe");
+
 		VU->efu.enable = 0;
 		VU->VI[REG_P].UL = VU->efu.reg.UL;
 
@@ -142,6 +152,8 @@ void _vuFlushAll(VURegs* VU)
 
 	for (i = VU->fmacreadpos; VU->fmaccount > 0; i = (i + 1) & 3)
 	{
+		VUM_LOG("flushing FMAC pipe[%d] (macflag=%x)", i, VU->fmac[i].macflag);
+
 		// Clip flags (Affected by CLIP instruction)
 		if (VU->fmac[i].flagreg & (1 << REG_CLIP_FLAG))
 			VU->VI[REG_CLIP_FLAG].UL = VU->fmac[i].clipflag;
@@ -211,6 +223,7 @@ static void _vuFMACTestStall(VURegs* VU, u32 reg, u32 xyzw)
 		{
 			u64 newCycle = VU->fmac[currentpipe].Cycle + VU->fmac[currentpipe].sCycle;
 
+			VUM_LOG("FMAC[%d] stall %d", currentpipe, newCycle - VU->cycle);
 			if (newCycle > VU->cycle)
 				VU->cycle = newCycle;
 		}
@@ -236,6 +249,7 @@ static __fi void _vuTestFDIVStalls(VURegs* VU, _VURegsNum* VUregsn)
 	if (VU->fdiv.enable != 0)
 	{
 		u64 newCycle = VU->fdiv.Cycle + VU->fdiv.sCycle;
+		VUM_LOG("waiting FDIV pipe %d", newCycle - VU->cycle);
 		if (newCycle > VU->cycle)
 			VU->cycle = newCycle;
 	}
@@ -256,6 +270,7 @@ static __fi void _vuTestEFUStalls(VURegs* VU, _VURegsNum* VUregsn)
 	VU->efu.Cycle -= 1;
 	u64 newCycle = VU->efu.sCycle + VU->efu.Cycle;
 
+	VUM_LOG("waiting EFU pipe %d", newCycle - VU->cycle);
 	if (newCycle > VU->cycle)
 		VU->cycle = newCycle;
 }
@@ -273,6 +288,7 @@ static __fi void _vuTestALUStalls(VURegs* VU, _VURegsNum* VUregsn)
 		{
 			u64 newCycle = VU->ialu[currentpipe].Cycle + VU->ialu[currentpipe].sCycle;
 
+			VUM_LOG("ALU[%d] stall %d", currentpipe, newCycle - VU->cycle);
 			if (newCycle > VU->cycle)
 				VU->cycle = newCycle;
 		}
@@ -310,6 +326,7 @@ static __ri void _vuAddFMACStalls(VURegs* VU, _VURegsNum* VUregsn, bool isUpper)
 {
 	int i = VU->fmacwritepos;
 
+	VUM_LOG("adding FMAC %s pipe[%d]; reg=%x xyzw=%x flagreg=%x target=%x current %x", isUpper ? "Upper" : "Lower", i, VUregsn->VFwrite, VUregsn->VFwxyzw, VUregsn->VIwrite, VU->cycle + 4, VU->cycle);
 	VU->fmac[i].sCycle = VU->cycle;
 	VU->fmac[i].Cycle = 4;
 
@@ -334,6 +351,8 @@ static __ri void _vuAddFMACStalls(VURegs* VU, _VURegsNum* VUregsn, bool isUpper)
 
 static __ri void _vuFDIVAdd(VURegs* VU, int cycles)
 {
+	VUM_LOG("adding FDIV pipe");
+
 	VU->fdiv.enable = 1;
 	VU->fdiv.sCycle = VU->cycle;
 	VU->fdiv.Cycle = cycles;
@@ -343,6 +362,8 @@ static __ri void _vuFDIVAdd(VURegs* VU, int cycles)
 
 static __ri void _vuEFUAdd(VURegs* VU, int cycles)
 {
+	VUM_LOG("adding EFU pipe for %d cycles\n", cycles);
+
 	VU->efu.enable = 1;
 	VU->efu.sCycle = VU->cycle;
 	VU->efu.Cycle = cycles;
@@ -357,6 +378,7 @@ static __ri void _vuAddIALUStalls(VURegs* VU, _VURegsNum* VUregsn)
 
 	int i = VU->ialuwritepos;
 
+	VUM_LOG("adding IALU pipe[%d]; reg=%x target=%x current %x", i, VUregsn->VIwrite, VU->cycle + VUregsn->cycles, VU->cycle);
 	VU->ialu[i].sCycle = VU->cycle;
 	VU->ialu[i].Cycle = VUregsn->cycles;
 	VU->ialu[i].reg = VUregsn->VIwrite;
@@ -1801,12 +1823,15 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 	VU1.xgkickcyclecount += cycles;
 	VU1.xgkicklastcycle += cycles;
 
+	VUM_LOG("Adding %d cycles, total XGKick cycles to run now %d flush %d enabled %d", cycles, VU1.xgkickcyclecount, flush, VU1.xgkickenable);
+
 	while (VU1.xgkickenable && (flush || VU1.xgkickcyclecount >= 2))
 	{
 		u32 transfersize = 0;
 
 		if (VU1.xgkicksizeremaining == 0)
 		{
+			VUM_LOG("XGKICK reading new tag from %x", VU1.xgkickaddr);
 			u32 size = gifUnit.GetGSPacketSize(GIF_PATH_1, vuRegs[1].Mem, VU1.xgkickaddr, ~0u, flush);
 			VU1.xgkicksizeremaining = size & 0xFFFF;
 			VU1.xgkickendpacket = size >> 31;
@@ -1814,9 +1839,12 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 
 			if (VU1.xgkicksizeremaining == 0)
 			{
+				VUM_LOG("Invalid GS packet size returned, cancelling XGKick");
 				VU1.xgkickenable = false;
 				break;
 			}
+			else
+				VUM_LOG("XGKICK New tag size %d bytes EOP %d", VU1.xgkicksizeremaining, VU1.xgkickendpacket);
 		}
 
 		if (!flush)
@@ -1829,6 +1857,8 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 			transfersize = VU1.xgkicksizeremaining / 0x10;
 			transfersize = std::min(transfersize, VU1.xgkickdiff / 0x10);
 		}
+
+		VUM_LOG("XGKICK Transferring %x bytes from %x size %x", transfersize * 0x10, VU1.xgkickaddr, VU1.xgkicksizeremaining);
 
 		// Would be "nicer" to do the copy until it's all up, however this really screws up PATH3 masking stuff
 		// So lets just do it the other way :)
@@ -1853,8 +1883,11 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 		VU1.xgkicksizeremaining -= (transfersize * 0x10);
 		VU1.xgkickdiff = 0x4000 - VU1.xgkickaddr;
 
-		if (!(VU1.xgkicksizeremaining || !VU1.xgkickendpacket))
+		if (VU1.xgkicksizeremaining || !VU1.xgkickendpacket)
+			VUM_LOG("XGKICK next addr %x left size %x", VU1.xgkickaddr, VU1.xgkicksizeremaining);
+		else
 		{
+			VUM_LOG("XGKICK transfer finished");
 			VU1.xgkickenable = false;
 			VU0.VI[REG_VPU_STAT].UL &= ~(1 << 12);
 			// Check if VIF is waiting for the GIF to not be busy
@@ -1867,8 +1900,10 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 	}
 	if (flush)
 	{
+		VUM_LOG("Disabling XGKICK");
 		_vuTestPipes(&VU1);
 	}
+	VUM_LOG("XGKick run complete Enabled %d", VU1.xgkickenable);
 }
 
 static __ri void _vuXGKICK(VURegs* VU)
@@ -1889,6 +1924,7 @@ static __ri void _vuXGKICK(VURegs* VU)
 	// Can be tested with Resident Evil: Outbreak, Kingdom Hearts, CART Fury.
 	VU->xgkickcyclecount = 1;
 	VU0.VI[REG_VPU_STAT].UL |= (1 << 12);
+	VUM_LOG("XGKICK addr %x", addr);
 }
 
 static __ri void _vuXTOP(VURegs* VU)

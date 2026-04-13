@@ -37,7 +37,10 @@ static __fi void vu0SetMicroFlags(u32* flags, u32 value)
 }
 
 void vu0ExecMicro(u32 addr) {
+	VUM_LOG("vu0ExecMicro %x", addr);
+
 	if(VU0.VI[REG_VPU_STAT].UL & 0x1) {
+		DevCon.Warning("vu0ExecMicro > Stalling for previous microprogram to finish");
 		vu0Finish();
 	}
 

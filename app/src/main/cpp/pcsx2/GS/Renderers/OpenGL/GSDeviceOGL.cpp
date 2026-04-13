@@ -768,9 +768,11 @@ bool GSDeviceOGL::CheckFeatures()
 		GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
 	DevCon.WriteLn("GL: GPU profile hints: %s", profile_selection.hints.c_str());
 	const bool use_mali_profile = IsMaliGPUProfile();
+	const bool use_adreno_profile = IsAdrenoGPUProfile();
 #else
 	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali : RuntimeGpuProfile::Adreno);
 	const bool use_mali_profile = vendor_id_mali;
+	const bool use_adreno_profile = vendor_id_adreno;
 #endif
 
 	GLint major_gl = 0;
@@ -855,14 +857,10 @@ bool GSDeviceOGL::CheckFeatures()
 	}
 	else
 	{
-		m_bugs.buggy_pbo = !GLAD_GL_EXT_buffer_storage;
-		if (!m_bugs.buggy_pbo && IsAdrenoGPUProfile())
-		{
-			m_bugs.buggy_pbo = true;
-		}
+		m_bugs.buggy_pbo = GLAD_GL_EXT_buffer_storage;
 	}
 	if (m_bugs.buggy_pbo)
-		Console.Warning("GL: Not using PBOs for texture uploads.");
+		Console.Warning("GL: Not using PBOs for texture uploads because buffer_storage is unavailable.");
 
 	// Give the user the option to disable PBO usage for downloads.
 	// Most drivers seem to be faster with PBO.
@@ -871,14 +869,10 @@ bool GSDeviceOGL::CheckFeatures()
 		Console.Warning("GL: Not using PBOs for texture downloads, this may reduce performance.");
 
 	// optional features based on context
-	m_features.broken_point_sampler = (m_is_gles && IsAdrenoGPUProfile());
-	if (m_features.broken_point_sampler)
-		Console.Warning("GL: Enabling shader point-sampling workaround for Adreno GLES.");
+	m_features.broken_point_sampler = false;
 	m_features.primitive_id = true;
 
-	m_features.framebuffer_fetch =
-		(GLAD_GL_ARM_shader_framebuffer_fetch || GLAD_GL_EXT_shader_framebuffer_fetch ||
-		 GLAD_GL_EXT_shader_pixel_local_storage);
+	m_features.framebuffer_fetch = (GLAD_GL_ARM_shader_framebuffer_fetch || GLAD_GL_EXT_shader_framebuffer_fetch);
 	if (m_features.framebuffer_fetch && GSConfig.DisableFramebufferFetch)
 	{
 		Host::AddOSDMessage(
@@ -905,6 +899,53 @@ bool GSDeviceOGL::CheckFeatures()
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
 	m_features.prefer_new_textures = false;
 	m_features.stencil_buffer = true;
+
+	if (use_mali_profile)
+	{
+		Console.WriteLn(Color_Yellow, "GL: Applying Mali-specific optimizations for tile-based rendering.");
+		m_features.prefer_new_textures = true;
+		m_features.framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
+		if (GSConfig.OverrideTextureBarriers == -1)
+		{
+			m_features.texture_barrier = m_features.framebuffer_fetch;
+			if (m_features.framebuffer_fetch)
+				Console.WriteLn("GL: Mali optimization - using ARM framebuffer fetch over texture barriers.");
+		}
+	}
+
+	if (use_adreno_profile)
+	{
+		Console.WriteLn(Color_Cyan, "GL: Applying Adreno-specific optimizations for Qualcomm GPU.");
+		m_features.prefer_new_textures = true;
+		if (m_features.bptc_textures)
+			Console.WriteLn("GL: Adreno optimization - leveraging BPTC texture compression.");
+		Console.WriteLn("GL: Adreno optimization - minimizing state changes for improved performance.");
+	}
+
+	const bool has_arm_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
+	const bool has_ext_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
+	const bool has_pls_fetch = GLAD_GL_EXT_shader_pixel_local_storage;
+	Console.WriteLn("GL: Framebuffer fetch extension caps: arm=%d ext=%d pls=%d.",
+		has_arm_fetch ? 1 : 0, has_ext_fetch ? 1 : 0, has_pls_fetch ? 1 : 0);
+
+	const char* active_profile_name = use_mali_profile ? "Mali" : (use_adreno_profile ? "Adreno" : "Generic");
+	const char* active_fetch_backend = "None";
+	if (m_features.framebuffer_fetch)
+	{
+		if (use_mali_profile)
+			active_fetch_backend = "ARM";
+		else if (has_ext_fetch || has_pls_fetch)
+			active_fetch_backend = "EXT/PLS";
+		else if (has_arm_fetch)
+			active_fetch_backend = "ARM";
+	}
+	Console.WriteLn("GL: Active framebuffer fetch backend (%s profile): %s.", active_profile_name, active_fetch_backend);
+
+	if (use_mali_profile && !has_arm_fetch)
+		Console.Warning("GL: Mali profile selected but ARM framebuffer fetch is unavailable; using non-fetch fallback.");
+	if (use_mali_profile && !GLAD_GL_ARB_texture_barrier && m_features.framebuffer_fetch)
+		Console.WriteLn("GL: Mali path active without GL_ARB_texture_barrier; using no-op texture barrier.");
+
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	if (m_features.texture_barrier)
 	{
@@ -3153,6 +3194,30 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, bool one_barrier, boo
 			}
 
 			Console.Warning("GL: Failed to allocate temp texture for full-barrier RT copy fallback.");
+		}
+		else if (one_barrier && config.rt)
+		{
+			GL_PUSH("one_barrier fallback (RT copy)");
+
+			GSTexture* draw_rt = config.rt;
+			const GSVector2i rtsize = draw_rt->GetSize();
+			GSTexture* draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
+			if (draw_rt_clone)
+			{
+				const GSVector4i copy_area = ProcessCopyArea(GSVector4i(0, 0, rtsize.x, rtsize.y), config.drawarea);
+				CopyRect(draw_rt, draw_rt_clone, copy_area, copy_area.left, copy_area.top);
+				
+				// Rebind slots that were reading from the RT
+				PSSetShaderResource(2, draw_rt_clone);
+				if (config.tex && config.tex == config.rt)
+					PSSetShaderResource(0, draw_rt_clone);
+
+				DrawIndexedPrimitive();
+				Recycle(draw_rt_clone);
+				return;
+			}
+
+			Console.Warning("GL: Failed to allocate temp texture for one-barrier RT copy fallback.");
 		}
 
 		DrawIndexedPrimitive();

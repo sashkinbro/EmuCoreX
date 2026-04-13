@@ -66,6 +66,7 @@ bool SaveStateBase::vif1Freeze()
 
 __fi void vif0FBRST(u32 value)
 {
+	VIF_LOG("VIF0_FBRST write32 0x%8.8x", value);
 	/* Fixme: Forcebreaks are pretty unknown for operation, presumption is it just stops it what its doing
 			  usually accompanied by a reset, but if we find a broken game which falls here, we need to see it! (Refraction) */
 	if (value & 0x2) // Forcebreak Vif,
@@ -74,6 +75,7 @@ __fi void vif0FBRST(u32 value)
 		cpuRegs.interrupt &= ~1; //Stop all vif0 DMA's
 		vif0Regs.stat.VFS = true;
 		vif0Regs.stat.VPS = VPS_IDLE;
+		Console.WriteLn("vif0 force break");
 	}
 
 	if (value & 0x4) // Stop Vif.
@@ -139,6 +141,8 @@ __fi void vif0FBRST(u32 value)
 
 __fi void vif1FBRST(u32 value)
 {
+	VIF_LOG("VIF1_FBRST write32 0x%8.8x", value);
+
 	/* Fixme: Forcebreaks are pretty unknown for operation, presumption is it just stops it what its doing
 			  usually accompanied by a reset, but if we find a broken game which falls here, we need to see it! (Refraction) */
 
@@ -150,6 +154,7 @@ __fi void vif1FBRST(u32 value)
 		cpuRegs.interrupt &= ~((1 << 1) | (1 << 10)); //Stop all vif1 DMA's
 		vif1.vifstalled.enabled = VifStallEnable(vif1ch);
 		vif1.vifstalled.value = VIF_IRQ_STALL;
+		Console.WriteLn("vif1 force break");
 	}
 
 	if (FBRST(value).STP) // Stop Vif.
@@ -218,6 +223,8 @@ __fi void vif1FBRST(u32 value)
 		vif1.MaskRow._u64[0] = SaveRow._u64[0];
 		vif1.MaskRow._u64[1] = SaveRow._u64[1];
 
+
+		GUNIT_WARN(Color_Red, "VIF FBRST Reset MSK = %x", vif1Regs.mskpath3);
 		vif1Regs.mskpath3 = false;
 		gifRegs.stat.M3P = 0;
 		vif1Regs.err.reset();
@@ -230,6 +237,8 @@ __fi void vif1FBRST(u32 value)
 
 __fi void vif1STAT(u32 value)
 {
+	VIF_LOG("VIF1_STAT write32 0x%8.8x", value);
+
 	/* Only FDR bit is writable, so mask the rest */
 	if ((vif1Regs.stat.FDR) ^ ((tVIF_STAT&)value).FDR)
 	{
@@ -237,6 +246,7 @@ __fi void vif1STAT(u32 value)
 		// different so can't be stalled
 		if (vif1Regs.stat.test(VIF1_STAT_INT | VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
 		{
+			DbgCon.WriteLn("changing dir when vif1 fifo stalled done = %x qwc = %x stat = %x", vif1.done, vif1ch.qwc, vif1Regs.stat._u32);
 			isStalled = true;
 		}
 
@@ -338,6 +348,7 @@ _vifT __fi bool vifWrite32(u32 mem, u32 value)
 	switch (mem)
 	{
 		case caseVif(MARK):
+			VIF_LOG("VIF%d_MARK write32 0x%8.8x", idx, value);
 			vifXRegs.stat.MRK = false;
 			//vifXRegs.mark	   = value;
 			break;

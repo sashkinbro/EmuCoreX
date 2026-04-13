@@ -46,6 +46,7 @@ namespace Patch
 	{
 		std::string name;
 		std::optional<float> override_aspect_ratio;
+		std::optional<AspectRatioType> override_aspect_ratio_mode;
 		std::optional<GSInterlaceMode> override_interlace_mode;
 		std::vector<PatchCommand> patches;
 		std::vector<DynamicPatch> dpatches;
@@ -139,6 +140,7 @@ namespace Patch
 	static std::vector<std::string> s_just_enabled_patches;
 	static u32 s_patches_crc;
 	static std::optional<float> s_override_aspect_ratio;
+	static std::optional<AspectRatioType> s_override_aspect_ratio_mode;
 	static std::optional<GSInterlaceMode> s_override_interlace_mode;
 
 	static const PatchTextTable s_patch_commands[] = {
@@ -674,6 +676,8 @@ u32 Patch::EnablePatches(const std::vector<PatchGroup>* patches, const std::vect
 
 		if (p.override_aspect_ratio.has_value())
 			s_override_aspect_ratio = p.override_aspect_ratio;
+		if (p.override_aspect_ratio_mode.has_value())
+			s_override_aspect_ratio_mode = p.override_aspect_ratio_mode;
 		if (p.override_interlace_mode.has_value())
 			s_override_interlace_mode = p.override_interlace_mode;
 
@@ -766,6 +770,7 @@ void Patch::UpdateActivePatches(bool reload_enabled_list, bool verbose, bool ver
 	const size_t prev_count = s_active_patches.size();
 	s_active_patches.clear();
 	s_override_aspect_ratio.reset();
+	s_override_aspect_ratio_mode.reset();
 	s_override_interlace_mode.reset();
 	s_active_pnach_dynamic_patches.clear();
 
@@ -819,13 +824,24 @@ void Patch::UpdateActivePatches(bool reload_enabled_list, bool verbose, bool ver
 
 void Patch::ApplyPatchSettingOverrides()
 {
-	// Switch to 16:9 (or any custom aspect ratio) if widescreen patches are enabled, and AR is auto.
-	if (s_override_aspect_ratio.has_value() && EmuConfig.GS.AspectRatio == AspectRatioType::RAuto4_3_3_2)
+	// Switch to the requested aspect ratio if widescreen patches are enabled, and AR is auto.
+	if (EmuConfig.GS.AspectRatio == AspectRatioType::RAuto4_3_3_2)
 	{
-		EmuConfig.CurrentCustomAspectRatio = s_override_aspect_ratio.value();
+		if (s_override_aspect_ratio_mode.has_value())
+		{
+			EmuConfig.GS.AspectRatio = s_override_aspect_ratio_mode.value();
+			EmuConfig.CurrentCustomAspectRatio = 0.0f;
 
-		Console.WriteLn(Color_Gray,
-			fmt::format("Patch: Setting aspect ratio to {} by patch request.", s_override_aspect_ratio.value()));
+			Console.WriteLn(Color_Gray, fmt::format("Patch: Setting aspect ratio mode to {} by patch request.",
+									 Pcsx2Config::GSOptions::AspectRatioNames[static_cast<u8>(s_override_aspect_ratio_mode.value())]));
+		}
+		else if (s_override_aspect_ratio.has_value())
+		{
+			EmuConfig.CurrentCustomAspectRatio = s_override_aspect_ratio.value();
+
+			Console.WriteLn(Color_Gray,
+				fmt::format("Patch: Setting aspect ratio to {} by patch request.", s_override_aspect_ratio.value()));
+		}
 	}
 
 	// Disable interlacing in GS if active.
@@ -978,6 +994,16 @@ void Patch::PatchFunc::gsaspectratio(PatchGroup* group, const std::string_view c
 	{
 		group->override_aspect_ratio = aspect_ratio;
 		return;
+	}
+
+	for (u32 i = 0; i < static_cast<u32>(AspectRatioType::MaxCount); i++)
+	{
+		const char* const name = Pcsx2Config::GSOptions::AspectRatioNames[i];
+		if (name && StringUtil::compareNoCase(param, name))
+		{
+			group->override_aspect_ratio_mode = static_cast<AspectRatioType>(i);
+			return;
+		}
 	}
 
 	Console.Error(fmt::format("Patch error: {} is an unknown aspect ratio.", param));

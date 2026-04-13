@@ -731,6 +731,8 @@ static void recCancelInstruction()
 
 static void recExecute()
 {
+	static bool s_logged_rec_execute = false;
+
 	// Reset before we try to execute any code, if there's one pending.
 	// We need to do this here, because if we reset while we're executing, it sets the "needs reset"
 	// flag, which triggers a JIT exit (the fastjmp_set below), and eventually loops back here.
@@ -746,6 +748,17 @@ static void recExecute()
 	if (!fastjmp_set(&m_SetJmp_StateCheck))
 	{
 		eeCpuExecuting = true;
+		if (!s_logged_rec_execute)
+		{
+			s_logged_rec_execute = true;
+			BASEBLOCK* first_block = PC_GETBLOCK(cpuRegs.pc);
+			const uptr first_fnptr = first_block ? first_block->GetFnptr() : 0;
+			const void* host_ptr = PSM(cpuRegs.pc);
+			const u32 first_opcode = host_ptr ? *reinterpret_cast<const u32*>(host_ptr) : 0;
+			Console.WriteLn("(EErec) EnterRecompiledCode=%p cpuRegs.pc=0x%08x host_ptr=%p opcode=0x%08x block=%p fnptr=%p recLUTPage=%p",
+				EnterRecompiledCode, cpuRegs.pc, host_ptr, first_opcode, static_cast<void*>(first_block),
+				reinterpret_cast<const void*>(first_fnptr), reinterpret_cast<const void*>(recLUT[cpuRegs.pc >> 16]));
+		}
 		((void (*)())EnterRecompiledCode)();
 
 		// Generally unreachable code here ...
@@ -1805,7 +1818,22 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 		_flushCOP2regs();
 	}
 
+	if (cpuRegs.code == 0x401a7800)
+	{
+		const OPCODE* root_opcode = &R5900::OpcodeTables::tbl_Standard[_Opcode_];
+		Console.WriteLn("(EErec) pre-GetCurrentInstruction: code=0x%08x root_name=%s getsubclass=%p interpret=%p recompile=%p",
+			cpuRegs.code, root_opcode->Name, reinterpret_cast<const void*>(root_opcode->getsubclass),
+			reinterpret_cast<const void*>(root_opcode->interpret), reinterpret_cast<const void*>(root_opcode->recompile));
+	}
+
 	const OPCODE& opcode = GetCurrentInstruction();
+
+	if (cpuRegs.code == 0x401a7800)
+	{
+		Console.WriteLn("(EErec) post-GetCurrentInstruction: name=%s cycles=%u flags=0x%08x interpret=%p recompile=%p",
+			opcode.Name, opcode.cycles, opcode.flags, reinterpret_cast<const void*>(opcode.interpret),
+			reinterpret_cast<const void*>(opcode.recompile));
+	}
 
 	//pxAssert( !(g_pCurInstInfo->info & EEINSTINFO_NOREC) );
 	//Console.Warning("opcode name = %s, it's cycles = %d\n",opcode.Name,opcode.cycles);
@@ -2230,8 +2258,20 @@ static void recRecompile(const u32 startpc)
 {
 	u32 i = 0;
 	u32 willbranch3 = 0;
+	static bool s_logged_first_recompile = false;
 
 	pxAssert(startpc);
+
+	if (!s_logged_first_recompile)
+	{
+		s_logged_first_recompile = true;
+		BASEBLOCK* start_block = PC_GETBLOCK(startpc);
+		const void* host_ptr = PSM(startpc);
+		const u32 first_opcode = host_ptr ? *reinterpret_cast<const u32*>(host_ptr) : 0;
+		Console.WriteLn("(EErec) recRecompile(startpc=0x%08x) host_ptr=%p opcode=0x%08x recPtr=%p recPtrEnd=%p block=%p fnptr=%p",
+			startpc, host_ptr, first_opcode, recPtr, recPtrEnd, static_cast<void*>(start_block),
+			reinterpret_cast<const void*>(start_block ? start_block->GetFnptr() : 0));
+	}
 
 	// if recPtr reached the mem limit reset whole mem
 	if (recPtr >= recPtrEnd)
@@ -2644,6 +2684,12 @@ StartRecomp:
 			COP2FlagHackPass().Run(startpc, s_nEndBlock, s_pInstCache + 1);
 	}
 
+	if (startpc == 0xbfc00000)
+	{
+		Console.WriteLn("(EErec) recRecompile analysis done: startpc=0x%08x endpc=0x%08x has_cop2=%d",
+			startpc, s_nEndBlock, has_cop2_instructions ? 1 : 0);
+	}
+
 #ifdef DUMP_BLOCKS
 	ZydisDecoder disas_decoder;
 	ZydisDecoderInit(&disas_decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64);
@@ -2703,6 +2749,11 @@ StartRecomp:
 				recompileNextInstruction(false, false);
 			}
 #else
+			if (startpc == 0xbfc00000 && pc == startpc)
+			{
+				Console.WriteLn("(EErec) compiling first instruction at pc=0x%08x code=0x%08x",
+					pc, memRead32(pc));
+			}
 			recompileNextInstruction(false, false); // For the love of recursion, batman!
 #endif
 		}

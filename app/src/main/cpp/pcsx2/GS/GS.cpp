@@ -136,6 +136,7 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 #endif
 
 		default:
+			Console.Error("Unsupported render API %s", GSDevice::RenderAPIToString(new_api));
 			return false;
 	}
 
@@ -143,6 +144,12 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 	if (okay)
 	{
 		okay = ImGuiManager::Initialize();
+		if (!okay)
+			Console.Error("Failed to initialize ImGuiManager");
+	}
+	else
+	{
+		Console.Error("Failed to create GS device");
 	}
 
 	if (!okay)
@@ -155,6 +162,9 @@ static bool OpenGSDevice(GSRendererType renderer, bool clear_state_on_fail, bool
 	}
 
 	GSConfig.OsdShowGPU = GSConfig.OsdShowGPU && g_gs_device->SetGPUTimingEnabled(true);
+
+	Console.WriteLn(Color_StrongGreen, "%s Graphics Driver Info:", GSDevice::RenderAPIToString(new_api));
+	Console.WriteLn(g_gs_device->GetDriverInfo());
 
 	return true;
 }
@@ -171,6 +181,7 @@ static void CloseGSDevice(bool clear_state)
 
 static void GSClampUpscaleMultiplier(Pcsx2Config::GSOptions& config)
 {
+	// Clamp against the active device capability so target sizing stays in sync with the actual renderer.
 	const u32 max_upscale_multiplier = GSGetMaxUpscaleMultiplier(g_gs_device->GetMaxTextureSize());
 	if (config.UpscaleMultiplier <= static_cast<float>(max_upscale_multiplier))
 	{
@@ -229,6 +240,10 @@ static void CloseGSRenderer()
 bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_renderer,
 	std::optional<const Pcsx2Config::GSOptions*> old_config)
 {
+	// Reopen correctness matters for rendering too: stale GS state after a backend/config flip can masquerade
+	// as a renderer bug, especially with cached HW targets and feedback-dependent effects.
+	Console.WriteLn("Reopening GS with %s device", recreate_device ? "new" : "existing");
+
 	g_gs_renderer->Flush(GSState::GSFlushReason::GSREOPEN);
 
 	if (recreate_device && !recreate_renderer)
@@ -249,6 +264,7 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	{
 		capture_filename = GSCapture::GetNextCaptureFileName();
 		capture_size = GSCapture::GetSize();
+		Console.Warning(fmt::format("Restarting video capture to {}.", capture_filename));
 		g_gs_renderer->EndCapture();
 	}
 
@@ -259,12 +275,18 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	if (recreate_renderer)
 	{
 		if (g_gs_renderer->Freeze(&fd, true) != 0)
+		{
+			Console.Error("(GSreopen) Failed to get GS freeze size");
 			return false;
+		}
 
 		fd_data = std::make_unique<u8[]>(fd.size);
 		fd.data = fd_data.get();
 		if (g_gs_renderer->Freeze(&fd, false) != 0)
+		{
+			Console.Error("(GSreopen) Failed to freeze GS");
 			return false;
+		}
 
 		CloseGSRenderer();
 	}
@@ -300,10 +322,16 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 	if (recreate_renderer)
 	{
 		if (!OpenGSRenderer(new_renderer, basemem))
+		{
+			Console.Error("(GSreopen) Failed to create new renderer");
 			return false;
+		}
 
 		if (g_gs_renderer->Defrost(&fd) != 0)
+		{
+			Console.Error("(GSreopen) Failed to defrost");
 			return false;
+		}
 	}
 
 	if (!capture_filename.empty())
@@ -327,6 +355,7 @@ bool GSopen(const Pcsx2Config::GSOptions& config, GSRendererType renderer, u8* b
 		if (!res)
 			CloseGSDevice(true);
 	}
+
 	if (!res)
 	{
 		Host::ReportErrorAsync("Error",
@@ -359,6 +388,7 @@ void GSreset(bool hardware_reset)
 	{
 		std::string next_filename = GSCapture::GetNextCaptureFileName();
 		const GSVector2i size = GSCapture::GetSize();
+		Console.Warning(fmt::format("Restarting video capture to {}.", next_filename));
 		g_gs_renderer->EndCapture();
 		g_gs_renderer->BeginCapture(std::move(next_filename), size);
 	}
@@ -525,6 +555,13 @@ void GSUpdateDisplayWindow()
 
 void GSSetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
 {
+	static constexpr std::array<const char*, static_cast<size_t>(GSVSyncMode::Count)> modes = {{
+		"Disabled",
+		"FIFO",
+		"Mailbox",
+	}};
+	Console.WriteLnFmt(Color_StrongCyan, "Setting vsync mode: {}{}", modes[static_cast<size_t>(mode)],
+		allow_present_throttle ? " (throttle allowed)" : "");
 	g_gs_device->SetVSyncMode(mode, allow_present_throttle);
 }
 
@@ -868,7 +905,10 @@ void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 
 	s_fh = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, nullptr);
 	if (s_fh == NULL)
+	{
+		Console.Error("Failed to create file mapping of size %zu. WIN API ERROR:%u", size, GetLastError());
 		return nullptr;
+	}
 
 	// Reserve the whole area with repeats.
 	u8* base = static_cast<u8*>(VirtualAlloc2(
@@ -885,6 +925,7 @@ void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 			if ((i != (repeat - 1) && !VirtualFreeEx(GetCurrentProcess(), addr, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) ||
 				!MapViewOfFile3(s_fh, GetCurrentProcess(), addr, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, nullptr, 0))
 			{
+				Console.Error("Failed to map repeat %zu of size %zu.", i, size);
 				okay = false;
 
 				for (size_t j = 0; j < i; j++)
@@ -893,11 +934,15 @@ void* GSAllocateWrappedMemory(size_t size, size_t repeat)
 		}
 
 		if (okay)
+		{
+			DbgCon.WriteLn("fifo_alloc(): Mapped %zu repeats of %zu bytes at %p.", repeat, size, base);
 			return base;
+		}
 
 		VirtualFreeEx(GetCurrentProcess(), base, 0, MEM_RELEASE);
 	}
 
+	Console.Error("Failed to reserve VA space of size %zu. WIN API ERROR:%u", size, GetLastError());
 	CloseHandle(s_fh);
 	s_fh = NULL;
 	return nullptr;
@@ -1073,8 +1118,7 @@ static void HotkeyAdjustUpscaleMultiplier(const float delta)
 
 	// Clamp logic mirrors GraphicsSettingsWidget::populateUpscaleMultipliers().
 	float candidate_multiplier = EmuConfig.GS.UpscaleMultiplier + delta;
-	const float max_multiplier = static_cast<float>(std::clamp(GSGetMaxUpscaleMultiplier(g_gs_device->GetMaxTextureSize()),
-													10u, EmuConfig.GS.ExtendedUpscalingMultipliers ? 25u : 12u));
+	const float max_multiplier = static_cast<float>(GSGetMaxUpscaleMultiplier(g_gs_device->GetMaxTextureSize()));
 
 	std::string osd_message;
 	if (candidate_multiplier <= 1)

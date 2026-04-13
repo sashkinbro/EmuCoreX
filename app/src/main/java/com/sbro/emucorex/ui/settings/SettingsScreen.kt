@@ -109,10 +109,8 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.PerformanceProfiles
-import com.sbro.emucorex.core.UPSCALE_MAX
-import com.sbro.emucorex.core.UPSCALE_MIN
-import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
-import com.sbro.emucorex.core.formatUpscaleLabel
+import com.sbro.emucorex.core.buildUpscaleOptions
+import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
@@ -1012,14 +1010,11 @@ private fun SettingsContent(
                                 onClick = launchDriverPicker
                             )
                         }
-                        SliderItem(
-                            icon = Icons.Rounded.GraphicEq,
+                        ChoiceSection(
                             title = stringResource(R.string.settings_upscale),
-                            subtitle = formatUpscaleLabel(uiState.upscaleMultiplier),
-                            value = uiState.upscaleMultiplier,
-                            range = UPSCALE_MIN..UPSCALE_MAX,
-                            steps = UPSCALE_SLIDER_STEPS,
-                            onValueChange = viewModel::setUpscaleMultiplier,
+                            options = buildUpscaleOptions(stringResource(R.string.settings_upscale_native)),
+                            selectedValue = upscaleMultiplierValue(uiState.upscaleMultiplier),
+                            onSelect = { viewModel.setUpscaleMultiplier(it.toFloat()) },
                             helpText = stringResource(R.string.settings_help_upscale),
                             onResetToDefault = { viewModel.setUpscaleMultiplier(defaults.upscaleMultiplier) }
                         )

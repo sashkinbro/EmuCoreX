@@ -120,4 +120,4 @@ private:
 	u32 Get_vuCycles();
 };
 
-extern VU_Thread& vu1Thread;
+extern VU_Thread vu1Thread;

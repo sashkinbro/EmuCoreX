@@ -8,7 +8,6 @@
 #include "common/StringUtil.h"
 
 alignas(128) vuRegistersPack g_vuRegistersPack;
-VU_Thread& vu1Thread = g_vuRegistersPack.vu1Thread;
 
 //------------------------------------------------------------------
 // Micro VU - Main Functions

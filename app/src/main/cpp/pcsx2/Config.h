@@ -753,7 +753,6 @@ struct Pcsx2Config
 					SynchronousMTGS : 1,
 					VsyncEnable : 1,
 					DisableMailboxPresentation : 1,
-					ExtendedUpscalingMultipliers : 1,
 					PCRTCAntiBlur : 1,
 					DisableInterlaceOffset : 1,
 					PCRTCOffsets : 1,

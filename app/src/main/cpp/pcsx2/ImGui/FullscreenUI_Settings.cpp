@@ -2710,25 +2710,6 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		FSUI_NSTR("4x Native (~1440px/QHD)"),
 		FSUI_NSTR("5x Native (~1800px/QHD+)"),
 		FSUI_NSTR("6x Native (~2160px/4K UHD)"),
-		FSUI_NSTR("7x Native (~2520px)"),
-		FSUI_NSTR("8x Native (~2880px/5K UHD)"),
-		FSUI_NSTR("9x Native (~3240px)"),
-		FSUI_NSTR("10x Native (~3600px/6K UHD)"),
-		FSUI_NSTR("11x Native (~3960px)"),
-		FSUI_NSTR("12x Native (~4320px/8K UHD)"),
-		FSUI_NSTR("13x Native (~4680px)"),
-		FSUI_NSTR("14x Native (~5040px)"),
-		FSUI_NSTR("15x Native (~5400px)"),
-		FSUI_NSTR("16x Native (~5760px)"),
-		FSUI_NSTR("17x Native (~6120px)"),
-		FSUI_NSTR("18x Native (~6480px/12K UHD)"),
-		FSUI_NSTR("19x Native (~6840px)"),
-		FSUI_NSTR("20x Native (~7200px)"),
-		FSUI_NSTR("21x Native (~7560px)"),
-		FSUI_NSTR("22x Native (~7920px)"),
-		FSUI_NSTR("23x Native (~8280px)"),
-		FSUI_NSTR("24x Native (~8640px/16K UHD)"),
-		FSUI_NSTR("25x Native (~9000px)"),
 	};
 	static const char* s_resolution_values[] = {
 		"1",
@@ -2737,25 +2718,6 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		"4",
 		"5",
 		"6",
-		"7",
-		"8",
-		"9",
-		"10",
-		"11",
-		"12",
-		"13",
-		"14",
-		"15",
-		"16",
-		"17",
-		"18",
-		"19",
-		"20",
-		"21",
-		"22",
-		"23",
-		"24",
-		"25",
 	};
 	static constexpr const char* s_bilinear_options[] = {
 		FSUI_NSTR("Nearest"),
@@ -2839,8 +2801,8 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		s_last_adapter_list_renderer = effective_renderer;
 	}
 
-	u32 max_upscale_multiplier = 12;
-	bool supports_extended_upscales = false;
+	static constexpr u32 MAX_UI_UPSCALE_MULTIPLIER = 6;
+	u32 max_upscale_multiplier = MAX_UI_UPSCALE_MULTIPLIER;
 	if (is_hardware && !s_graphics_adapter_list_cache.empty())
 	{
 		std::string current_adapter;
@@ -2862,19 +2824,10 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		if (!current_adapter_info && !s_graphics_adapter_list_cache.empty())
 			current_adapter_info = &s_graphics_adapter_list_cache.front();
 		if (current_adapter_info)
-			max_upscale_multiplier = std::clamp<u32>(current_adapter_info->max_upscale_multiplier, 12, std::size(s_resolution_options));
-
-		supports_extended_upscales = max_upscale_multiplier > 12u;
+			max_upscale_multiplier = std::clamp<u32>(current_adapter_info->max_upscale_multiplier, 1u, MAX_UI_UPSCALE_MULTIPLIER);
 	}
 
-	size_t max_shown_multiplier = static_cast<size_t>(
-		(supports_extended_upscales && bsi->GetBoolValue("EmuCore/GS", "ExtendedUpscalingMultipliers", false)) ? max_upscale_multiplier : 12u);
-	const bool game_settings = IsEditingGameSettings(bsi);
-	std::optional<float> saved_multiplier;
-	if (const std::optional<SmallString> config_value = bsi->GetOptionalSmallStringValue("EmuCore/GS", "upscale_multiplier"))
-	{
-		saved_multiplier = StringUtil::FromChars<float>(config_value->c_str());
-	}
+	size_t max_shown_multiplier = static_cast<size_t>(max_upscale_multiplier);
 
 	static const char* s_shown_resolution_options[std::size(s_resolution_options)];
 	static const char* s_shown_resolution_values[std::size(s_resolution_values)];
@@ -2884,18 +2837,6 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 	{
 		s_shown_resolution_options[num_resolutions] = s_resolution_options[num_resolutions];
 		s_shown_resolution_values[num_resolutions] = s_resolution_values[num_resolutions];
-	}
-
-	if (saved_multiplier)
-	{
-		// if saved multiplier goes above the current UI cap, expose it temporarily.
-		const size_t saved_count = static_cast<size_t>(saved_multiplier.value());
-		if (saved_count > max_shown_multiplier && saved_count <= std::size(s_resolution_options) && static_cast<float>(saved_count) == *saved_multiplier)
-		{
-			s_shown_resolution_options[num_resolutions] = s_resolution_options[saved_count - 1];
-			s_shown_resolution_values[num_resolutions] = s_resolution_values[saved_count - 1];
-			num_resolutions++;
-		}
 	}
 
 #ifndef PCSX2_DEVBUILD
@@ -3239,9 +3180,6 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 			FSUI_CSTR("Forces the use of FIFO over Mailbox presentation, i.e. double buffering instead of triple buffering. "
 					  "Usually results in worse frame pacing."),
 			"EmuCore/GS", "DisableMailboxPresentation", false);
-		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_ARROW_UP_RIGHT_FROM_SQUARE, "Extended Upscaling Multipliers"),
-			FSUI_CSTR("Displays additional, very high upscaling multipliers dependent on GPU and driver capability."),
-			"EmuCore/GS", "ExtendedUpscalingMultipliers", false, supports_extended_upscales);
 		if (IsEditingGameSettings(bsi))
 		{
 			DrawIntListSetting(bsi, FSUI_CSTR("Hardware Download Mode"), FSUI_CSTR("Changes synchronization behavior for GS downloads."),
@@ -5599,25 +5537,6 @@ TRANSLATE_NOOP("FullscreenUI", "3x Native (~1080px/FHD)");
 TRANSLATE_NOOP("FullscreenUI", "4x Native (~1440px/QHD)");
 TRANSLATE_NOOP("FullscreenUI", "5x Native (~1800px/QHD+)");
 TRANSLATE_NOOP("FullscreenUI", "6x Native (~2160px/4K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "7x Native (~2520px)");
-TRANSLATE_NOOP("FullscreenUI", "8x Native (~2880px/5K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "9x Native (~3240px)");
-TRANSLATE_NOOP("FullscreenUI", "10x Native (~3600px/6K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "11x Native (~3960px)");
-TRANSLATE_NOOP("FullscreenUI", "12x Native (~4320px/8K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "13x Native (~4680px)");
-TRANSLATE_NOOP("FullscreenUI", "14x Native (~5040px)");
-TRANSLATE_NOOP("FullscreenUI", "15x Native (~5400px)");
-TRANSLATE_NOOP("FullscreenUI", "16x Native (~5760px)");
-TRANSLATE_NOOP("FullscreenUI", "17x Native (~6120px)");
-TRANSLATE_NOOP("FullscreenUI", "18x Native (~6480px/12K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "19x Native (~6840px)");
-TRANSLATE_NOOP("FullscreenUI", "20x Native (~7200px)");
-TRANSLATE_NOOP("FullscreenUI", "21x Native (~7560px)");
-TRANSLATE_NOOP("FullscreenUI", "22x Native (~7920px)");
-TRANSLATE_NOOP("FullscreenUI", "23x Native (~8280px)");
-TRANSLATE_NOOP("FullscreenUI", "24x Native (~8640px/16K UHD)");
-TRANSLATE_NOOP("FullscreenUI", "25x Native (~9000px)");
 TRANSLATE_NOOP("FullscreenUI", "Nearest");
 TRANSLATE_NOOP("FullscreenUI", "Bilinear (Forced)");
 TRANSLATE_NOOP("FullscreenUI", "Bilinear (PS2)");
@@ -5825,7 +5744,6 @@ TRANSLATE_NOOP("FullscreenUI", "Shade Boost Brightness");
 TRANSLATE_NOOP("FullscreenUI", "Shade Boost Contrast");
 TRANSLATE_NOOP("FullscreenUI", "Shade Boost Saturation");
 TRANSLATE_NOOP("FullscreenUI", "TV Shaders");
-TRANSLATE_NOOP("FullscreenUI", "Extended Upscaling Multipliers");
 TRANSLATE_NOOP("FullscreenUI", "OSD Scale");
 TRANSLATE_NOOP("FullscreenUI", "OSD Margin");
 TRANSLATE_NOOP("FullscreenUI", "OSD Messages Position");

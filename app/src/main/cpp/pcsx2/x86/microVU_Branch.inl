@@ -460,7 +460,7 @@ void normBranch(mV, microFlagCycles& mFC)
 		u32 tempPC = iPC;
         if (mVU.index && THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x400 : 0x4));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x400 : 0x4));
@@ -490,7 +490,7 @@ void normBranch(mV, microFlagCycles& mFC)
 		u32 tempPC = iPC;
         if (mVU.index && THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x800 : 0x8));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x800 : 0x8));
@@ -564,7 +564,7 @@ void condBranch(mV, microFlagCycles& mFC, a64::Condition JMPcc)
 		u32 tempPC = iPC;
         if (mVU.index && THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x800 : 0x8));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x800 : 0x8));
@@ -618,7 +618,7 @@ void condBranch(mV, microFlagCycles& mFC, a64::Condition JMPcc)
 		u32 tempPC = iPC;
         if (mVU.index  && THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x400 : 0x4));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x400 : 0x4));
@@ -817,7 +817,7 @@ void normJump(mV, microFlagCycles& mFC)
 
         if (THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x400 : 0x4));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x400 : 0x4));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x400 : 0x4));
@@ -850,7 +850,7 @@ void normJump(mV, microFlagCycles& mFC)
 
         if (mVU.index && THREAD_VU1) {
 //            xTEST(ptr32[&vu1Thread.vuFBRST], (isVU1 ? 0x800 : 0x8));
-            armAsm->Tst(armLoad(PTR_MVU(vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
+            armAsm->Tst(armLoad(armMemOperandPtr(&vu1Thread.vuFBRST)), (isVU1 ? 0x800 : 0x8));
         }
         else {
 //            xTEST(ptr32[&VU0.VI[REG_FBRST].UL], (isVU1 ? 0x800 : 0x8));

@@ -2084,7 +2084,7 @@ mVUop(mVU_XTOP)
 //		xMOVZX(regT, ptr16[&mVU.getVifRegs().top]);
 		if (mVU.index && THREAD_VU1)
 		{
-			armAsm->Ldrh(regT, PTR_MVU(vu1Thread.vifRegs.top));
+			armAsm->Ldrh(regT, armMemOperandPtr(&vu1Thread.vifRegs.top));
 		}
 		else
 		{
@@ -2112,7 +2112,7 @@ mVUop(mVU_XITOP)
 //		xMOVZX(regT, ptr16[&mVU.getVifRegs().itop]);
 		if (mVU.index && THREAD_VU1)
 		{
-			armAsm->Ldrh(regT, PTR_MVU(vu1Thread.vifRegs.itop));
+			armAsm->Ldrh(regT, armMemOperandPtr(&vu1Thread.vifRegs.itop));
 		}
 		else
 		{

@@ -177,21 +177,27 @@ bool GSDeviceVK::SelectInstanceExtensions(ExtensionList* extension_list, const W
 	}
 
 	if (extension_count == 0)
+	{
+		Console.Error("VK: No extensions supported by instance.");
 		return false;
-	
+	}
 
 	std::vector<VkExtensionProperties> available_extension_list(extension_count);
 	res = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extension_list.data());
 	pxAssert(res == VK_SUCCESS);
 
-	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool /*required*/) {
+	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool required) {
 		if (std::find_if(available_extension_list.begin(), available_extension_list.end(),
 				[name](const VkExtensionProperties& properties) { return !strcmp(name, properties.extensionName); }) !=
 			available_extension_list.end())
 		{
+			DevCon.WriteLn("VK: Enabling extension: %s", name);
 			extension_list->push_back(name);
 			return true;
 		}
+
+		if (required)
+			Console.Error("VK: Missing required extension %s.", name);
 
 		return false;
 	};
@@ -216,16 +222,17 @@ bool GSDeviceVK::SelectInstanceExtensions(ExtensionList* extension_list, const W
 	if (wi.type == WindowInfo::Type::MacOS && !SupportsExtension(VK_EXT_METAL_SURFACE_EXTENSION_NAME, true))
 		return false;
 #endif
-
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	if (wi.type == WindowInfo::Type::Android && !SupportsExtension(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME, true))
+	if (wi.type == WindowInfo::Type::Android &&
+		!SupportsExtension(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME, true))
+	{
 		return false;
+	}
 #endif
 
 	// VK_EXT_debug_utils
 	if (enable_debug_utils && !SupportsExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, false))
-	{
-	}
+		Console.Warning("VK: Debug report requested, but extension is not available.");
 
 	oe->vk_swapchain_maintenance1 = wi.type != WindowInfo::Type::Surfaceless;
 	if (wi.type != WindowInfo::Type::Surfaceless)
@@ -262,6 +269,8 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 	res = vkEnumeratePhysicalDevices(instance, &gpu_count, physical_devices.data());
 	if (res == VK_INCOMPLETE)
 	{
+		Console.Warning("VK: First vkEnumeratePhysicalDevices() call returned %zu devices, but second returned %u",
+			physical_devices.size(), gpu_count);
 	}
 	else if (res != VK_SUCCESS)
 	{
@@ -283,6 +292,9 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 		if (VK_API_VERSION_VARIANT(props.apiVersion) == 0 && VK_API_VERSION_MAJOR(props.apiVersion) <= 1 &&
 			VK_API_VERSION_MINOR(props.apiVersion) < 1)
 		{
+			Console.Warning(fmt::format("VK: Ignoring GPU '{}' because it only claims support for Vulkan {}.{}.{}",
+				props.deviceName, VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion),
+				VK_API_VERSION_PATCH(props.apiVersion)));
 			continue;
 		}
 
@@ -291,6 +303,8 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 		res = vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
 		if (res != VK_SUCCESS)
 		{
+			Console.Warning(fmt::format("VK: Ignoring GPU '{}' because vkEnumerateInstanceExtensionProperties() failed: ",
+				props.deviceName, Vulkan::VkResultToString(res)));
 			continue;
 		}
 
@@ -307,6 +321,8 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 					return (std::strcmp(required_extension_name, ext.extensionName) == 0);
 				}) == available_extension_list.end())
 			{
+				Console.Warning(fmt::format("VK: Ignoring GPU '{}' because is is missing required extension {}",
+					props.deviceName, required_extension_name));
 				has_missing_extension = true;
 			}
 		}
@@ -381,15 +397,17 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	}
 
 	if (extension_count == 0)
+	{
+		Console.Error("VK: No extensions supported by device.");
 		return false;
-	
+	}
 
 	std::vector<VkExtensionProperties> available_extension_list(extension_count);
 	res = vkEnumerateDeviceExtensionProperties(
 		m_physical_device, nullptr, &extension_count, available_extension_list.data());
 	pxAssert(res == VK_SUCCESS);
 
-	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool /*required*/) {
+	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool required) {
 		if (std::find_if(available_extension_list.begin(), available_extension_list.end(),
 				[name](const VkExtensionProperties& properties) { return !strcmp(name, properties.extensionName); }) !=
 			available_extension_list.end())
@@ -397,11 +415,15 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 			if (std::none_of(extension_list->begin(), extension_list->end(),
 					[name](const char* existing_name) { return (std::strcmp(existing_name, name) == 0); }))
 			{
+				DevCon.WriteLn("VK: Enabling extension: %s", name);
 				extension_list->push_back(name);
 			}
 
 			return true;
 		}
+
+		if (required)
+			Console.Error("VK: Missing required extension %s.", name);
 
 		return false;
 	};
@@ -416,14 +438,6 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 			return false;
 	}
 
-	// MoltenVK does not support VK_EXT_line_rasterization. We want it for other platforms,
-	// but on Mac, the implicit line rasterization apparently matches Bresenham anyway.
-#ifdef __APPLE__
-	static constexpr bool require_line_rasterization = false;
-#else
-	static constexpr bool require_line_rasterization = true;
-#endif
-
 	m_optional_extensions.vk_ext_provoking_vertex = SupportsExtension(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_memory_budget = SupportsExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_calibrated_timestamps =
@@ -432,8 +446,7 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
-	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME,
-		require_line_rasterization);
+	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_push_descriptor =
 		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_driver_properties = SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
@@ -489,11 +502,14 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	u32 queue_family_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, nullptr);
 	if (queue_family_count == 0)
+	{
+		Console.Error("No queue families found on specified vulkan physical device.");
 		return false;
-	
+	}
 
 	std::vector<VkQueueFamilyProperties> queue_family_properties(queue_family_count);
 	vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, queue_family_properties.data());
+	DevCon.WriteLn("%u vulkan queue families", queue_family_count);
 
 	// Find graphics and present queues.
 	m_graphics_queue_family_index = queue_family_count;
@@ -553,11 +569,15 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 			break; // Async compute queue, definitely pick this one
 	}
 	if (m_graphics_queue_family_index == queue_family_count)
+	{
+		Console.Error("VK: Failed to find an acceptable graphics queue.");
 		return false;
-	
+	}
 	if (surface != VK_NULL_HANDLE && m_present_queue_family_index == queue_family_count)
+	{
+		Console.Error("VK: Failed to find an acceptable present queue.");
 		return false;
-	
+	}
 
 	VkDeviceCreateInfo device_info = {};
 	device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -695,6 +715,11 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	m_gpu_timing_supported = (m_device_properties.limits.timestampComputeAndGraphics != 0 &&
 							  queue_family_properties[m_graphics_queue_family_index].timestampValidBits > 0 &&
 							  m_device_properties.limits.timestampPeriod > 0);
+	DevCon.WriteLn("GPU timing is %s (TS=%u TS valid bits=%u, TS period=%f)",
+		m_gpu_timing_supported ? "supported" : "not supported",
+		static_cast<u32>(m_device_properties.limits.timestampComputeAndGraphics),
+		queue_family_properties[m_graphics_queue_family_index].timestampValidBits,
+		m_device_properties.limits.timestampPeriod);
 
 	if (!ProcessDeviceExtensions())
 		return false;
@@ -730,7 +755,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
 	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
 	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_FALSE};
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_TRUE};
 	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
 
@@ -775,9 +800,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 		// Confirm the implementation can cover our texture set needs. Otherwise fall back to descriptor sets.
 		if (push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
-		{
 			m_optional_extensions.vk_khr_push_descriptor = false;
-		}
 	}
 	else
 	{
@@ -785,14 +808,10 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
 	}
 
-	if (!line_rasterization_feature.bresenhamLines)
+	if (m_optional_extensions.vk_ext_line_rasterization && !line_rasterization_feature.bresenhamLines)
 	{
-		// See note in SelectDeviceExtensions().
-#ifndef __APPLE__
-		return false;
-#else
+		Console.Warning("VK: bresenhamLines is not supported.");
 		m_optional_extensions.vk_ext_line_rasterization = false;
-#endif
 	}
 
 	// VK_EXT_calibrated_timestamps checking
@@ -831,6 +850,24 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 	m_optional_extensions.vk_swapchain_maintenance1 &= 
 		(swapchain_maintenance1_feature.swapchainMaintenance1 == VK_TRUE);
+
+	Console.WriteLn(
+		"VK_EXT_provoking_vertex is %s", m_optional_extensions.vk_ext_provoking_vertex ? "supported" : "NOT supported");
+	Console.WriteLn(
+		"VK_EXT_memory_budget is %s", m_optional_extensions.vk_ext_memory_budget ? "supported" : "NOT supported");
+	Console.WriteLn("VK_EXT_calibrated_timestamps is %s",
+		m_optional_extensions.vk_ext_calibrated_timestamps ? "supported" : "NOT supported");
+	Console.WriteLn("VK_EXT_rasterization_order_attachment_access is %s",
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access ? "supported" : "NOT supported");
+	Console.WriteLn("VK_%s_swapchain_maintenance1 is %s",
+		m_optional_extensions.vk_swapchain_maintenance1_is_khr ? "KHR" : "EXT",
+		m_optional_extensions.vk_swapchain_maintenance1 ? "supported" : "NOT supported");
+	Console.WriteLn("VK_EXT_full_screen_exclusive is %s",
+		m_optional_extensions.vk_ext_full_screen_exclusive ? "supported" : "NOT supported");
+	Console.WriteLn("VK_KHR_driver_properties is %s",
+		m_optional_extensions.vk_khr_driver_properties ? "supported" : "NOT supported");
+	Console.WriteLn("VK_EXT_attachment_feedback_loop_layout is %s",
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout ? "supported" : "NOT supported");
 
 	return true;
 }
@@ -874,6 +911,8 @@ bool GSDeviceVK::CreateAllocator()
 
 			if (heap_size_limits[type.heapIndex] == VK_WHOLE_SIZE)
 			{
+				Console.Warning("VK: Disabling allocation from upload heap #%u (%.2f MB) due to debug device.",
+					type.heapIndex, static_cast<float>(heap.size) / 1048576.0f);
 				heap_size_limits[type.heapIndex] = 0;
 				has_upload_heap = true;
 			}
@@ -947,18 +986,13 @@ bool GSDeviceVK::CreateCommandBuffers()
 bool GSDeviceVK::CreateGlobalDescriptorPool()
 {
 	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
-		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTORS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_SAMPLED_IMAGE_DESCRIPTORS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_STORAGE_IMAGE_DESCRIPTORS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_INPUT_ATTACHMENT_IMAGE_DESCRIPTORS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_SAMPLER, MAX_COMBINED_IMAGE_SAMPLER_DESCRIPTORS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, MAX_DESCRIPTOR_SETS_PER_FRAME * NUM_COMMAND_BUFFERS},
-		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_DESCRIPTOR_SETS_PER_FRAME * NUM_COMMAND_BUFFERS},
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2},
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
 	};
 
 	VkDescriptorPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, nullptr,
 		VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-		MAX_DESCRIPTOR_SETS_PER_FRAME * NUM_COMMAND_BUFFERS, // TODO: tweak this
+		1024, // TODO: tweak this
 		static_cast<u32>(std::size(pool_sizes)), pool_sizes};
 
 	VkResult res = vkCreateDescriptorPool(m_device, &pool_create_info, nullptr, &m_global_descriptor_pool);
@@ -1453,10 +1487,27 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverit
 	VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData)
 {
-	static_cast<void>(severity);
-	static_cast<void>(messageType);
-	static_cast<void>(pCallbackData);
-	static_cast<void>(pUserData);
+	if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+	{
+		Console.Error("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else if (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT))
+	{
+		Console.Warning("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+	{
+		Console.WriteLn("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+	else
+	{
+		DevCon.WriteLn("VK: debug report: (%s) %s",
+			pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "", pCallbackData->pMessage);
+	}
+
 	return VK_FALSE;
 }
 
@@ -1943,8 +1994,7 @@ void GSDeviceVK::CalibrateSpinTimestamp()
 			break;
 	}
 	if (maxDeviation >= MAX_MAX_DEVIATION)
-	{
-	}
+		Console.Warning("vkGetCalibratedTimestampsEXT returned high max deviation of %lluus", maxDeviation / 1000);
 	const double gpu_time = timestamps[0] * m_spin_timestamp_scale;
 #ifdef _WIN32
 	const double cpu_time = timestamps[1] * m_queryperfcounter_to_ns;
@@ -2034,10 +2084,12 @@ bool GSDeviceVK::IsSuitableDefaultRenderer()
 
 	// Check the first GPU, should be enough.
 	const std::string& name = gpus.front().second.name;
+	INFO_LOG("Using Vulkan GPU '{}' for automatic renderer check.", name);
 
 	// Any software rendering (LLVMpipe, SwiftShader).
 	if (StringUtil::StartsWithNoCase(name, "llvmpipe") || StringUtil::StartsWithNoCase(name, "SwiftShader"))
 	{
+		Console.WriteLn(Color_StrongOrange, "Not using Vulkan for software renderer.");
 		return false;
 	}
 
@@ -2045,9 +2097,11 @@ bool GSDeviceVK::IsSuitableDefaultRenderer()
 	// Plus, the Ivy Bridge and Haswell drivers are incomplete.
 	if (StringUtil::StartsWithNoCase(name, "Intel"))
 	{
+		Console.WriteLn(Color_StrongOrange, "Not using Vulkan for Intel GPU.");
 		return false;
 	}
 
+	Console.WriteLn(Color_StrongGreen, "Allowing Vulkan as default renderer.");
 	return true;
 }
 
@@ -2190,14 +2244,17 @@ bool GSDeviceVK::UpdateWindow()
 
 	VkSurfaceKHR surface = VKSwapChain::CreateVulkanSurface(m_instance, m_physical_device, &m_window_info);
 	if (surface == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to create new surface for swap chain");
 		return false;
-	
+	}
 
 	VkPresentModeKHR present_mode;
 	if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
 		!(m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
 			  Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl))))
 	{
+		Console.Error("VK: Failed to create swap chain");
 		VKSwapChain::DestroyVulkanSurface(m_instance, &m_window_info, surface);
 		return false;
 	}
@@ -2227,6 +2284,7 @@ void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float
 	if (!m_swap_chain->ResizeSwapChain(new_window_width, new_window_height, new_window_scale))
 	{
 		// AcquireNextImage() will fail, and we'll recreate the surface.
+		Console.Error("VK: Failed to resize swap chain. Next present will fail.");
 		return;
 	}
 
@@ -2281,8 +2339,10 @@ void GSDeviceVK::SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
 
 	VkPresentModeKHR present_mode;
 	if (!VKSwapChain::SelectPresentMode(m_swap_chain->GetSurface(), &mode, &present_mode))
+	{
+		ERROR_LOG("Ignoring vsync mode change.");
 		return;
-	
+	}
 
 	// Actually changed? If using a fallback, it might not have.
 	if (m_vsync_mode == mode)
@@ -2329,18 +2389,18 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 		}
 		else if (res == VK_ERROR_SURFACE_LOST_KHR)
 		{
-			if (!AcquireWindow(false))
+			Console.Warning("VK: Surface lost, attempting to recreate");
+			WaitForGPUIdle();
+			if (!AcquireWindow(true))
 			{
+				Console.Error("VK: Failed to reacquire Android window after surface loss");
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}
-			if (m_window_info.type == WindowInfo::Type::Surfaceless)
-			{
-				ExecuteCommandBuffer(false);
-				return PresentResult::FrameSkipped;
-			}
+
 			if (!m_swap_chain->RecreateSurface(m_window_info))
 			{
+				Console.Error("VK: Failed to recreate surface after loss");
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}
@@ -2523,11 +2583,14 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 				Host::ReportErrorAsync("Error", "Failed to create Vulkan instance. Does your GPU and/or driver support Vulkan?");
 				return false;
 			}
+
+			ERROR_LOG("VK: validation/debug layers requested but are unavailable. Creating non-debug device.");
 		}
 	}
 
 	if (!Vulkan::LoadVulkanInstanceFunctions(m_instance))
 	{
+		ERROR_LOG("Failed to load Vulkan instance functions");
 		return false;
 	}
 
@@ -2544,6 +2607,7 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 		u32 gpu_index = 0;
 		for (; gpu_index < static_cast<u32>(gpus.size()); gpu_index++)
 		{
+			DEV_LOG("GPU {}: {}", gpu_index, gpus[gpu_index].second.name);
 			if (gpus[gpu_index].second.name == GSConfig.Adapter)
 			{
 				m_physical_device = gpus[gpu_index].first;
@@ -2553,11 +2617,13 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 
 		if (gpu_index == static_cast<u32>(gpus.size()))
 		{
+			WARNING_LOG("Requested GPU '{}' not found, using first ({})", GSConfig.Adapter, gpus[0].second.name);
 			m_physical_device = gpus[0].first;
 		}
 	}
 	else
 	{
+		INFO_LOG("{} GPU requested, using first ({})", is_default_gpu ? "Default" : "No", gpus[0].second.name);
 		m_physical_device = gpus[0].first;
 	}
 
@@ -2566,15 +2632,20 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 
 	// Stores the GPU name
 	m_name = m_device_properties.deviceName;
-
 #if defined(__ANDROID__)
 	{
 		const GpuProfileSelection profile_selection =
-			GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, GetVendorNameFromID(m_device_properties.vendorID), m_name);
+			GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
+				GetVendorNameFromID(m_device_properties.vendorID), m_name);
 		SetRuntimeGPUProfile(profile_selection.runtime_profile);
+		Console.WriteLn("VK: GPU profile override='%s' resolved='%s'.",
+			GpuProfileDetector::OverrideToConfigString(profile_selection.override_mode),
+			GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
+		DevCon.WriteLn("VK: GPU profile hints: %s", profile_selection.hints.c_str());
 	}
 #else
-	SetRuntimeGPUProfile((m_device_properties.vendorID == 0x13B5u) ? RuntimeGpuProfile::Mali : RuntimeGpuProfile::Adreno);
+	SetRuntimeGPUProfile((m_device_properties.vendorID == 0x13B5u) ? RuntimeGpuProfile::Mali :
+		RuntimeGpuProfile::Adreno);
 #endif
 
 	// We need this to be at least 32 byte aligned for AVX2 stores.
@@ -2621,6 +2692,7 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 			!(m_swap_chain = VKSwapChain::Create(m_window_info, surface, present_mode,
 				  Pcsx2Config::GSOptions::TriStateToOptionalBoolean(GSConfig.ExclusiveFullscreenControl))))
 		{
+			ERROR_LOG("Failed to create swap chain");
 			return false;
 		}
 
@@ -2640,6 +2712,7 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
+	const u32 vendorID = m_device_properties.vendorID;
 	//const bool isAMD = (vendorID == 0x1002 || vendorID == 0x1022);
 	//const bool isNVIDIA = (vendorID == 0x10DE);
 
@@ -2649,6 +2722,18 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
 
+#ifdef __ANDROID__
+	// Qualcomm Android drivers are currently corrupting indexed/feedback-heavy scenes with the barrier path.
+	if (IsAdrenoGPUProfile())
+	{
+		if (m_features.texture_barrier || m_features.framebuffer_fetch)
+			Console.Warning("VK: Disabling texture barriers/framebuffer fetch on Android Adreno due to rendering corruption.");
+
+		m_features.texture_barrier = false;
+		m_features.framebuffer_fetch = false;
+	}
+#endif
+
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
 	m_features.primitive_id = m_device_features.geometryShader;
 
@@ -2657,8 +2742,7 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
 
 	if (!m_features.texture_barrier)
-	{
-	}
+		Console.Warning("VK: Texture buffers are disabled. This may break some graphical effects.");
 
 	// Test for D32S8 support.
 	{
@@ -2684,6 +2768,16 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.line_expand =
 		(m_device_features.wideLines && limits.lineWidthRange[0] <= f_upscale && limits.lineWidthRange[1] >= f_upscale);
 
+	// Mobile GPUs tend to emulate wide points/lines expensively, so keep the old vertex-expansion path there.
+	if (vendorID == 0x5143u || vendorID == 0x13B5u)
+	{
+		if (m_features.point_expand || m_features.line_expand)
+			Console.WriteLn("VK: Forcing vertex-based expansion for points/lines on mobile GPU (vendor 0x%X).",
+				vendorID);
+		m_features.point_expand = false;
+		m_features.line_expand = false;
+	}
+
 	if (m_features.texture_barrier && (GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Auto ||
 		GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Depth))
 	{
@@ -2693,6 +2787,14 @@ bool GSDeviceVK::CheckFeatures()
 	{
 		m_features.depth_feedback = GSDevice::DepthFeedbackSupport::None;
 	}
+
+	DevCon.WriteLn("Optional features:%s%s%s%s%s", m_features.primitive_id ? " primitive_id" : "",
+		m_features.texture_barrier ? " texture_barrier" : "", m_features.framebuffer_fetch ? " framebuffer_fetch" : "",
+		m_features.provoking_vertex_last ? " provoking_vertex_last" : "", m_features.vs_expand ? " vs_expand" : "");
+
+	DevCon.WriteLn("Using %s for point expansion and %s for line expansion.",
+		m_features.point_expand ? "hardware" : "vertex expanding",
+		m_features.line_expand ? "hardware" : "vertex expanding");
 
 	// Check texture format support before we try to create them.
 	for (u32 fmt = static_cast<u32>(GSTexture::Format::Color); fmt < static_cast<u32>(GSTexture::Format::PrimID); fmt++)
@@ -3225,7 +3327,6 @@ void GSDeviceVK::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, 
 	const bool feedback_write_1 = PMODE.EN1 && sTex[2] != nullptr && EXTBUF.FBIN == 0;
 	const bool feedback_write_2_but_blend_bg = feedback_write_2 && PMODE.SLBG == 1;
 	const VkSampler& sampler = linear ? m_linear_sampler : m_point_sampler;
-
 	// Merge the 2 source textures (sTex[0],sTex[1]). Final results go to dTex. Feedback write will go to sTex[2].
 	// If either 2nd output is disabled or SLBG is 1, a background color will be used.
 	// Note: background color is also used when outside of the unit rectangle area
@@ -3236,7 +3337,6 @@ void GSDeviceVK::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, 
 		(sTex[0]->GetState() == GSTexture::State::Dirty || (sTex[0]->GetState() == GSTexture::State::Cleared || sTex[0]->GetClearColor() != 0)));
 	const bool has_input_1 = (PMODE.SLBG == 0 || feedback_write_2_but_blend_bg) && sTex[1] &&
 		(sTex[1]->GetState() == GSTexture::State::Dirty || (sTex[1]->GetState() == GSTexture::State::Cleared || sTex[1]->GetClearColor() != 0));
-
 	if (has_input_0)
 	{
 		static_cast<GSTextureVK*>(sTex[0])->CommitClear();
@@ -3603,9 +3703,6 @@ VkSampler GSDeviceVK::GetSampler(GSHWDrawConfig::SamplerSelector ss)
 		return it->second;
 
 	const bool aniso = (ss.aniso && GSConfig.MaxAnisotropy > 1 && m_device_features.samplerAnisotropy);
-	const float max_supported_aniso = m_device_features.samplerAnisotropy ?
-		std::max(1.0f, static_cast<float>(m_device_properties.limits.maxSamplerAnisotropy)) : 1.0f;
-	const float aniso_value = aniso ? std::min(static_cast<float>(GSConfig.MaxAnisotropy), max_supported_aniso) : 1.0f;
 
 	// See https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkSamplerCreateInfo.html#_description
 	// for the reasoning behind 0.25f here.
@@ -3621,7 +3718,7 @@ VkSampler GSDeviceVK::GetSampler(GSHWDrawConfig::SamplerSelector ss)
 		VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, // w
 		0.0f, // lod bias
 		static_cast<VkBool32>(aniso), // anisotropy enable
-		aniso_value, // anisotropy
+		aniso ? static_cast<float>(GSConfig.MaxAnisotropy) : 1.0f, // anisotropy
 		VK_FALSE, // compare enable
 		VK_COMPARE_OP_ALWAYS, // compare op
 		0.0f, // min lod
@@ -4229,8 +4326,7 @@ bool GSDeviceVK::CompileInterlacePipelines()
 
 	for (int i = 0; i < static_cast<int>(m_interlace.size()); i++)
 	{
-		const std::string entry_point = StringUtil::StdStringFromFormat("ps_main%d", i);
-		VkShaderModule ps = GetUtilityFragmentShader(*shader, entry_point.c_str());
+		VkShaderModule ps = GetUtilityFragmentShader(*shader, StringUtil::StdStringFromFormat("ps_main%d", i).c_str());
 		if (ps == VK_NULL_HANDLE)
 			return false;
 
@@ -4280,8 +4376,7 @@ bool GSDeviceVK::CompileMergePipelines()
 
 	for (int i = 0; i < static_cast<int>(m_merge.size()); i++)
 	{
-		const std::string entry_point = StringUtil::StdStringFromFormat("ps_main%d", i);
-		VkShaderModule ps = GetUtilityFragmentShader(*shader, entry_point.c_str());
+		VkShaderModule ps = GetUtilityFragmentShader(*shader, StringUtil::StdStringFromFormat("ps_main%d", i).c_str());
 		if (ps == VK_NULL_HANDLE)
 			return false;
 
@@ -4434,19 +4529,25 @@ bool GSDeviceVK::CompileImGuiPipeline()
 {
 	const std::optional<std::string> glsl = ReadShaderSource("shaders/vulkan/imgui.glsl");
 	if (!glsl.has_value())
+	{
+		Console.Error("VK: Failed to read imgui.glsl");
 		return false;
-	
+	}
 
 	VkShaderModule vs = GetUtilityVertexShader(glsl.value(), "vs_main");
 	if (vs == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to compile ImGui vertex shader");
 		return false;
-	
+	}
 	ScopedGuard vs_guard([this, &vs]() { vkDestroyShaderModule(m_device, vs, nullptr); });
 
 	VkShaderModule ps = GetUtilityFragmentShader(glsl.value(), "ps_main");
 	if (ps == VK_NULL_HANDLE)
+	{
+		Console.Error("VK: Failed to compile ImGui pixel shader");
 		return false;
-	
+	}
 	ScopedGuard ps_guard([this, &ps]() { vkDestroyShaderModule(m_device, ps, nullptr); });
 
 	Vulkan::GraphicsPipelineBuilder gpb;
@@ -4470,8 +4571,10 @@ bool GSDeviceVK::CompileImGuiPipeline()
 
 	m_imgui_pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(), false);
 	if (!m_imgui_pipeline)
+	{
+		Console.Error("VK: Failed to compile ImGui pipeline");
 		return false;
-	
+	}
 
 	Vulkan::SetObjectName(m_device, m_imgui_pipeline, "ImGui pipeline");
 	return true;
@@ -4512,8 +4615,10 @@ void GSDeviceVK::RenderImGui()
 		{
 			const u32 size = sizeof(ImDrawVert) * static_cast<u32>(cmd_list->VtxBuffer.Size);
 			if (!m_vertex_stream_buffer.ReserveMemory(size, sizeof(ImDrawVert)))
+			{
+				Console.Warning("VK: Skipping ImGui draw because of no vertex buffer space");
 				return;
-			
+			}
 
 			vertex_offset = m_vertex_stream_buffer.GetCurrentOffset() / sizeof(ImDrawVert);
 			std::memcpy(m_vertex_stream_buffer.GetCurrentHostPointer(), cmd_list->VtxBuffer.Data, size);
@@ -4554,8 +4659,10 @@ void GSDeviceVK::RenderBlankFrame()
 {
 	VkResult res = m_swap_chain->AcquireNextImage();
 	if (res != VK_SUCCESS)
+	{
+		Console.Error("VK: Failed to acquire image for blank frame present");
 		return;
-	
+	}
 
 	VkCommandBuffer cmdbuffer = GetCurrentCommandBuffer();
 	GSTextureVK* sctex = m_swap_chain->GetCurrentTexture();
@@ -4597,7 +4704,6 @@ bool GSDeviceVK::DoCAS(
 		const VkDescriptorSet descriptor_set = AllocatePersistentDescriptorSet(m_cas_ds_layout);
 		if (descriptor_set == VK_NULL_HANDLE)
 			return false;
-		
 
 		dsub.UpdateToDescriptorSet(m_device, descriptor_set, true);
 		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_COMPUTE, m_cas_pipeline_layout, 0, 1, &descriptor_set, 0,
@@ -5075,13 +5181,18 @@ void GSDeviceVK::ExecuteCommandBuffer(bool wait_for_completion)
 
 void GSDeviceVK::ExecuteCommandBuffer(bool wait_for_completion, const char* reason, ...)
 {
-	static_cast<void>(reason);
+	std::va_list ap;
+	va_start(ap, reason);
+	const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
+	va_end(ap);
+
+	Console.Warning("VK: Executing command buffer due to '%s'", reason_str.c_str());
 	ExecuteCommandBuffer(wait_for_completion);
 }
 
 void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completion, const char* reason)
 {
-	static_cast<void>(reason);
+	Console.Warning("VK: Executing command buffer due to '%s'", reason);
 
 	const VkRenderPass render_pass = m_current_render_pass;
 	const GSVector4i render_pass_area = m_current_render_pass_area;
@@ -5105,7 +5216,12 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completi
 
 void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion, const char* reason, ...)
 {
-	static_cast<void>(reason);
+	std::va_list ap;
+	va_start(ap, reason);
+	const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
+	va_end(ap);
+
+	Console.Warning("VK: Executing command buffer due to '%s'", reason_str.c_str());
 
 	pxAssert(m_is_presenting);
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
@@ -5423,8 +5539,10 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 				sizeof(m_vs_cb_cache), static_cast<u32>(m_device_properties.limits.minUniformBufferOffsetAlignment)))
 		{
 			if (already_execed)
+			{
+				Console.Error("VK: Failed to reserve vertex uniform space");
 				return false;
-			
+			}
 
 			ExecuteCommandBufferAndRestartRenderPass(false, "Ran out of vertex uniform space");
 			return ApplyTFXState(true);
@@ -5442,8 +5560,10 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 				sizeof(m_ps_cb_cache), static_cast<u32>(m_device_properties.limits.minUniformBufferOffsetAlignment)))
 		{
 			if (already_execed)
+			{
+				Console.Error("VK: Failed to reserve pixel uniform space");
 				return false;
-			
+			}
 
 			ExecuteCommandBufferAndRestartRenderPass(false, "Ran out of pixel uniform space");
 			return ApplyTFXState(true);
@@ -5533,7 +5653,6 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 			const VkDescriptorSet descriptor_set = AllocatePersistentDescriptorSet(m_tfx_texture_ds_layout);
 			if (descriptor_set == VK_NULL_HANDLE)
 				return false;
-			
 
 			dsub.UpdateToDescriptorSet(m_device, descriptor_set, true);
 			vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout,
@@ -5573,7 +5692,6 @@ bool GSDeviceVK::ApplyUtilityState(bool already_execed)
 			const VkDescriptorSet descriptor_set = AllocatePersistentDescriptorSet(m_utility_ds_layout);
 			if (descriptor_set == VK_NULL_HANDLE)
 				return false;
-			
 
 			dsub.UpdateToDescriptorSet(m_device, descriptor_set, true);
 			vkCmdBindDescriptorSets(
@@ -5759,6 +5877,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		date_image = SetupPrimitiveTrackingDATE(config);
 		if (!date_image)
 		{
+			Console.Warning("VK: Failed to allocate DATE image, aborting draw.");
 			return;
 		}
 
@@ -5864,6 +5983,8 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 			colclip_rt = static_cast<GSTextureVK*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
 			if (!colclip_rt)
 			{
+				Console.Warning("VK: Failed to allocate ColorClip render target, aborting draw.");
+
 				if (date_image)
 					Recycle(date_image);
 
@@ -5947,8 +6068,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 				PSSetShaderResource(0, draw_rt_clone, true);
 		}
 		else
-		{
-		}
+			Console.Warning("VK: Failed to allocate temp texture for RT copy.");
 	}
 
 	OMSetRenderTargets(draw_rt, draw_ds, config.scissor, static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags));
@@ -6153,9 +6273,9 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 		if (config.ps.IsFeedbackLoopRT())
 			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
 
-	if (config.ps.IsFeedbackLoopDepth())
-		pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
-}
+		if (config.ps.IsFeedbackLoopDepth())
+			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
+	}
 	if (!(pipe.feedback_loop_flags & FeedbackLoopFlag_ReadAndWriteDepth))
 	{
 		pipe.feedback_loop_flags |= (config.tex && config.tex == config.ds) ? FeedbackLoopFlag_ReadDepth : FeedbackLoopFlag_None;
@@ -6222,8 +6342,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 
 #ifdef PCSX2_DEVBUILD
 	if ((one_barrier || full_barrier) && !(m_pipeline_selector.ps.IsFeedbackLoopRT() || m_pipeline_selector.ps.IsFeedbackLoopDepth())) [[unlikely]]
-	{
-	}
+		Console.Warning("VK: Possible unnecessary barrier detected.");
 #endif
 	VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
 

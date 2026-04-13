@@ -52,12 +52,12 @@ VULKAN_INSTANCE_ENTRY_POINT(vkGetPhysicalDeviceXlibPresentationSupportKHR, false
 VULKAN_INSTANCE_ENTRY_POINT(vkCreateWaylandSurfaceKHR, false)
 #endif
 
-#if defined(VK_USE_PLATFORM_METAL_EXT)
-VULKAN_INSTANCE_ENTRY_POINT(vkCreateMetalSurfaceEXT, false)
-#endif
-
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 VULKAN_INSTANCE_ENTRY_POINT(vkCreateAndroidSurfaceKHR, false)
+#endif
+
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+VULKAN_INSTANCE_ENTRY_POINT(vkCreateMetalSurfaceEXT, false)
 #endif
 
 // VK_EXT_debug_utils

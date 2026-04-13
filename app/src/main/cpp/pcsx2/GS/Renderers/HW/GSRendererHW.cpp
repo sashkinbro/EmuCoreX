@@ -3,7 +3,6 @@
 
 #include "GS/Renderers/HW/GSRendererHW.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
-#include "GS/Renderers/OpenGL/GSDeviceOGL.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
@@ -12,32 +11,6 @@
 #include "common/BitUtils.h"
 #include "common/StringUtil.h"
 #include <bit>
-
-static const char* GetOGLCopyReason(const bool gles_force_copy_direct_target_region, const bool invalid_direct_target_region,
-	const bool downscale_source, const bool channel_shuffle, const GSTexture* tex_texture,
-	const GSTextureCache::Target* rt, const GSTextureCache::Target* ds, const GSTextureCache::Source* tex,
-	const bool tex_matches_rt, const bool tex_matches_ds, const bool channel_shuffle_mismatch)
-{
-	if (gles_force_copy_direct_target_region)
-		return "gles_force_direct_target_region";
-	if (invalid_direct_target_region)
-		return "invalid_direct_target_region";
-	if (downscale_source && tex->m_from_target)
-		return "downscale_source";
-	if (channel_shuffle_mismatch)
-		return "channel_shuffle_mismatch";
-	if (channel_shuffle)
-		return "channel_shuffle";
-	if (tex_texture && tex_texture->GetType() == GSTexture::Type::DepthStencil)
-		return "depth_source_texture";
-	if (rt && tex_matches_rt)
-		return "render_target_feedback";
-	if (ds && tex_matches_ds)
-		return "depth_feedback";
-	if (tex->m_from_target)
-		return "from_target_fallback";
-	return "unknown";
-}
 
 GSRendererHW::GSRendererHW()
 	: GSRenderer()
@@ -1254,6 +1227,7 @@ GSVector2i GSRendererHW::GetValidSize(const GSTextureCache::Source* tex, const b
 	constexpr int valid_max_size = 2047;
 	if ((width > valid_max_size) || (height > valid_max_size))
 	{
+		DevCon.Warning("Warning: GetValidSize out of bounds, X:%d Y:%d", width, height);
 		width = std::min(width, valid_max_size);
 		height = std::min(height, valid_max_size);
 	}
@@ -2614,8 +2588,7 @@ void GSRendererHW::Draw()
 			g_gs_device->SetColorClipTexture(nullptr);
 		}
 		else
-		{
-		}
+			DevCon.Warning("HW: Error resolving colclip texture for pre-draw resolve");
 	}
 
 	const bool draw_sprite_tex = PRIM->TME && (m_vt.m_primclass == GS_SPRITE_CLASS);
@@ -3697,7 +3670,6 @@ void GSRendererHW::Draw()
 					if (horizontal_page_offset)
 						src->m_region.SetX(horizontal_page_offset * GSLocalMemory::m_psm[rt->m_TEX0.PSM].pgs.x, target_width * GSLocalMemory::m_psm[rt->m_TEX0.PSM].pgs.x);
 
-
 					if (rt->m_dirty.empty())
 					{
 						RGBAMask rgba_mask;
@@ -3944,6 +3916,7 @@ void GSRendererHW::Draw()
 				}
 				else
 				{
+					DevCon.Warning("HW: Temporary depth buffer creation failed.");
 					m_using_temp_z = false;
 				}
 			}
@@ -4551,8 +4524,7 @@ void GSRendererHW::Draw()
 						g_texture_cache->SetTemporaryZ(tex);
 					}
 					else
-					{
-					}
+						DevCon.Warning("HW: Temporary depth buffer creation failed.");
 				}
 			}
 			const bool z_masked = m_cached_ctx.ZBUF.ZMSK;
@@ -5807,6 +5779,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 	const bool alpha_eq_one = alpha_c0_eq_one || alpha_c2_eq_one;
 	const bool alpha_high_one = alpha_c0_high_min_one || alpha_c2_high_one;
 	const bool alpha_eq_less_one = alpha_c0_eq_less_max_one || alpha_c2_eq_less_one;
+	const bool alpha_mali_custom_set = g_gs_device && g_gs_device->IsMaliGPUProfile() &&
+		(alpha_eq_less_one || alpha_c0_high_max_one);
 
 	// Optimize blending equations, must be done before index calculation
 	if ((m_conf.ps.blend_a == m_conf.ps.blend_b) || ((m_conf.ps.blend_b == m_conf.ps.blend_d) && alpha_eq_one))
@@ -5977,8 +5951,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 			accumulation_blend &= !prefer_sw_blend;
 			// Enable sw blending for barriers.
 			sw_blending |= blend_requires_barrier || prefer_sw_blend;
-			// Enable sw blending for free blending (non recursive, accumulation).
-			sw_blending |= free_blend;
+			// Keep the old Mali path forcing SW blending on the problematic alpha ranges.
+			sw_blending |= (free_blend || alpha_mali_custom_set);
 			// Do not run BLEND MIX if sw blending is already present, it's less accurate.
 			blend_mix &= !sw_blending;
 			sw_blending |= blend_mix;
@@ -6788,11 +6762,10 @@ __ri void GSRendererHW::EmulateTextureSampler(const GSTextureCache::Target* rt, 
 	m_conf.ps.ltf = bilinear && shader_emulated_sampler;
 	m_conf.ps.point_sampler = g_gs_device->Features().broken_point_sampler && GSConfig.GPUPaletteConversion && !target_region && (!bilinear || shader_emulated_sampler);
 
-	const bool copied_source = static_cast<bool>(src_copy);
-	const int tw = copied_source ? unscaled_size.x : static_cast<int>(1 << m_cached_ctx.TEX0.TW);
-	const int th = copied_source ? unscaled_size.y : static_cast<int>(1 << m_cached_ctx.TEX0.TH);
-	const int miptw = copied_source ? unscaled_size.x : (1 << tex->m_TEX0.TW);
-	const int mipth = copied_source ? unscaled_size.y : (1 << tex->m_TEX0.TH);
+	const int tw = static_cast<int>(1 << m_cached_ctx.TEX0.TW);
+	const int th = static_cast<int>(1 << m_cached_ctx.TEX0.TH);
+	const int miptw = 1 << tex->m_TEX0.TW;
+	const int mipth = 1 << tex->m_TEX0.TH;
 
 	const GSVector4 WH(static_cast<float>(tw), static_cast<float>(th), miptw * scale, mipth * scale);
 
@@ -6856,21 +6829,7 @@ __ri void GSRendererHW::EmulateTextureSampler(const GSTextureCache::Target* rt, 
 		}
 	}
 
-	const bool gles_sprite_lod_workaround =
-		trilinear_manual &&
-		!tex->m_target &&
-		m_vt.m_primclass == GS_SPRITE_CLASS &&
-		g_gs_device->GetRenderAPI() == RenderAPI::OpenGL &&
-		GSDeviceOGL::GetInstance()->IsGLESDevice();
-
-	if (gles_sprite_lod_workaround)
-	{
-		// GLES manual LOD selection is noticeably unstable on some alpha billboard/sprite draws,
-		// causing nearby foliage to jump between mip levels while moving. Prefer hardware LOD here.
-		tex->m_texture->GenerateMipmapsIfNeeded();
-		m_conf.ps.automatic_lod = 1;
-	}
-	else if (trilinear_manual)
+	if (trilinear_manual)
 	{
 		m_conf.cb_ps.LODParams.x = static_cast<float>(m_context->TEX1.K) / 16.0f;
 		m_conf.cb_ps.LODParams.y = static_cast<float>(1 << m_context->TEX1.L);
@@ -6924,35 +6883,15 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 	const GSTextureCache::Source* tex, const TextureMinMaxResult& tmm, GSTextureCache::SourceRegion& source_region,
 	bool& target_region, GSVector2i& unscaled_size, float& scale, GSDevice::RecycledTexture& src_copy)
 {
+
 	const int tex_diff = tex->m_from_target ? static_cast<int>(m_cached_ctx.TEX0.TBP0 - tex->m_from_target->m_TEX0.TBP0) : static_cast<int>(m_cached_ctx.TEX0.TBP0 - tex->m_TEX0.TBP0);
 	const int frame_diff = rt ? static_cast<int>(m_cached_ctx.FRAME.Block() - rt->m_TEX0.TBP0) : 0;
-	const GSVector2i tex_unscaled_size = tex->GetUnscaledSize();
-	const GSVector4i tex_unscaled_rect(0, 0, tex_unscaled_size.x, tex_unscaled_size.y);
-	const GSVector4i source_region_rect = source_region.GetRect(tex_unscaled_size.x, tex_unscaled_size.y);
-	const bool gles_force_copy_direct_target_region =
-		g_gs_device->GetRenderAPI() == RenderAPI::OpenGL &&
-		GSDeviceOGL::GetInstance()->IsGLESDevice() &&
-		target_region &&
-		tex->m_from_target &&
-		tex->m_target_direct;
-	const bool invalid_direct_target_region =
-		target_region &&
-		tex->m_from_target &&
-		tex->m_target_direct &&
-		!source_region_rect.rintersect(tex_unscaled_rect).eq(source_region_rect);
-	const bool tex_matches_rt = (rt && m_conf.tex == m_conf.rt && !(m_channel_shuffle && tex && tex_diff != frame_diff));
-	const bool tex_matches_ds =
-		(ds && m_conf.tex == m_conf.ds &&
-			(!m_channel_shuffle || (rt && static_cast<int>(m_cached_ctx.FRAME.Block() - rt->m_TEX0.TBP0) ==
-				static_cast<int>(m_cached_ctx.ZBUF.Block() - ds->m_TEX0.TBP0))));
-	const bool channel_shuffle_mismatch = (m_channel_shuffle && tex->m_from_target && tex_diff != frame_diff);
-	const char* copy_reason = nullptr;
 
 	// Detect framebuffer read that will need special handling
 	const GSTextureCache::Target* src_target = nullptr;
 	if (!m_downscale_source || !tex->m_from_target)
 	{
-		if (tex_matches_rt)
+		if (rt && m_conf.tex == m_conf.rt && !(m_channel_shuffle && tex && tex_diff != frame_diff))
 		{
 			// Can we read the framebuffer directly? (i.e. sample location matches up).
 			if (CanUseTexIsFB(rt, tex, tmm))
@@ -6971,10 +6910,9 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 
 			GL_CACHE("HW: Source is render target, taking copy.");
 			src_target = rt;
-			copy_reason = "render_target_feedback";
 		}
 		// Be careful of single page channel shuffles where depth is the source but it's not going to the same place, we can't read this directly.
-		else if (tex_matches_ds)
+		else if (ds && m_conf.tex == m_conf.ds && (!m_channel_shuffle || (rt && static_cast<int>(m_cached_ctx.FRAME.Block() - rt->m_TEX0.TBP0) == static_cast<int>(m_cached_ctx.ZBUF.Block() - ds->m_TEX0.TBP0))))
 		{
 			// GL, Vulkan (in General layout), DirectX11 (binding dsv as read only) no support for DirectX12 yet!
 			const bool can_read_current_depth_buffer = g_gs_device->Features().test_and_sample_depth;
@@ -6993,32 +6931,10 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 			// Can't safely read the depth buffer, so we need to take a copy of it.
 			GL_CACHE("HW: Source is depth buffer, unsafe to read, taking copy.");
 			src_target = ds;
-			copy_reason = "depth_feedback";
 		}
-		else if (channel_shuffle_mismatch)
+		else if (m_channel_shuffle && tex->m_from_target && tex_diff != frame_diff)
 		{
 			src_target = tex->m_from_target;
-			copy_reason = "channel_shuffle_mismatch";
-		}
-		else if (gles_force_copy_direct_target_region)
-		{
-			GL_CACHE("HW: Forcing copy for GLES direct target-region source: region=%d,%d-%d,%d src=%dx%d tbp0=0x%x from=0x%x",
-				source_region_rect.x, source_region_rect.y, source_region_rect.z, source_region_rect.w,
-				tex_unscaled_size.x, tex_unscaled_size.y,
-				static_cast<unsigned>(tex->m_TEX0.TBP0),
-				static_cast<unsigned>(tex->m_from_target ? tex->m_from_target->m_TEX0.TBP0 : 0));
-			src_target = tex->m_from_target;
-			copy_reason = "gles_force_direct_target_region";
-		}
-		else if (invalid_direct_target_region)
-		{
-			GL_CACHE("HW: Direct target region exceeds source bounds, taking copy instead: region=%d,%d-%d,%d src=%dx%d tbp0=0x%x from=0x%x",
-				source_region_rect.x, source_region_rect.y, source_region_rect.z, source_region_rect.w,
-				tex_unscaled_size.x, tex_unscaled_size.y,
-				static_cast<unsigned>(tex->m_TEX0.TBP0),
-				static_cast<unsigned>(tex->m_from_target ? tex->m_from_target->m_TEX0.TBP0 : 0));
-			src_target = tex->m_from_target;
-			copy_reason = "invalid_direct_target_region";
 		}
 		else
 		{
@@ -7027,16 +6943,7 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 		}
 	}
 	else
-	{
 		src_target = tex->m_from_target;
-		copy_reason = "downscale_source";
-	}
-
-	if (!copy_reason)
-	{
-		copy_reason = GetOGLCopyReason(gles_force_copy_direct_target_region, invalid_direct_target_region, m_downscale_source,
-			m_channel_shuffle, tex->m_texture, rt, ds, tex, tex_matches_rt, tex_matches_ds, channel_shuffle_mismatch);
-	}
 
 	// We need to copy. Try to cut down the source range as much as possible so we don't copy texels we're not reading.
 	const GSVector2i& src_unscaled_size = src_target->GetUnscaledSize();
@@ -7204,6 +7111,7 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 	                   g_gs_device->CreateRenderTarget(scaled_copy_size.x, scaled_copy_size.y, src_target->m_texture->GetFormat(), true, true));
 	if (!src_copy) [[unlikely]]
 	{
+		Console.Error("HW: Failed to allocate %dx%d texture for hazard copy", scaled_copy_size.x, scaled_copy_size.y);
 		m_conf.tex = nullptr;
 		m_conf.ps.tfx = 4;
 		return;
@@ -7552,6 +7460,9 @@ void GSRendererHW::EmulateAlphaTest(const bool& DATE, bool& DATE_BARRIER, bool& 
 
 	// Determine if the method for doing depth feedback uses multiple render targets.
 	// This should not be used in conjunction with dual source blend.
+	const bool depth_as_rt_feedback = afail_needs_depth &&
+		(features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT);
+
 	// We need depth feedback but do not have the correct features.
 	const bool avoid_feedback = afail_needs_depth && !depth_feedback_supported;
 
@@ -8311,12 +8222,14 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 			DATE_one = false;
 			DATE_PRIMID = true;
 			m_conf.destination_alpha = GSHWDrawConfig::DestinationAlphaMode::PrimIDTracking;
+			DevCon.Warning("HW: Depth buffer creation failed for Stencil Date. Fallback to PrimIDTracking.");
 		}
 		else
 		{
 			DATE = false;
 			DATE_one = false;
 			m_conf.destination_alpha = GSHWDrawConfig::DestinationAlphaMode::Off;
+			DevCon.Warning("HW: Depth buffer creation failed for Stencil Date.");
 		}
 	}
 
@@ -10005,7 +9918,10 @@ void GSRendererHW::EndHLEHardwareDraw(bool force_copy_on_hazard /* = false */)
 			GSTexture* src = (config.tex == config.rt) ? config.rt : config.ds;
 			copy = g_gs_device->CreateTexture(src->GetWidth(), src->GetHeight(), 1, src->GetFormat(), true);
 			if (!copy)
+			{
+				Console.Error("HW: Texture allocation failure in EndHLEHardwareDraw()");
 				return;
+			}
 
 			const GSVector4i copy_rect = config.drawarea.rintersect(src->GetRect());
 			g_gs_device->CopyRect(src, copy, copy_rect - copy_rect.xyxy(), copy_rect.x, copy_rect.y);

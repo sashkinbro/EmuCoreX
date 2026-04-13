@@ -87,9 +87,15 @@ bool GSRenderer::Merge(int field)
 	int y_offset[3] = { 0, 0, 0 };
 	const bool feedback_merge = m_regs->EXTWRITE.WRITE == 1;
 
+	if (!PCRTCDisplays.PCRTCDisplays[0].enabled && !PCRTCDisplays.PCRTCDisplays[1].enabled)
+	{
+		m_real_size = GSVector2i(0, 0);
+		return false;
+	}
+
 	// Need to do this here, if the user has Anti-Blur enabled, these offsets can get wiped out/changed.
-	const bool game_deinterlacing = (PCRTCDisplays.PCRTCDisplays[0].framebufferOffsets != PCRTCDisplays.PCRTCDisplays[0].prevFramebufferOffsets) !=
-									(PCRTCDisplays.PCRTCDisplays[1].framebufferOffsets != PCRTCDisplays.PCRTCDisplays[1].prevFramebufferOffsets);
+	const bool game_deinterlacing = (PCRTCDisplays.PCRTCDisplays[0].prevFramebufferOffsets.y != PCRTCDisplays.PCRTCDisplays[0].framebufferOffsets.y) !=
+	                                (PCRTCDisplays.PCRTCDisplays[1].prevFramebufferOffsets.y != PCRTCDisplays.PCRTCDisplays[1].framebufferOffsets.y);
 
 	// Only need to check the right/bottom on software renderer, hardware always gets the full texture then cuts a bit out later.
 	if (PCRTCDisplays.FrameRectMatch() && !PCRTCDisplays.FrameWrap() && !feedback_merge)
@@ -106,10 +112,12 @@ bool GSRenderer::Merge(int field)
 				(!(m_regs->PMODE.MMOD == 1 && m_regs->PMODE.ALP == 0) || // Blend RC1 with non-zero alpha.
 				(m_regs->PMODE.AMOD == 0) ||                             // Use alpha of RC1.
 				(feedback_merge && m_regs->EXTBUF.FBIN == 0));           // Use RC1 for feedback merge.
-
+		
+		// The following two flags determine if RC1 output completely overwrites RC2 output
+		// due to the alpha used for blending and the respective rectangles of the outputs.
 		const bool rc1_contains_rc2 =
 			PCRTCDisplays.PCRTCDisplays[0].displayRect.rcontains(PCRTCDisplays.PCRTCDisplays[1].displayRect);
-
+		
 		const bool rc1_overwrites_rc2 = use_rc1 && rc1_contains_rc2 && m_regs->PMODE.MMOD == 1 && m_regs->PMODE.ALP == 255;
 
 		const bool use_rc2 =
@@ -129,6 +137,7 @@ bool GSRenderer::Merge(int field)
 	if (!tex[0] && !tex[1])
 	{
 		m_real_size = GSVector2i(0, 0);
+
 		// Clear out the MAD buffer as some remnants of the previously shown frame came be left over, causing a flash for one frame.
 		if (GSConfig.InterlaceMode == GSInterlaceMode::Automatic || GSConfig.InterlaceMode >= GSInterlaceMode::AdaptiveTFF)
 		{

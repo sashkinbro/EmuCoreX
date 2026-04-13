@@ -41,6 +41,7 @@
 #include "USB/USB.h"
 #include "Vif_Dynarec.h"
 #include "VMManager.h"
+#include "arm64/cpuRegistersPack.h"
 #include "ps2/BiosTools.h"
 
 #include "common/Console.h"
@@ -160,6 +161,27 @@ static std::atomic<VMState> s_state{VMState::Shutdown};
 static bool s_cpu_implementation_changed = false;
 static Threading::ThreadHandle s_vm_thread_handle;
 
+static const char* VMStateToDebugString(VMState state)
+{
+	switch (state)
+	{
+		case VMState::Initializing:
+			return "Initializing";
+		case VMState::Running:
+			return "Running";
+		case VMState::Paused:
+			return "Paused";
+		case VMState::Resetting:
+			return "Resetting";
+		case VMState::Stopping:
+			return "Stopping";
+		case VMState::Shutdown:
+			return "Shutdown";
+		default:
+			return "Unknown";
+	}
+}
+
 static std::deque<std::thread> s_save_state_threads;
 static std::mutex s_save_state_threads_mutex;
 
@@ -265,6 +287,7 @@ void VMManager::SetState(VMState state)
 	// Some state transitions aren't valid.
 	const VMState old_state = s_state.load(std::memory_order_acquire);
 	pxAssert(state != VMState::Initializing && state != VMState::Shutdown);
+	Console.WriteLn("(VMManager) SetState %s -> %s", VMStateToDebugString(old_state), VMStateToDebugString(state));
 	SetTimerResolutionIncreased(state == VMState::Running);
 	s_state.store(state, std::memory_order_release);
 
@@ -734,10 +757,12 @@ void VMManager::ApplyGameFixes()
 	game->applyGSHardwareFixes(EmuConfig.GS);
 
 #ifdef __ANDROID__
-	if (EmuConfig.GS.Renderer == GSRendererType::OGL && EmuConfig.GS.GPUPaletteConversion)
+	if ((EmuConfig.GS.Renderer == GSRendererType::OGL || EmuConfig.GS.Renderer == GSRendererType::VK) &&
+		EmuConfig.GS.GPUPaletteConversion)
 	{
 		EmuConfig.GS.GPUPaletteConversion = false;
-		Console.Warning("VMManager: Forcing gpuPaletteConversion off on Android OpenGL after GameDB fixes.");
+		Console.Warning("VMManager: Forcing gpuPaletteConversion off on Android %s after GameDB fixes.",
+			(EmuConfig.GS.Renderer == GSRendererType::VK) ? "Vulkan" : "OpenGL");
 	}
 #endif
 
@@ -1521,6 +1546,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	mmap_ResetBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
+	Arm64RefreshRuntimeCpuOptions();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	memBindConditionalHandlers();
 	SysMemory::Reset();
@@ -1627,10 +1653,13 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 	Console.WriteLn("VM subsystems initialized in %.2f ms", init_timer.GetTimeMilliseconds());
 	s_state.store(VMState::Paused, std::memory_order_release);
+	Console.WriteLn("(VMManager) Initialize: calling Host::OnVMStarted()");
 	Host::OnVMStarted();
+	Console.WriteLn("(VMManager) Initialize: calling FullscreenUI::OnVMStarted()");
 	FullscreenUI::OnVMStarted();
+	Console.WriteLn("(VMManager) Initialize: calling UpdateInhibitScreensaver(%d)", EmuConfig.InhibitScreensaver ? 1 : 0);
 	UpdateInhibitScreensaver(EmuConfig.InhibitScreensaver);
-
+	Console.WriteLn("(VMManager) Initialize: calling SetEmuThreadAffinities()");
 	SetEmuThreadAffinities();
 
 	// do we want to load state?
@@ -1644,6 +1673,8 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	}
 
 	PerformanceMetrics::Clear();
+	Console.WriteLn("(VMManager) Initialize completed successfully, state=%s",
+		VMStateToDebugString(s_state.load(std::memory_order_acquire)));
 	return VMBootResult::StartupSuccess;
 }
 
@@ -2690,6 +2721,12 @@ void VMManager::UpdateCPUImplementations()
 	// drop-in policy for this Android branch while JIT performance remains mandatory.
 	CpuVU0 = EmuConfig.Cpu.Recompiler.EnableVU0 ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU0) : static_cast<BaseVUmicroCPU*>(&CpuIntVU0);
 	CpuVU1 = EmuConfig.Cpu.Recompiler.EnableVU1 ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU1) : static_cast<BaseVUmicroCPU*>(&CpuIntVU1);
+	Console.WriteLn("(VMManager) CPU providers: EE=%s IOP=%s VU0=%s VU1=%s Cpu=%p psxCpu=%p",
+		CHECK_EEREC ? "rec" : "int",
+		CHECK_IOPREC ? "rec" : "int",
+		EmuConfig.Cpu.Recompiler.EnableVU0 ? "microVU" : "intVU",
+		EmuConfig.Cpu.Recompiler.EnableVU1 ? "microVU" : "intVU",
+		static_cast<const void*>(Cpu), static_cast<const void*>(psxCpu));
 }
 
 void VMManager::Internal::ClearCPUExecutionCaches()
@@ -2713,6 +2750,15 @@ void VMManager::Internal::ClearCPUExecutionCaches()
 
 void VMManager::Execute()
 {
+	static bool s_logged_execute_entry = false;
+	if (!s_logged_execute_entry)
+	{
+		s_logged_execute_entry = true;
+		Console.WriteLn("(VMManager) Execute: entering with state=%s Cpu=%p psxCpu=%p cpuRegs.pc=0x%08x",
+			VMStateToDebugString(s_state.load(std::memory_order_acquire)), static_cast<const void*>(Cpu),
+			static_cast<const void*>(psxCpu), cpuRegs.pc);
+	}
+
 	// Check for interpreter<->recompiler switches.
 	if (std::exchange(s_cpu_implementation_changed, false))
 	{
@@ -2919,6 +2965,7 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	}
 
 	Console.WriteLn("Updating CPU configuration...");
+	Arm64RefreshRuntimeCpuOptions();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 
 	// Order matters here: we first refresh the current providers/caches against the

@@ -106,9 +106,12 @@ const char* Vulkan::VkResultToString(VkResult res)
 
 void Vulkan::LogVulkanResult(const char* func_name, VkResult res, const char* msg, ...)
 {
-	static_cast<void>(func_name);
-	static_cast<void>(res);
-	static_cast<void>(msg);
+	std::va_list ap;
+	va_start(ap, msg);
+	std::string real_msg = StringUtil::StdStringFromFormatV(msg, ap);
+	va_end(ap);
+
+	Console.Error("(%s) %s (%d: %s)", func_name, real_msg.c_str(), static_cast<int>(res), VkResultToString(res));
 }
 
 Vulkan::DescriptorSetLayoutBuilder::DescriptorSetLayoutBuilder()

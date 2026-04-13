@@ -106,8 +106,9 @@ static void UNPACK_V4_5(u32 *dest, const u32* src)
 	writeXYZW<idx,0,doMask>(OFFSET_W, *(dest+3),	((data & 0x8000) >> 8));
 }
 
-static void UNPACK_INVALID(u32*, const u32*)
+static void UNPACK_INVALID(u32* dest, const u32* src)
 {
+	Console.Warning("Vpu/Vif: Invalid Unpack");
 }
 
 // =====================================================================================================
@@ -232,6 +233,8 @@ _vifT void vifUnpackSetup(const u32 *data) {
 	u32 addr = vifXRegs.code;
 	if (idx && ((addr>>15)&1)) addr += vif1Regs.tops;
 	vifX.tag.addr = (addr<<4) & (idx ? 0x3ff0 : 0xff0);
+
+	VIF_LOG("Unpack VIF%x, QWC %x tagsize %x", idx, vifNum, vifX.tag.size);
 
 	vifX.cl			 = 0;
 	vifX.tag.cmd	 = vifX.cmd;

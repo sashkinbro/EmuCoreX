@@ -281,7 +281,6 @@ public:
 struct vuRegistersPack
 {
     alignas(16) microVU microVU[2];
-    alignas(128) VU_Thread vu1Thread;
 };
 alignas(128) extern vuRegistersPack g_vuRegistersPack;
 ////

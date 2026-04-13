@@ -240,10 +240,12 @@
     <string name="achievements_status_earned">Unlocked</string>
     <string name="achievements_status_locked">Locked</string>
     <string name="settings_upscale">Image Quality</string>
-    <string name="settings_upscale_native">Original</string>
+    <string name="settings_upscale_native">Native</string>
     <string name="settings_upscale_2x">2x</string>
     <string name="settings_upscale_3x">3x</string>
     <string name="settings_upscale_4x">4x</string>
+    <string name="settings_upscale_5x">5x</string>
+    <string name="settings_upscale_6x">6x</string>
     <string name="settings_aspect_ratio">Aspect Ratio</string>
     <string name="settings_aspect_ratio_auto">Auto</string>
     <string name="settings_aspect_ratio_43">4:3</string>
@@ -325,7 +327,7 @@
     <string name="settings_help_cover_art_style">Chooses the default cover type used when downloading artwork. Flat covers match the classic front-box look, while 3D Box uses angled box renders when the source provides them. 3D covers can look more dramatic, but availability may be slightly worse than flat art.</string>
     <string name="settings_help_cover_download_url">Overrides the built-in cover source used for automatic downloads. The URL should point directly to a folder that contains JPG covers named by game serial, for example SLUS-20312.jpg. Change this only if you host your own mirror or want to use a different compatible cover library.</string>
     <string name="settings_help_renderer">Selects the graphics backend used for hardware rendering. Vulkan is usually the fastest on modern devices, OpenGL can be safer for compatibility on some GPUs, and Software is mainly a fallback for testing or games that break badly in hardware mode.</string>
-    <string name="settings_help_upscale">Raises the game’s internal render resolution above native PS2 output. It makes 3D scenes look much cleaner, but GPU load climbs fast and some games show extra seams, blur, or broken effects at higher values. If a game looks wrong, drop back toward 1x first.</string>
+    <string name="settings_help_upscale">Raises internal render resolution above native PS2 output. 3D scenes look much cleaner, but GPU load climbs fast and some games show extra seams, blur, or broken effects at higher values. If a game looks wrong, switch back to Native first.</string>
     <string name="settings_help_aspect_ratio">Controls how the final image is framed on your display. Auto follows the game, 4:3 keeps the original look for most PS2 titles, 16:9 suits widescreen-patched games, and Stretch should only be used if you do not mind geometric distortion.</string>
     <string name="settings_help_anisotropic_filtering">Sharpens textures viewed at steep angles, especially roads, floors, fields, and long walls. It usually has a smaller cost than raising resolution, so it is a good quality upgrade if the game already runs well.</string>
     <string name="settings_help_fxaa">Applies a lightweight post-process anti-aliasing pass after rendering. It can smooth jagged edges in games that shimmer, but it also softens UI text and fine detail, so use it only if the cleaner image is worth the blur.</string>
@@ -367,7 +369,7 @@
     <string name="settings_help_skip_draw_end">Sets the end of the skipped draw-call range. It works together with Skip Draw Start and is meant for surgical, game-specific fixes rather than general tuning.</string>
     <string name="settings_help_texture_inside_rt">Changes how the hardware renderer detects textures stored inside render targets. This can fix missing HUDs, videos, or framebuffer-based effects in some games, but stronger modes are heavier and should only be used when needed.</string>
     <string name="settings_help_half_pixel_offset">Adjusts sampling to compensate for half-pixel rounding differences between the PS2 and modern graphics APIs. It is often the first fix to try for shifted bloom, double images, outlines, or post-processing that looks offset when upscaling.</string>
-    <string name="settings_help_native_scaling">Keeps certain sprite and 2D draws closer to native PS2 scaling even when the game is rendered above 1x. This can help HUD alignment, text, and post-process layers that only break when the image is upscaled.</string>
+    <string name="settings_help_native_scaling">Keeps certain sprite and 2D draws closer to native PS2 scaling even when the game is rendered above native resolution. This can help HUD alignment, text, and post-process layers that only break when the image is upscaled.</string>
     <string name="settings_help_round_sprite">Rounds sprite coordinates to reduce thin seams, gaps, or flickering lines on 2D elements and HUDs. It is especially useful in games that show grid lines only when rendered above native resolution.</string>
     <string name="settings_help_bilinear_upscale">Applies bilinear filtering to upscale passes used by some effects. It can smooth harsh scaling artifacts in post-process layers, but it may also soften the image more than you want.</string>
     <string name="settings_help_texture_offset_x">Offsets texture sampling horizontally. This is a precision fix for games where text, HUDs, or post-process layers appear shifted left or right after upscaling.</string>
@@ -478,7 +480,7 @@
     <string name="settings_device_profile_family_exynos">Exynos</string>
     <string name="settings_device_profile_family_tensor">Tensor</string>
     <string name="settings_device_profile_family_generic">Generic Android</string>
-    <string name="settings_device_profile_desc_mediatek">Recommended for MediaTek: switches to OpenGL, keeps 1x resolution, lowers filtering load, and uses safer speedhacks to reduce crashes and improve frame pacing.</string>
+    <string name="settings_device_profile_desc_mediatek">Recommended for MediaTek: switches to OpenGL, keeps native resolution, lowers filtering load, and uses safer speedhacks to reduce crashes and improve frame pacing.</string>
     <string name="settings_device_profile_desc_snapdragon">Recommended for Snapdragon: keeps the fast default path and reapplies the balanced preset for stable performance.</string>
     <string name="settings_device_profile_desc_generic">Applies a balanced compatibility preset for devices that do not have a chipset-specific profile yet.</string>
     <string name="settings_ee_cycle_disabled">Disabled</string>

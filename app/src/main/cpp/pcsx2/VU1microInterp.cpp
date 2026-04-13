@@ -213,6 +213,17 @@ void vu1Exec(VURegs* VU)
 {
 	VU->cycle++;
 	_vu1Exec(VU);
+
+	if (VU->VI[0].UL != 0)
+		DbgCon.Error("VI[0] != 0!!!!\n");
+	if (VU->VF[0].f.x != 0.0f)
+		DbgCon.Error("VF[0].x != 0.0!!!!\n");
+	if (VU->VF[0].f.y != 0.0f)
+		DbgCon.Error("VF[0].y != 0.0!!!!\n");
+	if (VU->VF[0].f.z != 0.0f)
+		DbgCon.Error("VF[0].z != 0.0!!!!\n");
+	if (VU->VF[0].f.w != 1.0f)
+		DbgCon.Error("VF[0].w != 1.0!!!!\n");
 }
 
 InterpVU1 CpuIntVU1;
@@ -225,6 +236,7 @@ InterpVU1::InterpVU1()
 
 void InterpVU1::Reset()
 {
+	DevCon.Warning("VU1 Int Reset");
 	VU1.fmacwritepos = 0;
 	VU1.fmacreadpos = 0;
 	VU1.fmaccount = 0;

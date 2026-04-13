@@ -41,6 +41,9 @@ bool _VIF0chain()
 		return true;
 	}
 
+	VIF_LOG("VIF0chain size=%d, madr=%lx, tadr=%lx",
+	        vif0ch.qwc, vif0ch.madr, vif0ch.tadr);
+
 	if (vif0.irqoffset.enabled)
 		return VIF0transfer(pMem + vif0.irqoffset.value, vif0ch.qwc * 4 - vif0.irqoffset.value);
 	else
@@ -60,6 +63,9 @@ __fi void vif0SetupTransfer()
 
 	// Transfer dma tag if tte is set
 
+	VIF_LOG("vif0 Tag %8.8x_%8.8x size=%d, id=%d, madr=%lx, tadr=%lx",
+			ptag[1]._u32, ptag[0]._u32, vif0ch.qwc, ptag->ID, vif0ch.madr, vif0ch.tadr);
+
 	vif0.inprogress = 0;
 
 	if (vif0ch.chcr.TTE)
@@ -72,6 +78,8 @@ __fi void vif0SetupTransfer()
 
 		masked_tag._u64[0] = 0;
 		masked_tag._u64[1] = *((u64*)ptag + 1);
+
+		VIF_LOG("\tVIF0 SrcChain TTE=1, data = 0x%08x.%08x", masked_tag._u32[3], masked_tag._u32[2]);
 
 		if (vif0.irqoffset.enabled)
 		{
@@ -105,6 +113,8 @@ __fi void vif0SetupTransfer()
 	//Check TIE bit of CHCR and IRQ bit of tag
 	if (vif0ch.chcr.TIE && ptag->IRQ)
 	{
+		VIF_LOG("dmaIrq Set");
+
         //End Transfer
 		vif0.done = true;
 		return;
@@ -143,6 +153,7 @@ __fi void vif0VUFinish()
 		return;
 	}
 	vif0Regs.stat.VEW = false;
+	VIF_LOG("VU0 finished");
 	if(vif0.waitforvu)
 	{
 		vif0.waitforvu = false;
@@ -155,9 +166,13 @@ __fi void vif0VUFinish()
 
 __fi void vif0Interrupt()
 {
+	VIF_LOG("vif0Interrupt: %8.8x", cpuRegs.cycle);
+
 	g_vif0Cycles = 0;
 
 	vif0Regs.stat.FQC = std::min(vif0ch.qwc, (u32)8);
+
+	if (!(vif0ch.chcr.STR)) Console.WriteLn("vif0 running when CHCR == %x", vif0ch.chcr._u32);
 
 	if(vif0.waitforvu)
 	{
@@ -167,6 +182,7 @@ __fi void vif0Interrupt()
 	}
 	if (vif0Regs.stat.VGW)
 	{
+		DevCon.Warning("VIF0 waiting for path");
 	}
 
 	if (vif0.irq && vif0.vifstalled.enabled && vif0.vifstalled.value == VIF_IRQ_STALL)
@@ -192,6 +208,7 @@ __fi void vif0Interrupt()
 			if (vif0ch.qwc > 0 || !vif0.done)
 			{
 				vif0Regs.stat.VPS = VPS_DECODING; //If there's more data you need to say it's decoding the next VIF CMD (Onimusha - Blade Warriors)
+				VIF_LOG("VIF0 Stalled");
 				CPU_SET_DMASTALL(DMAC_VIF0, true);
 				return;
 			}
@@ -235,10 +252,13 @@ __fi void vif0Interrupt()
 
 	if (vif0.vifstalled.enabled && vif0.done)
 	{
+		DevCon.WriteLn("VIF0 looping on stall at end\n");
 		CPU_INT(DMAC_VIF0, 0);
 		return; //Dont want to end if vif is stalled.
 	}
 #ifdef PCSX2_DEVBUILD
+	if (vif0ch.qwc > 0) Console.WriteLn("vif0 Ending with %x QWC left", vif0ch.qwc);
+	if (vif0.cmd != 0) Console.WriteLn("vif0.cmd still set %x tag size %x", vif0.cmd, vif0.tag.size);
 #endif
 
 	vif0ch.chcr.STR = false;
@@ -250,10 +270,16 @@ __fi void vif0Interrupt()
 	hwDmacIrq(DMAC_VIF0);
 	CPU_SET_DMASTALL(DMAC_VIF0, false);
 	vif0Regs.stat.FQC = 0;
+	DMA_LOG("VIF0 DMA End");
 }
 
 void dmaVIF0()
 {
+	VIF_LOG("dmaVIF0 chcr = %lx, madr = %lx, qwc  = %lx\n"
+	        "        tadr = %lx, asr0 = %lx, asr1 = %lx",
+	        vif0ch.chcr._u32, vif0ch.madr, vif0ch.qwc,
+	        vif0ch.tadr, vif0ch.asr0, vif0ch.asr1);
+
 	g_vif0Cycles = 0;
 	CPU_SET_DMASTALL(DMAC_VIF0, false);
 
@@ -276,6 +302,7 @@ void dmaVIF0()
 		{
 			vif0.dmamode = VIF_NORMAL_FROM_MEM_MODE;
 
+			if (vif0.irqoffset.enabled && !vif0.done) DevCon.Warning("Warning! VIF0 starting a Normal transfer with vif offset set (Possible force stop?)");
 			vif0.done = true;
 		}
 

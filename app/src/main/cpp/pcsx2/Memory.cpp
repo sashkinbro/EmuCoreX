@@ -148,6 +148,8 @@ u8* SysMemory::AllocateVirtualMemory(const char* name, void* file_handle, size_t
 		if (u8* ret = TryAllocateVirtualMemory(name, file_handle, base, size))
 			return ret;
 
+		DevCon.Warning("%s: host memory @ 0x%016" PRIXPTR " -> 0x%016" PRIXPTR " is unavailable; attempting to map elsewhere...", name,
+			base, base + size);
 	}
 #else
 	return TryAllocateVirtualMemory(name, file_handle, 0, size);
@@ -341,6 +343,7 @@ void ba0W16(u32 mem, u16 value)
 	{
 		if (s_ba[0x2] == 0x4F || s_ba[0x2] == 0x41)
 		{
+			DevCon.Warning("Error running DVE command, Control Reg value set to %x", value);
 			s_ba_error_detected = true;
 		}
 		else if (s_ba[masked_mem] & 0x80) // Start executing
@@ -378,6 +381,7 @@ void ba0W16(u32 mem, u16 value)
 		else
 			s_ba_error_detected = false;
 
+		DevCon.Warning("DVE powered %s", value == 0 ? "off" : "on");
 	}
 }
 
@@ -409,6 +413,8 @@ u16 ba0R16(u32 mem)
 
 void MyMemCheck(u32 mem)
 {
+    if ( mem == 0x1c02f2a0 )
+        Console.WriteLn("yo; (mem == 0x1c02f2a0) in MyMemCheck...");
 }
 
 /////////////////////////////
@@ -585,6 +591,7 @@ static mem8_t _ext_memRead8 (u32 mem)
 		case 7: // dev9
 		{
 			mem8_t retval = DEV9read8(mem & ~0xa4000000);
+			Console.WriteLn("DEV9 read8 %8.8lx: %2.2lx", mem & ~0xa4000000, retval);
 			return retval;
 		}
 		case 9:
@@ -614,6 +621,7 @@ static mem16_t _ext_memRead16(u32 mem)
 		case 7: // dev9
 		{
 			mem16_t retval = DEV9read16(mem & ~0xa4000000);
+			Console.WriteLn("DEV9 read16 %8.8lx: %4.4lx", mem & ~0xa4000000, retval);
 			return retval;
 		}
 
@@ -639,6 +647,7 @@ static mem32_t _ext_memRead32(u32 mem)
 		case 7: // dev9
 		{
 			mem32_t retval = DEV9read32(mem & ~0xa4000000);
+			Console.WriteLn("DEV9 read32 %8.8lx: %8.8lx", mem & ~0xa4000000, retval);
 			return retval;
 		}
 		case 9:
@@ -709,6 +718,7 @@ static void _ext_memWrite8 (u32 mem, mem8_t  value)
 			gsWrite8(mem, value); return;
 		case 7: // dev9
 			DEV9write8(mem & ~0xa4000000, value);
+			Console.WriteLn("DEV9 write8 %8.8lx: %2.2lx", mem & ~0xa4000000, value);
 			return;
 		case 9:
 			iopMemWrite8(mem & ~0x1c000000, value);
@@ -732,6 +742,7 @@ static void _ext_memWrite16(u32 mem, mem16_t value)
 			gsWrite16(mem, value); return;
 		case 7: // dev9
 			DEV9write16(mem & ~0xa4000000, value);
+			Console.WriteLn("DEV9 write16 %8.8lx: %4.4lx", mem & ~0xa4000000, value);
 			return;
 		case 8: // spu2
 			SPU2write(mem, value); return;
@@ -752,6 +763,7 @@ static void _ext_memWrite32(u32 mem, mem32_t value)
 			gsWrite32(mem, value); return;
 		case 7: // dev9
 			DEV9write32(mem & ~0xa4000000, value);
+			Console.WriteLn("DEV9 write32 %8.8lx: %8.8lx", mem & ~0xa4000000, value);
 			return;
 		case 9:
 			iopMemWrite32(mem & ~0x1c000000, value);

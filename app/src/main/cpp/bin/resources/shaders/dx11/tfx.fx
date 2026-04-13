@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #define FMT_32 0
@@ -19,27 +19,6 @@
 #define GS_IIP 0
 #define GS_PRIM 3
 #define GS_FORWARD_PRIMID 0
-#endif
-
-#ifndef ZTST_GEQUAL
-#define ZTST_GEQUAL 2
-#define ZTST_GREATER 3
-#endif
-
-#ifndef AFAIL_KEEP
-#define AFAIL_KEEP 0
-#define AFAIL_FB_ONLY 1
-#define AFAIL_ZB_ONLY 2
-#define AFAIL_RGB_ONLY 3
-#define AFAIL_RGB_ONLY_DSB 4
-#endif
-
-#ifndef PS_ATST_NONE
-#define PS_ATST_NONE 0
-#define PS_ATST_LEQUAL 1
-#define PS_ATST_GEQUAL 2
-#define PS_ATST_EQUAL 3
-#define PS_ATST_NOTEQUAL 4
 #endif
 
 #ifndef PS_FST
@@ -70,7 +49,6 @@
 #define PS_PROCESS_RG 0
 #define PS_SHUFFLE_ACROSS 0
 #define PS_READ16_SRC 0
-#define PS_WRITE_RG 0
 #define PS_DST_FMT 0
 #define PS_DEPTH_FMT 0
 #define PS_PAL_FMT 0
@@ -92,8 +70,6 @@
 #define PS_DITHER 0
 #define PS_DITHER_ADJUST 0
 #define PS_ZCLAMP 0
-#define PS_ZFLOOR 0
-#define PS_ZWRITE 0
 #define PS_SCANMSK 0
 #define PS_AUTOMATIC_LOD 0
 #define PS_MANUAL_LOD 0
@@ -101,16 +77,11 @@
 #define PS_NO_COLOR 0
 #define PS_NO_COLOR1 0
 #define PS_DATE 0
-#define PS_TEX_IS_FB 0
-#define PS_COLOR_FEEDBACK 0
-#define PS_DEPTH_FEEDBACK 0
 #endif
 
 #define SW_BLEND (PS_BLEND_A || PS_BLEND_B || PS_BLEND_D)
 #define SW_BLEND_NEEDS_RT (SW_BLEND && (PS_BLEND_A == 1 || PS_BLEND_B == 1 || PS_BLEND_C == 1 || PS_BLEND_D == 1))
 #define SW_AD_TO_HW (PS_BLEND_C == 1 && PS_A_MASKED)
-#define AFAIL_NEEDS_RT (PS_AFAIL == AFAIL_ZB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY)
-#define AFAIL_NEEDS_DEPTH (PS_AFAIL == AFAIL_FB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY)
 
 struct VS_INPUT
 {
@@ -138,7 +109,7 @@ struct VS_OUTPUT
 
 struct PS_INPUT
 {
-	noperspective centroid float4 p : SV_Position;
+	float4 p : SV_Position;
 	float4 t : TEXCOORD0;
 	float4 ti : TEXCOORD2;
 #if VS_IIP != 0 || GS_IIP != 0 || PS_IIP != 0
@@ -155,42 +126,25 @@ struct PS_INPUT
 
 struct PS_OUTPUT
 {
-#define NUM_RTS 0
 #if !PS_NO_COLOR
 #if PS_DATE == 1 || PS_DATE == 2
 	float c : SV_Target;
 #else
 	float4 c0 : SV_Target0;
-	#undef NUM_RTS
-	#define NUM_RTS 1
 #if !PS_NO_COLOR1
 	float4 c1 : SV_Target1;
 #endif
 #endif
 #endif
-#if PS_ZWRITE
-	// In DX12 we do depth feedback loops with a color copy.
-	#if PS_DEPTH_FEEDBACK && PS_NO_COLOR1 && DX12
-		#if NUM_RTS > 0
-			float depth_color : SV_Target1;
-		#else
-			float depth_color : SV_Target0;
-		#endif
-	#endif
-	#if PS_HAS_CONSERVATIVE_DEPTH && !PS_DEPTH_FEEDBACK
-		float depth : SV_DepthLessEqual;
-	#else
-		float depth : SV_Depth;
-	#endif
+#if PS_ZCLAMP
+	float depth : SV_Depth;
 #endif
-#undef NUM_RTS
 };
 
 Texture2D<float4> Texture : register(t0);
 Texture2D<float4> Palette : register(t1);
 Texture2D<float4> RtTexture : register(t2);
 Texture2D<float> PrimMinTexture : register(t3);
-Texture2D<float> DepthTexture : register(t4);
 SamplerState TextureSampler : register(s0);
 
 #ifdef DX12
@@ -211,7 +165,6 @@ cbuffer cb1
 	float4 LODParams;
 	float4 STRange;
 	int4 ChannelShuffle;
-	float2 ChannelShuffleOffset;
 	float2 TC_OffsetHack;
 	float2 STScale;
 	float4x4 DitherMatrix;
@@ -219,10 +172,10 @@ cbuffer cb1
 	float RcpScaleFactor;
 };
 
-float4 sample_c(float2 uv, float uv_w, int2 xy)
+float4 sample_c(float2 uv, float uv_w)
 {
 #if PS_TEX_IS_FB == 1
-	return RtTexture.Load(int3(int2(xy), 0));
+	return RtTexture.Load(int3(int2(uv * WH.zw), 0));
 #elif PS_REGION_RECT == 1
 	return Texture.Load(int3(int2(uv), 0));
 #else
@@ -361,26 +314,26 @@ float4 clamp_wrap_uv(float4 uv)
 	return uv;
 }
 
-float4x4 sample_4c(float4 uv, float uv_w, int2 xy)
+float4x4 sample_4c(float4 uv, float uv_w)
 {
 	float4x4 c;
 
-	c[0] = sample_c(uv.xy, uv_w, xy);
-	c[1] = sample_c(uv.zy, uv_w, xy);
-	c[2] = sample_c(uv.xw, uv_w, xy);
-	c[3] = sample_c(uv.zw, uv_w, xy);
+	c[0] = sample_c(uv.xy, uv_w);
+	c[1] = sample_c(uv.zy, uv_w);
+	c[2] = sample_c(uv.xw, uv_w);
+	c[3] = sample_c(uv.zw, uv_w);
 
 	return c;
 }
 
-uint4 sample_4_index(float4 uv, float uv_w, int2 xy)
+uint4 sample_4_index(float4 uv, float uv_w)
 {
 	float4 c;
 
-	c.x = sample_c(uv.xy, uv_w, xy).a;
-	c.y = sample_c(uv.zy, uv_w, xy).a;
-	c.z = sample_c(uv.xw, uv_w, xy).a;
-	c.w = sample_c(uv.zw, uv_w, xy).a;
+	c.x = sample_c(uv.xy, uv_w).a;
+	c.y = sample_c(uv.zy, uv_w).a;
+	c.z = sample_c(uv.xw, uv_w).a;
+	c.w = sample_c(uv.zw, uv_w).a;
 
 	// Denormalize value
 	uint4 i;
@@ -423,14 +376,14 @@ float4x4 sample_4p(uint4 u)
 	return c;
 }
 
-uint fetch_raw_depth(int2 xy)
+int fetch_raw_depth(int2 xy)
 {
 #if PS_TEX_IS_FB == 1
 	float4 col = RtTexture.Load(int3(xy, 0));
 #else
 	float4 col = Texture.Load(int3(xy, 0));
 #endif
-	return (uint)(col.r * exp2(32.0f));
+	return (int)(col.r * exp2(32.0f));
 }
 
 float4 fetch_raw_color(int2 xy)
@@ -505,10 +458,10 @@ float4 sample_depth(float2 st, float2 pos)
 	if (PS_TALES_OF_ABYSS_HLE == 1)
 	{
 		// Warning: UV can't be used in channel effect
-		uint depth = fetch_raw_depth(pos);
+		int depth = fetch_raw_depth(pos);
 
 		// Convert msb based on the palette
-		t = Palette.Load(int3((depth >> 8u) & 0xFFu, 0, 0)) * 255.0f;
+		t = Palette.Load(int3((depth >> 8) & 0xFF, 0, 0)) * 255.0f;
 	}
 	else if (PS_URBAN_CHAOS_HLE == 1)
 	{
@@ -519,13 +472,13 @@ float4 sample_depth(float2 st, float2 pos)
 		// To be faster both steps (msb&lsb) are done in a single pass.
 
 		// Warning: UV can't be used in channel effect
-		uint depth = fetch_raw_depth(pos);
+		int depth = fetch_raw_depth(pos);
 
 		// Convert lsb based on the palette
-		t = Palette.Load(int3(depth & 0xFFu, 0, 0)) * 255.0f;
+		t = Palette.Load(int3(depth & 0xFF, 0, 0)) * 255.0f;
 
 		// Msb is easier
-		float green = (float)((depth >> 8u) & 0xFFu) * 36.0f;
+		float green = (float)((depth >> 8) & 0xFF) * 36.0f;
 		green = min(green, 255.0f);
 		t.g += green;
 	}
@@ -577,7 +530,7 @@ float4 fetch_red(int2 xy)
 
 	if ((PS_DEPTH_FMT == 1) || (PS_DEPTH_FMT == 2))
 	{
-		uint depth = (fetch_raw_depth(xy)) & 0xFFu;
+		int depth = (fetch_raw_depth(xy)) & 0xFF;
 		rt = (float4)(depth) / 255.0f;
 	}
 	else
@@ -594,7 +547,7 @@ float4 fetch_green(int2 xy)
 
 	if ((PS_DEPTH_FMT == 1) || (PS_DEPTH_FMT == 2))
 	{
-		uint depth = (fetch_raw_depth(xy) >> 8u) & 0xFFu;
+		int depth = (fetch_raw_depth(xy) >> 8) & 0xFF;
 		rt = (float4)(depth) / 255.0f;
 	}
 	else
@@ -611,7 +564,7 @@ float4 fetch_blue(int2 xy)
 
 	if ((PS_DEPTH_FMT == 1) || (PS_DEPTH_FMT == 2))
 	{
-		uint depth = (fetch_raw_depth(xy) >> 16u) & 0xFFu;
+		int depth = (fetch_raw_depth(xy) >> 16) & 0xFF;
 		rt = (float4)(depth) / 255.0f;
 	}
 	else
@@ -639,8 +592,8 @@ float4 fetch_gXbY(int2 xy)
 {
 	if ((PS_DEPTH_FMT == 1) || (PS_DEPTH_FMT == 2))
 	{
-		uint depth = fetch_raw_depth(xy);
-		uint bg = (depth >> (8u + uint(ChannelShuffle.w))) & 0xFFu;
+		int depth = fetch_raw_depth(xy);
+		int bg = (depth >> (8 + ChannelShuffle.w)) & 0xFF;
 		return (float4)(bg);
 	}
 	else
@@ -652,7 +605,7 @@ float4 fetch_gXbY(int2 xy)
 	}
 }
 
-float4 sample_color(float2 st, float uv_w, int2 xy)
+float4 sample_color(float2 st, float uv_w)
 {
 	#if PS_TCOFFSETHACK
 	st += TC_OffsetHack.xy;
@@ -664,7 +617,7 @@ float4 sample_color(float2 st, float uv_w, int2 xy)
 
 	if (PS_LTF == 0 && PS_AEM_FMT == FMT_32 && PS_PAL_FMT == 0 && PS_REGION_RECT == 0 && PS_WMS < 2 && PS_WMT < 2)
 	{
-		c[0] = sample_c(st, uv_w, xy);
+		c[0] = sample_c(st, uv_w);
 	}
 	else
 	{
@@ -688,9 +641,9 @@ float4 sample_color(float2 st, float uv_w, int2 xy)
 		uv = clamp_wrap_uv(uv);
 
 #if PS_PAL_FMT != 0
-			c = sample_4p(sample_4_index(uv, uv_w, xy));
+			c = sample_4p(sample_4_index(uv, uv_w));
 #else
-			c = sample_4c(uv, uv_w, xy);
+			c = sample_4c(uv, uv_w);
 #endif
 	}
 
@@ -757,34 +710,34 @@ bool atst(float4 C)
 {
 	float a = C.a;
 
-#if PS_ATST == PS_ATST_LEQUAL
-
-	return (a <= AREF);
-
-#elif PS_ATST == PS_ATST_GEQUAL
-
-	return (a >= AREF);
-
-#elif PS_ATST == PS_ATST_EQUAL
-
-	return (abs(a - AREF) <= 0.5f);
-
-#elif PS_ATST == PS_ATST_NOTEQUAL
-
-	return (abs(a - AREF) >= 0.5f);
-
-#else
-
-	return true;
-
-#endif
+	if(PS_ATST == 1)
+	{
+		return (a <= AREF);
+	}
+	else if(PS_ATST == 2)
+	{
+		return (a >= AREF);
+	}
+	else if(PS_ATST == 3)
+	{
+		 return (abs(a - AREF) <= 0.5f);
+	}
+	else if(PS_ATST == 4)
+	{
+		return (abs(a - AREF) >= 0.5f);
+	}
+	else
+	{
+		// nothing to do
+		return true;
+	}
 }
 
 float4 fog(float4 c, float f)
 {
 	if(PS_FOG)
 	{
-		c.rgb = trunc(lerp(FogColor, c.rgb, (f * 255.0f) / 256.0f));
+		c.rgb = trunc(lerp(FogColor, c.rgb, f));
 	}
 
 	return c;
@@ -801,21 +754,21 @@ float4 ps_color(PS_INPUT input)
 #endif
 
 #if PS_CHANNEL_FETCH == 1
-	float4 T = fetch_red(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_red(int2(input.p.xy));
 #elif PS_CHANNEL_FETCH == 2
-	float4 T = fetch_green(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_green(int2(input.p.xy));
 #elif PS_CHANNEL_FETCH == 3
-	float4 T = fetch_blue(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_blue(int2(input.p.xy));
 #elif PS_CHANNEL_FETCH == 4
-	float4 T = fetch_alpha(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_alpha(int2(input.p.xy));
 #elif PS_CHANNEL_FETCH == 5
-	float4 T = fetch_rgb(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_rgb(int2(input.p.xy));
 #elif PS_CHANNEL_FETCH == 6
-	float4 T = fetch_gXbY(int2(input.p.xy + ChannelShuffleOffset));
+	float4 T = fetch_gXbY(int2(input.p.xy));
 #elif PS_DEPTH_FMT > 0
 	float4 T = sample_depth(st_int, input.p.xy);
 #else
-	float4 T = sample_color(st, input.t.w, int2(input.p.xy));
+	float4 T = sample_color(st, input.t.w);
 #endif
 
 	if (PS_SHUFFLE && !PS_SHUFFLE_SAME && !PS_READ16_SRC && !(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE))
@@ -1062,31 +1015,10 @@ void ps_blend(inout float4 Color, inout float4 As_rgba, float2 pos_xy)
 
 PS_OUTPUT ps_main(PS_INPUT input)
 {
-	// Must floor before depth testing.
-#if PS_ZFLOOR
-	input.p.z = floor(input.p.z * exp2(32.0f)) * exp2(-32.0f);
-#endif
-
-#if PS_DEPTH_FEEDBACK && (PS_ZTST == ZTST_GEQUAL || PS_ZTST == ZTST_GREATER)
-	#if PS_ZTST == ZTST_GEQUAL
-		if (input.p.z < DepthTexture.Load(int3(input.p.xy, 0)).r)
-			discard;
-	#elif PS_ZTST == ZTST_GREATER
-		if (input.p.z <= DepthTexture.Load(int3(input.p.xy, 0)).r)
-			discard;
-	#endif
-#endif // PS_ZTST
-
 	float4 C = ps_color(input);
-
-#if PS_FIXED_ONE_A
-	// AA (Fixed one) will output a coverage of 1.0 as alpha
-	C.a = 128.0f;
-#endif
-
 	bool atst_pass = atst(C);
 
-#if PS_AFAIL == AFAIL_KEEP
+#if PS_AFAIL == 0 // KEEP or ATST off
 	if (!atst_pass)
 		discard;
 #endif
@@ -1098,6 +1030,14 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		// fail depth test on prohibited lines
 		if ((int(input.p.y) & 1) == (PS_SCANMSK & 1))
 			discard;
+	}
+
+	// Must be done before alpha correction
+
+	// AA (Fixed one) will output a coverage of 1.0 as alpha
+	if (PS_FIXED_ONE_A)
+	{
+		C.a = 128.0f;
 	}
 
 	float4 alpha_blend = (float4)0.0f;
@@ -1122,36 +1062,6 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		float A_one = 128.0f;
 		if (C.a < A_one) C.a += A_one;
 	}
-
-#if PS_DATE >= 5
-
-#if PS_WRITE_RG == 1
-	// Pseudo 16 bits access.
-	float rt_a = RtTexture.Load(int3(input.p.xy, 0)).g;
-#else
-	float rt_a = RtTexture.Load(int3(input.p.xy, 0)).a;
-#endif
-
-#if (PS_DATE & 3) == 1
-	// DATM == 0: Pixel with alpha equal to 1 will failed
-	#if PS_RTA_CORRECTION
-		bool bad = (254.5f / 255.0f) < rt_a;
-	#else
-		bool bad = (127.5f / 255.0f) < rt_a;
-	#endif
-#elif (PS_DATE & 3) == 2
-	// DATM == 1: Pixel with alpha equal to 0 will failed
-	#if PS_RTA_CORRECTION
-		bool bad = rt_a < (254.5f / 255.0f);
-	#else
-		bool bad = rt_a < (127.5f / 255.0f);
-	#endif
-#endif
-
-	if (bad)
-		discard;
-
-#endif
 
 #if PS_DATE == 3
 	// Note gl_PrimitiveID == stencil_ceil will be the primitive that will update
@@ -1244,7 +1154,7 @@ PS_OUTPUT ps_main(PS_INPUT input)
 
 	ps_fbmask(C, input.p.xy);
 
-#if (PS_AFAIL == AFAIL_RGB_ONLY_DSB) && !PS_NO_COLOR1
+#if PS_AFAIL == 3 // RGB_ONLY
 	// Use alpha blend factor to determine whether to update A.
 	alpha_blend.a = float(atst_pass);
 #endif
@@ -1255,40 +1165,12 @@ PS_OUTPUT ps_main(PS_INPUT input)
 #if !PS_NO_COLOR1
 	output.c1 = alpha_blend;
 #endif
-
-	// Alpha test with feedback
-#if (PS_AFAIL == AFAIL_FB_ONLY) && PS_DEPTH_FEEDBACK && PS_ZWRITE
-	if (!atst_pass)
-		input.p.z = DepthTexture.Load(int3(input.p.xy, 0)).r;
-#elif (PS_AFAIL == AFAIL_ZB_ONLY) && PS_COLOR_FEEDBACK
-	if (!atst_pass)
-		output.c0 = RtTexture.Load(int3(input.p.xy, 0));
-#elif (PS_AFAIL == AFAIL_RGB_ONLY)
-	if (!atst_pass)
-	{
-	#if PS_COLOR_FEEDBACK
-		output.c0.a = RtTexture.Load(int3(input.p.xy, 0)).a;
-	#endif
-	#if PS_DEPTH_FEEDBACK && PS_ZWRITE
-		input.p.z = DepthTexture.Load(int3(input.p.xy, 0)).r; 
-	#endif
-	}
-#endif
-
 #endif // !PS_NO_COLOR
 
 #endif // PS_DATE != 1/2
 
 #if PS_ZCLAMP
-	input.p.z = min(input.p.z, MaxDepthPS);
-#endif
-
-#if PS_ZWRITE
-#if PS_DEPTH_FEEDBACK && PS_NO_COLOR1 && DX12
-	// Output color clone for feedback as well as real depth.
-	output.depth_color = input.p.z;
-#endif
-	output.depth = input.p.z;
+	output.depth = min(input.p.z, MaxDepthPS);
 #endif
 
 	return output;
@@ -1419,7 +1301,9 @@ VS_OUTPUT vs_main_expand(uint vid : SV_VertexID)
 	uint vid_base = vid >> 2;
 	bool is_bottom = vid & 2;
 	bool is_right = vid & 1;
-	uint vid_other = is_bottom ? vid_base - 1 : vid_base + 1;
+	// All lines will be a pair of vertices next to each other
+	// Since DirectX uses provoking vertex first, the bottom point will be the lower of the two
+	uint vid_other = is_bottom ? vid_base + 1 : vid_base - 1;
 	VS_OUTPUT vtx = vs_main(load_vertex(vid_base));
 	VS_OUTPUT other = vs_main(load_vertex(vid_other));
 

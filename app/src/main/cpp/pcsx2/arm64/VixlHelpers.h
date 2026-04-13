@@ -64,11 +64,9 @@ namespace a64 = vixl::aarch64;
 // CPU(iR5900), PSX(iR3000A), FPU(iFPU, iFPUd)
 #define RSTATE_CPU a64::x27
 #define RSTATE_PSX a64::x28
-// Local ARM64 JIT contract: helper code materializes g_cpuRegistersPack into
+// ARM64 JIT contract: helper code materializes g_cpuRegistersPack into
 // RSTATE_CPU and then addresses EE/IOP/VU/vtlb state through fixed offsets.
-// Treat offsetof(cpuRegistersPack, ...) users as ABI-sensitive until the whole
-// ARM64 helper/recVTLB/fastmem stack is audited and migrated together.
-#define PTR_CPU(field) a64::MemOperand(RSTATE_CPU, offsetof(cpuRegistersPack, field))
+#define PTR_CPU(field) a64::MemOperand(RSTATE_CPU, offsetof(Arm64CpuRuntimePack, field))
 
 // microVU
 #define RSTATE_MVU a64::x28

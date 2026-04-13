@@ -210,10 +210,12 @@
     <string name="achievements_status_earned">Desbloqueada</string>
     <string name="achievements_status_locked">Bloqueada</string>
     <string name="settings_upscale">Qualidade de Imagem</string>
-    <string name="settings_upscale_native">Original</string>
+    <string name="settings_upscale_native">Nativo</string>
     <string name="settings_upscale_2x">2x</string>
     <string name="settings_upscale_3x">3x</string>
     <string name="settings_upscale_4x">4x</string>
+    <string name="settings_upscale_5x">5x</string>
+    <string name="settings_upscale_6x">6x</string>
     <string name="settings_aspect_ratio">Proporção da Tela</string>
     <string name="settings_aspect_ratio_auto">Auto</string>
     <string name="settings_aspect_ratio_43">4:3</string>
@@ -339,7 +341,7 @@
     <string name="settings_device_profile_family_exynos">Exynos</string>
     <string name="settings_device_profile_family_tensor">Tensor</string>
     <string name="settings_device_profile_family_generic">Android Genérico</string>
-    <string name="settings_device_profile_desc_mediatek">Recomendado para MediaTek: muda para OpenGL, mantém a resolução de 1x, reduz a carga de filtragem e usa speedhacks mais seguros para reduzir travamentos e melhorar o ritmo de quadros.</string>
+    <string name="settings_device_profile_desc_mediatek">Recomendado para MediaTek: muda para OpenGL, mantém a resolução nativa, reduz a carga de filtragem e usa speedhacks mais seguros para reduzir travamentos e melhorar o ritmo de quadros.</string>
     <string name="settings_device_profile_desc_snapdragon">Recomendado para Snapdragon: mantém o caminho padrão rápido e reaplica a predefinição equilibrada para desempenho estável.</string>
     <string name="settings_device_profile_desc_generic">Aplica uma predefinição de compatibilidade equilibrada para dispositivos que ainda não possuem um perfil específico do chipset.</string>
     <string name="settings_ee_cycle_disabled">Desativado</string>
@@ -710,7 +712,7 @@
     <string name="settings_help_recent_games">Mostra uma linha de acesso rápido para os jogos que você jogou por último. Útil se você costuma alternar entre alguns títulos frequentemente; desligue se quiser uma tela inicial mais limpa.</string>
     <string name="settings_help_home_search">Mostra a barra de pesquisa da biblioteca diretamente na tela inicial. Deixe ativado para grandes bibliotecas; desligue se preferir um layout mais limpo e raramente pesquisar por nome.</string>
     <string name="settings_help_renderer">Seleciona o backend de gráficos usado para renderização de hardware. O Vulkan costuma ser o mais rápido em dispositivos modernos, o OpenGL pode ser mais seguro para compatibilidade em algumas GPUs, e o Software é principalmente um substituto para testes ou jogos que quebram feio no modo de hardware.</string>
-    <string name="settings_help_upscale">Aumenta a resolução de renderização interna do jogo acima da saída nativa do PS2. Isso faz as cenas 3D parecerem muito mais limpas, mas a carga da GPU sobe rápido e alguns jogos mostram emendas (seams) extras, desfoque ou efeitos quebrados em valores mais altos. Se um jogo parecer errado, tente voltar para 1x primeiro.</string>
+    <string name="settings_help_upscale">Aumenta a resolução de renderização interna do jogo acima da saída nativa do PS2. Isso faz as cenas 3D parecerem muito mais limpas, mas a carga da GPU sobe rápido e alguns jogos mostram emendas (seams) extras, desfoque ou efeitos quebrados em valores mais altos. Se um jogo parecer errado, tente voltar para a resolução nativa primeiro.</string>
     <string name="settings_help_aspect_ratio">Controla como a imagem final é enquadrada no seu monitor. O modo "Auto" segue o jogo, 4:3 mantém o aspecto original para a maioria dos títulos do PS2, 16:9 serve para jogos com patches de tela larga e "Esticar" deve ser usado apenas se você não se importar com a distorção geométrica.</string>
     <string name="settings_help_anisotropic_filtering">Melhora a nitidez de texturas vistas em ângulos íngremes, especialmente ruas, pisos, campos e paredes longas. Geralmente, tem um custo menor do que aumentar a resolução, o que faz dessa opção uma boa atualização de qualidade se o jogo já rodar bem.</string>
     <string name="settings_help_fxaa">Aplica um passe leve de anti-aliasing de pós-processamento após a renderização. Ele pode suavizar bordas irregulares em jogos que piscam, mas também suaviza o texto da interface do usuário (UI) e detalhes finos, então use-o apenas se a imagem mais limpa valer o desfoque.</string>
@@ -751,7 +753,7 @@
     <string name="settings_help_skip_draw_end">Define o final do intervalo das chamadas de desenho que foram ignoradas. O parâmetro trabalha em conjunto com o "Saltar chamada inicial de desenho", não se destinando a ajustes globais, sendo antes pensado para aprimoramentos cirúrgicos em determinados jogos.</string>
     <string name="settings_help_texture_inside_rt">Muda a forma como o renderizador de hardware detecta as texturas guardadas em destinos de renderização. Em certos títulos essa configuração corrige a ausência dos displays no HUD, clipes nas animações e falhas provocadas nos processos envolvendo os buffers, mas utilizar os modos mais exigentes prejudicará a eficiência e por esse motivo essa configuração deverá ser aplicada sempre que tal se justifique.</string>
     <string name="settings_help_half_pixel_offset">Equilibra as amostragens devido a variações no arredondamento a meio pixel (half-pixel) e entre o padrão do console PS2 relativamente às interfaces e API de programação de gráficos mais atualizadas. Trata-se da reparação base a testar no surgimento de elementos duplos, linhas indesejáveis em redor de textos, deslocamento de florescimento ou defeitos no pós-processamento derivados dos métodos utilizados para esticar a imagem.</string>
-    <string name="settings_help_native_scaling">Mantém determinados sprites e gráficos 2D em escala semelhante aos apresentados originalmente pela arquitetura do console PS2 e sem importar a que o render da imagem ultrapasse a barreira de 1x. Essa ação beneficia o controle sobre a posição na HUD de forma semelhante à formatação imposta pelos elementos escritos e a estabilização das linhas e esquemas gráficos implementadas pelo pós-processamento as quais costumam sofrer corrupções à hora de ampliar as imagens em resolução e tamanho.</string>
+    <string name="settings_help_native_scaling">Mantém determinados sprites e gráficos 2D em escala semelhante aos apresentados originalmente pela arquitetura do console PS2, mesmo quando o jogo é renderizado acima da resolução nativa. Essa ação beneficia o controle sobre a posição na HUD de forma semelhante à formatação imposta pelos elementos escritos e a estabilização das linhas e esquemas gráficos implementadas pelo pós-processamento, que costumam sofrer corrupções ao ampliar as imagens em resolução e tamanho.</string>
     <string name="settings_help_round_sprite">Efetua os cálculos redondos em conformidade e aplicáveis às coordenadas referentes à matriz visual a que correspondam os sprites e de modo a diminuir problemas com separações ténues que afetam as linhas em gráficos HUD a duas dimensões. É bastante prático para resolver o inconveniente inerente aos sistemas de grade cujas exibições sofrem alterações notórias ao utilizarem um formato dimensional acima da definição de base exigida pela fonte nativa.</string>
     <string name="settings_help_bilinear_upscale">Aplica filtragem bilinear aos passes de aumento (upscale) usados por alguns efeitos. Pode suavizar artefatos de escala severos em camadas de pós-processamento, mas também pode suavizar a imagem mais do que você deseja.</string>
     <string name="settings_help_texture_offset_x">Desloca a amostragem de textura horizontalmente. Esta é uma correção de precisão para jogos onde o texto, as HUDs ou as camadas de pós-processamento parecem deslocados para a esquerda ou direita após o upscale.</string>

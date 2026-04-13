@@ -62,11 +62,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.sbro.emucorex.R
-import com.sbro.emucorex.core.UPSCALE_MAX
-import com.sbro.emucorex.core.UPSCALE_MIN
-import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
+import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.formatUpscaleLabel
-import com.sbro.emucorex.core.normalizeUpscale
+import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.PerGameSettings
@@ -397,7 +395,12 @@ private fun GameSettingsProfileCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ProfileBadge(text = stringResource(rendererLabel(profile.renderer)))
-                ProfileBadge(text = formatUpscaleLabel(profile.upscaleMultiplier))
+                ProfileBadge(
+                    text = formatUpscaleLabel(
+                        value = profile.upscaleMultiplier,
+                        nativeLabel = stringResource(R.string.settings_upscale_native)
+                    )
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -436,6 +439,7 @@ private fun GameSettingsEditorDialog(
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
     var draft by remember(profile) { mutableStateOf(profile) }
     val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial) {
         settingsSnapshot.toPerGameSettings(
@@ -515,16 +519,14 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_aspect_ratio),
                                 onResetToDefault = { draft = draft.copy(aspectRatio = defaultProfile.aspectRatio) }
                             )
-                        SliderRow(
-                            title = stringResource(R.string.settings_upscale),
-                            value = draft.upscaleMultiplier,
-                            valueLabel = formatUpscaleLabel(draft.upscaleMultiplier),
-                            range = UPSCALE_MIN..UPSCALE_MAX,
-                            steps = UPSCALE_SLIDER_STEPS,
-                            onValueChange = { draft = draft.copy(upscaleMultiplier = normalizeUpscale(it)) },
-                            helpText = stringResource(R.string.settings_help_upscale),
-                            onResetToDefault = { draft = draft.copy(upscaleMultiplier = defaultProfile.upscaleMultiplier) }
-                        )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_upscale),
+                                options = buildUpscaleOptions(nativeUpscaleLabel),
+                                selectedValue = upscaleMultiplierValue(draft.upscaleMultiplier),
+                                onSelected = { draft = draft.copy(upscaleMultiplier = it.toFloat()) },
+                                helpText = stringResource(R.string.settings_help_upscale),
+                                onResetToDefault = { draft = draft.copy(upscaleMultiplier = defaultProfile.upscaleMultiplier) }
+                            )
                         }
                         EditorSection(title = stringResource(R.string.game_settings_manager_section_runtime)) {
                             ToggleRow(

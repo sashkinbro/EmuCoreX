@@ -138,10 +138,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.core.UPSCALE_MAX
-import com.sbro.emucorex.core.UPSCALE_MIN
-import com.sbro.emucorex.core.UPSCALE_SLIDER_STEPS
-import com.sbro.emucorex.core.formatUpscaleLabel
+import com.sbro.emucorex.core.buildUpscaleOptions
+import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
@@ -2412,10 +2410,11 @@ private fun EmulationSidebarMenu(
                     onResetToDefault = { onSetRenderer(globalDefaults.renderer) }
                 )
 
-                LiveUpscaleSliderRow(
+                LiveChipsSelectionRow(
                     title = stringResource(R.string.settings_upscale),
-                    value = uiState.upscale,
-                    onValueChange = onSetUpscale,
+                    options = buildUpscaleOptions(stringResource(R.string.settings_upscale_native)),
+                    currentValue = upscaleMultiplierValue(uiState.upscale),
+                    onValueChange = { onSetUpscale(it.toFloat()) },
                     helpText = stringResource(R.string.settings_help_upscale),
                     onResetToDefault = { onSetUpscale(globalDefaults.upscaleMultiplier) }
                 )
@@ -3829,69 +3828,6 @@ private fun LiveSliderRow(
             onValueChangeFinished = { onValueChange(sliderValue) },
             valueRange = range,
             steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary
-            )
-        )
-    }
-}
-
-@Composable
-private fun LiveUpscaleSliderRow(
-    title: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    helpText: String? = null,
-    onResetToDefault: (() -> Unit)? = null
-) {
-    var sliderValue by remember { mutableFloatStateOf(value) }
-    val interactionSource = remember { MutableInteractionSource() }
-
-    LaunchedEffect(value) {
-        sliderValue = value
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {},
-                    onLongClick = onResetToDefault
-                ),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-                helpText?.let {
-                    SettingHelpButton(title = title, description = it)
-                }
-            }
-            Text(
-                text = formatUpscaleLabel(sliderValue),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Slider(
-            value = sliderValue,
-            onValueChange = { sliderValue = it },
-            onValueChangeFinished = { onValueChange(sliderValue) },
-            valueRange = UPSCALE_MIN..UPSCALE_MAX,
-            steps = UPSCALE_SLIDER_STEPS,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary

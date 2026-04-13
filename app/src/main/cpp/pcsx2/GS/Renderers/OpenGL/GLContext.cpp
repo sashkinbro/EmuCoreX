@@ -22,6 +22,33 @@
 
 #include "glad/gl.h"
 
+#include <cstdlib>
+#include <cstring>
+
+static bool ShouldPreferESContext()
+{
+#ifndef _MSC_VER
+	const char* value = std::getenv("PREFER_GLES_CONTEXT");
+	return (value && std::strcmp(value, "1") == 0);
+#else
+	char buffer[2] = {};
+	size_t buffer_size = sizeof(buffer);
+	getenv_s(&buffer_size, buffer, "PREFER_GLES_CONTEXT");
+	return (std::strcmp(buffer, "1") == 0);
+#endif
+}
+
+static void DisableBrokenExtensions(const char* gl_vendor, const char* gl_renderer)
+{
+	if (std::strstr(gl_vendor, "ARM") || std::strstr(gl_renderer, "Mali"))
+	{
+		// GL_{EXT,OES}_copy_image appears to fall back to CPU paths on Mali.
+		Console.Warning("Mali driver detected, disabling GL_{EXT,OES}_copy_image");
+		GLAD_GL_EXT_copy_image = 0;
+		GLAD_GL_OES_copy_image = 0;
+	}
+}
+
 GLContext::GLContext(const WindowInfo& wi)
 	: m_wi(wi)
 {
@@ -37,7 +64,7 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, Error* error)
 std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<const Version> versions_to_try, Error* error)
 {
 	std::array<Version, 16> reordered_versions = {};
-	if (wi.type == WindowInfo::Type::Android)
+	if (wi.type == WindowInfo::Type::Android || ShouldPreferESContext())
 	{
 		size_t count = 0;
 		for (const Version& version : versions_to_try)
@@ -99,6 +126,11 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	}
 
 	context_being_created = nullptr;
+
+	const char* gl_vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+	const char* gl_renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+	if (gl_vendor && gl_renderer)
+		DisableBrokenExtensions(gl_vendor, gl_renderer);
 
 	return context;
 }
