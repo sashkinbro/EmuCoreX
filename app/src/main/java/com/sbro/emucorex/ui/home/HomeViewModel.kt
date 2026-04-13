@@ -365,10 +365,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val state = _uiState.value
         val query = normalizeSearchToken(state.searchQuery)
         val filtered = allGames.filter { game ->
+            !BiosValidator.isLikelyBiosLibraryEntry(
+                fileName = game.fileName,
+                title = game.title,
+                serial = game.serial,
+                fileSize = game.fileSize
+            ) && (
             query.isBlank() ||
                 normalizeSearchToken(game.title).contains(query) ||
                 normalizeSearchToken(game.fileName).contains(query) ||
                 normalizeSearchToken(game.serial).contains(query)
+            )
         }
         val sorted = when (state.sortOption) {
             HomeSortOption.TITLE_ASC -> filtered.sortedWith(

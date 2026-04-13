@@ -41,16 +41,21 @@ object BiosValidator {
         serial: String?,
         fileSize: Long
     ): Boolean {
-        if (!serial.isNullOrBlank()) return false
-
         val lowerFileName = fileName.lowercase()
         val lowerTitle = title.orEmpty().lowercase()
         val combined = "$lowerFileName $lowerTitle"
         val ext = lowerFileName.substringAfterLast('.', "")
+        val titleLooksLikeBios = lowerTitle.contains("playstation 2 bios") ||
+            lowerTitle == "ps2 bios" ||
+            lowerTitle.contains("sony playstation 2 bios")
+        val serialLooksLikeBios = serial.orEmpty().lowercase().contains("bios")
         val biosHint = isLikelyBiosName(fileName) || extraArtifactHints.any(combined::contains)
         val likelyBiosSizedBlob = ext in setOf("bin", "rom") && fileSize in (512L * 1024L)..(8L * 1024L * 1024L)
 
-        return biosHint || (likelyBiosSizedBlob && (combined.contains("playstation 2") || combined.contains("ps2") || combined.contains("scph")))
+        return titleLooksLikeBios ||
+            (serialLooksLikeBios && (biosHint || lowerTitle.contains("playstation 2") || lowerTitle.contains("ps2"))) ||
+            biosHint ||
+            (likelyBiosSizedBlob && (combined.contains("playstation 2") || combined.contains("ps2") || combined.contains("scph")))
     }
 
     fun isLikelyBiosName(name: String?): Boolean {

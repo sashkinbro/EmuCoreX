@@ -34,16 +34,20 @@ class MemoryCardRepository(
 
     suspend fun ensureDefaultCardsAssigned(): MemoryCardAssignments {
         syncNativeMemoryCardDirectory()
-        val availableCards = listCards()
-        val existingNames = availableCards.map { it.name }.toSet()
+        val initialCards = listCards()
         val defaultSlot1 = DEFAULT_CARD_SLOT_1
         val defaultSlot2 = DEFAULT_CARD_SLOT_2
 
+        migrateLegacyDefaultCardIfNeeded(defaultSlot1, initialCards)
+        migrateLegacyDefaultCardIfNeeded(defaultSlot2, initialCards)
+
+        val existingNames = listCards().map { it.name }.toSet()
+
         if (defaultSlot1 !in existingNames) {
-            createBlankPs2CardFile(File(EmulatorStorage.memoryCardsDir(context), defaultSlot1), 8)
+            createPs2Card(defaultSlot1, 8)
         }
         if (defaultSlot2 !in existingNames) {
-            createBlankPs2CardFile(File(EmulatorStorage.memoryCardsDir(context), defaultSlot2), 8)
+            createPs2Card(defaultSlot2, 8)
         }
 
         val refreshedNames = listCards().map { it.name }.toSet()
@@ -84,8 +88,11 @@ class MemoryCardRepository(
         syncNativeMemoryCardDirectory()
         val normalized = buildUniqueCardName(name)
         val resolvedSizeMb = sizeMb.toSupportedPs2CardSizeMb()
-        val target = File(EmulatorStorage.memoryCardsDir(context), normalized)
-        return createBlankPs2CardFile(target, resolvedSizeMb)
+        return NativeApp.createMemoryCard(
+            normalized,
+            MEMORY_CARD_TYPE_FILE,
+            resolvedSizeMb.toNativePs2FileType()
+        )
     }
 
     fun importCard(uri: Uri, displayName: String? = null): Boolean {
@@ -269,29 +276,32 @@ class MemoryCardRepository(
         }
     }
 
-    private fun createBlankPs2CardFile(target: File, sizeMb: Int): Boolean {
-        val totalBytes = sizeMb * PS2_CARD_MB_SIZE_BYTES
-        val block = ByteArray(PS2_CARD_ERASE_BLOCK_BYTES) { 0xFF.toByte() }
-        return runCatching {
-            target.parentFile?.mkdirs()
-            target.outputStream().buffered().use { output ->
-                var remaining = totalBytes
-                while (remaining > 0) {
-                    val chunkSize = minOf(remaining, block.size)
-                    output.write(block, 0, chunkSize)
-                    remaining -= chunkSize
-                }
-                output.flush()
+    private fun migrateLegacyDefaultCardIfNeeded(
+        cardName: String,
+        availableCards: List<MemoryCardInfo>
+    ) {
+        val existingCard = availableCards.firstOrNull { it.name.equals(cardName, ignoreCase = true) } ?: return
+        val target = File(existingCard.path)
+        if (!target.exists() || !target.isFile || !existingCard.shouldRecreateDefaultCard(target)) {
+            return
+        }
+
+        runCatching {
+            if (target.delete()) {
+                NativeApp.createMemoryCard(
+                    cardName,
+                    MEMORY_CARD_TYPE_FILE,
+                    MEMORY_CARD_FILE_TYPE_PS2_8MB
+                )
             }
-            true
-        }.getOrDefault(false)
+        }
     }
 
     private companion object {
         const val DEFAULT_CARD_SLOT_1 = "Mcd001.ps2"
         const val DEFAULT_CARD_SLOT_2 = "Mcd002.ps2"
-        const val PS2_CARD_ERASE_BLOCK_BYTES = 528 * 16
-        const val PS2_CARD_MB_SIZE_BYTES = 1024 * 528 * 2
+        const val MEMORY_CARD_TYPE_FILE = 1
+        const val MEMORY_CARD_FILE_TYPE_PS2_8MB = 1
     }
 }
 
@@ -308,3 +318,41 @@ private fun Int.toSupportedPs2CardSizeMb(): Int = when (this) {
     8, 16, 32, 64 -> this
     else -> 8
 }
+
+private fun Int.toNativePs2FileType(): Int = when (this) {
+    16 -> 2
+    32 -> 3
+    64 -> 4
+    else -> 1
+}
+
+private fun File.looksLikeLegacyBlankPs2Card(): Boolean {
+    if (!exists() || !isFile || length() <= 0L) return false
+    return runCatching {
+        inputStream().buffered().use { input ->
+            val sampleSize = minOf(length(), LEGACY_BLANK_SAMPLE_BYTES.toLong()).toInt()
+            val sample = ByteArray(sampleSize)
+            val bytesRead = input.read(sample)
+            bytesRead == sampleSize && sample.all { it == 0xFF.toByte() }
+        }
+    }.getOrDefault(false)
+}
+
+private fun MemoryCardInfo.shouldRecreateDefaultCard(file: File): Boolean {
+    if (!name.equals("Mcd001.ps2", ignoreCase = true) && !name.equals("Mcd002.ps2", ignoreCase = true)) {
+        return false
+    }
+
+    if (file.looksLikeLegacyBlankPs2Card()) {
+        return true
+    }
+
+    val looksLikeBrokenLegacyCard = type == 1 &&
+        fileType == 0 &&
+        !formatted &&
+        sizeBytes in 8_000_000L..9_000_000L
+
+    return looksLikeBrokenLegacyCard
+}
+
+private const val LEGACY_BLANK_SAMPLE_BYTES = 64 * 1024

@@ -1,6 +1,7 @@
 package com.sbro.emucorex.data
 
 import android.content.Context
+import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,12 +46,18 @@ class GameLibraryCacheRepository(context: Context) {
                     for (index in 0 until games.length()) {
                         val game = games.optJSONObject(index) ?: continue
                         val serial = game.optString("serial").takeIf { it.isNotBlank() }
+                        val title = game.optString("title", game.optString("file_name"))
+                        val fileName = game.optString("file_name")
+                        val fileSize = game.optLong("file_size")
+                        if (BiosValidator.isLikelyBiosLibraryEntry(fileName, title, serial, fileSize)) {
+                            continue
+                        }
                         add(
                             GameItem(
-                                title = game.optString("title", game.optString("file_name")),
+                                title = title,
                                 path = game.optString("path"),
-                                fileName = game.optString("file_name"),
-                                fileSize = game.optLong("file_size"),
+                                fileName = fileName,
+                                fileSize = fileSize,
                                 lastModified = game.optLong("last_modified"),
                                 coverArtPath = game.optString("cover_art_path").takeIf { it.isNotBlank() },
                                 serial = serial,
