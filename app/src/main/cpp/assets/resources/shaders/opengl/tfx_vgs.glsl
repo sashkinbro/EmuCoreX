@@ -75,7 +75,7 @@ void vs_main()
 	gl_Position.w = 1.0f;
 
 #if HAS_CLIP_CONTROL
-    gl_Position.z = float(z) * exp_min32;
+	gl_Position.z = float(z) * exp_min32;
 #else
 	// GLES doesn't support ARB_clip_control, so remap it to -1..1. This isn't lossless, but
 	// gets rid of really bad Z-fighting.

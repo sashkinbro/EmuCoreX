@@ -92,20 +92,13 @@ GSTextureOGL::GSTextureOGL(Type type, int width, int height, int levels, Format 
 		// Depth buffer
 		case Format::DepthStencil:
 		{
-			if (!g_gs_device->Features().framebuffer_fetch)
-			{
-				gl_fmt = GL_DEPTH32F_STENCIL8;
-				m_int_format = GL_DEPTH_STENCIL;
-				m_int_type = GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
-				m_int_shift = 3; // 4 bytes for depth + 4 bytes for stencil by texels
-			}
-			else
-			{
-				gl_fmt = GL_DEPTH_COMPONENT32F;
-				m_int_format = GL_DEPTH_COMPONENT;
-				m_int_type = GL_FLOAT;
-				m_int_shift = 2;
-			}
+			// Framebuffer fetch only replaces readback hazards for feedback paths.
+			// The GS still relies on stencil/DATE for correctness, so depth targets
+			// must remain packed depth-stencil even on GLES fetch backends.
+			gl_fmt = GL_DEPTH32F_STENCIL8;
+			m_int_format = GL_DEPTH_STENCIL;
+			m_int_type = GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
+			m_int_shift = 3; // 4 bytes for depth + 4 bytes for stencil by texels
 		}
 		break;
 

@@ -879,6 +879,15 @@ bool GSDeviceOGL::CheckFeatures()
 			"Framebuffer fetch was found but is disabled. This will reduce performance.", Host::OSD_ERROR_DURATION);
 		m_features.framebuffer_fetch = false;
 	}
+
+	// The EXT framebuffer fetch path on Adreno is fast, but it has proven unreliable
+	// in some depth/stencil-heavy scenes. Prefer the safer fallback path there unless
+	// the user explicitly overrides the barrier mode.
+	if (use_adreno_profile && m_features.framebuffer_fetch && GSConfig.OverrideTextureBarriers == -1)
+	{
+		Console.Warning("GL: Disabling framebuffer fetch on Adreno for correctness; using fallback RT/depth paths.");
+		m_features.framebuffer_fetch = false;
+	}
 	if (GSConfig.OverrideTextureBarriers == 0)
 		m_features.texture_barrier = m_features.framebuffer_fetch; // Force Disabled
 	else if (GSConfig.OverrideTextureBarriers == 1)
@@ -891,7 +900,20 @@ bool GSDeviceOGL::CheckFeatures()
 			"GL_ARB_texture_barrier is not supported, blending will not be accurate.", Host::OSD_ERROR_DURATION);
 	}
 
-	m_features.multidraw_fb_copy = false;
+	// Without texture barriers on Adreno/GLES, feedback hazards can be missed when a texture is sourced
+	// from a region inside an existing render target. Enable inside-target tracking so tex-in-RT draws are
+	// treated as target-backed sources instead of plain textures.
+	if (use_adreno_profile && !m_features.texture_barrier &&
+		GSConfig.UserHacks_TextureInsideRt == GSTextureInRtMode::Disabled)
+	{
+		Console.Warning("GL: Enabling TextureInsideRT=InsideTargets on Adreno to track RT-backed texture sources.");
+		GSConfig.UserHacks_TextureInsideRt = GSTextureInRtMode::InsideTargets;
+	}
+
+	// OpenGL/GLES can emulate barriered feedback via split draws and copy snapshots even when
+	// texture_barrier is unavailable. Expose this so GSRendererHW doesn't disable full-barrier
+	// paths before the OpenGL fallback in SendHWDraw() gets a chance to handle them.
+	m_features.multidraw_fb_copy = !m_features.texture_barrier;
 
 	m_features.provoking_vertex_last = true;
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
@@ -947,7 +969,10 @@ bool GSDeviceOGL::CheckFeatures()
 		Console.WriteLn("GL: Mali path active without GL_ARB_texture_barrier; using no-op texture barrier.");
 
 	m_features.test_and_sample_depth = m_features.texture_barrier;
-	if (m_features.texture_barrier)
+	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.
+	// Keep direct depth sampling gated on barriers, but allow the safer copy-based path on GLES.
+	if (m_features.texture_barrier || GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::DepthAsRT ||
+		GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Auto)
 	{
 		// Auto select chooses depth-as-rt as it appears to be more compatible across hardware.
 		if (GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::DepthAsRT ||
@@ -955,7 +980,7 @@ bool GSDeviceOGL::CheckFeatures()
 		{
 			m_features.depth_feedback = GSDevice::DepthFeedbackSupport::DepthAsRT;
 		}
-		else if (GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Depth)
+		else if (m_features.texture_barrier && GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Depth)
 		{
 			m_features.depth_feedback = GSDevice::DepthFeedbackSupport::Depth;
 		}
@@ -1304,7 +1329,7 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_write);
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
 			(t->GetType() == GSTexture::Type::RenderTarget) ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
-		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, m_features.framebuffer_fetch ? GL_DEPTH_ATTACHMENT : GL_DEPTH_STENCIL_ATTACHMENT,
+		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
 			GL_TEXTURE_2D, (t->GetType() == GSTexture::Type::DepthStencil) ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
 	}
 	else
@@ -1388,8 +1413,7 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 	if (use_write_fbo)
 	{
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,
-			(t->GetType() == GSTexture::Type::RenderTarget) ? GL_COLOR_ATTACHMENT0 :
-															  (m_features.framebuffer_fetch ? GL_DEPTH_ATTACHMENT : GL_DEPTH_STENCIL_ATTACHMENT),
+			(t->GetType() == GSTexture::Type::RenderTarget) ? GL_COLOR_ATTACHMENT0 : GL_DEPTH_STENCIL_ATTACHMENT,
 			GL_TEXTURE_2D, 0, 0);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
 	}
@@ -2586,8 +2610,8 @@ void GSDeviceOGL::OMAttachDs(GSTexture* ds)
 
 	GLState::ds = static_cast<GSTextureOGL*>(ds);
 
-	const GLenum target = m_features.framebuffer_fetch ? GL_DEPTH_ATTACHMENT : GL_DEPTH_STENCIL_ATTACHMENT;
-	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, target, GL_TEXTURE_2D, ds ? static_cast<GSTextureOGL*>(ds)->GetID() : 0, 0);
+	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D,
+		ds ? static_cast<GSTextureOGL*>(ds)->GetID() : 0, 0);
 }
 
 void GSDeviceOGL::OMSetFBO(GLuint fbo)
@@ -2820,6 +2844,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 
 	GSTexture* primid_texture = nullptr;
 	GSTexture* draw_rt_clone = nullptr;
+	GSTexture* draw_ds_clone = nullptr;
 	GSTexture* colclip_rt = g_gs_device->GetColorClipTexture();
 
 	if (colclip_rt)
@@ -2923,7 +2948,9 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		PSSetShaderResource(1, config.pal);
 	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier))
 		PSSetShaderResource(2, colclip_rt ? colclip_rt : config.rt);
-	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier) && config.ps.IsFeedbackLoopDepth())
+	if (config.ps.IsFeedbackLoopDepth() &&
+		((m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier)) ||
+		 m_features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT))
 		PSSetShaderResource(4, m_features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT ? config.ds_as_rt :
 		                       m_features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth ? config.ds : nullptr);
 
@@ -3057,7 +3084,10 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		glTextureBarrier();
 	}
 
-	if (draw_rt && (config.require_one_barrier || (config.tex && config.tex == config.rt)) && !m_features.texture_barrier)
+	const bool multidraw_fb_copy = m_features.multidraw_fb_copy && (config.require_one_barrier || config.require_full_barrier);
+
+	if (draw_rt && (config.require_one_barrier || (config.require_full_barrier && multidraw_fb_copy) ||
+		(config.tex && config.tex == config.rt)) && !m_features.texture_barrier)
 	{
 		// Requires a copy of the RT.
 		draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
@@ -3077,18 +3107,39 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 			Console.Warning("GL: Failed to allocate temp texture for RT copy.");
 	}
 
+	if (draw_ds_as_rt && !m_features.texture_barrier)
+	{
+		const GSVector2i dssize = draw_ds_as_rt->GetSize();
+		draw_ds_clone = CreateTexture(dssize.x, dssize.y, 1, draw_ds_as_rt->GetFormat(), true);
+		if (draw_ds_clone)
+		{
+			GL_PUSH("GL: Copy depth-feedback RT to temp texture {%d,%d %dx%d}",
+				config.drawarea.left, config.drawarea.top,
+				config.drawarea.width(), config.drawarea.height());
+			const GSVector4i snapped_drawarea = ProcessCopyArea(GSVector4i(0, 0, dssize.x, dssize.y), config.drawarea);
+			CopyRect(draw_ds_as_rt, draw_ds_clone, snapped_drawarea, snapped_drawarea.left, snapped_drawarea.top);
+			PSSetShaderResource(4, draw_ds_clone);
+		}
+		else
+		{
+			Console.Warning("GL: Failed to allocate temp texture for depth feedback copy.");
+		}
+	}
+
 	OMSetRenderTargets(draw_rt, draw_ds_as_rt, draw_ds, &config.scissor);
 	OMSetColorMaskState(config.colormask);
 	SetupOM(config.depth);
 
 	// Clear stencil as close as possible to the RT bind, to avoid framebuffer swaps.
-	if (config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::StencilOne && m_features.texture_barrier)
+	if (config.destination_alpha == GSHWDrawConfig::DestinationAlphaMode::StencilOne &&
+		(m_features.texture_barrier || multidraw_fb_copy))
 	{
 		constexpr GLint clear_color = 1;
 		glClearBufferiv(GL_STENCIL, 0, &clear_color);
 	}
 
-	SendHWDraw(config, config.require_one_barrier, config.require_full_barrier);
+	SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, draw_ds_as_rt,
+		config.require_one_barrier, config.require_full_barrier);
 
 	if (config.blend_multi_pass.enable)
 	{
@@ -3135,13 +3186,16 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 			OMSetBlendState();
 		}
 		SetupOM(config.alpha_second_pass.depth);
-		SendHWDraw(config, config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier);
+		SendHWDraw(config, draw_rt_clone, draw_rt, draw_ds_clone, draw_ds_as_rt,
+			config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier);
 	}
 
 	if (primid_texture)
 		Recycle(primid_texture);
 	if (draw_rt_clone)
 		Recycle(draw_rt_clone);
+	if (draw_ds_clone)
+		Recycle(draw_ds_clone);
 
 	if (colclip_rt)
 	{
@@ -3160,64 +3214,54 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 	}
 }
 
-void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, bool one_barrier, bool full_barrier)
+void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_clone, GSTexture* draw_rt,
+	GSTexture* draw_ds_clone, GSTexture* draw_ds_as_rt, bool one_barrier, bool full_barrier)
 {
 	if (!m_features.texture_barrier) [[unlikely]]
 	{
-		if (full_barrier && config.drawlist && !config.drawlist->empty() && config.rt)
+		if (draw_rt_clone || draw_ds_clone)
 		{
-			GL_PUSH("Split the draw (RT copy fallback)");
+			auto copy_and_bind = [&](const GSVector4i& drawarea) {
+				if (draw_rt_clone)
+					CopyRect(draw_rt, draw_rt_clone, drawarea, drawarea.left, drawarea.top);
+				if (draw_ds_clone)
+					CopyRect(draw_ds_as_rt, draw_ds_clone, drawarea, drawarea.left, drawarea.top);
+				if ((one_barrier || full_barrier) && draw_rt_clone)
+					PSSetShaderResource(2, draw_rt_clone);
+				if (draw_ds_clone)
+					PSSetShaderResource(4, draw_ds_clone);
+				if (config.tex && config.tex == config.rt && draw_rt_clone)
+					PSSetShaderResource(0, draw_rt_clone);
+			};
 
-			GSTexture* draw_rt = config.rt;
-			const GSVector2i rtsize = draw_rt->GetSize();
-			GSTexture* draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
-			if (draw_rt_clone)
+			const GSVector2i copy_size = draw_rt ? draw_rt->GetSize() : draw_ds_as_rt->GetSize();
+			const GSVector4i copy_bounds(0, 0, copy_size.x, copy_size.y);
+
+			if (full_barrier && config.drawlist && !config.drawlist->empty())
 			{
-				const GSVector4i copy_area = ProcessCopyArea(GSVector4i(0, 0, rtsize.x, rtsize.y), config.drawarea);
+				GL_PUSH("Split the draw (RT/depth copy fallback)");
 				const u32 indices_per_prim = config.indices_per_prim;
 				const u32 draw_list_size = static_cast<u32>(config.drawlist->size());
 
 				for (u32 n = 0, p = 0; n < draw_list_size; n++)
 				{
-					CopyRect(draw_rt, draw_rt_clone, copy_area, copy_area.left, copy_area.top);
-					PSSetShaderResource(2, draw_rt_clone);
-					if (config.tex && config.tex == config.rt)
-						PSSetShaderResource(0, draw_rt_clone);
+					copy_and_bind(ProcessCopyArea(copy_bounds, config.drawarea));
 
 					const u32 count = (*config.drawlist)[n] * indices_per_prim;
 					DrawIndexedPrimitive(p, count);
 					p += count;
 				}
 
-				Recycle(draw_rt_clone);
 				return;
 			}
 
-			Console.Warning("GL: Failed to allocate temp texture for full-barrier RT copy fallback.");
-		}
-		else if (one_barrier && config.rt)
-		{
-			GL_PUSH("one_barrier fallback (RT copy)");
-
-			GSTexture* draw_rt = config.rt;
-			const GSVector2i rtsize = draw_rt->GetSize();
-			GSTexture* draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
-			if (draw_rt_clone)
+			if (one_barrier || draw_ds_clone)
 			{
-				const GSVector4i copy_area = ProcessCopyArea(GSVector4i(0, 0, rtsize.x, rtsize.y), config.drawarea);
-				CopyRect(draw_rt, draw_rt_clone, copy_area, copy_area.left, copy_area.top);
-				
-				// Rebind slots that were reading from the RT
-				PSSetShaderResource(2, draw_rt_clone);
-				if (config.tex && config.tex == config.rt)
-					PSSetShaderResource(0, draw_rt_clone);
-
+				GL_PUSH("one_barrier/depth fallback copy");
+				copy_and_bind(ProcessCopyArea(copy_bounds, config.drawarea));
 				DrawIndexedPrimitive();
-				Recycle(draw_rt_clone);
 				return;
 			}
-
-			Console.Warning("GL: Failed to allocate temp texture for one-barrier RT copy fallback.");
 		}
 
 		DrawIndexedPrimitive();

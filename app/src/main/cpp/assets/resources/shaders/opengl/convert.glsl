@@ -162,7 +162,7 @@ float rgba8_to_depth16(vec4 unorm)
 #if HAS_CLIP_CONTROL
 	return float(c.r | (c.g << 8)) * exp2(-32.0f);
 #else
-    return float(c.r | (c.g << 8)) * exp2(-24.0f);
+	return float(c.r | (c.g << 8)) * exp2(-24.0f);
 #endif
 }
 
@@ -199,7 +199,7 @@ void ps_convert_float32_float24()
 	gl_FragDepth = float(d) * exp2(-32.0f);
 #else
 	uint d = uint(sample_c().r * exp2(24.0f)) & 0xFFFFFFu;
-    gl_FragDepth = float(d) * exp2(-24.0f);
+	gl_FragDepth = float(d) * exp2(-24.0f);
 #endif
 }
 #endif
