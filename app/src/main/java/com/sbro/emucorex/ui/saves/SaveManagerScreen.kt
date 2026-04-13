@@ -51,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,7 +92,9 @@ fun SaveManagerScreen(
     var previewPaths by remember(gamePath, gameTitle) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isWorking by remember { mutableStateOf(false) }
     var isPreparingEntries by remember(gamePath, gameTitle) { mutableStateOf(true) }
+    var isResolvingEntries by remember(gamePath, gameTitle) { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SaveStateEntryInfo?>(null) }
+    var refreshGeneration by remember(gamePath, gameTitle) { mutableStateOf(0) }
 
     val isFiltered = !gamePath.isNullOrBlank()
     val screenSubtitle = remember(isFiltered, gameTitle, entries) {
@@ -104,32 +107,49 @@ fun SaveManagerScreen(
     }
 
     fun refresh() {
+        val generation = refreshGeneration + 1
+        refreshGeneration = generation
         scope.launch {
             isWorking = true
             isPreparingEntries = true
             entries = emptyList()
             previewPaths = emptyMap()
-            val prepared = withContext(Dispatchers.IO) {
-                val initialEntries = repository.listEntries(
+            val initialEntries = withContext(Dispatchers.IO) {
+                repository.listEntries(
                     filterGamePath = gamePath,
                     filterGameTitle = gameTitle
                 )
-                val resolvedEntries = if (gamePath.isNullOrBlank() && initialEntries.isNotEmpty()) {
-                    repository.enrichGlobalEntries(initialEntries)
-                } else {
-                    initialEntries
-                }
-                val readyPreviewPaths = resolvedEntries.mapNotNull { entry ->
-                    repository.getPreviewImagePath(entry)?.let { previewPath ->
-                        entry.absolutePath to previewPath
-                    }
-                }.toMap()
-                resolvedEntries to readyPreviewPaths
             }
-            entries = prepared.first
-            previewPaths = prepared.second
+            if (refreshGeneration != generation) return@launch
+
+            entries = initialEntries
             isPreparingEntries = false
             isWorking = false
+
+            val resolvedEntries = if (gamePath.isNullOrBlank() && initialEntries.isNotEmpty()) {
+                isResolvingEntries = true
+                withContext(Dispatchers.IO) {
+                    repository.enrichGlobalEntries(initialEntries)
+                }
+            } else {
+                initialEntries
+            }
+            if (refreshGeneration != generation) return@launch
+            if (resolvedEntries !== initialEntries) {
+                entries = resolvedEntries
+            }
+            isResolvingEntries = false
+
+            scope.launch(Dispatchers.IO) {
+                resolvedEntries.forEach { entry ->
+                    val previewPath = repository.getPreviewImagePath(entry) ?: return@forEach
+                    withContext(Dispatchers.Main) {
+                        if (refreshGeneration != generation) return@withContext
+                        if (previewPaths[entry.absolutePath] == previewPath) return@withContext
+                        previewPaths = previewPaths + (entry.absolutePath to previewPath)
+                    }
+                }
+            }
         }
     }
 
@@ -184,7 +204,7 @@ fun SaveManagerScreen(
                     stringResource(
                         R.string.save_manager_delete_confirm_body,
                         entry.gameTitle,
-                        entry.slot + 1
+                        entry.slot
                     )
                 )
             },
@@ -314,6 +334,7 @@ fun SaveManagerScreen(
                         SaveEntryCard(
                             entry = entry,
                             previewPath = previewPaths[entry.absolutePath],
+                            showLoadUnavailable = !isResolvingEntries,
                             onLoadClick = {
                                 val path = entry.gamePath ?: return@SaveEntryCard
                                 onLoadClick(path, entry.slot)
@@ -507,6 +528,7 @@ private fun SaveManagerActionsSkeleton() {
 private fun SaveEntryCard(
     entry: SaveStateEntryInfo,
     previewPath: String?,
+    showLoadUnavailable: Boolean,
     onLoadClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -556,7 +578,7 @@ private fun SaveEntryCard(
                         text = stringResource(
                             R.string.save_manager_entry_meta,
                             entry.serial,
-                            entry.slot + 1
+                            entry.slot
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -582,7 +604,7 @@ private fun SaveEntryCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!entry.canLoad) {
+                    if (showLoadUnavailable && !entry.canLoad) {
                         Text(
                             text = stringResource(R.string.save_manager_load_unavailable),
                             style = MaterialTheme.typography.labelMedium,
@@ -731,11 +753,13 @@ private fun SaveEntrySkeletonCard() {
 
 @Composable
 private fun SkeletonBlock(modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
     Box(
         modifier = modifier
+            .clip(shape)
             .background(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(18.dp)
+                shape = shape
             )
             .shimmer()
     )

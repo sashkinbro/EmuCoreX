@@ -78,6 +78,7 @@ object NativeApp {
     @JvmStatic external fun shutdown()
     @JvmStatic external fun refreshBIOS()
     @JvmStatic external fun hasValidVm(): Boolean
+    @JvmStatic external fun getGameSerial(): String?
     @JvmStatic external fun saveStateToSlot(slot: Int): Boolean
     @JvmStatic external fun loadStateFromSlot(slot: Int): Boolean
     @JvmStatic external fun getSaveStatePathForFile(path: String, slot: Int): String?

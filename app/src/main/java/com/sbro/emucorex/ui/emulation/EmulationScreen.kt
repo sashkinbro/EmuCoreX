@@ -703,6 +703,7 @@ fun EmulationScreen(
             val message = when (uiState.toastMessage) {
                 "saved" -> stringResource(R.string.emulation_saved)
                 "loaded" -> stringResource(R.string.emulation_loaded)
+                "load_failed" -> stringResource(R.string.emulation_load_failed)
                 "bios_missing" -> stringResource(R.string.emulation_bios_missing)
                 "launch_failed" -> stringResource(R.string.emulation_launch_failed)
                 "launch_path_error" -> stringResource(R.string.emulation_launch_path_error)
@@ -2111,7 +2112,7 @@ private fun EmulationSidebarMenu(
                                 )
                                 androidx.compose.material3.IconButton(
                                     onClick = onPrevSlot,
-                                    enabled = uiState.currentSlot > 0,
+                                    enabled = uiState.currentSlot > 1,
                                     colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
                                         contentColor = MaterialTheme.colorScheme.primary
                                     )
@@ -2119,14 +2120,14 @@ private fun EmulationSidebarMenu(
                                     Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, null)
                                 }
                                 Text(
-                                    text = "${uiState.currentSlot + 1}",
+                                    text = "${uiState.currentSlot}",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 4.dp)
                                 )
                                 androidx.compose.material3.IconButton(
                                     onClick = onNextSlot,
-                                    enabled = uiState.currentSlot < 4,
+                                    enabled = uiState.currentSlot < 10,
                                     colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
                                         contentColor = MaterialTheme.colorScheme.primary
                                     )

@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">Незбережений прогрес буде втрачено.</string>
     <string name="emulation_saved">Збережено</string>
     <string name="emulation_loaded">Завантажено</string>
+    <string name="emulation_load_failed">Не вдалося завантажити збереження.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Спочатку додайте файли BIOS.</string>
     <string name="emulation_launch_failed">Неможливо відкрити цю гру.</string>

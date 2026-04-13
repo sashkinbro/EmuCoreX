@@ -30,10 +30,11 @@ object GameLaunchShortcut {
         game: GameItem,
         saveSlot: Int? = null
     ): Boolean {
+        val normalizedSaveSlot = normalizeSaveSlot(saveSlot)
         val shortcutId = buildString {
             append("game:")
             append(game.path.hashCode())
-            saveSlot?.let {
+            normalizedSaveSlot?.let {
                 append(":")
                 append(it)
             }
@@ -41,7 +42,7 @@ object GameLaunchShortcut {
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_LAUNCH_GAME
             putExtra(EXTRA_GAME_PATH, game.path)
-            saveSlot?.let { putExtra(EXTRA_SAVE_SLOT, it) }
+            normalizedSaveSlot?.let { putExtra(EXTRA_SAVE_SLOT, it) }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         val shortcut = ShortcutInfoCompat.Builder(context, shortcutId)
@@ -58,12 +59,13 @@ object GameLaunchShortcut {
         saveSlot: Int? = null,
         bootBios: Boolean = false
     ): Uri {
+        val normalizedSaveSlot = normalizeSaveSlot(saveSlot)
         return Uri.Builder()
             .scheme(SCHEME)
             .authority(HOST)
             .apply {
                 gamePath?.let { appendQueryParameter("gamePath", it) }
-                saveSlot?.let { appendQueryParameter("saveSlot", it.toString()) }
+                normalizedSaveSlot?.let { appendQueryParameter("saveSlot", it.toString()) }
                 if (bootBios) appendQueryParameter("bootBios", "true")
             }
             .build()
@@ -80,8 +82,8 @@ object GameLaunchShortcut {
         }
         val gamePath = intent.getStringExtra(EXTRA_GAME_PATH) ?: gamePathFromData
         val saveSlot = when {
-            intent.hasExtra(EXTRA_SAVE_SLOT) -> intent.getIntExtra(EXTRA_SAVE_SLOT, -1).takeIf { it >= 0 }
-            data?.scheme == SCHEME && data.host == HOST -> data.getQueryParameter("saveSlot")?.toIntOrNull()?.takeIf { it >= 0 }
+            intent.hasExtra(EXTRA_SAVE_SLOT) -> normalizeSaveSlot(intent.getIntExtra(EXTRA_SAVE_SLOT, -1))
+            data?.scheme == SCHEME && data.host == HOST -> normalizeSaveSlot(data.getQueryParameter("saveSlot")?.toIntOrNull())
             else -> null
         }
         val bootBios = intent.getBooleanExtra(EXTRA_BOOT_BIOS, false) ||
@@ -101,6 +103,15 @@ object GameLaunchShortcut {
         intent.removeExtra(EXTRA_BOOT_BIOS)
         if (intent.data?.scheme == SCHEME && intent.data?.host == HOST) {
             intent.data = null
+        }
+    }
+
+    private fun normalizeSaveSlot(slot: Int?): Int? {
+        return when {
+            slot == null -> null
+            slot in 1..10 -> slot
+            slot in 0..9 -> slot + 1
+            else -> null
         }
     }
 }

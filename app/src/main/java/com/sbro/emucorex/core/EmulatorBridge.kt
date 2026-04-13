@@ -529,12 +529,12 @@ object EmulatorBridge {
         if (!isNativeLoaded || !isVmActive) return false
         return runSerial {
             try {
-                NativeApp.loadStateFromSlot(slot).also { success ->
-                    if (success) {
-                        rebindSurface()
-                        NativeApp.resume()
-                    }
+                val success = NativeApp.loadStateFromSlot(slot)
+                if (success) {
+                    runCatching { rebindSurface() }
+                    runCatching { NativeApp.resume() }
                 }
+                success
             } catch (_: Exception) {
                 false
             }

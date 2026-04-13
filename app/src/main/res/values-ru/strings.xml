@@ -74,6 +74,7 @@
     <string name="emulation_exit_confirm_desc">Несохраненный прогресс будет потерян.</string>
     <string name="emulation_saved">Сохранено</string>
     <string name="emulation_loaded">Загружено</string>
+    <string name="emulation_load_failed">Не удалось загрузить сохранение.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Сначала добавьте файлы BIOS.</string>
     <string name="emulation_launch_failed">Невозможно открыть эту игру.</string>

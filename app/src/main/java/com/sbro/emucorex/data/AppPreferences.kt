@@ -27,7 +27,8 @@ import org.json.JSONObject
 data class RecentGameEntry(
     val path: String,
     val title: String,
-    val lastPlayedAt: Long
+    val lastPlayedAt: Long,
+    val serial: String? = null
 )
 
 data class SettingsSnapshot(
@@ -742,14 +743,15 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[HOME_LIBRARY_VIEW_MODE] = mode.coerceIn(0, 1) }
     }
 
-    suspend fun markGameLaunched(path: String, title: String) {
+    suspend fun markGameLaunched(path: String, title: String, serial: String? = null) {
         context.dataStore.edit { prefs ->
             val updated = buildList {
                 add(
                     RecentGameEntry(
                         path = path,
                         title = title,
-                        lastPlayedAt = System.currentTimeMillis()
+                        lastPlayedAt = System.currentTimeMillis(),
+                        serial = serial
                     )
                 )
                 addAll(
@@ -773,7 +775,8 @@ class AppPreferences(private val context: Context) {
                         RecentGameEntry(
                             path = path,
                             title = item.optString("title"),
-                            lastPlayedAt = item.optLong("lastPlayedAt")
+                            lastPlayedAt = item.optLong("lastPlayedAt"),
+                            serial = item.optString("serial").takeIf { it.isNotBlank() }
                         )
                     )
                 }
@@ -789,6 +792,7 @@ class AppPreferences(private val context: Context) {
                     put("path", item.path)
                     put("title", item.title)
                     put("lastPlayedAt", item.lastPlayedAt)
+                    put("serial", item.serial ?: "")
                 }
             )
         }

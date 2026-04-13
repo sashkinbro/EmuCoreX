@@ -45,12 +45,13 @@ data class SaveStateEntryInfo(
 class SaveStateRepository(private val context: Context) {
 
     private val gameRepository = GameRepository()
+    private val gameLibraryCacheRepository = GameLibraryCacheRepository(context)
     private val coverArtRepository = CoverArtRepository(context)
     private val preferences = AppPreferences(context)
     private val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
     fun listSlots(gamePath: String): List<SaveStateSlotInfo> {
-        return (0 until 5).map { slot ->
+        return SAVE_STATE_SLOTS.map { slot ->
             val path = runCatching { NativeApp.getSaveStatePathForFile(gamePath, slot) }.getOrNull()
             val file = path?.let(::File)
             SaveStateSlotInfo(
@@ -85,8 +86,7 @@ class SaveStateRepository(private val context: Context) {
             if (entry.gamePath != null && !entry.coverArtPath.isNullOrBlank()) {
                 entry
             } else {
-                val match = libraryIndex.bySaveFileName[entry.fileName]
-                    ?: libraryIndex.findBestMatch(serial = entry.serial, titleHint = entry.gameTitle)
+                val match = libraryIndex.findBestMatch(serial = entry.serial, titleHint = entry.gameTitle)
                 if (match == null) {
                     entry
                 } else {
@@ -220,16 +220,28 @@ class SaveStateRepository(private val context: Context) {
 
     private suspend fun loadLibraryIndex(): LibraryIndex {
         val libraryPath = preferences.gamePath.first()
-        val libraryGames = when {
+        val cachedLibraryGames = when {
             libraryPath.isNullOrBlank() -> emptyList()
-            libraryPath.startsWith("content://") -> gameRepository.scanDirectoryFromUri(libraryPath.toUri(), context)
-            else -> gameRepository.scanDirectory(libraryPath, context)
+            else -> gameLibraryCacheRepository.loadSnapshot(libraryPath).games
         }
+        val recentGames = preferences.recentGames.first().map { recent ->
+            GameItem(
+                title = recent.title.ifBlank { recent.path.substringAfterLast('/').substringBeforeLast('.') },
+                path = recent.path,
+                fileName = recent.path.substringAfterLast('/'),
+                fileSize = 0L,
+                lastModified = recent.lastPlayedAt,
+                coverArtPath = null,
+                serial = recent.serial,
+                pcsx2Compatibility = null
+            )
+        }
+        val libraryGames = (recentGames + cachedLibraryGames)
+            .distinctBy { it.path }
 
         val bySerial = linkedMapOf<String, GameItem>()
         val byTitle = linkedMapOf<String, MutableList<GameItem>>()
         val byPath = linkedMapOf<String, GameItem>()
-        val bySaveFileName = linkedMapOf<String, GameItem>()
 
         libraryGames.forEach { game ->
             byPath[game.path] = game
@@ -239,16 +251,12 @@ class SaveStateRepository(private val context: Context) {
             normalizeTitleKey(game.title)?.let { key ->
                 byTitle.getOrPut(key) { mutableListOf() }.add(game)
             }
-            buildSaveFileNamesForGame(game.path).forEach { fileName ->
-                bySaveFileName.putIfAbsent(fileName, game)
-            }
         }
 
         return LibraryIndex(
             bySerial = bySerial,
             byTitle = byTitle,
-            byPath = byPath,
-            bySaveFileName = bySaveFileName
+            byPath = byPath
         )
     }
 
@@ -311,15 +319,6 @@ class SaveStateRepository(private val context: Context) {
             !fileName.contains(".resume.", ignoreCase = true)
     }
 
-    private fun buildSaveFileNamesForGame(gamePath: String): List<String> {
-        return (0 until 5).mapNotNull { slot ->
-            runCatching { NativeApp.getSaveStatePathForFile(gamePath, slot) }
-                .getOrNull()
-                ?.let(::File)
-                ?.name
-        }
-    }
-
     private fun String?.normalizeSerialKey(): String? {
         if (this.isNullOrBlank()) return null
         val cleanSerial = this.trim().uppercase(Locale.ROOT)
@@ -368,8 +367,7 @@ class SaveStateRepository(private val context: Context) {
     private data class LibraryIndex(
         val bySerial: Map<String, GameItem>,
         val byTitle: Map<String, List<GameItem>>,
-        val byPath: Map<String, GameItem>,
-        val bySaveFileName: Map<String, GameItem>
+        val byPath: Map<String, GameItem>
     ) {
         fun findBestMatch(serial: String?, titleHint: String?): GameItem? {
             serial?.let { bySerial[it] }?.let { return it }
@@ -384,6 +382,7 @@ class SaveStateRepository(private val context: Context) {
     }
 
     private companion object {
+        private val SAVE_STATE_SLOTS = 1..10
         private val SAVE_STATE_FILE_REGEX = Regex("""^(.+?) \(([0-9A-Fa-f]{8})\)\.(\d{2})\.p2s$""")
     }
 }

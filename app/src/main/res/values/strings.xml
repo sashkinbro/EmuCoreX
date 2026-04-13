@@ -83,6 +83,7 @@
     <string name="emulation_exit_confirm_desc">Unsaved progress will be lost.</string>
     <string name="emulation_saved">Saved</string>
     <string name="emulation_loaded">Loaded</string>
+    <string name="emulation_load_failed">Failed to load save state.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Add BIOS files first.</string>
     <string name="emulation_launch_failed">Unable to open this game.</string>

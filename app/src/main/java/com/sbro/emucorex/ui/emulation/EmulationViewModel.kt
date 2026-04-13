@@ -63,7 +63,7 @@ data class EmulationUiState(
     val speedPercent: Float = 100f,
     val toastMessage: String? = null,
     val statusMessage: String? = null,
-    val currentSlot: Int = 0,
+    val currentSlot: Int = 1,
     val renderer: Int = EmulatorBridge.VULKAN_RENDERER,
     val upscale: Float = 1f,
     val aspectRatio: Int = 1,
@@ -559,6 +559,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun startEmulation(path: String?, slotToLoad: Int? = null, bootToBios: Boolean = false) {
         if (_uiState.value.isStarting) return
+        val normalizedSlotToLoad = slotToLoad?.let { normalizeSaveSlot(it) }
+        val hasPendingStateLoad = !bootToBios && normalizedSlotToLoad != null
         cancelPendingStart = false
         pausedForBackground = false
         currentGamePath = if (bootToBios) null else path?.takeIf { it.isNotBlank() }
@@ -733,8 +735,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     statusMessage = "status_starting_core"
                 )
                 if (!bootToBios && !path.isNullOrBlank()) {
-                    val displayName = DocumentPathResolver.getDisplayName(getApplication(), path)
-                    preferences.markGameLaunched(path = path, title = displayName.substringBeforeLast('.'))
+                    preferences.markGameLaunched(
+                        path = path,
+                        title = currentGameTitle.ifBlank {
+                            DocumentPathResolver.getDisplayName(getApplication(), path).substringBeforeLast('.')
+                        },
+                        serial = currentGameSerial.takeIf { it.isNotBlank() }
+                    )
                 }
 
                 val liveRuntime = loadLiveRuntimeSnapshot()
@@ -794,26 +801,47 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
             
-            if (!bootToBios && slotToLoad != null) {
+            if (hasPendingStateLoad) {
                 viewModelScope.launch(Dispatchers.IO) {
                     var vmReadyWaitFrames = 0
-                    while (vmReadyWaitFrames < 40 && isActive) {
+                    while (vmReadyWaitFrames < 60 && isActive) {
                         try {
                             if (EmulatorBridge.hasValidVm()) break
                         } catch (_: Exception) { }
                         delay(250)
                         vmReadyWaitFrames++
                     }
+                    if (!isActive) return@launch
+
+                    if (!EmulatorBridge.hasValidVm()) {
+                        _uiState.value = _uiState.value.copy(
+                            statusMessage = null,
+                            toastMessage = "load_failed"
+                        )
+                        delay(2500)
+                        if (_uiState.value.toastMessage == "load_failed") {
+                            _uiState.value = _uiState.value.copy(toastMessage = null)
+                        }
+                        return@launch
+                    }
+
                     delay(500)
-                    _uiState.value = _uiState.value.copy(statusMessage = "status_loading_state")
-                    EmulatorBridge.loadState(slotToLoad)
+                    val loaded = EmulatorBridge.loadState(normalizedSlotToLoad)
                     _uiState.value = _uiState.value.copy(
-                        statusMessage = "status_running",
-                        toastMessage = "loaded"
+                        isRunning = true,
+                        isPaused = false,
+                        statusMessage = if (loaded) "status_running" else null,
+                        toastMessage = if (loaded) null else "load_failed"
                     )
-                    delay(2500)
-                    if (_uiState.value.toastMessage == "loaded") {
-                        _uiState.value = _uiState.value.copy(toastMessage = null)
+                    delay(2000)
+                    if (_uiState.value.statusMessage == "status_running") {
+                        _uiState.value = _uiState.value.copy(statusMessage = null)
+                    }
+                    if (_uiState.value.toastMessage == "load_failed") {
+                        delay(500)
+                        if (_uiState.value.toastMessage == "load_failed") {
+                            _uiState.value = _uiState.value.copy(toastMessage = null)
+                        }
                     }
                 }
             }
@@ -829,19 +857,21 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 return@launch
             }
 
-            viewModelScope.launch(Dispatchers.IO) {
-                var waitFrames = 0
-                while (waitFrames < 60 && isActive) {
-                    if (EmulatorBridge.hasValidVm()) {
-                        _uiState.value = _uiState.value.copy(statusMessage = "status_running")
-                        delay(2000)
-                        if (_uiState.value.statusMessage == "status_running") {
-                            _uiState.value = _uiState.value.copy(statusMessage = null)
+            if (!hasPendingStateLoad) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    var waitFrames = 0
+                    while (waitFrames < 60 && isActive) {
+                        if (EmulatorBridge.hasValidVm()) {
+                            _uiState.value = _uiState.value.copy(statusMessage = "status_running")
+                            delay(2000)
+                            if (_uiState.value.statusMessage == "status_running") {
+                                _uiState.value = _uiState.value.copy(statusMessage = null)
+                            }
+                            break
                         }
-                        break
+                        delay(250)
+                        waitFrames++
                     }
-                    delay(250)
-                    waitFrames++
                 }
             }
 
@@ -855,7 +885,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 launchPath = path
             )
             
-            if (!started && !_uiState.value.isPaused) {
+            if (!started &&
+                !_uiState.value.isPaused &&
+                !cancelPendingStart &&
+                !isShuttingDown
+            ) {
                 _uiState.value = _uiState.value.copy(
                     isRunning = false,
                     statusMessage = null,
@@ -2182,8 +2216,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setSlot(slot: Int) {
-        _uiState.value = _uiState.value.copy(currentSlot = slot.coerceIn(0, 4))
+        _uiState.value = _uiState.value.copy(currentSlot = normalizeSaveSlot(slot))
     }
+
+    private fun normalizeSaveSlot(slot: Int): Int = slot.coerceIn(1, 10)
 
     fun quickSave() {
         val slot = _uiState.value.currentSlot

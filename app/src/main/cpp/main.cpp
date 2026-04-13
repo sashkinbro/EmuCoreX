@@ -2236,29 +2236,53 @@ extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_core_NativeApp_loadStateFromSlot(JNIEnv *env, jclass clazz, jint p_slot) {
     if (!VMManager::HasValidVM()) {
+        Console.Warning(fmt::format("(NativeApp::loadStateFromSlot) Ignoring load for slot {} because VM is not valid.", p_slot));
         return false;
     }
 
     bool result = false;
     Host::RunOnCPUThread([p_slot, &result]() {
         if (!VMManager::HasValidVM())
+        {
+            Console.Warning(fmt::format("(NativeApp::loadStateFromSlot) VM became invalid before loading slot {}.", p_slot));
             return;
+        }
 
         const u32 crc = VMManager::GetDiscCRC();
         if (crc == 0)
+        {
+            Console.Warning(fmt::format("(NativeApp::loadStateFromSlot) Disc CRC is not ready yet for slot {}.", p_slot));
             return;
+        }
 
-        if (!VMManager::HasSaveStateInSlot(VMManager::GetDiscSerial().c_str(), crc, p_slot))
+        const std::string serial = VMManager::GetDiscSerial();
+        if (serial.empty())
+        {
+            Console.Warning(fmt::format("(NativeApp::loadStateFromSlot) Disc serial is empty for slot {}.", p_slot));
             return;
+        }
+
+        if (!VMManager::HasSaveStateInSlot(serial.c_str(), crc, p_slot))
+        {
+            Console.Warning(fmt::format(
+                "(NativeApp::loadStateFromSlot) Save state not found for serial {} crc {:08X} slot {}.",
+                serial,
+                crc,
+                p_slot));
+            return;
+        }
 
         if (VMManager::GetState() != VMState::Paused)
             VMManager::SetPaused(true);
 
         if (VMManager::GetState() != VMState::Paused)
+        {
+            Console.Warning(fmt::format("(NativeApp::loadStateFromSlot) Failed to pause VM before loading slot {}.", p_slot));
             return;
+        }
 
         result = VMManager::LoadStateFromSlot(p_slot);
-    });
+    }, true);
 
     return result ? JNI_TRUE : JNI_FALSE;
 }
