@@ -883,4 +883,9 @@
     <string name="settings_bios_picker_action">选择文件</string>
     <string name="settings_help_bios_path">将 EmuCoreX 指向您的 PS2 BIOS 镜像文件。从您自己的主机上获取的纯净转储是最佳选择。该应用需要主 BIOS 镜像（通常是 .bin 或 .rom 文件），并将生成的任何 NVRAM/MEC 文件保存在导入副本的旁边。</string>
     <string name="onboarding_bios_desc">选择启动游戏所需的 PS2 BIOS 镜像文件。</string>
+    <string name="emulation_quick_save_confirm_title">保存状态？</string>
+    <string name="emulation_quick_save_confirm_desc">这将使用当前游戏状态覆盖插槽 %1$d。</string>
+    <string name="emulation_quick_load_confirm_title">加载状态？</string>
+    <string name="emulation_quick_load_confirm_desc">这将恢复插槽 %1$d 并替换您当前未保存的进度。</string>
+    <string name="settings_aspect_ratio_107">10:7</string>
 </resources>

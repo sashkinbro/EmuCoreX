@@ -25,7 +25,7 @@ data class SettingsUiState(
     val isLoaded: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
-    val renderer: Int = EmulatorBridge.VULKAN_RENDERER,
+    val renderer: Int = EmulatorBridge.DEFAULT_RENDERER,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,

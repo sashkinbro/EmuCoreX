@@ -512,7 +512,8 @@ private fun GameSettingsEditorDialog(
                                     1 to stringResource(R.string.settings_aspect_ratio_auto),
                                     2 to stringResource(R.string.settings_aspect_ratio_43),
                                     3 to stringResource(R.string.settings_aspect_ratio_169),
-                                    4 to stringResource(R.string.emulation_aspect_stretch)
+                                    4 to stringResource(R.string.settings_aspect_ratio_107),
+                                    0 to stringResource(R.string.emulation_aspect_stretch)
                                 ),
                                 selectedValue = draft.aspectRatio,
                                 onSelected = { draft = draft.copy(aspectRatio = it) },

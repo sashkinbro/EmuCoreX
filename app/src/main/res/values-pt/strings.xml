@@ -883,4 +883,9 @@
     <string name="settings_bios_picker_action">Selecionar arquivo</string>
     <string name="settings_help_bios_path">Direciona o EmuCoreX para o seu arquivo de imagem da BIOS do PS2. Um dump limpo do seu próprio console é a melhor escolha. O aplicativo espera a imagem principal da BIOS, geralmente um arquivo .bin ou .rom, e mantém quaisquer arquivos NVRAM/MEC gerados ao lado da cópia importada.</string>
     <string name="onboarding_bios_desc">Selecione o arquivo de imagem da BIOS do PS2 necessário para iniciar os jogos.</string>
+    <string name="emulation_quick_save_confirm_title">Salvar estado?</string>
+    <string name="emulation_quick_save_confirm_desc">Isso substituirá o slot %1$d pelo estado atual do jogo.</string>
+    <string name="emulation_quick_load_confirm_title">Carregar estado?</string>
+    <string name="emulation_quick_load_confirm_desc">Isso restaurará o slot %1$d e substituirá seu progresso atual não salvo.</string>
+    <string name="settings_aspect_ratio_107">10:7</string>
 </resources>

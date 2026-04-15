@@ -156,9 +156,9 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         gameKey = optString("gameKey"),
         gameTitle = optString("gameTitle"),
         gameSerial = optString("gameSerial").takeIf { it.isNotBlank() },
-        renderer = optInt("renderer", EmulatorBridge.VULKAN_RENDERER).let(::sanitizeRendererValue),
+        renderer = optInt("renderer", EmulatorBridge.DEFAULT_RENDERER).let(::sanitizeRendererValue),
         upscaleMultiplier = readUpscaleMultiplier(),
-        aspectRatio = optInt("aspectRatio", 1),
+        aspectRatio = optInt("aspectRatio", 1).let(::sanitizeAspectRatioValue),
         showFps = optBoolean("showFps", false),
         fpsOverlayMode = optInt("fpsOverlayMode", AppPreferences.FPS_OVERLAY_MODE_DETAILED),
         enableMtvu = optBoolean("enableMtvu", true),
@@ -223,7 +223,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         fun shouldWrite(key: String): Boolean = keys == null || key in keys
         if (shouldWrite("renderer")) put("renderer", sanitizeRendererValue(renderer))
         if (shouldWrite("upscaleMultiplier")) put("upscaleMultiplier", upscaleMultiplier.toDouble())
-        if (shouldWrite("aspectRatio")) put("aspectRatio", aspectRatio)
+        if (shouldWrite("aspectRatio")) put("aspectRatio", sanitizeAspectRatioValue(aspectRatio))
         if (shouldWrite("showFps")) put("showFps", showFps)
         if (shouldWrite("fpsOverlayMode")) put("fpsOverlayMode", fpsOverlayMode)
         if (shouldWrite("enableMtvu")) put("enableMtvu", enableMtvu)
@@ -279,7 +279,11 @@ private fun PerGameSettings.toJson(): JSONObject {
 }
 
 private fun sanitizeRendererValue(value: Int): Int {
-    return if (value <= 0) EmulatorBridge.VULKAN_RENDERER else value
+    return if (value <= 0) EmulatorBridge.DEFAULT_RENDERER else value
+}
+
+private fun sanitizeAspectRatioValue(value: Int): Int {
+    return if (value in 0..4) value else 1
 }
 
 private fun JSONObject.readUpscaleMultiplier(): Float {

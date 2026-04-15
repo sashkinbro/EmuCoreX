@@ -978,8 +978,8 @@ private fun SettingsContent(
                         ChoiceSection(
                             title = stringResource(R.string.settings_renderer),
                             options = listOf(
-                                14 to stringResource(R.string.settings_renderer_vulkan),
                                 12 to stringResource(R.string.settings_renderer_opengl),
+                                14 to stringResource(R.string.settings_renderer_vulkan),
                                 13 to stringResource(R.string.settings_renderer_software)
                             ),
                             selectedValue = uiState.renderer,
@@ -1024,6 +1024,7 @@ private fun SettingsContent(
                                 1 to stringResource(R.string.settings_aspect_ratio_auto),
                                 2 to stringResource(R.string.settings_aspect_ratio_43),
                                 3 to stringResource(R.string.settings_aspect_ratio_169),
+                                4 to stringResource(R.string.settings_aspect_ratio_107),
                                 0 to stringResource(R.string.emulation_aspect_stretch)
                             ),
                             selectedValue = uiState.aspectRatio,

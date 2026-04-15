@@ -714,7 +714,7 @@ struct Pcsx2Config
 		static constexpr float DEFAULT_FRAME_RATE_NTSC = 59.94f;
 		static constexpr float DEFAULT_FRAME_RATE_PAL = 50.00f;
 
-		static constexpr GSRendererType DEFAULT_HW_RENDERER = GSRendererType::Auto;
+		static constexpr GSRendererType DEFAULT_HW_RENDERER = GSRendererType::OGL;
 
 		static constexpr AspectRatioType DEFAULT_ASPECT_RATIO = AspectRatioType::RAuto4_3_3_2;
 		static constexpr GSInterlaceMode DEFAULT_INTERLACE_MODE = GSInterlaceMode::Automatic;

@@ -53,7 +53,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.LockOpen
@@ -65,7 +64,6 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.TouchApp
-import androidx.compose.material.icons.rounded.Upload
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -332,6 +330,8 @@ fun EmulationScreen(
     LocalConfiguration.current
     val view = LocalView.current
     var showExitDialog by remember { mutableStateOf(false) }
+    var showQuickSaveDialog by remember { mutableStateOf(false) }
+    var showQuickLoadDialog by remember { mutableStateOf(false) }
     var showCheatsDialog by remember { mutableStateOf(false) }
     var showControlsEditor by remember { mutableStateOf(false) }
     var showGamepadMappingDialog by remember { mutableStateOf(false) }
@@ -351,8 +351,18 @@ fun EmulationScreen(
     val toggleMenuClick = rememberDebouncedClick(onClick = { viewModel.toggleMenu() })
     val toggleControlsClick = rememberDebouncedClick(onClick = { viewModel.toggleControlsVisibility() })
     val togglePauseClick = rememberDebouncedClick(onClick = { viewModel.togglePause() })
-    val quickSaveClick = rememberDebouncedClick(onClick = { viewModel.quickSave() })
-    val quickLoadClick = rememberDebouncedClick(onClick = { viewModel.quickLoad() })
+    val requestQuickSaveClick = rememberDebouncedClick(onClick = { showQuickSaveDialog = true })
+    val requestQuickLoadClick = rememberDebouncedClick(onClick = { showQuickLoadDialog = true })
+    val confirmQuickSaveClick = rememberDebouncedClick(onClick = {
+        showQuickSaveDialog = false
+        viewModel.quickSave()
+    })
+    val confirmQuickLoadClick = rememberDebouncedClick(onClick = {
+        showQuickLoadDialog = false
+        viewModel.quickLoad()
+    })
+    val dismissQuickSaveClick = rememberDebouncedClick(onClick = { showQuickSaveDialog = false })
+    val dismissQuickLoadClick = rememberDebouncedClick(onClick = { showQuickLoadDialog = false })
     val requestExitClick = rememberDebouncedClick(onClick = { showExitDialog = true })
     val confirmExitClick = rememberDebouncedClick(onClick = {
         showExitDialog = false
@@ -902,8 +912,8 @@ fun EmulationScreen(
                     overlayDefaults = overlayDefaults,
                     onClose = toggleMenuClick,
                     onPauseToggle = togglePauseClick,
-                    onQuickSave = quickSaveClick,
-                    onQuickLoad = quickLoadClick,
+                    onQuickSave = requestQuickSaveClick,
+                    onQuickLoad = requestQuickLoadClick,
                     onSaveGameSettingsProfile = { viewModel.saveCurrentGameSettingsProfile() },
                     onResetGameSettingsProfile = { viewModel.resetCurrentGameSettingsProfile() },
                     onNextSlot = { viewModel.setSlot(uiState.currentSlot + 1) },
@@ -1005,6 +1015,68 @@ fun EmulationScreen(
             },
             dismissButton = {
                 TextButton(onClick = dismissExitClick) {
+                    Text(stringResource(R.string.no))
+                }
+            }
+        )
+    }
+
+    if (showQuickSaveDialog) {
+        AlertDialog(
+            onDismissRequest = dismissQuickSaveClick,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Text(
+                    stringResource(R.string.emulation_quick_save_confirm_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.emulation_quick_save_confirm_desc, uiState.currentSlot),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = confirmQuickSaveClick) {
+                    Text(stringResource(R.string.emulation_quick_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = dismissQuickSaveClick) {
+                    Text(stringResource(R.string.no))
+                }
+            }
+        )
+    }
+
+    if (showQuickLoadDialog) {
+        AlertDialog(
+            onDismissRequest = dismissQuickLoadClick,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Text(
+                    stringResource(R.string.emulation_quick_load_confirm_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.emulation_quick_load_confirm_desc, uiState.currentSlot),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = confirmQuickLoadClick) {
+                    Text(stringResource(R.string.emulation_quick_load))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = dismissQuickLoadClick) {
                     Text(stringResource(R.string.no))
                 }
             }
@@ -2166,7 +2238,7 @@ private fun EmulationSidebarMenu(
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 QuickIconActionButton(
-                                    icon = Icons.Rounded.Download,
+                                    icon = Icons.Rounded.Save,
                                     contentDescription = stringResource(R.string.emulation_quick_save_desc),
                                     onClick = onQuickSave,
                                     enabled = !uiState.isActionInProgress,
@@ -2176,7 +2248,7 @@ private fun EmulationSidebarMenu(
                             }
                             Box(modifier = Modifier.weight(1f)) {
                                 QuickIconActionButton(
-                                    icon = Icons.Rounded.Upload,
+                                    icon = Icons.Rounded.Restore,
                                     contentDescription = stringResource(R.string.emulation_quick_load_desc),
                                     onClick = onQuickLoad,
                                     enabled = !uiState.isActionInProgress,
@@ -2450,6 +2522,7 @@ private fun EmulationSidebarMenu(
                         LiveSelectionOption(1, stringResource(R.string.emulation_aspect_auto)),
                         LiveSelectionOption(2, "4:3"),
                         LiveSelectionOption(3, "16:9"),
+                        LiveSelectionOption(4, stringResource(R.string.settings_aspect_ratio_107)),
                         LiveSelectionOption(
                             value = 0,
                             icon = Icons.Rounded.Fullscreen,

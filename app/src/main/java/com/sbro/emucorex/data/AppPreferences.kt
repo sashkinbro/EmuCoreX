@@ -35,7 +35,7 @@ data class SettingsSnapshot(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val languageTag: String? = null,
     val performanceProfile: Int = PerformanceProfiles.SAFE,
-    val renderer: Int = EmulatorBridge.VULKAN_RENDERER,
+    val renderer: Int = EmulatorBridge.DEFAULT_RENDERER,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val padVibration: Boolean = true,
@@ -343,7 +343,7 @@ class AppPreferences(private val context: Context) {
 
     private fun normalizeRendererPreference(value: Int?): Int {
         return when (value) {
-            null, 0, EmulatorBridge.AUTO_RENDERER -> EmulatorBridge.VULKAN_RENDERER
+            null, 0, EmulatorBridge.AUTO_RENDERER -> EmulatorBridge.DEFAULT_RENDERER
             else -> value
         }
     }
@@ -523,7 +523,7 @@ class AppPreferences(private val context: Context) {
                 performanceProfile = performanceProfile,
                 renderer = normalizeRendererPreference(prefs[RENDERER]),
                 upscaleMultiplier = readUpscale(prefs),
-                aspectRatio = prefs[ASPECT_RATIO] ?: 1,
+                aspectRatio = normalizeAspectRatioPreference(prefs[ASPECT_RATIO]),
                 padVibration = prefs[PAD_VIBRATION] ?: true,
                 showFps = prefs[SHOW_FPS] ?: false,
                 fpsOverlayMode = prefs[FPS_OVERLAY_MODE] ?: FPS_OVERLAY_MODE_DETAILED,
@@ -652,11 +652,18 @@ class AppPreferences(private val context: Context) {
         .distinctUntilChanged()
 
     val aspectRatio: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[ASPECT_RATIO] ?: 1
+        normalizeAspectRatioPreference(prefs[ASPECT_RATIO])
     }
 
     suspend fun setAspectRatio(value: Int) {
-        context.dataStore.edit { it[ASPECT_RATIO] = value }
+        context.dataStore.edit { it[ASPECT_RATIO] = normalizeAspectRatioPreference(value) }
+    }
+
+    private fun normalizeAspectRatioPreference(value: Int?): Int {
+        return when (value) {
+            0, 1, 2, 3, 4 -> value
+            else -> 1
+        }
     }
 
     val padVibration: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -1551,7 +1558,7 @@ class AppPreferences(private val context: Context) {
             put("coverArtStyle", prefs[COVER_ART_STYLE] ?: COVER_ART_STYLE_DISABLED)
             put("onboardingCompleted", prefs[ONBOARDING_COMPLETED] ?: false)
             put("languageTag", prefs[LANGUAGE_TAG])
-            put("aspectRatio", prefs[ASPECT_RATIO] ?: 1)
+            put("aspectRatio", normalizeAspectRatioPreference(prefs[ASPECT_RATIO]))
             put("padVibration", prefs[PAD_VIBRATION] ?: true)
             put("showFps", prefs[SHOW_FPS] ?: false)
             put("fpsOverlayMode", prefs[FPS_OVERLAY_MODE] ?: FPS_OVERLAY_MODE_DETAILED)
@@ -1643,7 +1650,7 @@ class AppPreferences(private val context: Context) {
             prefs[PERFORMANCE_PROFILE] = PerformanceProfiles.normalize(
                 json.optInt("performanceProfile", PerformanceProfiles.SAFE)
             )
-            prefs[RENDERER] = normalizeRendererPreference(json.optInt("renderer", EmulatorBridge.VULKAN_RENDERER))
+            prefs[RENDERER] = normalizeRendererPreference(json.optInt("renderer", EmulatorBridge.DEFAULT_RENDERER))
             prefs[UPSCALE] = json.readUpscaleMultiplier()
             json.optString("biosPath").takeIf { it.isNotBlank() }?.let { prefs[BIOS_PATH] = it } ?: prefs.remove(BIOS_PATH)
             json.optString("gamePath").takeIf { it.isNotBlank() }?.let { prefs[GAME_PATH] = it } ?: prefs.remove(GAME_PATH)
@@ -1657,7 +1664,7 @@ class AppPreferences(private val context: Context) {
             }
             prefs[ONBOARDING_COMPLETED] = json.optBoolean("onboardingCompleted", false)
             languageTag?.let { prefs[LANGUAGE_TAG] = it } ?: prefs.remove(LANGUAGE_TAG)
-            prefs[ASPECT_RATIO] = json.optInt("aspectRatio", 1)
+            prefs[ASPECT_RATIO] = normalizeAspectRatioPreference(json.optInt("aspectRatio", 1))
             prefs[PAD_VIBRATION] = json.optBoolean("padVibration", true)
             prefs[SHOW_FPS] = json.optBoolean("showFps", false)
             prefs[FPS_OVERLAY_MODE] = json.optInt("fpsOverlayMode", FPS_OVERLAY_MODE_DETAILED)

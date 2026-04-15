@@ -17,6 +17,8 @@ import java.util.Locale
 
 object EmulatorBridge {
     const val AUTO_RENDERER = -1
+    const val OPENGL_RENDERER = 12
+    const val DEFAULT_RENDERER = OPENGL_RENDERER
     const val VULKAN_RENDERER = 14
 
     private val aspectRatioSettingValues = mapOf(
@@ -73,9 +75,13 @@ object EmulatorBridge {
 
     private fun upscaleOp(value: Float) = RuntimeOp("upscale", listOf(value.toString()))
 
+    private fun normalizeAspectRatio(type: Int): Int {
+        return if (type in aspectRatioSettingValues.keys) type else 1
+    }
+
     private fun aspectOp(type: Int) = RuntimeOp(
         "aspect",
-        listOf(type.toString(), aspectRatioSettingValues[type] ?: aspectRatioSettingValues.getValue(1))
+        normalizeAspectRatio(type).let { listOf(it.toString(), aspectRatioSettingValues.getValue(it)) }
     )
 
     private fun customDriverOp(path: String) = RuntimeOp("custom_driver", listOf(path))
@@ -120,6 +126,12 @@ object EmulatorBridge {
                         "aspect" -> {
                             val type = op.fields.firstOrNull()?.toIntOrNull() ?: return@forEach
                             NativeApp.setAspectRatio(type)
+                            NativeApp.setSetting(
+                                "EmuCore/GS",
+                                "AspectRatio",
+                                "string",
+                                op.fields.getOrNull(1) ?: aspectRatioSettingValues.getValue(1)
+                            )
                         }
                         "custom_driver" -> {
                             NativeApp.setCustomDriverPath(op.fields.firstOrNull().orEmpty())
@@ -148,9 +160,9 @@ object EmulatorBridge {
     }
 
     private fun rendererName(renderer: Int): String = when (renderer) {
-        AUTO_RENDERER -> "Vulkan"
-        0 -> "Vulkan"
-        12 -> "OpenGL"
+        AUTO_RENDERER -> "OpenGL"
+        0 -> "OpenGL"
+        OPENGL_RENDERER -> "OpenGL"
         13 -> "Software"
         VULKAN_RENDERER -> "Vulkan"
         15 -> "D3D12"
@@ -159,7 +171,7 @@ object EmulatorBridge {
     }
 
     private fun normalizeRenderer(renderer: Int): Int {
-        return if (renderer <= 0) VULKAN_RENDERER else renderer
+        return if (renderer <= 0) DEFAULT_RENDERER else renderer
     }
 
     private fun toCoreSettingValue(section: String, key: String, value: String): String {
@@ -569,9 +581,10 @@ object EmulatorBridge {
     }
 
     suspend fun setAspectRatio(type: Int) {
-        val value = aspectRatioSettingValues[type] ?: aspectRatioSettingValues.getValue(1)
+        val normalizedType = normalizeAspectRatio(type)
+        val value = aspectRatioSettingValues.getValue(normalizedType)
         settingsCache["EmuCore/GS:AspectRatio"] = value
-        performRuntimeOps(listOf(aspectOp(type)))
+        performRuntimeOps(listOf(aspectOp(normalizedType)))
     }
 
     suspend fun setCustomDriverPath(path: String) {

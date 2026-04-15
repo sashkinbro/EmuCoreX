@@ -883,4 +883,9 @@
     <string name="shell_memory_cards">Карты памяти</string>
     <string name="settings_memory_cards_tab">Карты памяти</string>
     <string name="memory_card_help_text">Назначайте карты в два стандартных слота PS2, создавайте новые карты, экспортируйте отдельные карты, делайте полные резервные копии, восстанавливайте существующие карты и безопасно управляйте дубликатами или переименованиями.</string>
+    <string name="emulation_quick_save_confirm_title">Сохранить состояние?</string>
+    <string name="emulation_quick_save_confirm_desc">Это перезапишет слот %1$d текущим состоянием игры.</string>
+    <string name="emulation_quick_load_confirm_title">Загрузить состояние?</string>
+    <string name="emulation_quick_load_confirm_desc">Это восстановит слот %1$d и заменит ваш текущий несохраненный прогресс.</string>
+    <string name="settings_aspect_ratio_107">10:7</string>
 </resources>

@@ -76,6 +76,10 @@
     <string name="emulation_quick_load">Load</string>
     <string name="emulation_quick_save_desc">Write the current state to the quick slot.</string>
     <string name="emulation_quick_load_desc">Restore the latest state from the quick slot.</string>
+    <string name="emulation_quick_save_confirm_title">Save state?</string>
+    <string name="emulation_quick_save_confirm_desc">This will overwrite slot %1$d with the current game state.</string>
+    <string name="emulation_quick_load_confirm_title">Load state?</string>
+    <string name="emulation_quick_load_confirm_desc">This will restore slot %1$d and replace your current unsaved progress.</string>
     <string name="emulation_settings">Settings</string>
     <string name="emulation_menu_subtitle">Manage the current session without leaving the game.</string>
     <string name="emulation_exit">Exit</string>
@@ -251,6 +255,7 @@
     <string name="settings_aspect_ratio_auto">Auto</string>
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
+    <string name="settings_aspect_ratio_107">10:7</string>
     <string name="settings_paths">Files</string>
     <string name="settings_bios_path">BIOS File</string>
     <string name="settings_bios_path_desc">Select the PS2 BIOS image file needed to start games.</string>

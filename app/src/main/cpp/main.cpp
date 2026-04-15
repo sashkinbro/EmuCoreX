@@ -1032,7 +1032,7 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
             VMManager::SetDefaultSettings(*s_settings_interface, true, true, true, true, true);
             s_settings_interface->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
             s_settings_interface->SetIntValue("EmuCore/GS", "VsyncEnable", false);
-            s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::VK));
+            s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
             s_settings_interface->SetBoolValue("InputSources", "SDL", true);
             s_settings_interface->SetBoolValue("InputSources", "XInput", false);
             s_settings_interface->SetBoolValue("Logging", "EnableSystemConsole", true);
@@ -1166,7 +1166,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
             VMManager::SetDefaultSettings(*s_settings_interface, true, true, true, true, true);
         s_settings_interface->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
         s_settings_interface->SetIntValue("EmuCore/GS", "VsyncEnable", false);
-        s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::VK));
+        s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
         s_settings_interface->SetBoolValue("InputSources", "SDL", true);
         s_settings_interface->SetBoolValue("InputSources", "XInput", false);
         s_settings_interface->SetBoolValue("Logging", "EnableSystemConsole", true);

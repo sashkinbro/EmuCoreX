@@ -883,4 +883,9 @@
     <string name="settings_bios_picker_action">Datei auswählen</string>
     <string name="settings_help_bios_path">Verweist EmuCoreX auf deine PS2-BIOS-Image-Datei. Ein sauberer Dump von deiner eigenen Konsole ist die beste Wahl. Die App erwartet das Haupt-BIOS-Image, normalerweise eine .bin- oder .rom-Datei, und speichert alle generierten NVRAM/MEC-Dateien neben der importierten Kopie.</string>
     <string name="onboarding_bios_desc">Wähle die PS2-BIOS-Image-Datei aus, die zum Starten von Spielen benötigt wird.</string>
+    <string name="emulation_quick_save_confirm_title">Spielstand speichern?</string>
+    <string name="emulation_quick_save_confirm_desc">Dies überschreibt Steckplatz %1$d mit dem aktuellen Spielstand.</string>
+    <string name="emulation_quick_load_confirm_title">Spielstand laden?</string>
+    <string name="emulation_quick_load_confirm_desc">Dies stellt Steckplatz %1$d wieder her und ersetzt deinen aktuellen, ungespeicherten Fortschritt.</string>
+    <string name="settings_aspect_ratio_107">10:7</string>
 </resources>
