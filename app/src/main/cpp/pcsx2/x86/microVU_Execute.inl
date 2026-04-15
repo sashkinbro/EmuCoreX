@@ -44,7 +44,7 @@ void mVUdispatcherAB(mV)
 		// Load VU's MXCSR state
 		if (mvuNeedsFPCRUpdate(mVU)) {
 //            xLDMXCSR(ptr32[isVU0 ? &EmuConfig.Cpu.VU0FPCR.bitmask : &EmuConfig.Cpu.VU1FPCR.bitmask]);
-            armAsm->Msr(a64::FPCR, armLoad64(isVU0 ? PTR_CPU(Cpu.VU0FPCR.bitmask) : PTR_CPU(Cpu.VU1FPCR.bitmask)));
+            armAsm->Msr(a64::FPCR, armLoad64(isVU0 ? PTR_CONFIG(VU0FPCR.bitmask) : PTR_CONFIG(VU1FPCR.bitmask)));
         }
 
         // Load Regs
@@ -105,7 +105,7 @@ void mVUdispatcherAB(mV)
 		// Load EE's MXCSR state
 		if (mvuNeedsFPCRUpdate(mVU)) {
 //            xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
-            armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUFPCR.bitmask)));
+            armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
         }
 
 		// = The first two DWORD or smaller arguments are passed in ECX and EDX registers;
@@ -140,7 +140,7 @@ void mVUdispatcherCD(mV)
         // Load VU's MXCSR state
         if (mvuNeedsFPCRUpdate(mVU)) {
 //            xLDMXCSR(ptr32[isVU0 ? &EmuConfig.Cpu.VU0FPCR.bitmask : &EmuConfig.Cpu.VU1FPCR.bitmask]);
-            armAsm->Msr(a64::FPCR, armLoad64(isVU0 ? PTR_CPU(Cpu.VU0FPCR.bitmask) : PTR_CPU(Cpu.VU1FPCR.bitmask)));
+            armAsm->Msr(a64::FPCR, armLoad64(isVU0 ? PTR_CONFIG(VU0FPCR.bitmask) : PTR_CONFIG(VU1FPCR.bitmask)));
         }
 
         mVUrestoreRegs(mVU);
@@ -172,7 +172,7 @@ void mVUdispatcherCD(mV)
         // Load EE's MXCSR state
         if (mvuNeedsFPCRUpdate(mVU)) {
 //            xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
-            armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUFPCR.bitmask)));
+            armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
         }
 
         armEndStackFrame();

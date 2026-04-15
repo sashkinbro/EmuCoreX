@@ -382,9 +382,9 @@ __fi void fpuFloat3(int regd) // +NaN -> +fMax, -NaN -> -fMax, +Inf -> +fMax, -I
     auto regQ = a64::QRegister(regd);
 
 //	xPMIN.SD(xRegisterSSE(regd), ptr128[&g_maxvals[0]]);
-    armAsm->Smin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).V4S());
+    armAsm->Smin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V4S());
 //	xPMIN.UD(xRegisterSSE(regd), ptr128[&g_minvals[0]]);
-    armAsm->Umin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_CPU(mVUss4.g_minvals[0])).V4S());
+    armAsm->Umin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_MVUCONST(g_minvals[0])).V4S());
 }
 
 __fi void fpuFloat(int regd) // +/-NaN -> +fMax, +Inf -> +fMax, -Inf -> -fMax
@@ -394,9 +394,9 @@ __fi void fpuFloat(int regd) // +/-NaN -> +fMax, +Inf -> +fMax, -Inf -> -fMax
         auto regQ = a64::QRegister(regd);
 
 //		xMIN.SS(xRegisterSSE(regd), ptr[&g_maxvals[0]]); // MIN() must be before MAX()! So that NaN's become +Maximum
-        armAsm->Fminnm(regQ.S(), regQ.S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).S());
+        armAsm->Fminnm(regQ.S(), regQ.S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).S());
 //		xMAX.SS(xRegisterSSE(regd), ptr[&g_minvals[0]]);
-        armAsm->Fmaxnm(regQ.S(), regQ.S(), armLoadPtrV(PTR_CPU(mVUss4.g_minvals[0])).S());
+        armAsm->Fmaxnm(regQ.S(), regQ.S(), armLoadPtrV(PTR_MVUCONST(g_minvals[0])).S());
 	}
 }
 
@@ -434,12 +434,12 @@ void recABS_S_xmm(int info)
     }
 
 //	xAND.PS(xRegisterSSE(EEREC_D), ptr[&s_pos[0]]);
-    armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_pos[0])).V16B());
+    armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_MVUCONST(s_pos[0])).V16B());
 	//xAND(ptr32[&fpuRegs.fprc[31]], ~(FPUflagO|FPUflagU)); // Clear O and U flags
 
 	if (CHECK_FPU_OVERFLOW) { // Only need to do positive clamp, since EEREC_D is positive
 //        xMIN.SS(xRegisterSSE(EEREC_D), ptr[&g_maxvals[0]]);
-        armAsm->Fminnm(regED.S(), regED.S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).S());
+        armAsm->Fminnm(regED.S(), regED.S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).S());
     }
 }
 
@@ -529,7 +529,7 @@ void FPU_ADD_SUB(int regd, int regt, int issub)
 //	xMOVAPS(xRegisterSSE(xmmtemp), xRegisterSSE(regt));
     armAsm->Mov(regQTemp, regT);
 //	xAND.PS(xRegisterSSE(xmmtemp), ptr[s_neg]);
-    armAsm->And(regQTemp.V16B(), regQTemp.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_neg)).V16B());
+    armAsm->And(regQTemp.V16B(), regQTemp.V16B(), armLoadPtrV(PTR_MVUCONST(s_neg)).V16B());
 	if (issub) {
 //        xSUB.SS(xRegisterSSE(regd), xRegisterSSE(xmmtemp));
         armAsm->Fsub(regD.S(), regD.S(), regQTemp.S());
@@ -569,7 +569,7 @@ void FPU_ADD_SUB(int regd, int regt, int issub)
     armBind(&j8Ptr3);
 	//diff = -255 .. -25, expd < expt
 //	xAND.PS(xRegisterSSE(regd), ptr[s_neg]);
-    armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_neg)).V16B());
+    armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(s_neg)).V16B());
 	if (issub) {
 //        xSUB.SS(xRegisterSSE(regd), xRegisterSSE(regt));
         armAsm->Fsub(regD.S(), regD.S(), regT.S());
@@ -670,7 +670,7 @@ void FPU_MUL(int regd, int regt, bool reverseOperands)
         a64::Label noHack;
         armCbnz(EDX, &noHack);
 //			xMOVAPS(xRegisterSSE(regd), ptr128[result]);
-            armAsm->Ldr(regD.Q(), PTR_CPU(mVUss4.result));
+            armAsm->Ldr(regD.Q(), PTR_MVUCONST(result));
 //			endMul = JMP8(0);
             armAsm->B(&endMul);
 //		x86SetJ8(noHack);
@@ -1370,9 +1370,9 @@ void recDIVhelper1(int regd, int regt) // Sets flags
 //		xXOR.PS(xRegisterSSE(regd), xRegisterSSE(regt)); // Make regd Positive or Negative
         armAsm->Eor(regD.V16B(), regD.V16B(), regT.V16B());
 //		xAND.PS(xRegisterSSE(regd), ptr[&s_neg[0]]); // Get the sign bit
-        armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_neg[0])).V16B());
+        armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(s_neg[0])).V16B());
 //		xOR.PS(xRegisterSSE(regd), ptr[&g_maxvals[0]]); // regd = +/- Maximum
-        armAsm->Orr(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).V16B());
+        armAsm->Orr(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V16B());
         //xMOVSSZX(xRegisterSSE(regd), ptr[&g_maxvals[0]]);
 //		bjmp32 = JMP32(0);
         armAsm->B(&bjmp32);
@@ -1414,7 +1414,7 @@ void recDIV_S_xmm(int info)
 
 	if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask) {
 //        xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUDivFPCR.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUDivFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUDivFPCR.bitmask)));
     }
 
 	switch (info & (PROCESS_EE_S | PROCESS_EE_T))
@@ -1491,7 +1491,7 @@ void recDIV_S_xmm(int info)
 
 	if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask) {
 //        xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
     }
 
 	_freeXMMreg(t0reg);
@@ -2087,7 +2087,7 @@ void recNEG_S_xmm(int info)
 
 	//xAND(ptr32[&fpuRegs.fprc[31]], ~(FPUflagO|FPUflagU)); // Clear O and U flags
 //	xXOR.PS(xRegisterSSE(EEREC_D), ptr[&s_neg[0]]);
-    armAsm->Eor(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_neg[0])).V16B());
+    armAsm->Eor(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_MVUCONST(s_neg[0])).V16B());
 
 	// Always preserve sign. Using float clamping here would result in
 	// +inf to become +fMax instead of -fMax, which is definitely wrong.
@@ -2213,7 +2213,7 @@ void recSQRT_S_xmm(int info)
 		roundmode_nearest = EmuConfig.Cpu.FPUFPCR;
 		roundmode_nearest.SetRoundMode(FPRoundMode::Nearest);
 //		xLDMXCSR(ptr32[&roundmode_nearest.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 		roundmodeFlag = true;
 	}
 
@@ -2242,18 +2242,18 @@ void recSQRT_S_xmm(int info)
 //			xOR(ptr32[&fpuRegs.fprc[31]], FPUflagI | FPUflagSI); // Set I and SI flags
             armOrr(PTR_CPU(fpuRegs.fprc[31]), FPUflagI | FPUflagSI);
 //			xAND.PS(xRegisterSSE(EEREC_D), ptr[&s_pos[0]]); // Make EEREC_D Positive
-            armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_pos[0])).V16B());
+            armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_MVUCONST(s_pos[0])).V16B());
 //		x86SetJ8(pjmp);
         armBind(&pjmp);
 	}
 	else {
 //        xAND.PS(xRegisterSSE(EEREC_D), ptr[&s_pos[0]]); // Make EEREC_D Positive
-        armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_pos[0])).V16B());
+        armAsm->And(regED.V16B(), regED.V16B(), armLoadPtrV(PTR_MVUCONST(s_pos[0])).V16B());
     }
 
 	if (CHECK_FPU_OVERFLOW) { // Only need to do positive clamp, since EEREC_D is positive
 //        xMIN.SS(xRegisterSSE(EEREC_D), ptr[&g_maxvals[0]]);
-        armAsm->Fminnm(regED.S(), regED.S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).S());
+        armAsm->Fminnm(regED.S(), regED.S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).S());
     }
 //	xSQRT.SS(xRegisterSSE(EEREC_D), xRegisterSSE(EEREC_D));
     armAsm->Fsqrt(regED.S(), regED.S());
@@ -2262,7 +2262,7 @@ void recSQRT_S_xmm(int info)
 
 	if (roundmodeFlag) {
 //        xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CPU(Cpu.FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
     }
 }
 
@@ -2300,7 +2300,7 @@ void recRSQRThelper1(int regd, int t0reg) // Preforms the RSQRT function when re
 //		xOR(ptr32[&fpuRegs.fprc[31]], FPUflagI | FPUflagSI); // Set I and SI flags
         armOrr(PTR_CPU(fpuRegs.fprc[31]), FPUflagI | FPUflagSI);
 //		xAND.PS(xRegisterSSE(t0reg), ptr[&s_pos[0]]); // Make t0reg Positive
-        armAsm->And(regT0.V16B(), regT0.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_pos[0])).V16B()); // Make t0reg Positive
+        armAsm->And(regT0.V16B(), regT0.V16B(), armLoadPtrV(PTR_MVUCONST(s_pos[0])).V16B()); // Make t0reg Positive
 //	x86SetJ8(pjmp2);
     armBind(&pjmp2);
 
@@ -2339,9 +2339,9 @@ void recRSQRThelper1(int regd, int t0reg) // Preforms the RSQRT function when re
 
 		/*--- Make regd +/- Maximum ---*/
 //		xAND.PS(xRegisterSSE(regd), ptr[&s_neg[0]]); // Get the sign bit
-        armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_neg[0])).V16B());
+        armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(s_neg[0])).V16B());
 //		xOR.PS(xRegisterSSE(regd), ptr[&g_maxvals[0]]); // regd = +/- Maximum
-        armAsm->Orr(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).V16B());
+        armAsm->Orr(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V16B());
 //		pjmp32 = JMP32(0);
         armAsm->B(&pjmp32);
 //	x86SetJ8(pjmp1);
@@ -2350,7 +2350,7 @@ void recRSQRThelper1(int regd, int t0reg) // Preforms the RSQRT function when re
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 	{
 //		xMIN.SS(xRegisterSSE(t0reg), ptr[&g_maxvals[0]]); // Only need to do positive clamp, since t0reg is positive
-        armAsm->Fminnm(regT0.S(), regT0.S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).S());
+        armAsm->Fminnm(regT0.S(), regT0.S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).S());
 		fpuFloat2(regd);
 	}
 
@@ -2372,11 +2372,11 @@ void recRSQRThelper2(int regd, int t0reg) // Preforms the RSQRT function when re
     auto regT0 = a64::QRegister(t0reg);
 
 //	xAND.PS(xRegisterSSE(t0reg), ptr[&s_pos[0]]); // Make t0reg Positive
-    armAsm->And(regT0.V16B(), regT0.V16B(), armLoadPtrV(PTR_CPU(mVUss4.s_pos[0])).V16B());
+    armAsm->And(regT0.V16B(), regT0.V16B(), armLoadPtrV(PTR_MVUCONST(s_pos[0])).V16B());
 	if (CHECK_FPU_EXTRA_OVERFLOW)
 	{
 //		xMIN.SS(xRegisterSSE(t0reg), ptr[&g_maxvals[0]]); // Only need to do positive clamp, since t0reg is positive
-        armAsm->Fminnm(regT0.S(), regT0.S(), armLoadPtrV(PTR_CPU(mVUss4.g_maxvals[0])).S());
+        armAsm->Fminnm(regT0.S(), regT0.S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).S());
 		fpuFloat2(regd);
 	}
 //	xSQRT.SS(xRegisterSSE(t0reg), xRegisterSSE(t0reg));

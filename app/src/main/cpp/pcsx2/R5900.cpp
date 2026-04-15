@@ -160,10 +160,18 @@ __ri void cpuException(u32 code, u32 bd)
 		if (errLevel2) Console.Warning("cpuException: Status.EXL = 1 cause %x", code);
 	}
 
-	if (checkStatus)
-		cpuRegs.pc = 0x80000000 + offset;
-	else
-		cpuRegs.pc = 0xBFC00200 + offset;
+	const u32 target_pc = checkStatus ? (0x80000000 + offset) : (0xBFC00200 + offset);
+	const bool is_tlb_exception = ((code & 0x7C) >= 0x8) && ((code & 0x7C) <= 0xC);
+	const u32 target_clear_pc = (target_pc & 0x1fffffffu) & ~0x3ffu;
+
+	cpuRegs.pc = target_pc;
+
+	if (is_tlb_exception && Cpu != &intCpu)
+	{
+		Console.Error("cpuException TLB target pc:%x phys:%x epc:%x badv:%x status:%x cause:%x",
+			cpuRegs.pc, target_clear_pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr,
+			cpuRegs.CP0.n.Status.val, cpuRegs.CP0.n.Cause);
+	}
 
 	cpuUpdateOperationMode();
 }
@@ -211,6 +219,113 @@ __fi void cpuSetNextEventDelta( s32 delta )
 	cpuSetNextEvent( cpuRegs.cycle, delta );
 }
 
+static __fi void _cpuTestPERF();
+
+static __fi void cpuBeginEventTestWindow()
+{
+	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
+	cpuRegs.lastEventCycle = cpuRegs.cycle;
+}
+
+static __fi void cpuEnterEventTest()
+{
+	eeEventTestIsActive = true;
+	cpuBeginEventTestWindow();
+}
+
+static __fi void cpuLeaveEventTest()
+{
+	eeEventTestIsActive = false;
+}
+
+static __fi void cpuArmEvent(EE_EventType n, s32 ecycle)
+{
+	cpuRegs.interrupt |= 1 << n;
+	cpuRegs.sCycle[n] = cpuRegs.cycle;
+	cpuRegs.eCycle[n] = ecycle;
+}
+
+static __fi void cpuRequestHwInterruptCheck()
+{
+	cpuSetNextEventDelta(4);
+}
+
+static __fi void cpuBreakActiveIopExecution()
+{
+	if (psxRegs.iopCycleEE <= 0)
+		return;
+
+	psxRegs.iopBreak += psxRegs.iopCycleEE;
+	psxRegs.iopCycleEE = 0;
+}
+
+static __fi void cpuRequestRapidEventTest()
+{
+	cpuSetNextEventDelta(48);
+}
+
+static __fi void cpuScheduleNextEventFromIopState()
+{
+	const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
+	const int nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);
+
+	if (EEsCycle >= nextIopEventDeta)
+	{
+		cpuRequestRapidEventTest();
+	}
+	else
+	{
+		cpuSetNextEventDelta(((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier) - EEsCycle);
+	}
+}
+
+static __fi void cpuSyncIopCycleState()
+{
+	EEsCycle += cpuRegs.cycle - EEoCycle;
+	EEoCycle = cpuRegs.cycle;
+
+	if (EEsCycle > 0)
+		iopEventAction = true;
+}
+
+static __fi void cpuExecutePendingIopEvents()
+{
+	if (!iopEventAction)
+		return;
+
+	EEsCycle = psxCpu->ExecuteBlock(EEsCycle);
+	iopEventAction = false;
+}
+
+static __fi void cpuRunCounterUpdateIfNeeded()
+{
+	if (!cpuTestCycle(nextStartCounter, nextDeltaCounter))
+		return;
+
+	rcntUpdate();
+	_cpuTestPERF();
+}
+
+static __fi void cpuApplyCounterEventDeadline()
+{
+	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
+}
+
+static __fi bool cpuHasPendingEvent(uint interrupt)
+{
+	return (cpuRegs.interrupt & (1 << interrupt)) != 0;
+}
+
+static __fi bool cpuShouldDispatchEventNow(uint interrupt)
+{
+	return CHECK_INSTANTDMAHACK || cpuTestCycle(cpuRegs.sCycle[interrupt], cpuRegs.eCycle[interrupt]);
+}
+
+static __fi void cpuDeferEventUntilReady(uint interrupt)
+{
+	cpuSetNextEvent(cpuRegs.sCycle[interrupt], cpuRegs.eCycle[interrupt]);
+}
+
 __fi int cpuGetCycles(int interrupt)
 {
 	if(interrupt == VU_MTVU_BUSY && (!THREAD_VU1 || INSTANT_VU1))
@@ -248,15 +363,16 @@ __fi void cpuClearInt( uint i )
 
 static __fi void TESTINT( u8 n, void (*callback)() )
 {
-	if( !(cpuRegs.interrupt & (1 << n)) ) return;
+	if (!cpuHasPendingEvent(n))
+		return;
 
-	if(CHECK_INSTANTDMAHACK || cpuTestCycle( cpuRegs.sCycle[n], cpuRegs.eCycle[n] ) )
+	if (cpuShouldDispatchEventNow(n))
 	{
 		cpuClearInt( n );
 		callback();
 	}
 	else
-		cpuSetNextEvent( cpuRegs.sCycle[n], cpuRegs.eCycle[n] );
+		cpuDeferEventUntilReady(n);
 }
 
 // [TODO] move this function to Dmac.cpp, and remove most of the DMAC-related headers from
@@ -364,9 +480,7 @@ static bool cpuIntsEnabled(int Interrupt)
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
 {
-	eeEventTestIsActive = true;
-	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
-	cpuRegs.lastEventCycle = cpuRegs.cycle;
+	cpuEnterEventTest();
 	// ---- INTC / DMAC (CPU-level Exceptions) -----------------
 	// Done first because exceptions raised during event tests need to be postponed a few
 	// cycles (fixes Grandia II [PAL], which does a spin loop on a vsync and expects to
@@ -386,29 +500,14 @@ __fi void _cpuEventTest_Shared()
 	//   cpuEventTest, the IOP generally starts to run way ahead of the EE.
 
 	// It's also important to sync up the IOP before updating the timers, since gates will depend on starting/stopping in the right place!
-	EEsCycle += cpuRegs.cycle - EEoCycle;
-	EEoCycle = cpuRegs.cycle;
-
-	if (EEsCycle > 0)
-		iopEventAction = true;
-
-	if (iopEventAction)
-	{
-		//if( EEsCycle < -450 )
-		//	Console.WriteLn( " IOP ahead by: %d cycles", -EEsCycle );
-
-		EEsCycle = psxCpu->ExecuteBlock(EEsCycle);
-
-		iopEventAction = false;
-	}
+	cpuSyncIopCycleState();
+	//if( EEsCycle < -450 )
+	//	Console.WriteLn( " IOP ahead by: %d cycles", -EEsCycle );
+	cpuExecutePendingIopEvents();
 
 	iopEventTest();
 
-	if (cpuTestCycle(nextStartCounter, nextDeltaCounter))
-	{
-		rcntUpdate();
-		_cpuTestPERF();
-	}
+	cpuRunCounterUpdateIfNeeded();
 
 	_cpuTestTIMR();
 
@@ -438,27 +537,14 @@ __fi void _cpuEventTest_Shared()
 	CpuVU1->ExecuteBlock();
 
 	// ---- Schedule Next Event Test --------------
-	const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
-	const int nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);
-	// 8 or more cycles behind and there's an event scheduled
-	if (EEsCycle >= nextIopEventDeta)
-	{
-		// EE's running way ahead of the IOP still, so we should branch quickly to give the
-		// IOP extra timeslices in short order.
-
-		cpuSetNextEventDelta(48);
-		//Console.Warning( "EE ahead of the IOP -- Rapid Event!  %d", EEsCycle );
-	}
-	else
-	{
-		// Otherwise IOP is caught up/not doing anything so we can wait for the next event.
-		cpuSetNextEventDelta(((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier) - EEsCycle);
-	}
+	// 8 or more cycles behind and there's an event scheduled.
+	// Otherwise IOP is caught up/not doing anything so we can wait for the next event.
+	cpuScheduleNextEventFromIopState();
 
 	// Apply vsync and other counter nextCycles
-	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
+	cpuApplyCounterEventDeadline();
 
-	eeEventTestIsActive = false;
+	cpuLeaveEventTest();
 }
 
 __ri void cpuTestINTCInts()
@@ -471,12 +557,9 @@ __ri void cpuTestINTCInts()
 	if ((psHu32(INTC_STAT) & psHu32(INTC_MASK)) == 0)
 		return;
 
-	cpuSetNextEventDelta(4);
-	if (eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
-	{
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
-	}
+	cpuRequestHwInterruptCheck();
+	if (eeEventTestIsActive)
+		cpuBreakActiveIopExecution();
 }
 
 __fi void cpuTestDMACInts()
@@ -490,12 +573,9 @@ __fi void cpuTestDMACInts()
 		((psHu16(0xe010) & 0x8000) == 0))
 		return;
 
-	cpuSetNextEventDelta(4);
-	if (eeEventTestIsActive && (psxRegs.iopCycleEE > 0))
-	{
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
-	}
+	cpuRequestHwInterruptCheck();
+	if (eeEventTestIsActive)
+		cpuBreakActiveIopExecution();
 }
 
 __fi void cpuTestTIMRInts()
@@ -529,9 +609,7 @@ __fi void CPU_INT( EE_EventType n, s32 ecycle)
 	if (ecycle < 4 && !(cpuRegs.dmastall & (1 << n)) && eeRunInterruptScan != INT_NOT_RUNNING)
 	{
 		eeRunInterruptScan = INT_REQ_LOOP;
-		cpuRegs.interrupt |= 1 << n;
-		cpuRegs.sCycle[n] = cpuRegs.cycle;
-		cpuRegs.eCycle[n] = 0;
+		cpuArmEvent(n, 0);
 		return;
 	}
 
@@ -541,19 +619,15 @@ __fi void CPU_INT( EE_EventType n, s32 ecycle)
 	if (CHECK_EETIMINGHACK && n < VIF_VU0_FINISH)
 		ecycle = 8;
 
-	cpuRegs.interrupt |= 1 << n;
-	cpuRegs.sCycle[n] = cpuRegs.cycle;
-	cpuRegs.eCycle[n] = ecycle;
+	cpuArmEvent(n, ecycle);
 
 	// Interrupt is happening soon: make sure both EE and IOP are aware.
 
-	if (ecycle <= 28 && psxRegs.iopCycleEE > 0)
+	if (ecycle <= 28)
 	{
 		// If running in the IOP, force it to break immediately into the EE.
 		// the EE's branch test is due to run.
-
-		psxRegs.iopBreak += psxRegs.iopCycleEE; // record the number of cycles the IOP didn't run.
-		psxRegs.iopCycleEE = 0;
+		cpuBreakActiveIopExecution();
 	}
 
 	cpuSetNextEventDelta(cpuRegs.eCycle[n]);

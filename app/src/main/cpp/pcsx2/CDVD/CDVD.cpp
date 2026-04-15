@@ -169,8 +169,13 @@ void cdvdLoadNVRAM()
 	auto fp = FileSystem::OpenManagedCFileTryIgnoreCase(nvmfile.c_str(), "rb", &error);
 	if (!fp || std::fread(s_nvram, sizeof(s_nvram), 1, fp.get()) != 1)
 	{
-		ERROR_LOG("Failed to open or read NVRAM at {}: {}", Path::GetFileName(nvmfile), error.GetDescription());
+		WARNING_LOG("NVRAM missing or unreadable at {}: {}, creating default.", Path::GetFileName(nvmfile),
+			error.GetDescription());
 		cdvdCreateNewNVM();
+		fp.reset();
+		fp = FileSystem::OpenManagedCFileTryIgnoreCase(nvmfile.c_str(), "wb");
+		if (!fp || std::fwrite(s_nvram, sizeof(s_nvram), 1, fp.get()) != 1)
+			Host::ReportErrorAsync("Error", "Failed to write NVRAM file. Check your BIOS setup/permission settings.");
 	}
 	else
 	{
@@ -194,7 +199,7 @@ void cdvdLoadNVRAM()
 	{
 		s_mecha_version = DEFAULT_MECHA_VERSION;
 
-		ERROR_LOG("Failed to open or read MEC file at {}: {}, creating default.", Path::GetFileName(nvmfile),
+		WARNING_LOG("MEC file missing or unreadable at {}: {}, creating default.", Path::GetFileName(mecfile),
 			error.GetDescription());
 		fp.reset();
 		fp = FileSystem::OpenManagedCFileTryIgnoreCase(mecfile.c_str(), "wb");

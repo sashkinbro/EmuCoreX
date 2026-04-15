@@ -65,8 +65,14 @@ namespace a64 = vixl::aarch64;
 #define RSTATE_CPU a64::x27
 #define RSTATE_PSX a64::x28
 // ARM64 JIT contract: helper code materializes g_cpuRegistersPack into
-// RSTATE_CPU and then addresses EE/IOP/VU/vtlb state through fixed offsets.
+// RSTATE_CPU and addresses the legacy mixed state block by fixed offsets.
+// New backend-local scratch should go through PTR_RUNTIME().
+#define PTR_RUNTIME(field) a64::MemOperand(RSTATE_CPU, offsetof(Arm64CpuRuntimePack, runtime) + offsetof(Arm64BackendRuntime, field))
 #define PTR_CPU(field) a64::MemOperand(RSTATE_CPU, offsetof(Arm64CpuRuntimePack, field))
+// Named contracts for backend-local banks. Callers should address them by role
+// instead of treating them as mixed state-root fields.
+#define PTR_CONFIG(field) PTR_RUNTIME(config.field)
+#define PTR_MVUCONST(field) PTR_CPU(mVUss4.field)
 
 // microVU
 #define RSTATE_MVU a64::x28

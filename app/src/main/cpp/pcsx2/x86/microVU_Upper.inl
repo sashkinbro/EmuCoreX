@@ -96,9 +96,9 @@ static void mVUupdateFlags(mV, const xmm& reg, const xmm& regT1in = a64::NoVReg,
 //		xMOVAPS(regT1, regT2);
         armAsm->Mov(regT1.Q(), regT2.Q());
 //		xAND.PS(regT1, ptr128[&sse4_compvals[1][0]]); // Remove sign flags (we don't care)
-        armAsm->And(regT1.V16B(), regT1.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sse4_compvals[1][0])).V16B());
+        armAsm->And(regT1.V16B(), regT1.V16B(), armLoadPtrV(PTR_MVUCONST(sse4_compvals[1][0])).V16B());
 //		xCMPNLT.PS(regT1, ptr128[&sse4_compvals[0][0]]); // Compare if T1 == FLT_MAX
-        armAsm->Fcmeq(regT1.V4S(), regT1.V4S(), armLoadPtrV(PTR_CPU(mVUss4.sse4_compvals[0][0])).V4S());
+        armAsm->Fcmeq(regT1.V4S(), regT1.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_compvals[0][0])).V4S());
 //		xMOVMSKPS(gprT2, regT1); // Grab sign bits  for equal results
         armMOVMSKPS(gprT2, regT1);
 //		xAND(gprT2, AND_XYZW); // Grab "Is FLT_MAX" bits from the previous calculation
@@ -727,11 +727,11 @@ mVUop(mVU_MINIy)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIy,  0);  }
 mVUop(mVU_MINIz)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIz,  0);  }
 mVUop(mVU_MINIw)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIw,  0);  }
 mVUop(mVU_FTOI0)  { mVU_FTOIx(mX, a64::MemOperand(),              opFTOI0);      }
-mVUop(mVU_FTOI4)  { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_4),        opFTOI4);      }
-mVUop(mVU_FTOI12) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_12),       opFTOI12);     }
-mVUop(mVU_FTOI15) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_15),       opFTOI15);     }
+mVUop(mVU_FTOI4)  { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_4),    opFTOI4);      }
+mVUop(mVU_FTOI12) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_12),   opFTOI12);     }
+mVUop(mVU_FTOI15) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_15),   opFTOI15);     }
 mVUop(mVU_ITOF0)  { mVU_ITOFx(mX, a64::MemOperand(),              opITOF0);      }
-mVUop(mVU_ITOF4)  { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_4),        opITOF4);      }
-mVUop(mVU_ITOF12) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_12),       opITOF12);     }
-mVUop(mVU_ITOF15) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_15),       opITOF15);     }
+mVUop(mVU_ITOF4)  { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_4),    opITOF4);      }
+mVUop(mVU_ITOF12) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_12),   opITOF12);     }
+mVUop(mVU_ITOF15) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_15),   opITOF15);     }
 mVUop(mVU_NOP)    { pass2 { mVU.profiler.EmitOp(opNOP); } pass3 { mVUlog("NOP"); } }

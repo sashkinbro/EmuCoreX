@@ -222,8 +222,6 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">Fichiers</string>
-    <string name="settings_bios_path">Dossier du BIOS</string>
-    <string name="settings_bios_path_desc">Sélectionnez le dossier contenant les fichiers BIOS nécessaires pour démarrer les jeux.</string>
     <string name="settings_game_path">Dossier de jeux</string>
     <string name="settings_game_path_desc">Sélectionnez le dossier qui contient vos jeux.</string>
     <string name="settings_not_set">Non défini</string>
@@ -515,7 +513,6 @@
     <string name="onboarding_title">Préparez-vous à jouer</string>
     <string name="onboarding_subtitle">Ajoutez des fichiers BIOS et choisissez votre dossier de jeux.</string>
     <string name="onboarding_bios_title">Choisir les fichiers BIOS</string>
-    <string name="onboarding_bios_desc">Sélectionnez le dossier contenant les fichiers BIOS nécessaires pour démarrer les jeux.</string>
     <string name="onboarding_games_title">Choisir le dossier de jeux</string>
     <string name="onboarding_games_desc">Sélectionnez le dossier qui contient vos jeux.</string>
     <string name="onboarding_status_required">Requis</string>
@@ -776,7 +773,6 @@
     <string name="settings_help_force_even_sprite_position">Aligne les positions des sprites sur des coordonnées paires pour réduire les petits espaces ou le scintillement entre les pixels aux résolutions plus élevées. Utile pour les jeux très riches en 2D, mais cela peut décaler légèrement certains éléments.</string>
     <string name="settings_help_native_palette_draw">Dessine les effets basés sur la palette au plus près de la précision native. Cela peut réparer les effets indexés par couleur, les ombres de palette ou d\'autres astuces lourdes en CLUT qui se cassent lors de la mise à l\'échelle, mais cela peut également rendre la sortie haute résolution moins nette.</string>
     <string name="settings_help_bilinear_filtering">Contrôle le mode de filtrage de texture principal utilisé par le moteur de rendu. "Le plus proche" (Nearest) conserve l\'aspect brut le plus net, "PS2" reste le plus proche du comportement d\'origine de la console, et les modes "Forcés" lissent de manière plus agressive. Si un jeu semble trop pixelisé ou trop flou, c\'est la première option de filtrage à ajuster.</string>
-    <string name="settings_help_bios_path">Indique à EmuCoreX le dossier qui contient vos fichiers BIOS PS2. Un dump propre de votre propre console est le meilleur choix. L\'application peut détecter les fichiers courants liés au BIOS tels que .bin, .rom, .mec, .nvm et .elf, y compris les fichiers ROM d\'accompagnement tels que ROM0, ROM1, ROM2 et EROM lorsqu\'ils sont présents.</string>
     <string name="settings_help_game_path">Sélectionne le dossier de la bibliothèque qu\'EmuCoreX analyse pour trouver des jeux. L\'analyse est récursive, les sous-dossiers ne posent donc pas de problème. Les images prises en charge incluent .iso, .bin, .chd, .cso et .gz. L\'ISO est la base la plus sûre, tandis que le CHD est généralement le meilleur format à long terme car il économise de l\'espace sans renoncer à l\'utilisation normale.</string>
     <string name="settings_help_cover_download_url">Remplace la source de jaquettes intégrée utilisée pour les téléchargements automatiques. L\'URL doit pointer directement vers un dossier contenant des jaquettes JPG nommées par le numéro de série du jeu, par exemple SLUS-20312.jpg. Ne modifiez cela que si vous hébergez votre propre miroir ou si vous souhaitez utiliser une autre bibliothèque de jaquettes compatible.</string>
     <string name="settings_cover_download_url">URL de téléchargement des jaquettes</string>
@@ -803,10 +799,6 @@
     <string name="settings_cover_download_url_copied">URL d\'exemple copiées.</string>
     <string name="settings_help_cover_art_style">Choisit le type de jaquette par défaut utilisé lors du téléchargement d\'images. Les jaquettes plates correspondent à l\'aspect classique de la face avant de la boîte, tandis que Boîte 3D utilise des rendus de boîtes inclinées lorsque la source les fournit. Les jaquettes 3D peuvent paraître plus spectaculaires, mais leur disponibilité peut être légèrement inférieure à celle des images plates.</string>
     <string name="settings_renderer_auto">Auto</string>
-    <string name="settings_bios_picker_title">Choisir le dossier BIOS</string>
-    <string name="settings_bios_picker_desc">Choisissez le dossier qui contient vos fichiers BIOS PlayStation 2. Ce dossier sera utilisé pour le démarrage normal des jeux et le démarrage du BIOS.</string>
-    <string name="settings_bios_picker_current">Dossier BIOS actuel</string>
-    <string name="settings_bios_picker_action">Sélectionner un dossier</string>
     <string name="settings_auto">Auto</string>
     <string name="settings_target_fps_mode">Mode FPS cible</string>
     <string name="settings_target_fps_auto">FPS auto</string>
@@ -883,4 +875,12 @@
     <string name="shell_memory_cards">Cartes mémoire</string>
     <string name="settings_memory_cards_tab">Cartes mémoire</string>
     <string name="memory_card_help_text">Attribuez des cartes aux deux emplacements PS2 standard, créez de nouvelles cartes, exportez des cartes individuelles, effectuez des sauvegardes complètes, restaurez des cartes existantes et gérez les doublons ou les renommages en toute sécurité.</string>
+    <string name="settings_bios_path">Fichier BIOS</string>
+    <string name="settings_bios_path_desc">Sélectionnez le fichier image du BIOS PS2 nécessaire pour démarrer les jeux.</string>
+    <string name="settings_bios_picker_title">Choisir le fichier BIOS</string>
+    <string name="settings_bios_picker_desc">Choisissez votre fichier image du BIOS PlayStation 2. Ce fichier sera utilisé pour le démarrage normal des jeux et le démarrage du BIOS.</string>
+    <string name="settings_bios_picker_current">Fichier BIOS actuel</string>
+    <string name="settings_bios_picker_action">Sélectionner un fichier</string>
+    <string name="settings_help_bios_path">Indique à EmuCoreX où se trouve votre fichier image du BIOS PS2. Un dump propre de votre propre console est le meilleur choix. L\'application attend l\'image principale du BIOS, généralement un fichier .bin ou .rom, et conserve tout fichier NVRAM/MEC généré à côté de la copie importée.</string>
+    <string name="onboarding_bios_desc">Sélectionnez le fichier image du BIOS PS2 nécessaire pour démarrer les jeux.</string>
 </resources>

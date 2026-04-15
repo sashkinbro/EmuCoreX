@@ -252,12 +252,12 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">Files</string>
-    <string name="settings_bios_path">BIOS Folder</string>
-    <string name="settings_bios_path_desc">Select the folder with BIOS files needed to start games.</string>
-    <string name="settings_bios_picker_title">Choose BIOS Folder</string>
-    <string name="settings_bios_picker_desc">Pick the folder that contains your PlayStation 2 BIOS files. This folder will be used for normal game boot and BIOS boot.</string>
-    <string name="settings_bios_picker_current">Current BIOS folder</string>
-    <string name="settings_bios_picker_action">Select Folder</string>
+    <string name="settings_bios_path">BIOS File</string>
+    <string name="settings_bios_path_desc">Select the PS2 BIOS image file needed to start games.</string>
+    <string name="settings_bios_picker_title">Choose BIOS File</string>
+    <string name="settings_bios_picker_desc">Pick your PlayStation 2 BIOS image file. This file will be used for normal game boot and BIOS boot.</string>
+    <string name="settings_bios_picker_current">Current BIOS file</string>
+    <string name="settings_bios_picker_action">Select File</string>
     <string name="settings_game_path">Games Folder</string>
     <string name="settings_game_path_desc">Select the folder that contains your games.</string>
     <string name="settings_cover_download_url">Cover Download URL</string>
@@ -323,7 +323,7 @@
     <string name="settings_help_recent_games">Shows a quick-access row for the games you played last. Good if you bounce between a few titles often; turn it off if you want a cleaner home screen.</string>
     <string name="settings_help_home_search">Shows the library search bar directly on the home screen. Leave it on for big libraries; turn it off if you prefer a cleaner layout and rarely search by name.</string>
     <string name="settings_help_prefer_english_game_titles">Uses English titles from PCSX2\'s GameIndex database for games that ship with Japanese or other regional names. This mainly helps imported releases read more clearly in the library, while games without an English database title keep their normal name.</string>
-    <string name="settings_help_bios_path">Points EmuCoreX to the folder that contains your PS2 BIOS files. A clean dump from your own console is the best choice. The app can detect common BIOS-related files such as .bin, .rom, .mec, .nvm, and .elf, including companion ROM files like ROM0, ROM1, ROM2, and EROM when they are present.</string>
+    <string name="settings_help_bios_path">Points EmuCoreX to your PS2 BIOS image file. A clean dump from your own console is the best choice. The app expects the main BIOS image, usually a .bin or .rom file, and keeps any generated NVRAM/MEC files beside the imported copy.</string>
     <string name="settings_help_game_path">Selects the library folder that EmuCoreX scans for games. The scan is recursive, so subfolders are fine. Supported images include .iso, .bin, .chd, .cso, and .gz. ISO is the safest baseline, while CHD is usually the best long-term format because it saves space without giving up normal usage.</string>
     <string name="settings_help_cover_art_style">Chooses the default cover type used when downloading artwork. Flat covers match the classic front-box look, while 3D Box uses angled box renders when the source provides them. 3D covers can look more dramatic, but availability may be slightly worse than flat art.</string>
     <string name="settings_help_cover_download_url">Overrides the built-in cover source used for automatic downloads. The URL should point directly to a folder that contains JPG covers named by game serial, for example SLUS-20312.jpg. Change this only if you host your own mirror or want to use a different compatible cover library.</string>
@@ -667,7 +667,7 @@
     <string name="onboarding_title">Get ready to play</string>
     <string name="onboarding_subtitle">Add BIOS files and choose your games folder.</string>
     <string name="onboarding_bios_title">Choose BIOS files</string>
-    <string name="onboarding_bios_desc">Select the folder with BIOS files needed to start games.</string>
+    <string name="onboarding_bios_desc">Select the PS2 BIOS image file needed to start games.</string>
     <string name="onboarding_games_title">Choose games folder</string>
     <string name="onboarding_games_desc">Select the folder that contains your games.</string>
     <string name="onboarding_status_required">Required</string>

@@ -16,8 +16,6 @@
 
 class Error;
 
-class SaveStateBase;
-
 namespace Achievements
 {
 	enum class LoginRequestReason
@@ -55,7 +53,7 @@ namespace Achievements
 
 	/// Saves/loads state.
 	void LoadState(std::span<const u8> data);
-	void SaveState(SaveStateBase& writer);
+	void SaveStateToBuffer(std::vector<u8>* out_data);
 
 	/// Attempts to log in to RetroAchievements using the specified credentials.
 	/// If the login is successful, the token returned by the server will be saved.

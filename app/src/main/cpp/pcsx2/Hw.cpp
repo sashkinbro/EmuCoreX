@@ -148,9 +148,9 @@ __ri void hwMFIFOResume() {
 	{
 		case MFD_VIF1: // Most common case.
 		{
-			if (vif1.inprogress & 0x10)
+			if (vif1.IsMfifoAwaitingData())
 			{
-				vif1.inprogress &= ~0x10;
+				vif1.SetMfifoAwaitingData(false);
 				//Don't resume if stalled or already looping
 				if (vif1ch.chcr.STR && !(cpuRegs.interrupt & (1 << DMAC_MFIFO_VIF)) && !vif1Regs.stat.INT)
 				{

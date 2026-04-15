@@ -719,6 +719,7 @@ bool s_execute_exit;
 int s_window_width = 0;
 int s_window_height = 0;
 ANativeWindow* s_window = nullptr;
+static jobject s_surface_object = nullptr;
 static std::mutex s_surface_mutex;
 static std::mutex s_cpu_thread_queue_mutex;
 static std::deque<std::function<void()>> s_cpu_thread_queue;
@@ -1844,8 +1845,12 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass clazz,
                                                             jobject p_surface, jint p_width, jint p_height) {
     ANativeWindow* new_window = nullptr;
+    jobject new_surface = nullptr;
     if (p_surface != nullptr)
+    {
         new_window = ANativeWindow_fromSurface(env, p_surface);
+        new_surface = env->NewGlobalRef(p_surface);
+    }
 
     {
         std::lock_guard<std::mutex> lock(s_surface_mutex);
@@ -1853,8 +1858,14 @@ Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass
             ANativeWindow_release(s_window);
             s_window = nullptr;
         }
+        if (s_surface_object)
+        {
+            env->DeleteGlobalRef(s_surface_object);
+            s_surface_object = nullptr;
+        }
 
         s_window = new_window;
+        s_surface_object = new_surface;
         if (p_width > 0)
             s_window_width = p_width;
         if (p_height > 0)
@@ -1879,6 +1890,13 @@ Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv *env, jcla
             ANativeWindow_release(s_window);
             s_window = nullptr;
         }
+        if (s_surface_object)
+        {
+            env->DeleteGlobalRef(s_surface_object);
+            s_surface_object = nullptr;
+        }
+        s_window_width = 0;
+        s_window_height = 0;
     }
 }
 
@@ -1892,6 +1910,29 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 
     {
         std::lock_guard<std::mutex> lock(s_surface_mutex);
+        if (recreate_window && s_surface_object)
+        {
+            JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+            if (env)
+            {
+                ANativeWindow* recreated_window = ANativeWindow_fromSurface(env, s_surface_object);
+                if (recreated_window)
+                {
+                    if (s_window && s_window != recreated_window)
+                        ANativeWindow_release(s_window);
+                    s_window = recreated_window;
+                }
+                else
+                {
+                    Console.Warning("AcquireRenderWindow: failed to recreate ANativeWindow from stored Surface");
+                }
+            }
+            else
+            {
+                Console.Warning("AcquireRenderWindow: SDL_GetAndroidJNIEnv() returned null during recreate");
+            }
+        }
+
         window = s_window;
         window_width = s_window_width;
         window_height = s_window_height;
@@ -2718,7 +2759,7 @@ bool PageFaultHandler::InstallSecondaryThread()
 bool Common::InhibitScreensaver(bool inhibit)
 {
     (void)inhibit;
-    return false;
+    return true;
 }
 
 bool Common::PlaySoundAsync(const char* path)

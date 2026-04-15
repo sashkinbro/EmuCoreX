@@ -109,6 +109,82 @@ __fi void psxSetNextBranchDelta( s32 delta )
 	psxSetNextBranch( psxRegs.cycle, delta );
 }
 
+__fi int psxTestCycle( u64 startCycle, s32 delta );
+
+static __fi void psxBeginEventTestWindow()
+{
+	psxRegs.iopNextEventCycle = psxRegs.cycle + iopWaitCycles;
+}
+
+static __fi void psxEnterEventTest()
+{
+	iopEventTestIsActive = true;
+}
+
+static __fi void psxLeaveEventTest()
+{
+	iopEventTestIsActive = false;
+}
+
+static __fi void psxArmEvent(IopEventId n, s32 ecycle)
+{
+	psxRegs.interrupt |= 1 << n;
+	psxRegs.sCycle[n] = psxRegs.cycle;
+	psxRegs.eCycle[n] = ecycle;
+}
+
+static __fi void psxRequestInterruptBranchTest()
+{
+	psxSetNextBranchDelta(2);
+}
+
+static __fi void psxMarkEventActionPending()
+{
+	iopEventAction = true;
+}
+
+static __fi void psxRequestEeEventTest(s32 delta)
+{
+	cpuSetNextEventDelta(delta);
+}
+
+static __fi void psxNotifyEeOfPendingEvent(s32 iopDelta)
+{
+	if (psxRegs.iopCycleEE < iopDelta)
+		psxRequestEeEventTest(iopDelta - psxRegs.iopCycleEE);
+}
+
+static __fi void psxApplyCounterEventDeadline()
+{
+	if (psxNextDeltaCounter < static_cast<s32>(psxRegs.iopNextEventCycle - psxNextStartCounter))
+		psxRegs.iopNextEventCycle = psxNextStartCounter + psxNextDeltaCounter;
+}
+
+static __fi bool psxShouldRunCounterUpdate()
+{
+	return psxTestCycle(psxNextStartCounter, psxNextDeltaCounter);
+}
+
+static __fi bool psxHasPendingEvent(IopEventId n)
+{
+	return (psxRegs.interrupt & (1 << n)) != 0;
+}
+
+static __fi bool psxShouldDispatchEventNow(IopEventId n)
+{
+	return psxTestCycle(psxRegs.sCycle[n], psxRegs.eCycle[n]);
+}
+
+static __fi void psxDeferEventUntilReady(IopEventId n)
+{
+	psxSetNextBranch(psxRegs.sCycle[n], psxRegs.eCycle[n]);
+}
+
+static __fi void psxClearPendingEvent(IopEventId n)
+{
+	psxRegs.interrupt &= ~(1 << n);
+}
+
 __fi int psxTestCycle( u64 startCycle, s32 delta )
 {
 	// typecast the conditional to signed so that things don't explode
@@ -131,51 +207,45 @@ __fi void PSX_INT( IopEventId n, s32 ecycle )
 	//if (ecycle > 8192 && n != 19)
 	//	DevCon.Warning( "IOP cycles high: %d, n %d", ecycle, n );
 
-	psxRegs.interrupt |= 1 << n;
-
-	psxRegs.sCycle[n] = psxRegs.cycle;
-	psxRegs.eCycle[n] = ecycle;
+	psxArmEvent(n, ecycle);
 
 	psxSetNextBranchDelta(ecycle);
 	const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
 	const s32 iopDelta = (psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier;
 
-	if (psxRegs.iopCycleEE < iopDelta)
-	{
-		// The EE called this int, so inform it to branch as needed:
-		
-		cpuSetNextEventDelta(iopDelta - psxRegs.iopCycleEE);
-	}
+	// The EE called this int, so inform it to branch as needed:
+	psxNotifyEeOfPendingEvent(iopDelta);
 }
 
 static __fi void IopTestEvent( IopEventId n, void (*callback)() )
 {
-	if( !(psxRegs.interrupt & (1 << n)) ) return;
+	if (!psxHasPendingEvent(n))
+		return;
 
-	if( psxTestCycle( psxRegs.sCycle[n], psxRegs.eCycle[n] ) )
+	if (psxShouldDispatchEventNow(n))
 	{
-		psxRegs.interrupt &= ~(1 << n);
+		psxClearPendingEvent(n);
 		callback();
 	}
 	else
-		psxSetNextBranch( psxRegs.sCycle[n], psxRegs.eCycle[n] );
+		psxDeferEventUntilReady(n);
 }
 
 static __fi void Sio0TestEvent(IopEventId n)
 {
-	if (!(psxRegs.interrupt & (1 << n)))
+	if (!psxHasPendingEvent(n))
 	{
 		return;
 	}
 
-	if (psxTestCycle(psxRegs.sCycle[n], psxRegs.eCycle[n]))
+	if (psxShouldDispatchEventNow(n))
 	{
-		psxRegs.interrupt &= ~(1 << n);
+		psxClearPendingEvent(n);
 		g_Sio0.Interrupt(Sio0Interrupt::TEST_EVENT);
 	}
 	else
 	{
-		psxSetNextBranch(psxRegs.sCycle[n], psxRegs.eCycle[n]);
+		psxDeferEventUntilReady(n);
 	}
 }
 
@@ -207,26 +277,25 @@ static __fi void _psxTestInterrupts()
 
 __ri void iopEventTest()
 {
-	psxRegs.iopNextEventCycle = psxRegs.cycle + iopWaitCycles;
+	psxBeginEventTestWindow();
 
-	if (psxTestCycle(psxNextStartCounter, psxNextDeltaCounter))
+	if (psxShouldRunCounterUpdate())
 	{
 		psxRcntUpdate();
-		iopEventAction = true;
+		psxMarkEventActionPending();
 	}
 	else
 	{
 		// start the next branch at the next counter event by default
 		// the interrupt code below will assign nearer branches if needed.
-		if (psxNextDeltaCounter < static_cast<s32>(psxRegs.iopNextEventCycle - psxNextStartCounter))
-			psxRegs.iopNextEventCycle = psxNextStartCounter + psxNextDeltaCounter;
+		psxApplyCounterEventDeadline();
 	}
 
 	if (psxRegs.interrupt)
 	{
-		iopEventTestIsActive = true;
+		psxEnterEventTest();
 		_psxTestInterrupts();
-		iopEventTestIsActive = false;
+		psxLeaveEventTest();
 	}
 
 	if ((psxHu32(HW_ICTRL) != 0) && ((psxHu32(HW_ISTAT) & psxHu32(HW_IMASK)) != 0))
@@ -235,7 +304,7 @@ __ri void iopEventTest()
 		{
 			PSXCPU_LOG("Interrupt: %x  %x", psxHu32(HW_ISTAT), psxHu32(HW_IMASK));
 			psxException(0, 0);
-			iopEventAction = true;
+			psxMarkEventActionPending();
 		}
 	}
 }
@@ -250,15 +319,15 @@ void iopTestIntc()
 		// An iop exception has occurred while the EE is running code.
 		// Inform the EE to branch so the IOP can handle it promptly:
 
-		cpuSetNextEventDelta( 16 );
-		iopEventAction = true;
+		psxRequestEeEventTest(16);
+		psxMarkEventActionPending();
 		//Console.Error( "** IOP Needs an EE EventText, kthx **  %d", iopCycleEE );
 
 		// Note: No need to set the iop's branch delta here, since the EE
 		// will run an IOP branch test regardless.
 	}
 	else if ( !iopEventTestIsActive )
-		psxSetNextBranchDelta( 2 );
+		psxRequestInterruptBranchTest();
 }
 
 inline bool psxIsBranchOrJump(u32 addr)

@@ -43,6 +43,7 @@ hs_err_pid*
 app/src/main/native-tools/
 
 # Private / generated local data
+/docs/
 IGDB/
 pcsx2_official/
 public/

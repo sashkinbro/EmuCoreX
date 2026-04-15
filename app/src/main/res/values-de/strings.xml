@@ -222,8 +222,6 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">Dateien</string>
-    <string name="settings_bios_path">BIOS-Ordner</string>
-    <string name="settings_bios_path_desc">Wähle den Ordner mit den BIOS-Dateien aus, die zum Starten von Spielen benötigt werden.</string>
     <string name="settings_game_path">Spieleordner</string>
     <string name="settings_game_path_desc">Wähle den Ordner aus, der deine Spiele enthält.</string>
     <string name="settings_not_set">Nicht festgelegt</string>
@@ -515,7 +513,6 @@
     <string name="onboarding_title">Mach dich bereit zum Spielen</string>
     <string name="onboarding_subtitle">Füge BIOS-Dateien hinzu und wähle deinen Spieleordner.</string>
     <string name="onboarding_bios_title">BIOS-Dateien auswählen</string>
-    <string name="onboarding_bios_desc">Wähle den Ordner mit den BIOS-Dateien aus, die zum Starten von Spielen benötigt werden.</string>
     <string name="onboarding_games_title">Spieleordner auswählen</string>
     <string name="onboarding_games_desc">Wähle den Ordner aus, der deine Spiele enthält.</string>
     <string name="onboarding_status_required">Erforderlich</string>
@@ -776,7 +773,6 @@
     <string name="settings_help_force_even_sprite_position">Rastet Sprite-Positionen an geraden Koordinaten ein, um winzige Lücken oder Flimmern zwischen Pixeln bei höheren Auflösungen zu reduzieren. Hilfreich für 2D-lastige Spiele, kann aber einige Elemente leicht verschieben.</string>
     <string name="settings_help_native_palette_draw">Zeichnet palettenbasierte Effekte näher an der nativen Präzision. Dies kann farbindizierte Effekte, Palettenschatten oder andere CLUT-lastige Tricks reparieren, die beim Upscaling kaputt gehen, kann aber auch dazu führen, dass hochauflösende Ausgaben weniger sauber aussehen.</string>
     <string name="settings_help_bilinear_filtering">Steuert den vom Renderer verwendeten Hauptmodus für die Texturfilterung. „Nearest“ (Nächster) behält den schärfsten, rohen Look, „PS2“ bleibt am nächsten am ursprünglichen Konsolenverhalten und erzwungene („Forced“) Modi glätten aggressiver. Wenn ein Spiel zu blockig oder zu verschwommen aussieht, ist dies die erste Filteroption, die du anpassen solltest.</string>
-    <string name="settings_help_bios_path">Weist EmuCoreX den Ordner zu, der deine PS2-BIOS-Dateien enthält. Ein sauberer Dump von deiner eigenen Konsole ist die beste Wahl. Die App kann gängige BIOS-bezogene Dateien wie .bin, .rom, .mec, .nvm und .elf erkennen, einschließlich begleitender ROM-Dateien wie ROM0, ROM1, ROM2 und EROM, wenn diese vorhanden sind.</string>
     <string name="settings_help_game_path">Wählt den Bibliotheksordner aus, den EmuCoreX nach Spielen durchsucht. Der Scan ist rekursiv, Unterordner sind also in Ordnung. Unterstützte Images umfassen .iso, .bin, .chd, .cso und .gz. ISO ist die sicherste Basis, während CHD meist das beste langfristige Format ist, da es Platz spart, ohne die normale Nutzung einzuschränken.</string>
     <string name="settings_help_cover_download_url">Überschreibt die integrierte Cover-Quelle, die für automatische Downloads verwendet wird. Die URL sollte direkt auf einen Ordner zeigen, der JPG-Cover enthält, die nach der Spiel-Seriennummer benannt sind (z. B. SLUS-20312.jpg). Ändere dies nur, wenn du deinen eigenen Mirror hostest oder eine andere kompatible Cover-Bibliothek verwenden möchtest.</string>
     <string name="settings_cover_download_url">Cover-Download-URL</string>
@@ -803,10 +799,6 @@
     <string name="settings_cover_download_url_copied">Beispiel-URLs kopiert.</string>
     <string name="settings_help_cover_art_style">Wählt den Standard-Cover-Typ aus, der beim Herunterladen von Grafiken verwendet wird. Flache Cover entsprechen dem klassischen Look der Box-Vorderseite, während 3D-Box abgewinkelte Box-Renderings verwendet, wenn die Quelle diese bereitstellt. 3D-Cover können dramatischer aussehen, aber die Verfügbarkeit ist möglicherweise etwas schlechter als bei flachen Grafiken.</string>
     <string name="settings_renderer_auto">Automatisch</string>
-    <string name="settings_bios_picker_title">BIOS-Ordner auswählen</string>
-    <string name="settings_bios_picker_desc">Wähle den Ordner, der deine PlayStation 2 BIOS-Dateien enthält. Dieser Ordner wird für den normalen Spielstart und den BIOS-Start verwendet.</string>
-    <string name="settings_bios_picker_current">Aktueller BIOS-Ordner</string>
-    <string name="settings_bios_picker_action">Ordner auswählen</string>
     <string name="settings_auto">Automatisch</string>
     <string name="settings_target_fps_mode">Ziel-FPS-Modus</string>
     <string name="settings_target_fps_auto">Auto-FPS</string>
@@ -883,4 +875,12 @@
     <string name="shell_memory_cards">Memory Cards</string>
     <string name="settings_memory_cards_tab">Memory Cards</string>
     <string name="memory_card_help_text">Weise den zwei Standard-PS2-Steckplätzen Karten zu, erstelle neue Karten, exportiere einzelne Karten, erstelle vollständige Backups, stelle vorhandene Karten wieder her und verwalte Duplikate oder Umbenennungen auf sichere Weise.</string>
+    <string name="settings_bios_path">BIOS-Datei</string>
+    <string name="settings_bios_path_desc">Wähle die PS2-BIOS-Image-Datei aus, die zum Starten von Spielen benötigt wird.</string>
+    <string name="settings_bios_picker_title">BIOS-Datei auswählen</string>
+    <string name="settings_bios_picker_desc">Wähle deine PlayStation 2 BIOS-Image-Datei. Diese Datei wird für den normalen Spielstart und den BIOS-Start verwendet.</string>
+    <string name="settings_bios_picker_current">Aktuelle BIOS-Datei</string>
+    <string name="settings_bios_picker_action">Datei auswählen</string>
+    <string name="settings_help_bios_path">Verweist EmuCoreX auf deine PS2-BIOS-Image-Datei. Ein sauberer Dump von deiner eigenen Konsole ist die beste Wahl. Die App erwartet das Haupt-BIOS-Image, normalerweise eine .bin- oder .rom-Datei, und speichert alle generierten NVRAM/MEC-Dateien neben der importierten Kopie.</string>
+    <string name="onboarding_bios_desc">Wähle die PS2-BIOS-Image-Datei aus, die zum Starten von Spielen benötigt wird.</string>
 </resources>

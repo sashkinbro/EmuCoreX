@@ -222,8 +222,6 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">Archivos</string>
-    <string name="settings_bios_path">Carpeta BIOS</string>
-    <string name="settings_bios_path_desc">Selecciona la carpeta con los archivos BIOS necesarios para iniciar los juegos.</string>
     <string name="settings_game_path">Carpeta de juegos</string>
     <string name="settings_game_path_desc">Selecciona la carpeta que contiene tus juegos.</string>
     <string name="settings_not_set">No establecido</string>
@@ -515,7 +513,6 @@
     <string name="onboarding_title">Prepárate para jugar</string>
     <string name="onboarding_subtitle">Añade archivos BIOS y elige tu carpeta de juegos.</string>
     <string name="onboarding_bios_title">Elegir archivos BIOS</string>
-    <string name="onboarding_bios_desc">Selecciona la carpeta con los archivos BIOS necesarios para iniciar los juegos.</string>
     <string name="onboarding_games_title">Elegir carpeta de juegos</string>
     <string name="onboarding_games_desc">Selecciona la carpeta que contiene tus juegos.</string>
     <string name="onboarding_status_required">Requerido</string>
@@ -776,7 +773,6 @@
     <string name="settings_help_force_even_sprite_position">Ajusta las posiciones de los sprites a coordenadas pares para reducir pequeños huecos o parpadeos entre los píxeles en resoluciones altas. Útil para juegos muy 2D, pero puede desplazar ligeramente algunos elementos.</string>
     <string name="settings_help_native_palette_draw">Dibuja efectos basados en paleta más cerca de la precisión nativa. Esto puede reparar efectos indexados por color, sombras de paleta u otros trucos pesados en CLUT que se rompen al escalar, pero también puede hacer que la salida de alta resolución se vea menos limpia.</string>
     <string name="settings_help_bilinear_filtering">Controla el modo principal de filtrado de texturas utilizado por el renderizador. "Más cercano" (Nearest) mantiene el aspecto crudo más nítido, "PS2" se mantiene más fiel al comportamiento original de la consola, y los modos forzados suavizan de forma más agresiva. Si un juego se ve demasiado pixelado o demasiado borroso, esta es la primera opción de filtrado que debes ajustar.</string>
-    <string name="settings_help_bios_path">Dirige EmuCoreX a la carpeta que contiene tus archivos de BIOS de PS2. Un volcado limpio de tu propia consola es la mejor opción. La aplicación puede detectar archivos comunes relacionados con la BIOS como .bin, .rom, .mec, .nvm y .elf, incluyendo archivos ROM complementarios como ROM0, ROM1, ROM2 y EROM cuando están presentes.</string>
     <string name="settings_help_game_path">Selecciona la carpeta de la biblioteca que EmuCoreX escanea en busca de juegos. El escaneo es recursivo, por lo que las subcarpetas están bien. Las imágenes compatibles incluyen .iso, .bin, .chd, .cso y .gz. ISO es la base más segura, mientras que CHD suele ser el mejor formato a largo plazo porque ahorra espacio sin renunciar al uso normal.</string>
     <string name="settings_help_cover_download_url">Anula la fuente de carátulas integrada utilizada para las descargas automáticas. La URL debe apuntar directamente a una carpeta que contenga carátulas en formato JPG nombradas por el número de serie del juego, por ejemplo SLUS-20312.jpg. Cambia esto solo si alojas tu propio servidor (mirror) o quieres usar una biblioteca de carátulas compatible diferente.</string>
     <string name="settings_cover_download_url">URL de descarga de carátulas</string>
@@ -803,10 +799,6 @@
     <string name="settings_cover_download_url_copied">URL de ejemplo copiadas.</string>
     <string name="settings_help_cover_art_style">Elige el tipo de carátula predeterminado que se utilizará al descargar imágenes. Las carátulas planas coinciden con el aspecto clásico de la parte frontal de la caja, mientras que Caja 3D utiliza renderizados de cajas en ángulo cuando la fuente los proporciona. Las carátulas en 3D pueden verse más espectaculares, pero la disponibilidad puede ser un poco peor que la del arte plano.</string>
     <string name="settings_renderer_auto">Automático</string>
-    <string name="settings_bios_picker_title">Elegir carpeta BIOS</string>
-    <string name="settings_bios_picker_desc">Elige la carpeta que contiene tus archivos de BIOS de PlayStation 2. Esta carpeta se utilizará para el inicio normal del juego y el inicio de la BIOS.</string>
-    <string name="settings_bios_picker_current">Carpeta BIOS actual</string>
-    <string name="settings_bios_picker_action">Seleccionar carpeta</string>
     <string name="settings_auto">Automático</string>
     <string name="settings_target_fps_mode">Modo de FPS objetivo</string>
     <string name="settings_target_fps_auto">FPS automáticos</string>
@@ -883,4 +875,12 @@
     <string name="shell_memory_cards">Tarjetas de memoria</string>
     <string name="settings_memory_cards_tab">Tarjetas de memoria</string>
     <string name="memory_card_help_text">Asigna tarjetas a las dos ranuras estándar de PS2, crea nuevas tarjetas, exporta tarjetas individuales, haz copias de seguridad completas, restaura tarjetas existentes y gestiona duplicados o renombres de forma segura.</string>
+    <string name="settings_bios_path">Archivo BIOS</string>
+    <string name="settings_bios_path_desc">Selecciona el archivo de imagen de la BIOS de PS2 necesario para iniciar los juegos.</string>
+    <string name="settings_bios_picker_title">Elegir archivo BIOS</string>
+    <string name="settings_bios_picker_desc">Elige tu archivo de imagen de la BIOS de PlayStation 2. Este archivo se utilizará para el inicio normal del juego y el inicio de la BIOS.</string>
+    <string name="settings_bios_picker_current">Archivo BIOS actual</string>
+    <string name="settings_bios_picker_action">Seleccionar archivo</string>
+    <string name="settings_help_bios_path">Dirige EmuCoreX a tu archivo de imagen de la BIOS de PS2. Un volcado limpio de tu propia consola es la mejor opción. La aplicación espera la imagen principal de la BIOS, normalmente un archivo .bin o .rom, y guarda los archivos NVRAM/MEC generados junto a la copia importada.</string>
+    <string name="onboarding_bios_desc">Selecciona el archivo de imagen de la BIOS de PS2 necesario para iniciar los juegos.</string>
 </resources>

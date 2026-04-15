@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include "MemoryTypes.h"
 
 #include "common/HostSys.h"
@@ -38,6 +40,7 @@ template<> struct vtlbMemFP< 64,  true> { typedef vtlbMemW64FP  fn; static const
 template<> struct vtlbMemFP<128,  true> { typedef vtlbMemW128FP fn; static const uptr Index = 4; };
 
 typedef u32 vtlbHandler;
+struct tlbs;
 
 extern bool vtlb_Core_Alloc();
 extern void vtlb_Core_Free();
@@ -45,7 +48,14 @@ extern void vtlb_Alloc_Ppmap();
 extern void vtlb_Init();
 extern void vtlb_Shutdown();
 extern void vtlb_Reset();
+extern void vtlb_CaptureStateLoadSnapshot(tlbs* snapshot, size_t count);
+extern void vtlb_InvalidateRuntimeBlockTracking();
+extern void vtlb_RebuildFastmemMappings();
+extern void vtlb_RefreshRuntimeMappingsAfterConfigChange();
 extern void vtlb_ResetFastmem();
+extern void vtlb_ResetKernelVirtualMappings();
+extern void vtlb_RestoreMappingsFromState(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix);
+extern void vtlb_RunPostLoadRepair(const tlbs* previous, size_t count, bool apply_goemon_fix);
 
 extern vtlbHandler vtlb_NewHandler();
 

@@ -1694,9 +1694,10 @@ void Achievements::LoadState(std::span<const u8> data)
 	}
 }
 
-void Achievements::SaveState(SaveStateBase& writer)
+void Achievements::SaveStateToBuffer(std::vector<u8>* out_data)
 {
 	const auto lock = GetLock();
+	out_data->clear();
 
 #ifdef ENABLE_RAINTEGRATION
 	if (IsUsingRAIntegration())
@@ -1706,13 +1707,14 @@ void Achievements::SaveState(SaveStateBase& writer)
 		const u32 data_size = (size >= 0) ? static_cast<u32>(size) : 0;
 		if (data_size > 0)
 		{
-			writer.PrepBlock(static_cast<int>(data_size));
+			out_data->resize(data_size);
 
-			const int result = RA_CaptureState(reinterpret_cast<char*>(writer.GetBlockPtr()), static_cast<int>(data_size));
+			const int result = RA_CaptureState(reinterpret_cast<char*>(out_data->data()), static_cast<int>(data_size));
 			if (result != static_cast<int>(data_size))
+			{
 				Console.Warning("Failed to serialize cheevos state from RAIntegration.");
-			else
-				writer.CommitBlock(static_cast<int>(data_size));
+				out_data->clear();
+			}
 		}
 
 		return;
@@ -1725,13 +1727,14 @@ void Achievements::SaveState(SaveStateBase& writer)
 		const size_t data_size = rc_client_progress_size(s_client);
 		if (data_size > 0)
 		{
-			writer.PrepBlock(static_cast<int>(data_size));
+			out_data->resize(data_size);
 
-			const int result = rc_client_serialize_progress_sized(s_client, writer.GetBlockPtr(), data_size);
+			const int result = rc_client_serialize_progress_sized(s_client, out_data->data(), data_size);
 			if (result != RC_OK)
+			{
 				Console.Warning("Failed to serialize cheevos state (%d)", result);
-			else
-				writer.CommitBlock(static_cast<int>(data_size));
+				out_data->clear();
+			}
 		}
 	}
 }

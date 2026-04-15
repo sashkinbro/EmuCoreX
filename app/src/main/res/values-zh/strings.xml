@@ -222,8 +222,6 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">檔案</string>
-    <string name="settings_bios_path">BIOS 資料夾</string>
-    <string name="settings_bios_path_desc">選擇包含啟動遊戲所需 BIOS 檔案的資料夾。</string>
     <string name="settings_game_path">遊戲資料夾</string>
     <string name="settings_game_path_desc">選擇包含您遊戲的資料夾。</string>
     <string name="settings_not_set">未設定</string>
@@ -515,7 +513,6 @@
     <string name="onboarding_title">準備開始遊玩</string>
     <string name="onboarding_subtitle">新增 BIOS 檔案並選擇您的遊戲資料夾。</string>
     <string name="onboarding_bios_title">選擇 BIOS 檔案</string>
-    <string name="onboarding_bios_desc">選擇包含啟動遊戲所需 BIOS 檔案的資料夾。</string>
     <string name="onboarding_games_title">選擇遊戲資料夾</string>
     <string name="onboarding_games_desc">選擇包含您遊戲的資料夾。</string>
     <string name="onboarding_status_required">必填</string>
@@ -776,7 +773,6 @@
     <string name="settings_help_force_even_sprite_position">将精灵图位置吸附到偶数坐标，以减少较高分辨率下像素之间的微小间隙或闪烁。对于重度 2D 的游戏很有帮助，但可能会轻微偏移某些元素。</string>
     <string name="settings_help_native_palette_draw">以更接近原生精度的方式绘制基于调色板的特效。这可以修复在升频时损坏的色彩索引效果、调色板阴影或其他重度使用 CLUT 的技巧，但也可能使高分辨率输出看起来不够干净。</string>
     <string name="settings_help_bilinear_filtering">控制渲染器使用的主要纹理过滤模式。“最近邻”(Nearest) 保持最锐利的原始外观，“PS2”最接近原始主机的表现，而“强制”(Forced) 模式则会更激进地进行平滑处理。如果游戏看起来太有像素块感或太模糊，这是首先需要调整的过滤选项。</string>
-    <string name="settings_help_bios_path">将 EmuCoreX 指向包含您的 PS2 BIOS 文件的文件夹。从您自己的主机提取的干净转储是最佳选择。该应用可以检测常见的与 BIOS 相关的文件，例如 .bin、.rom、.mec、.nvm 和 .elf，以及随附的 ROM 文件（如 ROM0、ROM1、ROM2 和 EROM，如果存在的话）。</string>
     <string name="settings_help_game_path">选择 EmuCoreX 扫描游戏所用的库文件夹。扫描是递归的，因此支持子文件夹。支持的镜像文件包括 .iso、.bin、.chd、.cso 和 .gz。ISO 是最安全的基准，而 CHD 通常是最好的长期格式，因为它在不牺牲正常使用的情况下节省了空间。</string>
     <string name="settings_help_cover_download_url">覆盖用于自动下载的内置封面来源。此 URL 应直接指向包含以游戏序列号命名的 JPG 封面的文件夹，例如 SLUS-20312.jpg。仅当您托管自己的镜像或希望使用其他兼容的封面库时才更改此设置。</string>
     <string name="settings_cover_download_url">封面下载 URL</string>
@@ -803,10 +799,6 @@
     <string name="settings_cover_download_url_copied">已复制示例 URL。</string>
     <string name="settings_help_cover_art_style">选择下载封面时使用的默认封面类型。平面封面与经典的包装盒正面外观相匹配，而 3D 包装盒则在来源提供时使用带有角度的包装盒渲染图。3D 封面看起来更具视觉冲击力，但其可用性可能略低于平面封面。</string>
     <string name="settings_renderer_auto">自动</string>
-    <string name="settings_bios_picker_title">选择 BIOS 文件夹</string>
-    <string name="settings_bios_picker_desc">选择包含您的 PlayStation 2 BIOS 文件的文件夹。此文件夹将用于正常的游戏启动和 BIOS 启动。</string>
-    <string name="settings_bios_picker_current">当前 BIOS 文件夹</string>
-    <string name="settings_bios_picker_action">选择文件夹</string>
     <string name="settings_auto">自动</string>
     <string name="settings_target_fps_mode">目标帧率模式</string>
     <string name="settings_target_fps_auto">自动帧率</string>
@@ -883,4 +875,12 @@
     <string name="shell_memory_cards">记忆卡</string>
     <string name="settings_memory_cards_tab">记忆卡</string>
     <string name="memory_card_help_text">将记忆卡分配到标准的两个 PS2 插槽，创建新记忆卡，导出单个记忆卡，进行完整备份，还原现有记忆卡，并安全地管理副本或重命名。</string>
+    <string name="settings_bios_path">BIOS 文件</string>
+    <string name="settings_bios_path_desc">选择启动游戏所需的 PS2 BIOS 镜像文件。</string>
+    <string name="settings_bios_picker_title">选择 BIOS 文件</string>
+    <string name="settings_bios_picker_desc">选择您的 PlayStation 2 BIOS 镜像文件。此文件将用于正常的游戏启动和 BIOS 启动。</string>
+    <string name="settings_bios_picker_current">当前 BIOS 文件</string>
+    <string name="settings_bios_picker_action">选择文件</string>
+    <string name="settings_help_bios_path">将 EmuCoreX 指向您的 PS2 BIOS 镜像文件。从您自己的主机上获取的纯净转储是最佳选择。该应用需要主 BIOS 镜像（通常是 .bin 或 .rom 文件），并将生成的任何 NVRAM/MEC 文件保存在导入副本的旁边。</string>
+    <string name="onboarding_bios_desc">选择启动游戏所需的 PS2 BIOS 镜像文件。</string>
 </resources>

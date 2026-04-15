@@ -223,61 +223,89 @@ __fi void COP0_UpdatePCCR()
 //////////////////////////////////////////////////////////////////////////////////////////
 //
 
+static bool TryMapScratchpadTlbEntry(const tlbs& entry)
+{
+	// According to the manual:
+	// 'It [SPR] must be mapped into a contiguous 16 KB of virtual address space that is
+	// aligned on a 16KB boundary. Results are not guaranteed if this restriction is not followed.'
+	// Assume the game maps it sanely and bind directly to eeMem->Scratch.
+	if (!entry.isSPR())
+		return false;
+
+	if (entry.VPN2() != 0x70000000)
+		Console.Warning("COP0: Mapping Scratchpad to non-default address 0x%08X", entry.VPN2());
+
+	vtlb_VMapBuffer(entry.VPN2(), eeMem->Scratch, Ps2MemSize::Scratch);
+	return true;
+}
+
+static bool TryUnmapScratchpadTlbEntry(const tlbs& entry)
+{
+	if (!entry.isSPR())
+		return false;
+
+	vtlb_VMapUnmap(entry.VPN2(), Ps2MemSize::Scratch);
+	return true;
+}
+
+static bool GetTlbPageRange(const tlbs& entry, bool upper_half, u32* mask, u32* start, u32* end)
+{
+	const bool valid = upper_half ? entry.EntryLo1.V : entry.EntryLo0.V;
+	if (!valid)
+		return false;
+
+	*mask = ((~entry.Mask()) << 1) & 0xfffff;
+	*start = (entry.VPN2() >> 12) + (upper_half ? (entry.Mask() + 1) : 0);
+	*end = *start + entry.Mask() + 1;
+	return true;
+}
+
+static void MapPhysicalTlbPageRange(const tlbs& entry, bool upper_half)
+{
+	u32 mask, start, end;
+	if (!GetTlbPageRange(entry, upper_half, &mask, &start, &end))
+		return;
+
+	const u32 vpn2_page = entry.VPN2() >> 12;
+	const u32 base_pfn = upper_half ? entry.PFN1() : entry.PFN0();
+	for (u32 addr = start; addr < end; addr++)
+	{
+		if ((addr & mask) == (vpn2_page & mask))
+		{
+			memSetPageAddr(addr << 12, base_pfn + ((addr - start) << 12));
+			Cpu->Clear(addr << 12, 0x400);
+		}
+	}
+}
+
+static void UnmapPhysicalTlbPageRange(const tlbs& entry, bool upper_half)
+{
+	u32 mask, start, end;
+	if (!GetTlbPageRange(entry, upper_half, &mask, &start, &end))
+		return;
+
+	const u32 vpn2_page = entry.VPN2() >> 12;
+	for (u32 addr = start; addr < end; addr++)
+	{
+		if ((addr & mask) == (vpn2_page & mask))
+		{
+			memClearPageAddr(addr << 12);
+			Cpu->Clear(addr << 12, 0x400);
+		}
+	}
+}
 
 void MapTLB(const tlbs& t, int i)
 {
-	u32 mask, addr;
-	u32 saddr, eaddr;
-
 	COP0_LOG("MAP TLB %d: 0x%08X-> [0x%08X 0x%08X] S=%d G=%d ASID=%d Mask=0x%03X EntryLo0 PFN=%x EntryLo0 Cache=%x EntryLo1 PFN=%x EntryLo1 Cache=%x VPN2=%x",
 		i, t.VPN2(), t.PFN0(), t.PFN1(), t.isSPR() >> 31, t.isGlobal(), t.EntryHi.ASID,
 		t.Mask(), t.EntryLo0.PFN, t.EntryLo0.C, t.EntryLo1.PFN, t.EntryLo1.C, t.VPN2());
 
-	// According to the manual
-	// 'It [SPR] must be mapped into a contiguous 16 KB of virtual address space that is
-	// aligned on a 16KB boundary.Results are not guaranteed if this restriction is not followed.'
-	// Assume that the game isn't doing anything less-than-ideal with the scratchpad mapping and map it directly to eeMem->Scratch.
-	if (t.isSPR())
-	{
-		if (t.VPN2() != 0x70000000)
-			Console.Warning("COP0: Mapping Scratchpad to non-default address 0x%08X", t.VPN2());
+	if (TryMapScratchpadTlbEntry(t))
+		return;
 
-		vtlb_VMapBuffer(t.VPN2(), eeMem->Scratch, Ps2MemSize::Scratch);
-	}
-	else
-	{
-		if (t.EntryLo0.V)
-		{
-			mask = ((~t.Mask()) << 1) & 0xfffff;
-			saddr = t.VPN2() >> 12;
-			eaddr = saddr + t.Mask() + 1;
-
-			for (addr = saddr; addr < eaddr; addr++)
-			{
-				if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-				{ //match
-					memSetPageAddr(addr << 12, t.PFN0() + ((addr - saddr) << 12));
-					Cpu->Clear(addr << 12, 0x400);
-				}
-			}
-		}
-
-		if (t.EntryLo1.V)
-		{
-			mask = ((~t.Mask()) << 1) & 0xfffff;
-			saddr = (t.VPN2() >> 12) + t.Mask() + 1;
-			eaddr = saddr + t.Mask() + 1;
-
-			for (addr = saddr; addr < eaddr; addr++)
-			{
-				if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-				{ //match
-					memSetPageAddr(addr << 12, t.PFN1() + ((addr - saddr) << 12));
-					Cpu->Clear(addr << 12, 0x400);
-				}
-			}
-		}
-	}
+	MapPhysicalTlbPageRange(t, false);
+	MapPhysicalTlbPageRange(t, true);
 }
 
 __inline u32 ConvertPageMask(const u32 PageMask)
@@ -289,53 +317,12 @@ __inline u32 ConvertPageMask(const u32 PageMask)
 	return (1 << (12 + mask)) - 1;
 }
 
-void UnmapTLB(const tlbs& t, int i)
+static void RemoveCachedTlbEntry(const tlbs& entry)
 {
-	//Console.WriteLn("Clear TLB %d: %08x-> [%08x %08x] S=%d G=%d ASID=%d Mask= %03X", i,t.VPN2,t.PFN0,t.PFN1,t.S,t.G,t.ASID,t.Mask);
-	u32 mask, addr;
-	u32 saddr, eaddr;
-
-	if (t.isSPR())
-	{
-		vtlb_VMapUnmap(t.VPN2(), 0x4000);
-		return;
-	}
-
-	if (t.EntryLo0.V)
-	{
-		mask = ((~t.Mask()) << 1) & 0xfffff;
-		saddr = t.VPN2() >> 12;
-		eaddr = saddr + t.Mask() + 1;
-		//	Console.WriteLn("Clear TLB: %08x ~ %08x",saddr,eaddr-1);
-		for (addr = saddr; addr < eaddr; addr++)
-		{
-			if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-			{ //match
-				memClearPageAddr(addr << 12);
-				Cpu->Clear(addr << 12, 0x400);
-			}
-		}
-	}
-
-	if (t.EntryLo1.V)
-	{
-		mask = ((~t.Mask()) << 1) & 0xfffff;
-		saddr = (t.VPN2() >> 12) + t.Mask() + 1;
-		eaddr = saddr + t.Mask() + 1;
-		//	Console.WriteLn("Clear TLB: %08x ~ %08x",saddr,eaddr-1);
-		for (addr = saddr; addr < eaddr; addr++)
-		{
-			if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-			{ //match
-				memClearPageAddr(addr << 12);
-				Cpu->Clear(addr << 12, 0x400);
-			}
-		}
-	}
-
+	const u32 page_mask = ConvertPageMask(entry.PageMask.UL);
 	for (size_t i = 0; i < cachedTlbs.count; i++)
 	{
-		if (cachedTlbs.PFN0s[i] == t.PFN0() && cachedTlbs.PFN1s[i] == t.PFN1() && cachedTlbs.PageMasks[i] == ConvertPageMask(t.PageMask.UL))
+		if (cachedTlbs.PFN0s[i] == entry.PFN0() && cachedTlbs.PFN1s[i] == entry.PFN1() && cachedTlbs.PageMasks[i] == page_mask)
 		{
 			for (size_t j = i; j < cachedTlbs.count - 1; j++)
 			{
@@ -349,6 +336,66 @@ void UnmapTLB(const tlbs& t, int i)
 			break;
 		}
 	}
+}
+
+static void AppendCachedTlbEntry(const tlbs& entry)
+{
+	const size_t idx = cachedTlbs.count;
+	cachedTlbs.CacheEnabled0[idx] = entry.EntryLo0.isCached() ? ~0 : 0;
+	cachedTlbs.CacheEnabled1[idx] = entry.EntryLo1.isCached() ? ~0 : 0;
+	cachedTlbs.PFN1s[idx] = entry.PFN1();
+	cachedTlbs.PFN0s[idx] = entry.PFN0();
+	cachedTlbs.PageMasks[idx] = ConvertPageMask(entry.PageMask.UL);
+	cachedTlbs.count++;
+}
+
+static void RunPostRestoreTlbFixups(bool apply_goemon_fix)
+{
+	if (apply_goemon_fix)
+		GoemonPreloadTlb();
+}
+
+static void ReplaceRuntimeTlbEntry(int index)
+{
+	ClearTLBMappingsFromSnapshot(&tlb[index], 1);
+	WriteTLB(index);
+}
+
+void UnmapTLB(const tlbs& t, int i)
+{
+	//Console.WriteLn("Clear TLB %d: %08x-> [%08x %08x] S=%d G=%d ASID=%d Mask= %03X", i,t.VPN2,t.PFN0,t.PFN1,t.S,t.G,t.ASID,t.Mask);
+	if (TryUnmapScratchpadTlbEntry(t))
+		return;
+
+	UnmapPhysicalTlbPageRange(t, false);
+	UnmapPhysicalTlbPageRange(t, true);
+
+	RemoveCachedTlbEntry(t);
+}
+
+void RefreshTLBEntryMapping(const tlbs& previous, int i)
+{
+	UnmapTLB(previous, i);
+	MapTLB(tlb[i], i);
+}
+
+void RestoreTLBMappingsFromSnapshot(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix)
+{
+	const size_t restore_count = std::min(count, std::size(tlb));
+	for (size_t i = 0; i < restore_count; i++)
+	{
+		if (!only_changed_entries || std::memcmp(&previous[i], &tlb[i], sizeof(tlbs)) != 0)
+			RefreshTLBEntryMapping(previous[i], static_cast<int>(i));
+	}
+
+	RunPostRestoreTlbFixups(apply_goemon_fix);
+}
+
+void ClearTLBMappingsFromSnapshot(const tlbs* entries, size_t count)
+{
+	const size_t clear_count = std::min(count, std::size(tlb));
+	for (size_t i = 0; i < clear_count; i++)
+		UnmapTLB(entries[i], static_cast<int>(i));
 }
 
 void WriteTLB(int i)
@@ -375,16 +422,7 @@ void WriteTLB(int i)
 	}
 
 	if (!tlb[i].isSPR() && ((tlb[i].EntryLo0.V && tlb[i].EntryLo0.isCached()) || (tlb[i].EntryLo1.V && tlb[i].EntryLo1.isCached())))
-	{
-		const size_t idx = cachedTlbs.count;
-		cachedTlbs.CacheEnabled0[idx] = tlb[i].EntryLo0.isCached() ? ~0 : 0;
-		cachedTlbs.CacheEnabled1[idx] = tlb[i].EntryLo1.isCached() ? ~0 : 0;
-		cachedTlbs.PFN1s[idx] = tlb[i].PFN1();
-		cachedTlbs.PFN0s[idx] = tlb[i].PFN0();
-		cachedTlbs.PageMasks[idx] = ConvertPageMask(tlb[i].PageMask.UL);
-
-		cachedTlbs.count++;
-	}
+		AppendCachedTlbEntry(tlb[i]);
 
 	MapTLB(tlb[i], i);
 }
@@ -394,11 +432,48 @@ namespace Interpreter {
 namespace OpcodeImpl {
 namespace COP0 {
 
+	static bool ShouldTraceTlbRefill()
+	{
+		static int s_trace_count = 0;
+		if (!cpuRegs.CP0.n.Status.b.EXL || cpuRegs.CP0.n.BadVAddr == 0 || s_trace_count >= 32)
+			return false;
+
+		s_trace_count++;
+		return true;
+	}
+
+	static void TraceTlbRefillOp(const char* op)
+	{
+		if (!ShouldTraceTlbRefill())
+			return;
+
+		Console.Error("COP0_%s during TLB refill pc:%x epc:%x badv:%x entryhi:%x entrylo0:%x entrylo1:%x pagemask:%x status:%x cause:%x",
+			op, cpuRegs.pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr, cpuRegs.CP0.n.EntryHi,
+			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1, cpuRegs.CP0.n.PageMask,
+			cpuRegs.CP0.n.Status.val, cpuRegs.CP0.n.Cause);
+	}
+
+	static void TraceTlbRefillMtc0(u32 value)
+	{
+		if (_Rd_ != 2 && _Rd_ != 3 && _Rd_ != 5 && _Rd_ != 10 && _Rd_ != 12 && _Rd_ != 14 && _Rd_ != 30)
+			return;
+
+		if (!ShouldTraceTlbRefill())
+			return;
+
+		Console.Error("COP0_MTC0 during TLB refill pc:%x rd:%u rt:%u value:%x old:%x epc:%x badv:%x entryhi:%x entrylo0:%x entrylo1:%x pagemask:%x status:%x cause:%x",
+			cpuRegs.pc, _Rd_, _Rt_, value, cpuRegs.CP0.r[_Rd_], cpuRegs.CP0.n.EPC,
+			cpuRegs.CP0.n.BadVAddr, cpuRegs.CP0.n.EntryHi, cpuRegs.CP0.n.EntryLo0,
+			cpuRegs.CP0.n.EntryLo1, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.Status.val,
+			cpuRegs.CP0.n.Cause);
+	}
+
 	void TLBR()
 	{
 		COP0_LOG("COP0_TLBR %d:%x,%x,%x,%x",
 			cpuRegs.CP0.n.Index, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
+		TraceTlbRefillOp("TLBR");
 
 		const u8 i = cpuRegs.CP0.n.Index & 0x3f;
 
@@ -431,9 +506,9 @@ namespace COP0 {
 		COP0_LOG("COP0_TLBWI %d:%x,%x,%x,%x",
 			cpuRegs.CP0.n.Index, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
+		TraceTlbRefillOp("TLBWI");
 
-		UnmapTLB(tlb[j], j);
-		WriteTLB(j);
+		ReplaceRuntimeTlbEntry(j);
 	}
 
 	void TLBWR()
@@ -449,9 +524,9 @@ namespace COP0 {
 		DevCon.Warning("COP0_TLBWR %d:%x,%x,%x,%x\n",
 			cpuRegs.CP0.n.Random, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
+		TraceTlbRefillOp("TLBWR");
 
-		UnmapTLB(tlb[j], j);
-		WriteTLB(j);
+		ReplaceRuntimeTlbEntry(j);
 	}
 
 	void TLBP()
@@ -483,6 +558,7 @@ namespace COP0 {
 		}
 		if (cpuRegs.CP0.n.Index == 0xFFFFFFFF)
 			cpuRegs.CP0.n.Index = 0x80000000;
+		TraceTlbRefillOp("TLBP");
 	}
 
 	void MFC0()
@@ -541,19 +617,22 @@ cpuRegs.PERF.n.pccr, cpuRegs.PERF.n.pcr0, cpuRegs.PERF.n.pcr1, _Imm_ & 0x3F);*/
 	void MTC0()
 	{
 		//if(bExecBIOS == FALSE && _Rd_ == 25) Console.WriteLn("MTC0 _Rd_ %x = %x", _Rd_, cpuRegs.CP0.r[_Rd_]);
+		const u32 mtc0_value = cpuRegs.GPR.r[_Rt_].UL[0];
+		TraceTlbRefillMtc0(mtc0_value);
+
 		switch (_Rd_)
 		{
 			case 9:
 				cpuRegs.lastCOP0Cycle = cpuRegs.cycle;
-				cpuRegs.CP0.r[9] = cpuRegs.GPR.r[_Rt_].UL[0];
+				cpuRegs.CP0.r[9] = mtc0_value;
 				break;
 
 			case 12:
-				WriteCP0Status(cpuRegs.GPR.r[_Rt_].UL[0]);
+				WriteCP0Status(mtc0_value);
 				break;
 
 			case 16:
-				WriteCP0Config(cpuRegs.GPR.r[_Rt_].UL[0]);
+				WriteCP0Config(mtc0_value);
 				break;
 
 			case 24:
@@ -569,23 +648,23 @@ cpuRegs.PERF.n.pccr, cpuRegs.PERF.n.pcr0, cpuRegs.PERF.n.pcr1, _Imm_ & 0x3F);*/
 						break;
 					// Updates PCRs and sets the PCCR.
 					COP0_UpdatePCCR();
-					cpuRegs.PERF.n.pccr.val = cpuRegs.GPR.r[_Rt_].UL[0];
+					cpuRegs.PERF.n.pccr.val = mtc0_value;
 					COP0_DiagnosticPCCR();
 				}
 				else if (0 == (_Imm_ & 2)) // MTPC 0, only LSB of register matters
 				{
-					cpuRegs.PERF.n.pcr0 = cpuRegs.GPR.r[_Rt_].UL[0];
+					cpuRegs.PERF.n.pcr0 = mtc0_value;
 					cpuRegs.lastPERFCycle[0] = cpuRegs.cycle;
 				}
 				else // MTPC 1
 				{
-					cpuRegs.PERF.n.pcr1 = cpuRegs.GPR.r[_Rt_].UL[0];
+					cpuRegs.PERF.n.pcr1 = mtc0_value;
 					cpuRegs.lastPERFCycle[1] = cpuRegs.cycle;
 				}
 				break;
 
 			default:
-				cpuRegs.CP0.r[_Rd_] = cpuRegs.GPR.r[_Rt_].UL[0];
+				cpuRegs.CP0.r[_Rd_] = mtc0_value;
 				break;
 		}
 	}
@@ -655,6 +734,7 @@ cpuRegs.PERF.n.pccr, cpuRegs.PERF.n.pcr0, cpuRegs.PERF.n.pcr1, _Imm_ & 0x3F);*/
 		}
 		else
 		{
+			TraceTlbRefillOp("ERET");
 			cpuRegs.pc = cpuRegs.CP0.n.EPC;
 			cpuRegs.CP0.n.Status.b.EXL = 0;
 		}

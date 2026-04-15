@@ -732,6 +732,7 @@ static void recCancelInstruction()
 static void recExecute()
 {
 	static bool s_logged_rec_execute = false;
+	static int s_logged_rec_exception_exit_count = 0;
 
 	// Reset before we try to execute any code, if there's one pending.
 	// We need to do this here, because if we reset while we're executing, it sets the "needs reset"
@@ -765,6 +766,14 @@ static void recExecute()
 	}
 
 	eeCpuExecuting = false;
+
+	if (cpuRegs.CP0.n.Status.b.EXL && cpuRegs.CP0.n.BadVAddr != 0 && s_logged_rec_exception_exit_count < 32)
+	{
+		s_logged_rec_exception_exit_count++;
+		Console.Error("(EErec) exit after exception pc:%x epc:%x badv:%x status:%x cause:%x next:%x",
+			cpuRegs.pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr, cpuRegs.CP0.n.Status.val,
+			cpuRegs.CP0.n.Cause, cpuRegs.nextEventCycle);
+	}
 
 	EE::Profiler.Print();
 }
@@ -2688,6 +2697,13 @@ StartRecomp:
 	{
 		Console.WriteLn("(EErec) recRecompile analysis done: startpc=0x%08x endpc=0x%08x has_cop2=%d",
 			startpc, s_nEndBlock, has_cop2_instructions ? 1 : 0);
+	}
+
+	if (startpc == 0x80000000 || startpc == 0x80000180 || startpc == 0xBFC00200 || startpc == 0xBFC00380)
+	{
+		Console.Error("(EErec) exception vector compile startpc:%x phys:%x opcode:%x epc:%x badv:%x status:%x cause:%x",
+			startpc, HWADDR(startpc), memRead32(startpc), cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr,
+			cpuRegs.CP0.n.Status.val, cpuRegs.CP0.n.Cause);
 	}
 
 #ifdef DUMP_BLOCKS

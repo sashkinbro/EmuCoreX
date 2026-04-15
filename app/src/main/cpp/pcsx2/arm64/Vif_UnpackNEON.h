@@ -15,6 +15,36 @@
 #define xmmRow vixl::aarch64::q6
 #define xmmTemp vixl::aarch64::q7
 
+inline bool Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(int upknum)
+{
+	switch (upknum)
+	{
+		case 3:
+		case 7:
+		case 11:
+			return true;
+		default:
+			return false;
+	}
+}
+
+inline void Arm64AssertVifMaskedIterationPolicy(int upknum)
+{
+	pxAssertRel(Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(upknum),
+		"ARM64 VIF unpack validation contract unexpectedly changed.");
+}
+
+inline bool Arm64VifUsesProvisional8BitScalarExpandPath()
+{
+	return true;
+}
+
+inline void Arm64AssertVifProvisional8BitScalarExpandPath()
+{
+	pxAssertRel(Arm64VifUsesProvisional8BitScalarExpandPath(),
+		"ARM64 VIF 8-bit scalar expand path unexpectedly marked finalized.");
+}
+
 // --------------------------------------------------------------------------------------
 //  VifUnpackSSE_Base
 // --------------------------------------------------------------------------------------

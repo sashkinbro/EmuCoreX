@@ -467,6 +467,9 @@ SDLInputSource::~SDLInputSource()
 
 bool SDLInputSource::Initialize(SettingsInterface& si, std::unique_lock<std::mutex>& settings_lock)
 {
+	if (m_sdl_subsystem_init_failed)
+		return false;
+
 	LoadSettings(si);
 	settings_lock.unlock();
 	SetHints();
@@ -507,8 +510,11 @@ void SDLInputSource::UpdateSettings(SettingsInterface& si, std::unique_lock<std:
 	{
 		settings_lock.unlock();
 		ShutdownSubsystem();
-		SetHints();
-		InitializeSubsystem();
+		if (!m_sdl_subsystem_init_failed)
+		{
+			SetHints();
+			InitializeSubsystem();
+		}
 		settings_lock.lock();
 	}
 }
@@ -637,7 +643,10 @@ bool SDLInputSource::InitializeSubsystem()
 {
 	if (!SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC))
 	{
-		Console.Error("SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC) failed");
+		m_sdl_subsystem_init_failed = true;
+		Console.Error(fmt::format(
+			"SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD | SDL_INIT_HAPTIC) failed: {}",
+			SDL_GetError()));
 		return false;
 	}
 

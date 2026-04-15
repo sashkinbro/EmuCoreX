@@ -241,13 +241,13 @@ static __fi void mVU_EATAN_(mV, const xmm& PQ, const xmm& Fs, const xmm& t1, con
     armAsm->Fmul(PQ.S(), PQ.S(), armLoadPtrV(PTR_CPU(mVUglob.T1)).S());
 //	xMOVAPS(t2, Fs);
     armAsm->Mov(t2.Q(), Fs.Q());
-	EATANhelper(PTR_CPU(mVUglob.T2));
-	EATANhelper(PTR_CPU(mVUglob.T3));
-	EATANhelper(PTR_CPU(mVUglob.T4));
-	EATANhelper(PTR_CPU(mVUglob.T5));
-	EATANhelper(PTR_CPU(mVUglob.T6));
-	EATANhelper(PTR_CPU(mVUglob.T7));
-	EATANhelper(PTR_CPU(mVUglob.T8));
+    EATANhelper(PTR_CPU(mVUglob.T2));
+    EATANhelper(PTR_CPU(mVUglob.T3));
+    EATANhelper(PTR_CPU(mVUglob.T4));
+    EATANhelper(PTR_CPU(mVUglob.T5));
+    EATANhelper(PTR_CPU(mVUglob.T6));
+    EATANhelper(PTR_CPU(mVUglob.T7));
+    EATANhelper(PTR_CPU(mVUglob.T8));
 //	xADD.SS(PQ, ptr32[mVUglob.Pi4]);
     armAsm->Fadd(PQ.S(), PQ.S(), armLoadPtrV(PTR_CPU(mVUglob.Pi4)).S());
 //	xPSHUF.D(PQ, PQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -275,9 +275,9 @@ mVUop(mVU_EATAN)
 //		xMOVSS (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
 //		xSUB.SS(Fs,    ptr32[mVUglob.one]);
-        armAsm->Fsub(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
+    armAsm->Fsub(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
 //		xADD.SS(xmmPQ, ptr32[mVUglob.one]);
-        armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
+    armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 		mVU_EATAN_(mVU, xmmPQ, Fs, t1, t2);
 		mVU.regAlloc->clearNeeded(Fs);
@@ -385,28 +385,28 @@ mVUop(mVU_EEXP)
 //		xMOVSS  (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
 //		xMUL.SS (xmmPQ, ptr32[mVUglob.E1]);
-        armAsm->Fmul(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.E1)).S());
+    armAsm->Fmul(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.E1)).S());
 //		xADD.SS (xmmPQ, ptr32[mVUglob.one]);
-        armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
+    armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_CPU(mVUglob.one)).S());
 //		xMOVAPS(t1, Fs);
         armAsm->Mov(t1.Q(), Fs.Q());
 		SSE_MULSS(mVU, t1, Fs);
 //		xMOVAPS(t2, t1);
         armAsm->Mov(t2.Q(), t1.Q());
 //		xMUL.SS(t1, ptr32[mVUglob.E2]);
-        armAsm->Fmul(t1.S(), t1.S(), armLoadPtrV(PTR_CPU(mVUglob.E2)).S());
+    armAsm->Fmul(t1.S(), t1.S(), armLoadPtrV(PTR_CPU(mVUglob.E2)).S());
 		SSE_ADDSS(mVU, xmmPQ, t1);
-		eexpHelper(PTR_CPU(mVUglob.E3));
-		eexpHelper(PTR_CPU(mVUglob.E4));
-		eexpHelper(PTR_CPU(mVUglob.E5));
+    eexpHelper(PTR_CPU(mVUglob.E3));
+    eexpHelper(PTR_CPU(mVUglob.E4));
+    eexpHelper(PTR_CPU(mVUglob.E5));
 		SSE_MULSS(mVU, t2, Fs);
 //		xMUL.SS(t2, ptr32[mVUglob.E6]);
-        armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_CPU(mVUglob.E6)).S());
+    armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_CPU(mVUglob.E6)).S());
 		SSE_ADDSS(mVU, xmmPQ, t2);
 		SSE_MULSS(mVU, xmmPQ, xmmPQ);
 		SSE_MULSS(mVU, xmmPQ, xmmPQ);
 //		xMOVSSZX(t2, ptr32[mVUglob.one]);
-        armAsm->Ldr(t2, PTR_CPU(mVUglob.one));
+    armAsm->Ldr(t2, PTR_CPU(mVUglob.one));
 		SSE_DIVSS(mVU, t2, xmmPQ);
 //		xMOVSS(xmmPQ, t2);
         armAsm->Mov(xmmPQ.S(), 0, t2.S(), 0);
@@ -483,7 +483,7 @@ mVUop(mVU_ERCPR)
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-        armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
+    armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -516,7 +516,7 @@ mVUop(mVU_ERLENG)
         armAsm->Fsqrt(RQSCRATCH.S(), RQSCRATCH.S());
         armAsm->Mov(xmmPQ.S(), 0, RQSCRATCH.S(), 0);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-        armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
+    armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -546,7 +546,7 @@ mVUop(mVU_ERSADD)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU_sumXYZ(mVU, xmmPQ, Fs);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-        armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
+    armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -575,11 +575,11 @@ mVUop(mVU_ERSQRT)
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 //		xAND.PS       (Fs, ptr128[mVUglob.absclip]);
-        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
+    armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
 //		xSQRT.SS      (xmmPQ, Fs);
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-        armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
+    armAsm->Ldr(Fs, PTR_CPU(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -643,26 +643,26 @@ mVUop(mVU_ESIN)
 //		xMOVAPS       (t2, Fs);    // t2 = X^3
         armAsm->Mov(t2, Fs);
 //		xMUL.SS       (Fs, ptr32[mVUglob.S2]); // fs = s2 * X^3
-        armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S2)).S());
+    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S2)).S());
 		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3
 
 		SSE_MULSS(mVU, t2, t1);    // t2 = X^3 * X^2
 //		xMOVAPS       (Fs, t2);    // fs = X^5
         armAsm->Mov(Fs, t2);
 //		xMUL.SS       (Fs, ptr32[mVUglob.S3]); // ps = s3 * X^5
-        armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S3)).S());
+    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S3)).S());
 		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3 + s3 * X^5
 
 		SSE_MULSS(mVU, t2, t1);    // t2 = X^5 * X^2
 //		xMOVAPS       (Fs, t2);    // fs = X^7
         armAsm->Mov(Fs, t2);
 //		xMUL.SS       (Fs, ptr32[mVUglob.S4]); // fs = s4 * X^7
-        armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S4)).S());
+    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_CPU(mVUglob.S4)).S());
 		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3 + s3 * X^5 + s4 * X^7
 
 		SSE_MULSS(mVU, t2, t1);    // t2 = X^7 * X^2
 //		xMUL.SS       (t2, ptr32[mVUglob.S5]); // t2 = s5 * X^9
-        armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_CPU(mVUglob.S5)).S());
+    armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_CPU(mVUglob.S5)).S());
 		SSE_ADDSS(mVU, xmmPQ, t2); // pq = X + s2 * X^3 + s3 * X^5 + s4 * X^7 + s5 * X^9
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -691,7 +691,7 @@ mVUop(mVU_ESQRT)
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 //		xAND.PS (Fs, ptr128[mVUglob.absclip]);
-        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
+    armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
 //		xSQRT.SS(xmmPQ, Fs);
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back

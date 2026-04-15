@@ -12,6 +12,7 @@
 #include "common/Assertions.h"
 
 class Error;
+class StateWrapper;
 
 enum class FreezeAction
 {
@@ -96,6 +97,10 @@ public:
 
 	bool FreezeBios();
 	bool FreezeInternals(Error* error);
+	bool FreezeStateWrapperBlock(const char* name, u32 reserve, bool (*do_state_func)(StateWrapper&));
+	bool FreezeIopCounterAndLinkState();
+	bool FreezeIopPeripheralState();
+	bool FreezeIopAuxiliaryState();
 
 	// Loads or saves an arbitrary data type.  Usable on atomic types, structs, and arrays.
 	// For dynamically allocated pointers use FreezeMem instead.
@@ -114,6 +119,7 @@ public:
 	}
 
 	void PrepBlock( int size );
+	bool FreezePlaceholderBlocks(size_t block_size, size_t block_count);
 
 	template <typename T>
 	void FreezeDeque(std::deque<T>& q)
@@ -193,6 +199,15 @@ public:
 
 protected:
 	bool vmFreeze();
+	bool FreezeCoreRegisterState();
+	bool FreezeCycleTimingState();
+	bool FreezeEeSubsystemState(Error* error);
+	bool FreezeEeTimingAndMemoryState(Error* error);
+	bool FreezeEeVectorUnitState();
+	bool FreezeVuExecutionState();
+	bool FreezeVifTransportState();
+	bool FreezeEeTransferSubsystemState();
+	bool FreezeIopSubsystemState();
 	bool mtvuFreeze();
 	bool rcntFreeze();
 	bool memFreeze(Error* error);

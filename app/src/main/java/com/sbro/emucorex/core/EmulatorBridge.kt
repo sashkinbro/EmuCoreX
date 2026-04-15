@@ -264,9 +264,11 @@ object EmulatorBridge {
 
         val context = getContext() ?: return
         val resolvedRenderer = normalizeRenderer(renderer)
-        val resolvedBiosPath = DocumentPathResolver.prepareBiosDirectory(context, biosPath)
+        val preparedBios = DocumentPathResolver.prepareBiosSelection(context, biosPath)
+        val resolvedBiosPath = preparedBios?.directoryPath
             ?: biosPath?.let(DocumentPathResolver::resolveDirectoryPath)
-        val preferredBiosFile = DocumentPathResolver.findPreferredBiosFileName(resolvedBiosPath)
+        val preferredBiosFile = preparedBios?.fileName
+            ?: DocumentPathResolver.findPreferredBiosFileName(resolvedBiosPath)
         val savestatesDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "sstates").apply { mkdirs() }
         val memcardsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "memcards").apply { mkdirs() }
         val cheatsDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "cheats").apply { mkdirs() }

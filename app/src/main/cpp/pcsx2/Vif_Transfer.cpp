@@ -20,7 +20,7 @@ _vifT void vifTransferLoop(u32* &data) {
 	vifXRegs.stat.VPS |= VPS_TRANSFERRING;
 	vifXRegs.stat.ER1  = false;
 	//VIF_LOG("Starting VIF%d loop, pSize = %x, stalled = %x", idx, pSize, vifX.vifstalled.enabled );
-	while (pSize > 0 && !vifX.vifstalled.enabled) {
+	while (pSize > 0 && !vifX.IsWaitingForStallState()) {
 
 		if(!vifX.cmd) { // Get new VifCode
 
@@ -46,7 +46,7 @@ _vifT void vifTransferLoop(u32* &data) {
 		ret = vifCmdHandler[idx][vifX.cmd & 0x7f](vifX.pass, data);
 		data   += ret;
 		pSize  -= ret;
-		if (vifX.vifstalled.enabled)
+		if (vifX.IsWaitingForStallState())
 		{
 			int current_STR = idx ? vif1ch.chcr.STR : vif0ch.chcr.STR;
 			if (!current_STR)
@@ -59,7 +59,7 @@ _vifT static __fi bool vifTransfer(u32 *data, int size, bool TTE) {
 	vifStruct& vifX = GetVifX;
 
 	// irqoffset necessary to add up the right qws, or else will spin (spiderman)
-	int transferred = vifX.irqoffset.enabled ? vifX.irqoffset.value : 0;
+	int transferred = vifX.HasResumeOffset() ? vifX.GetResumeOffset() : 0;
 
 	vifX.vifpacketsize = size;
 	vifTransferLoop<idx>(data);
@@ -71,13 +71,13 @@ _vifT static __fi bool vifTransfer(u32 *data, int size, bool TTE) {
 	if (!idx) g_vif0Cycles += std::max(1, (int)((transferred * BIAS) >> 2));
 	else	  g_vif1Cycles += std::max(1, (int)((transferred * BIAS) >> 2));
 
-	vifX.irqoffset.value = transferred % 4; // cannot lose the offset
+	const u32 resume_offset = transferred % 4;
+	vifX.SetResumeOffset(resume_offset); // cannot lose the offset
 
 	if (vifX.irq && vifX.cmd == 0) {
 		VIF_LOG("Vif%d IRQ Triggering", idx);
 		//Always needs to be set to return to the correct offset if there is data left.
-		vifX.vifstalled.enabled = VifStallEnable(vifXch);
-		vifX.vifstalled.value = VIF_IRQ_STALL;
+		vifX.SetIrqStall(!!vifXch.chcr.STR);
 	}
 
 	if (!TTE) // *WARNING* - Tags CAN have interrupts! so lets just ignore the dma modifying stuffs (GT4)
@@ -89,24 +89,31 @@ _vifT static __fi bool vifTransfer(u32 *data, int size, bool TTE) {
 
 		hwDmacSrcTadrInc(vifXch);
 
-		vifX.irqoffset.enabled = false;
-
 		if(!vifXch.qwc)
-			vifX.inprogress &= ~0x1;
-		else if (vifX.irqoffset.value != 0)
-			vifX.irqoffset.enabled = true;
+		{
+			vifX.SetTransferActive(false);
+			vifX.ClearResumeOffset();
+		}
+		else if (resume_offset != 0)
+		{
+			vifX.SetResumeOffset(resume_offset);
+		}
+		else
+		{
+			vifX.ClearResumeOffset();
+		}
 	}
 	else
 	{
-		if(vifX.irqoffset.value != 0){
-			vifX.irqoffset.enabled = true;
-		}else
-			vifX.irqoffset.enabled = false;
+		if (resume_offset != 0)
+			vifX.SetResumeOffset(resume_offset);
+		else
+			vifX.ClearResumeOffset();
 	}
 
 	vifExecQueue(idx);
 
-	return !vifX.vifstalled.enabled;
+	return !vifX.IsWaitingForStallState();
 }
 
 // When TTE is set to 1, MADR and QWC are not updated as part of the transfer.

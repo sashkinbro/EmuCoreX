@@ -65,6 +65,9 @@ namespace SysMemory
 static void memAllocate();
 static void memReset();
 static void memRelease();
+static void InitializeMemoryBackings();
+static void ResetMemoryStateAndMappings();
+static void ReleaseMemoryBackings();
 
 int MemMode = 0;		// 0 is Kernel Mode, 1 is Supervisor Mode, 2 is User Mode
 
@@ -250,9 +253,7 @@ bool SysMemory::Allocate()
 
 	DumpMemoryMap();
 
-	memAllocate();
-	iopMemAlloc();
-	vuMemAllocate();
+	InitializeMemoryBackings();
 
 	if (!vtlb_Core_Alloc())
 		return false;
@@ -264,9 +265,7 @@ void SysMemory::Reset()
 {
 	DevCon.WriteLn(Color_StrongBlue, "Resetting host memory for virtual systems...");
 
-	memReset();
-	iopMemReset();
-	vuMemReset();
+	ResetMemoryStateAndMappings();
 
 	// Note: newVif is reset as part of other VIF structures.
 	// Software is reset on the GS thread.
@@ -278,9 +277,7 @@ void SysMemory::Release()
 
 	vtlb_Core_Free(); // Just to be sure... (calling order could result in it getting missed during Decommit).
 
-	vuMemRelease();
-	iopMemRelease();
-	memRelease();
+	ReleaseMemoryBackings();
 }
 
 u8* SysMemory::GetDataPtr(size_t offset)
@@ -1094,6 +1091,51 @@ void memAllocate()
 	eeMem = reinterpret_cast<EEVM_MemoryAllocMess*>(SysMemory::GetEEMem());
 }
 
+static void InitializeMemoryBackings()
+{
+	memAllocate();
+	iopMemAlloc();
+	vuMemAllocate();
+}
+
+static void MapMemorySpacesAndTLB()
+{
+	memMapPhy();
+	memMapVUmicro();
+	memMapKernelMem();
+	memMapSupervisorMem();
+	memMapUserMem();
+	memSetKernelMode();
+	vtlb_ResetKernelVirtualMappings();
+}
+
+static void ResetMemoryMappedIoState()
+{
+	std::memset(s_ba, 0, sizeof(s_ba));
+
+	s_ba[0xA] = 1; // Power on
+	s_ba_command_executing = false;
+	s_ba_error_detected = false;
+	s_ba_current_reg = 0;
+
+	std::memset(s_dve_regs, 0, sizeof(s_dve_regs));
+	s_dve_regs[0x7e] = 0x1C; // Status register. 0x1C seems to be the value it's expecting for everything being OK.
+}
+
+static void ReloadBiosIntoMemory()
+{
+	// BIOS is included in eeMem, so it needs to be copied after zeroing.
+	std::memset(eeMem, 0, sizeof(*eeMem));
+	CopyBIOSToMemory();
+}
+
+static void ReleaseMemoryBackings()
+{
+	vuMemRelease();
+	iopMemRelease();
+	memRelease();
+}
+
 void memReset()
 {
 	// Note!!  Ideally the vtlb should only be initialized once, and then subsequent
@@ -1201,36 +1243,21 @@ void memReset()
 	// reset memLUT (?)
 	//vtlb_VMap(0x00000000,0x00000000,0x20000000);
 	//vtlb_VMapUnmap(0x20000000,0x60000000);
-
-	memMapPhy();
-	memMapVUmicro();
-	memMapKernelMem();
-	memMapSupervisorMem();
-	memMapUserMem();
-	memSetKernelMode();
-
-	vtlb_VMap(0x00000000,0x00000000,0x20000000);
-	vtlb_VMapUnmap(0x20000000,0x60000000);
-
-	std::memset(s_ba, 0, sizeof(s_ba));
-
-	s_ba[0xA] = 1; // Power on
-	s_ba_command_executing = false;
-	s_ba_error_detected = false;
-	s_ba_current_reg = 0;
-
-	std::memset(s_dve_regs, 0, sizeof(s_dve_regs));
-
-	s_dve_regs[0x7e] = 0x1C; // Status register. 0x1C seems to be the value it's expecting for everything being OK.
-
-	// BIOS is included in eeMem, so it needs to be copied after zeroing.
-	std::memset(eeMem, 0, sizeof(*eeMem));
-	CopyBIOSToMemory();
+	MapMemorySpacesAndTLB();
+	ResetMemoryMappedIoState();
+	ReloadBiosIntoMemory();
 }
 
 void memRelease()
 {
 	eeMem = nullptr;
+}
+
+static void ResetMemoryStateAndMappings()
+{
+	memReset();
+	iopMemReset();
+	vuMemReset();
 }
 
 bool SaveStateBase::memFreeze(Error* error)

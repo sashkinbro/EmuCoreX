@@ -20,6 +20,7 @@ data class ControlsLayoutState(
     val rbtnOffset: Pair<Float, Float> = AppPreferences.DEFAULT_RBTN_OFFSET_X to AppPreferences.DEFAULT_RBTN_OFFSET_Y,
     val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
+    val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts()
 )
 
@@ -43,6 +44,7 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
                     rbtnOffset = snapshot.rbtnOffset,
                     centerOffset = snapshot.centerOffset,
                     stickScale = snapshot.stickScale,
+                    stickSurfaceMode = snapshot.stickSurfaceMode,
                     controlLayouts = snapshot.controlLayouts
                 )
             }
@@ -83,6 +85,18 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
         }
     }
 
+    fun updateControlScale(controlId: String, scale: Int) {
+        viewModelScope.launch {
+            commitLayout { current ->
+                val updated = current.controlLayouts.toMutableMap()
+                val controlDefaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
+                val control = updated[controlId] ?: controlDefaults[controlId] ?: OverlayControlLayout()
+                updated[controlId] = control.copy(scale = scale.coerceIn(50, 200))
+                current.copy(controlLayouts = updated)
+            }
+        }
+    }
+
     fun toggleLeftInputMode() {
         viewModelScope.launch {
             commitLayout { current ->
@@ -115,6 +129,13 @@ class ControlsEditorViewModel(application: Application) : AndroidViewModel(appli
                 updated[controlId] = control.copy(visible = visible)
                 current.copy(controlLayouts = updated)
             }
+        }
+    }
+
+    fun setStickSurfaceMode(enabled: Boolean) {
+        viewModelScope.launch {
+            _layoutState.value = _layoutState.value.copy(stickSurfaceMode = enabled)
+            preferences.setStickSurfaceMode(enabled)
         }
     }
 

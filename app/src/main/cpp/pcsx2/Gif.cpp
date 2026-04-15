@@ -13,6 +13,19 @@
 alignas(16) GIF_Fifo gif_fifo;
 alignas(16) gifStruct gif;
 
+static void gifLogPath3Sync(const char* event)
+{
+	static u32 s_gif_path3_logs = 0;
+	if (s_gif_path3_logs++ >= 64)
+		return;
+
+	Console.WriteLn(
+		"GIFPath3[%s] cycle=%u apath=%u p3state=%u masked=%d canPath3=%d gifqwc=%x fifo=%d vifVGW=%d vifqwc=%x vifstat=%08x",
+		event, cpuRegs.cycle, gifRegs.stat.APATH, static_cast<u32>(gifUnit.gifPath[GIF_PATH_3].state),
+		gifUnit.Path3Masked() ? 1 : 0, gifUnit.CanDoPath3() ? 1 : 0, gifch.qwc, gif_fifo.fifoSize,
+		vif1HasGifWait() ? 1 : 0, vif1ch.qwc, vif1Regs.stat._u32);
+}
+
 static __fi void GifDMAInt(int cycles)
 {
 	if (dmacRegs.ctrl.MFD == MFD_GIF)
@@ -181,12 +194,9 @@ __fi void gifCheckPathStatus(bool calledFromGIF)
 	// GIF DMA isn't running but VIF might be waiting on PATH3 so resume it here
 	if (calledFromGIF && gifUnit.gifPath[GIF_PATH_3].state == GIF_PATH_IDLE)
 	{
-		if (vif1Regs.stat.VGW)
+		if (vif1RequestResumeFromGifPathIdle(1))
 		{
-			// Check if VIF is in a cycle or is currently "idle" waiting for GIF to come back.
-			if (!(cpuRegs.interrupt & (1 << DMAC_VIF1)))
-				CPU_INT(DMAC_VIF1, 1);
-
+			gifLogPath3Sync("ResumeVIF");
 			// Make sure it loops if the GIF packet is empty to prepare for the next packet
 			// or end if it was the end of a packet.
 			// This must trigger after VIF retriggers as VIf might instantly mask Path3
@@ -204,12 +214,9 @@ __fi void gifInterrupt()
 
 	if (gifUnit.gifPath[GIF_PATH_3].state == GIF_PATH_IDLE)
 	{
-		if (vif1Regs.stat.VGW)
+		if (vif1RequestResumeFromGifPathIdle(1))
 		{
-			// Check if VIF is in a cycle or is currently "idle" waiting for GIF to come back.
-			if (!(cpuRegs.interrupt & (1 << DMAC_VIF1)))
-				CPU_INT(DMAC_VIF1, 1);
-
+			gifLogPath3Sync("InterruptResumeVIF");
 			// Make sure it loops if the GIF packet is empty to prepare for the next packet
 			// or end if it was the end of a packet.
 			// This must trigger after VIF retriggers as VIf might instantly mask Path3
@@ -669,12 +676,9 @@ void gifMFIFOInterrupt()
 
 	if (gifUnit.gifPath[GIF_PATH_3].state == GIF_PATH_IDLE)
 	{
-		if (vif1Regs.stat.VGW)
+		if (vif1RequestResumeFromGifPathIdle(1))
 		{
-			// Check if VIF is in a cycle or is currently "idle" waiting for GIF to come back.
-			if (!(cpuRegs.interrupt & (1 << DMAC_VIF1)))
-				CPU_INT(DMAC_VIF1, 1);
-
+			gifLogPath3Sync("MFIFOResumeVIF");
 			// Make sure it loops if the GIF packet is empty to prepare for the next packet
 			// or end if it was the end of a packet.
 			// This must trigger after VIF retriggers as VIf might instantly mask Path3

@@ -114,25 +114,94 @@ struct Arm64MvuGlobals
     float ITOF_15[4] = {0.000030517578125f, 0.000030517578125f, 0.000030517578125f, 0.000030517578125f};
 };
 
+struct Arm64BackendConfig
+{
+    // Only keep the FP control mirrors that the ARM64 JIT currently reads.
+    FPControlRegister FPUFPCR{};
+    FPControlRegister FPUDivFPCR{};
+    FPControlRegister VU0FPCR{};
+    FPControlRegister VU1FPCR{};
+};
+
+struct Arm64BackendRuntime
+{
+    // ARM64-only helper/config state which must not be treated as canonical VM state.
+    Arm64BackendConfig config{};
+    alignas(16) ShuffleLanes shuffle;
+    alignas(16) Arm64MvuSse4 mVUss4{};
+    // Currently unused by the live ARM64 JIT path, but still backend-local.
+    alignas(32) Arm64MvuGlobals mVUglob{};
+};
+
 struct Arm64CpuRuntimePack
 {
-    // This runtime block backs the ARM64 JIT's fixed-offset addressing scheme.
-    // The leading fields intentionally mirror the official global state objects.
+    // Keep the legacy field names/offset roots intact while we split off only
+    // the volatile ARM64 runtime block first. This avoids breaking the current
+    // JIT contract and still starts moving backend-local state out of the core.
     alignas(16) cpuRegisters cpuRegs{};
     alignas(16) fpuRegisters fpuRegs{};
     alignas(16) psxRegisters psxRegs{};
     alignas(16) VURegs vuRegs[2]{};
     alignas(16) ShuffleLanes shuffle;
-    alignas(16) Pcsx2Config::CpuOptions Cpu;
     alignas(16) Arm64MvuSse4 mVUss4{};
     alignas(32) Arm64MvuGlobals mVUglob{};
     alignas(64) vtlb_private::MapData vtlbdata;
+    Arm64BackendRuntime runtime{};
 };
 alignas(64) extern Arm64CpuRuntimePack g_cpuRegistersPack;
 
-inline void Arm64RefreshRuntimeCpuOptions()
+inline void Arm64RefreshRuntimeBackendConfig()
 {
-    g_cpuRegistersPack.Cpu = EmuConfig.Cpu;
+    Arm64BackendConfig& config = g_cpuRegistersPack.runtime.config;
+    config.FPUFPCR = EmuConfig.Cpu.FPUFPCR;
+    config.FPUDivFPCR = EmuConfig.Cpu.FPUDivFPCR;
+    config.VU0FPCR = EmuConfig.Cpu.VU0FPCR;
+    config.VU1FPCR = EmuConfig.Cpu.VU1FPCR;
+}
+
+inline void Arm64PrepareRuntimeForStateLoad()
+{
+    // Runtime-only helper banks are rebuilt or mirrored explicitly after load.
+}
+
+inline void Arm64RepairRuntimeAfterStateLoad()
+{
+    Arm64RefreshRuntimeBackendConfig();
+}
+
+inline bool Arm64SupportsDynBackpatchLoadStore()
+{
+    return false;
+}
+
+inline bool Arm64UsesHardFailDynBackpatchStub()
+{
+    return true;
+}
+
+inline bool Arm64UsesVuJitPlaceholderState()
+{
+    return true;
+}
+
+inline bool Arm64HasStableVuJitStateSerialization()
+{
+    return false;
+}
+
+inline bool Arm64ShouldSynchronizeVuThreadBeforePlaceholderFreezeOnSave()
+{
+    return true;
+}
+
+inline constexpr size_t Arm64GetVuJitPlaceholderStateBlockSize()
+{
+    return 96;
+}
+
+inline constexpr size_t Arm64GetVuJitPlaceholderStateBlockCount()
+{
+    return 2;
 }
 
 #endif //PCSX2_CPUREGISTERSPACK_H

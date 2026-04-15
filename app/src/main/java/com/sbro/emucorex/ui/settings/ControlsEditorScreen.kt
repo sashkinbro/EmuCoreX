@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Refresh
@@ -62,6 +65,8 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.ui.emulation.EmulationUiState
+import com.sbro.emucorex.ui.common.OverlayActionGapLandscape
+import com.sbro.emucorex.ui.common.OverlayActionGapPortrait
 import com.sbro.emucorex.ui.common.OverlayBottomAnchorPadding
 import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
 import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
@@ -105,7 +110,6 @@ fun ControlsEditorScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     var selectedControlId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showHiddenControls by rememberSaveable { mutableStateOf(false) }
     var editorControlLayouts by remember { mutableStateOf(state.controlLayouts) }
     val defaultLayouts = remember(state.stickScale) { AppPreferences.defaultOverlayControlLayouts(state.stickScale) }
     val isShowingLeftStick = (
@@ -146,6 +150,23 @@ fun ControlsEditorScreen(
         viewModel.updateControlOffset(controlId, current.offset)
     }
 
+    fun setControlVisibleLocally(controlId: String, visible: Boolean) {
+        val current = currentLayoutFor(controlId, if (controlId.contains("stick")) state.stickScale else 100)
+        editorControlLayouts = editorControlLayouts.toMutableMap().apply {
+            put(controlId, current.copy(visible = visible))
+        }
+        viewModel.setControlVisible(controlId, visible)
+    }
+
+    fun setControlScaleLocally(controlId: String, scale: Int) {
+        val current = currentLayoutFor(controlId, if (controlId.contains("stick")) state.stickScale else 100)
+        val nextScale = scale.coerceIn(50, 200)
+        editorControlLayouts = editorControlLayouts.toMutableMap().apply {
+            put(controlId, current.copy(scale = nextScale))
+        }
+        viewModel.updateControlScale(controlId, nextScale)
+    }
+
     BackHandler(onBack = onBackClick)
 
     if (manageActivityOrientation) {
@@ -168,7 +189,6 @@ fun ControlsEditorScreen(
             state = state,
             controlLayouts = editorControlLayouts,
             selectedControlId = selectedControlId,
-            showHiddenControls = showHiddenControls,
             onSelectControl = { selectedControlId = it },
             onMoveControlBy = ::moveControlLocally,
             onCommitControlPosition = ::persistControlPosition,
@@ -241,7 +261,7 @@ fun ControlsEditorScreen(
                 OutlinedButton(
                     onClick = {
                         selectedControlId?.let { controlId ->
-                            viewModel.setControlVisible(controlId, !(selectedLayout?.visible ?: true))
+                            setControlVisibleLocally(controlId, !(selectedLayout?.visible ?: true))
                         }
                     },
                     enabled = selectedControlId != null,
@@ -254,35 +274,28 @@ fun ControlsEditorScreen(
                 ) {
                     Icon(
                         imageVector = if (selectedLayout?.visible == false) {
-                            Icons.Rounded.Visibility
-                        } else {
                             Icons.Rounded.VisibilityOff
+                        } else {
+                            Icons.Rounded.Visibility
                         },
                         contentDescription = null
                     )
                 }
 
                 OutlinedButton(
-                    onClick = { showHiddenControls = !showHiddenControls },
+                    onClick = { viewModel.setStickSurfaceMode(!state.stickSurfaceMode) },
                     shape = RoundedCornerShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (showHiddenControls) {
-                            Color.White.copy(alpha = 0.16f)
+                        containerColor = if (state.stickSurfaceMode) {
+                            Color(0xFF3565FF).copy(alpha = 0.78f)
                         } else {
-                            Color.White.copy(alpha = 0.08f)
+                            Color.White.copy(alpha = 0.06f)
                         },
-                        contentColor = Color.White
+                        contentColor = if (state.stickSurfaceMode) Color.White else Color.White.copy(alpha = 0.58f)
                     )
                 ) {
-                    Icon(
-                        imageVector = if (showHiddenControls) {
-                            Icons.Rounded.Visibility
-                        } else {
-                            Icons.Rounded.VisibilityOff
-                        },
-                        contentDescription = null
-                    )
+                    Icon(Icons.Rounded.TouchApp, contentDescription = null)
                 }
 
                 Button(
@@ -295,6 +308,52 @@ fun ControlsEditorScreen(
                     )
                 ) {
                     Text(stringResource(R.string.controls_editor_done))
+                }
+            }
+
+            selectedControlId?.let { controlId ->
+                val scale = selectedLayout?.scale ?: if (controlId.contains("stick")) state.stickScale else 100
+                Surface(
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = Color(0xFF111827).copy(alpha = 0.82f),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { setControlScaleLocally(controlId, scale - 10) },
+                            enabled = scale > 50,
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Remove, contentDescription = null)
+                        }
+                        Text(
+                            text = "$scale%",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                        OutlinedButton(
+                            onClick = { setControlScaleLocally(controlId, scale + 10) },
+                            enabled = scale < 200,
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null)
+                        }
+                    }
                 }
             }
         }
@@ -331,7 +390,6 @@ private fun PreviewLayout(
     state: EmulationUiState,
     controlLayouts: Map<String, OverlayControlLayout>,
     selectedControlId: String?,
-    showHiddenControls: Boolean,
     onSelectControl: (String) -> Unit,
     onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit,
@@ -357,8 +415,9 @@ private fun PreviewLayout(
     val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
     val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
+    val actionGap = if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
-    val actionStep = overlayClusterStep(actionSize / 3.1f, clusterGap)
+    val actionStep = overlayClusterStep(actionSize / 3.1f, actionGap)
     val actionButtonSize = actionSize / 3.1f
     val actionClusterExtent = actionStep + actionButtonSize
     val rightStickBaseX = -(actionClusterExtent + 12.dp)
@@ -463,31 +522,29 @@ private fun PreviewLayout(
                 .align(Alignment.BottomStart)
                 .padding(start = edgePadStart, bottom = bottomPad)
         ) {
+            val leftStickLayout = layoutFor("left_stick", state.stickScale)
             listOf(
                 "dpad_up" to overlayDpadOffset(dpadStep, "up"),
                 "dpad_down" to overlayDpadOffset(dpadStep, "down"),
                 "dpad_left" to overlayDpadOffset(dpadStep, "left"),
                 "dpad_right" to overlayDpadOffset(dpadStep, "right")
-            ).forEach { (id, baseOffset) ->
+            ).takeIf { !leftStickLayout.visible }?.forEach { (id, baseOffset) ->
                 val layout = layoutFor(id)
-                if (layout.visible) {
-                    PreviewButton(
-                        id = id,
-                        layout = layout,
-                        width = dpadSize / 3f,
-                        height = dpadSize / 3f,
-                        shape = RoundedCornerShape(8.dp),
-                        selected = selectedControlId == id,
-                        x = baseOffset.first + state.dpadOffset.first.pxToDp(),
-                        y = baseOffset.second + state.dpadOffset.second.pxToDp(),
-                        onSelectControl = onSelectControl,
-                        onMoveControlBy = onMoveControlBy,
-                        onCommitControlPosition = onCommitControlPosition
-                    )
-                }
+                PreviewButton(
+                    id = id,
+                    layout = layout,
+                    width = dpadSize / 3f,
+                    height = dpadSize / 3f,
+                    shape = RoundedCornerShape(8.dp),
+                    selected = selectedControlId == id,
+                    x = baseOffset.first + state.dpadOffset.first.pxToDp(),
+                    y = baseOffset.second + state.dpadOffset.second.pxToDp(),
+                    onSelectControl = onSelectControl,
+                    onMoveControlBy = onMoveControlBy,
+                    onCommitControlPosition = onCommitControlPosition
+                )
             }
 
-            val leftStickLayout = layoutFor("left_stick", state.stickScale)
             val leftStickSize = analogSize * (leftStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
             val leftStickBase = (dpadSize - leftStickSize) / 2f
             if (leftStickLayout.visible) {
@@ -496,13 +553,14 @@ private fun PreviewLayout(
                     layout = leftStickLayout,
                     selected = selectedControlId == "left_stick",
                     size = leftStickSize,
-                x = leftStickBase + state.lstickOffset.first.pxToDp(),
-                y = leftStickBase + state.lstickOffset.second.pxToDp(),
-                onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
-                onCommitControlPosition = onCommitControlPosition
-            )
-        }
+                    surfaceOnly = state.stickSurfaceMode,
+                    x = leftStickBase + state.lstickOffset.first.pxToDp(),
+                    y = leftStickBase + state.lstickOffset.second.pxToDp(),
+                    onSelectControl = onSelectControl,
+                    onMoveControlBy = onMoveControlBy,
+                    onCommitControlPosition = onCommitControlPosition
+                )
+            }
         }
 
         Box(
@@ -517,21 +575,19 @@ private fun PreviewLayout(
                 "cross" to overlayActionOffset(actionStep, "cross")
             ).forEach { (id, baseOffset) ->
                 val layout = layoutFor(id)
-                if (layout.visible) {
-                    PreviewButton(
-                        id = id,
-                        layout = layout,
-                        width = actionSize / 3.1f,
-                        height = actionSize / 3.1f,
-                        shape = CircleShape,
-                        selected = selectedControlId == id,
-                        x = baseOffset.first + state.actionOffset.first.pxToDp(),
-                        y = baseOffset.second + state.actionOffset.second.pxToDp(),
-                        onSelectControl = onSelectControl,
-                        onMoveControlBy = onMoveControlBy,
-                        onCommitControlPosition = onCommitControlPosition
-                    )
-                }
+                PreviewButton(
+                    id = id,
+                    layout = layout,
+                    width = actionSize / 3.1f,
+                    height = actionSize / 3.1f,
+                    shape = CircleShape,
+                    selected = selectedControlId == id,
+                    x = baseOffset.first + state.actionOffset.first.pxToDp(),
+                    y = baseOffset.second + state.actionOffset.second.pxToDp(),
+                    onSelectControl = onSelectControl,
+                    onMoveControlBy = onMoveControlBy,
+                    onCommitControlPosition = onCommitControlPosition
+                )
             }
         }
 
@@ -541,37 +597,64 @@ private fun PreviewLayout(
                 .padding(end = edgePadEnd, bottom = bottomPad)
         ) {
             val rightStick = layoutFor("right_stick", state.stickScale)
-            if (rightStick.visible) {
-                PreviewStick(
-                    id = "right_stick",
-                    layout = rightStick,
-                    selected = selectedControlId == "right_stick",
-                    size = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
-                    x = rightStickBaseX + state.rstickOffset.first.pxToDp(),
-                    y = state.rstickOffset.second.pxToDp(),
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
+            PreviewStick(
+                id = "right_stick",
+                layout = rightStick,
+                selected = selectedControlId == "right_stick",
+                size = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
+                surfaceOnly = state.stickSurfaceMode,
+                x = rightStickBaseX + state.rstickOffset.first.pxToDp(),
+                y = state.rstickOffset.second.pxToDp(),
+                onSelectControl = onSelectControl,
+                onMoveControlBy = onMoveControlBy,
+                onCommitControlPosition = onCommitControlPosition
+            )
         }
 
             val selectLayout = layoutFor("select")
             val toggleLayout = layoutFor("left_input_toggle")
             val startLayout = layoutFor("start")
             val l3Layout = layoutFor("l3")
+            val r3Layout = layoutFor("r3")
+            val l3Width = centerW * (l3Layout.scale / 100f)
+            val r3Width = centerW * (r3Layout.scale / 100f)
             val selectWidth = wideCenterW * (selectLayout.scale / 100f)
             val toggleSize = centerH * (toggleLayout.scale / 100f)
             val startWidth = wideCenterW * (startLayout.scale / 100f)
-            val centerInlineWidths = listOf(selectWidth, toggleSize, startWidth)
-            val leftColumnX = overlayCenterButtonOffset(
-                buttonWidth = centerW * (l3Layout.scale / 100f),
-                columnWidth = wideCenterW,
-                gap = centerColumnGap,
-                leftColumn = true
-            ) + l3Layout.offset.first.dp
-            val selectX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 0) +
+            val visibleCenterItems = buildList {
+                if (l3Layout.visible) add("l3" to l3Width)
+                if (selectLayout.visible) add("select" to selectWidth)
+                if (toggleLayout.visible) add("left_input_toggle" to toggleSize)
+                if (startLayout.visible) add("start" to startWidth)
+                if (r3Layout.visible) add("r3" to r3Width)
+            }
+            val visibleCenterWidths = visibleCenterItems.map { it.second }
+            fun visibleCenterX(id: String): Dp? {
+                val index = visibleCenterItems.indexOfFirst { it.first == id }
+                return if (index >= 0) overlayInlineGroupOffset(visibleCenterWidths, centerInlineGap, index) else null
+            }
+            val visibleCenterBounds = visibleCenterItems.mapNotNull { (id, width) ->
+                visibleCenterX(id)?.let { it to (it + width) }
+            }
+            val visibleCenterLeft = visibleCenterBounds.minOfOrNull { it.first }
+            val visibleCenterRight = visibleCenterBounds.maxOfOrNull { it.second }
+            val fallbackCenterWidths = listOf(l3Width, selectWidth, toggleSize, startWidth, r3Width)
+            val l3X = visibleCenterX("l3") ?: (
+                visibleCenterLeft?.let { it - centerInlineGap - l3Width }
+                    ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 0)
+                )
+            val selectX = (visibleCenterX("select")
+                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 1)) +
                 OverlayCenterSelectOpticalNudgeX
+            val toggleX = visibleCenterX("left_input_toggle")
+                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 2)
+            val startX = (visibleCenterX("start")
+                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 3)) +
+                OverlayCenterStartOpticalNudgeX
+            val r3X = visibleCenterX("r3") ?: (
+                visibleCenterRight?.let { it + centerInlineGap }
+                    ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 4)
+                )
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -583,7 +666,7 @@ private fun PreviewLayout(
                     )
                 }
         ) {
-            layoutFor("select").takeIf { it.visible }?.let { layout ->
+            layoutFor("select").let { layout ->
                 PreviewCenter(
                     id = "select",
                     layout = layout,
@@ -597,13 +680,13 @@ private fun PreviewLayout(
                     onCommitControlPosition = onCommitControlPosition
                 )
             }
-            layoutFor("left_input_toggle").takeIf { it.visible }?.let { layout ->
+            layoutFor("left_input_toggle").let { layout ->
                 PreviewCenter(
                     id = "left_input_toggle",
                     layout = layout,
                     width = toggleSize,
                     height = centerH,
-                    x = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 1),
+                    x = toggleX,
                     selected = selectedControlId == "left_input_toggle",
                     y = OverlayCenterToggleOpticalNudgeY,
                     isToggle = true,
@@ -612,14 +695,13 @@ private fun PreviewLayout(
                     onCommitControlPosition = onCommitControlPosition
                 )
             }
-            layoutFor("start").takeIf { it.visible }?.let { layout ->
+            layoutFor("start").let { layout ->
                 PreviewCenter(
                     id = "start",
                     layout = layout,
                     width = startWidth,
                     height = centerH,
-                    x = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 2) +
-                        OverlayCenterStartOpticalNudgeX,
+                    x = startX,
                     selected = selectedControlId == "start",
                     y = 0.dp,
                     onSelectControl = onSelectControl,
@@ -627,130 +709,34 @@ private fun PreviewLayout(
                     onCommitControlPosition = onCommitControlPosition
                 )
             }
-            layoutFor("l3").takeIf { it.visible }?.let { layout ->
+            layoutFor("l3").let { layout ->
                 PreviewCenter(
                     id = "l3",
                     layout = layout,
-                    width = centerW,
+                    width = l3Width,
                     height = centerH,
-                    x = leftColumnX,
+                    x = l3X,
                     selected = selectedControlId == "l3",
-                    y = overlayCenterSecondRowOffset(centerH * (layout.scale / 100f), centerRowGap),
+                    y = 0.dp,
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
                     onCommitControlPosition = onCommitControlPosition
                 )
             }
-            layoutFor("r3").takeIf { it.visible }?.let { layout ->
+            layoutFor("r3").let { layout ->
                 PreviewCenter(
                     id = "r3",
                     layout = layout,
-                    width = centerW,
+                    width = r3Width,
                     height = centerH,
-                    x = overlayCenterButtonOffset(
-                        buttonWidth = centerW * (layout.scale / 100f),
-                        columnWidth = wideCenterW,
-                        gap = centerColumnGap,
-                        leftColumn = false
-                    ),
+                    x = r3X,
                     selected = selectedControlId == "r3",
-                    y = overlayCenterSecondRowOffset(centerH * (layout.scale / 100f), centerRowGap),
+                    y = 0.dp,
                     onSelectControl = onSelectControl,
                     onMoveControlBy = onMoveControlBy,
                     onCommitControlPosition = onCommitControlPosition
                 )
             }
-        }
-
-        if (showHiddenControls) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(y = (-8).dp)
-            ) {
-                HiddenPreviewControls(
-                    state = state,
-                    selectedControlId = selectedControlId,
-                    analogSize = analogSize,
-                    dpadButtonSize = dpadSize / 3f,
-                    actionButtonSize = actionSize / 3.1f,
-                    shoulderW = shoulderW,
-                    shoulderH = shoulderH,
-                    centerW = centerW,
-                    centerH = centerH,
-                    wideCenterW = wideCenterW,
-                    centerColumnGap = centerColumnGap,
-                    centerInlineGap = centerInlineGap,
-                    centerRowGap = centerRowGap,
-                    stickScaleFactor = stickScaleFactor,
-                    layoutFor = ::layoutFor,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HiddenPreviewControls(
-    state: EmulationUiState,
-    selectedControlId: String?,
-    analogSize: Dp,
-    dpadButtonSize: Dp,
-    actionButtonSize: Dp,
-    shoulderW: Dp,
-    shoulderH: Dp,
-    centerW: Dp,
-    centerH: Dp,
-    wideCenterW: Dp,
-    centerColumnGap: Dp,
-    centerInlineGap: Dp,
-    centerRowGap: Dp,
-    stickScaleFactor: Float,
-    layoutFor: (String, Int) -> OverlayControlLayout,
-    onSelectControl: (String) -> Unit,
-    onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
-    onCommitControlPosition: (String) -> Unit
-) {
-    val hiddenSelectLayout = layoutFor("select", 100)
-    val hiddenToggleLayout = layoutFor("left_input_toggle", 100)
-    val hiddenStartLayout = layoutFor("start", 100)
-    val hiddenSelectWidth = wideCenterW * (hiddenSelectLayout.scale / 100f)
-    val hiddenToggleSize = centerH * (hiddenToggleLayout.scale / 100f)
-    val hiddenStartWidth = wideCenterW * (hiddenStartLayout.scale / 100f)
-    val hiddenInlineWidths = listOf(hiddenSelectWidth, hiddenToggleSize, hiddenStartWidth)
-    val hiddenIds = listOf(
-        "l2", "l1", "r2", "r1",
-        "dpad_up", "dpad_down", "dpad_left", "dpad_right",
-        "left_stick",
-        "triangle", "square", "circle", "cross",
-        "right_stick",
-        "select", "left_input_toggle", "start", "l3", "r3"
-    ).filter { !layoutFor(it, if (it.contains("stick")) state.stickScale else 100).visible }
-
-    hiddenIds.forEach { id ->
-        when (id) {
-            "l2" -> PreviewShoulder(id, layoutFor(id, 100), shoulderW, shoulderH, selectedControlId == id, x = (-280).dp, y = (-210).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "l1" -> PreviewShoulder(id, layoutFor(id, 100), shoulderW, shoulderH, selectedControlId == id, x = (-280).dp, y = (-164).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "r2" -> PreviewShoulder(id, layoutFor(id, 100), shoulderW, shoulderH, selectedControlId == id, x = 210.dp, y = (-210).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "r1" -> PreviewShoulder(id, layoutFor(id, 100), shoulderW, shoulderH, selectedControlId == id, x = 210.dp, y = (-164).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "dpad_up" -> PreviewButton(id, layoutFor(id, 100), dpadButtonSize, dpadButtonSize, RoundedCornerShape(8.dp), selectedControlId == id, x = (-180).dp, y = (-60).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "dpad_down" -> PreviewButton(id, layoutFor(id, 100), dpadButtonSize, dpadButtonSize, RoundedCornerShape(8.dp), selectedControlId == id, x = (-180).dp, y = 52.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "dpad_left" -> PreviewButton(id, layoutFor(id, 100), dpadButtonSize, dpadButtonSize, RoundedCornerShape(8.dp), selectedControlId == id, x = (-236).dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "dpad_right" -> PreviewButton(id, layoutFor(id, 100), dpadButtonSize, dpadButtonSize, RoundedCornerShape(8.dp), selectedControlId == id, x = (-124).dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "left_stick" -> PreviewStick(id, layoutFor(id, state.stickScale), selectedControlId == id, analogSize * (layoutFor(id, state.stickScale).scale / (stickScaleFactor * 100f).coerceAtLeast(1f)), x = (-180).dp, y = 132.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "triangle" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 180.dp, y = (-60).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "cross" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 180.dp, y = 52.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "square" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 124.dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "circle" -> PreviewButton(id, layoutFor(id, 100), actionButtonSize, actionButtonSize, CircleShape, selectedControlId == id, x = 236.dp, y = (-4).dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "right_stick" -> PreviewStick(id, layoutFor(id, state.stickScale), selectedControlId == id, analogSize * (layoutFor(id, state.stickScale).scale / (stickScaleFactor * 100f).coerceAtLeast(1f)), x = 180.dp, y = 132.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "select" -> PreviewCenter(id, layoutFor(id, 100), hiddenSelectWidth, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 0) + OverlayCenterSelectOpticalNudgeX, selectedControlId == id, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "left_input_toggle" -> PreviewCenter(id, layoutFor(id, 100), hiddenToggleSize, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 1), selectedControlId == id, y = 214.dp + OverlayCenterToggleOpticalNudgeY, isToggle = true, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "start" -> PreviewCenter(id, layoutFor(id, 100), hiddenStartWidth, centerH, overlayInlineGroupOffset(hiddenInlineWidths, centerInlineGap, index = 2) + OverlayCenterStartOpticalNudgeX, selectedControlId == id, y = 214.dp, onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "l3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, overlayCenterButtonOffset(buttonWidth = centerW * (layoutFor(id, 100).scale / 100f), columnWidth = wideCenterW, gap = centerColumnGap, leftColumn = true), selectedControlId == id, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
-            "r3" -> PreviewCenter(id, layoutFor(id, 100), centerW, centerH, overlayCenterButtonOffset(buttonWidth = centerW * (layoutFor(id, 100).scale / 100f), columnWidth = wideCenterW, gap = centerColumnGap, leftColumn = false), selectedControlId == id, y = 214.dp + overlayCenterSecondRowOffset(centerH * (layoutFor(id, 100).scale / 100f), centerRowGap), onSelectControl = onSelectControl, onMoveControlBy = onMoveControlBy, onCommitControlPosition = onCommitControlPosition)
         }
     }
 }
@@ -875,6 +861,7 @@ private fun PreviewStick(
     layout: OverlayControlLayout,
     selected: Boolean,
     size: Dp,
+    surfaceOnly: Boolean = false,
     x: Dp,
     y: Dp,
     onSelectControl: (String) -> Unit,
@@ -898,6 +885,7 @@ private fun PreviewStick(
             analogSize = size,
             alpha = if (layout.visible) 1f else 0.38f,
             selected = selected,
+            surfaceOnly = surfaceOnly,
             interactive = false
         )
     }

@@ -1871,7 +1871,7 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 		}
 		else*/
 		//{
-			gifUnit.TransferGSPacketData(GIF_TRANS_XGKICK, &vuRegs[1].Mem[VU1.xgkickaddr], transfersize * 0x10, true);
+		gifUnit.TransferGSPacketData(GIF_TRANS_XGKICK, &vuRegs[1].Mem[VU1.xgkickaddr], transfersize * 0x10, true);
 		//}
 
 		if ((VU0.VI[REG_VPU_STAT].UL & 0x100) && flush)

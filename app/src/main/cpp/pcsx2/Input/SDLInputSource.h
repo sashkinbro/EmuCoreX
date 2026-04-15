@@ -27,6 +27,7 @@ public:
 	bool ReloadDevices() override;
 	void Shutdown() override;
 	bool IsInitialized() override;
+	bool CanAttemptInitialization() const override { return !m_sdl_subsystem_init_failed; }
 
 	void PollEvents() override;
 	std::vector<std::pair<std::string, std::string>> EnumerateDevices() override;
@@ -105,6 +106,7 @@ private:
 	std::vector<std::pair<std::string, std::string>> m_sdl_hints;
 
 	bool m_sdl_subsystem_initialized = false;
+	bool m_sdl_subsystem_init_failed = false;
 	bool m_enable_enhanced_reports = false;
 	bool m_use_raw_input = false;
 	bool m_enable_ps5_player_leds = false;

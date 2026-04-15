@@ -17,6 +17,7 @@ void vif0Reset()
 	/* Reset the whole VIF, meaning the internal pcsx2 vars and all the registers */
 	std::memset(&vif0, 0, sizeof(vif0));
 	std::memset(&vif0Regs, 0, sizeof(vif0Regs));
+	vif0.NormalizeBridgeState();
 
 	resetNewVif(0);
 }
@@ -26,6 +27,7 @@ void vif1Reset()
 	/* Reset the whole VIF, meaning the internal pcsx2 vars, and all the registers */
 	std::memset(&vif1, 0, sizeof(vif1));
 	std::memset(&vif1Regs, 0, sizeof(vif1Regs));
+	vif1.NormalizeBridgeState();
 
 	resetNewVif(1);
 }
@@ -38,6 +40,8 @@ bool SaveStateBase::vif0Freeze()
 	Freeze(g_vif0Cycles);
 
 	Freeze(vif0);
+	if (IsLoading())
+		vif0.NormalizeBridgeState();
 
 	Freeze(nVif[0].bSize);
 	FreezeMem(nVif[0].buffer, nVif[0].bSize);
@@ -53,6 +57,8 @@ bool SaveStateBase::vif1Freeze()
 	Freeze(g_vif1Cycles);
 
 	Freeze(vif1);
+	if (IsLoading())
+		vif1.NormalizeBridgeState();
 
 	Freeze(nVif[1].bSize);
 	FreezeMem(nVif[1].buffer, nVif[1].bSize);
@@ -152,8 +158,7 @@ __fi void vif1FBRST(u32 value)
 		vif1Regs.stat.VFS = true;
 		vif1Regs.stat.VPS = VPS_IDLE;
 		cpuRegs.interrupt &= ~((1 << 1) | (1 << 10)); //Stop all vif1 DMA's
-		vif1.vifstalled.enabled = VifStallEnable(vif1ch);
-		vif1.vifstalled.value = VIF_IRQ_STALL;
+		vif1.SetIrqStall(!!vif1ch.chcr.STR);
 		Console.WriteLn("vif1 force break");
 	}
 
@@ -163,8 +168,7 @@ __fi void vif1FBRST(u32 value)
 		// just stoppin the VIF (linuz).
 		vif1Regs.stat.VSS = true;
 		vif1Regs.stat.VPS = VPS_IDLE;
-		vif1.vifstalled.enabled = VifStallEnable(vif1ch);
-		vif1.vifstalled.value = VIF_IRQ_STALL;
+		vif1.SetIrqStall(!!vif1ch.chcr.STR);
 	}
 
 	if (FBRST(value).STC) // Cancel Vif Stall.
@@ -183,24 +187,10 @@ __fi void vif1FBRST(u32 value)
 		if (cancel)
 		{
 			g_vif1Cycles = 0;
-			// loop necessary for spiderman
-			switch (dmacRegs.ctrl.MFD)
-			{
-			case MFD_VIF1:
-				//Console.WriteLn("MFIFO Stall");
-				//MFIFO active and not empty
-				if (vif1ch.chcr.STR && !vif1Regs.stat.test(VIF1_STAT_FDR))
-					CPU_INT(DMAC_MFIFO_VIF, 0);
-				break;
-
-			case NO_MFD:
-			case MFD_RESERVED:
-			case MFD_GIF: // Wonder if this should be with VIF?
-				// Gets the timing right - Flatout
-				if (vif1ch.chcr.STR && !vif1Regs.stat.test(VIF1_STAT_FDR))
-					CPU_INT(DMAC_VIF1, 0);
-				break;
-			}
+			// loop necessary for spiderman; use the active VIF1 DMA event so
+			// control-path resumes match the same MFIFO/normal routing as GIF wakeups.
+			if (vif1CanResumeFromControlWrite())
+				vif1RequestDmaRetry(0);
 
 			//vif1ch.chcr.STR = true;
 		}
@@ -216,7 +206,7 @@ __fi void vif1FBRST(u32 value)
 		SaveCol._u64[1] = vif1.MaskCol._u64[1];
 		SaveRow._u64[0] = vif1.MaskRow._u64[0];
 		SaveRow._u64[1] = vif1.MaskRow._u64[1];
-		u8 mfifo_empty = vif1.inprogress & 0x10;
+		const bool preserve_mfifo_wait = vif1.IsMfifoAwaitingData();
 		std::memset(&vif1, 0, sizeof(vif1));
 		vif1.MaskCol._u64[0] = SaveCol._u64[0];
 		vif1.MaskCol._u64[1] = SaveCol._u64[1];
@@ -228,9 +218,8 @@ __fi void vif1FBRST(u32 value)
 		vif1Regs.mskpath3 = false;
 		gifRegs.stat.M3P = 0;
 		vif1Regs.err.reset();
-		vif1.inprogress = mfifo_empty;
+		vif1.ResetRuntimeBridgeState(preserve_mfifo_wait);
 		vif1.cmd = 0;
-		vif1.vifstalled.enabled = false;
 		vif1Regs.stat._u32 = 0;
 	}
 }
@@ -287,8 +276,8 @@ __fi void vif1STAT(u32 value)
 		//Sometimes the value from the GS is bigger than vif wanted, so it just sets it back and cancels it.
 		//Other times it can read it off ;)
 		vif1Regs.stat.FQC = 0;
-		if (vif1ch.chcr.STR)
-			CPU_INT(DMAC_VIF1, 0);
+		if (vif1CanResumeFromControlWrite())
+			vif1RequestDmaRetry(0);
 	}
 }
 

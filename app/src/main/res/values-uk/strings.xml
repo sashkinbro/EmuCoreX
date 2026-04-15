@@ -222,8 +222,8 @@
     <string name="settings_aspect_ratio_43">4:3</string>
     <string name="settings_aspect_ratio_169">16:9</string>
     <string name="settings_paths">Файли</string>
-    <string name="settings_bios_path">Папка з файлами BIOS</string>
-    <string name="settings_bios_path_desc">Виберіть папку з файлами BIOS, необхідними для запуску ігор.</string>
+    <string name="settings_bios_path">Файл BIOS</string>
+    <string name="settings_bios_path_desc">Виберіть файл образу BIOS PS2, необхідний для запуску ігор.</string>
     <string name="settings_game_path">Папка з іграми</string>
     <string name="settings_game_path_desc">Виберіть папку, що містить ваші ігри.</string>
     <string name="settings_not_set">Не встановлено</string>
@@ -521,7 +521,7 @@
     <string name="onboarding_title">Готуйтеся до гри</string>
     <string name="onboarding_subtitle">Додайте файли BIOS та виберіть папку з іграми.</string>
     <string name="onboarding_bios_title">Виберіть файли BIOS</string>
-    <string name="onboarding_bios_desc">Виберіть папку з файлами BIOS, необхідними для запуску ігор.</string>
+    <string name="onboarding_bios_desc">Виберіть файл образу BIOS PS2, необхідний для запуску ігор.</string>
     <string name="onboarding_games_title">Виберіть папку з іграми</string>
     <string name="onboarding_games_desc">Виберіть папку, яка містить ваші ігри.</string>
     <string name="onboarding_status_required">Обов\'язково</string>
@@ -782,7 +782,7 @@
     <string name="settings_help_force_even_sprite_position">Прив\'язує положення спрайтів до парних координат, щоб зменшити крихітні зазори або мерехтіння між пікселями при вищих роздільних здатностях. Корисно для ігор із великою кількістю 2D, але може трохи змістити деякі елементи.</string>
     <string name="settings_help_native_palette_draw">Відмальовує ефекти на основі палітри ближче до нативної точності. Це може виправити ефекти з індексуванням кольорів, тіні палітри або інші хитрощі, що інтенсивно використовують CLUT, які ламаються під час масштабування, але також може зробити зображення у високій роздільній здатності менш чистим.</string>
     <string name="settings_help_bilinear_filtering">Керує основним режимом фільтрації текстур, який використовує рендерер. «Найближчий» (Nearest) зберігає найчіткіший необроблений вигляд, «PS2» залишається найближчим до оригінальної поведінки консолі, а примусові режими згладжують більш агресивно. Якщо гра виглядає занадто піксельною або занадто розмитою, це перша опція фільтрації, яку слід налаштувати.</string>
-    <string name="settings_help_bios_path">Вказує EmuCoreX на папку, що містить ваші файли BIOS PS2. Чистий дамп із вашої власної консолі — найкращий вибір. Програма може виявляти загальні файли, пов\'язані з BIOS, як-от .bin, .rom, .mec, .nvm та .elf, включаючи супутні файли ROM, такі як ROM0, ROM1, ROM2 і EROM, якщо вони присутні.</string>
+    <string name="settings_help_bios_path">Вказує EmuCoreX на файл образу BIOS PS2. Чистий дамп із вашої власної консолі — найкращий вибір. Програма очікує основний образ BIOS, зазвичай файл .bin або .rom, а створені NVRAM/MEC файли зберігає поруч з імпортованою копією.</string>
     <string name="settings_help_game_path">Вибирає папку бібліотеки, яку EmuCoreX сканує на наявність ігор. Сканування рекурсивне, тому підпапки також перевіряються. Підтримувані образи включають .iso, .bin, .chd, .cso та .gz. ISO — це найбезпечніша база, тоді як CHD зазвичай є найкращим довгостроковим форматом, оскільки він економить місце без шкоди для нормального використання.</string>
     <string name="settings_help_cover_download_url">Перевизначає вбудоване джерело обкладинок, що використовується для автоматичного завантаження. URL-адреса має вказувати безпосередньо на папку, яка містить обкладинки у форматі JPG, названі за серійним номером гри, наприклад SLUS-20312.jpg. Змінюйте це лише в тому випадку, якщо ви розміщуєте власне дзеркало або хочете використовувати іншу сумісну бібліотеку обкладинок.</string>
     <string name="settings_cover_download_url">URL-адреса завантаження обкладинок</string>
@@ -809,10 +809,10 @@
     <string name="settings_cover_download_url_copied">Приклади URL-адрес скопійовано.</string>
     <string name="settings_help_cover_art_style">Вибирає тип обкладинки за замовчуванням, що використовується під час завантаження зображень. Пласкі обкладинки відповідають класичному вигляду передньої частини коробки, тоді як 3D-коробка використовує кутові рендери коробок, якщо джерело їх надає. 3D-обкладинки можуть виглядати більш ефектно, але їхня доступність може бути трохи гіршою, ніж у пласких зображень.</string>
     <string name="settings_renderer_auto">Авто</string>
-    <string name="settings_bios_picker_title">Вибрати папку BIOS</string>
-    <string name="settings_bios_picker_desc">Виберіть папку, яка містить файли BIOS PlayStation 2. Ця папка використовуватиметься для звичайного запуску ігор та запуску BIOS.</string>
-    <string name="settings_bios_picker_current">Поточна папка BIOS</string>
-    <string name="settings_bios_picker_action">Вибрати папку</string>
+    <string name="settings_bios_picker_title">Вибрати файл BIOS</string>
+    <string name="settings_bios_picker_desc">Виберіть файл образу BIOS PlayStation 2. Цей файл використовуватиметься для звичайного запуску ігор та запуску BIOS.</string>
+    <string name="settings_bios_picker_current">Поточний файл BIOS</string>
+    <string name="settings_bios_picker_action">Вибрати файл</string>
     <string name="settings_auto">Авто</string>
     <string name="settings_target_fps_mode">Режим цільового FPS</string>
     <string name="settings_target_fps_auto">Авто FPS</string>

@@ -2880,7 +2880,8 @@ void GSState::Transfer(const u8* mem, u32 size)
 
 								do
 								{
-									(this->*m_fpGIFPackedRegHandlers[path.GetReg(reg++)])((GIFPackedReg*)mem);
+									const u32 cur_reg = path.GetReg(reg++);
+									(this->*m_fpGIFPackedRegHandlers[cur_reg])((GIFPackedReg*)mem);
 
 									mem += sizeof(GIFPackedReg);
 

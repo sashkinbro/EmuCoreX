@@ -261,6 +261,15 @@ void recMFC0()
 
 void recMTC0()
 {
+	// ARM64 COP0 writes which steer exception return or TLB refill state are
+	// correctness-sensitive. Route them through the interpreter helper so the
+	// EE state is fully flushed and traced consistently.
+	if (_Rd_ == 2 || _Rd_ == 3 || _Rd_ == 5 || _Rd_ == 10 || _Rd_ == 14 || _Rd_ == 30)
+	{
+		recCall(Interp::MTC0);
+		return;
+	}
+
 	if (GPR_IS_CONST1(_Rt_))
 	{
 		switch (_Rd_)

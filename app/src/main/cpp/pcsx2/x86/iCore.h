@@ -324,7 +324,9 @@ int _allocIfUsedFPUtoXMM(int fpureg, int mode);
 #define FLUSH_EVERYTHING   0x1ff
 //#define FLUSH_EXCEPTION		0x1ff   // will probably do this totally differently actually
 #define FLUSH_INTERPRETER  0xfff
-#define FLUSH_FULLVTLB 0x000
+// VTLB helper calls can raise EE exceptions and exit the current rec block.
+// Flush the full interpreter-visible EE state before entering them.
+#define FLUSH_FULLVTLB FLUSH_INTERPRETER
 
 // no freeing, used when callee won't destroy xmm regs
 #define FLUSH_NODESTROY (FLUSH_CONSTANT_REGS | FLUSH_FLUSH_XMM | FLUSH_ALL_X86)

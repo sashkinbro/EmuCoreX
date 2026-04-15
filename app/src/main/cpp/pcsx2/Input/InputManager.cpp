@@ -1765,6 +1765,10 @@ void InputManager::UpdateInputSourceState(SettingsInterface& si, std::unique_loc
 		{
 			s_input_sources[static_cast<u32>(type)]->UpdateSettings(si, settings_lock);
 		}
+		else if (!s_input_sources[static_cast<u32>(type)]->CanAttemptInitialization())
+		{
+			// Initialization already failed in a non-retryable way for this runtime.
+		}
 		else if (!s_input_sources[static_cast<u32>(type)]->Initialize(si, settings_lock))
 		{
 			Console.Error("(InputManager) Source '%s' failed to initialize.", InputSourceToString(type));

@@ -81,6 +81,18 @@
 
 namespace VMManager
 {
+	static void TraceRegressionMilestone(const char* milestone, std::string_view detail)
+	{
+		if (detail.empty())
+		{
+			DevCon.WriteLn(Color_Green, "[Regression] %s", milestone);
+			return;
+		}
+
+		const std::string message = fmt::format("[Regression] {} :: {}", milestone, detail);
+		DevCon.WriteLn(Color_Green, "%s", message.c_str());
+	}
+
 	static void SetDefaultLoggingSettings(SettingsInterface& si);
 	static void UpdateLoggingSettings(SettingsInterface& si);
 
@@ -120,6 +132,7 @@ namespace VMManager
 	static void ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 		std::unique_ptr<SaveStateScreenshotData> screenshot, const char* filename,
 		s32 slot_for_message, std::function<void(const std::string&)> error_callback);
+	static void TraceRegressionMilestone(const char* milestone, std::string_view detail = {});
 	static void ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
 		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string filename,
 		s32 slot_for_message, std::function<void(const std::string&)> error_callback);
@@ -1542,10 +1555,10 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
-	mmap_ResetBlockTracking();
+	vtlb_InvalidateRuntimeBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
-	Arm64RefreshRuntimeCpuOptions();
+	Arm64RefreshRuntimeBackendConfig();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	memBindConditionalHandlers();
 	SysMemory::Reset();
@@ -1672,6 +1685,10 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	}
 
 	PerformanceMetrics::Clear();
+	TraceRegressionMilestone("boot-complete",
+		fmt::format("state={} fast_boot={} resumed_state={}",
+			VMStateToDebugString(s_state.load(std::memory_order_acquire)),
+			s_fast_boot_requested ? 1 : 0, state_to_load.empty() ? 0 : 1));
 	Console.WriteLn("(VMManager) Initialize completed successfully, state=%s",
 		VMStateToDebugString(s_state.load(std::memory_order_acquire)));
 	return VMBootResult::StartupSuccess;
@@ -1807,7 +1824,7 @@ void VMManager::Reset()
 
 	Achievements::ResetClient();
 
-	mmap_ResetBlockTracking();
+	vtlb_InvalidateRuntimeBlockTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
 	memBindConditionalHandlers();
@@ -1822,6 +1839,8 @@ void VMManager::Reset()
 	}
 
 	ResetFrameLimiter();
+	TraceRegressionMilestone("vm-reset-complete",
+		fmt::format("elf_changed={} recording={}", elf_was_changed ? 1 : 0, g_InputRecording.isActive() ? 1 : 0));
 
 	// If we were paused, state won't be resetting, so don't flip back to running.
 	if (s_state.load(std::memory_order_acquire) == VMState::Resetting)
@@ -1999,6 +2018,8 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 			Host::OSD_QUICK_DURATION);
 	}
 
+	TraceRegressionMilestone("savestate-save",
+		fmt::format("slot={} file={}", slot_for_message, Path::GetFileName(filename)));
 	DevCon.WriteLn("Zipping save state to '%s' took %.2f ms", filename, timer.GetTimeMilliseconds());
 }
 
@@ -2083,6 +2104,7 @@ bool VMManager::LoadState(const char* filename, Error* error)
 		return false;
 	}
 
+	TraceRegressionMilestone("savestate-load", Path::GetFileName(filename));
 	return true;
 }
 
@@ -2126,6 +2148,8 @@ bool VMManager::LoadStateFromSlot(s32 slot, bool backup, Error* error)
 			Host::OSD_QUICK_DURATION);
 	}
 
+	TraceRegressionMilestone("savestate-load-slot",
+		fmt::format("slot={} backup={}", slot, backup ? 1 : 0));
 	return true;
 }
 
@@ -2764,7 +2788,7 @@ void VMManager::Execute()
 		// We need to switch the cpus out, and reset the new ones if so.
 		UpdateCPUImplementations();
 		Internal::ClearCPUExecutionCaches();
-		vtlb_ResetFastmem();
+		vtlb_RefreshRuntimeMappingsAfterConfigChange();
 	}
 
 	// Execute until we're asked to stop.
@@ -2903,7 +2927,7 @@ void VMManager::Internal::EntryPointCompilingOnCPUThread()
 	FileMcd_CancelEject();
 
 	// Toss all the recs, we're going to be executing new code.
-	mmap_ResetBlockTracking();
+	vtlb_InvalidateRuntimeBlockTracking();
 	ClearCPUExecutionCaches();
 
 	R5900SymbolImporter.OnElfLoadedInMemory();
@@ -2964,7 +2988,7 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	}
 
 	Console.WriteLn("Updating CPU configuration...");
-	Arm64RefreshRuntimeCpuOptions();
+	Arm64RefreshRuntimeBackendConfig();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 
 	// Order matters here: we first refresh the current providers/caches against the
@@ -2976,7 +3000,7 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	memBindConditionalHandlers();
 
 	if (EmuConfig.Cpu.Recompiler.EnableFastmem != old_config.Cpu.Recompiler.EnableFastmem)
-		vtlb_ResetFastmem();
+		vtlb_RefreshRuntimeMappingsAfterConfigChange();
 
 	// did we toggle recompilers?
 	if (EmuConfig.Cpu.CpusChanged(old_config.Cpu))

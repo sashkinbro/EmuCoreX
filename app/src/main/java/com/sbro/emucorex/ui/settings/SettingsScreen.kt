@@ -202,14 +202,14 @@ fun SettingsScreen(
     }
 
     val biosPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::setBiosPath) }
 
     val gamePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let(viewModel::setGamePath) }
 
-    val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(null) })
+    val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(arrayOf("*/*")) })
     val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog = true })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
     val openLanguageSheet = rememberDebouncedClick(onClick = { onOpenLanguageScreen?.invoke() })

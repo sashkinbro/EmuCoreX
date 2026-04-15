@@ -124,6 +124,7 @@ data class OverlayLayoutSnapshot(
     val rbtnOffset: Pair<Float, Float> = AppPreferences.DEFAULT_RBTN_OFFSET_X to AppPreferences.DEFAULT_RBTN_OFFSET_Y,
     val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
+    val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts()
 )
 
@@ -290,6 +291,7 @@ class AppPreferences(private val context: Context) {
         private val RBTN_OFFSET = stringPreferencesKey("rbtn_offset")
         private val CENTER_OFFSET = stringPreferencesKey("center_offset")
         private val STICK_SCALE = intPreferencesKey("stick_scale")
+        private val STICK_SURFACE_MODE = booleanPreferencesKey("stick_surface_mode")
         private val CONTROL_LAYOUTS = stringPreferencesKey("control_layouts")
         private val OVERLAY_LAYOUT_VERSION = intPreferencesKey("overlay_layout_version")
     }
@@ -643,6 +645,7 @@ class AppPreferences(private val context: Context) {
                     DEFAULT_CENTER_OFFSET_X to DEFAULT_CENTER_OFFSET_Y
                 ),
                 stickScale = prefs[STICK_SCALE] ?: 100,
+                stickSurfaceMode = prefs[STICK_SURFACE_MODE] ?: false,
                 controlLayouts = decodeControlLayouts(prefs[CONTROL_LAYOUTS])
             )
         }
@@ -1399,6 +1402,12 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    suspend fun setStickSurfaceMode(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[STICK_SURFACE_MODE] = enabled
+        }
+    }
+
     suspend fun setControlsLayout(
         dpadX: Float, dpadY: Float,
         lstickX: Float, lstickY: Float,
@@ -1434,6 +1443,7 @@ class AppPreferences(private val context: Context) {
             prefs.remove(RBTN_OFFSET)
             prefs.remove(CENTER_OFFSET)
             prefs.remove(STICK_SCALE)
+            prefs.remove(STICK_SURFACE_MODE)
             prefs.remove(CONTROL_LAYOUTS)
             prefs[OVERLAY_LAYOUT_VERSION] = CURRENT_OVERLAY_LAYOUT_VERSION
         }
@@ -1453,6 +1463,7 @@ class AppPreferences(private val context: Context) {
                 prefs.remove(RBTN_OFFSET)
                 prefs.remove(CENTER_OFFSET)
                 prefs.remove(STICK_SCALE)
+                prefs.remove(STICK_SURFACE_MODE)
                 prefs.remove(CONTROL_LAYOUTS)
             } else {
                 val savedLeftStickOffset = parseOffsetStr(
@@ -1617,6 +1628,7 @@ class AppPreferences(private val context: Context) {
             put("rbtnOffset", prefs[RBTN_OFFSET])
             put("centerOffset", prefs[CENTER_OFFSET])
             put("stickScale", prefs[STICK_SCALE] ?: 100)
+            put("stickSurfaceMode", prefs[STICK_SURFACE_MODE] ?: false)
             put("controlLayouts", prefs[CONTROL_LAYOUTS])
             put("memoryCardSlot1", prefs[MEMORY_CARD_SLOT1])
             put("memoryCardSlot2", prefs[MEMORY_CARD_SLOT2])
@@ -1738,6 +1750,7 @@ class AppPreferences(private val context: Context) {
             json.optString("rbtnOffset").takeIf { it.isNotBlank() }?.let { prefs[RBTN_OFFSET] = it } ?: prefs.remove(RBTN_OFFSET)
             json.optString("centerOffset").takeIf { it.isNotBlank() }?.let { prefs[CENTER_OFFSET] = it } ?: prefs.remove(CENTER_OFFSET)
             prefs[STICK_SCALE] = json.optInt("stickScale", 100)
+            prefs[STICK_SURFACE_MODE] = json.optBoolean("stickSurfaceMode", false)
             json.optString("controlLayouts").takeIf { it.isNotBlank() }?.let { prefs[CONTROL_LAYOUTS] = it } ?: prefs.remove(CONTROL_LAYOUTS)
             json.optString("memoryCardSlot1").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT1] = it } ?: prefs.remove(MEMORY_CARD_SLOT1)
             json.optString("memoryCardSlot2").takeIf { it.isNotBlank() }?.let { prefs[MEMORY_CARD_SLOT2] = it } ?: prefs.remove(MEMORY_CARD_SLOT2)

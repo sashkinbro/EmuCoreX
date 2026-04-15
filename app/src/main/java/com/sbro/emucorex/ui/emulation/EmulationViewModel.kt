@@ -56,6 +56,7 @@ data class EmulationUiState(
     val rbtnOffset: Pair<Float, Float> = AppPreferences.DEFAULT_RBTN_OFFSET_X to AppPreferences.DEFAULT_RBTN_OFFSET_Y,
     val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
+    val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
     val fps: String = "0.0",
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
@@ -1770,6 +1771,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             rbtnOffset = snapshot.rbtnOffset,
             centerOffset = snapshot.centerOffset,
             stickScale = snapshot.stickScale,
+            stickSurfaceMode = snapshot.stickSurfaceMode,
             controlLayouts = snapshot.controlLayouts
         )
     }

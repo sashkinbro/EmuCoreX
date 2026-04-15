@@ -77,14 +77,14 @@ fun VectorOverlayButton(
     selected: Boolean = false,
     pressed: Boolean = false,
     interactive: Boolean = true,
-    pressedScale: Float = 0.9f,
+    pressedScale: Float = 1.3f,
     onClick: (() -> Unit)? = null,
     onPressChange: ((Boolean) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if ((interactive && isPressed) || pressed) pressedScale else 1f,
+        targetValue = if ((interactive && isPressed) || pressed) pressedScale.coerceAtLeast(1f) else 1f,
         animationSpec = tween(durationMillis = 80),
         label = "vector_overlay_button_scale"
     )
@@ -142,6 +142,7 @@ fun VectorAnalogStick(
     modifier: Modifier = Modifier,
     alpha: Float = 1f,
     selected: Boolean = false,
+    surfaceOnly: Boolean = false,
     interactive: Boolean = true,
     onClick: (() -> Unit)? = null,
     onValueChange: ((Float, Float) -> Unit)? = null
@@ -171,7 +172,7 @@ fun VectorAnalogStick(
                 onDragStart = { offset ->
                     if (size.width == 0f) return@detectDragGestures
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val maxDistance = minOf(size.width, size.height) * 0.32f
+                    val maxDistance = minOf(size.width, size.height) * 0.5f
                     val deadZone = 0.12f
                     val raw = offset - center
                     val distance = raw.getDistance()
@@ -191,7 +192,7 @@ fun VectorAnalogStick(
                 change.consume()
                 if (size.width == 0f) return@detectDragGestures
                 val center = Offset(size.width / 2f, size.height / 2f)
-                val maxDistance = minOf(size.width, size.height) * 0.32f
+                val maxDistance = minOf(size.width, size.height) * 0.5f
                 val deadZone = 0.12f
                 val raw = change.position - center
                 val distance = raw.getDistance()
@@ -214,7 +215,6 @@ fun VectorAnalogStick(
         modifier = modifier
             .size(analogSize)
             .graphicsLayer(alpha = alpha)
-            .clip(CircleShape)
             .then(
                 if (selected) {
                     Modifier.border(1.5.dp, OverlaySelectedStroke, CircleShape)
@@ -237,13 +237,15 @@ fun VectorAnalogStick(
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
-        Image(
-            painter = painterResource(R.drawable.ic_controller_analog_stick),
-            contentDescription = null,
-            modifier = Modifier
-                .size(analogSize * 0.68f)
-                .offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) },
-            contentScale = ContentScale.Fit
-        )
+        if (!surfaceOnly) {
+            Image(
+                painter = painterResource(R.drawable.ic_controller_analog_stick),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(analogSize * 0.52f)
+                    .offset { IntOffset(thumbOffset.x.roundToInt(), thumbOffset.y.roundToInt()) },
+                contentScale = ContentScale.Fit
+            )
+        }
     }
 }

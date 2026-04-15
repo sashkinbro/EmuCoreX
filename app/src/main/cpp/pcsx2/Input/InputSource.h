@@ -25,6 +25,7 @@ public:
 	virtual bool ReloadDevices() = 0;
 	virtual void Shutdown() = 0;
 	virtual bool IsInitialized() = 0;
+	virtual bool CanAttemptInitialization() const { return true; }
 
 	virtual void PollEvents() = 0;
 

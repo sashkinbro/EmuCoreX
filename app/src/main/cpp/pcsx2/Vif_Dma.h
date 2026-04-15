@@ -65,6 +65,62 @@ struct tVIF_CTRL {
    u32 value;
 };
 
+enum VifTransferProgressBits : u8
+{
+	VIF_TRANSFER_ACTIVE = 0x01,
+	VIF_TRANSFER_MFIFO_EMPTY = 0x10
+};
+
+enum Vif1WaitReason : u32
+{
+	VIF1_WAIT_NONE = 0,
+	VIF1_WAIT_VU = 1u << 0,
+	VIF1_WAIT_GIF = 1u << 1,
+	VIF1_WAIT_STALL = 1u << 2,
+	VIF1_WAIT_RESUME = 1u << 3,
+	VIF1_WAIT_MFIFO = 1u << 4
+};
+
+enum class Vif1GifWaitState : u8
+{
+	Idle = 0,
+	Waiting = 1
+};
+
+enum VifBridgeStateBits : u32
+{
+	VIF_BRIDGE_NONE = 0,
+	VIF_BRIDGE_STALL = 1u << 0,
+	VIF_BRIDGE_WAIT_VU = 1u << 1,
+	VIF_BRIDGE_WAIT_GIF = 1u << 2,
+	VIF_BRIDGE_RESUME_OFFSET = 1u << 3,
+	VIF_BRIDGE_TRANSFER_ACTIVE = 1u << 4,
+	VIF_BRIDGE_MFIFO_EMPTY = 1u << 5,
+	VIF_BRIDGE_QUEUED_PROGRAM = 1u << 6,
+	VIF_BRIDGE_QUEUED_GIF_WAIT = 1u << 7
+};
+
+struct VifBridgeStateSnapshot
+{
+	u32 flags = VIF_BRIDGE_NONE;
+	u32 stall_kind = 0;
+	u32 resume_offset = 0;
+	u32 queued_pc = 0;
+
+	__fi bool HasAny(u32 mask) const { return (flags & mask) != 0; }
+	__fi bool HasAll(u32 mask) const { return (flags & mask) == mask; }
+};
+
+__fi inline Vif1GifWaitState vif1GetGifWaitState()
+{
+	return vif1Regs.stat.VGW ? Vif1GifWaitState::Waiting : Vif1GifWaitState::Idle;
+}
+
+__fi inline bool vif1HasGifWait()
+{
+	return vif1GetGifWaitState() == Vif1GifWaitState::Waiting;
+}
+
 // NOTE, if debugging vif stalls, use sega classics, spyro, gt4, and taito
 struct vifStruct {
 	alignas(16) u128 MaskRow;
@@ -110,9 +166,191 @@ struct vifStruct {
 	bool queued_program;
 	u32 queued_pc;
 	bool queued_gif_wait;
+
+	__fi bool IsTransferActive() const { return (inprogress & VIF_TRANSFER_ACTIVE) != 0; }
+	__fi void SetTransferActive(bool active)
+	{
+		if (active)
+			inprogress |= VIF_TRANSFER_ACTIVE;
+		else
+			inprogress &= ~VIF_TRANSFER_ACTIVE;
+	}
+	__fi void ClearTransferProgress() { inprogress = 0; }
+	__fi void ResetTransferProgress(bool preserve_mfifo_wait)
+	{
+		inprogress = preserve_mfifo_wait ? (inprogress & VIF_TRANSFER_MFIFO_EMPTY) : 0;
+	}
+
+	__fi bool IsMfifoAwaitingData() const { return (inprogress & VIF_TRANSFER_MFIFO_EMPTY) != 0; }
+	__fi void SetMfifoAwaitingData(bool waiting)
+	{
+		if (waiting)
+			inprogress |= VIF_TRANSFER_MFIFO_EMPTY;
+		else
+			inprogress &= ~VIF_TRANSFER_MFIFO_EMPTY;
+	}
+
+	__fi u32 GetResumeOffset() const { return irqoffset.value; }
+	__fi void SetResumeOffset(u32 offset)
+	{
+		irqoffset.value = offset;
+		irqoffset.enabled = (offset != 0);
+	}
+	__fi void ClearResumeOffset()
+	{
+		irqoffset.value = 0;
+		irqoffset.enabled = false;
+	}
+
+	__fi bool HasResumeOffset() const { return irqoffset.enabled; }
+	__fi bool IsIrqStalled() const { return vifstalled.enabled && vifstalled.value == VIF_IRQ_STALL; }
+	__fi bool IsTimingStalled() const { return vifstalled.enabled && vifstalled.value == VIF_TIMING_BREAK; }
+	__fi bool IsWaitingForVu() const { return waitforvu; }
+	__fi void SetWaitForVu(bool waiting) { waitforvu = waiting; }
+	__fi void BeginVuWait(bool enable_stall)
+	{
+		waitforvu = true;
+		SetTimingBreakStall(enable_stall);
+	}
+	__fi void EndVuWait()
+	{
+		waitforvu = false;
+		NormalizeBridgeState();
+	}
+	__fi bool IsWaitingForGif(const VIFregisters& vifRegs) const
+	{
+		pxAssert(&vifRegs == &vif1Regs);
+		return vif1HasGifWait();
+	}
+	__fi bool IsWaitingForStallState() const { return vifstalled.enabled; }
+	__fi void SetStallState(bool enabled, u32 value)
+	{
+		vifstalled.enabled = enabled;
+		if (enabled)
+			vifstalled.value = value;
+	}
+	__fi void SetTimingBreakStall(bool enabled) { SetStallState(enabled, VIF_TIMING_BREAK); }
+	__fi void SetIrqStall(bool enabled) { SetStallState(enabled, VIF_IRQ_STALL); }
+	__fi void ClearStallState() { vifstalled.enabled = false; }
+	__fi bool IsWaitingForVuOrGif(const VIFregisters& vifRegs) const { return IsWaitingForVu() || IsWaitingForGif(vifRegs); }
+	__fi bool HasStallResumeOffset() const { return HasResumeOffset() && IsWaitingForStallState(); }
+
+	__fi bool HasQueuedProgram() const { return queued_program; }
+	__fi void SetQueuedProgram(bool queued) { queued_program = queued; }
+	__fi void ClearQueuedProgram()
+	{
+		queued_program = false;
+		queued_gif_wait = false;
+	}
+	__fi void QueueMicroProgram(u32 pc, bool requires_gif_wait)
+	{
+		queued_program = true;
+		queued_pc = pc;
+		queued_gif_wait = requires_gif_wait;
+	}
+	__fi bool IsQueuedGifWaitPending() const { return queued_gif_wait; }
+	__fi void SetQueuedGifWait(bool waiting) { queued_gif_wait = waiting; }
+	__fi bool ShouldDelayQueuedProgramForGifPath() const { return HasQueuedProgram() && IsQueuedGifWaitPending(); }
+	__fi void NormalizeBridgeState()
+	{
+		inprogress &= (VIF_TRANSFER_ACTIVE | VIF_TRANSFER_MFIFO_EMPTY);
+		if (!vifstalled.enabled)
+			vifstalled.value = 0;
+		if (!irqoffset.enabled || irqoffset.value == 0)
+			ClearResumeOffset();
+		if (!queued_program)
+		{
+			queued_gif_wait = false;
+			queued_pc = 0;
+		}
+	}
+	__fi void PrepareForDmaStart()
+	{
+		ClearTransferProgress();
+		NormalizeBridgeState();
+	}
+	__fi void CompleteDmaTransfer()
+	{
+		ClearStallState();
+		ClearResumeOffset();
+		NormalizeBridgeState();
+	}
+	__fi void ResetRuntimeBridgeState(bool preserve_mfifo_wait)
+	{
+		ResetTransferProgress(preserve_mfifo_wait);
+		ClearStallState();
+		ClearResumeOffset();
+		NormalizeBridgeState();
+	}
+	__fi VifBridgeStateSnapshot CaptureBridgeState(const VIFregisters* vifRegs = nullptr) const
+	{
+		VifBridgeStateSnapshot snapshot;
+		snapshot.flags |= IsWaitingForStallState() ? VIF_BRIDGE_STALL : VIF_BRIDGE_NONE;
+		snapshot.flags |= IsWaitingForVu() ? VIF_BRIDGE_WAIT_VU : VIF_BRIDGE_NONE;
+		snapshot.flags |= (vifRegs == &vif1Regs && IsWaitingForGif(*vifRegs)) ? VIF_BRIDGE_WAIT_GIF : VIF_BRIDGE_NONE;
+		snapshot.flags |= HasResumeOffset() ? VIF_BRIDGE_RESUME_OFFSET : VIF_BRIDGE_NONE;
+		snapshot.flags |= IsTransferActive() ? VIF_BRIDGE_TRANSFER_ACTIVE : VIF_BRIDGE_NONE;
+		snapshot.flags |= IsMfifoAwaitingData() ? VIF_BRIDGE_MFIFO_EMPTY : VIF_BRIDGE_NONE;
+		snapshot.flags |= HasQueuedProgram() ? VIF_BRIDGE_QUEUED_PROGRAM : VIF_BRIDGE_NONE;
+		snapshot.flags |= IsQueuedGifWaitPending() ? VIF_BRIDGE_QUEUED_GIF_WAIT : VIF_BRIDGE_NONE;
+		snapshot.stall_kind = IsWaitingForStallState() ? vifstalled.value : 0;
+		snapshot.resume_offset = HasResumeOffset() ? GetResumeOffset() : 0;
+		snapshot.queued_pc = HasQueuedProgram() ? queued_pc : 0;
+		return snapshot;
+	}
+	__fi bool HasBridgeState(u32 mask, const VIFregisters* vifRegs = nullptr) const
+	{
+		return CaptureBridgeState(vifRegs).HasAny(mask);
+	}
+
+	// Transitional adapter: expose the current VIF1 wait sources as named reasons
+	// while the legacy storage still lives in split flags and bitfields.
+	__fi u32 GetVif1WaitReasonMask(const VIFregisters& vifRegs) const
+	{
+		const VifBridgeStateSnapshot snapshot = CaptureBridgeState(&vifRegs);
+		u32 mask = VIF1_WAIT_NONE;
+		mask |= snapshot.HasAny(VIF_BRIDGE_WAIT_VU) ? VIF1_WAIT_VU : 0;
+		mask |= snapshot.HasAny(VIF_BRIDGE_WAIT_GIF) ? VIF1_WAIT_GIF : 0;
+		mask |= snapshot.HasAny(VIF_BRIDGE_STALL) ? VIF1_WAIT_STALL : 0;
+		mask |= snapshot.HasAny(VIF_BRIDGE_RESUME_OFFSET) ? VIF1_WAIT_RESUME : 0;
+		mask |= snapshot.HasAny(VIF_BRIDGE_MFIFO_EMPTY) ? VIF1_WAIT_MFIFO : 0;
+		return mask;
+	}
+
+	__fi bool HasVif1WaitReason(const VIFregisters& vifRegs, Vif1WaitReason reason) const
+	{
+		return (GetVif1WaitReasonMask(vifRegs) & static_cast<u32>(reason)) != 0;
+	}
 };
 
 alignas(16) extern vifStruct  vif0, vif1;
+
+__fi inline void vif1SetGifWait(bool waiting)
+{
+	vif1Regs.stat.VGW = (waiting ? 1u : 0u);
+}
+
+__fi inline void vif1ClearGifWait()
+{
+	vif1SetGifWait(false);
+}
+
+__fi inline void vif1ArmGifPathWait()
+{
+	vif1SetGifWait(true);
+	vif1.SetTimingBreakStall(!!vif1ch.chcr.STR);
+}
+
+__fi inline bool vif1IsBridgeBlocked()
+{
+	const VifBridgeStateSnapshot bridge = vif1.CaptureBridgeState(&vif1Regs);
+	return bridge.HasAny(VIF_BRIDGE_WAIT_VU | VIF_BRIDGE_WAIT_GIF);
+}
+
+__fi inline bool vif1CanResumeFromControlWrite()
+{
+	return vif1ch.chcr.STR && !vif1Regs.stat.test(VIF1_STAT_FDR);
+}
 
 _vifT extern u32 vifRead32(u32 mem);
 _vifT extern bool vifWrite32(u32 mem, u32 value);
@@ -123,6 +361,12 @@ extern void vif0Reset();
 extern void vif1Interrupt();
 extern void vif1VUFinish();
 extern void vif1Reset();
+extern void vif1RequestDmaRetry(u32 cycles);
+extern void vif1RequestDmaProgress(u32 cycles);
+extern void vif1RequestDmaProgressWithVuBusy(u32 cycles);
+extern void vif1SetActiveDmaStall(bool stalled);
+extern bool vif1RequestResumeFromGifPathIdle(u32 resumeCycles);
+extern bool vif1ResumeDmaFromGifPathSignal(u32 resumeCycles);
 
 typedef int FnType_VifCmdHandler(int pass, const u32 *data);
 typedef FnType_VifCmdHandler* Fnptr_VifCmdHandler;

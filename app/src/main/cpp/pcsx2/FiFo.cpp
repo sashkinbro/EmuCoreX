@@ -53,7 +53,7 @@ void ReadFIFO_VIF1(mem128_t* out)
 void WriteFIFO_VIF0(const mem128_t* value)
 {
 	vif0ch.qwc += 1;
-	if (vif0.irqoffset.value != 0 && vif0.vifstalled.enabled)
+	if (vif0.CaptureBridgeState().HasAll(VIF_BRIDGE_STALL | VIF_BRIDGE_RESUME_OFFSET))
 	{
 	}
 	[[maybe_unused]] bool ret = VIF0transfer((u32*)value, 4);
@@ -79,7 +79,7 @@ void WriteFIFO_VIF1(const mem128_t* value)
 	if (vif1Regs.stat.test(VIF1_STAT_INT | VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
 	{
 	}
-	if (vif1.irqoffset.value != 0 && vif1.vifstalled.enabled)
+	if (vif1.CaptureBridgeState(&vif1Regs).HasAll(VIF_BRIDGE_STALL | VIF_BRIDGE_RESUME_OFFSET))
 	{
 	}
 
@@ -97,9 +97,9 @@ void WriteFIFO_VIF1(const mem128_t* value)
 	{
 		gifRegs.stat.APATH = 0;
 		gifRegs.stat.OPH = 0;
-		vif1Regs.stat.VGW = false; //Let vif continue if it's stuck on a flush
+		vif1ClearGifWait(); //Let vif continue if it's stuck on a flush
 
-		if (gifUnit.checkPaths(1, 0, 1))
+		if (gifUnit.GetVifPath13BusyMask() != 0)
 			gifUnit.Execute(false, true);
 	}
 

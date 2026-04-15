@@ -11,6 +11,52 @@
 
 u32 g_vif1Cycles = 0;
 
+static __fi EE_EventType vif1GetActiveDmaEvent()
+{
+	return dmacRegs.ctrl.MFD == MFD_VIF1 ? DMAC_MFIFO_VIF : DMAC_VIF1;
+}
+
+void vif1RequestDmaRetry(u32 cycles)
+{
+	const EE_EventType irq = vif1GetActiveDmaEvent();
+	if (!(cpuRegs.interrupt & (1u << irq)) || cpuRegs.eCycle[irq] > cycles)
+		CPU_INT(irq, cycles);
+}
+
+void vif1RequestDmaProgress(u32 cycles)
+{
+	vif1RequestDmaRetry(cycles);
+}
+
+void vif1RequestDmaProgressWithVuBusy(u32 cycles)
+{
+	vif1RequestDmaRetry(std::max<int>(cycles, cpuGetCycles(VU_MTVU_BUSY)));
+}
+
+void vif1SetActiveDmaStall(bool stalled)
+{
+	CPU_SET_DMASTALL(vif1GetActiveDmaEvent(), stalled);
+}
+
+bool vif1RequestResumeFromGifPathIdle(u32 resumeCycles)
+{
+	if (!vif1HasGifWait())
+		return false;
+
+	vif1RequestDmaRetry(resumeCycles);
+	return true;
+}
+
+bool vif1ResumeDmaFromGifPathSignal(u32 resumeCycles)
+{
+	if (!vif1HasGifWait())
+		return false;
+
+	vif1ClearGifWait();
+	vif1RequestDmaRetry(resumeCycles);
+	return true;
+}
+
 __fi void vif1FLUSH()
 {
 	if (VU0.VI[REG_VPU_STAT].UL & 0x500) // T bit stop or Busy

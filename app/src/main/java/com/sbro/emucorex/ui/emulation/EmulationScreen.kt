@@ -123,6 +123,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -845,6 +846,7 @@ fun EmulationScreen(
                     .graphicsLayer(alpha = alpha),
                 scaleFactor = scaleFactor,
                 stickScaleFactor = uiState.stickScale / 100f,
+                stickSurfaceMode = uiState.stickSurfaceMode,
                 dpadOffset = uiState.dpadOffset,
                 lstickOffset = uiState.lstickOffset,
                 rstickOffset = uiState.rstickOffset,
@@ -1248,6 +1250,7 @@ private fun OnScreenControls(
     modifier: Modifier = Modifier,
     scaleFactor: Float,
     stickScaleFactor: Float = 1.0f,
+    stickSurfaceMode: Boolean = false,
     dpadOffset: Pair<Float, Float>,
     lstickOffset: Pair<Float, Float>,
     rstickOffset: Pair<Float, Float>,
@@ -1283,9 +1286,10 @@ private fun OnScreenControls(
     val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
     val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
     val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
+    val actionGap = if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait
     val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
     val actionButtonSize = actionSize / 3.1f
-    val actionStep = overlayClusterStep(actionButtonSize, clusterGap)
+    val actionStep = overlayClusterStep(actionButtonSize, actionGap)
     val actionClusterExtent = actionStep + actionButtonSize
     val rightStickBaseX = -(actionClusterExtent + 12.dp)
 
@@ -1405,6 +1409,7 @@ private fun OnScreenControls(
                 val leftStickBase = (dpadSize - leftStickSize) / 2f
                 VectorAnalogStick(
                     analogSize = leftStickSize,
+                    surfaceOnly = stickSurfaceMode,
                     onValueChange = { x, y ->
                         updateAnalogStick(
                             x = x,
@@ -1444,6 +1449,7 @@ private fun OnScreenControls(
             if (rightStick.visible) {
                 VectorAnalogStick(
                     analogSize = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
+                    surfaceOnly = stickSurfaceMode,
                     onValueChange = { x, y ->
                         updateAnalogStick(
                             x = x,
@@ -1471,22 +1477,45 @@ private fun OnScreenControls(
             val start = layoutFor("start")
             val l3 = layoutFor("l3")
             val r3 = layoutFor("r3")
+            val l3Width = centerW * (l3.scale / 100f)
+            val r3Width = centerW * (r3.scale / 100f)
             val selectWidth = wideCenterW * (select.scale / 100f)
             val toggleSize = centerH * (toggle.scale / 100f)
             val startWidth = wideCenterW * (start.scale / 100f)
-            val centerInlineWidths = listOf(selectWidth, toggleSize, startWidth)
-            val selectX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 0) +
-                OverlayCenterSelectOpticalNudgeX + select.offset.first.dp
-            val toggleX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 1) + toggle.offset.first.dp
-            val startX = overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index = 2) +
-                OverlayCenterStartOpticalNudgeX + start.offset.first.dp
-            val leftColumnX = overlayCenterButtonOffset(
-                buttonWidth = centerW * (l3.scale / 100f),
-                columnWidth = wideCenterW,
-                gap = centerColumnGap,
-                leftColumn = true
-            ) + l3.offset.first.dp
-            val centerAnchorShift = with(density) { (-minOf(selectX, leftColumnX)).roundToPx() }
+            val centerItems = buildList {
+                if (l3.visible) add("l3" to l3Width)
+                if (select.visible) add("select" to selectWidth)
+                if (toggle.visible) add("left_input_toggle" to toggleSize)
+                if (start.visible) add("start" to startWidth)
+                if (r3.visible) add("r3" to r3Width)
+            }
+            val centerInlineWidths = centerItems.map { it.second }
+            fun centerInlineX(id: String): Dp {
+                val index = centerItems.indexOfFirst { it.first == id }
+                return if (index >= 0) {
+                    overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index)
+                } else {
+                    0.dp
+                }
+            }
+            val l3X = centerInlineX("l3") + l3.offset.first.dp
+            val selectX = centerInlineX("select") + OverlayCenterSelectOpticalNudgeX + select.offset.first.dp
+            val toggleX = centerInlineX("left_input_toggle") + toggle.offset.first.dp
+            val startX = centerInlineX("start") + OverlayCenterStartOpticalNudgeX + start.offset.first.dp
+            val r3X = centerInlineX("r3") + r3.offset.first.dp
+            val centerBounds = buildList {
+                if (select.visible) add(selectX to selectWidth)
+                if (toggle.visible) add(toggleX to toggleSize)
+                if (start.visible) add(startX to startWidth)
+                if (l3.visible) add(l3X to l3Width)
+                if (r3.visible) add(r3X to r3Width)
+            }
+            val centerVisualShift = if (centerBounds.isNotEmpty()) {
+                val left = centerBounds.minOf { it.first }
+                -left
+            } else {
+                0.dp
+            }
 
         Box(
             modifier = Modifier
@@ -1494,7 +1523,7 @@ private fun OnScreenControls(
                 .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
                 .offset {
                     IntOffset(
-                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt() + centerAnchorShift,
+                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt() + centerVisualShift.roundToPx(),
                         centerOffset.second.roundToInt()
                     )
                 }
@@ -1548,13 +1577,10 @@ private fun OnScreenControls(
                             TouchButtonSpec(
                                 id = "l3",
                                 drawableRes = requireNotNull(overlayDrawableForControl("l3")),
-                                width = centerW * (l3.scale / 100f),
+                                width = l3Width,
                                 height = centerH * (l3.scale / 100f),
-                                x = leftColumnX,
-                                y = overlayCenterSecondRowOffset(
-                                    buttonHeight = centerH * (l3.scale / 100f),
-                                    rowGap = centerRowGap
-                                ) + l3.offset.second.dp,
+                                x = l3X,
+                                y = l3.offset.second.dp,
                                 shape = RoundedCornerShape(8.dp),
                                 onPressChange = { pressed -> onPadInput(PadKey.L3, 0, pressed) }
                             )
@@ -1565,18 +1591,10 @@ private fun OnScreenControls(
                             TouchButtonSpec(
                                 id = "r3",
                                 drawableRes = requireNotNull(overlayDrawableForControl("r3")),
-                                width = centerW * (r3.scale / 100f),
+                                width = r3Width,
                                 height = centerH * (r3.scale / 100f),
-                                x = overlayCenterButtonOffset(
-                                    buttonWidth = centerW * (r3.scale / 100f),
-                                    columnWidth = wideCenterW,
-                                    gap = centerColumnGap,
-                                    leftColumn = false
-                                ) + r3.offset.first.dp,
-                                y = overlayCenterSecondRowOffset(
-                                    buttonHeight = centerH * (r3.scale / 100f),
-                                    rowGap = centerRowGap
-                                ) + r3.offset.second.dp,
+                                x = r3X,
+                                y = r3.offset.second.dp,
                                 shape = RoundedCornerShape(8.dp),
                                 onPressChange = { pressed -> onPadInput(PadKey.R3, 0, pressed) }
                             )

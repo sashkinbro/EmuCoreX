@@ -459,15 +459,15 @@ void MIN_MAX_PS(microVU& mVU, const xmm& to, const xmm& from, const xmm& t1in, c
 //		xPSHUF.D(t1, to, 0xfa); 1234 => 3344
         armPSHUFD(t1, to, 0xfa);
 //		xPAND   (t1, ptr128[sseMasks.MIN_MAX_1]);
-        armAsm->And(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_1)).V16B());
+        armAsm->And(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_1)).V16B());
 //		xPOR    (t1, ptr128[sseMasks.MIN_MAX_2]);
-        armAsm->Orr(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_2)).V16B());
+        armAsm->Orr(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_2)).V16B());
 //		xPSHUF.D(t2, from, 0xfa); 1234 => 3344
         armPSHUFD(t2, from, 0xfa);
 //		xPAND   (t2, ptr128[sseMasks.MIN_MAX_1]);
-        armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_1)).V16B());
+        armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_1)).V16B());
 //		xPOR    (t2, ptr128[sseMasks.MIN_MAX_2]);
-        armAsm->Orr(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_2)).V16B());
+        armAsm->Orr(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_2)).V16B());
 //		if (min) xMIN.PD(t1, t2);
         if (min) armAsm->Fminnm(t1.V2D(), t1.V2D(), t2.V2D());
 //		else     xMAX.PD(t1, t2);
@@ -477,15 +477,15 @@ void MIN_MAX_PS(microVU& mVU, const xmm& to, const xmm& from, const xmm& t1in, c
 //		xPSHUF.D(t2, from, 0x50); 1234 => 1122
         armPSHUFD(t2, from, 0x50);
 //		xPAND   (t2, ptr128[sseMasks.MIN_MAX_1]);
-        armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_1)).V16B());
+        armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_1)).V16B());
 //		xPOR    (t2, ptr128[sseMasks.MIN_MAX_2]);
-        armAsm->Orr(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_2)).V16B());
+        armAsm->Orr(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_2)).V16B());
 //		xPSHUF.D(to, to, 0x50); 1234 => 1122
         armPSHUFD(to, to, 0x50);
 //		xPAND   (to, ptr128[sseMasks.MIN_MAX_1]);
-        armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_1)).V16B());
+        armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_1)).V16B());
 //		xPOR    (to, ptr128[sseMasks.MIN_MAX_2]);
-        armAsm->Orr(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_2)).V16B());
+        armAsm->Orr(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_2)).V16B());
 //		if (min) xMIN.PD(to, t2);
 //		else     xMAX.PD(to, t2);
         if (min) armAsm->Fminnm(to.V2D(), to.V2D(), t2.V2D());
@@ -540,9 +540,9 @@ void MIN_MAX_SS(mV, const xmm& to, const xmm& from, const xmm& t1in, bool min)
 //	xSHUF.PS(to, from, 0);
     armSHUFPS(to, from, 0);
 //	xPAND   (to, ptr128[sseMasks.MIN_MAX_1]);
-    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_1)).V16B());
+    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_1)).V16B());
 //	xPOR    (to, ptr128[sseMasks.MIN_MAX_2]);
-    armAsm->Orr(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.MIN_MAX_2)).V16B());
+    armAsm->Orr(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.MIN_MAX_2)).V16B());
 //	xPSHUF.D(t1, to, 0xee);
     armAsm->Dup(t1.V2D(), to.V2D(), 1); //v3v2v3v2
 //	if (min) xMIN.PD(to, t1);
@@ -591,7 +591,7 @@ void ADD_SS_Single_Guard_Bit(microVU& mVU, const xmm& to, const xmm& from, const
 
     // case_pos_big:
 //	xPAND(to, ptr128[sseMasks.ADD_SS]);
-    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.ADD_SS)).V16B());
+    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.ADD_SS)).V16B());
 //	xForwardJump8 case_end2;
     a64::Label case_end2;
     armAsm->B(&case_end2);
@@ -622,7 +622,7 @@ void ADD_SS_Single_Guard_Bit(microVU& mVU, const xmm& to, const xmm& from, const
 
     // case_neg_big:
 //	xPAND(from, ptr128[sseMasks.ADD_SS]);
-    armAsm->And(from.V16B(), from.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.ADD_SS)).V16B());
+    armAsm->And(from.V16B(), from.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.ADD_SS)).V16B());
 //	xForwardJump8 case_end4;
     a64::Label case_end4;
     armAsm->B(&case_end4);
@@ -687,7 +687,7 @@ void ADD_SS_TriAceHack(microVU& mVU, const xmm& to, const xmm& from)
 
     // case_pos_big:
 //	xPAND(to, ptr128[sseMasks.ADD_SS]);
-    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.ADD_SS)).V16B());
+    armAsm->And(to.V16B(), to.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.ADD_SS)).V16B());
 //	xForwardJump8 case_end2;
     a64::Label case_end2;
     armAsm->B(&case_end2);
@@ -695,7 +695,7 @@ void ADD_SS_TriAceHack(microVU& mVU, const xmm& to, const xmm& from)
 //	case_neg_big.SetTarget();
     armBind(&case_neg_big);
 //	xPAND(from, ptr128[sseMasks.ADD_SS]);
-    armAsm->And(from.V16B(), from.V16B(), armLoadPtrV(PTR_CPU(mVUss4.sseMasks.ADD_SS)).V16B());
+    armAsm->And(from.V16B(), from.V16B(), armLoadPtrV(PTR_MVUCONST(sseMasks.ADD_SS)).V16B());
 
 //	case_end1.SetTarget();
     armBind(&case_end1);

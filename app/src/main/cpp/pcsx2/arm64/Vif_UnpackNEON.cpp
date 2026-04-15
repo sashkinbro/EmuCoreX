@@ -44,7 +44,7 @@ void VifUnpackNEON_Base::xShiftR(const vixl::aarch64::VRegister& regX, int n) co
 
 void VifUnpackNEON_Base::xPMOVXX8(const vixl::aarch64::VRegister& regX) const
 {
-	// TODO(Stenzek): Check this
+	Arm64AssertVifProvisional8BitScalarExpandPath();
 	armAsm->Ldr(regX.S(), srcIndirect);
 
 	if (usn)
@@ -345,8 +345,8 @@ void VifUnpackNEON_Base::xUnpack(int upknum) const
 		case 3:
 		case 7:
 		case 11:
-			// TODO: Needs hardware testing.
-			// Dynasty Warriors 5: Empire  - Player 2 chose a character menu.
+			Arm64AssertVifMaskedIterationPolicy(upknum);
+			// Transitional policy until hardware validation confirms the masked iteration behavior.
 			break;
 	}
 }

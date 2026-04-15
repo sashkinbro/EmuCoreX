@@ -17,10 +17,11 @@
 #include "common/MD5Digest.h"
 #include "common/Path.h"
 
-// glslang fallback for Android builds where shaderc_shared is not bundled.
+#ifndef __ANDROID__
 #include "SPIRV/GlslangToSpv.h"
 #include "StandAlone/ResourceLimits.h"
 #include "glslang/Public/ShaderLang.h"
+#endif
 
 #include "fmt/format.h"
 #include "shaderc/shaderc.h"
@@ -33,7 +34,10 @@
 std::unique_ptr<VKShaderCache> g_vulkan_shader_cache;
 
 static u32 s_next_bad_shader_id = 0;
+#ifndef __ANDROID__
 static bool s_glslang_initialized = false;
+static bool s_shaderc_fallback_warning_emitted = false;
+#endif
 
 namespace
 {
@@ -130,6 +134,7 @@ namespace dyn_shaderc
 
 	static DynamicLibrary s_library;
 	static shaderc_compiler_t s_compiler = nullptr;
+	static bool s_open_failed = false;
 
 #define ADD_FUNC(F) static decltype(&::F) F;
 	SHADERC_FUNCTIONS(ADD_FUNC)
@@ -139,6 +144,17 @@ namespace dyn_shaderc
 
 bool dyn_shaderc::Open()
 {
+	if (s_compiler)
+		return true;
+
+	if (s_open_failed)
+		return false;
+
+#ifdef __ANDROID__
+#define LOAD_FUNC(F) F = &::F;
+	SHADERC_FUNCTIONS(LOAD_FUNC)
+#undef LOAD_FUNC
+#else
 	if (s_library.IsOpen())
 		return true;
 
@@ -152,6 +168,7 @@ bool dyn_shaderc::Open()
 #endif
 	if (!s_library.Open(libname.c_str(), &error))
 	{
+		s_open_failed = true;
 		ERROR_LOG("Failed to load shaderc: {}", error.GetDescription());
 		return false;
 	}
@@ -159,6 +176,7 @@ bool dyn_shaderc::Open()
 #define LOAD_FUNC(F) \
 	if (!s_library.GetSymbol(#F, &F)) \
 	{ \
+		s_open_failed = true; \
 		ERROR_LOG("Failed to find function {}", #F); \
 		Close(); \
 		return false; \
@@ -166,10 +184,12 @@ bool dyn_shaderc::Open()
 
 	SHADERC_FUNCTIONS(LOAD_FUNC)
 #undef LOAD_FUNC
+#endif
 
 	s_compiler = shaderc_compiler_initialize();
 	if (!s_compiler)
 	{
+		s_open_failed = true;
 		ERROR_LOG("shaderc_compiler_initialize() failed");
 		Close();
 		return false;
@@ -211,6 +231,7 @@ static void DumpBadShader(std::string_view code, std::string_view errors)
 	}
 }
 
+#ifndef __ANDROID__
 static bool InitializeGlslang()
 {
 	if (s_glslang_initialized)
@@ -324,6 +345,7 @@ static std::optional<std::vector<u32>> CompileShaderToSPVWithGlslang(u32 stage, 
 
 	return out_code;
 }
+#endif
 
 static const char* compilation_status_to_string(shaderc_compilation_status status)
 {
@@ -349,8 +371,17 @@ std::optional<VKShaderCache::SPIRVCodeVector> VKShaderCache::CompileShaderToSPV(
 	std::optional<VKShaderCache::SPIRVCodeVector> ret;
 	if (!dyn_shaderc::Open())
 	{
-		WARNING_LOG("Falling back to glslang for SPIR-V compilation because shaderc could not be loaded.");
+#ifdef __ANDROID__
+		ERROR_LOG("Static shaderc compiler could not be initialized.");
+		return std::nullopt;
+#else
+		if (!s_shaderc_fallback_warning_emitted)
+		{
+			WARNING_LOG("Falling back to glslang for SPIR-V compilation because shaderc could not be loaded.");
+			s_shaderc_fallback_warning_emitted = true;
+		}
 		return CompileShaderToSPVWithGlslang(stage, source, debug);
+#endif
 	}
 
 	shaderc_compile_options_t options = dyn_shaderc::shaderc_compile_options_initialize();

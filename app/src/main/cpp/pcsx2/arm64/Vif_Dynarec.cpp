@@ -361,8 +361,8 @@ void VifUnpackNEON_Dynarec::ModUnpack(int upknum, bool PostOp)
 		case 3:
 		case 7:
 		case 11:
-			// TODO: Needs hardware testing.
-			// Dynasty Warriors 5: Empire  - Player 2 chose a character menu.
+			Arm64AssertVifMaskedIterationPolicy(upknum);
+			// Transitional policy until hardware validation confirms the masked iteration behavior.
 			break;
 	}
 }
@@ -482,7 +482,7 @@ _vifT __fi nVifBlock* dVifCompile(nVifBlock& block, bool isFill)
 
 	VifUnpackNEON_Dynarec(v, block).CompileRoutine();
 
-	Perf::vif.RegisterPC(v.recWritePtr, armGetCurrentCodePointer() - v.recWritePtr, block.upkType /* FIXME ideally a key*/);
+	Perf::vif.RegisterKey(v.recWritePtr, armGetCurrentCodePointer() - v.recWritePtr, "blk", GetVifPerfRegistrationKey(block));
 	v.recWritePtr = armEndBlock();
 
 	return &block;

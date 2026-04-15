@@ -43,4 +43,12 @@ alignas(16) extern nVifStruct nVif[2];
 alignas(16) extern nVifCall nVifUpk[(2 * 2 * 16) * 4]; // ([USN][Masking][Unpack Type]) [curCycle]
 alignas(16) extern u32      nVifMask[3][4][4];         // [MaskNumber][CycleNumber][Vector]
 
+inline u64 GetVifPerfRegistrationKey(const nVifBlock& block)
+{
+	u64 key = static_cast<u64>(block.hash_key);
+	key = (key << 32) ^ static_cast<u64>(block.key0);
+	key = (key * 0x9E3779B185EBCA87ull) ^ static_cast<u64>(block.key1);
+	return key;
+}
+
 static constexpr bool newVifDynaRec = 1; // Use code in Vif_Dynarec.inl

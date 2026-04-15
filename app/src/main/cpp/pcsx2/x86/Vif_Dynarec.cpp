@@ -442,7 +442,7 @@ _vifT __fi nVifBlock* dVifCompile(nVifBlock& block, bool isFill)
 
 	VifUnpackSSE_Dynarec(v, block).CompileRoutine();
 
-	Perf::vif.RegisterPC(v.recWritePtr, xGetPtr() - v.recWritePtr, block.upkType /* FIXME ideally a key*/);
+	Perf::vif.RegisterKey(v.recWritePtr, xGetPtr() - v.recWritePtr, "blk", GetVifPerfRegistrationKey(block));
 	v.recWritePtr = xGetPtr();
 
 	return &block;

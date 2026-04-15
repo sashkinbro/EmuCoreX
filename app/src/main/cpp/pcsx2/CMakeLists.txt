@@ -662,8 +662,17 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
 	)
-	target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers glslang)
-	target_include_directories(PCSX2_FLAGS INTERFACE ${SHADERC_INCLUDE_DIR})
+	if(ANDROID)
+		add_library(shaderc_static STATIC IMPORTED GLOBAL)
+		set_target_properties(shaderc_static PROPERTIES
+			IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/3rdparty/shaderc/libs/system/${ANDROID_ABI}/libshaderc.a"
+			INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/3rdparty/shaderc/include"
+		)
+		target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers shaderc_static)
+	else()
+		target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers glslang)
+		target_include_directories(PCSX2_FLAGS INTERFACE ${SHADERC_INCLUDE_DIR})
+	endif()
 endif()
 
 set(pcsx2GSMetalShaders

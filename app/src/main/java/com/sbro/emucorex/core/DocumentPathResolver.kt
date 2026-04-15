@@ -12,7 +12,14 @@ import androidx.core.net.toUri
 
 object DocumentPathResolver {
 
-    private val biosExtensions = setOf("bin", "rom", "mec", "nvm", "elf")
+    data class PreparedBiosSelection(
+        val directoryPath: String,
+        val fileName: String?
+    )
+
+    private val biosImageExtensions = setOf("bin", "rom")
+    private val biosArtifactExtensions = setOf("mec", "nvm", "elf")
+    private val biosImportExtensions = biosImageExtensions + biosArtifactExtensions
     private val biosNameHints = listOf("scph", "ps2", "bios", "rom")
 
     fun resolveFilePath(context: Context, rawPath: String): String? {
@@ -82,20 +89,48 @@ object DocumentPathResolver {
         return normalized.startsWith(primaryExternal)
     }
 
-
-
     fun prepareBiosDirectory(context: Context, rawPath: String?): String? {
-        if (rawPath.isNullOrBlank()) return null
-        if (!rawPath.startsWith("content://")) return rawPath
+        return prepareBiosSelection(context, rawPath)?.directoryPath
+    }
 
-        val root = DocumentFile.fromTreeUri(context, rawPath.toUri()) ?: return null
+    fun prepareBiosSelection(context: Context, rawPath: String?): PreparedBiosSelection? {
+        if (rawPath.isNullOrBlank()) return null
+        if (!rawPath.startsWith("content://")) {
+            val file = File(rawPath)
+            return when {
+                file.isFile && isLikelyMainBiosName(file.name) -> PreparedBiosSelection(
+                    directoryPath = file.parentFile?.absolutePath ?: file.absoluteFile.parent.orEmpty(),
+                    fileName = file.name
+                )
+                file.isDirectory -> PreparedBiosSelection(
+                    directoryPath = file.absolutePath,
+                    fileName = findPreferredBiosFileName(file.absolutePath)
+                )
+                else -> null
+            }
+        }
+
+        val uri = rawPath.toUri()
         val targetDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "imported-bios")
         if (!targetDir.exists()) {
             targetDir.mkdirs()
         }
 
+        val single = DocumentFile.fromSingleUri(context, uri)
+        if (single?.isFile == true) {
+            val copiedPath = copySingleBiosFile(context, single, targetDir) ?: return null
+            return PreparedBiosSelection(
+                directoryPath = targetDir.absolutePath,
+                fileName = File(copiedPath).name
+            )
+        }
+
+        val root = DocumentFile.fromTreeUri(context, uri) ?: return null
         copyBiosFilesRecursive(context, root, targetDir)
-        return targetDir.absolutePath
+        return PreparedBiosSelection(
+            directoryPath = targetDir.absolutePath,
+            fileName = findPreferredBiosFileName(targetDir.absolutePath)
+        )
     }
 
     fun findPreferredBiosFileName(directoryPath: String?): String? {
@@ -105,7 +140,7 @@ object DocumentPathResolver {
 
         return dir.walkTopDown()
             .maxDepth(2)
-            .filter { it.isFile && isLikelyBiosName(it.name) }.minByOrNull { it.name.lowercase() }
+            .filter { it.isFile && isLikelyMainBiosName(it.name) }.minByOrNull { it.name.lowercase() }
             ?.name
     }
 
@@ -205,11 +240,19 @@ object DocumentPathResolver {
         for (child in root.listFiles()) {
             if (child.isDirectory) {
                 copyBiosFilesRecursive(context, child, targetDir)
-            } else if (child.isFile && isLikelyBiosName(child.name)) {
+            } else if (child.isFile && isLikelyImportedBiosName(child.name)) {
                 val targetFile = File(targetDir, sanitizeFileName(child.name ?: "bios.bin"))
                 copyUriToFile(context, child.uri, targetFile)
             }
         }
+    }
+
+    private fun copySingleBiosFile(context: Context, file: DocumentFile, targetDir: File): String? {
+        if (!isLikelyMainBiosName(file.name)) return null
+
+        clearImportedBiosImages(targetDir)
+        val targetFile = File(targetDir, sanitizeFileName(file.name ?: "bios.bin"))
+        return copyUriToFile(context, file.uri, targetFile)
     }
 
     private fun copyUriToFile(context: Context, uri: Uri, targetFile: File): String? {
@@ -224,10 +267,22 @@ object DocumentPathResolver {
         }.getOrNull()
     }
 
-    private fun isLikelyBiosName(name: String?): Boolean {
+    private fun isLikelyImportedBiosName(name: String?): Boolean {
         val fileName = name?.lowercase() ?: return false
         val ext = fileName.substringAfterLast('.', "")
-        return ext in biosExtensions && biosNameHints.any(fileName::contains)
+        return ext in biosImportExtensions && biosNameHints.any(fileName::contains)
+    }
+
+    private fun isLikelyMainBiosName(name: String?): Boolean {
+        val fileName = name?.lowercase() ?: return false
+        val ext = fileName.substringAfterLast('.', "")
+        return ext in biosImageExtensions && biosNameHints.any(fileName::contains)
+    }
+
+    private fun clearImportedBiosImages(targetDir: File) {
+        targetDir.listFiles()
+            ?.filter { it.isFile && isLikelyMainBiosName(it.name) }
+            ?.forEach { it.delete() }
     }
 
     private fun sanitizeFileName(name: String): String {

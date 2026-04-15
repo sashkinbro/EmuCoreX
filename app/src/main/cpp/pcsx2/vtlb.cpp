@@ -76,6 +76,9 @@ struct LoadstoreBackpatchInfo
 	bool is_fpr;
 };
 
+static constexpr u32 GOEMON_TLB_ENTRY_COUNT = 150;
+static constexpr u32 GOEMON_TLB_INVALID_VALUE = 0xFEFEFEFE;
+
 static constexpr size_t FASTMEM_AREA_SIZE = 0x100000000ULL;
 static constexpr u32 FASTMEM_PAGE_COUNT = FASTMEM_AREA_SIZE / VTLB_PAGE_SIZE;
 static constexpr u32 NO_FASTMEM_MAPPING = 0xFFFFFFFFu;
@@ -85,6 +88,78 @@ static std::vector<u32> s_fastmem_virtual_mapping; // maps vaddr -> mainmem offs
 static std::unordered_multimap<u32, u32> s_fastmem_physical_mapping; // maps mainmem offset -> vaddr
 static std::unordered_map<uptr, LoadstoreBackpatchInfo> s_fastmem_backpatch_info;
 static std::unordered_set<u32> s_fastmem_faulting_pcs;
+
+static void vtlb_RemoveFastmemMappings();
+static bool vtlb_GetMainMemoryOffsetFromPtr(uptr ptr, u32* mainmem_offset, u32* mapping_size, PageProtectionMode* prot);
+static void vtlb_CreateFastmemMapping(u32 vaddr, u32 mainmem_offset, const PageProtectionMode& mode);
+static void vtlb_UpdateFastmemProtectionForMainMemoryRange(u32 mainmem_offset, u32 size, const PageProtectionMode& prot);
+static void vtlb_SyncFastmemMappingsForPhysicalRange(u32 vaddr, u32 paddr, u32 size);
+static bool vtlb_TryMapScratchpadFastmemAliases(u32 vaddr, const void* buffer, u32 size);
+static void vtlb_AssignVirtualMappingsForPhysicalRange(u32 vaddr, u32 paddr, u32 size);
+static void vtlb_AssignVirtualMappingsForBuffer(u32 vaddr, uptr buffer, u32 size);
+static void vtlb_AssignUnmappedVirtualRange(u32 vaddr, u32 size);
+static void vtlb_MapGoemonTlbAliases(u32 vaddr, u32 paddr, u32 size);
+static void vtlb_UnmapGoemonTlbAliases(u32 vaddr, u32 size);
+static void vtlb_ResetGoemonTlbCacheEntry(GoemonTlb& entry);
+
+static void ResetFastmemTrackingState()
+{
+	vtlb_RemoveFastmemMappings();
+	s_fastmem_backpatch_info.clear();
+	s_fastmem_faulting_pcs.clear();
+}
+
+static void RebuildFastmemMappingsFromCurrentVtlbState()
+{
+	if (!CHECK_FASTMEM || !CHECK_EEREC || !vtlbdata.vmap)
+		return;
+
+	// we need to go through and look at the vtlb pointers, to remap the host area
+	for (size_t i = 0; i < VTLB_VMAP_ITEMS; i++)
+	{
+		const VTLBVirtual& vm = vtlbdata.vmap[i];
+		const u32 vaddr = static_cast<u32>(i) << VTLB_PAGE_BITS;
+		if (vm.isHandler(vaddr))
+		{
+			// Handlers should be unmapped.
+			continue;
+		}
+
+		// Check if it's a physical mapping to our main memory area.
+		u32 mainmem_offset, mainmem_size;
+		PageProtectionMode prot;
+		if (vtlb_GetMainMemoryOffsetFromPtr(vm.assumePtr(vaddr), &mainmem_offset, &mainmem_size, &prot))
+			vtlb_CreateFastmemMapping(vaddr, mainmem_offset, prot);
+	}
+}
+
+static bool InitializeFastmemAllocationState()
+{
+	pxAssert(!s_fastmem_area);
+	s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE);
+	if (!s_fastmem_area)
+	{
+		Host::ReportErrorAsync("Error", "Failed to allocate fastmem area");
+		return false;
+	}
+
+	s_fastmem_virtual_mapping.resize(FASTMEM_PAGE_COUNT, NO_FASTMEM_MAPPING);
+	vtlbdata.fastmem_base = (uptr)s_fastmem_area->BasePointer();
+	DevCon.WriteLn(Color_StrongGreen, "Fastmem area: %p - %p",
+		vtlbdata.fastmem_base, vtlbdata.fastmem_base + (FASTMEM_AREA_SIZE - 1));
+	return true;
+}
+
+static void ReleaseFastmemAllocationState()
+{
+	ResetFastmemTrackingState();
+	vtlb_ClearLoadStoreInfo();
+
+	vtlbdata.fastmem_base = 0;
+	decltype(s_fastmem_physical_mapping)().swap(s_fastmem_physical_mapping);
+	decltype(s_fastmem_virtual_mapping)().swap(s_fastmem_virtual_mapping);
+	s_fastmem_area.reset();
+}
 
 vtlb_private::VTLBPhysical vtlb_private::VTLBPhysical::fromPointer(sptr ptr)
 {
@@ -452,12 +527,32 @@ static void GoemonTlbMissDebug()
 	}
 }
 
+static void vtlb_MapGoemonTlbAliases(u32 vaddr, u32 paddr, u32 size)
+{
+	vtlb_VMap(vaddr, paddr, size);
+	vtlb_VMap(0x20000000 | vaddr, paddr, size);
+}
+
+static void vtlb_UnmapGoemonTlbAliases(u32 vaddr, u32 size)
+{
+	vtlb_VMapUnmap(vaddr, size);
+	vtlb_VMapUnmap(0x20000000 | vaddr, size);
+}
+
+static void vtlb_ResetGoemonTlbCacheEntry(GoemonTlb& entry)
+{
+	entry.valid = 0;
+	entry.key = GOEMON_TLB_INVALID_VALUE;
+	entry.low_add = GOEMON_TLB_INVALID_VALUE;
+	entry.high_add = GOEMON_TLB_INVALID_VALUE;
+}
+
 void GoemonPreloadTlb()
 {
 	// 0x3d5580 is the address of the TLB cache table
 	GoemonTlb* tlb = (GoemonTlb*)&eeMem->Main[0x3d5580];
 
-	for (u32 i = 0; i < 150; i++)
+	for (u32 i = 0; i < GOEMON_TLB_ENTRY_COUNT; i++)
 	{
 		if (tlb[i].valid == 0x1 && tlb[i].low_add != tlb[i].high_add)
 		{
@@ -472,8 +567,7 @@ void GoemonPreloadTlb()
 			if (vmv.isHandler(vaddr) && vmv.assumeHandlerGetID() == 0)
 			{
 				DevCon.WriteLn("GoemonPreloadTlb: Entry %d. Key %x. From V:0x%8.8x to P:0x%8.8x (%d pages)", i, tlb[i].key, vaddr, paddr, size >> VTLB_PAGE_BITS);
-				vtlb_VMap(vaddr, paddr, size);
-				vtlb_VMap(0x20000000 | vaddr, paddr, size);
+				vtlb_MapGoemonTlbAliases(vaddr, paddr, size);
 			}
 		}
 	}
@@ -483,7 +577,7 @@ void GoemonUnloadTlb(u32 key)
 {
 	// 0x3d5580 is the address of the TLB cache table
 	GoemonTlb* tlb = (GoemonTlb*)&eeMem->Main[0x3d5580];
-	for (u32 i = 0; i < 150; i++)
+	for (u32 i = 0; i < GOEMON_TLB_ENTRY_COUNT; i++)
 	{
 		if (tlb[i].key == key)
 		{
@@ -493,15 +587,11 @@ void GoemonUnloadTlb(u32 key)
 				u32 vaddr = tlb[i].low_add;
 				DevCon.WriteLn("GoemonUnloadTlb: Entry %d. Key %x. From V:0x%8.8x to V:0x%8.8x (%d pages)", i, tlb[i].key, vaddr, vaddr + size, size >> VTLB_PAGE_BITS);
 
-				vtlb_VMapUnmap(vaddr, size);
-				vtlb_VMapUnmap(0x20000000 | vaddr, size);
+				vtlb_UnmapGoemonTlbAliases(vaddr, size);
 
 				// Unmap the tlb in game cache table
-				// Note: Game copy FEFEFEFE for others data
-				tlb[i].valid = 0;
-				tlb[i].key = 0xFEFEFEFE;
-				tlb[i].low_add = 0xFEFEFEFE;
-				tlb[i].high_add = 0xFEFEFEFE;
+				// Note: Game copies FEFEFEFE for other data.
+				vtlb_ResetGoemonTlbCacheEntry(tlb[i]);
 			}
 			else
 			{
@@ -517,7 +607,8 @@ static __ri void vtlb_Miss(u32 addr, u32 mode)
 	if (EmuConfig.Gamefixes.GoemonTlbHack)
 		GoemonTlbMissDebug();
 
-	// Hack to handle expected tlb miss by some games.
+	const std::string message(fmt::format("TLB Miss, pc=0x{:x} addr=0x{:x} [{}]", cpuRegs.pc, addr, mode ? "store" : "load"));
+
 	if (Cpu == &intCpu)
 	{
 		if (mode)
@@ -530,7 +621,6 @@ static __ri void vtlb_Miss(u32 addr, u32 mode)
 		return;
 	}
 
-	const std::string message(fmt::format("TLB Miss, pc=0x{:x} addr=0x{:x} [{}]", cpuRegs.pc, addr, mode ? "store" : "load"));
 	if (EmuConfig.Cpu.Recompiler.PauseOnTLBMiss)
 	{
 		// Pause, let the user try to figure out what went wrong in the debugger.
@@ -1068,17 +1158,22 @@ void vtlb_UpdateFastmemProtection(u32 paddr, u32 size, PageProtectionMode prot)
 	pxAssert(size > 0 && (size & VTLB_PAGE_MASK) == 0);
 
 	u32 mainmem_start, mainmem_size;
-	PageProtectionMode old_prot;
-	if (!vtlb_GetMainMemoryOffset(paddr, &mainmem_start, &mainmem_size, &old_prot))
+	PageProtectionMode current_protection;
+	if (!vtlb_GetMainMemoryOffset(paddr, &mainmem_start, &mainmem_size, &current_protection))
 		return;
+	(void)current_protection;
 
 	FASTMEM_LOG("UpdateFastmemProtection %08X mmoffset %08X %08X", paddr, mainmem_start, size);
+	vtlb_UpdateFastmemProtectionForMainMemoryRange(mainmem_start, std::min(size, mainmem_size), prot);
+}
 
-	u32 current_mainmem = mainmem_start;
-	const u32 num_pages = std::min(size, mainmem_size) / VTLB_PAGE_SIZE;
+static void vtlb_UpdateFastmemProtectionForMainMemoryRange(u32 mainmem_offset, u32 size, const PageProtectionMode& prot)
+{
+	u32 current_mainmem = mainmem_offset;
+	const u32 num_pages = size / VTLB_PAGE_SIZE;
 	for (u32 i = 0; i < num_pages; i++, current_mainmem += VTLB_PAGE_SIZE)
 	{
-		// update virtual mapping mapping
+		// Update every virtual alias that currently resolves to this main memory page.
 		auto range = s_fastmem_physical_mapping.equal_range(current_mainmem);
 		for (auto it = range.first; it != range.second; ++it)
 		{
@@ -1087,6 +1182,81 @@ void vtlb_UpdateFastmemProtection(u32 paddr, u32 size, PageProtectionMode prot)
 			if (vtlb_IsHostAligned(it->second))
 				HostSys::MemProtect(s_fastmem_area->OffsetPointer(it->second), __pagesize, prot);
 		}
+	}
+}
+
+static void vtlb_SyncFastmemMappingsForPhysicalRange(u32 vaddr, u32 paddr, u32 size)
+{
+	const u32 num_pages = size / VTLB_PAGE_SIZE;
+	u32 current_vaddr = vaddr;
+	u32 current_paddr = paddr;
+
+	for (u32 i = 0; i < num_pages; i++, current_vaddr += VTLB_PAGE_SIZE, current_paddr += VTLB_PAGE_SIZE)
+	{
+		u32 mainmem_offset, mainmem_size;
+		PageProtectionMode mode;
+		if (vtlb_GetMainMemoryOffset(current_paddr, &mainmem_offset, &mainmem_size, &mode))
+			vtlb_CreateFastmemMapping(current_vaddr, mainmem_offset, mode);
+		else
+			vtlb_RemoveFastmemMapping(current_vaddr);
+	}
+}
+
+static bool vtlb_TryMapScratchpadFastmemAliases(u32 vaddr, const void* buffer, u32 size)
+{
+	if (buffer != eeMem->Scratch || size != Ps2MemSize::Scratch)
+		return false;
+
+	u32 current_vaddr = vaddr;
+	u32 current_hostoffset = HostMemoryMap::EEmemOffset + offsetof(EEVM_MemoryAllocMess, Scratch);
+	PageProtectionMode mode = PageProtectionMode().Read().Write();
+	for (u32 i = 0; i < (Ps2MemSize::Scratch / VTLB_PAGE_SIZE); i++, current_vaddr += VTLB_PAGE_SIZE, current_hostoffset += VTLB_PAGE_SIZE)
+		vtlb_CreateFastmemMapping(current_vaddr, current_hostoffset, mode);
+
+	return true;
+}
+
+static void vtlb_AssignVirtualMappingsForPhysicalRange(u32 vaddr, u32 paddr, u32 size)
+{
+	while (size > 0)
+	{
+		VTLBVirtual vmv;
+		if (paddr >= VTLB_PMAP_SZ)
+			vmv = VTLBVirtual(VTLBPhysical::fromHandler(UnmappedPhyHandler), paddr, vaddr);
+		else
+			vmv = VTLBVirtual(vtlbdata.pmap[paddr >> VTLB_PAGE_BITS], paddr, vaddr);
+
+		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = vmv;
+		if (vtlbdata.ppmap)
+		{
+			if (!(vaddr & 0x80000000))
+				vtlbdata.ppmap[vaddr >> VTLB_PAGE_BITS] = paddr & ~VTLB_PAGE_MASK;
+		}
+
+		vaddr += VTLB_PAGE_SIZE;
+		paddr += VTLB_PAGE_SIZE;
+		size -= VTLB_PAGE_SIZE;
+	}
+}
+
+static void vtlb_AssignVirtualMappingsForBuffer(u32 vaddr, uptr buffer, u32 size)
+{
+	while (size > 0)
+	{
+		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = VTLBVirtual::fromPointer(buffer, vaddr);
+		vaddr += VTLB_PAGE_SIZE;
+		buffer += VTLB_PAGE_SIZE;
+		size -= VTLB_PAGE_SIZE;
+	}
+}
+
+static void vtlb_AssignUnmappedVirtualRange(u32 vaddr, u32 size)
+{
+	while (size > 0)
+	{
+		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = VTLBVirtual(VTLBPhysical::fromHandler(UnmappedVirtHandler), vaddr, vaddr);
+		vaddr += VTLB_PAGE_SIZE;
+		size -= VTLB_PAGE_SIZE;
 	}
 }
 
@@ -1148,41 +1318,9 @@ void vtlb_VMap(u32 vaddr, u32 paddr, u32 size)
 	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
 
 	if (CHECK_FASTMEM)
-	{
-		const u32 num_pages = size / VTLB_PAGE_SIZE;
-		u32 current_vaddr = vaddr;
-		u32 current_paddr = paddr;
+		vtlb_SyncFastmemMappingsForPhysicalRange(vaddr, paddr, size);
 
-		for (u32 i = 0; i < num_pages; i++, current_vaddr += VTLB_PAGE_SIZE, current_paddr += VTLB_PAGE_SIZE)
-		{
-			u32 hoffset, hsize;
-			PageProtectionMode mode;
-			if (vtlb_GetMainMemoryOffset(current_paddr, &hoffset, &hsize, &mode))
-				vtlb_CreateFastmemMapping(current_vaddr, hoffset, mode);
-			else
-				vtlb_RemoveFastmemMapping(current_vaddr);
-		}
-	}
-
-	while (size > 0)
-	{
-		VTLBVirtual vmv;
-		if (paddr >= VTLB_PMAP_SZ)
-			vmv = VTLBVirtual(VTLBPhysical::fromHandler(UnmappedPhyHandler), paddr, vaddr);
-		else
-			vmv = VTLBVirtual(vtlbdata.pmap[paddr >> VTLB_PAGE_BITS], paddr, vaddr);
-
-		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = vmv;
-		if (vtlbdata.ppmap)
-		{
-			if (!(vaddr & 0x80000000)) // those address are already physical don't change them
-				vtlbdata.ppmap[vaddr >> VTLB_PAGE_BITS] = paddr & ~VTLB_PAGE_MASK;
-		}
-
-		vaddr += VTLB_PAGE_SIZE;
-		paddr += VTLB_PAGE_SIZE;
-		size -= VTLB_PAGE_SIZE;
-	}
+	vtlb_AssignVirtualMappingsForPhysicalRange(vaddr, paddr, size);
 }
 
 void vtlb_VMapBuffer(u32 vaddr, void* buffer, u32 size)
@@ -1192,28 +1330,13 @@ void vtlb_VMapBuffer(u32 vaddr, void* buffer, u32 size)
 
 	if (CHECK_FASTMEM)
 	{
-		if (buffer == eeMem->Scratch && size == Ps2MemSize::Scratch)
-		{
-			u32 fm_vaddr = vaddr;
-			u32 fm_hostoffset = HostMemoryMap::EEmemOffset + offsetof(EEVM_MemoryAllocMess, Scratch);
-			PageProtectionMode mode = PageProtectionMode().Read().Write();
-			for (u32 i = 0; i < (Ps2MemSize::Scratch / VTLB_PAGE_SIZE); i++, fm_vaddr += VTLB_PAGE_SIZE, fm_hostoffset += VTLB_PAGE_SIZE)
-				vtlb_CreateFastmemMapping(fm_vaddr, fm_hostoffset, mode);
-		}
-		else
+		if (!vtlb_TryMapScratchpadFastmemAliases(vaddr, buffer, size))
 		{
 			vtlb_RemoveFastmemMappings(vaddr, size);
 		}
 	}
 
-	uptr bu8 = (uptr)buffer;
-	while (size > 0)
-	{
-		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = VTLBVirtual::fromPointer(bu8, vaddr);
-		vaddr += VTLB_PAGE_SIZE;
-		bu8 += VTLB_PAGE_SIZE;
-		size -= VTLB_PAGE_SIZE;
-	}
+	vtlb_AssignVirtualMappingsForBuffer(vaddr, (uptr)buffer, size);
 }
 
 void vtlb_VMapUnmap(u32 vaddr, u32 size)
@@ -1222,13 +1345,7 @@ void vtlb_VMapUnmap(u32 vaddr, u32 size)
 	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
 
 	vtlb_RemoveFastmemMappings(vaddr, size);
-
-	while (size > 0)
-	{
-		vtlbdata.vmap[vaddr >> VTLB_PAGE_BITS] = VTLBVirtual(VTLBPhysical::fromHandler(UnmappedVirtHandler), vaddr, vaddr);
-		vaddr += VTLB_PAGE_SIZE;
-		size -= VTLB_PAGE_SIZE;
-	}
+	vtlb_AssignUnmappedVirtualRange(vaddr, size);
 }
 
 // vtlb_Init -- Clears vtlb handlers and memory mappings.
@@ -1272,46 +1389,61 @@ void vtlb_Init()
 // This function should probably be part of the COP0 rather than here in VTLB.
 void vtlb_Reset()
 {
-	vtlb_RemoveFastmemMappings();
-	for (int i = 0; i < 48; i++)
-		UnmapTLB(tlb[i], i);
+	ResetFastmemTrackingState();
+	ClearTLBMappingsFromSnapshot(tlb, std::size(tlb));
 }
 
 void vtlb_Shutdown()
 {
-	vtlb_RemoveFastmemMappings();
-	s_fastmem_backpatch_info.clear();
-	s_fastmem_faulting_pcs.clear();
+	ResetFastmemTrackingState();
+}
+
+void vtlb_CaptureStateLoadSnapshot(tlbs* snapshot, size_t count)
+{
+	if (!snapshot || count == 0)
+		return;
+
+	const size_t snapshot_count = std::min(count, std::size(tlb));
+	std::memcpy(snapshot, tlb, sizeof(tlbs) * snapshot_count);
+}
+
+void vtlb_InvalidateRuntimeBlockTracking()
+{
+	mmap_ResetBlockTracking();
+}
+
+void vtlb_RebuildFastmemMappings()
+{
+	DevCon.WriteLn("Resetting fastmem mappings...");
+
+	ResetFastmemTrackingState();
+	RebuildFastmemMappingsFromCurrentVtlbState();
+}
+
+void vtlb_RefreshRuntimeMappingsAfterConfigChange()
+{
+	vtlb_RebuildFastmemMappings();
 }
 
 void vtlb_ResetFastmem()
 {
-	DevCon.WriteLn("Resetting fastmem mappings...");
+	vtlb_RebuildFastmemMappings();
+}
 
-	vtlb_RemoveFastmemMappings();
-	s_fastmem_backpatch_info.clear();
-	s_fastmem_faulting_pcs.clear();
+void vtlb_ResetKernelVirtualMappings()
+{
+	vtlb_VMap(0x00000000, 0x00000000, 0x20000000);
+	vtlb_VMapUnmap(0x20000000, 0x60000000);
+}
 
-	if (!CHECK_FASTMEM || !CHECK_EEREC || !vtlbdata.vmap)
-		return;
+void vtlb_RestoreMappingsFromState(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix)
+{
+	RestoreTLBMappingsFromSnapshot(previous, count, only_changed_entries, apply_goemon_fix);
+}
 
-	// we need to go through and look at the vtlb pointers, to remap the host area
-	for (size_t i = 0; i < VTLB_VMAP_ITEMS; i++)
-	{
-		const VTLBVirtual& vm = vtlbdata.vmap[i];
-		const u32 vaddr = static_cast<u32>(i) << VTLB_PAGE_BITS;
-		if (vm.isHandler(vaddr))
-		{
-			// Handlers should be unmapped.
-			continue;
-		}
-
-		// Check if it's a physical mapping to our main memory area.
-		u32 mainmem_offset, mainmem_size;
-		PageProtectionMode prot;
-		if (vtlb_GetMainMemoryOffsetFromPtr(vm.assumePtr(vaddr), &mainmem_offset, &mainmem_size, &prot))
-			vtlb_CreateFastmemMapping(vaddr, mainmem_offset, prot);
-	}
+void vtlb_RunPostLoadRepair(const tlbs* previous, size_t count, bool apply_goemon_fix)
+{
+	vtlb_RestoreMappingsFromState(previous, count, true, apply_goemon_fix);
 }
 
 // Reserves the vtlb core allocation used by various emulation components!
@@ -1327,18 +1459,8 @@ bool vtlb_Core_Alloc()
 
 	vtlbdata.vmap = reinterpret_cast<VTLBVirtual*>(SysMemory::GetVTLBVirtualMap());
 
-	pxAssert(!s_fastmem_area);
-	s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE);
-	if (!s_fastmem_area)
-	{
-		Host::ReportErrorAsync("Error", "Failed to allocate fastmem area");
+	if (!InitializeFastmemAllocationState())
 		return false;
-	}
-
-	s_fastmem_virtual_mapping.resize(FASTMEM_PAGE_COUNT, NO_FASTMEM_MAPPING);
-	vtlbdata.fastmem_base = (uptr)s_fastmem_area->BasePointer();
-	DevCon.WriteLn(Color_StrongGreen, "Fastmem area: %p - %p",
-		vtlbdata.fastmem_base, vtlbdata.fastmem_base + (FASTMEM_AREA_SIZE - 1));
 
 	Error error;
 	if (!PageFaultHandler::Install(&error))
@@ -1371,14 +1493,7 @@ void vtlb_Core_Free()
 {
 	vtlbdata.vmap = nullptr;
 	vtlbdata.ppmap = nullptr;
-
-	vtlb_RemoveFastmemMappings();
-	vtlb_ClearLoadStoreInfo();
-
-	vtlbdata.fastmem_base = 0;
-	decltype(s_fastmem_physical_mapping)().swap(s_fastmem_physical_mapping);
-	decltype(s_fastmem_virtual_mapping)().swap(s_fastmem_virtual_mapping);
-	s_fastmem_area.reset();
+	ReleaseFastmemAllocationState();
 }
 
 // ===========================================================================================

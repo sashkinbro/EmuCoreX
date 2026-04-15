@@ -4,25 +4,60 @@
 #include "common/Console.h"
 #include "MTVU.h"
 #include "SaveState.h"
+#include "arm64/cpuRegistersPack.h"
 #include "vtlb.h"
 
 #include "common/Assertions.h"
 
+namespace
+{
+void Arm64AssertDynBackpatchStubContract()
+{
+	pxAssertRel(!Arm64SupportsDynBackpatchLoadStore(), "ARM64 dyn backpatch unexpectedly marked supported.");
+	pxAssertRel(Arm64UsesHardFailDynBackpatchStub(), "ARM64 dyn backpatch failure mode unexpectedly changed.");
+}
+
+void Arm64FailMissingDynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, u32 guest_addr)
+{
+	Arm64AssertDynBackpatchStubContract();
+	pxFailRel("ARM64 dyn backpatch load/store is unsupported (guest_pc=%x guest_addr=%x code=%p size=%u).",
+		guest_pc, guest_addr, reinterpret_cast<void*>(code_address), code_size);
+}
+
+void Arm64AssertVuJitPlaceholderStateContract()
+{
+	pxAssertRel(Arm64UsesVuJitPlaceholderState(), "ARM64 VU JIT placeholder path unexpectedly disabled.");
+	pxAssertRel(!Arm64HasStableVuJitStateSerialization(), "ARM64 VU JIT state unexpectedly marked stable.");
+}
+
+void Arm64PrepareVuJitPlaceholderStateForFreeze(SaveStateBase& state)
+{
+	if (state.IsSaving() && Arm64ShouldSynchronizeVuThreadBeforePlaceholderFreezeOnSave())
+		vu1Thread.WaitVU();
+}
+
+bool Arm64FreezeVuJitPlaceholderStateBlocks(SaveStateBase& state)
+{
+	// Transitional placeholder until ARM64 VU JIT state gets a real ownership-backed format.
+	return state.FreezePlaceholderBlocks(
+		Arm64GetVuJitPlaceholderStateBlockSize(),
+		Arm64GetVuJitPlaceholderStateBlockCount());
+}
+
+bool FreezeLegacyVuJitPlaceholderState(SaveStateBase& state)
+{
+	Arm64AssertVuJitPlaceholderStateContract();
+	Arm64PrepareVuJitPlaceholderStateForFreeze(state);
+	return Arm64FreezeVuJitPlaceholderStateBlocks(state);
+}
+}  // namespace
+
 void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, u32 guest_addr, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr)
 {
-  pxFailRel("Not implemented.");
+	Arm64FailMissingDynBackpatchLoadStore(code_address, code_size, guest_pc, guest_addr);
 }
 
 bool SaveStateBase::vuJITFreeze()
 {
-	if(IsSaving())
-		vu1Thread.WaitVU();
-
-	// HACK!!
-
-	// size of microRegInfo structure
-	std::array<u8,96> empty_data{};
-	Freeze(empty_data);
-	Freeze(empty_data);
-	return true;
+	return FreezeLegacyVuJitPlaceholderState(*this);
 }
