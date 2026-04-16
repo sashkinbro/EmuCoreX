@@ -19,7 +19,7 @@
     public static void onPadVibration(int, float, float);
     public static void ensureResourceSubdirectoryCopied(java.lang.String);
     public static void nativeLog(java.lang.String);
-    public static void onPerformanceMetrics(float, float, float, float, float);
+    public static void onPerformanceMetrics(java.lang.String, float, float);
     public static int openContentUri(java.lang.String);
 }
 
