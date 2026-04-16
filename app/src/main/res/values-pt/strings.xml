@@ -20,7 +20,7 @@
     <string name="home_recent_title">Abertos recentemente</string>
     <string name="home_recent_label">Continuar</string>
     <string name="home_setup_title">Concluir configuração</string>
-    <string name="home_setup_subtitle">Escolha os arquivos da BIOS e sua pasta de jogos para começar.</string>
+    <string name="home_setup_subtitle">Escolha um arquivo da BIOS e sua pasta de jogos para começar.</string>
     <string name="home_finish_setup">Abrir Configuração</string>
     <string name="home_choose_bios">Escolher BIOS</string>
     <string name="home_sort_size_desc">Maior</string>
@@ -29,8 +29,8 @@
     <string name="home_empty_search_subtitle">Tente um nome diferente ou altere a classificação.</string>
     <string name="home_stat_games">Jogos</string>
     <string name="home_stat_games_desc">Jogos exibidos atualmente na biblioteca.</string>
-    <string name="home_stat_bios">Arquivos da BIOS</string>
-    <string name="home_stat_bios_desc">Mostra se os arquivos da BIOS estão prontos.</string>
+    <string name="home_stat_bios">Arquivo da BIOS</string>
+    <string name="home_stat_bios_desc">Mostra se o arquivo da BIOS está pronto.</string>
     <string name="home_stat_library">Pasta de Jogos</string>
     <string name="home_stat_library_desc">Mostra se uma pasta de jogos está selecionada.</string>
     <string name="home_status_ready">Pronto</string>
@@ -76,14 +76,14 @@
     <string name="emulation_loaded">Carregado</string>
     <string name="emulation_load_failed">Não foi possível carregar o save state.</string>
     <string name="emulation_fps">FPS: %s</string>
-    <string name="emulation_bios_missing">Adicione os arquivos da BIOS primeiro.</string>
+    <string name="emulation_bios_missing">Adicione um arquivo da BIOS primeiro.</string>
     <string name="emulation_launch_failed">Não foi possível abrir este jogo.</string>
     <string name="emulation_launch_path_error">Não foi possível abrir este arquivo.</string>
     <string name="emulation_show_controls">Mostrar controles</string>
     <string name="emulation_hide_controls">Ocultar controles</string>
     <string name="emulation_show_quick_actions">Mostrar ações</string>
     <string name="emulation_status_preparing">Preparando…</string>
-    <string name="emulation_status_checking_bios">Verificando arquivos da BIOS…</string>
+    <string name="emulation_status_checking_bios">Verificando arquivo da BIOS…</string>
     <string name="emulation_status_loading_game">Carregando jogo…</string>
     <string name="emulation_status_starting_core">Iniciando núcleo de emulação…</string>
     <string name="emulation_status_waiting_vm">Aguardando máquina virtual…</string>
@@ -251,7 +251,7 @@
     <string name="settings_about_more_apps_url">https://play.google.com/store/apps/dev?id=7136622298887775989</string>
     <string name="settings_setup_ready">Configuração concluída</string>
     <string name="settings_setup_incomplete">Configuração necessária</string>
-    <string name="settings_setup_summary">Arquivos da BIOS: %1$d/1 • Pasta de jogos: %2$d/1</string>
+    <string name="settings_setup_summary">Arquivo da BIOS: %1$d/1 • Pasta de jogos: %2$d/1</string>
     <string name="settings_open_setup">Abrir Configuração</string>
     <string name="settings_pad_vibration">Vibração do controle</string>
     <string name="settings_pad_vibration_desc">Ative a vibração em jogos compatíveis e em dispositivos suportados.</string>
@@ -509,10 +509,10 @@
     <string name="onboarding_page_3_title">Sua Biblioteca de Jogos</string>
     <string name="onboarding_page_3_subtitle">Crie sua biblioteca de jogos pessoal com capas bonitas, informações detalhadas e acesso rápido aos seus favoritos.</string>
     <string name="onboarding_page_4_title">Pronto para Jogar</string>
-    <string name="onboarding_page_4_subtitle">Escolha os arquivos da BIOS e sua pasta de jogos para começar.</string>
+    <string name="onboarding_page_4_subtitle">Escolha um arquivo da BIOS e sua pasta de jogos para começar.</string>
     <string name="onboarding_title">Prepare-se para jogar</string>
-    <string name="onboarding_subtitle">Escolha os arquivos da BIOS e sua pasta de jogos.</string>
-    <string name="onboarding_bios_title">Escolher arquivos da BIOS</string>
+    <string name="onboarding_subtitle">Escolha um arquivo da BIOS e sua pasta de jogos.</string>
+    <string name="onboarding_bios_title">Escolher arquivo da BIOS</string>
     <string name="onboarding_games_title">Escolher pasta de jogos</string>
     <string name="onboarding_games_desc">Selecione a pasta que contém seus jogos.</string>
     <string name="onboarding_status_required">Obrigatório</string>

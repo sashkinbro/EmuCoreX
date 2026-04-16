@@ -20,7 +20,7 @@
     <string name="home_recent_title">Недавно открытые</string>
     <string name="home_recent_label">Продолжить</string>
     <string name="home_setup_title">Завершить настройку</string>
-    <string name="home_setup_subtitle">Выберите файлы BIOS и папку с играми для начала.</string>
+    <string name="home_setup_subtitle">Выберите файл BIOS и папку с играми для начала.</string>
     <string name="home_finish_setup">Открыть настройку</string>
     <string name="home_choose_bios">Выбрать BIOS</string>
     <string name="home_sort_size_desc">Самые большие</string>
@@ -29,8 +29,8 @@
     <string name="home_empty_search_subtitle">Попробуйте другое название или измените сортировку.</string>
     <string name="home_stat_games">Игры</string>
     <string name="home_stat_games_desc">Игры, которые сейчас отображаются в библиотеке.</string>
-    <string name="home_stat_bios">Файлы BIOS</string>
-    <string name="home_stat_bios_desc">Показывает, готовы ли файлы BIOS.</string>
+    <string name="home_stat_bios">Файл BIOS</string>
+    <string name="home_stat_bios_desc">Показывает, готов ли файл BIOS.</string>
     <string name="home_stat_library">Папка с играми</string>
     <string name="home_stat_library_desc">Показывает, выбрана ли папка с играми.</string>
     <string name="home_status_ready">Готово</string>
@@ -76,14 +76,14 @@
     <string name="emulation_loaded">Загружено</string>
     <string name="emulation_load_failed">Не удалось загрузить сохранение.</string>
     <string name="emulation_fps">FPS: %s</string>
-    <string name="emulation_bios_missing">Сначала добавьте файлы BIOS.</string>
+    <string name="emulation_bios_missing">Сначала добавьте файл BIOS.</string>
     <string name="emulation_launch_failed">Невозможно открыть эту игру.</string>
     <string name="emulation_launch_path_error">Невозможно открыть этот файл.</string>
     <string name="emulation_show_controls">Показать управление</string>
     <string name="emulation_hide_controls">Скрыть управление</string>
     <string name="emulation_show_quick_actions">Показать действия</string>
     <string name="emulation_status_preparing">Подготовка…</string>
-    <string name="emulation_status_checking_bios">Проверка файлов BIOS…</string>
+    <string name="emulation_status_checking_bios">Проверка файла BIOS…</string>
     <string name="emulation_status_loading_game">Загрузка игры…</string>
     <string name="emulation_status_starting_core">Запуск ядра эмуляции…</string>
     <string name="emulation_status_waiting_vm">Ожидание виртуальной машины…</string>
@@ -253,7 +253,7 @@
     <string name="settings_about_more_apps_url">https://play.google.com/store/apps/dev?id=7136622298887775989</string>
     <string name="settings_setup_ready">Настройка завершена</string>
     <string name="settings_setup_incomplete">Требуется настройка</string>
-    <string name="settings_setup_summary">Файлы BIOS: %1$d/1 • Папка с играми: %2$d/1</string>
+    <string name="settings_setup_summary">Файл BIOS: %1$d/1 • Папка с играми: %2$d/1</string>
     <string name="settings_open_setup">Открыть настройку</string>
     <string name="settings_pad_vibration">Вибрация геймпада</string>
     <string name="settings_pad_vibration_desc">Включить вибрацию в поддерживаемых играх и на поддерживаемых устройствах.</string>
@@ -511,10 +511,10 @@
     <string name="onboarding_page_3_title">Ваша библиотека игр</string>
     <string name="onboarding_page_3_subtitle">Создайте личную библиотеку игр с красивыми обложками, подробной информацией и быстрым доступом к любимым играм.</string>
     <string name="onboarding_page_4_title">Готовы к игре</string>
-    <string name="onboarding_page_4_subtitle">Добавьте файлы BIOS и выберите папку с играми для начала.</string>
+    <string name="onboarding_page_4_subtitle">Добавьте файл BIOS и выберите папку с играми для начала.</string>
     <string name="onboarding_title">Подготовьтесь к игре</string>
-    <string name="onboarding_subtitle">Добавьте файлы BIOS и выберите папку с играми.</string>
-    <string name="onboarding_bios_title">Выберите файлы BIOS</string>
+    <string name="onboarding_subtitle">Добавьте файл BIOS и выберите папку с играми.</string>
+    <string name="onboarding_bios_title">Выберите файл BIOS</string>
     <string name="onboarding_bios_desc">Выберите файл образа BIOS PS2, необходимый для запуска игр.</string>
     <string name="onboarding_games_title">Выберите папку с играми</string>
     <string name="onboarding_games_desc">Выберите папку, которая содержит ваши игры.</string>

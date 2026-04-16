@@ -20,7 +20,7 @@
     <string name="home_recent_title">Zuletzt geöffnet</string>
     <string name="home_recent_label">Fortsetzen</string>
     <string name="home_setup_title">Einrichtung abschließen</string>
-    <string name="home_setup_subtitle">Wähle BIOS-Dateien und deinen Spieleordner, um loszulegen.</string>
+    <string name="home_setup_subtitle">Wähle eine BIOS-Datei und deinen Spieleordner, um loszulegen.</string>
     <string name="home_finish_setup">Einrichtung öffnen</string>
     <string name="home_choose_bios">BIOS auswählen</string>
     <string name="home_sort_size_desc">Größte</string>
@@ -29,8 +29,8 @@
     <string name="home_empty_search_subtitle">Versuche einen anderen Namen oder ändere die Sortierung.</string>
     <string name="home_stat_games">Spiele</string>
     <string name="home_stat_games_desc">Spiele, die derzeit in der Bibliothek angezeigt werden.</string>
-    <string name="home_stat_bios">BIOS-Dateien</string>
-    <string name="home_stat_bios_desc">Zeigt an, ob die BIOS-Dateien bereit sind.</string>
+    <string name="home_stat_bios">BIOS-Datei</string>
+    <string name="home_stat_bios_desc">Zeigt an, ob die BIOS-Datei bereit ist.</string>
     <string name="home_stat_library">Spieleordner</string>
     <string name="home_stat_library_desc">Zeigt an, ob ein Spieleordner ausgewählt ist.</string>
     <string name="home_status_ready">Bereit</string>
@@ -76,14 +76,14 @@
     <string name="emulation_loaded">Geladen</string>
     <string name="emulation_load_failed">Speicherstand konnte nicht geladen werden.</string>
     <string name="emulation_fps">FPS: %s</string>
-    <string name="emulation_bios_missing">Füge zuerst BIOS-Dateien hinzu.</string>
+    <string name="emulation_bios_missing">Füge zuerst eine BIOS-Datei hinzu.</string>
     <string name="emulation_launch_failed">Dieses Spiel konnte nicht geöffnet werden.</string>
     <string name="emulation_launch_path_error">Diese Datei konnte nicht geöffnet werden.</string>
     <string name="emulation_show_controls">Steuerung anzeigen</string>
     <string name="emulation_hide_controls">Steuerung ausblenden</string>
     <string name="emulation_show_quick_actions">Aktionen anzeigen</string>
     <string name="emulation_status_preparing">Vorbereiten…</string>
-    <string name="emulation_status_checking_bios">BIOS-Dateien werden überprüft…</string>
+    <string name="emulation_status_checking_bios">BIOS-Datei wird überprüft…</string>
     <string name="emulation_status_loading_game">Spiel wird geladen…</string>
     <string name="emulation_status_starting_core">Emulationskern wird gestartet…</string>
     <string name="emulation_status_waiting_vm">Warten auf virtuelle Maschine…</string>
@@ -251,7 +251,7 @@
     <string name="settings_about_more_apps_url">https://play.google.com/store/apps/dev?id=7136622298887775989</string>
     <string name="settings_setup_ready">Einrichtung abgeschlossen</string>
     <string name="settings_setup_incomplete">Einrichtung erforderlich</string>
-    <string name="settings_setup_summary">BIOS-Dateien: %1$d/1 • Spieleordner: %2$d/1</string>
+    <string name="settings_setup_summary">BIOS-Datei: %1$d/1 • Spieleordner: %2$d/1</string>
     <string name="settings_open_setup">Einrichtung öffnen</string>
     <string name="settings_pad_vibration">Controller-Vibration</string>
     <string name="settings_pad_vibration_desc">Aktiviere Vibration in unterstützten Spielen und auf unterstützten Geräten.</string>
@@ -509,10 +509,10 @@
     <string name="onboarding_page_3_title">Deine Spielebibliothek</string>
     <string name="onboarding_page_3_subtitle">Baue deine persönliche Spielebibliothek mit wunderschönen Covern, detaillierten Informationen und schnellem Zugriff auf deine Favoriten auf.</string>
     <string name="onboarding_page_4_title">Bereit zum Spielen</string>
-    <string name="onboarding_page_4_subtitle">Füge BIOS-Dateien hinzu und wähle deinen Spieleordner, um loszulegen.</string>
+    <string name="onboarding_page_4_subtitle">Füge eine BIOS-Datei hinzu und wähle deinen Spieleordner, um loszulegen.</string>
     <string name="onboarding_title">Mach dich bereit zum Spielen</string>
-    <string name="onboarding_subtitle">Füge BIOS-Dateien hinzu und wähle deinen Spieleordner.</string>
-    <string name="onboarding_bios_title">BIOS-Dateien auswählen</string>
+    <string name="onboarding_subtitle">Füge eine BIOS-Datei hinzu und wähle deinen Spieleordner.</string>
+    <string name="onboarding_bios_title">BIOS-Datei auswählen</string>
     <string name="onboarding_games_title">Spieleordner auswählen</string>
     <string name="onboarding_games_desc">Wähle den Ordner aus, der deine Spiele enthält.</string>
     <string name="onboarding_status_required">Erforderlich</string>

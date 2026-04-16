@@ -2724,13 +2724,17 @@ bool GSDeviceVK::CheckFeatures()
 
 #ifdef __ANDROID__
 	// Qualcomm Android drivers are currently corrupting indexed/feedback-heavy scenes with the barrier path.
-	if (IsAdrenoGPUProfile())
+	if (IsAdrenoGPUProfile() && !GpuProfileDetector::PrefersNativeAdrenoBarrierPath(m_name))
 	{
 		if (m_features.texture_barrier || m_features.framebuffer_fetch)
 			Console.Warning("VK: Disabling texture barriers/framebuffer fetch on Android Adreno due to rendering corruption.");
 
 		m_features.texture_barrier = false;
 		m_features.framebuffer_fetch = false;
+	}
+	else if (IsAdrenoGPUProfile())
+	{
+		Console.WriteLn("VK: Keeping native barrier/fetch path enabled for modern Adreno device '%s'.", m_name.c_str());
 	}
 #endif
 

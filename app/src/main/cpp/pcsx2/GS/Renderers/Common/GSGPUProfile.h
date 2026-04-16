@@ -5,6 +5,7 @@
 
 #include "common/Pcsx2Defs.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -35,6 +36,8 @@ public:
 	static const char* OverrideToConfigString(GpuProfileOverride value);
 	static const char* OverrideToString(GpuProfileOverride value);
 	static const char* RuntimeProfileToString(RuntimeGpuProfile value);
+	static std::optional<u32> DetectAdrenoModel(std::string_view gpu_renderer_or_name);
+	static bool PrefersNativeAdrenoBarrierPath(std::string_view gpu_renderer_or_name);
 
 	static GpuProfileSelection Resolve(std::string_view override_value, std::string_view gpu_vendor,
 		std::string_view gpu_renderer_or_name);

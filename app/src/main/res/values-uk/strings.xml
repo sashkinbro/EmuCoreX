@@ -20,7 +20,7 @@
     <string name="home_recent_title">Нещодавно відкриті</string>
     <string name="home_recent_label">Продовжити</string>
     <string name="home_setup_title">Завершити налаштування</string>
-    <string name="home_setup_subtitle">Виберіть файли BIOS та папку з іграми для початку.</string>
+    <string name="home_setup_subtitle">Виберіть файл BIOS та папку з іграми для початку.</string>
     <string name="home_finish_setup">Відкрити налаштування</string>
     <string name="home_choose_bios">Вибрати BIOS</string>
     <string name="home_sort_size_desc">Найбільші</string>
@@ -29,8 +29,8 @@
     <string name="home_empty_search_subtitle">Спробуйте іншу назву або змініть сортування.</string>
     <string name="home_stat_games">Ігри</string>
     <string name="home_stat_games_desc">Ігри, які зараз відображаються в бібліотеці.</string>
-    <string name="home_stat_bios">Файли BIOS</string>
-    <string name="home_stat_bios_desc">Показує, чи готові файли BIOS.</string>
+    <string name="home_stat_bios">Файл BIOS</string>
+    <string name="home_stat_bios_desc">Показує, чи готовий файл BIOS.</string>
     <string name="home_stat_library">Папка з іграми</string>
     <string name="home_stat_library_desc">Показує, чи вибрана папка з іграми.</string>
     <string name="home_status_ready">Готово</string>
@@ -76,14 +76,14 @@
     <string name="emulation_loaded">Завантажено</string>
     <string name="emulation_load_failed">Не вдалося завантажити збереження.</string>
     <string name="emulation_fps">FPS: %s</string>
-    <string name="emulation_bios_missing">Спочатку додайте файли BIOS.</string>
+    <string name="emulation_bios_missing">Спочатку додайте файл BIOS.</string>
     <string name="emulation_launch_failed">Неможливо відкрити цю гру.</string>
     <string name="emulation_launch_path_error">Неможливо відкрити цей файл.</string>
     <string name="emulation_show_controls">Показати керування</string>
     <string name="emulation_hide_controls">Приховати керування</string>
     <string name="emulation_show_quick_actions">Показати дії</string>
     <string name="emulation_status_preparing">Підготовка…</string>
-    <string name="emulation_status_checking_bios">Перевірка файлів BIOS…</string>
+    <string name="emulation_status_checking_bios">Перевірка файлу BIOS…</string>
     <string name="emulation_status_loading_game">Завантаження гри…</string>
     <string name="emulation_status_starting_core">Запуск ядра емуляції…</string>
     <string name="emulation_status_waiting_vm">Очікування віртуальної машини…</string>
@@ -253,7 +253,7 @@
     <string name="settings_about_more_apps_url">https://play.google.com/store/apps/dev?id=7136622298887775989</string>
     <string name="settings_setup_ready">Налаштування завершено</string>
     <string name="settings_setup_incomplete">Потрібне налаштування</string>
-    <string name="settings_setup_summary">Файли BIOS: %1$d/1 • Папка з іграми: %2$d/1</string>
+    <string name="settings_setup_summary">Файл BIOS: %1$d/1 • Папка з іграми: %2$d/1</string>
     <string name="settings_open_setup">Відкрити налаштування</string>
     <string name="settings_pad_vibration">Вібрація геймпада</string>
     <string name="settings_pad_vibration_desc">Увімкнути вібрацію в підтримуваних іграх і на підтримуваних пристроях.</string>
@@ -511,7 +511,7 @@
     <string name="onboarding_page_3_title">Ваша бібліотека ігор</string>
     <string name="onboarding_page_3_subtitle">Створіть особисту бібліотеку ігор з гарними обкладинками, детальною інформацією та швидким доступом до улюблених ігор.</string>
     <string name="onboarding_page_4_title">Готові до гри</string>
-    <string name="onboarding_page_4_subtitle">Додайте файли BIOS та виберіть папку з іграми для початку.</string>
+    <string name="onboarding_page_4_subtitle">Додайте файл BIOS та виберіть папку з іграми для початку.</string>
     <string name="onboarding_profile_title">Виберіть стартовий профіль</string>
     <string name="onboarding_profile_subtitle">Безпечний профіль рекомендований для більшості пристроїв та ігор. Швидкий може дати більше швидкості на слабких телефонах, але знижує сумісність і стабільність.</string>
     <string name="onboarding_profile_safe_title">Оптимальний / Безпечний</string>
@@ -519,8 +519,8 @@
     <string name="onboarding_profile_fast_title">Швидкий / Небезпечний</string>
     <string name="onboarding_profile_fast_desc">Для слабших пристроїв, яким потрібна додаткова швидкість. У частини ігор може бути більше графічних помилок або гірша стабільність.</string>
     <string name="onboarding_title">Готуйтеся до гри</string>
-    <string name="onboarding_subtitle">Додайте файли BIOS та виберіть папку з іграми.</string>
-    <string name="onboarding_bios_title">Виберіть файли BIOS</string>
+    <string name="onboarding_subtitle">Додайте файл BIOS та виберіть папку з іграми.</string>
+    <string name="onboarding_bios_title">Виберіть файл BIOS</string>
     <string name="onboarding_bios_desc">Виберіть файл образу BIOS PS2, необхідний для запуску ігор.</string>
     <string name="onboarding_games_title">Виберіть папку з іграми</string>
     <string name="onboarding_games_desc">Виберіть папку, яка містить ваші ігри.</string>

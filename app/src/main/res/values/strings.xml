@@ -22,7 +22,7 @@
     <string name="home_recent_title">Recently opened</string>
     <string name="home_recent_label">Continue</string>
     <string name="home_setup_title">Finish setup</string>
-    <string name="home_setup_subtitle">Choose BIOS files and your games folder to get started.</string>
+    <string name="home_setup_subtitle">Choose a BIOS file and your games folder to get started.</string>
     <string name="home_finish_setup">Open Setup</string>
     <string name="home_choose_bios">Choose BIOS</string>
     <string name="home_sort_title_asc">Title A-Z</string>
@@ -35,8 +35,8 @@
     <string name="home_empty_search_subtitle">Try a different name or change the sorting.</string>
     <string name="home_stat_games">Games</string>
     <string name="home_stat_games_desc">Games currently shown in the library.</string>
-    <string name="home_stat_bios">BIOS Files</string>
-    <string name="home_stat_bios_desc">Shows whether the BIOS files are ready.</string>
+    <string name="home_stat_bios">BIOS File</string>
+    <string name="home_stat_bios_desc">Shows whether the BIOS file is ready.</string>
     <string name="home_stat_library">Games Folder</string>
     <string name="home_stat_library_desc">Shows whether a games folder is selected.</string>
     <string name="home_status_ready">Ready</string>
@@ -96,7 +96,7 @@
     <string name="emulation_loaded">Loaded</string>
     <string name="emulation_load_failed">Failed to load save state.</string>
     <string name="emulation_fps">FPS: %s</string>
-    <string name="emulation_bios_missing">Add BIOS files first.</string>
+    <string name="emulation_bios_missing">Add a BIOS file first.</string>
     <string name="emulation_launch_failed">Unable to open this game.</string>
     <string name="emulation_launch_path_error">Unable to open this file.</string>
     <string name="emulation_session_restored_unavailable">The previous emulation session was closed in the background. Launch the game again from your library.</string>
@@ -104,7 +104,7 @@
     <string name="emulation_hide_controls">Hide controls</string>
     <string name="emulation_show_quick_actions">Show actions</string>
     <string name="emulation_status_preparing">Preparing…</string>
-    <string name="emulation_status_checking_bios">Checking BIOS files…</string>
+    <string name="emulation_status_checking_bios">Checking BIOS file…</string>
     <string name="emulation_status_loading_game">Loading game…</string>
     <string name="emulation_status_starting_core">Starting emulation core…</string>
     <string name="emulation_status_waiting_vm">Waiting for virtual machine…</string>
@@ -316,7 +316,7 @@
     <string name="settings_about_more_apps_url">https://play.google.com/store/apps/dev?id=7136622298887775989</string>
     <string name="settings_setup_ready">Setup complete</string>
     <string name="settings_setup_incomplete">Setup required</string>
-    <string name="settings_setup_summary">BIOS files: %1$d/1 • Games folder: %2$d/1</string>
+    <string name="settings_setup_summary">BIOS file: %1$d/1 • Games folder: %2$d/1</string>
     <string name="settings_open_setup">Open Setup</string>
     <string name="settings_pad_vibration">Pad vibration</string>
     <string name="settings_pad_vibration_desc">Enable vibration in supported games and on supported devices.</string>
@@ -669,7 +669,7 @@
     <string name="onboarding_page_3_title">Your Games Library</string>
     <string name="onboarding_page_3_subtitle">Build your personal game library with beautiful covers, detailed information, and quick access to your favorites.</string>
     <string name="onboarding_page_4_title">Ready to Play</string>
-    <string name="onboarding_page_4_subtitle">Add BIOS files and choose your games folder to get started.</string>
+    <string name="onboarding_page_4_subtitle">Add a BIOS file and choose your games folder to get started.</string>
     <string name="onboarding_profile_title">Choose your startup profile</string>
     <string name="onboarding_profile_subtitle">Safe is recommended for most devices and games. Fast can improve speed on weaker phones, but it may reduce compatibility and stability.</string>
     <string name="onboarding_profile_safe_title">Optimal / Safe</string>
@@ -677,8 +677,8 @@
     <string name="onboarding_profile_fast_title">Fast / Unsafe</string>
     <string name="onboarding_profile_fast_desc">For weaker devices that need extra speed. Some games may show more glitches or become less stable.</string>
     <string name="onboarding_title">Get ready to play</string>
-    <string name="onboarding_subtitle">Add BIOS files and choose your games folder.</string>
-    <string name="onboarding_bios_title">Choose BIOS files</string>
+    <string name="onboarding_subtitle">Add a BIOS file and choose your games folder.</string>
+    <string name="onboarding_bios_title">Choose BIOS File</string>
     <string name="onboarding_bios_desc">Select the PS2 BIOS image file needed to start games.</string>
     <string name="onboarding_games_title">Choose games folder</string>
     <string name="onboarding_games_desc">Select the folder that contains your games.</string>
