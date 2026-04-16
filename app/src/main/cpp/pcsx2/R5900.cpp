@@ -168,8 +168,9 @@ __ri void cpuException(u32 code, u32 bd)
 
 	if (is_tlb_exception && Cpu != &intCpu)
 	{
-		Console.Error("cpuException TLB target pc:%x phys:%x epc:%x badv:%x status:%x cause:%x",
-			cpuRegs.pc, target_clear_pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr,
+		// Diagnostic: JIT TLB exception is now intentionally handled in vtlb_Miss.
+		Console.WriteLn("cpuException TLB (JIT) target pc:%x epc:%x badv:%x status:%x cause:%x",
+			cpuRegs.pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr,
 			cpuRegs.CP0.n.Status.val, cpuRegs.CP0.n.Cause);
 	}
 

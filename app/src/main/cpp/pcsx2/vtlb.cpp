@@ -43,6 +43,12 @@
 using namespace R5900;
 using namespace vtlb_private;
 
+// Forward declaration: immediate JIT exit via longjmp (defined in iR5900.cpp).
+// Must be called instead of Cpu->ExitExecution() when we need the JIT block to
+// stop executing RIGHT NOW (e.g. after firing a TLB exception), not at the next
+// safe-exit check.
+extern void recExitExecutionImmediate();
+
 #define verify pxAssert
 
 namespace vtlb_private
@@ -630,9 +636,36 @@ static __ri void vtlb_Miss(u32 addr, u32 mode)
 		return;
 	}
 
-	static int spamStop = 0;
-	if (spamStop++ < 50 || IsDevBuild)
-		Console.Error(message);
+	// JIT path: trigger the PS2 TLB miss exception so the OS refill handler can map the page.
+	// The JIT flushes the faulting instruction's PC to cpuRegs.pc via FLUSH_FULLVTLB before
+	// calling any VTLB handler, so cpuRegs.pc is already correct (no pre-increment like the
+	// interpreter). Do NOT call cpuTlbMissR/W — that subtracts 4 to compensate for the
+	// interpreter's pre-increment and would produce a wrong EPC here.
+
+	// JIT path: fire the TLB miss exception unconditionally.
+	//
+	// If EXL=1 we are already inside an exception handler (double TLB miss). The previous
+	// code silently discarded these, which had two bad side-effects:
+	//   1. The OS refill handler read 0 instead of real page-table data → installed a garbage
+	//      TLB entry → ERET jumped to a wrong address → crash before reaching the menu.
+	//   2. The original JIT block kept running after the first exception (deferred exit) with
+	//      stale/zero register values, flooding the log with spurious EXL=1 misses.
+	//
+	// The correct behaviour: cpuException() already handles EXL=1 by routing the new
+	// exception to offset 0x180 (general exception) instead of 0x000 (TLB refill), so the
+	// OS double-miss handler runs.  We then call recExitExecutionImmediate() which does a
+	// longjmp back to the JIT dispatcher, stopping the block immediately rather than at the
+	// next deferred-exit check.
+	Console.Warning(message);
+	cpuRegs.CP0.n.BadVAddr = addr;
+	cpuRegs.CP0.n.Context &= 0xFF80000F;
+	cpuRegs.CP0.n.Context |= (addr >> 9) & 0x007FFFF0;
+	cpuRegs.CP0.n.EntryHi = (addr & 0xFFFFE000) | (cpuRegs.CP0.n.EntryHi & 0x1FFF);
+	// cpuRegs.branch is not maintained by the JIT; assume not in branch delay slot (0).
+	cpuException(mode ? EXC_CODE_TLBS : EXC_CODE_TLBL, 0);
+	// Exit the JIT block immediately (longjmp). This prevents the rest of the block from
+	// executing with stale register state and generating additional spurious TLB misses.
+	recExitExecutionImmediate();
 }
 
 // BusError exception: more serious than a TLB miss.  If properly emulated the PS2 kernel
