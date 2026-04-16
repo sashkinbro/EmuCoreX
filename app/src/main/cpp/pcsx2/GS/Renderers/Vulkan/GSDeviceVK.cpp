@@ -2720,7 +2720,7 @@ bool GSDeviceVK::CheckFeatures()
 
 #ifdef __ANDROID__
 	// Qualcomm Android drivers are currently corrupting indexed/feedback-heavy scenes with the barrier path.
-	if (IsAdrenoGPUProfile() && !GpuProfileDetector::PrefersNativeAdrenoBarrierPath(m_name))
+	if (IsAdrenoGPUProfile())
 	{
 		m_features.texture_barrier = false;
 		m_features.framebuffer_fetch = false;

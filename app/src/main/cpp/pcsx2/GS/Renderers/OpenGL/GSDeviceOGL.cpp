@@ -765,13 +765,10 @@ bool GSDeviceOGL::CheckFeatures()
 	SetRuntimeGPUProfile(profile_selection.runtime_profile);
 	const bool use_mali_profile = IsMaliGPUProfile();
 	const bool use_adreno_profile = IsAdrenoGPUProfile();
-	const bool prefer_native_adreno_barriers =
-		use_adreno_profile && GpuProfileDetector::PrefersNativeAdrenoBarrierPath(renderer_str);
 #else
 	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali : RuntimeGpuProfile::Adreno);
 	const bool use_mali_profile = vendor_id_mali;
 	const bool use_adreno_profile = vendor_id_adreno;
-	const bool prefer_native_adreno_barriers = false;
 #endif
 
 	GLint major_gl = 0;
@@ -882,8 +879,7 @@ bool GSDeviceOGL::CheckFeatures()
 	// The EXT framebuffer fetch path on Adreno is fast, but it has proven unreliable
 	// in some depth/stencil-heavy scenes. Prefer the safer fallback path there unless
 	// the user explicitly overrides the barrier mode.
-	if (!prefer_native_adreno_barriers && use_adreno_profile && m_features.framebuffer_fetch &&
-		GSConfig.OverrideTextureBarriers == -1)
+	if (use_adreno_profile && m_features.framebuffer_fetch && GSConfig.OverrideTextureBarriers == -1)
 	{
 		m_features.framebuffer_fetch = false;
 	}
@@ -902,7 +898,7 @@ bool GSDeviceOGL::CheckFeatures()
 	// Without texture barriers on Adreno/GLES, feedback hazards can be missed when a texture is sourced
 	// from a region inside an existing render target. Enable inside-target tracking so tex-in-RT draws are
 	// treated as target-backed sources instead of plain textures.
-	if (!prefer_native_adreno_barriers && use_adreno_profile && !m_features.texture_barrier &&
+	if (use_adreno_profile && !m_features.texture_barrier &&
 		GSConfig.UserHacks_TextureInsideRt == GSTextureInRtMode::Disabled)
 	{
 		GSConfig.UserHacks_TextureInsideRt = GSTextureInRtMode::InsideTargets;

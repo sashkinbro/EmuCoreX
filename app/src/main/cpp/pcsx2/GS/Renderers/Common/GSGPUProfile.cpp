@@ -7,8 +7,6 @@
 #include <array>
 #include <cctype>
 #include <initializer_list>
-#include <optional>
-
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
 #endif
@@ -100,30 +98,6 @@ static bool LooksLikeAdreno(std::string_view lowered_hints)
 	return (has_adreno || has_qualcomm);
 }
 
-static std::optional<u32> ParseAdrenoModel(std::string_view value)
-{
-	const std::string lowered = ToLowerASCII(value);
-	const size_t adreno_pos = lowered.find("adreno");
-	if (adreno_pos == std::string::npos)
-		return std::nullopt;
-
-	size_t digit_pos = adreno_pos + 6;
-	while (digit_pos < lowered.size() && !std::isdigit(static_cast<unsigned char>(lowered[digit_pos])))
-		digit_pos++;
-
-	if (digit_pos >= lowered.size())
-		return std::nullopt;
-
-	u32 model = 0;
-	size_t digits = 0;
-	while ((digit_pos + digits) < lowered.size() && std::isdigit(static_cast<unsigned char>(lowered[digit_pos + digits])))
-	{
-		model = (model * 10u) + static_cast<u32>(lowered[digit_pos + digits] - '0');
-		digits++;
-	}
-
-	return (digits >= 3) ? std::optional<u32>(model) : std::nullopt;
-}
 } // namespace
 
 GpuProfileOverride GpuProfileDetector::ParseOverride(std::string_view value)
@@ -175,17 +149,6 @@ const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
 		default:
 			return "Adreno";
 	}
-}
-
-std::optional<u32> GpuProfileDetector::DetectAdrenoModel(std::string_view gpu_renderer_or_name)
-{
-	return ParseAdrenoModel(gpu_renderer_or_name);
-}
-
-bool GpuProfileDetector::PrefersNativeAdrenoBarrierPath(std::string_view gpu_renderer_or_name)
-{
-	const std::optional<u32> model = DetectAdrenoModel(gpu_renderer_or_name);
-	return model.has_value() && model.value() >= 700u;
 }
 
 GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value, std::string_view gpu_vendor,
