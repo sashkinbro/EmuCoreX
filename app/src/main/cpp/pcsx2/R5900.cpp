@@ -165,6 +165,16 @@ __ri void cpuException(u32 code, u32 bd)
 	const bool is_tlb_exception = ((code & 0x7C) >= 0x8) && ((code & 0x7C) <= 0xC);
 	const u32 target_clear_pc = (target_pc & 0x1fffffffu) & ~0x3ffu;
 
+	if (is_tlb_exception && Cpu != &intCpu)
+	{
+		// Force a fresh compile of both the faulting guest block and the exception
+		// vector region. TLB refill changes the virtual mapping contract underneath
+		// already-linked rec blocks, so stale entry/return blocks are a common way
+		// to fall back into the same miss loop.
+		Cpu->Clear(cpuRegs.CP0.n.EPC, 1);
+		Cpu->Clear(target_clear_pc, 0x100);
+	}
+
 	cpuRegs.pc = target_pc;
 
 	if (is_tlb_exception && Cpu != &intCpu)
