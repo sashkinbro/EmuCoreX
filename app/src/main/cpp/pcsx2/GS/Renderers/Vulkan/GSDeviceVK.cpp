@@ -2638,10 +2638,6 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 			GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
 				GetVendorNameFromID(m_device_properties.vendorID), m_name);
 		SetRuntimeGPUProfile(profile_selection.runtime_profile);
-		Console.WriteLn("VK: GPU profile override='%s' resolved='%s'.",
-			GpuProfileDetector::OverrideToConfigString(profile_selection.override_mode),
-			GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
-		DevCon.WriteLn("VK: GPU profile hints: %s", profile_selection.hints.c_str());
 	}
 #else
 	SetRuntimeGPUProfile((m_device_properties.vendorID == 0x13B5u) ? RuntimeGpuProfile::Mali :
@@ -2726,15 +2722,8 @@ bool GSDeviceVK::CheckFeatures()
 	// Qualcomm Android drivers are currently corrupting indexed/feedback-heavy scenes with the barrier path.
 	if (IsAdrenoGPUProfile() && !GpuProfileDetector::PrefersNativeAdrenoBarrierPath(m_name))
 	{
-		if (m_features.texture_barrier || m_features.framebuffer_fetch)
-			Console.Warning("VK: Disabling texture barriers/framebuffer fetch on Android Adreno due to rendering corruption.");
-
 		m_features.texture_barrier = false;
 		m_features.framebuffer_fetch = false;
-	}
-	else if (IsAdrenoGPUProfile())
-	{
-		Console.WriteLn("VK: Keeping native barrier/fetch path enabled for modern Adreno device '%s'.", m_name.c_str());
 	}
 #endif
 
@@ -2775,9 +2764,6 @@ bool GSDeviceVK::CheckFeatures()
 	// Mobile GPUs tend to emulate wide points/lines expensively, so keep the old vertex-expansion path there.
 	if (vendorID == 0x5143u || vendorID == 0x13B5u)
 	{
-		if (m_features.point_expand || m_features.line_expand)
-			Console.WriteLn("VK: Forcing vertex-based expansion for points/lines on mobile GPU (vendor 0x%X).",
-				vendorID);
 		m_features.point_expand = false;
 		m_features.line_expand = false;
 	}
@@ -5190,14 +5176,11 @@ void GSDeviceVK::ExecuteCommandBuffer(bool wait_for_completion, const char* reas
 	const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
 	va_end(ap);
 
-	Console.Warning("VK: Executing command buffer due to '%s'", reason_str.c_str());
 	ExecuteCommandBuffer(wait_for_completion);
 }
 
 void GSDeviceVK::ExecuteCommandBufferAndRestartRenderPass(bool wait_for_completion, const char* reason)
 {
-	Console.Warning("VK: Executing command buffer due to '%s'", reason);
-
 	const VkRenderPass render_pass = m_current_render_pass;
 	const GSVector4i render_pass_area = m_current_render_pass_area;
 	const GSVector4i scissor = m_scissor;
@@ -5224,8 +5207,6 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 	va_start(ap, reason);
 	const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
 	va_end(ap);
-
-	Console.Warning("VK: Executing command buffer due to '%s'", reason_str.c_str());
 
 	pxAssert(m_is_presenting);
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());

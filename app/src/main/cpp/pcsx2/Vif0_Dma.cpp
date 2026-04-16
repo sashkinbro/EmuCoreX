@@ -172,8 +172,6 @@ __fi void vif0Interrupt()
 
 	vif0Regs.stat.FQC = std::min(vif0ch.qwc, (u32)8);
 
-	if (!(vif0ch.chcr.STR)) Console.WriteLn("vif0 running when CHCR == %x", vif0ch.chcr._u32);
-
 	if(vif0.waitforvu)
 	{
 		CPU_INT(VIF_VU0_FINISH, 16);
@@ -252,14 +250,9 @@ __fi void vif0Interrupt()
 
 	if (vif0.vifstalled.enabled && vif0.done)
 	{
-		DevCon.WriteLn("VIF0 looping on stall at end\n");
 		CPU_INT(DMAC_VIF0, 0);
 		return; //Dont want to end if vif is stalled.
 	}
-#ifdef PCSX2_DEVBUILD
-	if (vif0ch.qwc > 0) Console.WriteLn("vif0 Ending with %x QWC left", vif0ch.qwc);
-	if (vif0.cmd != 0) Console.WriteLn("vif0.cmd still set %x tag size %x", vif0.cmd, vif0.tag.size);
-#endif
 
 	vif0ch.chcr.STR = false;
 	vif0Regs.stat.FQC = std::min((u32)0x8, vif0ch.qwc);

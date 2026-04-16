@@ -35,7 +35,6 @@ void mVUreset(microVU& mVU, bool resetReserve)
 {
 	if (THREAD_VU1)
 	{
-		DevCon.Warning("mVU Reset");
 		// If MTVU is toggled on during gameplay we need to flush the running VU1 program, else it gets in a mess
 		if (VU0.VI[REG_VPU_STAT].UL & 0x100)
 		{
@@ -145,12 +144,6 @@ __ri microProgram* mVUcreateProg(microVU& mVU, int startPC)
 	prog->startPC = startPC;
 	if(doWholeProgCompare)
 		mVUcacheProg(mVU, *prog); // Cache Micro Program
-	double cacheSize = (double)((uptr)mVU.prog.x86end - (uptr)mVU.prog.x86start);
-	double cacheUsed = ((double)((uptr)mVU.prog.x86ptr - (uptr)mVU.prog.x86start)) / (double)_1mb;
-	double cachePerc = ((double)((uptr)mVU.prog.x86ptr - (uptr)mVU.prog.x86start)) / cacheSize * 100;
-	ConsoleColors c = mVU.index ? Color_Orange : Color_Magenta;
-	DevCon.WriteLn(c, "microVU%d: Cached Prog = [%03d] [PC=%04x] [List=%02d] (Cache=%3.3f%%) [%3.1fmb]",
-		mVU.index, prog->idx, startPC * 8, mVU.prog.prog[startPC]->size() + 1, cachePerc, cacheUsed);
 	return prog;
 }
 
@@ -221,7 +214,6 @@ void mVUprintUniqueRatio(microVU& mVU)
 	makeUnique(v);
 	if (!total)
 		return;
-	DevCon.WriteLn("%d / %d [%3.1f%%]", v.size(), total, 100. - (double)v.size() / (double)total * 100.);
 }
 
 // Compare Cached microProgram to mVU.regs().Micro

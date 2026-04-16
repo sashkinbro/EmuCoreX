@@ -340,8 +340,6 @@ __fi void vif1Interrupt()
 	{
 		//Console.WriteLn("VIFMFIFO\n");
 		// Test changed because the Final Fantasy 12 opening somehow has the tag in *Undefined* mode, which is not in the documentation that I saw.
-		if (vif1ch.chcr.MOD == NORMAL_MODE)
-			Console.WriteLn("MFIFO mode is normal (which isn't normal here)! %x", vif1ch.chcr._u32);
 		vif1Regs.stat.FQC = std::min((u32)0x10, vif1ch.qwc);
 		vifMFIFOInterrupt();
 		return;
@@ -383,10 +381,7 @@ __fi void vif1Interrupt()
 	}
 
 	if (!vif1ch.chcr.STR)
-	{
-		Console.WriteLn("Vif1 running when CHCR == %x", vif1ch.chcr._u32);
 		return;
-	}
 
 	if (vif1.irq && vif1.vifstalled.enabled && vif1.vifstalled.value == VIF_IRQ_STALL)
 	{
@@ -485,17 +480,10 @@ __fi void vif1Interrupt()
 
 	if (vif1.vifstalled.enabled && vif1.done)
 	{
-		DevCon.WriteLn("VIF1 looping on stall at end\n");
 		CPU_INT(DMAC_VIF1, 0);
 		CPU_SET_DMASTALL(DMAC_VIF1, true);
 		return; //Dont want to end if vif is stalled.
 	}
-#ifdef PCSX2_DEVBUILD
-	if (vif1ch.qwc > 0)
-		DevCon.WriteLn("VIF1 Ending with %x QWC left", vif1ch.qwc);
-	if (vif1.cmd != 0)
-		DevCon.WriteLn("vif1.cmd still set %x tag size %x", vif1.cmd, vif1.tag.size);
-#endif
 
 	if ((vif1ch.chcr.DIR == VIF_NORMAL_TO_MEM_MODE) && vif1.GSLastDownloadSize <= 16)
 	{
