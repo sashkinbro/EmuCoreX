@@ -874,18 +874,18 @@ static bool ApplyAndroidGsBootstrapDefaults(INISettingsInterface& si, bool only_
         changed = true;
     };
 
-    // Keep Android bootstrap aligned with the legacy UI defaults rather than
-    // the heavier upstream GS defaults, which were regressing OpenGL.
-    set_int("accurate_blending_unit", 0);
-    set_int("filter", 2);
-    set_int("TriFilter", -1);
-    set_int("texture_preloading", 1);
-    set_int("linear_present_mode", 1);
+    // Keep Android bootstrap aligned with the core GS defaults so fresh installs
+    // don't inherit renderer-wide regressions from legacy mobile presets.
+    set_int("accurate_blending_unit", static_cast<s32>(Pcsx2Config::GSOptions::DEFAULT_BLENDING_ACCURACY));
+    set_int("filter", static_cast<s32>(Pcsx2Config::GSOptions::DEFAULT_TEXTURE_FILTERING_MODE));
+    set_int("TriFilter", static_cast<s32>(Pcsx2Config::GSOptions::DEFAULT_TRILINEAR_FILTERING_MODE));
+    set_int("texture_preloading", static_cast<s32>(TexturePreloadingLevel::Full));
+    set_int("linear_present_mode", static_cast<s32>(Pcsx2Config::GSOptions::DEFAULT_BILINEAR_FILTERING_MODE));
     set_int("dithering_ps2", 2);
     set_int("MaxAnisotropy", 0);
     set_bool("fxaa", false);
-    set_int("CASMode", 0);
-    set_bool("hw_mipmap", false);
+    set_int("CASMode", static_cast<s32>(Pcsx2Config::GSOptions::DEFAULT_CAS_MODE));
+    set_bool("hw_mipmap", true);
 
     return changed;
 }
