@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">Charger l\'état ?</string>
     <string name="emulation_quick_load_confirm_desc">Cela restaurera l\'emplacement %1$d et remplacera votre progression actuelle non sauvegardée.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Commentaires de la communauté</string>
+    <string name="detail_comments_loading">Chargement des commentaires…</string>
+    <string name="detail_comments_empty">Aucun commentaire pour ce jeu pour le moment.</string>
+    <string name="detail_comments_error">Les commentaires sont temporairement indisponibles.</string>
+    <string name="detail_comment_device">Appareil</string>
+    <string name="detail_comment_unknown_user">Joueur</string>
+    <string name="detail_comments_load_more">Charger 3 de plus</string>
 </resources>

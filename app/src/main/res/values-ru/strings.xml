@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">Загрузить состояние?</string>
     <string name="emulation_quick_load_confirm_desc">Это восстановит слот %1$d и заменит ваш текущий несохраненный прогресс.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Комментарии сообщества</string>
+    <string name="detail_comments_loading">Загрузка комментариев…</string>
+    <string name="detail_comments_empty">Для этой игры пока нет комментариев.</string>
+    <string name="detail_comments_error">Комментарии временно недоступны.</string>
+    <string name="detail_comment_device">Устройство</string>
+    <string name="detail_comment_unknown_user">Игрок</string>
+    <string name="detail_comments_load_more">Загрузить еще 3</string>
 </resources>

@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">Carregar estado?</string>
     <string name="emulation_quick_load_confirm_desc">Isso restaurará o slot %1$d e substituirá seu progresso atual não salvo.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Comentários da comunidade</string>
+    <string name="detail_comments_loading">Carregando comentários…</string>
+    <string name="detail_comments_empty">Ainda não há comentários para este jogo.</string>
+    <string name="detail_comments_error">Os comentários estão temporariamente indisponíveis.</string>
+    <string name="detail_comment_device">Dispositivo</string>
+    <string name="detail_comment_unknown_user">Jogador</string>
+    <string name="detail_comments_load_more">Carregar mais 3</string>
 </resources>

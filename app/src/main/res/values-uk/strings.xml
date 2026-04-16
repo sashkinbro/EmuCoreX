@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">Завантажити стан?</string>
     <string name="emulation_quick_load_confirm_desc">Це відновить слот %1$d і замінить ваш поточний незбережений прогрес.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Коментарі спільноти</string>
+    <string name="detail_comments_loading">Завантаження коментарів…</string>
+    <string name="detail_comments_empty">Для цієї гри поки немає коментарів.</string>
+    <string name="detail_comments_error">Коментарі тимчасово недоступні.</string>
+    <string name="detail_comment_device">Пристрій</string>
+    <string name="detail_comment_unknown_user">Гравець</string>
+    <string name="detail_comments_load_more">Завантажити ще 3</string>
 </resources>

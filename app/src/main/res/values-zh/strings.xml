@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">加载状态？</string>
     <string name="emulation_quick_load_confirm_desc">这将恢复插槽 %1$d 并替换您当前未保存的进度。</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">社区评论</string>
+    <string name="detail_comments_loading">正在加载评论…</string>
+    <string name="detail_comments_empty">此游戏暂无评论。</string>
+    <string name="detail_comments_error">评论暂时不可用。</string>
+    <string name="detail_comment_device">设备</string>
+    <string name="detail_comment_unknown_user">玩家</string>
+    <string name="detail_comments_load_more">再加载 3 条</string>
 </resources>

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
 import android.content.ContextWrapper
+import android.text.format.DateFormat
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
@@ -104,8 +105,10 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.data.GameComment
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
+import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
@@ -119,6 +122,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Date
 import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -148,6 +152,7 @@ fun GameDetailScreen(
 
     val catalog = uiState.catalogDetails
     val heroImage = catalog?.coverUrl ?: catalog?.heroUrl
+    val comments = uiState.comments
 
     LaunchedEffect(uiState.isLoading, shouldRequestGamepadFocus, catalog?.name) {
         if (!uiState.isLoading && shouldRequestGamepadFocus) {
@@ -351,6 +356,19 @@ fun GameDetailScreen(
                         }
                     }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .then(if (isLandscape) Modifier.align(Alignment.CenterHorizontally) else Modifier)
+                        .widthIn(max = contentMaxWidth)
+                        .padding(horizontal = horizontalInset)
+                ) {
+                    CommentsSection(
+                        comments = comments,
+                        isLoading = uiState.isCommentsLoading,
+                        loadFailed = uiState.commentsLoadFailed
+                    )
+                }
             }
         }
     }
@@ -371,6 +389,214 @@ fun GameDetailScreen(
             startIndex = selectedVideoIndex,
             onDismiss = { selectedVideoIndex = -1 }
         )
+    }
+}
+
+@Composable
+private fun CommentsSection(
+    comments: List<GameComment>,
+    isLoading: Boolean,
+    loadFailed: Boolean
+) {
+    var visibleCount by remember(comments) { mutableIntStateOf(minOf(3, comments.size)) }
+    val visibleComments = comments.take(visibleCount)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.detail_comments),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            when {
+                isLoading -> {
+                    Text(
+                        text = stringResource(R.string.detail_comments_loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    repeat(2) {
+                        SkeletonBlock(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(104.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                        )
+                    }
+                }
+
+                loadFailed -> {
+                    Text(
+                        text = stringResource(R.string.detail_comments_error),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                comments.isEmpty() -> {
+                    Text(
+                        text = stringResource(R.string.detail_comments_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                else -> {
+                    visibleComments.forEach { comment ->
+                        CommentCard(comment = comment)
+                    }
+                    if (visibleCount < comments.size) {
+                        TextButton(
+                            onClick = { visibleCount = minOf(visibleCount + 3, comments.size) },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(text = stringResource(R.string.detail_comments_load_more))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentCard(comment: GameComment) {
+    val displayName = comment.displayName.ifBlank { stringResource(R.string.detail_comment_unknown_user) }
+    val initials = remember(displayName) {
+        displayName
+            .split(" ")
+            .filter { it.isNotBlank() }
+            .take(2)
+            .joinToString("") { it.first().uppercase() }
+            .ifBlank { "P" }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BitmapPathImage(
+                        imagePath = comment.photoURL,
+                        contentDescription = displayName,
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop,
+                        fallback = {
+                            Text(
+                                text = initials,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    comment.createdAt?.let { createdAt ->
+                        Text(
+                            text = rememberFormattedCommentDate(createdAt),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Box(modifier = Modifier.padding(top = 2.dp)) {
+                    ReadOnlyStars(rating = comment.rating)
+                }
+            }
+
+            comment.deviceTitle.takeIf { it.isNotBlank() }?.let { deviceTitle ->
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.detail_comment_device),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = deviceTitle,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        comment.deviceSpecs.takeIf { it.isNotBlank() }?.let { specs ->
+                            Text(
+                                text = specs,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = comment.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReadOnlyStars(rating: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        repeat(5) { index ->
+            val filled = index < rating
+            Icon(
+                imageVector = Icons.Rounded.Star,
+                contentDescription = null,
+                tint = if (filled) Color(0xFFFFC857) else MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberFormattedCommentDate(date: Date): String {
+    val context = LocalContext.current
+    return remember(date, context) {
+        DateFormat.getMediumDateFormat(context).format(date)
     }
 }
 

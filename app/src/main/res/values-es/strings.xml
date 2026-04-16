@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">¿Cargar estado?</string>
     <string name="emulation_quick_load_confirm_desc">Esto restaurará la ranura %1$d y reemplazará tu progreso actual no guardado.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Comentarios de la comunidad</string>
+    <string name="detail_comments_loading">Cargando comentarios…</string>
+    <string name="detail_comments_empty">Aún no hay comentarios para este juego.</string>
+    <string name="detail_comments_error">Los comentarios no están disponibles temporalmente.</string>
+    <string name="detail_comment_device">Dispositivo</string>
+    <string name="detail_comment_unknown_user">Jugador</string>
+    <string name="detail_comments_load_more">Cargar 3 más</string>
 </resources>

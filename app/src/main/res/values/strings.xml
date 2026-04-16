@@ -53,6 +53,13 @@
     <string name="detail_igdb_source_note">Game description and metadata on this screen are provided via the IGDB API.</string>
     <string name="detail_screenshots">Screenshots</string>
     <string name="detail_videos">Videos</string>
+    <string name="detail_comments">Community comments</string>
+    <string name="detail_comments_loading">Loading comments…</string>
+    <string name="detail_comments_empty">No comments for this game yet.</string>
+    <string name="detail_comments_error">Comments are temporarily unavailable.</string>
+    <string name="detail_comments_load_more">Load 3 more</string>
+    <string name="detail_comment_device">Device</string>
+    <string name="detail_comment_unknown_user">Player</string>
     <string name="detail_show_more">Show more</string>
     <string name="detail_show_less">Show less</string>
     <string name="detail_previous">Previous</string>

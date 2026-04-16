@@ -178,7 +178,9 @@ struct vifStruct {
 	__fi void ClearTransferProgress() { inprogress = 0; }
 	__fi void ResetTransferProgress(bool preserve_mfifo_wait)
 	{
-		inprogress = preserve_mfifo_wait ? (inprogress & VIF_TRANSFER_MFIFO_EMPTY) : 0;
+		// Use the constant directly: after a memset the current inprogress is
+		// already 0, so (inprogress & VIF_TRANSFER_MFIFO_EMPTY) would always be 0.
+		inprogress = preserve_mfifo_wait ? static_cast<u8>(VIF_TRANSFER_MFIFO_EMPTY) : 0u;
 	}
 
 	__fi bool IsMfifoAwaitingData() const { return (inprogress & VIF_TRANSFER_MFIFO_EMPTY) != 0; }

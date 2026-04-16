@@ -6,6 +6,7 @@
 #include "DebugTools/Breakpoints.h"
 #include "Elfheader.h"
 #include "GS.h"
+#include "Host.h"
 #include "Memory.h"
 #include "Patch.h"
 #include "R3000A.h"
@@ -72,6 +73,8 @@ eeProfiler EE::Profiler;
 
 static DynamicHeapArray<u8, 4096> recRAMCopy;
 static DynamicHeapArray<u8, 4096> recLutReserve_RAM;
+static DynamicHeapArray<u8, 4096> recLutUnmapped;
+static const void* UnmappedRecLUTPage = nullptr;
 static size_t recLutSize;
 static bool extraRam;
 
@@ -369,6 +372,21 @@ static void recEventTest()
 	}
 }
 
+static void recError(u32 error)
+{
+	switch (error)
+	{
+		case 0:
+			Host::ReportErrorAsync("R5900 Exception", fmt::format("Jump to unmapped recLUT page (PC: 0x{:08x})", cpuRegs.pc));
+			break;
+		case 1:
+			Host::ReportErrorAsync("R5900 Exception", fmt::format("Jump to unaligned address (PC: 0x{:08x})", cpuRegs.pc));
+			break;
+	}
+	VMManager::SetPaused(true);
+	recExitExecution();
+}
+
 // The address for all cleared blocks.  It recompiles the current pc and then
 // dispatches to the recompiled block address.
 static const void* _DynGen_JITCompile()
@@ -509,6 +527,14 @@ static const void* _DynGen_DispatchPageReset()
 	return retval;
 }
 
+static const void* _DynGen_UnmappedRecLUTPage()
+{
+    u8* retval = armGetCurrentCodePointer();
+    armAsm->Mov(a64::w0, 0u);
+    armEmitCall(reinterpret_cast<const void*>(recError));
+    return retval;
+}
+
 static void _DynGen_Dispatchers()
 {
 //	const u8* start = xGetAlignedCallTarget();
@@ -523,6 +549,7 @@ static void _DynGen_Dispatchers()
 	EnterRecompiledCode = _DynGen_EnterRecompiledCode();
 	DispatchBlockDiscard = _DynGen_DispatchBlockDiscard();
 	DispatchPageReset = _DynGen_DispatchPageReset();
+	UnmappedRecLUTPage = _DynGen_UnmappedRecLUTPage();
 
 	recBlocks.SetJITCompile(JITCompile);
 
@@ -549,6 +576,11 @@ static void recReserveRAM()
 	if (recLutReserve_RAM.size() != recLutSize)
 		recLutReserve_RAM.resize(recLutSize);
 
+	// Allocate one LUT page of memory for unmapped pages to reference
+	const size_t recLutUnmappedSize = (_64kb / 4) * sizeof(uptr);
+	if (recLutUnmapped.size() != recLutUnmappedSize)
+		recLutUnmapped.resize(recLutUnmappedSize);
+
 	BASEBLOCK* basepos = reinterpret_cast<BASEBLOCK*>(recLutReserve_RAM.data());
 	recRAM = basepos;
 	basepos += (Ps2MemSize::ExposedRam / 4);
@@ -559,8 +591,10 @@ static void recReserveRAM()
 	recROM2 = basepos;
 	basepos += (Ps2MemSize::Rom2 / 4);
 
+	// Initialize all pages to point at the unmapped handler (prevents native crash on bad PC)
+	BASEBLOCK* unmapped = reinterpret_cast<BASEBLOCK*>(recLutUnmapped.data());
 	for (int i = 0; i < 0x10000; i++)
-		recLUT_SetPage(recLUT, 0, 0, 0, i, 0);
+		recLUT_SetPage(recLUT, 0, unmapped, 0, i, 0);
 
 	for (int i = 0x0000; i < (int)(Ps2MemSize::ExposedRam / 0x10000); i++)
 	{
@@ -638,6 +672,12 @@ static void recResetRaw()
     recPtr = armEndBlock();
 
 	ClearRecLUT(reinterpret_cast<BASEBLOCK*>(recLutReserve_RAM.data()), recLutSize);
+
+	// Fill unmapped LUT entries with the UnmappedRecLUTPage handler so jumps to
+	// invalid addresses produce a graceful error instead of a native crash.
+	for (int i = 0; i < _64kb / 4; i++)
+		reinterpret_cast<BASEBLOCK*>(recLutUnmapped.data())[i].SetFnptr((uptr)UnmappedRecLUTPage);
+
 	recRAMCopy.fill(0);
 
 	maxrecmem = 0;
@@ -659,6 +699,7 @@ void recShutdown()
 {
 	recRAMCopy.deallocate();
 	recLutReserve_RAM.deallocate();
+	recLutUnmapped.deallocate();
 
 	recBlocks.Reset();
 

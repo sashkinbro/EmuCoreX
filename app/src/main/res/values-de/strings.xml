@@ -888,4 +888,11 @@
     <string name="emulation_quick_load_confirm_title">Spielstand laden?</string>
     <string name="emulation_quick_load_confirm_desc">Dies stellt Steckplatz %1$d wieder her und ersetzt deinen aktuellen, ungespeicherten Fortschritt.</string>
     <string name="settings_aspect_ratio_107">10:7</string>
+    <string name="detail_comments">Community-Kommentare</string>
+    <string name="detail_comments_loading">Kommentare werden geladen…</string>
+    <string name="detail_comments_empty">Noch keine Kommentare für dieses Spiel.</string>
+    <string name="detail_comments_error">Kommentare sind vorübergehend nicht verfügbar.</string>
+    <string name="detail_comment_device">Gerät</string>
+    <string name="detail_comment_unknown_user">Spieler</string>
+    <string name="detail_comments_load_more">3 weitere laden</string>
 </resources>
