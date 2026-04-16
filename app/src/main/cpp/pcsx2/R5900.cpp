@@ -101,6 +101,7 @@ __ri void cpuException(u32 code, u32 bd)
 	u32 offset = 0;
 
     cpuRegs.branch = 0;		// Tells the interpreter that an exception occurred during a branch.
+	cpuRegs.IsDelaySlot = 0;
 	cpuRegs.CP0.n.Cause = code & 0xffff;
 
 	if(cpuRegs.CP0.n.Status.b.ERL == 0)

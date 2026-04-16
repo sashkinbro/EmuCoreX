@@ -661,8 +661,9 @@ static __ri void vtlb_Miss(u32 addr, u32 mode)
 	cpuRegs.CP0.n.Context &= 0xFF80000F;
 	cpuRegs.CP0.n.Context |= (addr >> 9) & 0x007FFFF0;
 	cpuRegs.CP0.n.EntryHi = (addr & 0xFFFFE000) | (cpuRegs.CP0.n.EntryHi & 0x1FFF);
-	// cpuRegs.branch is not maintained by the JIT; assume not in branch delay slot (0).
-	cpuException(mode ? EXC_CODE_TLBS : EXC_CODE_TLBL, 0);
+	const u32 bd = cpuRegs.IsDelaySlot;
+	cpuRegs.IsDelaySlot = 0;
+	cpuException(mode ? EXC_CODE_TLBS : EXC_CODE_TLBL, bd);
 	// Exit the JIT block immediately (longjmp). This prevents the rest of the block from
 	// executing with stale register state and generating additional spurious TLB misses.
 	recExitExecutionImmediate();

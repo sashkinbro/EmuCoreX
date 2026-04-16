@@ -101,8 +101,17 @@ void recBC0TL()
 
 void recTLBR() { recCall(Interp::TLBR); }
 void recTLBP() { recCall(Interp::TLBP); }
-void recTLBWI() { recCall(Interp::TLBWI); }
-void recTLBWR() { recCall(Interp::TLBWR); }
+void recTLBWI()
+{
+	// A runtime TLB write can invalidate assumptions made by already-compiled
+	// load/store paths, so force a dispatcher trip after the interpreter helper.
+	recBranchCall(Interp::TLBWI);
+}
+void recTLBWR()
+{
+	// Same rationale as TLBWI: stop the current block immediately after the remap.
+	recBranchCall(Interp::TLBWR);
+}
 
 void recERET()
 {
@@ -165,14 +174,6 @@ REC_SYS(MTC0);
 
 void recMFC0()
 {
-	static bool s_logged_first_recMFC0 = false;
-	if (!s_logged_first_recMFC0 && cpuRegs.pc == 0xbfc00004)
-	{
-		s_logged_first_recMFC0 = true;
-		Console.WriteLn("(EErec/COP0) recMFC0 enter: code=0x%08x rt=%u rd=%u imm=0x%x",
-			cpuRegs.code, _Rt_, _Rd_, _Imm_);
-	}
-
 	if (_Rd_ == 9)
 	{
 		// This case needs to be handled even if the write-back is ignored (_Rt_ == 0 )
@@ -247,26 +248,19 @@ void recMFC0()
 	}
 
 	const int regt = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_WRITE);
-	if (cpuRegs.pc == 0xbfc00004)
-	{
-		Console.WriteLn("(EErec/COP0) recMFC0 allocated host reg=%d for rt=%u", regt, _Rt_);
-	}
 //	xMOVSX(xRegister64(regt), ptr32[&cpuRegs.CP0.r[_Rd_]]);
     armLoadsw(a64::XRegister(regt), PTR_CPU(cpuRegs.CP0.r[_Rd_]));
-	if (cpuRegs.pc == 0xbfc00004)
-	{
-		Console.WriteLn("(EErec/COP0) recMFC0 emitted load from CP0.r[%u]", _Rd_);
-	}
 }
 
 void recMTC0()
 {
 	// ARM64 COP0 writes which steer exception return or TLB refill state are
-	// correctness-sensitive. Route them through the interpreter helper so the
-	// EE state is fully flushed and traced consistently.
+	// correctness-sensitive. Force a dispatcher trip after the helper so the
+	// refill/exception path cannot keep running inside a block compiled with
+	// stale CP0 assumptions.
 	if (_Rd_ == 2 || _Rd_ == 3 || _Rd_ == 5 || _Rd_ == 10 || _Rd_ == 14 || _Rd_ == 30)
 	{
-		recCall(Interp::MTC0);
+		recBranchCall(Interp::MTC0);
 		return;
 	}
 

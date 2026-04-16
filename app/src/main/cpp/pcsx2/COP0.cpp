@@ -432,48 +432,11 @@ namespace Interpreter {
 namespace OpcodeImpl {
 namespace COP0 {
 
-	static bool ShouldTraceTlbRefill()
-	{
-		static int s_trace_count = 0;
-		if (!cpuRegs.CP0.n.Status.b.EXL || cpuRegs.CP0.n.BadVAddr == 0 || s_trace_count >= 32)
-			return false;
-
-		s_trace_count++;
-		return true;
-	}
-
-	static void TraceTlbRefillOp(const char* op)
-	{
-		if (!ShouldTraceTlbRefill())
-			return;
-
-		Console.Error("COP0_%s during TLB refill pc:%x epc:%x badv:%x entryhi:%x entrylo0:%x entrylo1:%x pagemask:%x status:%x cause:%x",
-			op, cpuRegs.pc, cpuRegs.CP0.n.EPC, cpuRegs.CP0.n.BadVAddr, cpuRegs.CP0.n.EntryHi,
-			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1, cpuRegs.CP0.n.PageMask,
-			cpuRegs.CP0.n.Status.val, cpuRegs.CP0.n.Cause);
-	}
-
-	static void TraceTlbRefillMtc0(u32 value)
-	{
-		if (_Rd_ != 2 && _Rd_ != 3 && _Rd_ != 5 && _Rd_ != 10 && _Rd_ != 12 && _Rd_ != 14 && _Rd_ != 30)
-			return;
-
-		if (!ShouldTraceTlbRefill())
-			return;
-
-		Console.Error("COP0_MTC0 during TLB refill pc:%x rd:%u rt:%u value:%x old:%x epc:%x badv:%x entryhi:%x entrylo0:%x entrylo1:%x pagemask:%x status:%x cause:%x",
-			cpuRegs.pc, _Rd_, _Rt_, value, cpuRegs.CP0.r[_Rd_], cpuRegs.CP0.n.EPC,
-			cpuRegs.CP0.n.BadVAddr, cpuRegs.CP0.n.EntryHi, cpuRegs.CP0.n.EntryLo0,
-			cpuRegs.CP0.n.EntryLo1, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.Status.val,
-			cpuRegs.CP0.n.Cause);
-	}
-
 	void TLBR()
 	{
 		COP0_LOG("COP0_TLBR %d:%x,%x,%x,%x",
 			cpuRegs.CP0.n.Index, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
-		TraceTlbRefillOp("TLBR");
 
 		const u8 i = cpuRegs.CP0.n.Index & 0x3f;
 
@@ -506,7 +469,6 @@ namespace COP0 {
 		COP0_LOG("COP0_TLBWI %d:%x,%x,%x,%x",
 			cpuRegs.CP0.n.Index, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
-		TraceTlbRefillOp("TLBWI");
 
 		ReplaceRuntimeTlbEntry(j);
 	}
@@ -524,7 +486,6 @@ namespace COP0 {
 		DevCon.Warning("COP0_TLBWR %d:%x,%x,%x,%x\n",
 			cpuRegs.CP0.n.Random, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
-		TraceTlbRefillOp("TLBWR");
 
 		ReplaceRuntimeTlbEntry(j);
 	}
@@ -558,7 +519,6 @@ namespace COP0 {
 		}
 		if (cpuRegs.CP0.n.Index == 0xFFFFFFFF)
 			cpuRegs.CP0.n.Index = 0x80000000;
-		TraceTlbRefillOp("TLBP");
 	}
 
 	void MFC0()
@@ -618,7 +578,6 @@ cpuRegs.PERF.n.pccr, cpuRegs.PERF.n.pcr0, cpuRegs.PERF.n.pcr1, _Imm_ & 0x3F);*/
 	{
 		//if(bExecBIOS == FALSE && _Rd_ == 25) Console.WriteLn("MTC0 _Rd_ %x = %x", _Rd_, cpuRegs.CP0.r[_Rd_]);
 		const u32 mtc0_value = cpuRegs.GPR.r[_Rt_].UL[0];
-		TraceTlbRefillMtc0(mtc0_value);
 
 		switch (_Rd_)
 		{
@@ -734,7 +693,6 @@ cpuRegs.PERF.n.pccr, cpuRegs.PERF.n.pcr0, cpuRegs.PERF.n.pcr1, _Imm_ & 0x3F);*/
 		}
 		else
 		{
-			TraceTlbRefillOp("ERET");
 			cpuRegs.pc = cpuRegs.CP0.n.EPC;
 			cpuRegs.CP0.n.Status.b.EXL = 0;
 		}
