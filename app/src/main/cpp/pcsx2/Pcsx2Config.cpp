@@ -2304,6 +2304,10 @@ static std::string LoadPathFromSettings(SettingsInterface& si, const std::string
 
 void EmuFolders::LoadConfig(SettingsInterface& si)
 {
+	// DataRoot can be injected directly by the Android host, so rebuild Settings here too
+	// instead of relying on SetDataRoot()/portable startup paths to have done it already.
+	Settings = Path::Combine(DataRoot, "inis");
+
 	Bios = LoadPathFromSettings(si, DataRoot, "Bios", "bios");
 	Snapshots = LoadPathFromSettings(si, DataRoot, "Snapshots", "snaps");
 	Savestates = LoadPathFromSettings(si, DataRoot, "Savestates", "sstates");
@@ -2322,6 +2326,7 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
 	DebuggerSettings = LoadPathFromSettings(si, Settings, "DebuggerSettings", "debuggersettings");
 
 	Console.WriteLn("BIOS Directory: %s", Bios.c_str());
+	Console.WriteLn("Settings Directory: %s", Settings.c_str());
 	Console.WriteLn("Snapshots Directory: %s", Snapshots.c_str());
 	Console.WriteLn("Savestates Directory: %s", Savestates.c_str());
 	Console.WriteLn("MemoryCards Directory: %s", MemoryCards.c_str());

@@ -40,7 +40,7 @@ bool FileMcd_Open = false;
 // https://sourceforge.net/p/mymc-opl/code/ci/master/tree/ps2mc_ecc.py
 // Public domain license
 
-static u32 CalculateECC(const u8* buf)
+static u32 CalculateECC(u8* buf)
 {
 	const u8 parity_table[256] = {0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1,
 		0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
@@ -79,55 +79,6 @@ static u32 CalculateECC(const u8* buf)
 	}
 
 	return column_parity | (line_parity_0 << 8) | (line_parity_1 << 16);
-}
-
-class CanonicalFileMemoryCardGenerator final : public FolderMemoryCard
-{
-public:
-	bool Create(const std::string& path, u32 size_in_mb)
-	{
-		if (size_in_mb == 0)
-			return false;
-
-		InitializeInternalData();
-		m_performFileWrites = false;
-		m_isEnabled = true;
-
-		const u32 clusters = (size_in_mb * 1024 * 1024) / ClusterSize;
-		m_superBlock.data.page_len = PageSize;
-		m_superBlock.data.pages_per_cluster = 2;
-		m_superBlock.data.pages_per_block = 16;
-		m_superBlock.data.unused = 0xFF00;
-		m_superBlock.data.clusters_per_card = clusters;
-		m_superBlock.data.alloc_offset = clusters / 0x100 + 9;
-		m_superBlock.data.alloc_end = clusters - 0x10 - m_superBlock.data.alloc_offset;
-		m_superBlock.data.rootdir_cluster = 0;
-		m_superBlock.data.backup_block1 = (clusters / 8) - 1;
-		m_superBlock.data.backup_block2 = (clusters / 8) - 2;
-		std::memcpy(m_superBlock.data.magic, "Sony PS2 Memory Card Format ", sizeof(m_superBlock.data.magic));
-		std::memcpy(m_superBlock.data.version, "1.2.0.0", 8);
-		m_superBlock.data.card_type = 2;
-		m_superBlock.data.card_flags = 0x52;
-		for (u32 i = 0; i < std::size(m_superBlock.data.ifc_list); i++)
-			m_superBlock.data.ifc_list[i] = 0xFFFFFFFFu;
-		for (u32& bad_block : m_superBlock.data.bad_block_list)
-			bad_block = 0xFFFFFFFFu;
-		m_superBlock.data.ifc_list[0] = 8;
-
-		CreateFat();
-		CreateRootDir();
-		FlushSuperBlock();
-		FlushFileEntries();
-		WriteToFile(path);
-
-		return (FileSystem::GetPathFileSize(path.c_str()) == static_cast<s64>(size_in_mb) * MC2_MBSIZE);
-	}
-};
-
-static bool InitializeFormattedPS2MemoryCard(const char* path, u32 size_in_mb)
-{
-	CanonicalFileMemoryCardGenerator generator;
-	return generator.Create(path, size_in_mb);
 }
 
 static bool ConvertNoECCtoRAW(const char* file_in, const char* file_out)
@@ -433,8 +384,16 @@ bool FileMemoryCard::Create(const char* mcdFile, uint sizeInMB)
 	if (!fp)
 		return false;
 
-	std::fclose(fp.release());
-	return InitializeFormattedPS2MemoryCard(mcdFile, sizeInMB);
+	u8 buf[MC2_ERASE_SIZE];
+	std::memset(buf, 0xff, sizeof(buf));
+
+	for (uint i = 0; i < (MC2_MBSIZE * sizeInMB) / sizeof(buf); i++)
+	{
+		if (std::fwrite(buf, sizeof(buf), 1, fp.get()) != 1)
+			return false;
+	}
+
+	return true;
 }
 
 s32 FileMemoryCard::IsPresent(uint slot)
@@ -1074,12 +1033,19 @@ bool FileMcd_CreateNewCard(const std::string_view name, MemoryCardType type, Mem
 		if (!isPSX)
 		{
 			Console.WriteLn("(FileMcd) Creating new PS2 %uMB memory card: '%s'", size / MC2_MBSIZE, full_path.c_str());
-			std::fclose(fp.release());
-			if (!InitializeFormattedPS2MemoryCard(full_path.c_str(), size / MC2_MBSIZE))
+
+			u8 buf[MC2_ERASE_SIZE];
+			std::memset(buf, 0xff, sizeof(buf));
+
+			const u32 count = size / sizeof(buf);
+			for (uint i = 0; i < count; i++)
 			{
-				Host::ReportErrorAsync("Memory Card Creation Failed",
-					fmt::format("Failed to write memory card file:\n{}", full_path));
-				return false;
+				if (std::fwrite(buf, sizeof(buf), 1, fp.get()) != 1)
+				{
+					Host::ReportErrorAsync("Memory Card Creation Failed",
+						fmt::format("Failed to write memory card file:\n{}", full_path));
+					return false;
+				}
 			}
 
 			return true;
