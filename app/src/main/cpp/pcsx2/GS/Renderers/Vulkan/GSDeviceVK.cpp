@@ -12,7 +12,7 @@
 #include "GS/Renderers/Vulkan/VKSwapChain.h"
 #include "GS/Renderers/Common/GSDevice.h"
 
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "Host.h"
 
 #include "common/Console.h"

@@ -283,9 +283,29 @@ struct vuRegistersPack
     alignas(16) microVU microVU[2];
 };
 alignas(128) extern vuRegistersPack g_vuRegistersPack;
-////
-static microVU& microVU0 = g_vuRegistersPack.microVU[0];
-static microVU& microVU1 = g_vuRegistersPack.microVU[1];
+
+inline vuRegistersPack& GetMicroVuRegistersPack()
+{
+	return g_vuRegistersPack;
+}
+
+inline vuRegistersPack* GetMicroVuRegistersPackPtr()
+{
+	return &GetMicroVuRegistersPack();
+}
+
+inline microVU& GetMicroVU0()
+{
+	return GetMicroVuRegistersPack().microVU[0];
+}
+
+inline microVU& GetMicroVU1()
+{
+	return GetMicroVuRegistersPack().microVU[1];
+}
+
+#define microVU0 (GetMicroVU0())
+#define microVU1 (GetMicroVU1())
 
 // Debug Helper
 int mVUdebugNow = 0;

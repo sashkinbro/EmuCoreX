@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "CDVD/CDVD.h"
 #include "CDVD/IsoReader.h"
 #include "Counters.h"
@@ -14,7 +14,7 @@
 #include "GS.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "GSDumpReplayer.h"
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 #include "GameList.h"
 #include "Host.h"
 #include "INISettingsInterface.h"
@@ -26,7 +26,7 @@
 #include "MTVU.h"
 #include "PINE.h"
 #include "Patch.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "R3000A.h"
 #include "R5900.h"
 #include "Recording/InputRecording.h"
@@ -41,7 +41,7 @@
 #include "USB/USB.h"
 #include "Vif_Dynarec.h"
 #include "VMManager.h"
-#include "arm64/cpuRegistersPack.h"
+#include "arm64/policy/Arm64RuntimePolicy.h"
 #include "ps2/BiosTools.h"
 
 #include "common/Console.h"
@@ -1555,7 +1555,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
-	vtlb_InvalidateRuntimeBlockTracking();
+	vtlb_InvalidateExecutionTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
 	Arm64RefreshRuntimeBackendConfig();
@@ -1824,7 +1824,7 @@ void VMManager::Reset()
 
 	Achievements::ResetClient();
 
-	vtlb_InvalidateRuntimeBlockTracking();
+	vtlb_InvalidateExecutionTracking();
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	Internal::ClearCPUExecutionCaches();
 	memBindConditionalHandlers();
@@ -2788,7 +2788,7 @@ void VMManager::Execute()
 		// We need to switch the cpus out, and reset the new ones if so.
 		UpdateCPUImplementations();
 		Internal::ClearCPUExecutionCaches();
-		vtlb_RefreshRuntimeMappingsAfterConfigChange();
+		vtlb_RebuildRuntimeMappingsForConfigChange();
 	}
 
 	// Execute until we're asked to stop.
@@ -2927,7 +2927,7 @@ void VMManager::Internal::EntryPointCompilingOnCPUThread()
 	FileMcd_CancelEject();
 
 	// Toss all the recs, we're going to be executing new code.
-	vtlb_InvalidateRuntimeBlockTracking();
+	vtlb_InvalidateExecutionTracking();
 	ClearCPUExecutionCaches();
 
 	R5900SymbolImporter.OnElfLoadedInMemory();
@@ -3000,7 +3000,7 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	memBindConditionalHandlers();
 
 	if (EmuConfig.Cpu.Recompiler.EnableFastmem != old_config.Cpu.Recompiler.EnableFastmem)
-		vtlb_RefreshRuntimeMappingsAfterConfigChange();
+		vtlb_RebuildRuntimeMappingsForConfigChange();
 
 	// did we toggle recompilers?
 	if (EmuConfig.Cpu.CpusChanged(old_config.Cpu))

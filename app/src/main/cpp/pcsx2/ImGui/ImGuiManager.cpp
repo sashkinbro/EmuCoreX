@@ -13,7 +13,7 @@
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
 #include "MTGS.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "Recording/InputRecording.h"
 #include "VMManager.h"
 

@@ -45,6 +45,60 @@ inline void Arm64AssertVifProvisional8BitScalarExpandPath()
 		"ARM64 VIF 8-bit scalar expand path unexpectedly marked finalized.");
 }
 
+inline void Arm64HandleTransitionalMaskedIterationUnpack(int upknum)
+{
+	Arm64AssertVifMaskedIterationPolicy(upknum);
+}
+
+enum class Arm64VifUnpackIterationUpdatePhase
+{
+	None,
+	BeforeWrite,
+	AfterWrite,
+};
+
+inline Arm64VifUnpackIterationUpdatePhase Arm64GetVifUnpackIterationUpdatePhase(int upknum)
+{
+	switch (upknum)
+	{
+		case 0:
+		case 1:
+		case 2:
+		case 4:
+		case 5:
+		case 6:
+		case 8:
+			return Arm64VifUnpackIterationUpdatePhase::AfterWrite;
+
+		case 9:
+		case 10:
+			return Arm64VifUnpackIterationUpdatePhase::BeforeWrite;
+
+		default:
+			return Arm64VifUnpackIterationUpdatePhase::None;
+	}
+}
+
+inline int Arm64GetVifUnpackIterationMask(int upknum)
+{
+	switch (upknum)
+	{
+		case 0:
+		case 1:
+		case 2:
+			return 0x3;
+
+		case 4:
+		case 5:
+		case 6:
+		case 8:
+			return 0x1;
+
+		default:
+			return 0;
+	}
+}
+
 // --------------------------------------------------------------------------------------
 //  VifUnpackSSE_Base
 // --------------------------------------------------------------------------------------

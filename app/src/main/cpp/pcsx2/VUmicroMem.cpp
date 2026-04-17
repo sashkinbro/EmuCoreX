@@ -3,10 +3,10 @@
 
 #include "Common.h"
 #include "VUmicro.h"
+#include "core/state/CoreStateExposure.h"
 #include "MTVU.h"
-#include "arm64/cpuRegistersPack.h"
 
-VURegs (&vuRegs)[2] = g_cpuRegistersPack.vuRegs;
+VURegs (&vuRegs)[2] = CORE_STATE_VU_REGS;
 
 void vuMemAllocate()
 {

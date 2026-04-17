@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 #include "GS/GS.h"
 #include "Host.h"
 #include "IconsFontAwesome.h"

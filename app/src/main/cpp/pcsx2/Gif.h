@@ -270,7 +270,9 @@ struct GIFregisters
 	u32 padding9[3];
 };
 
-static GIFregisters& gifRegs = (GIFregisters&)eeHw[0x3000];
+inline GIFregisters& GetGifRegs() { return reinterpret_cast<GIFregisters&>(eeHw[0x3000]); }
+
+#define gifRegs (GetGifRegs())
 
 extern void gifInterrupt();
 extern void GIFdma();

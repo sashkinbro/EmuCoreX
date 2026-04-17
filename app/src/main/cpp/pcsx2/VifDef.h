@@ -119,7 +119,10 @@ struct VIFregisters {
     u32 addr;
 };
 
-static VIFregisters& vif0Regs = (VIFregisters&)eeHw[0x3800];
-static VIFregisters& vif1Regs = (VIFregisters&)eeHw[0x3C00];
+inline VIFregisters& GetVif0Regs() { return reinterpret_cast<VIFregisters&>(eeHw[0x3800]); }
+inline VIFregisters& GetVif1Regs() { return reinterpret_cast<VIFregisters&>(eeHw[0x3C00]); }
+
+#define vif0Regs (GetVif0Regs())
+#define vif1Regs (GetVif1Regs())
 
 #endif //PCSX2_VIFDEF_H

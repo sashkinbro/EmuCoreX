@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 
 #include "common/Pcsx2Defs.h"
 

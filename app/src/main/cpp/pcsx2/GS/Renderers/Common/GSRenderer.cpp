@@ -11,7 +11,7 @@
 #include "GS/GSUtil.h"
 #include "GSDumpReplayer.h"
 #include "Host.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "pcsx2/Config.h"
 #include "VMManager.h"
 

@@ -219,18 +219,31 @@ struct dma_mbct
 	std::string desc() const { return StringUtil::StdStringFromFormat("madr: 0x%x bcr: 0x%x chcr: 0x%x tadr: 0x%x", madr, bcr, chcr, tadr); }
 };
 
-static dma_mbc&		hw_dma0		= (dma_mbc&) iopHw[0x1080];
-static dma_mbc&		hw_dma1		= (dma_mbc&) iopHw[0x1090];
-static dma_mbct&	hw_dma2		= (dma_mbct&)iopHw[0x10a0];
-static dma_mbc&		hw_dma3		= (dma_mbc&) iopHw[0x10b0];
-static dma_mbct&	hw_dma4		= (dma_mbct&)iopHw[0x10c0];
-static dma_mbc&		hw_dma6		= (dma_mbc&) iopHw[0x10e0];
-static dma_mbc&		hw_dma7		= (dma_mbc&) iopHw[0x1500];
-static dma_mbc&		hw_dma8		= (dma_mbc&) iopHw[0x1510];
-static dma_mbct&	hw_dma9		= (dma_mbct&)iopHw[0x1520];
-static dma_mbc&		hw_dma10	= (dma_mbc&) iopHw[0x1530];
-static dma_mbc&		hw_dma11	= (dma_mbc&) iopHw[0x1540];
-static dma_mbc&		hw_dma12	= (dma_mbc&) iopHw[0x1550];
+inline dma_mbc& GetIopHwDma0() { return reinterpret_cast<dma_mbc&>(iopHw[0x1080]); }
+inline dma_mbc& GetIopHwDma1() { return reinterpret_cast<dma_mbc&>(iopHw[0x1090]); }
+inline dma_mbct& GetIopHwDma2() { return reinterpret_cast<dma_mbct&>(iopHw[0x10a0]); }
+inline dma_mbc& GetIopHwDma3() { return reinterpret_cast<dma_mbc&>(iopHw[0x10b0]); }
+inline dma_mbct& GetIopHwDma4() { return reinterpret_cast<dma_mbct&>(iopHw[0x10c0]); }
+inline dma_mbc& GetIopHwDma6() { return reinterpret_cast<dma_mbc&>(iopHw[0x10e0]); }
+inline dma_mbc& GetIopHwDma7() { return reinterpret_cast<dma_mbc&>(iopHw[0x1500]); }
+inline dma_mbc& GetIopHwDma8() { return reinterpret_cast<dma_mbc&>(iopHw[0x1510]); }
+inline dma_mbct& GetIopHwDma9() { return reinterpret_cast<dma_mbct&>(iopHw[0x1520]); }
+inline dma_mbc& GetIopHwDma10() { return reinterpret_cast<dma_mbc&>(iopHw[0x1530]); }
+inline dma_mbc& GetIopHwDma11() { return reinterpret_cast<dma_mbc&>(iopHw[0x1540]); }
+inline dma_mbc& GetIopHwDma12() { return reinterpret_cast<dma_mbc&>(iopHw[0x1550]); }
+
+#define hw_dma0 (GetIopHwDma0())
+#define hw_dma1 (GetIopHwDma1())
+#define hw_dma2 (GetIopHwDma2())
+#define hw_dma3 (GetIopHwDma3())
+#define hw_dma4 (GetIopHwDma4())
+#define hw_dma6 (GetIopHwDma6())
+#define hw_dma7 (GetIopHwDma7())
+#define hw_dma8 (GetIopHwDma8())
+#define hw_dma9 (GetIopHwDma9())
+#define hw_dma10 (GetIopHwDma10())
+#define hw_dma11 (GetIopHwDma11())
+#define hw_dma12 (GetIopHwDma12())
 
 #define hw_dma(x)	hw_dma##x
 

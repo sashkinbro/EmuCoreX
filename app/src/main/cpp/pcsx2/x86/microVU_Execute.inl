@@ -4,6 +4,7 @@
 #pragma once
 
 #include "Config.h"
+#include "core/state/CoreStateExposure.h"
 #include "cpuinfo.h"
 
 //------------------------------------------------------------------
@@ -28,8 +29,8 @@ void mVUdispatcherAB(mV)
         armBeginStackFrame();
 
         // From memory to registry
-        armMoveAddressToReg(RSTATE_MVU, &g_vuRegistersPack);
-        armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+        armMoveAddressToReg(RSTATE_MVU, GetMicroVuRegistersPackPtr());
+        armMoveAddressToReg(RSTATE_CPU, GetCoreStateRuntimePackPtr());
 
 		// = The caller has already put the needed parameters in ecx/edx:
         if (!isVU1) {

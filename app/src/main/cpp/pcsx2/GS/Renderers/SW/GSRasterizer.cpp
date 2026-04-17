@@ -6,7 +6,7 @@
 #include "GS/Renderers/SW/GSRasterizer.h"
 #include "GS/Renderers/SW/GSDrawScanline.h"
 #include "GS/GSExtra.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "VMManager.h"
 
 #include "common/AlignedMalloc.h"

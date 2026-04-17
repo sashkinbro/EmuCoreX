@@ -12,7 +12,7 @@
 
 #include "Achievements.h"
 #include "Config.h"
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 #include "Host.h"
 #include "IopMem.h"
 #include "Memory.h"

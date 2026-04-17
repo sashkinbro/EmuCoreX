@@ -7,7 +7,7 @@
 #include "common/Timer.h"
 #include "common/Threading.h"
 
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 
 #include "GS.h"
 #include "GS/GSCapture.h"
@@ -223,9 +223,6 @@ void PerformanceMetrics::Update(bool gs_register_write, bool fb_blit, bool is_sk
 
 	s_frames_since_last_update = 0;
 	s_unskipped_frames_since_last_update = 0;
-	s_presents_since_last_update = 0;
-
-	Host::OnPerformanceMetricsUpdated();
 }
 
 void PerformanceMetrics::OnGPUPresent(float gpu_time)
@@ -236,20 +233,17 @@ void PerformanceMetrics::OnGPUPresent(float gpu_time)
 
 void PerformanceMetrics::SetCPUThread(Threading::ThreadHandle thread)
 {
-	s_last_cpu_time = thread ? thread.GetCPUTime() : 0;
-	s_cpu_thread_handle = std::move(thread);
+	s_cpu_thread_handle = thread;
 }
 
 void PerformanceMetrics::SetGSSWThreadCount(u32 count)
 {
-	s_gs_sw_threads.clear();
 	s_gs_sw_threads.resize(count);
 }
 
 void PerformanceMetrics::SetGSSWThread(u32 index, Threading::ThreadHandle thread)
 {
-	s_gs_sw_threads[index].last_cpu_time = thread ? thread.GetCPUTime() : 0;
-	s_gs_sw_threads[index].handle = std::move(thread);
+	s_gs_sw_threads[index].handle = thread;
 }
 
 u64 PerformanceMetrics::GetFrameNumber()
@@ -264,7 +258,7 @@ PerformanceMetrics::InternalFPSMethod PerformanceMetrics::GetInternalFPSMethod()
 
 bool PerformanceMetrics::IsInternalFPSValid()
 {
-	return s_internal_fps_method != InternalFPSMethod::None;
+	return (s_internal_fps_method != InternalFPSMethod::None);
 }
 
 float PerformanceMetrics::GetFPS()
@@ -279,7 +273,7 @@ float PerformanceMetrics::GetInternalFPS()
 
 float PerformanceMetrics::GetSpeed()
 {
-	return (s_fps / VMManager::GetFrameRate()) * 100.0;
+	return (s_internal_fps > 0.0f) ? (s_fps / s_internal_fps) : 0.0f;
 }
 
 float PerformanceMetrics::GetAverageFrameTime()

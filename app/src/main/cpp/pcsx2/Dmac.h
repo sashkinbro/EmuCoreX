@@ -537,19 +537,31 @@ struct INTCregisters
 
 #define intcRegs ((INTCregisters*)(eeHw+0xF000))
 
-static DMACregisters& dmacRegs	= (DMACregisters&)eeHw[0xE000];
+inline DMACregisters& GetDmacRegs() { return reinterpret_cast<DMACregisters&>(eeHw[0xE000]); }
 
 // Various useful locations
-static DMACh& vif0ch	= (DMACh&)eeHw[0x8000];
-static DMACh& vif1ch	= (DMACh&)eeHw[0x9000];
-static DMACh& gifch		= (DMACh&)eeHw[0xA000];
-static DMACh& spr0ch	= (DMACh&)eeHw[0xD000];
-static DMACh& spr1ch	= (DMACh&)eeHw[0xD400];
-static DMACh& ipu0ch	= (DMACh&)eeHw[0xb000];
-static DMACh& ipu1ch	= (DMACh&)eeHw[0xb400];
-static DMACh& sif0ch	= (DMACh&)eeHw[0xc000];
-static DMACh& sif1ch	= (DMACh&)eeHw[0xc400];
-static DMACh& sif2dma	= (DMACh&)eeHw[0xc800];
+inline DMACh& GetVif0DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0x8000]); }
+inline DMACh& GetVif1DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0x9000]); }
+inline DMACh& GetGifDmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xA000]); }
+inline DMACh& GetSpr0DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xD000]); }
+inline DMACh& GetSpr1DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xD400]); }
+inline DMACh& GetIpu0DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xb000]); }
+inline DMACh& GetIpu1DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xb400]); }
+inline DMACh& GetSif0DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xc000]); }
+inline DMACh& GetSif1DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xc400]); }
+inline DMACh& GetSif2DmaCh() { return reinterpret_cast<DMACh&>(eeHw[0xc800]); }
+
+#define dmacRegs (GetDmacRegs())
+#define vif0ch (GetVif0DmaCh())
+#define vif1ch (GetVif1DmaCh())
+#define gifch (GetGifDmaCh())
+#define spr0ch (GetSpr0DmaCh())
+#define spr1ch (GetSpr1DmaCh())
+#define ipu0ch (GetIpu0DmaCh())
+#define ipu1ch (GetIpu1DmaCh())
+#define sif0ch (GetSif0DmaCh())
+#define sif1ch (GetSif1DmaCh())
+#define sif2dma (GetSif2DmaCh())
 
 extern void throwBusError(const char *s);
 extern void setDmacStat(u32 num);

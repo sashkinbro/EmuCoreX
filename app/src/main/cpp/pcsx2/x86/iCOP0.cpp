@@ -20,6 +20,19 @@ namespace Dynarec {
 namespace OpcodeImpl {
 namespace COP0 {
 
+static void recBranchAfterTlbMutation(void (*helper)())
+{
+	// Runtime TLB mutation invalidates assumptions made by compiled load/store paths,
+	// so execution must bounce through the dispatcher after the interpreter helper.
+	recBranchCall(helper);
+}
+
+static bool recMtc0RequiresDispatcherTrip(u32 rd)
+{
+	// These COP0 writes steer exception return / TLB refill sensitive state.
+	return (rd == 2 || rd == 3 || rd == 5 || rd == 10 || rd == 14 || rd == 30);
+}
+
 /*********************************************************
 *   COP0 opcodes                                         *
 *                                                        *
@@ -104,14 +117,11 @@ void recTLBR() { recCall(Interp::TLBR); }
 void recTLBP() { recCall(Interp::TLBP); }
 void recTLBWI()
 {
-	// A runtime TLB write can invalidate assumptions made by already-compiled
-	// load/store paths, so force a dispatcher trip after the interpreter helper.
-	recBranchCall(Interp::TLBWI);
+	recBranchAfterTlbMutation(Interp::TLBWI);
 }
 void recTLBWR()
 {
-	// Same rationale as TLBWI: stop the current block immediately after the remap.
-	recBranchCall(Interp::TLBWR);
+	recBranchAfterTlbMutation(Interp::TLBWR);
 }
 
 void recERET()
@@ -255,11 +265,7 @@ void recMFC0()
 
 void recMTC0()
 {
-	// ARM64 COP0 writes which steer exception return or TLB refill state are
-	// correctness-sensitive. Force a dispatcher trip after the helper so the
-	// refill/exception path cannot keep running inside a block compiled with
-	// stale CP0 assumptions.
-	if (_Rd_ == 2 || _Rd_ == 3 || _Rd_ == 5 || _Rd_ == 10 || _Rd_ == 14 || _Rd_ == 30)
+	if (recMtc0RequiresDispatcherTrip(_Rd_))
 	{
 		recBranchCall(Interp::MTC0);
 		return;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "CDVD/CDVD.h"
 #include "COP0.h"
 #include "Cache.h"
@@ -47,39 +47,39 @@
 #include <png.h>
 
 #ifdef ARCH_ARM64
-#include "arm64/cpuRegistersPack.h"
+#include "arm64/policy/Arm64RuntimePolicy.h"
 #endif
 
 using namespace R5900;
 
-static tlbs s_tlb_backup[std::size(tlb)];
+static tlbs s_state_load_tlb_snapshot[std::size(tlb)];
 
-static void RuntimeStatePreLoadPrep()
+static void PrepareRuntimeStateForLoadOverwrite()
 {
 #ifdef ARCH_ARM64
 	Arm64PrepareRuntimeForStateLoad();
 #endif
 }
 
-static void RuntimeStatePostLoadPrep()
+static void RepairRuntimeStateAfterLoadOverwrite()
 {
 #ifdef ARCH_ARM64
 	Arm64RepairRuntimeAfterStateLoad();
 #endif
 }
 
-static void RestoreTlbMappingsAfterStateLoad()
+static void RepairTlbStateAfterLoadOverwrite()
 {
-	vtlb_RunPostLoadRepair(s_tlb_backup, std::size(tlb), EmuConfig.Gamefixes.GoemonTlbHack);
+	vtlb_RepairMappingsAfterStateLoad(s_state_load_tlb_snapshot, std::size(tlb), EmuConfig.Gamefixes.GoemonTlbHack);
 }
 
-static void RestoreDebuggerStateAfterStateLoad()
+static void RepairDebuggerStateAfterLoadOverwrite()
 {
 	CBreakPoints::SetSkipFirst(BREAKPOINT_EE, 0);
 	CBreakPoints::SetSkipFirst(BREAKPOINT_IOP, 0);
 }
 
-static void RestorePresentationStateAfterStateLoad()
+static void RepairPresentationStateAfterLoadOverwrite()
 {
 	UpdateVSyncRate(true);
 
@@ -87,7 +87,7 @@ static void RestorePresentationStateAfterStateLoad()
 		R5900SymbolImporter.OnElfLoadedInMemory();
 }
 
-static void WaitForVmSubsystemsBeforeStateLoad()
+static void SynchronizeVmSubsystemsBeforeStateLoad()
 {
 	// ensure everything is in sync before we start overwriting stuff.
 	if (THREAD_VU1)
@@ -95,33 +95,35 @@ static void WaitForVmSubsystemsBeforeStateLoad()
 	MTGS::WaitGS(false);
 }
 
-static void BackupTlbStateBeforeStateLoad()
+static void CaptureTlbStateSnapshotBeforeLoadOverwrite()
 {
-	vtlb_CaptureStateLoadSnapshot(s_tlb_backup, std::size(s_tlb_backup));
+	vtlb_CaptureTlbStateSnapshot(s_state_load_tlb_snapshot, std::size(s_state_load_tlb_snapshot));
 }
 
-static void ResetExecutionTrackingBeforeStateLoad()
+static void InvalidateExecutionTrackingBeforeStateLoad()
 {
-	vtlb_InvalidateRuntimeBlockTracking();
+	vtlb_InvalidateExecutionTracking();
 	VMManager::Internal::ClearCPUExecutionCaches();
 }
 
-static void PreLoadPrep()
+static void PrepareForStateLoadOverwrite()
 {
-	WaitForVmSubsystemsBeforeStateLoad();
-	BackupTlbStateBeforeStateLoad();
-	ResetExecutionTrackingBeforeStateLoad();
-	RuntimeStatePreLoadPrep();
+	// Order is deliberate: first stop side effects, then capture repair context,
+	// then invalidate runtime execution state, and only then prep backend-local runtime.
+	SynchronizeVmSubsystemsBeforeStateLoad();
+	CaptureTlbStateSnapshotBeforeLoadOverwrite();
+	InvalidateExecutionTrackingBeforeStateLoad();
+	PrepareRuntimeStateForLoadOverwrite();
 }
 
-static void PostLoadPrep()
+static void RepairAfterStateLoadOverwrite()
 {
 	resetCache();
 //	WriteCP0Status(cpuRegs.CP0.n.Status.val);
-	RestoreTlbMappingsAfterStateLoad();
-	RestoreDebuggerStateAfterStateLoad();
-	RestorePresentationStateAfterStateLoad();
-	RuntimeStatePostLoadPrep();
+	RepairTlbStateAfterLoadOverwrite();
+	RepairDebuggerStateAfterLoadOverwrite();
+	RepairPresentationStateAfterLoadOverwrite();
+	RepairRuntimeStateAfterLoadOverwrite();
 }
 
 // --------------------------------------------------------------------------------------
@@ -1095,7 +1097,9 @@ static zip_t* OpenSavestateZipForWrite(const char* filename, Error* error)
 	return OpenSavestateZipFromWriteSource(zs, &ze, filename, error);
 }
 
-static std::unique_ptr<zip_t, void (*)(zip_t*)> OpenSavestateZipForRead(const char* filename, const char* purpose, Error* error = nullptr)
+using ManagedSavestateZip = std::unique_ptr<zip_t, void (*)(zip_t*)>;
+
+static ManagedSavestateZip OpenSavestateZipForRead(const char* filename, const char* purpose, Error* error = nullptr)
 {
 	zip_error_t ze = {};
 	auto zf = zip_open_managed(filename, ZIP_RDONLY, &ze);
@@ -1449,6 +1453,18 @@ static zip_int64_t FindSavestateArchiveEntryIndex(zip_t* zf, const char* name, b
 	return index;
 }
 
+struct SavestateArchiveLoadContext
+{
+	s64 internal_structures_index = -1;
+	std::array<s64, std::size(SavestateEntries)> entry_indices = {};
+};
+
+struct SavestateLoadSession
+{
+	ManagedSavestateZip archive{nullptr, zip_discard};
+	SavestateArchiveLoadContext context;
+};
+
 static bool LoadInternalStructuresState(zip_t* zf, s64 index, Error* error)
 {
 	const std::optional<std::vector<u8>> buffer = ReadZipEntryPayloadByIndex(zf, index);
@@ -1458,27 +1474,25 @@ static bool LoadInternalStructuresState(zip_t* zf, s64 index, Error* error)
 	return LoadInternalStateFromPayload(*buffer, error);
 }
 
-static bool LookupSavestateArchiveEntryIndices(zip_t* zf, s64* out_internal_index,
-	std::array<s64, std::size(SavestateEntries)>* out_entry_indices)
+static bool LookupSavestateArchiveEntryIndices(zip_t* zf, SavestateArchiveLoadContext* context)
 {
-	*out_internal_index = FindSavestateArchiveEntryIndex(zf, EntryFilename_InternalStructures, true);
-	bool all_present = (*out_internal_index >= 0);
+	context->internal_structures_index = FindSavestateArchiveEntryIndex(zf, EntryFilename_InternalStructures, true);
+	bool all_present = (context->internal_structures_index >= 0);
 
 	for (u32 i = 0; i < std::size(SavestateEntries); i++)
 	{
 		const bool required = SavestateEntries[i]->IsRequired();
-		(*out_entry_indices)[i] = FindSavestateArchiveEntryIndex(zf, SavestateEntries[i]->GetFilename(), required);
-		if ((*out_entry_indices)[i] < 0 && required)
+		context->entry_indices[i] = FindSavestateArchiveEntryIndex(zf, SavestateEntries[i]->GetFilename(), required);
+		if (context->entry_indices[i] < 0 && required)
 			all_present = false;
 	}
 
 	return all_present;
 }
 
-static bool ValidateSavestateArchive(zip_t* zf, s64* out_internal_index, std::array<s64, std::size(SavestateEntries)>* out_entry_indices,
-	Error* error)
+static bool ValidateSavestateArchive(zip_t* zf, SavestateArchiveLoadContext* context, Error* error)
 {
-	if (!LookupSavestateArchiveEntryIndices(zf, out_internal_index, out_entry_indices))
+	if (!LookupSavestateArchiveEntryIndices(zf, context))
 	{
 		Error::SetString(error, "Some required components were not found or are incomplete.");
 		return false;
@@ -1513,13 +1527,22 @@ static bool LoadSavestateArchiveEntries(zip_t* zf, const std::array<s64, std::si
 
 static bool FailSavestateLoad(Error* error, const char* default_message);
 
-static bool RunSavestatePayloadLoadPhase(zip_t* zf, s64 internal_index,
-	const std::array<s64, std::size(SavestateEntries)>& entry_indices, Error* error)
+static bool LoadSavestateInternalStructures(const SavestateLoadSession& session, Error* error)
 {
-	if (!LoadInternalStructuresState(zf, internal_index, error))
+	return LoadInternalStructuresState(session.archive.get(), session.context.internal_structures_index, error);
+}
+
+static bool LoadSavestateComponentEntries(const SavestateLoadSession& session, Error* error)
+{
+	return LoadSavestateArchiveEntries(session.archive.get(), session.context.entry_indices, error);
+}
+
+static bool RunSavestatePayloadLoadPhase(const SavestateLoadSession& session, Error* error)
+{
+	if (!LoadSavestateInternalStructures(session, error))
 		return FailSavestateLoad(error, "Save state corruption in internal structures.");
 
-	if (!LoadSavestateArchiveEntries(zf, entry_indices, error))
+	if (!LoadSavestateComponentEntries(session, error))
 		return FailSavestateLoad(error, "Save state corruption in component entries.");
 
 	return true;
@@ -1527,82 +1550,102 @@ static bool RunSavestatePayloadLoadPhase(zip_t* zf, s64 internal_index,
 
 static bool FinalizeSavestateLoad()
 {
-	PostLoadPrep();
+	RepairAfterStateLoadOverwrite();
 	return true;
 }
 
-static void ResetVmAfterFailedStateLoad()
+static void FinalizeFailedSavestateLoadAttempt()
 {
 	VMManager::Reset();
 }
 
-static bool FailSavestateLoad(Error* error, const char* default_message)
+static void EnsureSavestateLoadFailureError(Error* error, const char* default_message)
 {
 	if (!error->IsValid())
 		Error::SetString(error, default_message);
+}
 
-	ResetVmAfterFailedStateLoad();
+static bool FailSavestateLoad(Error* error, const char* default_message)
+{
+	EnsureSavestateLoadFailureError(error, default_message);
+	FinalizeFailedSavestateLoadAttempt();
 	return false;
 }
 
-static bool RunSavestateLoadLifecycle(zip_t* zf, s64 internal_index,
-	const std::array<s64, std::size(SavestateEntries)>& entry_indices, Error* error)
+static bool RunSavestateLoadLifecycle(const SavestateLoadSession& session, Error* error)
 {
-	PreLoadPrep();
+	PrepareForStateLoadOverwrite();
 
-	if (!RunSavestatePayloadLoadPhase(zf, internal_index, entry_indices, error))
+	if (!RunSavestatePayloadLoadPhase(session, error))
 		return false;
 
 	return FinalizeSavestateLoad();
 }
 
-static bool ValidateAndIndexSavestateArchive(zip_t* zf, s64* out_internal_index,
-	std::array<s64, std::size(SavestateEntries)>* out_entry_indices, Error* error)
+static bool ValidateAndIndexSavestateArchive(zip_t* zf, SavestateArchiveLoadContext* context, Error* error);
+
+static bool OpenAndValidateSavestateLoadSession(const std::string& filename, Error* error, SavestateLoadSession* session)
+{
+	session->archive = OpenSavestateZipForRead(filename.c_str(), "save state load", error);
+	if (!session->archive)
+		return false;
+
+	return ValidateAndIndexSavestateArchive(session->archive.get(), &session->context, error);
+}
+
+static bool ValidateAndIndexSavestateArchive(zip_t* zf, SavestateArchiveLoadContext* context, Error* error)
 {
 	if (!ValidateSavestateVersion(zf, error))
 		return false;
 
-	return ValidateSavestateArchive(zf, out_internal_index, out_entry_indices, error);
+	return ValidateSavestateArchive(zf, context, error);
 }
 
 bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 {
-	auto zf = OpenSavestateZipForRead(filename.c_str(), "save state load", error);
-	if (!zf)
+	SavestateLoadSession session;
+	if (!OpenAndValidateSavestateLoadSession(filename, error, &session))
 		return false;
 
-	s64 internal_index = -1;
-	std::array<s64, std::size(SavestateEntries)> entry_indices = {};
-	if (!ValidateAndIndexSavestateArchive(zf.get(), &internal_index, &entry_indices, error))
-		return false;
-
-	return RunSavestateLoadLifecycle(zf.get(), internal_index, entry_indices, error);
+	return RunSavestateLoadLifecycle(session, error);
 }
 
-static std::string FormatSavestateLoadErrorMessage(const std::string& message, std::optional<s32> slot, bool backup)
+enum class SavestateOperation
+{
+	Load,
+	Save,
+};
+
+static std::string BuildSavestateOperationErrorMessage(
+	SavestateOperation operation, const std::string& message, std::optional<s32> slot, bool backup)
 {
 	if (slot.has_value())
 	{
-		if (backup)
+		if (operation == SavestateOperation::Load)
+		{
+			if (backup)
+			{
+				return fmt::format(
+					TRANSLATE_FS("SaveState", "Failed to load state from backup slot {}: {}"), *slot, message);
+			}
+
 			return fmt::format(
-				TRANSLATE_FS("SaveState", "Failed to load state from backup slot {}: {}"), *slot, message);
+				TRANSLATE_FS("SaveState", "Failed to load state from slot {}: {}"), *slot, message);
+		}
 
-		return fmt::format(
-			TRANSLATE_FS("SaveState", "Failed to load state from slot {}: {}"), *slot, message);
-	}
-
-	return fmt::format(TRANSLATE_FS("SaveState", "Failed to load state: {}"), message);
-}
-
-static std::string FormatSavestateSaveErrorMessage(const std::string& message, std::optional<s32> slot)
-{
-	if (slot.has_value())
-	{
 		return fmt::format(
 			TRANSLATE_FS("SaveState", "Failed to save state to slot {}: {}"), *slot, message);
 	}
 
+	if (operation == SavestateOperation::Load)
+		return fmt::format(TRANSLATE_FS("SaveState", "Failed to load state: {}"), message);
+
 	return fmt::format(TRANSLATE_FS("SaveState", "Failed to save state: {}"), message);
+}
+
+static const char* GetSavestateOperationOsdKey(SavestateOperation operation)
+{
+	return (operation == SavestateOperation::Load) ? "LoadState" : "SaveState";
 }
 
 static void PostSavestateOsdMessage(const char* key, const std::string& message)
@@ -1610,16 +1653,19 @@ static void PostSavestateOsdMessage(const char* key, const std::string& message)
 	Host::AddIconOSDMessage(key, ICON_FA_TRIANGLE_EXCLAMATION, message, Host::OSD_WARNING_DURATION);
 }
 
+static void ReportSavestateOperationErrorOSD(
+	SavestateOperation operation, const std::string& message, std::optional<s32> slot, bool backup)
+{
+	const std::string full_message = BuildSavestateOperationErrorMessage(operation, message, slot, backup);
+	PostSavestateOsdMessage(GetSavestateOperationOsdKey(operation), full_message);
+}
+
 void SaveState_ReportLoadErrorOSD(const std::string& message, std::optional<s32> slot, bool backup)
 {
-	const std::string full_message = FormatSavestateLoadErrorMessage(message, slot, backup);
-
-	PostSavestateOsdMessage("LoadState", full_message);
+	ReportSavestateOperationErrorOSD(SavestateOperation::Load, message, slot, backup);
 }
 
 void SaveState_ReportSaveErrorOSD(const std::string& message, std::optional<s32> slot)
 {
-	const std::string full_message = FormatSavestateSaveErrorMessage(message, slot);
-
-	PostSavestateOsdMessage("SaveState", full_message);
+	ReportSavestateOperationErrorOSD(SavestateOperation::Save, message, slot, false);
 }

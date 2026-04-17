@@ -59,36 +59,109 @@ if(WIN32)
 	)
 endif(WIN32)
 
+# Block 8 prep: first build-visible bucket for the transfer chain.
+set(pcsx2TransferSources
+	Gif.cpp
+	Gif_Logger.cpp
+	Gif_Unit.cpp
+	Vif0_Dma.cpp
+	Vif1_Dma.cpp
+	Vif1_MFIFO.cpp
+	Vif.cpp
+	Vif_Codes.cpp
+	Vif_Transfer.cpp
+	Vif_Unpack.cpp
+)
+
+set(pcsx2TransferHeaders
+	Gif.h
+	Gif_Unit.h
+	Vif_Dma.h
+	Vif.h
+	Vif_Unpack.h
+)
+
+set(pcsx2SavestateSources
+	SaveState.cpp
+	StateWrapper.cpp
+)
+
+set(pcsx2SavestateHeaders
+	SaveState.h
+	StateWrapper.h
+)
+
+set(pcsx2MemorySources
+	COP0.cpp
+	Memory.cpp
+	vtlb.cpp
+)
+
+set(pcsx2MemoryHeaders
+	COP0.h
+	Memory.h
+	MemoryTypes.h
+	vtlb.h
+)
+
+set(pcsx2SchedulerSources
+	Counters.cpp
+	Dmac.cpp
+	IopCounters.cpp
+	R5900.cpp
+)
+
+set(pcsx2SchedulerHeaders
+	Counters.h
+	Dmac.h
+	IopCounters.h
+	R5900.h
+)
+
+set(pcsx2RuntimeSources
+	core/runtime/BuildVersion.cpp
+	core/runtime/GameDatabase.cpp
+	GameList.cpp
+	Host.cpp
+	LayeredSettingsInterface.cpp
+	INISettingsInterface.cpp
+	Patch.cpp
+	Pcsx2Config.cpp
+	core/runtime/PerformanceMetrics.cpp
+	SourceLog.cpp
+	VMManager.cpp
+)
+
+set(pcsx2RuntimeHeaders
+	core/runtime/BuildVersion.h
+	Config.h
+	core/runtime/GameDatabase.h
+	GameList.h
+	Host.h
+	INISettingsInterface.h
+	LayeredSettingsInterface.h
+	Patch.h
+	core/runtime/PerformanceMetrics.h
+	VMManager.h
+)
+
 # Main pcsx2 source
 set(pcsx2Sources
 	Achievements.cpp
-	BuildVersion.cpp
 	Cache.cpp
-	COP0.cpp
 	COP2.cpp
-	Counters.cpp
-	Dmac.cpp
-	GameDatabase.cpp
 	Elfheader.cpp
 	FW.cpp
 	FiFo.cpp
 	FPU.cpp
-	GameList.cpp
-	Gif.cpp
-	Gif_Logger.cpp
-	Gif_Unit.cpp
 	GS.cpp
 	GSDumpReplayer.cpp
-	Host.cpp
 	Hotkeys.cpp
 	Hw.cpp
 	HwRead.cpp
 	HwWrite.cpp
-	LayeredSettingsInterface.cpp
-	INISettingsInterface.cpp
 	Interpreter.cpp
 	IopBios.cpp
-	IopCounters.cpp
 	IopDma.cpp
 	IopGte.cpp
 	IopHw.cpp
@@ -96,21 +169,15 @@ set(pcsx2Sources
 	IopMem.cpp
 	PINE.cpp
 	Mdec.cpp
-	Memory.cpp
 	MMI.cpp
 	MTGS.cpp
 	MTVU.cpp
-	Patch.cpp
-	Pcsx2Config.cpp
-	PerformanceMetrics.cpp
 	PrecompiledHeader.cpp
 	R3000A.cpp
 	R3000AInterpreter.cpp
 	R3000AOpcodeTables.cpp
-	R5900.cpp
 	R5900OpcodeImpl.cpp
 	R5900OpcodeTables.cpp
-	SaveState.cpp
 	ShiftJisToUnicode.cpp
 	Sif.cpp
 	Sif0.cpp
@@ -123,18 +190,12 @@ set(pcsx2Sources
 	SIO/Memcard/MemoryCardFile.cpp
 	SIO/Memcard/MemoryCardFolder.cpp
 	SIO/Memcard/MemoryCardProtocol.cpp
-	SourceLog.cpp
 	SPR.cpp
-	StateWrapper.cpp
-	Vif0_Dma.cpp
-	Vif1_Dma.cpp
-	Vif1_MFIFO.cpp
-	Vif.cpp
-	Vif_Codes.cpp
-	Vif_Transfer.cpp
-	Vif_Unpack.cpp
-	VMManager.cpp
-	vtlb.cpp
+	${pcsx2MemorySources}
+	${pcsx2RuntimeSources}
+	${pcsx2SavestateSources}
+	${pcsx2SchedulerSources}
+	${pcsx2TransferSources}
 	VU0.cpp
 	VUmicro.cpp
 	VU0micro.cpp
@@ -149,45 +210,27 @@ set(pcsx2Sources
 # Main pcsx2 header
 set(pcsx2Headers
 	Achievements.h
-	BuildVersion.h
 	Cache.h
 	Common.h
-	Config.h
-	COP0.h
-	Counters.h
-	Dmac.h
-	GameDatabase.h
+	core/runtime/GameDatabase.h
 	Elfheader.h
 	FW.h
-	GameList.h
-	Gif.h
-	Gif_Unit.h
 	GS.h
 	GSDumpReplayer.h
 	Hardware.h
-	Host.h
 	Hw.h
-	INISettingsInterface.h
 	IopBios.h
-	IopCounters.h
 	IopDma.h
 	IopGte.h
 	IopHw.h
 	IopMem.h
-	LayeredSettingsInterface.h
 	PINE.h
 	Mdec.h
 	MTGS.h
 	MTVU.h
-	Memory.h
-	MemoryTypes.h
-	Patch.h
-	PerformanceMetrics.h
 	PrecompiledHeader.h
 	R3000A.h
-	R5900.h
 	R5900OpcodeTables.h
-	SaveState.h
 	ShaderCacheVersion.h
 	Sifcmd.h
 	Sif.h
@@ -201,12 +244,11 @@ set(pcsx2Headers
 	SIO/Memcard/MemoryCardProtocol.h
 	SPR.h
 	SupportURLs.h
-	StateWrapper.h
-	Vif_Dma.h
-	Vif.h
-	Vif_Unpack.h
-	VMManager.h
-	vtlb.h
+	${pcsx2MemoryHeaders}
+	${pcsx2RuntimeHeaders}
+	${pcsx2SavestateHeaders}
+	${pcsx2SchedulerHeaders}
+	${pcsx2TransferHeaders}
 	VUflags.h
 	VUmicro.h
 	VUops.h)

@@ -18,7 +18,7 @@
 
 #include "Common.h"
 #include "vtlb.h"
-#include "arm64/cpuRegistersPack.h"
+#include "core/state/CoreStateExposure.h"
 #include "COP0.h"
 #include "Cache.h"
 #include "IopMem.h"
@@ -53,7 +53,7 @@ extern void recExitExecutionImmediate();
 
 namespace vtlb_private
 {
-	MapData& vtlbdata = g_cpuRegistersPack.vtlbdata;
+	MapData& vtlbdata = CORE_STATE_VTLB_DATA;
 } // namespace vtlb_private
 
 static vtlbHandler vtlbHandlerCount = 0;
@@ -108,14 +108,14 @@ static void vtlb_MapGoemonTlbAliases(u32 vaddr, u32 paddr, u32 size);
 static void vtlb_UnmapGoemonTlbAliases(u32 vaddr, u32 size);
 static void vtlb_ResetGoemonTlbCacheEntry(GoemonTlb& entry);
 
-static void ResetFastmemTrackingState()
+static void ClearFastmemRuntimeTrackingState()
 {
 	vtlb_RemoveFastmemMappings();
 	s_fastmem_backpatch_info.clear();
 	s_fastmem_faulting_pcs.clear();
 }
 
-static void RebuildFastmemMappingsFromCurrentVtlbState()
+static void RepopulateFastmemMappingsFromCurrentVtlbState()
 {
 	if (!CHECK_FASTMEM || !CHECK_EEREC || !vtlbdata.vmap)
 		return;
@@ -139,7 +139,7 @@ static void RebuildFastmemMappingsFromCurrentVtlbState()
 	}
 }
 
-static bool InitializeFastmemAllocationState()
+static bool InitializeFastmemRuntimeArea()
 {
 	pxAssert(!s_fastmem_area);
 	s_fastmem_area = SharedMemoryMappingArea::Create(FASTMEM_AREA_SIZE);
@@ -156,9 +156,9 @@ static bool InitializeFastmemAllocationState()
 	return true;
 }
 
-static void ReleaseFastmemAllocationState()
+static void ReleaseFastmemRuntimeArea()
 {
-	ResetFastmemTrackingState();
+	ClearFastmemRuntimeTrackingState();
 	vtlb_ClearLoadStoreInfo();
 
 	vtlbdata.fastmem_base = 0;
@@ -1294,6 +1294,38 @@ static void vtlb_AssignUnmappedVirtualRange(u32 vaddr, u32 size)
 	}
 }
 
+static void vtlb_VerifyVirtualMapRange(u32 vaddr, u32 size)
+{
+	verify(0 == (vaddr & VTLB_PAGE_MASK));
+	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
+}
+
+static void vtlb_VerifyPhysicalVirtualMapRange(u32 vaddr, u32 paddr, u32 size)
+{
+	vtlb_VerifyVirtualMapRange(vaddr, size);
+	verify(0 == (paddr & VTLB_PAGE_MASK));
+}
+
+static void vtlb_PrepareFastmemForPhysicalVirtualMap(u32 vaddr, u32 paddr, u32 size)
+{
+	if (CHECK_FASTMEM)
+		vtlb_SyncFastmemMappingsForPhysicalRange(vaddr, paddr, size);
+}
+
+static void vtlb_PrepareFastmemForBufferVirtualMap(u32 vaddr, const void* buffer, u32 size)
+{
+	if (!CHECK_FASTMEM)
+		return;
+
+	if (!vtlb_TryMapScratchpadFastmemAliases(vaddr, buffer, size))
+		vtlb_RemoveFastmemMappings(vaddr, size);
+}
+
+static void vtlb_PrepareFastmemForVirtualUnmap(u32 vaddr, u32 size)
+{
+	vtlb_RemoveFastmemMappings(vaddr, size);
+}
+
 void vtlb_ClearLoadStoreInfo()
 {
 	s_fastmem_backpatch_info.clear();
@@ -1347,38 +1379,24 @@ bool vtlb_IsFaultingPC(u32 guest_pc)
 //TODO: Add invalid paddr checks
 void vtlb_VMap(u32 vaddr, u32 paddr, u32 size)
 {
-	verify(0 == (vaddr & VTLB_PAGE_MASK));
-	verify(0 == (paddr & VTLB_PAGE_MASK));
-	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
-
-	if (CHECK_FASTMEM)
-		vtlb_SyncFastmemMappingsForPhysicalRange(vaddr, paddr, size);
+	vtlb_VerifyPhysicalVirtualMapRange(vaddr, paddr, size);
+	vtlb_PrepareFastmemForPhysicalVirtualMap(vaddr, paddr, size);
 
 	vtlb_AssignVirtualMappingsForPhysicalRange(vaddr, paddr, size);
 }
 
 void vtlb_VMapBuffer(u32 vaddr, void* buffer, u32 size)
 {
-	verify(0 == (vaddr & VTLB_PAGE_MASK));
-	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
-
-	if (CHECK_FASTMEM)
-	{
-		if (!vtlb_TryMapScratchpadFastmemAliases(vaddr, buffer, size))
-		{
-			vtlb_RemoveFastmemMappings(vaddr, size);
-		}
-	}
+	vtlb_VerifyVirtualMapRange(vaddr, size);
+	vtlb_PrepareFastmemForBufferVirtualMap(vaddr, buffer, size);
 
 	vtlb_AssignVirtualMappingsForBuffer(vaddr, (uptr)buffer, size);
 }
 
 void vtlb_VMapUnmap(u32 vaddr, u32 size)
 {
-	verify(0 == (vaddr & VTLB_PAGE_MASK));
-	verify(0 == (size & VTLB_PAGE_MASK) && size > 0);
-
-	vtlb_RemoveFastmemMappings(vaddr, size);
+	vtlb_VerifyVirtualMapRange(vaddr, size);
+	vtlb_PrepareFastmemForVirtualUnmap(vaddr, size);
 	vtlb_AssignUnmappedVirtualRange(vaddr, size);
 }
 
@@ -1423,16 +1441,16 @@ void vtlb_Init()
 // This function should probably be part of the COP0 rather than here in VTLB.
 void vtlb_Reset()
 {
-	ResetFastmemTrackingState();
+	ClearFastmemRuntimeTrackingState();
 	ClearTLBMappingsFromSnapshot(tlb, std::size(tlb));
 }
 
 void vtlb_Shutdown()
 {
-	ResetFastmemTrackingState();
+	ClearFastmemRuntimeTrackingState();
 }
 
-void vtlb_CaptureStateLoadSnapshot(tlbs* snapshot, size_t count)
+void vtlb_CaptureTlbStateSnapshot(tlbs* snapshot, size_t count)
 {
 	if (!snapshot || count == 0)
 		return;
@@ -1441,27 +1459,27 @@ void vtlb_CaptureStateLoadSnapshot(tlbs* snapshot, size_t count)
 	std::memcpy(snapshot, tlb, sizeof(tlbs) * snapshot_count);
 }
 
-void vtlb_InvalidateRuntimeBlockTracking()
+void vtlb_InvalidateExecutionTracking()
 {
 	mmap_ResetBlockTracking();
 }
 
-void vtlb_RebuildFastmemMappings()
+void vtlb_RebuildRuntimeMappings()
 {
 	DevCon.WriteLn("Resetting fastmem mappings...");
 
-	ResetFastmemTrackingState();
-	RebuildFastmemMappingsFromCurrentVtlbState();
+	ClearFastmemRuntimeTrackingState();
+	RepopulateFastmemMappingsFromCurrentVtlbState();
 }
 
-void vtlb_RefreshRuntimeMappingsAfterConfigChange()
+void vtlb_RebuildRuntimeMappingsForConfigChange()
 {
-	vtlb_RebuildFastmemMappings();
+	vtlb_RebuildRuntimeMappings();
 }
 
-void vtlb_ResetFastmem()
+void vtlb_ResetFastmemMappings()
 {
-	vtlb_RebuildFastmemMappings();
+	vtlb_RebuildRuntimeMappings();
 }
 
 void vtlb_ResetKernelVirtualMappings()
@@ -1470,14 +1488,14 @@ void vtlb_ResetKernelVirtualMappings()
 	vtlb_VMapUnmap(0x20000000, 0x60000000);
 }
 
-void vtlb_RestoreMappingsFromState(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix)
+void vtlb_RestoreMappingsFromSnapshot(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix)
 {
 	RestoreTLBMappingsFromSnapshot(previous, count, only_changed_entries, apply_goemon_fix);
 }
 
-void vtlb_RunPostLoadRepair(const tlbs* previous, size_t count, bool apply_goemon_fix)
+void vtlb_RepairMappingsAfterStateLoad(const tlbs* previous, size_t count, bool apply_goemon_fix)
 {
-	vtlb_RestoreMappingsFromState(previous, count, true, apply_goemon_fix);
+	vtlb_RestoreMappingsFromSnapshot(previous, count, true, apply_goemon_fix);
 }
 
 // Reserves the vtlb core allocation used by various emulation components!
@@ -1493,7 +1511,7 @@ bool vtlb_Core_Alloc()
 
 	vtlbdata.vmap = reinterpret_cast<VTLBVirtual*>(SysMemory::GetVTLBVirtualMap());
 
-	if (!InitializeFastmemAllocationState())
+	if (!InitializeFastmemRuntimeArea())
 		return false;
 
 	Error error;
@@ -1527,7 +1545,7 @@ void vtlb_Core_Free()
 {
 	vtlbdata.vmap = nullptr;
 	vtlbdata.ppmap = nullptr;
-	ReleaseFastmemAllocationState();
+	ReleaseFastmemRuntimeArea();
 }
 
 // ===========================================================================================

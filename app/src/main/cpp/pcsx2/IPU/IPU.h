@@ -278,7 +278,9 @@ union tIPU_cmd
 	}
 };
 
-static IPUregisters& ipuRegs = (IPUregisters&)eeHw[0x2000];
+inline IPUregisters& GetIpuRegs() { return reinterpret_cast<IPUregisters&>(eeHw[0x2000]); }
+
+#define ipuRegs (GetIpuRegs())
 
 extern bool FMVstarted;
 extern bool EnableFMV;

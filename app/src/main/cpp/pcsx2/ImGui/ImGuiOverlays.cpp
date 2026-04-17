@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "Config.h"
 #include "Counters.h"
 #include "GS/GS.h"
@@ -20,7 +20,7 @@
 #include "Input/InputManager.h"
 #include "MTGS.h"
 #include "Patch.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "Recording/InputRecording.h"
 #include "SIO/Pad/Pad.h"
 #include "SIO/Pad/PadBase.h"

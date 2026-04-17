@@ -261,7 +261,6 @@ struct cpuRegistersPack
 	alignas(16) fpuRegisters fpuRegs;
 };
 
-extern cpuRegistersPack& _cpuRegistersPack;
 alignas(16) extern tlbs tlb[48];
 
 struct cachedTlbs_t
@@ -277,8 +276,8 @@ struct cachedTlbs_t
 
 extern cachedTlbs_t cachedTlbs;
 
-static cpuRegisters& cpuRegs = _cpuRegistersPack.cpuRegs;
-static fpuRegisters& fpuRegs = _cpuRegistersPack.fpuRegs;
+extern cpuRegisters& cpuRegs;
+extern fpuRegisters& fpuRegs;
 
 extern bool eeEventTestIsActive;
 

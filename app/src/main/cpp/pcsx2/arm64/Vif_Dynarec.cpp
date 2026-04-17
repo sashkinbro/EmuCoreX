@@ -307,63 +307,24 @@ void VifUnpackNEON_Dynarec::writeBackRow() const
 
 void VifUnpackNEON_Dynarec::ModUnpack(int upknum, bool PostOp)
 {
-	switch (upknum)
+	const Arm64VifUnpackIterationUpdatePhase phase = Arm64GetVifUnpackIterationUpdatePhase(upknum);
+	const bool should_advance =
+		(phase == Arm64VifUnpackIterationUpdatePhase::BeforeWrite && !PostOp) ||
+		(phase == Arm64VifUnpackIterationUpdatePhase::AfterWrite && PostOp);
+
+	if (should_advance)
 	{
-		case 0:
-		case 1:
-		case 2:
-			if (PostOp)
-			{
-				UnpkLoopIteration++;
-				UnpkLoopIteration = UnpkLoopIteration & 0x3;
-			}
-			break;
+		UnpkLoopIteration++;
 
-		case 4:
-		case 5:
-		case 6:
-			if (PostOp)
-			{
-				UnpkLoopIteration++;
-				UnpkLoopIteration = UnpkLoopIteration & 0x1;
-			}
-			break;
+		const int iteration_mask = Arm64GetVifUnpackIterationMask(upknum);
+		if (iteration_mask != 0)
+			UnpkLoopIteration &= iteration_mask;
+	}
 
-		case 8:
-			if (PostOp)
-			{
-				UnpkLoopIteration++;
-				UnpkLoopIteration = UnpkLoopIteration & 0x1;
-			}
-			break;
-		case 9:
-			if (!PostOp)
-			{
-				UnpkLoopIteration++;
-			}
-			break;
-		case 10:
-			if (!PostOp)
-			{
-				UnpkLoopIteration++;
-			}
-			break;
-
-		case 12:
-			break;
-		case 13:
-			break;
-		case 14:
-			break;
-		case 15:
-			break;
-
-		case 3:
-		case 7:
-		case 11:
-			Arm64AssertVifMaskedIterationPolicy(upknum);
-			// Transitional policy until hardware validation confirms the masked iteration behavior.
-			break;
+	if (Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(upknum))
+	{
+		// Transitional policy until hardware validation confirms the masked iteration behavior.
+		Arm64HandleTransitionalMaskedIterationUnpack(upknum);
 	}
 }
 

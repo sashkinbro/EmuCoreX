@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "GS.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "Host.h"

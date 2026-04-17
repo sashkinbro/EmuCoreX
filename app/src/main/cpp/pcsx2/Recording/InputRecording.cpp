@@ -29,7 +29,7 @@ bool SaveStateBase::InputRecordingFreeze()
 #include "Host.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "DebugTools/Debug.h"
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 #include "fmt/format.h"
 #include "GS.h"
 #include "Host.h"

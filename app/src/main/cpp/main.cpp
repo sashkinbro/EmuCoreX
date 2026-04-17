@@ -10,7 +10,7 @@
 #include "common/ZipHelpers.h"
 #include "common/Error.h"
 #include "pcsx2/GS.h"
-#include "pcsx2/BuildVersion.h"
+#include "pcsx2/core/runtime/BuildVersion.h"
 #include "pcsx2/VMManager.h"
 #include "pcsx2/Config.h"
 #include "pcsx2/Counters.h"
@@ -18,7 +18,7 @@
 #include "pcsx2/SIO/Pad/Pad.h" // For GenericInputBinding
 
 #include "pcsx2/Patch.h"
-#include "PerformanceMetrics.h"
+#include "pcsx2/core/runtime/PerformanceMetrics.h"
 #include "GameList.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSCapture.h"

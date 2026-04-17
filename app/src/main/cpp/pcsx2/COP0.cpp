@@ -355,9 +355,14 @@ static void RunPostRestoreTlbFixups(bool apply_goemon_fix)
 		GoemonPreloadTlb();
 }
 
-static void ReplaceRuntimeTlbEntry(int index)
+static void ClearSingleTlbMappingFromSnapshot(const tlbs& previous)
 {
-	ClearTLBMappingsFromSnapshot(&tlb[index], 1);
+	ClearTLBMappingsFromSnapshot(&previous, 1);
+}
+
+static void RewriteTlbEntryFromCop0State(int index)
+{
+	ClearSingleTlbMappingFromSnapshot(tlb[index]);
 	WriteTLB(index);
 }
 
@@ -373,10 +378,15 @@ void UnmapTLB(const tlbs& t, int i)
 	RemoveCachedTlbEntry(t);
 }
 
-void RefreshTLBEntryMapping(const tlbs& previous, int i)
+static void RestoreSingleTlbEntryMappingFromSnapshot(const tlbs& previous, int index)
 {
-	UnmapTLB(previous, i);
-	MapTLB(tlb[i], i);
+	UnmapTLB(previous, index);
+	MapTLB(tlb[index], index);
+}
+
+static bool ShouldRestoreTlbEntryMappingFromSnapshot(const tlbs& previous, size_t index, bool only_changed_entries)
+{
+	return !only_changed_entries || std::memcmp(&previous, &tlb[index], sizeof(tlbs)) != 0;
 }
 
 void RestoreTLBMappingsFromSnapshot(const tlbs* previous, size_t count, bool only_changed_entries, bool apply_goemon_fix)
@@ -384,8 +394,8 @@ void RestoreTLBMappingsFromSnapshot(const tlbs* previous, size_t count, bool onl
 	const size_t restore_count = std::min(count, std::size(tlb));
 	for (size_t i = 0; i < restore_count; i++)
 	{
-		if (!only_changed_entries || std::memcmp(&previous[i], &tlb[i], sizeof(tlbs)) != 0)
-			RefreshTLBEntryMapping(previous[i], static_cast<int>(i));
+		if (ShouldRestoreTlbEntryMappingFromSnapshot(previous[i], i, only_changed_entries))
+			RestoreSingleTlbEntryMappingFromSnapshot(previous[i], static_cast<int>(i));
 	}
 
 	RunPostRestoreTlbFixups(apply_goemon_fix);
@@ -470,7 +480,7 @@ namespace COP0 {
 			cpuRegs.CP0.n.Index, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
 
-		ReplaceRuntimeTlbEntry(j);
+		RewriteTlbEntryFromCop0State(j);
 	}
 
 	void TLBWR()
@@ -487,7 +497,7 @@ namespace COP0 {
 			cpuRegs.CP0.n.Random, cpuRegs.CP0.n.PageMask, cpuRegs.CP0.n.EntryHi,
 			cpuRegs.CP0.n.EntryLo0, cpuRegs.CP0.n.EntryLo1);
 
-		ReplaceRuntimeTlbEntry(j);
+		RewriteTlbEntryFromCop0State(j);
 	}
 
 	void TLBP()

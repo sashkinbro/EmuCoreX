@@ -214,8 +214,11 @@ extern VURegs (&vuRegs)[2];
 
 // Obsolete(?)  -- I think I'd rather use vu0Regs/vu1Regs or actually have these explicit to any
 // CPP file that needs them only. --air
-static VURegs& VU0 = vuRegs[0];
-static VURegs& VU1 = vuRegs[1];
+inline VURegs& GetVU0Regs() { return vuRegs[0]; }
+inline VURegs& GetVU1Regs() { return vuRegs[1]; }
+
+#define VU0 (GetVU0Regs())
+#define VU1 (GetVU1Regs())
 
 // Do not use __fi here because it fires 'multiple definition' error in GCC
 inline bool VURegs::IsVU1() const { return this == &vuRegs[1]; }

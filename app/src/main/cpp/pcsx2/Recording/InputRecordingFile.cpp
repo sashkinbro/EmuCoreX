@@ -4,7 +4,7 @@
 #include "InputRecordingFile.h"
 #include "InputRecording.h"
 
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "Utilities/InputRecordingLogger.h"
 
 #include "common/FileSystem.h"

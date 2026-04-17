@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
-#include "BuildVersion.h"
+#include "core/runtime/BuildVersion.h"
 #include "CDVD/CDVD.h"
 #include "Elfheader.h"
 #include "Host.h"

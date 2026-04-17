@@ -4,7 +4,7 @@
 #include "common/Console.h"
 #include "MTVU.h"
 #include "SaveState.h"
-#include "arm64/cpuRegistersPack.h"
+#include "arm64/policy/Arm64RuntimePolicy.h"
 #include "vtlb.h"
 
 #include "common/Assertions.h"
@@ -13,6 +13,9 @@ namespace
 {
 void Arm64AssertDynBackpatchStubContract()
 {
+	pxAssertRel(
+		Arm64GetDynBackpatchLoadStorePolicy() == Arm64DynBackpatchLoadStorePolicy::UnsupportedHardFail,
+		"ARM64 dyn backpatch policy unexpectedly changed.");
 	pxAssertRel(!Arm64SupportsDynBackpatchLoadStore(), "ARM64 dyn backpatch unexpectedly marked supported.");
 	pxAssertRel(Arm64UsesHardFailDynBackpatchStub(), "ARM64 dyn backpatch failure mode unexpectedly changed.");
 }
@@ -26,8 +29,10 @@ void Arm64FailMissingDynBackpatchLoadStore(uptr code_address, u32 code_size, u32
 
 void Arm64AssertVuJitPlaceholderStateContract()
 {
-	pxAssertRel(Arm64UsesVuJitPlaceholderState(), "ARM64 VU JIT placeholder path unexpectedly disabled.");
-	pxAssertRel(!Arm64HasStableVuJitStateSerialization(), "ARM64 VU JIT state unexpectedly marked stable.");
+	pxAssertRel(
+		Arm64GetVuJitStateSerializationPolicy() == Arm64VuJitStateSerializationPolicy::CompatibilityPlaceholder,
+		"ARM64 VU JIT serialization policy unexpectedly changed.");
+	pxAssertRel(Arm64UsesCompatibilityVuJitPlaceholderState(), "ARM64 VU JIT placeholder path unexpectedly disabled.");
 }
 
 void Arm64PrepareVuJitPlaceholderStateForFreeze(SaveStateBase& state)
@@ -44,7 +49,7 @@ bool Arm64FreezeVuJitPlaceholderStateBlocks(SaveStateBase& state)
 		Arm64GetVuJitPlaceholderStateBlockCount());
 }
 
-bool FreezeLegacyVuJitPlaceholderState(SaveStateBase& state)
+bool Arm64FreezeCompatibilityVuJitState(SaveStateBase& state)
 {
 	Arm64AssertVuJitPlaceholderStateContract();
 	Arm64PrepareVuJitPlaceholderStateForFreeze(state);
@@ -59,5 +64,5 @@ void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, 
 
 bool SaveStateBase::vuJITFreeze()
 {
-	return FreezeLegacyVuJitPlaceholderState(*this);
+	return Arm64FreezeCompatibilityVuJitState(*this);
 }

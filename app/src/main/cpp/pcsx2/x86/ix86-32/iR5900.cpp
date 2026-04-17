@@ -9,6 +9,7 @@
 #include "Host.h"
 #include "Memory.h"
 #include "Patch.h"
+#include "core/state/CoreStateExposure.h"
 #include "R3000A.h"
 #include "R5900OpcodeTables.h"
 #include "VMManager.h"
@@ -492,7 +493,7 @@ static const void* _DynGen_EnterRecompiledCode()
     // From memory to registry
     armMoveAddressToReg(RSTATE_x29, &recLUT);
     armMoveAddressToReg(RSTATE_PSX, &psxRegs);
-    armMoveAddressToReg(RSTATE_CPU, &g_cpuRegistersPack);
+    armMoveAddressToReg(RSTATE_CPU, GetCoreStateRuntimePackPtr());
 
 	if (CHECK_FASTMEM) {
 //        xMOV(RFASTMEMBASE, ptrNative[&vtlb_private::vtlbdata.fastmem_base]);

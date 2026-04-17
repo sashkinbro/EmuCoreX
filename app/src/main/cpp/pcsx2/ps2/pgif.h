@@ -57,7 +57,9 @@ struct PGIFregisters
 	u128 		dummy1[2];
 	tPGIF_CTRL	ctrl;
 };
-static PGIFregisters& pgif = (PGIFregisters&)eeHw[0xf310];
+inline PGIFregisters& GetPgifRegs() { return reinterpret_cast<PGIFregisters&>(eeHw[0xf310]); }
+
+#define pgif (GetPgifRegs())
 
 union tPGPU_REGS
 {
@@ -104,7 +106,9 @@ struct PGPUregisters
 {
 	tPGPU_REGS	stat;
 };
-static PGPUregisters& pgpu = (PGPUregisters&)eeHw[0xf300];
+inline PGPUregisters& GetPgpuRegs() { return reinterpret_cast<PGPUregisters&>(eeHw[0xf300]); }
+
+#define pgpu (GetPgpuRegs())
 
 //Internal dma flags:
 struct dma_t
@@ -194,7 +198,9 @@ struct DMAregisters
 	tBCR_DMA	bcr;
 	tCHCR_DMA	chcr;
 };
-static DMAregisters& dmaRegs = (DMAregisters&)iopHw[0x10a0];
+inline DMAregisters& GetPgifDmaRegs() { return reinterpret_cast<DMAregisters&>(iopHw[0x10a0]); }
+
+#define dmaRegs (GetPgifDmaRegs())
 
 //Generic FIFO-related:
 struct ringBuf_t

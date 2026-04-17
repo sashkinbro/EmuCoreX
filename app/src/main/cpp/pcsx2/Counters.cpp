@@ -12,7 +12,7 @@
 #include "GS.h"
 #include "GS/GS.h"
 #include "MTGS.h"
-#include "PerformanceMetrics.h"
+#include "core/runtime/PerformanceMetrics.h"
 #include "Patch.h"
 #include "ps2/HwInternal.h"
 #include "SIO/Sio.h"
@@ -62,12 +62,56 @@ void rcntReset(int index)
 	counters[index].startCycle = cpuRegs.cycle;
 }
 
+static __fi s32 rcntGetCyclesSinceCounterStart(const Counter& counter)
+{
+	return static_cast<s32>(cpuRegs.cycle - counter.startCycle);
+}
+
+static __fi s32 rcntGetCyclesSinceCounterScheduleBase()
+{
+	return static_cast<s32>(cpuRegs.cycle - nextStartCounter);
+}
+
+static __fi void rcntApplyEarliestDeadlineCandidate(s32 delta)
+{
+	if (delta < nextDeltaCounter)
+	{
+		nextDeltaCounter = delta;
+		cpuSetNextEvent(nextStartCounter, nextDeltaCounter); // Need to update on counter resets/target changes
+	}
+}
+
+static __fi s32 rcntGetOverflowDeadlineDelta(const Counter& counter)
+{
+	s32 delta = ((0x10000 - counter.count) * counter.rate) - rcntGetCyclesSinceCounterStart(counter);
+	delta += rcntGetCyclesSinceCounterScheduleBase(); // adjust for time passed since last rcntUpdate();
+	return delta;
+}
+
+static __fi s32 rcntGetTargetDeadlineDelta(const Counter& counter)
+{
+	s32 delta = ((counter.target - counter.count) * counter.rate) - rcntGetCyclesSinceCounterStart(counter);
+	delta += rcntGetCyclesSinceCounterScheduleBase(); // adjust for time passed since last rcntUpdate();
+	return delta;
+}
+
+static __fi void rcntPrimeNextEventDeadlineFromBlankingSources()
+{
+	// Default to next VBlank.
+	nextStartCounter = cpuRegs.cycle;
+	nextDeltaCounter = vsyncCounter.deltaCycles - (cpuRegs.cycle - vsyncCounter.startCycle);
+
+	// Also check next HSync.
+	const s32 nextHsync = hsyncCounter.deltaCycles - (cpuRegs.cycle - hsyncCounter.startCycle);
+	if (nextHsync < nextDeltaCounter)
+		nextDeltaCounter = nextHsync;
+}
+
 // Updates the state of the nextCounter value (if needed) to serve
 // any pending events for the given counter.
 // Call this method after any modifications to the state of a counter.
 static __fi void _rcntSet(int cntidx)
 {
-	s32 c;
 	pxAssume(cntidx <= 4); // rcntSet isn't valid for h/vsync counters.
 
 	const Counter& counter = counters[cntidx];
@@ -88,18 +132,9 @@ static __fi void _rcntSet(int cntidx)
 
 	// nextCounter is relative to the cpuRegs.cycle when rcntUpdate() was last called.
 	// However, the current _rcntSet could be called at any cycle count, so we need to take
-	// that into account.  Adding the difference from that cycle count to the current one
-	// will do the trick!
-
-	c = ((0x10000 - counter.count) * counter.rate) - (cpuRegs.cycle - counter.startCycle);
-	c += cpuRegs.cycle - nextStartCounter; // adjust for time passed since last rcntUpdate();
-
-	if (c < nextDeltaCounter)
-	{
-		nextDeltaCounter = c;
-
-		cpuSetNextEvent(nextStartCounter, nextDeltaCounter); // Need to update on counter resets/target changes
-	}
+	// that into account. Adding the difference from that cycle count to the current one
+	// will do the trick.
+	rcntApplyEarliestDeadlineCandidate(rcntGetOverflowDeadlineDelta(counter));
 
 	// Ignore target diff if target is currently disabled.
 	// (the overflow is all we care about since it goes first, and then the
@@ -109,35 +144,16 @@ static __fi void _rcntSet(int cntidx)
 	{
 		return;
 	}
-	else
-	{
 
-		c = ((counter.target - counter.count) * counter.rate) - (cpuRegs.cycle - counter.startCycle);
-		c += cpuRegs.cycle - nextStartCounter; // adjust for time passed since last rcntUpdate();
-
-		if (c < nextDeltaCounter)
-		{
-			nextDeltaCounter = c;
-			cpuSetNextEvent(nextStartCounter, nextDeltaCounter); // Need to update on counter resets/target changes
-		}
-	}
+	rcntApplyEarliestDeadlineCandidate(rcntGetTargetDeadlineDelta(counter));
 }
 
 
 static __fi void cpuRcntSet()
 {
-	int i;
+	rcntPrimeNextEventDeadlineFromBlankingSources();
 
-	// Default to next VBlank
-	nextStartCounter = cpuRegs.cycle;
-	nextDeltaCounter = vsyncCounter.deltaCycles - (cpuRegs.cycle - vsyncCounter.startCycle);
-
-	// Also check next HSync
-	s32 nextHsync = hsyncCounter.deltaCycles - (cpuRegs.cycle - hsyncCounter.startCycle);
-	if (nextHsync < nextDeltaCounter)
-		nextDeltaCounter = nextHsync;
-
-	for (i = 0; i < 4; i++)
+	for (int i = 0; i < 4; i++)
 		_rcntSet(i);
 
 	// sanity check!
@@ -570,6 +586,48 @@ static u32 hsc = 0;
 static int vblankinc = 0;
 #endif
 
+static __fi void rcntHandleVSyncRenderResume()
+{
+	vsyncCounter.startCycle += vSyncInfo.Blank;
+	vsyncCounter.deltaCycles = vSyncInfo.Render;
+
+	VSyncEnd(vsyncCounter.startCycle);
+	vsyncCounter.Mode = MODE_VRENDER; // VSYNC END - Render begin
+}
+
+static __fi void rcntHandleGsBlankTransition()
+{
+	GSVSync();
+
+	vsyncCounter.Mode = MODE_VBLANK;
+	// Don't set the start cycle, makes it easier to calculate the correct Vsync End time.
+	vsyncCounter.deltaCycles = vSyncInfo.Blank;
+}
+
+static __fi void rcntHandleVSyncStartTransition()
+{
+	vsyncCounter.startCycle += vSyncInfo.Render;
+	vsyncCounter.deltaCycles = vSyncInfo.GSBlank;
+
+	VSyncStart(vsyncCounter.startCycle);
+	vsyncCounter.Mode = MODE_GSBLANK;
+
+	// Accumulate hsync rounding errors.
+	hsyncCounter.deltaCycles += vSyncInfo.hSyncError;
+
+#ifdef VSYNC_DEBUG
+	vblankinc++;
+	if (vblankinc > 1)
+	{
+		if (hsc != vSyncInfo.hScanlinesPerFrame)
+		{
+		}
+		hsc = 0;
+		vblankinc = 0;
+	}
+#endif
+}
+
 __fi void rcntUpdate_vSync()
 {
 	if (!cpuTestCycle(vsyncCounter.startCycle, vsyncCounter.deltaCycles))
@@ -577,45 +635,55 @@ __fi void rcntUpdate_vSync()
 
 	if (vsyncCounter.Mode == MODE_VBLANK)
 	{
-		vsyncCounter.startCycle += vSyncInfo.Blank;
-		vsyncCounter.deltaCycles = vSyncInfo.Render;
-
-		VSyncEnd(vsyncCounter.startCycle);
-
-		vsyncCounter.Mode = MODE_VRENDER; // VSYNC END - Render begin
+		rcntHandleVSyncRenderResume();
 	}
 	else if (vsyncCounter.Mode == MODE_GSBLANK) // GS CSR Swap and interrupt
 	{
-		GSVSync();
-
-		vsyncCounter.Mode = MODE_VBLANK;
-		// Don't set the start cycle, makes it easier to calculate the correct Vsync End time
-		vsyncCounter.deltaCycles = vSyncInfo.Blank;
+		rcntHandleGsBlankTransition();
 	}
 	else // VSYNC Start
 	{
-		vsyncCounter.startCycle += vSyncInfo.Render;
-		vsyncCounter.deltaCycles = vSyncInfo.GSBlank;
+		rcntHandleVSyncStartTransition();
+	}
+}
 
-		VSyncStart(vsyncCounter.startCycle);
+static __fi void rcntHandleHBlankEndTransition()
+{
+	// Setup the hRender's start and end cycle information.
+	hsyncCounter.startCycle += vSyncInfo.hBlank; // start  (absolute cycle value)
+	hsyncCounter.deltaCycles = vSyncInfo.hRender; // endpoint (delta from start value)
+	if (!GSSMODE1reg.SINT)
+	{
+		rcntEndGate(false, hsyncCounter.startCycle);
+		psxHBlankEnd();
+	}
 
-		vsyncCounter.Mode = MODE_GSBLANK;
+	hsyncCounter.Mode = MODE_HRENDER;
+}
 
-		// Accumulate hsync rounding errors:
-		hsyncCounter.deltaCycles += vSyncInfo.hSyncError;
+static __fi void rcntHandleHBlankStartTransition()
+{
+	// Set up the hblank's start and end cycle information.
+	hsyncCounter.startCycle += vSyncInfo.hRender; // start (absolute cycle value)
+	hsyncCounter.deltaCycles = vSyncInfo.hBlank;  // endpoint (delta from start value)
+	if (!GSSMODE1reg.SINT)
+	{
+		if (!CSRreg.HSINT)
+		{
+			CSRreg.HSINT = true;
+			if (!GSIMR.HSMSK)
+				gsIrq();
+		}
+
+		rcntStartGate(false, hsyncCounter.startCycle);
+		psxHBlankStart();
+	}
+
+	hsyncCounter.Mode = MODE_HBLANK;
 
 #ifdef VSYNC_DEBUG
-		vblankinc++;
-		if (vblankinc > 1)
-		{
-			if (hsc != vSyncInfo.hScanlinesPerFrame)
-			{
-			}
-			hsc = 0;
-			vblankinc = 0;
-		}
+	hsc++;
 #endif
-	}
 }
 
 __fi void rcntUpdate_hScanline()
@@ -625,44 +693,9 @@ __fi void rcntUpdate_hScanline()
 
 	//iopEventAction = 1;
 	if (hsyncCounter.Mode == MODE_HBLANK)
-	{ //HBLANK End / HRENDER Begin
-
-		// Setup the hRender's start and end cycle information:
-		hsyncCounter.startCycle += vSyncInfo.hBlank; // start  (absolute cycle value)
-		hsyncCounter.deltaCycles = vSyncInfo.hRender; // endpoint (delta from start value)
-		if (!GSSMODE1reg.SINT)
-		{
-			rcntEndGate(false, hsyncCounter.startCycle);
-			psxHBlankEnd();
-		}
-
-		hsyncCounter.Mode = MODE_HRENDER;
-	}
+		rcntHandleHBlankEndTransition(); // HBLANK End / HRENDER Begin
 	else
-	{ //HBLANK START / HRENDER End
-
-		// set up the hblank's start and end cycle information:
-		hsyncCounter.startCycle += vSyncInfo.hRender; // start (absolute cycle value)
-		hsyncCounter.deltaCycles = vSyncInfo.hBlank;  // endpoint (delta from start value)
-		if (!GSSMODE1reg.SINT)
-		{
-			if (!CSRreg.HSINT)
-			{
-				CSRreg.HSINT = true;
-				if (!GSIMR.HSMSK)
-					gsIrq();
-			}
-
-			rcntStartGate(false, hsyncCounter.startCycle);
-			psxHBlankStart();
-		}
-
-		hsyncCounter.Mode = MODE_HBLANK;
-
-#ifdef VSYNC_DEBUG
-		hsc++;
-#endif
-	}
+		rcntHandleHBlankStartTransition(); // HBLANK START / HRENDER End
 }
 
 static __fi void _cpuTestTarget(int i)
@@ -718,6 +751,22 @@ __fi bool rcntCanCount(int i)
 			(counters[i].mode.GateSource == 1 && (vsyncCounter.Mode == MODE_VRENDER || counters[i].mode.GateMode != 0)));
 }
 
+static __fi bool rcntUsesSignalSource(int index, bool isVblank)
+{
+	return (!!counters[index].mode.GateSource) == isVblank;
+}
+
+static __fi bool rcntShouldRunSignalClockTickOnGateStart(int index, bool isVblank)
+{
+	return !isVblank && (counters[index].mode.ClockSource == 3) && rcntCanCount(index);
+}
+
+static __fi void rcntRunCounterTargetOverflowTests(int index)
+{
+	_cpuTestOverflow(index);
+	_cpuTestTarget(index);
+}
+
 __fi void rcntSyncCounter(int i)
 {
 	if (counters[i].mode.ClockSource != 0x3) // don't count hblank sources
@@ -734,6 +783,21 @@ __fi void rcntSyncCounter(int i)
 		counters[i].startCycle = cpuRegs.cycle;
 }
 
+static __fi bool rcntShouldSkipRegularCounterEventTests(int index)
+{
+	return (counters[index].mode.ClockSource == 0x3) || !rcntCanCount(index); // don't count hblank sources
+}
+
+static __fi void rcntSyncAndTestRegularCounterEvents(int index)
+{
+	rcntSyncCounter(index);
+
+	if (rcntShouldSkipRegularCounterEventTests(index))
+		return;
+
+	rcntRunCounterTargetOverflowTests(index);
+}
+
 // forceinline note: this method is called from two locations, but one
 // of them is the interpreter, which doesn't count. ;)  So might as
 // well forceinline it!
@@ -746,15 +810,7 @@ __fi void rcntUpdate()
 	// Update counters so that we can perform overflow and target tests.
 
 	for (int i = 0; i <= 3; i++)
-	{
-		rcntSyncCounter(i);
-
-		if (counters[i].mode.ClockSource == 0x3 || !rcntCanCount(i)) // don't count hblank sources
-			continue;
-
-		_cpuTestOverflow(i);
-		_cpuTestTarget(i);
-	}
+		rcntSyncAndTestRegularCounterEvents(i);
 
 	cpuRcntSet();
 }
@@ -779,7 +835,7 @@ static __fi void rcntStartGate(bool isVblank, u64 sCycle)
 {
 	for (int i = 0; i < 4; i++)
 	{
-		if (!isVblank && (counters[i].mode.ClockSource == 3) && rcntCanCount(i))
+		if (rcntShouldRunSignalClockTickOnGateStart(i, isVblank))
 		{
 			// Update counters using the hblank as the clock.  This keeps the hblank source
 			// nicely in sync with the counters and serves as an optimization also, since these
@@ -787,14 +843,13 @@ static __fi void rcntStartGate(bool isVblank, u64 sCycle)
 			// Note: Target and overflow tests must be done here since they won't be done
 			// currectly by rcntUpdate (since it's not being scheduled for these counters)
 			counters[i].count += HBLANK_COUNTER_SPEED;
-			_cpuTestOverflow(i);
-			_cpuTestTarget(i);
+			rcntRunCounterTargetOverflowTests(i);
 		}
 
 		if (!counters[i].mode.EnableGate)
 			continue;
 
-		if ((!!counters[i].mode.GateSource) != isVblank)
+		if (!rcntUsesSignalSource(i, isVblank))
 			continue;
 
 		switch (counters[i].mode.GateMode)
@@ -835,7 +890,7 @@ static __fi void rcntEndGate(bool isVblank, u64 sCycle)
 		if (!counters[i].mode.EnableGate)
 			continue;
 
-		if ((!!counters[i].mode.GateSource) != isVblank)
+		if (!rcntUsesSignalSource(i, isVblank))
 			continue;
 
 		switch (counters[i].mode.GateMode)

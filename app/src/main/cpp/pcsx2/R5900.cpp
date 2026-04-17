@@ -7,6 +7,7 @@
 #include "ps2/BiosTools.h"
 #include "R5900.h"
 #include "R3000A.h"
+#include "core/state/CoreStateExposure.h"
 #include "arm64/cpuRegistersPack.h"
 #include "ps2/pgif.h" // pgif init
 #include "VUmicro.h"
@@ -20,7 +21,7 @@
 #include "Elfheader.h"
 #include "CDVD/CDVD.h"
 #include "Patch.h"
-#include "GameDatabase.h"
+#include "core/runtime/GameDatabase.h"
 #include "GSDumpReplayer.h"
 
 #include "DebugTools/Breakpoints.h"
@@ -38,7 +39,8 @@ u64 EEoCycle;
 alignas(64) Arm64CpuRuntimePack g_cpuRegistersPack;
 static_assert(offsetof(Arm64CpuRuntimePack, cpuRegs) == offsetof(cpuRegistersPack, cpuRegs));
 static_assert(offsetof(Arm64CpuRuntimePack, fpuRegs) == offsetof(cpuRegistersPack, fpuRegs));
-cpuRegistersPack& _cpuRegistersPack = reinterpret_cast<cpuRegistersPack&>(g_cpuRegistersPack);
+cpuRegisters& cpuRegs = CORE_STATE_CPU_REGS;
+fpuRegisters& fpuRegs = CORE_STATE_FPU_REGS;
 alignas(16) tlbs tlb[48];
 cachedTlbs_t cachedTlbs;
 
@@ -276,18 +278,40 @@ static __fi void cpuRequestRapidEventTest()
 	cpuSetNextEventDelta(48);
 }
 
-static __fi void cpuScheduleNextEventFromIopState()
+static __fi int cpuGetIopEventDeltaInEeCycles()
 {
 	const float mutiplier = static_cast<float>(PS2CLK) / static_cast<float>(PSXCLK);
-	const int nextIopEventDeta = ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);
+	return ((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier);
+}
 
-	if (EEsCycle >= nextIopEventDeta)
+static __fi bool cpuShouldRequestRapidEventTestForIopDelta(int nextIopEventDelta)
+{
+	return EEsCycle >= nextIopEventDelta;
+}
+
+static __fi void cpuApplyIopDrivenEventDeadline(int nextIopEventDelta)
+{
+	cpuSetNextEventDelta(nextIopEventDelta - EEsCycle);
+}
+
+static __fi void cpuNotifyUpcomingEeInterruptToSchedulers()
+{
+	cpuRequestHwInterruptCheck();
+	if (eeEventTestIsActive)
+		cpuBreakActiveIopExecution();
+}
+
+static __fi void cpuScheduleNextEventFromIopState()
+{
+	const int nextIopEventDelta = cpuGetIopEventDeltaInEeCycles();
+
+	if (cpuShouldRequestRapidEventTestForIopDelta(nextIopEventDelta))
 	{
 		cpuRequestRapidEventTest();
 	}
 	else
 	{
-		cpuSetNextEventDelta(((psxRegs.iopNextEventCycle - psxRegs.cycle) * mutiplier) - EEsCycle);
+		cpuApplyIopDrivenEventDeadline(nextIopEventDelta);
 	}
 }
 
@@ -331,6 +355,35 @@ static __fi bool cpuHasPendingEvent(uint interrupt)
 static __fi bool cpuShouldDispatchEventNow(uint interrupt)
 {
 	return CHECK_INSTANTDMAHACK || cpuTestCycle(cpuRegs.sCycle[interrupt], cpuRegs.eCycle[interrupt]);
+}
+
+static __fi bool cpuShouldPromoteEventToImmediateLoop(EE_EventType n, s32 ecycle)
+{
+	return (ecycle < 4) && !(cpuRegs.dmastall & (1 << n)) && (eeRunInterruptScan != INT_NOT_RUNNING);
+}
+
+static __fi s32 cpuApplyEeTimingHackIfNeeded(EE_EventType n, s32 ecycle)
+{
+	// EE events happen 8 cycles in the future instead of whatever was requested.
+	// This can be used on games with PATH3 masking issues for example, or when
+	// some FMV look bad.
+	if (CHECK_EETIMINGHACK && n < VIF_VU0_FINISH)
+		return 8;
+
+	return ecycle;
+}
+
+static __fi void cpuFinalizeArmedEventScheduling(EE_EventType n)
+{
+	// Interrupt is happening soon: make sure both EE and IOP are aware.
+	if (cpuRegs.eCycle[n] <= 28)
+	{
+		// If running in the IOP, force it to break immediately into the EE.
+		// the EE's branch test is due to run.
+		cpuBreakActiveIopExecution();
+	}
+
+	cpuSetNextEventDelta(cpuRegs.eCycle[n]);
 }
 
 static __fi void cpuDeferEventUntilReady(uint interrupt)
@@ -488,6 +541,68 @@ static bool cpuIntsEnabled(int Interrupt)
 		!cpuRegs.CP0.n.Status.b.EXL && (cpuRegs.CP0.n.Status.b.ERL == 0);
 }
 
+static __fi void cpuHandlePendingCpuLevelExceptions()
+{
+	const uint mask = intcInterrupt() | dmacInterrupt();
+	if (cpuIntsEnabled(mask))
+		cpuException(mask, cpuRegs.branch);
+}
+
+static __fi void cpuDriveIopEventFlow()
+{
+	// It's important to sync up the IOP before updating the timers, since gates
+	// depend on starting/stopping in the right place.
+	cpuSyncIopCycleState();
+	//if( EEsCycle < -450 )
+	//	Console.WriteLn( " IOP ahead by: %d cycles", -EEsCycle );
+	cpuExecutePendingIopEvents();
+	iopEventTest();
+}
+
+static __fi void cpuDriveCounterAndTimerEventFlow()
+{
+	cpuRunCounterUpdateIfNeeded();
+	_cpuTestTIMR();
+}
+
+static __fi void cpuDispatchPendingEeEventInterrupts()
+{
+	if (!cpuRegs.interrupt)
+		return;
+
+	// This is a BIOS hack because the coding in the BIOS is terrible but the bug is masked by Data Cache
+	// where a DMA buffer is overwritten without waiting for the transfer to end, which causes the fonts to get all messed up
+	// so to fix it, we run all the DMA's instantly when in the BIOS.
+	// Only use the lower 17 bits of the cpuRegs.interrupt as the upper bits are for VU0/1 sync which can't be done in a tight loop
+	if (CHECK_INSTANTDMAHACK && dmacRegs.ctrl.DMAE && !(psHu8(DMAC_ENABLER + 2) & 1) && (cpuRegs.interrupt & 0x1FFFF))
+	{
+		while ((cpuRegs.interrupt & 0x1FFFF) && _cpuTestInterrupts())
+			;
+	}
+	else
+	{
+		_cpuTestInterrupts();
+	}
+}
+
+static __fi void cpuRunVuSyncEventFlow()
+{
+	// We're in an EventTest. All dynarec registers are flushed
+	// so there is no need to freeze registers here.
+	CpuVU0->ExecuteBlock();
+	CpuVU1->ExecuteBlock();
+}
+
+static __fi void cpuScheduleEventTestDeadlines()
+{
+	// 8 or more cycles behind and there's an event scheduled.
+	// Otherwise IOP is caught up/not doing anything so we can wait for the next event.
+	cpuScheduleNextEventFromIopState();
+
+	// Apply vsync and other counter nextCycles.
+	cpuApplyCounterEventDeadline();
+}
+
 // Shared portion of the branch test, called from both the Interpreter
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
@@ -498,9 +613,7 @@ __fi void _cpuEventTest_Shared()
 	// cycles (fixes Grandia II [PAL], which does a spin loop on a vsync and expects to
 	// be able to read the value before the exception handler clears it).
 
-	uint mask = intcInterrupt() | dmacInterrupt();
-	if (cpuIntsEnabled(mask))
-		cpuException(mask, cpuRegs.branch);
+	cpuHandlePendingCpuLevelExceptions();
 
 	// ---- IOP -------------
 	// * It's important to run a iopEventTest before calling ExecuteBlock. This
@@ -510,51 +623,19 @@ __fi void _cpuEventTest_Shared()
 	//
 	// * The IOP cannot always be run.  If we run IOP code every time through the
 	//   cpuEventTest, the IOP generally starts to run way ahead of the EE.
-
-	// It's also important to sync up the IOP before updating the timers, since gates will depend on starting/stopping in the right place!
-	cpuSyncIopCycleState();
-	//if( EEsCycle < -450 )
-	//	Console.WriteLn( " IOP ahead by: %d cycles", -EEsCycle );
-	cpuExecutePendingIopEvents();
-
-	iopEventTest();
-
-	cpuRunCounterUpdateIfNeeded();
-
-	_cpuTestTIMR();
+	cpuDriveIopEventFlow();
+	cpuDriveCounterAndTimerEventFlow();
 
 	// ---- Interrupts -------------
 	// These are basically just DMAC-related events, which also piggy-back the same bits as
 	// the PS2's own DMA channel IRQs and IRQ Masks.
-
-	if (cpuRegs.interrupt)
-	{
-		// This is a BIOS hack because the coding in the BIOS is terrible but the bug is masked by Data Cache
-		// where a DMA buffer is overwritten without waiting for the transfer to end, which causes the fonts to get all messed up
-		// so to fix it, we run all the DMA's instantly when in the BIOS.
-		// Only use the lower 17 bits of the cpuRegs.interrupt as the upper bits are for VU0/1 sync which can't be done in a tight loop
-		if (CHECK_INSTANTDMAHACK && dmacRegs.ctrl.DMAE && !(psHu8(DMAC_ENABLER + 2) & 1) && (cpuRegs.interrupt & 0x1FFFF))
-		{
-			while ((cpuRegs.interrupt & 0x1FFFF) && _cpuTestInterrupts())
-				;
-		}
-		else
-			_cpuTestInterrupts();
-	}
+	cpuDispatchPendingEeEventInterrupts();
 
 	// ---- VU Sync -------------
-	// We're in a EventTest.  All dynarec registers are flushed
-	// so there is no need to freeze registers here.
-	CpuVU0->ExecuteBlock();
-	CpuVU1->ExecuteBlock();
+	cpuRunVuSyncEventFlow();
 
 	// ---- Schedule Next Event Test --------------
-	// 8 or more cycles behind and there's an event scheduled.
-	// Otherwise IOP is caught up/not doing anything so we can wait for the next event.
-	cpuScheduleNextEventFromIopState();
-
-	// Apply vsync and other counter nextCycles
-	cpuApplyCounterEventDeadline();
+	cpuScheduleEventTestDeadlines();
 
 	cpuLeaveEventTest();
 }
@@ -569,9 +650,7 @@ __ri void cpuTestINTCInts()
 	if ((psHu32(INTC_STAT) & psHu32(INTC_MASK)) == 0)
 		return;
 
-	cpuRequestHwInterruptCheck();
-	if (eeEventTestIsActive)
-		cpuBreakActiveIopExecution();
+	cpuNotifyUpcomingEeInterruptToSchedulers();
 }
 
 __fi void cpuTestDMACInts()
@@ -585,9 +664,7 @@ __fi void cpuTestDMACInts()
 		((psHu16(0xe010) & 0x8000) == 0))
 		return;
 
-	cpuRequestHwInterruptCheck();
-	if (eeEventTestIsActive)
-		cpuBreakActiveIopExecution();
+	cpuNotifyUpcomingEeInterruptToSchedulers();
 }
 
 __fi void cpuTestTIMRInts()
@@ -618,31 +695,16 @@ __fi void CPU_INT( EE_EventType n, s32 ecycle)
 {
 	// If it's retunning too quick, just rerun the DMA, there's no point in running the EE for < 4 cycles.
 	// This causes a huge uplift in performance for ONI FMV's.
-	if (ecycle < 4 && !(cpuRegs.dmastall & (1 << n)) && eeRunInterruptScan != INT_NOT_RUNNING)
+	if (cpuShouldPromoteEventToImmediateLoop(n, ecycle))
 	{
 		eeRunInterruptScan = INT_REQ_LOOP;
 		cpuArmEvent(n, 0);
 		return;
 	}
 
-	// EE events happen 8 cycles in the future instead of whatever was requested.
-	// This can be used on games with PATH3 masking issues for example, or when
-	// some FMV look bad.
-	if (CHECK_EETIMINGHACK && n < VIF_VU0_FINISH)
-		ecycle = 8;
-
+	ecycle = cpuApplyEeTimingHackIfNeeded(n, ecycle);
 	cpuArmEvent(n, ecycle);
-
-	// Interrupt is happening soon: make sure both EE and IOP are aware.
-
-	if (ecycle <= 28)
-	{
-		// If running in the IOP, force it to break immediately into the EE.
-		// the EE's branch test is due to run.
-		cpuBreakActiveIopExecution();
-	}
-
-	cpuSetNextEventDelta(cpuRegs.eCycle[n]);
+	cpuFinalizeArmedEventScheduling(n);
 }
 
 // Count arguments, save their starting locations, and replace the space separators with null terminators so they're separate strings

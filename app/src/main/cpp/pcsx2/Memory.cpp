@@ -1136,43 +1136,27 @@ static void ReleaseMemoryBackings()
 	memRelease();
 }
 
-void memReset()
+static void RegisterCoreFallbackMemoryHandlers()
 {
-	// Note!!  Ideally the vtlb should only be initialized once, and then subsequent
-	// resets of the system hardware would only clear vtlb mappings, but since the
-	// rest of the emu is not really set up to support a "soft" reset of that sort
-	// we opt for the hard/safe version.
-
-	pxAssume( eeMem );
-
-#ifdef ENABLECACHE
-	memset(pCache,0,sizeof(_cacheS)*64);
-#endif
-
-	vtlb_Init();
-
 	null_handler = vtlb_RegisterHandler(nullRead8, nullRead16, nullRead32, nullRead64, nullRead128,
 		nullWrite8, nullWrite16, nullWrite32, nullWrite64, nullWrite128);
 
-	tlb_fallback_0 = vtlb_RegisterHandlerTempl1(_ext_mem,0);
-	tlb_fallback_3 = vtlb_RegisterHandlerTempl1(_ext_mem,3);
-	tlb_fallback_4 = vtlb_RegisterHandlerTempl1(_ext_mem,4);
-	tlb_fallback_5 = vtlb_RegisterHandlerTempl1(_ext_mem,5);
-	tlb_fallback_7 = vtlb_RegisterHandlerTempl1(_ext_mem,7);
-	tlb_fallback_8 = vtlb_RegisterHandlerTempl1(_ext_mem,8);
-	iop_memory = vtlb_RegisterHandlerTempl1(_ext_mem,9);
+	tlb_fallback_0 = vtlb_RegisterHandlerTempl1(_ext_mem, 0);
+	tlb_fallback_3 = vtlb_RegisterHandlerTempl1(_ext_mem, 3);
+	tlb_fallback_4 = vtlb_RegisterHandlerTempl1(_ext_mem, 4);
+	tlb_fallback_5 = vtlb_RegisterHandlerTempl1(_ext_mem, 5);
+	tlb_fallback_7 = vtlb_RegisterHandlerTempl1(_ext_mem, 7);
+	tlb_fallback_8 = vtlb_RegisterHandlerTempl1(_ext_mem, 8);
+	iop_memory = vtlb_RegisterHandlerTempl1(_ext_mem, 9);
 
 	// Dynarec versions of VUs
-	vu0_micro_mem = vtlb_RegisterHandlerTempl1(vuMicro,0);
-	vu1_micro_mem = vtlb_RegisterHandlerTempl1(vuMicro,1);
-	vu1_data_mem  = (1||THREAD_VU1) ? vtlb_RegisterHandlerTempl1(vuData,1) : 0;
+	vu0_micro_mem = vtlb_RegisterHandlerTempl1(vuMicro, 0);
+	vu1_micro_mem = vtlb_RegisterHandlerTempl1(vuMicro, 1);
+	vu1_data_mem = (1 || THREAD_VU1) ? vtlb_RegisterHandlerTempl1(vuData, 1) : 0;
+}
 
-	//////////////////////////////////////////////////////////////////////////////////////////
-	// IOP's "secret" Hardware Register mapping, accessible from the EE (and meant for use
-	// by debugging or BIOS only).  The IOP's hw regs are divided into three main pages in
-	// the 0x1f80 segment, and then another oddball page for CDVD in the 0x1f40 segment.
-	//
-
+static void RegisterIopHardwareMirrorHandlers()
+{
 	using namespace IopMemory;
 
 	tlb_fallback_2 = vtlb_RegisterHandler(
@@ -1194,7 +1178,10 @@ void memReset()
 		iopHwRead8_Page8, iopHwRead16_Page8, iopHwRead32_Page8, _ext_memRead64<2>, _ext_memRead128<2>,
 		iopHwWrite8_Page8, iopHwWrite16_Page8, iopHwWrite32_Page8, _ext_memWrite64<2>, _ext_memWrite128<2>
 	);
+}
 
+static void RegisterEeHardwarePageHandlers()
+{
 	// psHw Optimized Mappings
 	// The HW Registers have been split into pages to improve optimization.
 
@@ -1202,27 +1189,29 @@ void memReset()
 	hwRead8<page>,	hwRead16<page>,	hwRead32<page>,	hwRead64<page>,	hwRead128<page>, \
 	hwWrite8<page>,	hwWrite16<page>,hwWrite32<page>,hwWrite64<page>,hwWrite128<page>
 
-	hw_by_page[0x0] = vtlb_RegisterHandler( hwHandlerTmpl(0x00) );
-	hw_by_page[0x1] = vtlb_RegisterHandler( hwHandlerTmpl(0x01) );
-	hw_by_page[0x2] = vtlb_RegisterHandler( hwHandlerTmpl(0x02) );
-	hw_by_page[0x3] = vtlb_RegisterHandler( hwHandlerTmpl(0x03) );
-	hw_by_page[0x4] = vtlb_RegisterHandler( hwHandlerTmpl(0x04) );
-	hw_by_page[0x5] = vtlb_RegisterHandler( hwHandlerTmpl(0x05) );
-	hw_by_page[0x6] = vtlb_RegisterHandler( hwHandlerTmpl(0x06) );
-	hw_by_page[0x7] = vtlb_RegisterHandler( hwHandlerTmpl(0x07) );
-	hw_by_page[0x8] = vtlb_RegisterHandler( hwHandlerTmpl(0x08) );
-	hw_by_page[0x9] = vtlb_RegisterHandler( hwHandlerTmpl(0x09) );
-	hw_by_page[0xa] = vtlb_RegisterHandler( hwHandlerTmpl(0x0a) );
-	hw_by_page[0xb] = vtlb_RegisterHandler( hwHandlerTmpl(0x0b) );
-	hw_by_page[0xc] = vtlb_RegisterHandler( hwHandlerTmpl(0x0c) );
-	hw_by_page[0xd] = vtlb_RegisterHandler( hwHandlerTmpl(0x0d) );
-	hw_by_page[0xe] = vtlb_RegisterHandler( hwHandlerTmpl(0x0e) );
+	hw_by_page[0x0] = vtlb_RegisterHandler(hwHandlerTmpl(0x00));
+	hw_by_page[0x1] = vtlb_RegisterHandler(hwHandlerTmpl(0x01));
+	hw_by_page[0x2] = vtlb_RegisterHandler(hwHandlerTmpl(0x02));
+	hw_by_page[0x3] = vtlb_RegisterHandler(hwHandlerTmpl(0x03));
+	hw_by_page[0x4] = vtlb_RegisterHandler(hwHandlerTmpl(0x04));
+	hw_by_page[0x5] = vtlb_RegisterHandler(hwHandlerTmpl(0x05));
+	hw_by_page[0x6] = vtlb_RegisterHandler(hwHandlerTmpl(0x06));
+	hw_by_page[0x7] = vtlb_RegisterHandler(hwHandlerTmpl(0x07));
+	hw_by_page[0x8] = vtlb_RegisterHandler(hwHandlerTmpl(0x08));
+	hw_by_page[0x9] = vtlb_RegisterHandler(hwHandlerTmpl(0x09));
+	hw_by_page[0xa] = vtlb_RegisterHandler(hwHandlerTmpl(0x0a));
+	hw_by_page[0xb] = vtlb_RegisterHandler(hwHandlerTmpl(0x0b));
+	hw_by_page[0xc] = vtlb_RegisterHandler(hwHandlerTmpl(0x0c));
+	hw_by_page[0xd] = vtlb_RegisterHandler(hwHandlerTmpl(0x0d));
+	hw_by_page[0xe] = vtlb_RegisterHandler(hwHandlerTmpl(0x0e));
 	hw_by_page[0xf] = vtlb_NewHandler();		// redefined later based on speedhacking prefs
 	memBindConditionalHandlers();
 
-	//////////////////////////////////////////////////////////////////////
-	// GS Optimized Mappings
+#undef hwHandlerTmpl
+}
 
+static void RegisterGsMemoryHandlers()
+{
 	tlb_fallback_6 = vtlb_RegisterHandler(
 		_ext_memRead8<6>, _ext_memRead16<6>, _ext_memRead32<6>, _ext_memRead64<6>, _ext_memRead128<6>,
 		_ext_memWrite8<6>, _ext_memWrite16<6>, _ext_memWrite32<6>, gsWrite64_generic, gsWrite128_generic
@@ -1237,6 +1226,34 @@ void memReset()
 		_ext_memRead8<6>, _ext_memRead16<6>, _ext_memRead32<6>, _ext_memRead64<6>, _ext_memRead128<6>,
 		_ext_memWrite8<6>, _ext_memWrite16<6>, _ext_memWrite32<6>, gsWrite64_page_01, gsWrite128_page_01
 	);
+}
+
+void memReset()
+{
+	// Note!!  Ideally the vtlb should only be initialized once, and then subsequent
+	// resets of the system hardware would only clear vtlb mappings, but since the
+	// rest of the emu is not really set up to support a "soft" reset of that sort
+	// we opt for the hard/safe version.
+
+	pxAssume( eeMem );
+
+#ifdef ENABLECACHE
+	memset(pCache,0,sizeof(_cacheS)*64);
+#endif
+
+	vtlb_Init();
+	RegisterCoreFallbackMemoryHandlers();
+
+	//////////////////////////////////////////////////////////////////////////////////////////
+	// IOP's "secret" Hardware Register mapping, accessible from the EE (and meant for use
+	// by debugging or BIOS only).  The IOP's hw regs are divided into three main pages in
+	// the 0x1f80 segment, and then another oddball page for CDVD in the 0x1f40 segment.
+	//
+
+	RegisterIopHardwareMirrorHandlers();
+
+	RegisterEeHardwarePageHandlers();
+	RegisterGsMemoryHandlers();
 
 	//vtlb_Reset();
 
