@@ -54,6 +54,7 @@ object NativeApp {
     @JvmStatic external fun reloadDataRoot(path: String)
     @JvmStatic external fun getGameTitle(path: String): String?
     @JvmStatic external fun setPadVibration(enabled: Boolean)
+    @JvmStatic external fun setPerformanceOverlayMode(visible: Boolean, detailed: Boolean)
     @JvmStatic external fun setPadButton(index: Int, range: Int, pressed: Boolean)
     @JvmStatic external fun onHostKeyEvent(keyCode: Int, pressed: Boolean)
     @JvmStatic external fun onHostMousePosition(x: Float, y: Float)
@@ -126,7 +127,7 @@ object NativeApp {
 
     @JvmStatic
     fun onPadVibration(index: Int, largeMotor: Float, smallMotor: Float) {
-        Log.d(TAG, "Pad vibration index=$index large=$largeMotor small=$smallMotor")
+        // Android UI layer currently doesn't consume vibration callbacks.
     }
 
     @JvmStatic

@@ -6,6 +6,22 @@
 #include "common/Perf.h"
 #include "common/StringUtil.h"
 
+#ifdef PCSX2_DEVBUILD
+static bool s_logged_vif_rec_cache_reset[2] = {};
+
+static void LogVifRecCacheResetOnce(int idx, uptr write_ptr, uptr end_ptr)
+{
+	if (idx < 0 || idx >= 2 || s_logged_vif_rec_cache_reset[idx])
+		return;
+
+	s_logged_vif_rec_cache_reset[idx] = true;
+	DevCon.WriteLn("nVif Recompiler Cache Reset! [0x%016" PRIXPTR " > 0x%016" PRIXPTR "]",
+		write_ptr, end_ptr);
+}
+#else
+static __fi void LogVifRecCacheResetOnce(int, uptr, uptr) {}
+#endif
+
 void dVifReset(int idx)
 {
 	nVif[idx].vifBlocks.reset();
@@ -427,8 +443,7 @@ _vifT __fi nVifBlock* dVifCompile(nVifBlock& block, bool isFill)
 	// Check size before the compilation
 	if (v.recWritePtr >= v.recEndPtr)
 	{
-		DevCon.WriteLn("nVif Recompiler Cache Reset! [0x%016" PRIXPTR " > 0x%016" PRIXPTR "]",
-			v.recWritePtr, v.recEndPtr);
+		LogVifRecCacheResetOnce(idx, v.recWritePtr, v.recEndPtr);
 		dVifReset(idx);
 	}
 

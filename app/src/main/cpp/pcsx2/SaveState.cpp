@@ -203,14 +203,18 @@ bool SaveStateBase::FreezeCoreRegisterState()
 	if (!FreezeTag("cpuRegs"))
 		return false;
 
-	Freeze(cpuRegs);		// cpu regs + COP0
-	Freeze(psxRegs);		// iop regs
-	Freeze(fpuRegs);
-	Freeze(tlb);			// tlbs
-	Freeze(cachedTlbs);		// cached tlbs
-	Freeze(AllowParams1);	//OSDConfig written (Fast Boot)
-	Freeze(AllowParams2);
-	return IsOkay();
+	auto freezeCoreRegisterPayload = [this]() {
+		Freeze(cpuRegs);		// cpu regs + COP0
+		Freeze(psxRegs);		// iop regs
+		Freeze(fpuRegs);
+		Freeze(tlb);			// tlbs
+		Freeze(cachedTlbs);		// cached tlbs
+		Freeze(AllowParams1);	//OSDConfig written (Fast Boot)
+		Freeze(AllowParams2);
+		return IsOkay();
+	};
+
+	return freezeCoreRegisterPayload();
 }
 
 bool SaveStateBase::FreezeCycleTimingState()
@@ -218,13 +222,17 @@ bool SaveStateBase::FreezeCycleTimingState()
 	if (!FreezeTag("Cycles"))
 		return false;
 
-	Freeze(EEsCycle);
-	Freeze(EEoCycle);
-	Freeze(nextDeltaCounter);
-	Freeze(nextStartCounter);
-	Freeze(psxNextStartCounter);
-	Freeze(psxNextDeltaCounter);
-	return IsOkay();
+	auto freezeCycleTimingPayload = [this]() {
+		Freeze(EEsCycle);
+		Freeze(EEoCycle);
+		Freeze(nextDeltaCounter);
+		Freeze(nextStartCounter);
+		Freeze(psxNextStartCounter);
+		Freeze(psxNextDeltaCounter);
+		return IsOkay();
+	};
+
+	return freezeCycleTimingPayload();
 }
 
 bool SaveStateBase::FreezeEeSubsystemState(Error* error)
@@ -243,43 +251,60 @@ bool SaveStateBase::FreezeEeSubsystemState(Error* error)
 
 bool SaveStateBase::FreezeEeTimingAndMemoryState(Error* error)
 {
-	bool okay = rcntFreeze();
-	okay = okay && memFreeze(error);
-	return okay;
+	if (!rcntFreeze())
+		return false;
+
+	return memFreeze(error);
 }
 
 bool SaveStateBase::FreezeEeVectorUnitState()
 {
-	bool okay = FreezeVuExecutionState();
-	okay = okay && FreezeVifTransportState();
-	return okay;
+	if (!FreezeVuExecutionState())
+		return false;
+
+	return FreezeVifTransportState();
 }
 
 bool SaveStateBase::FreezeVuExecutionState()
 {
-	bool okay = vuMicroFreeze();
-	okay = okay && vuJITFreeze();
-	okay = okay && mtvuFreeze();
-	return okay;
+	if (!vuMicroFreeze())
+		return false;
+
+	if (!vuJITFreeze())
+		return false;
+
+	return mtvuFreeze();
 }
 
 bool SaveStateBase::FreezeVifTransportState()
 {
-	bool okay = vif0Freeze();
-	okay = okay && vif1Freeze();
-	return okay;
+	if (!vif0Freeze())
+		return false;
+
+	return vif1Freeze();
 }
 
 bool SaveStateBase::FreezeEeTransferSubsystemState()
 {
-	bool okay = gsFreeze();
-	okay = okay && sifFreeze();
-	okay = okay && ipuFreeze();
-	okay = okay && ipuDmaFreeze();
-	okay = okay && gifFreeze();
-	okay = okay && gifDmaFreeze();
-	okay = okay && sprFreeze();
-	return okay;
+	if (!gsFreeze())
+		return false;
+
+	if (!sifFreeze())
+		return false;
+
+	if (!ipuFreeze())
+		return false;
+
+	if (!ipuDmaFreeze())
+		return false;
+
+	if (!gifFreeze())
+		return false;
+
+	if (!gifDmaFreeze())
+		return false;
+
+	return sprFreeze();
 }
 
 bool SaveStateBase::FreezeIopSubsystemState()
@@ -303,31 +328,50 @@ bool SaveStateBase::FreezeIopCounterAndLinkState()
 	return psxRcntFreeze();
 }
 
-bool SaveStateBase::FreezeIopPeripheralState()
+static bool DoIopSioPeripheralState(StateWrapper& sw)
 {
-	static const auto DoSioPeripheralState = [](StateWrapper& sw) -> bool
-	{
-		bool ok = g_Sio0.DoState(sw);
-		ok = ok && g_Sio2.DoState(sw);
-		ok = ok && g_MultitapArr.at(0).DoState(sw);
-		ok = ok && g_MultitapArr.at(1).DoState(sw);
-		return ok;
-	};
-	bool okay = FreezeStateWrapperBlock("IOP SIO/Multitap", 16 * 1024, DoSioPeripheralState);
-	if (!okay)
+	if (!g_Sio0.DoState(sw))
 		return false;
 
-	okay = okay && cdrFreeze();
-	okay = okay && cdvdFreeze();
-	return okay;
+	if (!g_Sio2.DoState(sw))
+		return false;
+
+	if (!g_MultitapArr.at(0).DoState(sw))
+		return false;
+
+	return g_MultitapArr.at(1).DoState(sw);
+}
+
+bool SaveStateBase::FreezeIopPeripheralState()
+{
+	if (!FreezeStateWrapperBlock("IOP SIO/Multitap", 16 * 1024, DoIopSioPeripheralState))
+		return false;
+
+	if (!cdrFreeze())
+		return false;
+
+	return cdvdFreeze();
 }
 
 bool SaveStateBase::FreezeIopAuxiliaryState()
 {
-	bool okay = deci2Freeze();
-	okay = okay && InputRecordingFreeze();
-	okay = okay && handleFreeze();
-	return okay;
+	if (!deci2Freeze())
+		return false;
+
+	if (!InputRecordingFreeze())
+		return false;
+
+	return handleFreeze();
+}
+
+static void WarnMtvuSavestateStabilityOnce()
+{
+	static bool s_warned = false;
+	if (s_warned)
+		return;
+
+	s_warned = true;
+	Console.Warning("MTVU speedhack is enabled, saved states may not be stable");
 }
 
 void SaveStateBase::PrepBlock(int size)
@@ -417,21 +461,29 @@ bool SaveStateBase::FreezeInternals(Error* error)
 {
 	// Print this until the MTVU problem in gifPathFreeze is taken care of (rama)
 	if (THREAD_VU1)
-		Console.Warning("MTVU speedhack is enabled, saved states may not be stable");
+		WarnMtvuSavestateStabilityOnce();
 
-	if (!vmFreeze())
+	auto freezeExecutionContextState = [this]() {
+		if (!vmFreeze())
+			return false;
+
+		if (!FreezeCoreRegisterState())
+			return false;
+
+		return FreezeCycleTimingState();
+	};
+
+	auto freezeSubsystemGroups = [this, error]() {
+		if (!FreezeEeSubsystemState(error))
+			return false;
+
+		return FreezeIopSubsystemState();
+	};
+
+	if (!freezeExecutionContextState())
 		return false;
 
-	if (!FreezeCoreRegisterState())
-		return false;
-
-	if (!FreezeCycleTimingState())
-		return false;
-
-	if (!FreezeEeSubsystemState(error))
-		return false;
-
-	return FreezeIopSubsystemState();
+	return freezeSubsystemGroups();
 }
 
 
@@ -839,23 +891,31 @@ static void AddSavestateArchiveEntry(ArchiveEntryList* destlist, const char* fil
 			.SetDataSize(endpos - startpos));
 }
 
-static bool SaveSavestateInternalStructures(memSavingState* saveme, ArchiveEntryList* destlist, Error* error)
+static bool FreezeSavestateInternalPayload(SaveStateBase* state, Error* error)
 {
-	const uint internals_start = saveme->GetCurrentPos();
-
-	if (!saveme->FreezeBios())
+	if (!state->FreezeBios())
 	{
 		Error::SetString(error, "FreezeBios() failed");
 		return false;
 	}
 
-	if (!saveme->FreezeInternals(error))
+	if (!state->FreezeInternals(error))
 	{
 		if (!error->IsValid())
 			Error::SetString(error, "FreezeInternals() failed");
 
 		return false;
 	}
+
+	return true;
+}
+
+static bool SaveSavestateInternalStructures(memSavingState* saveme, ArchiveEntryList* destlist, Error* error)
+{
+	const uint internals_start = saveme->GetCurrentPos();
+
+	if (!FreezeSavestateInternalPayload(saveme, error))
+		return false;
 
 	AddSavestateArchiveEntry(destlist, EntryFilename_InternalStructures, internals_start, saveme->GetCurrentPos());
 	return true;
@@ -878,16 +938,24 @@ static bool SaveSavestateComponentEntries(memSavingState* saveme, ArchiveEntryLi
 	return true;
 }
 
-static std::unique_ptr<ArchiveEntryList> CreateSavestateArchiveBuffer(Error* error)
+static bool RunSavestateArchiveBuildPhases(memSavingState* saveme, ArchiveEntryList* destlist, Error* error)
+{
+	if (!SaveSavestateInternalStructures(saveme, destlist, error))
+		return false;
+
+	if (!SaveSavestateComponentEntries(saveme, destlist, error))
+		return false;
+
+	return true;
+}
+
+static std::unique_ptr<ArchiveEntryList> BuildSavestateArchiveBuffer(Error* error)
 {
 	std::unique_ptr<ArchiveEntryList> destlist = std::make_unique<ArchiveEntryList>();
 	destlist->GetBuffer().resize(1024 * 1024 * 64);
 
 	memSavingState saveme(destlist->GetBuffer());
-	if (!SaveSavestateInternalStructures(&saveme, destlist.get(), error))
-		return nullptr;
-
-	if (!SaveSavestateComponentEntries(&saveme, destlist.get(), error))
+	if (!RunSavestateArchiveBuildPhases(&saveme, destlist.get(), error))
 		return nullptr;
 
 	return destlist;
@@ -895,7 +963,7 @@ static std::unique_ptr<ArchiveEntryList> CreateSavestateArchiveBuffer(Error* err
 
 std::unique_ptr<ArchiveEntryList> SaveState_DownloadState(Error* error)
 {
-	return CreateSavestateArchiveBuffer(error);
+	return BuildSavestateArchiveBuffer(error);
 }
 
 static std::optional<SaveStateScreenshotData> CaptureSavestateScreenshotData(u32 width, u32 height)
@@ -1209,10 +1277,7 @@ static std::optional<std::vector<u8>> ReadZipEntryPayloadByIndex(zip_t* zf, s64 
 static bool LoadInternalStateFromPayload(const std::vector<u8>& payload, Error* error)
 {
 	memLoadingState state(payload);
-	if (!state.FreezeBios())
-		return false;
-
-	return state.FreezeInternals(error);
+	return FreezeSavestateInternalPayload(&state, error);
 }
 
 static void DecodeSavestateScreenshotRgbRow(const u8* row_ptr, u32 width, u32* out_ptr)
@@ -1350,16 +1415,23 @@ static bool SaveSavestateScreenshotToZip(zip_t* zf, SaveStateScreenshotData* scr
 	return !screenshot || SaveState_CompressScreenshot(screenshot, zf);
 }
 
-static bool SaveState_AddToZip(zip_t* zf, ArchiveEntryList* srclist, SaveStateScreenshotData* screenshot)
+struct SavestateArchiveWriteSession
+{
+	ArchiveEntryList* archive_entries = nullptr;
+	SaveStateScreenshotData* screenshot = nullptr;
+	const char* filename = nullptr;
+};
+
+static bool WriteSavestateArchivePayloadToZip(zip_t* zf, const SavestateArchiveWriteSession& session)
 {
 	const SavestateCompressionSettings compression = GetSavestateCompressionSettings();
 	if (!AddSavestateVersionEntry(zf, compression))
 		return false;
 
-	if (!AddSavestateArchiveEntriesToZip(zf, srclist, compression))
+	if (!AddSavestateArchiveEntriesToZip(zf, session.archive_entries, compression))
 		return false;
 
-	return SaveSavestateScreenshotToZip(zf, screenshot);
+	return SaveSavestateScreenshotToZip(zf, session.screenshot);
 }
 
 static bool FinalizeSavestateZipWrite(zip_t* zf, const char* filename, Error* error)
@@ -1373,28 +1445,28 @@ static bool FinalizeSavestateZipWrite(zip_t* zf, const char* filename, Error* er
 	return false;
 }
 
-static bool WriteSavestateArchiveToDisk(zip_t* zf, ArchiveEntryList* srclist, SaveStateScreenshotData* screenshot,
-	const char* filename, Error* error)
+static bool RunSavestateArchiveWriteLifecycle(zip_t* zf, const SavestateArchiveWriteSession& session, Error* error)
 {
-	if (!SaveState_AddToZip(zf, srclist, screenshot))
+	if (!WriteSavestateArchivePayloadToZip(zf, session))
 	{
 		Error::SetStringFmt(error,
-			TRANSLATE_FS("SaveState", "Failed to save state to zip file '{}'."), filename);
+			TRANSLATE_FS("SaveState", "Failed to save state to zip file '{}'."), session.filename);
 		zip_discard(zf);
 		return false;
 	}
 
-	return FinalizeSavestateZipWrite(zf, filename, error);
+	return FinalizeSavestateZipWrite(zf, session.filename, error);
 }
 
 static bool SaveSavestateArchiveFile(std::unique_ptr<ArchiveEntryList>& srclist,
 	std::unique_ptr<SaveStateScreenshotData>& screenshot, const char* filename, Error* error)
 {
+	const SavestateArchiveWriteSession session = {srclist.get(), screenshot.get(), filename};
 	zip_t* const zf = OpenSavestateZipForWrite(filename, error);
 	if (!zf)
 		return false;
 
-	return WriteSavestateArchiveToDisk(zf, srclist.get(), screenshot.get(), filename, error);
+	return RunSavestateArchiveWriteLifecycle(zf, session, error);
 }
 
 bool SaveState_ZipToDisk(

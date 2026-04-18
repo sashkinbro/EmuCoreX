@@ -108,6 +108,54 @@ static void ClearRecLUT(BASEBLOCK* base, int count);
 static u32 scaleblockcycles();
 static void recExitExecution();
 
+struct EeJitWarningAudit
+{
+	bool branch_in_delay_slot_logged = false;
+	bool cop2_q_hazard_logged = false;
+	bool cop2_old_value_logged = false;
+};
+
+static EeJitWarningAudit s_eeJitWarningAudit;
+
+static __fi void ResetEeJitWarningAudit()
+{
+	s_eeJitWarningAudit = {};
+}
+
+static void WarnEeBranchInDelaySlotOnce(u32 code)
+{
+	if (s_eeJitWarningAudit.branch_in_delay_slot_logged)
+		return;
+
+	s_eeJitWarningAudit.branch_in_delay_slot_logged = true;
+	DevCon.Warning("Branch %x in delay slot!", code);
+}
+
+static void WarnEeCop2QHazardOnce(u32 block_start, u32 block_end, u32 current_pc, u32 hazard_pc)
+{
+	if (s_eeJitWarningAudit.cop2_q_hazard_logged)
+		return;
+
+	s_eeJitWarningAudit.cop2_q_hazard_logged = true;
+	Console.Warning("Possible incorrect Q value used in COP2. If the game is broken, please report to https://github.com/pcsx2/pcsx2.");
+	for (u32 i = block_start; i < block_end; i += 4)
+	{
+		std::string disasm;
+		disR5900Fasm(disasm, memRead32(i), i, false);
+		Console.Warning("%x %s%08X %s", i, i == current_pc - 4 ? "*" : i == hazard_pc ? "=" : " ",
+			memRead32(i), disasm.c_str());
+	}
+}
+
+static void WarnEeCop2OldValueOnce()
+{
+	if (s_eeJitWarningAudit.cop2_old_value_logged)
+		return;
+
+	s_eeJitWarningAudit.cop2_old_value_logged = true;
+	Console.Warning("Possible old value used in COP2 code. If the game is broken, please report to https://github.com/pcsx2/pcsx2.");
+}
+
 enum class EeDispatcherEventBounceReason
 {
 	WaitLoopTargetReached,
@@ -125,6 +173,8 @@ struct EeDispatcherEventBounceAudit
 	u64 dynamic_branch_cycle_deadline_reached = 0;
 	u64 timeout_loop_immediate_event = 0;
 	u64 timeout_loop_early_exit_event = 0;
+	bool timeout_loop_skip_logged = false;
+	bool mpeg_skip_logged = false;
 };
 
 static EeDispatcherEventBounceAudit s_eeDispatcherEventBounceAudit;
@@ -180,10 +230,30 @@ static void PrintEeDispatcherEventBounceAudit()
 		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.timeout_loop_immediate_event),
 		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.timeout_loop_early_exit_event));
 }
+
+static void LogEeTimeoutLoopSkipOnce(u32 startpc, u32 endpc)
+{
+	if (s_eeDispatcherEventBounceAudit.timeout_loop_skip_logged)
+		return;
+
+	s_eeDispatcherEventBounceAudit.timeout_loop_skip_logged = true;
+	DevCon.WriteLn("[EE/JIT] Timeout loop skip engaged at 0x%08X -> 0x%08X", startpc, endpc);
+}
+
+static void LogEeMpegSkipOnce(u32 startpc)
+{
+	if (s_eeDispatcherEventBounceAudit.mpeg_skip_logged)
+		return;
+
+	s_eeDispatcherEventBounceAudit.mpeg_skip_logged = true;
+	DevCon.WriteLn("[EE/JIT] sceMpegIsEnd skip path engaged at 0x%08X", startpc);
+}
 #else
 static __fi void ResetEeDispatcherEventBounceAudit() {}
 static __fi void RecordEeDispatcherEventBounceSite(const EeDispatcherEventBounceReason) {}
 static __fi void PrintEeDispatcherEventBounceAudit() {}
+static __fi void LogEeTimeoutLoopSkipOnce(u32, u32) {}
+static __fi void LogEeMpegSkipOnce(u32) {}
 #endif
 
 static __fi void armEmitDispatcherEventBounce(EeDispatcherEventBounceReason reason);
@@ -743,9 +813,12 @@ alignas(16) static u8 manual_counter[Ps2MemSize::TotalRam >> 12];
 ////////////////////////////////////////////////////
 static void recResetRaw()
 {
+#ifdef PCSX2_DEVBUILD
 	Console.WriteLn(Color_StrongBlack, "EE/iR5900 Recompiler Reset");
+#endif
 	PrintEeDispatcherEventBounceAudit();
 	ResetEeDispatcherEventBounceAudit();
+	ResetEeJitWarningAudit();
 
 	if (CHECK_EXTRAMEM != extraRam)
 	{
@@ -1924,7 +1997,7 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 		// Original PR and discussion at https://github.com/PCSX2/pcsx2/pull/1783 so we don't forget this information.
 		if (check_branch_delay)
 		{
-			DevCon.Warning("Branch %x in delay slot!", cpuRegs.code);
+			WarnEeBranchInDelaySlotOnce(cpuRegs.code);
 			_clearNeededX86regs();
 			_clearNeededXMMregs();
 			pc += 4;
@@ -2013,15 +2086,7 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 
 				else if (COP2IsQOP(cpuRegs.code))
 				{
-					Console.Warning("Possible incorrect Q value used in COP2. If the game is broken, please report to https://github.com/pcsx2/pcsx2.");
-					for (u32 i = s_pCurBlockEx->startpc; i < s_nEndBlock; i += 4)
-					{
-						std::string disasm = "";
-						disR5900Fasm(disasm, memRead32(i), i, false);
-						Console.Warning("%x %s%08X %s", i, i == pc - 4 ? "*" : i == p ? "=" :
-																						" ",
-							memRead32(i), disasm.c_str());
-					}
+					WarnEeCop2QHazardOnce(s_pCurBlockEx->startpc, s_nEndBlock, pc, p);
 					break;
 				}
 			}
@@ -2038,7 +2103,7 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 					// rd is fs
 					if ((_Rd_ == 16 && s & 1) || (_Rd_ == 17 && s & 2) || (_Rd_ == 18 && s & 4))
 					{
-						Console.Warning("Possible old value used in COP2 code. If the game is broken, please report to https://github.com/pcsx2/pcsx2.");
+						WarnEeCop2OldValueOnce();
 						break;
 					}
 				s &= ~cop2flags(cpuRegs.code);
@@ -2221,7 +2286,7 @@ static bool skipMPEG_By_Pattern(u32 sPC)
 		iBranchTest();
 		g_branch = 1;
 		pc = s_nEndBlock;
-		Console.WriteLn(Color_StrongGreen, "sceMpegIsEnd pattern found! Recompiling skip video fix...");
+		LogEeMpegSkipOnce(sPC);
 		return 1;
 	}
 	return 0;
@@ -2232,7 +2297,7 @@ static bool recSkipTimeoutLoop(s32 reg, bool is_timeout_loop)
 	if (!EmuConfig.Speedhacks.WaitLoop || !is_timeout_loop)
 		return false;
 
-	DevCon.WriteLn("[EE] Skipping timeout loop at 0x%08X -> 0x%08X", s_pCurBlockEx->startpc, s_nEndBlock);
+	LogEeTimeoutLoopSkipOnce(s_pCurBlockEx->startpc, s_nEndBlock);
 
 	// basically, if the time it takes the loop to run is shorter than the
 	// time to the next event, then we want to skip ahead to the event, but
@@ -2422,8 +2487,9 @@ static void recRecompile(const u32 startpc)
 	// if the register being decremented, which appears to vary. So far I haven't seen any which increment instead
 	// of decrementing, so we'll limit the test to that to be safe.
 	//
+	const bool allow_waitloop_speedhack = EmuConfig.Speedhacks.WaitLoop;
 	s32 timeout_reg = -1;
-	bool is_timeout_loop = true;
+	bool is_timeout_loop = allow_waitloop_speedhack;
 
 	// compile breakpoints as individual blocks
 	const int n1 = isBreakpointNeeded(i);
@@ -2584,7 +2650,7 @@ StartRecomp:
 	// which alter the machine state apart from registers, it will do the same thing on every
 	// iteration.
 	s_nBlockFF = false;
-	if (s_branchTo == startpc)
+	if (allow_waitloop_speedhack && s_branchTo == startpc)
 	{
 		s_nBlockFF = true;
 
@@ -2666,53 +2732,6 @@ StartRecomp:
 		is_timeout_loop = false;
 	}
 
-	// rec info //
-	bool has_cop2_instructions = false;
-	{
-        u32 block_offset = (s_nEndBlock - startpc) >> 2; // (s_nEndBlock - startpc) / 4
-		if (s_nInstCacheSize < block_offset + 1)
-		{
-			const u32 required_size = block_offset + 10;
-			const u32 new_size = std::max(required_size, s_nInstCacheSize << 1); // s_nInstCacheSize * 2
-			
-			EEINST* new_cache = (EEINST*)malloc(sizeof(EEINST) * new_size);
-			if (!new_cache)
-				pxFailRel("Failed to allocate R5900 InstCache array");
-			
-			if (s_pInstCache && s_nInstCacheSize > 0)
-			{
-				memcpy(new_cache, s_pInstCache, sizeof(EEINST) * s_nInstCacheSize);
-			}
-			
-			free(s_pInstCache);
-			s_pInstCache = new_cache;
-			s_nInstCacheSize = new_size;
-		}
-
-		EEINST* pcur = s_pInstCache + block_offset;
-		_recClearInst(pcur);
-		pcur->info = 0;
-
-		for (i = s_nEndBlock; i > startpc; i -= 4)
-		{
-			cpuRegs.code = *(int*)PSM(i - 4);
-			pcur[-1] = pcur[0];
-			recBackpropBSC(cpuRegs.code, pcur - 1, pcur);
-			pcur--;
-
-			has_cop2_instructions |= (_Opcode_ == 022 || _Opcode_ == 066 || _Opcode_ == 076);
-		}
-	}
-
-	// eventually we'll want to have a vector of passes or something.
-	if (has_cop2_instructions)
-	{
-		COP2MicroFinishPass().Run(startpc, s_nEndBlock, s_pInstCache + 1);
-
-		if (EmuConfig.Speedhacks.vuFlagHack)
-			COP2FlagHackPass().Run(startpc, s_nEndBlock, s_pInstCache + 1);
-	}
-
 #ifdef DUMP_BLOCKS
 	ZydisDecoder disas_decoder;
 	ZydisDecoderInit(&disas_decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_ADDRESS_WIDTH_64);
@@ -2737,10 +2756,56 @@ StartRecomp:
 	memory_protect_recompiled_code(startpc, (s_nEndBlock - startpc) >> 2);
 
 	// Skip Recompilation if sceMpegIsEnd Pattern detected
-	const bool doRecompilation = !skipMPEG_By_Pattern(startpc) && !recSkipTimeoutLoop(timeout_reg, is_timeout_loop);
+	const bool skip_recompilation = skipMPEG_By_Pattern(startpc) || recSkipTimeoutLoop(timeout_reg, is_timeout_loop);
+	const bool doRecompilation = !skip_recompilation;
 
 	if (doRecompilation)
 	{
+		// rec info //
+		bool has_cop2_instructions = false;
+		{
+			u32 block_offset = (s_nEndBlock - startpc) >> 2; // (s_nEndBlock - startpc) / 4
+			if (s_nInstCacheSize < block_offset + 1)
+			{
+				const u32 required_size = block_offset + 10;
+				const u32 new_size = std::max(required_size, s_nInstCacheSize << 1); // s_nInstCacheSize * 2
+
+				EEINST* new_cache = (EEINST*)malloc(sizeof(EEINST) * new_size);
+				if (!new_cache)
+					pxFailRel("Failed to allocate R5900 InstCache array");
+
+				if (s_pInstCache && s_nInstCacheSize > 0)
+					memcpy(new_cache, s_pInstCache, sizeof(EEINST) * s_nInstCacheSize);
+
+				free(s_pInstCache);
+				s_pInstCache = new_cache;
+				s_nInstCacheSize = new_size;
+			}
+
+			EEINST* pcur = s_pInstCache + block_offset;
+			_recClearInst(pcur);
+			pcur->info = 0;
+
+			for (i = s_nEndBlock; i > startpc; i -= 4)
+			{
+				cpuRegs.code = *(int*)PSM(i - 4);
+				pcur[-1] = pcur[0];
+				recBackpropBSC(cpuRegs.code, pcur - 1, pcur);
+				pcur--;
+
+				has_cop2_instructions |= (_Opcode_ == 022 || _Opcode_ == 066 || _Opcode_ == 076);
+			}
+		}
+
+		// eventually we'll want to have a vector of passes or something.
+		if (has_cop2_instructions)
+		{
+			COP2MicroFinishPass().Run(startpc, s_nEndBlock, s_pInstCache + 1);
+
+			if (EmuConfig.Speedhacks.vuFlagHack)
+				COP2FlagHackPass().Run(startpc, s_nEndBlock, s_pInstCache + 1);
+		}
+
 		// Finally: Generate x86 recompiled code!
 		g_pCurInstInfo = s_pInstCache;
 		while (!g_branch && pc < s_nEndBlock)

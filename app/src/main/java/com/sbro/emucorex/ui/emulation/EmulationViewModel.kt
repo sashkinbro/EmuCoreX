@@ -13,6 +13,7 @@ import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
 import com.sbro.emucorex.data.OverlayControlLayout
@@ -183,6 +184,8 @@ private data class EmulationLaunchConfig(
 )
 
 private data class LiveRuntimeSnapshot(
+    val showFps: Boolean,
+    val fpsOverlayMode: Int,
     val renderer: Int,
     val upscale: Float,
     val aspectRatio: Int,
@@ -270,6 +273,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val current = _uiState.value
         if (current.gameSettingsProfileActive) return
         _uiState.value = transform(current)
+        syncNativePerformanceOverlayState(_uiState.value)
+    }
+
+    private fun syncNativePerformanceOverlayState(state: EmulationUiState) {
+        NativeApp.setPerformanceOverlayMode(
+            visible = state.showFps,
+            detailed = state.showFps && state.fpsOverlayMode != FPS_OVERLAY_MODE_SIMPLE
+        )
     }
 
     init {
@@ -281,6 +292,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.showFps.collect { enabled ->
                 _uiState.value = _uiState.value.copy(showFps = enabled)
+                syncNativePerformanceOverlayState(_uiState.value)
             }
         }
         viewModelScope.launch {
@@ -291,6 +303,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.fpsOverlayMode.collect { mode ->
                 _uiState.value = _uiState.value.copy(fpsOverlayMode = mode)
+                syncNativePerformanceOverlayState(_uiState.value)
             }
         }
         viewModelScope.launch {
@@ -564,6 +577,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         })
+        syncNativePerformanceOverlayState(_uiState.value)
     }
 
     fun startEmulation(path: String?, slotToLoad: Int? = null, bootToBios: Boolean = false) {
@@ -757,6 +771,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val liveRuntime = loadLiveRuntimeSnapshot()
 
                 _uiState.value = _uiState.value.copy(
+                    showFps = liveRuntime.showFps,
+                    fpsOverlayMode = liveRuntime.fpsOverlayMode,
                     renderer = liveRuntime.renderer,
                     upscale = liveRuntime.upscale,
                     aspectRatio = liveRuntime.aspectRatio,
@@ -806,6 +822,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     frameLimitEnabled = liveRuntime.frameLimitEnabled,
                     targetFps = liveRuntime.targetFps
                 )
+                syncNativePerformanceOverlayState(_uiState.value)
                 updateCrashContext(
                     launchState = "starting",
                     launchPath = path
@@ -1806,10 +1823,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             )
             val finalState = updatedState.copy(gameSettingsProfileActive = true)
             _uiState.value = finalState
+            syncNativePerformanceOverlayState(finalState)
             finalState
         } else {
             persistGlobal()
             _uiState.value = updatedState
+            syncNativePerformanceOverlayState(updatedState)
             updatedState
         }
     }
@@ -1905,6 +1924,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun loadLiveRuntimeSnapshot(): LiveRuntimeSnapshot {
         val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
         return LiveRuntimeSnapshot(
+            showFps = preferences.showFps.first(),
+            fpsOverlayMode = preferences.fpsOverlayMode.first(),
             renderer = preferences.renderer.first(),
             upscale = preferences.upscaleMultiplier.first(),
             aspectRatio = preferences.aspectRatio.first(),
@@ -2024,6 +2045,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             return if (keys == null || key in keys) profile.value() else current
         }
         return copy(
+            showFps = pick("showFps", showFps) { showFps },
+            fpsOverlayMode = pick("fpsOverlayMode", fpsOverlayMode) { fpsOverlayMode },
             renderer = pick("renderer", renderer) { renderer },
             upscale = pick("upscaleMultiplier", upscale) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
@@ -2385,6 +2408,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     speedPercent = 100f,
                     statusMessage = null
                 )
+                syncNativePerformanceOverlayState(_uiState.value)
                 clearCrashContext()
             } finally {
                 isShuttingDown = false
@@ -2458,6 +2482,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        NativeApp.setPerformanceOverlayMode(false, false)
         NativeApp.setPerformanceListener(null)
         if (_uiState.value.isRunning) {
             EmulatorBridge.resetKeyStatus()

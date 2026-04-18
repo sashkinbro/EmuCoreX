@@ -360,7 +360,9 @@ static void nVifGen(int usn, int mask, int curCycle)
 
 void VifUnpackSSE_Init()
 {
+#ifdef PCSX2_DEVBUILD
 	DevCon.WriteLn("Generating SSE-optimized unpacking functions for VIF interpreters...");
+#endif
 
 	xSetPtr(SysMemory::GetVIFUnpackRec());
 
@@ -369,6 +371,7 @@ void VifUnpackSSE_Init()
 			for (int c = 0; c < 4; c++)
 				nVifGen(a, b, c);
 
+#ifdef PCSX2_DEVBUILD
 	DevCon.WriteLn("Unpack function generation complete.  Generated function statistics:");
 	DevCon.WriteLn(
 		"  Reserved buffer    : %zu bytes @ 0x%016" PRIXPTR "\n"
@@ -377,6 +380,7 @@ void VifUnpackSSE_Init()
 		SysMemory::GetVIFUnpackRec(),
 		xGetPtr() - SysMemory::GetVIFUnpackRec()
 	);
+#endif
 
 	Perf::any.Register(SysMemory::GetVIFUnpackRec(), xGetPtr() - SysMemory::GetVIFUnpackRec(), "VIF Unpack");
 }

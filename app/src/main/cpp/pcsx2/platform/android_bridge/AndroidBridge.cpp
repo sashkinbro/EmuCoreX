@@ -129,6 +129,12 @@ namespace
 		bool active = false;
 	};
 
+	struct AndroidPerformanceOverlayBridgeState
+	{
+		bool visible = false;
+		bool detailed = true;
+	};
+
 	static AndroidSurfaceState& GetAndroidSurfaceState()
 	{
 		static AndroidSurfaceState s_android_surface_state;
@@ -139,6 +145,12 @@ namespace
 	{
 		static CpuThreadBridgeState s_cpu_thread_bridge_state;
 		return s_cpu_thread_bridge_state;
+	}
+
+	static AndroidPerformanceOverlayBridgeState& GetAndroidPerformanceOverlayBridgeState()
+	{
+		static AndroidPerformanceOverlayBridgeState s_android_performance_overlay_state;
+		return s_android_performance_overlay_state;
 	}
 
 	static void ClearJNIExceptions(JNIEnv* env)
@@ -1223,6 +1235,15 @@ Java_com_sbro_emucorex_core_NativeApp_getCoreVersion(JNIEnv* env, jclass clazz)
 
 extern "C"
 JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_core_NativeApp_setPerformanceOverlayMode(JNIEnv*, jclass, jboolean visible, jboolean detailed)
+{
+    AndroidPerformanceOverlayBridgeState& overlay_state = GetAndroidPerformanceOverlayBridgeState();
+    overlay_state.visible = (visible == JNI_TRUE);
+    overlay_state.detailed = (detailed == JNI_TRUE);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstring p_szpath)
 {
     std::string new_path = GetJavaString(env, p_szpath);
@@ -2066,6 +2087,7 @@ static u32 s_total_frames = 0;
 
 void Host::BeginPresentFrame() {
     NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
+    const AndroidPerformanceOverlayBridgeState& overlay_state = GetAndroidPerformanceOverlayBridgeState();
     if (GSIsHardwareRenderer())
     {
         static constexpr auto update_stat = [](GSPerfMon::counter_t counter, u64& dst, double& last) {
@@ -2089,6 +2111,9 @@ void Host::BeginPresentFrame() {
     if (elapsed >= 500) {
         native_app_bridge.last_fps_sample_time = now;
 
+        if (!overlay_state.visible)
+            return;
+
         auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
         if (env && native_app_bridge.app_class && native_app_bridge.on_performance_metrics) {
             float fps = PerformanceMetrics::GetFPS();
@@ -2097,7 +2122,8 @@ void Host::BeginPresentFrame() {
                 fps = VMManager::GetFrameRate();
             const float speed_percent = PerformanceMetrics::GetSpeed() * 100.0f;
 
-            const std::string overlay_text_utf8 = BuildAndroidPerformanceOverlayText();
+            const std::string overlay_text_utf8 =
+                overlay_state.detailed ? BuildAndroidPerformanceOverlayText() : std::string();
             jstring overlay_text = env->NewStringUTF(overlay_text_utf8.c_str());
 
             env->CallStaticVoidMethod(
