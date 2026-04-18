@@ -35,11 +35,12 @@ class GameRepository {
     fun scanDirectory(
         path: String,
         context: Context,
-        cachedGamesByPath: Map<String, GameItem>
+        cachedGamesByPath: Map<String, GameItem>,
+        shouldAbort: () -> Boolean = { false }
     ): List<GameItem> {
         val dir = File(path)
         if (!dir.exists() || !dir.isDirectory) return emptyList()
-        return scanLocalDirectory(dir, context, cachedGamesByPath).sortedBy { it.title.lowercase() }
+        return scanLocalDirectory(dir, context, cachedGamesByPath, shouldAbort).sortedBy { it.title.lowercase() }
     }
 
     fun scanDirectoryFromUri(uri: Uri, context: Context): List<GameItem> {
@@ -49,11 +50,12 @@ class GameRepository {
     fun scanDirectoryFromUri(
         uri: Uri,
         context: Context,
-        cachedGamesByPath: Map<String, GameItem>
+        cachedGamesByPath: Map<String, GameItem>,
+        shouldAbort: () -> Boolean = { false }
     ): List<GameItem> {
         val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
             ?: return emptyList()
-        return scanDocumentFile(docFile, context, cachedGamesByPath).sortedBy { it.title.lowercase() }
+        return scanDocumentFile(docFile, context, cachedGamesByPath, shouldAbort).sortedBy { it.title.lowercase() }
     }
 
     fun formatFileSize(bytes: Long): String {
@@ -94,7 +96,8 @@ class GameRepository {
     private fun scanLocalDirectory(
         dir: File,
         context: Context,
-        cachedGamesByPath: Map<String, GameItem>
+        cachedGamesByPath: Map<String, GameItem>,
+        shouldAbort: () -> Boolean
     ): List<GameItem> {
         val items = mutableListOf<GameItem>()
         val children = dir.listFiles().orEmpty()
@@ -103,9 +106,10 @@ class GameRepository {
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
         children.forEach { file ->
+            if (shouldAbort()) return items
             when {
                 file.isDirectory && normalizeBaseName(file.name) !in COVER_DIRECTORY_NAMES -> {
-                    items.addAll(scanLocalDirectory(file, context, cachedGamesByPath))
+                    items.addAll(scanLocalDirectory(file, context, cachedGamesByPath, shouldAbort))
                 }
 
                 file.isFile && file.extension.lowercase() in SUPPORTED_EXTENSIONS -> {
@@ -148,7 +152,8 @@ class GameRepository {
     private fun scanDocumentFile(
         docFile: androidx.documentfile.provider.DocumentFile,
         context: Context,
-        cachedGamesByPath: Map<String, GameItem>
+        cachedGamesByPath: Map<String, GameItem>,
+        shouldAbort: () -> Boolean
     ): List<GameItem> {
         val items = mutableListOf<GameItem>()
         val children = docFile.listFiles()
@@ -157,9 +162,10 @@ class GameRepository {
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
         for (file in children) {
+            if (shouldAbort()) return items
             if (file.isDirectory) {
                 if (normalizeBaseName(file.name.orEmpty()) !in COVER_DIRECTORY_NAMES) {
-                    items.addAll(scanDocumentFile(file, context, cachedGamesByPath))
+                    items.addAll(scanDocumentFile(file, context, cachedGamesByPath, shouldAbort))
                 }
             } else if (file.isFile) {
                 val name = file.name ?: continue

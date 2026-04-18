@@ -205,13 +205,14 @@ __fi void VifUnpackNEON_Dynarec::SetMasks(int cS) const
 {
 	const int idx = v.idx;
 	const vifStruct& vif = MTVU_VifX;
+	const bool needs_mode_row_state = NeedsModeRowState(cS);
 
 	//This could have ended up copying the row when there was no row to write.1810080
 	u32 m0 = vB.mask; //The actual mask example 0x03020100
 	u32 m3 = ((m0 & 0xaaaaaaaa) >> 1) & ~m0; //all the upper bits, so our example 0x01010000 & 0xFCFDFEFF = 0x00010000 just the cols (shifted right for maskmerge)
 	u32 m2 = (m0 & 0x55555555) & (~m0 >> 1); // 0x1000100 & 0xFE7EFF7F = 0x00000100 Just the row
 
-	if ((doMask && m2) || doMode)
+	if ((doMask && m2) || needs_mode_row_state)
 	{
 		armLoadPtr(xmmRow, &vif.MaskRow);
 	}
@@ -228,6 +229,27 @@ __fi void VifUnpackNEON_Dynarec::SetMasks(int cS) const
 			armAsm->Dup(xmmCol0.V4S(), xmmCol0.V4S(), 0);
 	}
 	//if (doMask||doMode) loadRowCol((nVifStruct&)v);
+}
+
+bool VifUnpackNEON_Dynarec::NeedsModeRowState(int cycleCount) const
+{
+	if (doMode == 0)
+		return false;
+
+	if (!doMask)
+		return true;
+
+	const int effective_cycle_count = std::max(1, std::min(cycleCount, 4));
+	for (int cycle = 0; cycle < effective_cycle_count; cycle++)
+	{
+		const int cc = std::min(cycle, 3);
+		const u32 full_mask = (vB.mask >> (cc * 8)) & 0xff;
+		const u32 rowcol_mask = ((full_mask >> 1) | full_mask) & 0x55;
+		if (rowcol_mask != 0x55)
+			return true;
+	}
+
+	return false;
 }
 
 void VifUnpackNEON_Dynarec::doMaskWrite(const vixl::aarch64::VRegister& regX) const
@@ -320,23 +342,15 @@ void VifUnpackNEON_Dynarec::ModUnpack(int upknum, bool PostOp)
 		if (iteration_mask != 0)
 			UnpkLoopIteration &= iteration_mask;
 	}
-
-	if (Arm64GetVifTransitionalUnpackHandling(upknum) ==
-		Arm64VifTransitionalUnpackHandling::SkipExecutionUntilHardwareValidation)
-	{
-		// Mirror the current x86 invalid-unpack fallback contract until hardware validation
-		// proves a different ARM64 execution rule for these unpack types.
-		Arm64HandleTransitionalMaskedIterationUnpack(upknum);
-	}
 }
 
-void VifUnpackNEON_Dynarec::ProcessMasks()
+Arm64VifMaskExecutionState VifUnpackNEON_Dynarec::ProcessMasks()
 {
 	skipProcessing = false;
 	inputMasked = false;
 
 	if (!doMask)
-		return;
+		return Arm64VifMaskExecutionState::Normal;
 
 	const int cc = std::min(vCL, 3);
 	const u32 full_mask = (vB.mask >> (cc * 8)) & 0xff;
@@ -347,6 +361,14 @@ void VifUnpackNEON_Dynarec::ProcessMasks()
 
 	// All channels are masked, no reason to process anything here.
 	inputMasked = rowcol_mask == 0x55;
+
+	if (skipProcessing)
+		return Arm64VifMaskExecutionState::FullyWriteProtected;
+
+	if (inputMasked)
+		return Arm64VifMaskExecutionState::InputMasked;
+
+	return Arm64VifMaskExecutionState::Normal;
 }
 
 void VifUnpackNEON_Dynarec::CompileRoutine()
@@ -361,22 +383,35 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 	uint vNum = vB.num ? vB.num : 256;
 	doMode = (upkNum == 0xf) ? 0 : doMode; // V4_5 has no mode feature.
 	UnpkNoOfIterations = 0;
+	bool row_mode_writeback_required = false;
 
 	pxAssume(vCL == 0);
+	pxAssertRel(!Arm64ShouldFallbackToInterpreterForTransitionalUnpack(upkNum),
+		"ARM64 VIF dynarec should not compile transitional invalid unpack blocks.");
 
 	// Value passed determines # of col regs we need to load
 	SetMasks(isFill ? blockSize : cycleSize);
 
 	while (vNum)
 	{
-		// Determine if reads/processing can be skipped.
-		ProcessMasks();
-
 		if (vCL < cycleSize)
 		{
+			// Masked row/col-only cycles still need destination merge/write behavior,
+			// but they do not need source unpack emission. Fully write-protected cycles
+			// advance state only and can skip both unpack and write codegen.
+			const Arm64VifMaskExecutionState mask_state = ProcessMasks();
+
 			ModUnpack(upkNum, false);
-			xUnpack(upkNum);
-			xMovDest();
+			if (mask_state == Arm64VifMaskExecutionState::Normal)
+			{
+				xUnpack(upkNum);
+				if (doMode >= 2)
+					row_mode_writeback_required = true;
+			}
+			if (mask_state != Arm64VifMaskExecutionState::FullyWriteProtected)
+			{
+				xMovDest();
+			}
 			ModUnpack(upkNum, true);
 
 			dstIndirect = armOffsetMemOperand(dstIndirect, 16);
@@ -388,8 +423,17 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 		}
 		else if (isFill)
 		{
-			xUnpack(upkNum);
-			xMovDest();
+			const Arm64VifMaskExecutionState mask_state = ProcessMasks();
+			if (mask_state == Arm64VifMaskExecutionState::Normal)
+			{
+				xUnpack(upkNum);
+				if (doMode >= 2)
+					row_mode_writeback_required = true;
+			}
+			if (mask_state != Arm64VifMaskExecutionState::FullyWriteProtected)
+			{
+				xMovDest();
+			}
 
 			// dstIndirect += 16;
 			dstIndirect = armOffsetMemOperand(dstIndirect, 16);
@@ -406,7 +450,7 @@ void VifUnpackNEON_Dynarec::CompileRoutine()
 		}
 	}
 
-	if (doMode >= 2)
+	if (doMode >= 2 && row_mode_writeback_required)
 		writeBackRow();
 
 	armAsm->Ret();
@@ -458,9 +502,17 @@ _vifT __fi void dVifUnpack(const u8* data, bool isFill)
 	VIFregisters& vifRegs = MTVU_VifXRegs;
 
 	const u8 upkType = (vif.cmd & 0x1f) | (vif.usn << 5);
+	const int upkNum = upkType & 0xf;
 	const int doMask = isFill ? 1 : (vif.cmd & 0x10);
 
 	nVifBlock block;
+
+	if (Arm64ShouldFallbackToInterpreterForTransitionalUnpack(upkNum))
+	{
+		Arm64HandleTransitionalMaskedIterationUnpack(upkNum);
+		_nVifUnpack(idx, data, vifRegs.mode, isFill);
+		return;
+	}
 
 	// Performance note: initial code was using u8/u16 field of the struct
 	// directly. However reading back the data (as u32) in HashBucket.find
@@ -471,7 +523,7 @@ _vifT __fi void dVifUnpack(const u8* data, bool isFill)
 	u32 hash_key = (u32)(upkType & 0xFF) << 8 | (vifRegs.num & 0xFF);
 
 	u32 key1 = ((u32)vifRegs.cycle.wl << 24) | ((u32)vifRegs.cycle.cl << 16) | ((u32)(vif.start_aligned & 0xFF) << 8) | ((u32)vifRegs.mode & 0xFF);
-	if ((upkType & 0xf) != 9)
+	if (upkNum != 9)
 		key1 &= 0xFFFF01FF;
 
 	// Zero out the mask parameter if it's unused -- games leave random junk

@@ -33,6 +33,12 @@ inline Arm64VifTransitionalUnpackHandling Arm64GetVifTransitionalUnpackHandling(
 		Arm64VifTransitionalUnpackHandling::NormalExecution;
 }
 
+inline bool Arm64ShouldFallbackToInterpreterForTransitionalUnpack(int upknum)
+{
+	return Arm64GetVifTransitionalUnpackHandling(upknum) ==
+		Arm64VifTransitionalUnpackHandling::SkipExecutionUntilHardwareValidation;
+}
+
 inline void Arm64AssertVifMaskedIterationPolicy(int upknum)
 {
 	AssertVifTransitionalInvalidUnpackPolicy(upknum);
@@ -52,6 +58,7 @@ inline void Arm64AssertVifProvisional8BitScalarExpandPath()
 inline void Arm64HandleTransitionalMaskedIterationUnpack(int upknum)
 {
 	Arm64AssertVifMaskedIterationPolicy(upknum);
+	WarnOnceAboutTransitionalVifUnpack(upknum);
 }
 
 enum class Arm64VifUnpackIterationUpdatePhase
@@ -59,6 +66,13 @@ enum class Arm64VifUnpackIterationUpdatePhase
 	None,
 	BeforeWrite,
 	AfterWrite,
+};
+
+enum class Arm64VifMaskExecutionState
+{
+	Normal,
+	InputMasked,
+	FullyWriteProtected,
 };
 
 inline Arm64VifUnpackIterationUpdatePhase Arm64GetVifUnpackIterationUpdatePhase(int upknum)
@@ -216,12 +230,13 @@ public:
 	virtual bool IsUnmaskedOp() const { return !doMode && !doMask; }
 
 	void ModUnpack(int upknum, bool PostOp);
-	void ProcessMasks();
+	Arm64VifMaskExecutionState ProcessMasks();
 	void CompileRoutine();
 
 protected:
 	virtual void doMaskWrite(const vixl::aarch64::VRegister& regX) const;
 	void SetMasks(int cS) const;
+	bool NeedsModeRowState(int cycleCount) const;
 	void writeBackRow() const;
 
 	static VifUnpackNEON_Dynarec FillingWrite(const VifUnpackNEON_Dynarec& src)

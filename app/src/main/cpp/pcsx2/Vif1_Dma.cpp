@@ -33,6 +33,16 @@ void vif1RequestDmaProgressWithVuBusy(u32 cycles)
 	vif1RequestDmaRetry(std::max<int>(cycles, cpuGetCycles(VU_MTVU_BUSY)));
 }
 
+static __fi void vif1SetActiveTransferFqcFromQwc()
+{
+	vif1Regs.stat.FQC = std::min(vif1ch.qwc, static_cast<u32>(16));
+}
+
+static __fi void vif1ClearActiveTransferFqc()
+{
+	vif1Regs.stat.FQC = 0;
+}
+
 static void vif1ScheduleVuFinishCheck(u32 cycles)
 {
 	CPU_INT(VIF_VU1_FINISH, cycles);
@@ -42,6 +52,31 @@ static void vif1ScheduleVuFinishCheck(u32 cycles)
 void vif1SetActiveDmaStall(bool stalled)
 {
 	CPU_SET_DMASTALL(vif1GetActiveDmaEvent(), stalled);
+}
+
+static __fi void vif1BeginActiveDmaRetryStall(u32 cycles)
+{
+	vif1RequestDmaRetry(cycles);
+	vif1SetActiveDmaStall(true);
+}
+
+static __fi bool vif1HasActiveDmaInterruptScheduled()
+{
+	const EE_EventType irq = vif1GetActiveDmaEvent();
+	return (cpuRegs.interrupt & (1u << irq)) != 0;
+}
+
+static __fi void vif1DispatchActiveDmaInterrupt()
+{
+	if (dmacRegs.ctrl.MFD == MFD_VIF1)
+		vifMFIFOInterrupt();
+	else
+		vif1Interrupt();
+}
+
+static __fi void vif1SetGifPathWaitState(bool waiting_for_path3)
+{
+	vif1Regs.stat.VGW = waiting_for_path3;
 }
 
 bool vif1RequestResumeFromGifPathIdle(u32 resumeCycles)
@@ -81,11 +116,11 @@ void vif1TransferToMemory()
 	{ // Is vif0ptag empty?
 		Console.WriteLn("Vif1 Tag BUSERR");
 		dmacRegs.stat.BEIS = true; // Bus Error
-		vif1Regs.stat.FQC = 0;
+		vif1ClearActiveTransferFqc();
 
 		vif1ch.qwc = 0;
 		vif1.done = true;
-		CPU_INT(DMAC_VIF1, 0);
+		vif1RequestDmaRetry(0);
 		return; // An error has occurred.
 	}
 
@@ -133,12 +168,12 @@ void vif1TransferToMemory()
 	if (vif1.GSLastDownloadSize >= vif1ch.qwc)
 	{
 		vif1.GSLastDownloadSize -= vif1ch.qwc;
-		vif1Regs.stat.FQC = std::min((u32)16, vif1.GSLastDownloadSize);
+		vif1Regs.stat.FQC = std::min(static_cast<u32>(16), vif1.GSLastDownloadSize);
 		vif1ch.qwc = 0;
 	}
 	else
 	{
-		vif1Regs.stat.FQC = 0;
+		vif1ClearActiveTransferFqc();
 		vif1ch.qwc -= vif1.GSLastDownloadSize;
 		vif1.GSLastDownloadSize = 0;
 		//This could be potentially bad and cause hangs. I guess we will find out.
@@ -194,7 +229,7 @@ static bool vif1TryStallStdTransferOnRefsTag(const tDMA_TAG* ptag)
 		return false;
 
 	hwDmacIrq(DMAC_STALL_SIS);
-	CPU_SET_DMASTALL(DMAC_VIF1, true);
+	vif1SetActiveDmaStall(true);
 	return true;
 }
 
@@ -256,9 +291,9 @@ static void vif1ScheduleDmaProgressFromCurrentState()
 		return;
 
 	if (vif1.waitforvu)
-		CPU_INT(DMAC_VIF1, std::max(static_cast<int>(g_vif1Cycles), cpuGetCycles(VU_MTVU_BUSY)));
+		vif1RequestDmaProgress(std::max(static_cast<int>(g_vif1Cycles), cpuGetCycles(VU_MTVU_BUSY)));
 	else
-		CPU_INT(DMAC_VIF1, g_vif1Cycles);
+		vif1RequestDmaProgress(g_vif1Cycles);
 }
 
 static void vif1ClearCompletedPath2DownloadWait()
@@ -268,7 +303,7 @@ static void vif1ClearCompletedPath2DownloadWait()
 
 	gifRegs.stat.APATH = 0;
 	gifRegs.stat.OPH = 0;
-	vif1Regs.stat.VGW = false; // Let vif continue if it's stuck on a flush.
+	vif1SetGifPathWaitState(false); // Let vif continue if it's stuck on a flush.
 
 	if (gifUnit.checkPaths(1, 0, 1))
 		gifUnit.Execute(false, true);
@@ -280,7 +315,7 @@ static bool vif1TryHandleMfifoInterrupt()
 	if (dmacRegs.ctrl.MFD != MFD_VIF1)
 		return false;
 
-	vif1Regs.stat.FQC = std::min((u32)0x10, vif1ch.qwc);
+	vif1SetActiveTransferFqcFromQwc();
 	vifMFIFOInterrupt();
 	return true;
 }
@@ -295,15 +330,13 @@ static bool vif1TryHandleGsDownloadPathWait()
 	if ((isDirect && !gifUnit.CanDoPath2()) || (isDirectHL && !gifUnit.CanDoPath2HL()))
 	{
 		GUNIT_WARN("vif1Interrupt() - Waiting for Path 2 to be ready");
-		CPU_INT(DMAC_VIF1, 128);
-		if (gifRegs.stat.APATH == 3)
-			vif1Regs.stat.VGW = 1; // We're waiting for path 3. Gunslinger II
-		CPU_SET_DMASTALL(DMAC_VIF1, true);
+		vif1SetGifPathWaitState(gifRegs.stat.APATH == 3); // Gunslinger II waits on Path 3.
+		vif1BeginActiveDmaRetryStall(128);
 		return true;
 	}
 
-	vif1Regs.stat.VGW = 0; // Path 3 isn't busy so we don't need to wait for it.
-	vif1Regs.stat.FQC = std::min(vif1ch.qwc, (u32)16);
+	vif1SetGifPathWaitState(false); // Path 3 isn't busy so we don't need to wait for it.
+	vif1SetActiveTransferFqcFromQwc();
 	return false;
 }
 
@@ -313,7 +346,7 @@ static bool vif1TryHandleVuExecutionWait()
 		return false;
 
 	vif1ScheduleVuFinishCheck(std::max(16, cpuGetCycles(VU_MTVU_BUSY)));
-	CPU_SET_DMASTALL(DMAC_VIF1, true);
+	vif1SetActiveDmaStall(true);
 	return true;
 }
 
@@ -356,20 +389,17 @@ static void vif1ResumeDmaAfterVuCompletion()
 	vif1.EndVuWait();
 
 	// Check if VIF is already scheduled to interrupt, if it's waiting, kick it.
-	if ((cpuRegs.interrupt & ((1 << DMAC_VIF1) | (1 << DMAC_MFIFO_VIF))) == 0 && vif1ch.chcr.STR &&
+	if (!vif1HasActiveDmaInterruptScheduled() && vif1ch.chcr.STR &&
 		!vif1Regs.stat.test(VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
 	{
-		if (dmacRegs.ctrl.MFD == MFD_VIF1)
-			vifMFIFOInterrupt();
-		else
-			vif1Interrupt();
+		vif1DispatchActiveDmaInterrupt();
 	}
 }
 
 static void vif1RefreshActiveTransferFqc()
 {
 	if (vif1ch.chcr.DIR)
-		vif1Regs.stat.FQC = std::min(vif1ch.qwc, (u32)16);
+		vif1SetActiveTransferFqcFromQwc();
 }
 
 static void vif1UpdateVpsAfterInterruptProgress()
@@ -409,7 +439,7 @@ static void vif1FinalizeCompletedDmaInterrupt()
 	g_vif1Cycles = 0;
 	VIF_LOG("VIF1 DMA End");
 	hwDmacIrq(DMAC_VIF1);
-	CPU_SET_DMASTALL(DMAC_VIF1, false);
+	vif1SetActiveDmaStall(false);
 }
 
 __fi void vif1SetupTransfer()
@@ -482,7 +512,7 @@ __fi void vif1Interrupt()
 
 	if (vif1Regs.stat.VGW)
 	{
-		CPU_SET_DMASTALL(DMAC_VIF1, true);
+		vif1SetActiveDmaStall(true);
 		return;
 	}
 
@@ -515,7 +545,7 @@ __fi void vif1Interrupt()
 			{
 				vif1Regs.stat.VPS = VPS_DECODING; //If there's more data you need to say it's decoding the next VIF CMD (Onimusha - Blade Warriors)
 				VIF_LOG("VIF1 Stalled");
-				CPU_SET_DMASTALL(DMAC_VIF1, true);
+				vif1SetActiveDmaStall(true);
 				return;
 			}
 		}
@@ -555,8 +585,7 @@ __fi void vif1Interrupt()
 
 	if (vif1ShouldHoldCompletedDmaOnStall())
 	{
-		CPU_INT(DMAC_VIF1, 0);
-		CPU_SET_DMASTALL(DMAC_VIF1, true);
+		vif1BeginActiveDmaRetryStall(0);
 		return; //Dont want to end if vif is stalled.
 	}
 
@@ -572,7 +601,7 @@ void dmaVIF1()
 
 	g_vif1Cycles = 0;
 	vif1.inprogress = 0;
-	CPU_SET_DMASTALL(DMAC_VIF1, false);
+	vif1SetActiveDmaStall(false);
 
 	if (vif1ch.qwc > 0) // Normal Mode
 	{
@@ -622,5 +651,5 @@ void dmaVIF1()
 	// Batman Vengence does something stupid and instead of cancelling a stall it tries to restart VIF, THEN check the stall
 	// However if VIF FIFO is reversed, it can continue
 	if (!vif1ch.chcr.DIR || !vif1Regs.stat.test(VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
-		CPU_INT(DMAC_VIF1, 4);
+		vif1RequestDmaProgress(4);
 }

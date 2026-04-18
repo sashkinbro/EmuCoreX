@@ -345,8 +345,8 @@ void VifUnpackNEON_Base::xUnpack(int upknum) const
 		case 3:
 		case 7:
 		case 11:
-			// Mirror the current x86 "invalid unpack" fallback contract until hardware validation
-			// proves a different execution policy for ARM64.
+			// These unpack types stay on the interpreter fallback path until we validate
+			// an ARM64-specific execution rule against hardware behavior.
 			Arm64HandleTransitionalMaskedIterationUnpack(upknum);
 			break;
 	}
