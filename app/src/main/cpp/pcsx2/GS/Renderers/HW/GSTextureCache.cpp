@@ -47,6 +47,70 @@ __fi static constexpr bool PreferReusedLabelledTexture()
 }
 #endif
 
+namespace
+{
+static bool IsInsideTargetTrackingEnabled()
+{
+	return (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets);
+}
+
+static bool IsInsideTargetMergeEnabled()
+{
+	return (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::MergeTargets);
+}
+
+static bool IsAlignedInsideTargetBaseMatch(const GSTextureCache::Surface* surface, u32 bp)
+{
+	if (!IsInsideTargetTrackingEnabled() || surface->m_TEX0.TBP0 >= bp || (bp & 0x1f))
+		return false;
+
+	const u32 target_bw = std::max(surface->m_TEX0.TBW, 1U);
+	return ((((bp - surface->m_TEX0.TBP0) >> 5) % target_bw) == 0);
+}
+
+static bool ContainsSurfaceRange(const GSTextureCache::Surface* surface, u32 bp, u32 end_bp)
+{
+	return (surface->m_TEX0.TBP0 <= bp && surface->UnwrappedEndBlock() >= end_bp);
+}
+
+static bool MatchesExactOrInsideTargetBase(const GSTextureCache::Surface* surface, u32 bp)
+{
+	return (surface->m_TEX0.TBP0 == bp || IsAlignedInsideTargetBaseMatch(surface, bp));
+}
+
+static constexpr u64 MAX_RECENT_UPLOAD_DRAW_DISTANCE = 500;
+static constexpr u64 MAX_RECENT_ALPHA_UPLOAD_DRAW_DISTANCE = 100;
+
+static u32 GetUploadTransferStartBlock(const GSState::GSUploadQueue& transfer)
+{
+	return GSLocalMemory::GetStartBlockAddress(transfer.blit.DBP, transfer.blit.DBW, transfer.blit.DPSM, transfer.rect);
+}
+
+static u32 GetUploadTransferEndBlock(const GSState::GSUploadQueue& transfer)
+{
+	return GSLocalMemory::GetUnwrappedEndBlockAddress(transfer.blit.DBP, transfer.blit.DBW, transfer.blit.DPSM, transfer.rect);
+}
+
+static bool IsUploadTransferFormatCompatible(const GSState::GSUploadQueue& transfer, u32 psm)
+{
+	return GSUtil::HasCompatibleBits(transfer.blit.DPSM, psm);
+}
+
+static bool DoesUploadTransferOverlapRange(const GSState::GSUploadQueue& transfer, u32 bp, u32 end_bp, u32 psm)
+{
+	return (IsUploadTransferFormatCompatible(transfer, psm) &&
+		GetUploadTransferEndBlock(transfer) >= bp &&
+		GetUploadTransferStartBlock(transfer) <= end_bp);
+}
+
+static bool DoesUploadTransferFullyCoverRange(const GSState::GSUploadQueue& transfer, u32 bp, u32 end_bp, u32 psm)
+{
+	return (DoesUploadTransferOverlapRange(transfer, bp, end_bp, psm) &&
+		GetUploadTransferStartBlock(transfer) <= bp &&
+		GetUploadTransferEndBlock(transfer) >= end_bp);
+}
+} // namespace
+
 GSTextureCache::GSTextureCache()
 {
 	// In theory 4MB is enough but 9MB is safer for overflow (8MB
@@ -64,6 +128,59 @@ GSTextureCache::~GSTextureCache()
 
 	s_hash_cache_purge_list = {};
 	_aligned_free(s_unswizzle_buffer);
+}
+
+bool GSTextureCache::HasExpectedStripedMove(u32 sbp, u32 dbp) const
+{
+	return (m_expected_src_bp == static_cast<int>(sbp) && m_expected_dst_bp == static_cast<int>(dbp));
+}
+
+void GSTextureCache::ClearExpectedStripedMove()
+{
+	m_expected_src_bp = -1;
+	m_remembered_src_bp = -1;
+	m_expected_dst_bp = -1;
+	m_remembered_dst_bp = -1;
+}
+
+bool GSTextureCache::TryApplyExpectedStripedMove(u32& SBP, u32& DBP, u32 SBW, u32 SPSM, int& sx, int& sy, int& dx, int& dy, int w, int h, bool& req_resize)
+{
+	if (!HasExpectedStripedMove(SBP, DBP))
+		return false;
+
+	const GSVector4i rect_offset = TranslateAlignedRectByPage(m_remembered_src_bp, m_remembered_src_bp + 1, SBW, SPSM,
+		GSVector4i(0, 0, SBW * 64, dy + h), SBP, SPSM, SBW, GSVector4i(sx, sy, sx + w, sy + h), false);
+	const int x_offset = rect_offset.x - sx;
+	const int y_offset = rect_offset.y - sy;
+
+	sx += x_offset;
+	sy += y_offset;
+	dx += x_offset;
+	dy += y_offset;
+	req_resize = true;
+
+	GL_INS("TC: Detected striped move, realigning from SBP %x->%x DBP %x->%x", SBP, m_remembered_src_bp, DBP, m_remembered_dst_bp);
+
+	SBP = static_cast<u32>(m_remembered_src_bp);
+	DBP = static_cast<u32>(m_remembered_dst_bp);
+	return true;
+}
+
+void GSTextureCache::ArmExpectedStripedMove(u32 expected_src_bp, u32 expected_dst_bp, const Target* src, const Target* dst)
+{
+	m_expected_src_bp = static_cast<int>(expected_src_bp);
+	m_expected_dst_bp = static_cast<int>(expected_dst_bp);
+
+	// Only check the source, the destination might need expanding.
+	if (ContainsSurfaceRange(src, expected_src_bp, expected_src_bp))
+	{
+		m_remembered_src_bp = static_cast<int>(src->m_TEX0.TBP0);
+		m_remembered_dst_bp = static_cast<int>(dst->m_TEX0.TBP0);
+	}
+	else
+	{
+		ClearExpectedStripedMove();
+	}
 }
 
 void GSTextureCache::ReadbackAll()
@@ -428,7 +545,7 @@ GSVector4i GSTextureCache::TranslateAlignedRectByPage(u32 tbp, u32 tebp, u32 tbw
 			if ((in_rect.width() / dst_page_size.x) == src_pgw)
 			{
 				// The width is mismatched to the page.
-				if (!is_invalidation && GSConfig.UserHacks_TextureInsideRt < GSTextureInRtMode::MergeTargets)
+				if (!is_invalidation && !IsInsideTargetMergeEnabled())
 				{
 					DevCon.Warning("Uneven pages mess up sbp %x dbp %x spgw %d dpgw %d src fmt %d dst fmt %d src_rect %d, %d, %d, %d draw %lld", sbp, tbp, src_pgw, dst_pgw, spsm, tpsm, in_rect.x, in_rect.y, in_rect.z, in_rect.w, GSState::s_n);
 					return GSVector4i::zero();
@@ -1356,7 +1473,7 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 	if (!src)
 		src = FindSourceInMap(TEX0, TEXA, psm_s, clut, gpu_clut, compare_lod, region, is_fixed_tex0, m_src.m_map[lookup_page], CLAMP, r);
 
-	if (src && src->m_from_target && GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::MergeTargets && GSLocalMemory::GetUnwrappedEndBlockAddress(TEX0.TBP0, TEX0.TBW, TEX0.PSM, r) > src->m_from_target->m_end_block)
+	if (src && src->m_from_target && IsInsideTargetMergeEnabled() && GSLocalMemory::GetUnwrappedEndBlockAddress(TEX0.TBP0, TEX0.TBW, TEX0.PSM, r) > src->m_from_target->m_end_block)
 	{
 		m_src.RemoveAt(src);
 		src = nullptr;
@@ -1771,7 +1888,7 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 								x_offset = 0;
 								y_offset = 0;
 
-								if (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::MergeTargets && GSLocalMemory::GetUnwrappedEndBlockAddress(bp, bw, psm, req_rect) > dst->m_end_block)
+								if (IsInsideTargetMergeEnabled() && GSLocalMemory::GetUnwrappedEndBlockAddress(bp, bw, psm, req_rect) > dst->m_end_block)
 									continue;
 								else
 								{
@@ -1784,7 +1901,7 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 				}
 				// Make sure the texture actually is INSIDE the RT, it's possibly not valid if it isn't.
 				// Also check BP >= TBP, create source isn't equpped to expand it backwards and all data comes from the target. (GH3)
-				else if (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets &&
+				else if (IsInsideTargetTrackingEnabled() &&
 				         (GSLocalMemory::m_psm[color_psm].bpp >= 16 || (/*possible_shuffle &&*/ GSLocalMemory::m_psm[color_psm].bpp == 8 && GSLocalMemory::m_psm[t->m_TEX0.PSM].bpp >= 16)) && // Channel shuffles or non indexed lookups.
 				         t->m_age <= 1 && (!found_t || t->m_last_draw > dst->m_last_draw) /*&& CanTranslate(bp, bw, psm, block_boundary_rect, t->m_TEX0.TBP0, t->m_TEX0.PSM, t->m_TEX0.TBW)*/)
 				{
@@ -2019,7 +2136,7 @@ GSTextureCache::Source* GSTextureCache::LookupSource(const bool is_color, const 
 
 						// Strictly speaking this path is no longer needed, but I'm leaving it here for now because Guitar
 						// Hero III needs it to merge crowd textures.
-						else if (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::MergeTargets && !tex_merge_rt)
+						else if (IsInsideTargetMergeEnabled() && !tex_merge_rt)
 						{
 							dst = t;
 							x_offset = 0;
@@ -2297,7 +2414,7 @@ GSVector2i GSTextureCache::ScaleRenderTargetSize(const GSVector2i& sz, float sca
 void GSTextureCache::CombineAlignedInsideTargets(Target* target, GSTextureCache::Source* src)
 {
 	// Don't combine targets if Tex in RT is off, it will just fail to find them and make a new one, causing a loop of copies.
-	if (GSConfig.UserHacks_TextureInsideRt < GSTextureInRtMode::InsideTargets)
+	if (!IsInsideTargetTrackingEnabled())
 		return;
 
 	auto& list = m_dst[target->m_type];
@@ -2538,7 +2655,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 					}
 				}
 				// Probably pointing to half way through the target
-				else if (!min_rect.rempty() && GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets)
+				else if (!min_rect.rempty() && IsInsideTargetTrackingEnabled())
 				{
 					// Some games misuse the scissor so it ends up valid 1 pixel over, which causes hell for us. So check if it still overlaps without the extra pixel.
 					const GSVector4i adjusted_valid = GSVector4i(t->m_valid.x, t->m_valid.y, std::min(t->m_valid.z, static_cast<int>(t->m_TEX0.TBW) * 64), t->m_valid.w - 1);
@@ -2735,7 +2852,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 				Target* t = *i;
 				const u32 end_block = GSLocalMemory::GetEndBlockAddress(bp, TEX0.TBW, TEX0.PSM, GSVector4i(0, size.y, size.x, size.y + 1));
 				const u32 bp_adj = (end_block < t->m_TEX0.TBP0 && t->UnwrappedEndBlock() > GS_MAX_BLOCKS) ? (bp + GS_MAX_BLOCKS) : bp;
-				const bool half_buffer_match = GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets && TEX0.TBW == t->m_TEX0.TBW && TEX0.PSM == t->m_TEX0.PSM &&
+				const bool half_buffer_match = IsInsideTargetTrackingEnabled() && TEX0.TBW == t->m_TEX0.TBW && TEX0.PSM == t->m_TEX0.PSM &&
 												bp == GSLocalMemory::GetStartBlockAddress(t->m_TEX0.TBP0, t->m_TEX0.TBW, t->m_TEX0.PSM, GSVector4i(0, size.y, size.x, size.y + 1));
 				// Make sure the target is inside the texture
 				if (t->m_TEX0.TBP0 <= bp_adj && bp_adj <= t->UnwrappedEndBlock() && (half_buffer_match || t->Inside(bp_adj, TEX0.TBW, TEX0.PSM, GSVector4i::loadh(size))))
@@ -3229,7 +3346,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 			// Clear instead of invalidating if there is anything which isn't touched.
 			clear |= (!preserve_target && fbmask != 0);
 			GIFRegTEX0 new_TEX0;
-			new_TEX0.TBP0 = GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets ? dst_match->m_TEX0.TBP0 : TEX0.TBP0;
+			new_TEX0.TBP0 = IsInsideTargetTrackingEnabled() ? dst_match->m_TEX0.TBP0 : TEX0.TBP0;
 			new_TEX0.TBW = (!half_width) ? dst_match->m_TEX0.TBW : TEX0.TBW;
 			new_TEX0.PSM = is_shuffle ? dst_match->m_TEX0.PSM : TEX0.PSM;
 
@@ -3410,20 +3527,20 @@ GSTextureCache::Target* GSTextureCache::CreateTarget(GIFRegTEX0 TEX0, const GSVe
 			else
 			{
 				std::vector<GSState::GSUploadQueue>::reverse_iterator iter;
-				const int start_transfer = g_gs_renderer->s_transfer_n;
+				const auto start_transfer = static_cast<u64>(g_gs_renderer->s_transfer_n);
 				const u32 tex_end = GSLocalMemory::GetUnwrappedEndBlockAddress(TEX0.TBP0, TEX0.TBW, TEX0.PSM, GSVector4i::loadh(size));
 				for (iter = GSRendererHW::GetInstance()->m_draw_transfers.rbegin(); iter != GSRendererHW::GetInstance()->m_draw_transfers.rend();)
 				{
-					const u32 transfer_end = GSLocalMemory::GetUnwrappedEndBlockAddress(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect);
+					const u32 transfer_end = GetUploadTransferEndBlock(*iter);
 					// If the format, and location doesn't overlap
-					if (TEX0.TBP0 == iter->blit.DBP && GSUtil::HasCompatibleBits(iter->blit.DPSM, TEX0.PSM) && (iter->blit.DBW == dst->m_TEX0.TBW || (transfer_end >= tex_end && (iter->blit.DBW * 64) == iter->rect.z)))
+					if (TEX0.TBP0 == iter->blit.DBP && IsUploadTransferFormatCompatible(*iter, TEX0.PSM) && (iter->blit.DBW == dst->m_TEX0.TBW || (transfer_end >= tex_end && (iter->blit.DBW * 64) == iter->rect.z)))
 					{
 						dst->m_valid_alpha_high |= iter->blit.DPSM != PSMT4HL;
 						dst->m_valid_alpha_low |= iter->blit.DPSM != PSMT4HH;
 						break;
 					}
 
-					if ((start_transfer - iter->draw) > 100)
+					if ((start_transfer - iter->draw) > MAX_RECENT_ALPHA_UPLOAD_DRAW_DISTANCE)
 						break;
 
 					++iter;
@@ -3486,19 +3603,18 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 			if ((preserve_target || !draw_rect.eq(GSVector4i::loadh(valid_size))) && GSRendererHW::GetInstance()->m_draw_transfers.size() > 0)
 			{
 				auto& transfers = GSRendererHW::GetInstance()->m_draw_transfers;
-				const int last_draw = transfers.back().draw;
+				const u64 last_draw = transfers.back().draw;
 				GSVector4i eerect = GSVector4i::zero();
 
 				for (auto iter = transfers.rbegin(); iter != transfers.rend(); ++iter)
 				{
 					// Would be nice to make this 100, but B-Boy seems to rely on data uploaded ~200 draws ago. Making it bigger for now to be safe.
-					if (last_draw - iter->draw > 500)
+					if (last_draw - iter->draw > MAX_RECENT_UPLOAD_DRAW_DISTANCE)
 						break;
 
-					const u32 transfer_end = GSLocalMemory::GetUnwrappedEndBlockAddress(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect);
-					const u32 transfer_start = GSLocalMemory::GetStartBlockAddress(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect);
+					const u32 transfer_end = GetUploadTransferEndBlock(*iter);
 					// If the format, and location doesn't overlap
-					if (transfer_end >= TEX0.TBP0 && transfer_start <= rect_end && GSUtil::HasCompatibleBits(iter->blit.DPSM, TEX0.PSM))
+					if (DoesUploadTransferOverlapRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 					{
 						GSVector4i targetr = {};
 						const bool can_translate = CanTranslate(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect, TEX0.TBP0, TEX0.PSM, TEX0.TBW);
@@ -3556,7 +3672,7 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 						hw_clear = hw_clear.has_value() ? (hw_clear.value() && iter->zero_clear) : iter->zero_clear;
 
 						// When the write covers the entire target, don't bother checking any earlier writes.
-						if (iter->blit.DBP <= TEX0.TBP0 && transfer_end >= rect_end)
+						if (DoesUploadTransferFullyCoverRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 						{
 							// If it was a clear draw then we can use that as our target size.
 							if (iter->zero_clear && iter->blit.DBP == TEX0.TBP0 && iter->blit.DPSM == TEX0.PSM)
@@ -3812,7 +3928,7 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 						((((dst->m_TEX0.TBP0 - t->m_TEX0.TBP0) >> 5) % std::max(t->m_TEX0.TBW, 1U)) + (dst_valid.z / 64)) <= dst->m_TEX0.TBW)
 					{
 						// Probably a render target which was previously a Z.
-						if (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets && t->Inside(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, dst->m_valid) &&
+						if (IsInsideTargetTrackingEnabled() && t->Inside(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, dst->m_valid) &&
 							GSLocalMemory::m_psm[t->m_TEX0.PSM].bpp == GSLocalMemory::m_psm[dst->m_TEX0.PSM].bpp)
 						{
 							dst->m_TEX0.TBP0 = t->m_TEX0.TBP0;
@@ -3938,18 +4054,18 @@ GSTextureCache::Target* GSTextureCache::LookupDisplayTarget(GIFRegTEX0 TEX0, con
 
 		std::vector<GSState::GSUploadQueue>::reverse_iterator iter;
 		GSVector4i eerect = GSVector4i::zero();
-		const int last_draw = GSRendererHW::GetInstance()->m_draw_transfers.back().draw;
+		const u64 last_draw = GSRendererHW::GetInstance()->m_draw_transfers.back().draw;
 
 		for (iter = GSRendererHW::GetInstance()->m_draw_transfers.rbegin(); iter != GSRendererHW::GetInstance()->m_draw_transfers.rend();)
 		{
 			// Would be nice to make this 100, but B-Boy seems to rely on data uploaded ~200 draws ago. Making it bigger for now to be safe.
-			if (last_draw - iter->draw > 500)
+			if (last_draw - iter->draw > MAX_RECENT_UPLOAD_DRAW_DISTANCE)
 				break;
 
-			const u32 transfer_end = GSLocalMemory::GetUnwrappedEndBlockAddress(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect);
+			const u32 transfer_end = GetUploadTransferEndBlock(*iter);
 
 			// If the format, and location doesn't overlap
-			if (transfer_end >= TEX0.TBP0 && iter->blit.DBP <= rect_end && GSUtil::HasCompatibleBits(iter->blit.DPSM, TEX0.PSM))
+			if (DoesUploadTransferOverlapRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 			{
 				GSVector4i targetr = iter->rect;
 
@@ -3969,7 +4085,7 @@ GSTextureCache::Target* GSTextureCache::LookupDisplayTarget(GIFRegTEX0 TEX0, con
 					iter = std::vector<GSState::GSUploadQueue>::reverse_iterator(GSRendererHW::GetInstance()->m_draw_transfers.erase(iter.base() - 1));
 				}
 				// Double buffers, usually FMV's, if checking for the upper buffer, creating another target could mess things up.
-				else if (GSLocalMemory::GetStartBlockAddress(iter->blit.DBP, iter->blit.DBW, iter->blit.DPSM, iter->rect) <= TEX0.TBP0 && transfer_end >= rect_end && iter->rect.width() == size.x)
+				else if (DoesUploadTransferFullyCoverRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM) && iter->rect.width() == size.x)
 				{
 					GSTextureCache::Target* tgt = g_texture_cache->GetExactTarget(iter->blit.DBP, iter->blit.DBW, GSTextureCache::RenderTarget, iter->blit.DBP + 1);
 
@@ -5091,27 +5207,8 @@ bool GSTextureCache::Move(u32 SBP, u32 SBW, u32 SPSM, int sx, int sy, u32 DBP, u
 	const u32 start_SBP = SBP;
 	const u32 start_DBP = DBP;
 
-	if (m_expected_src_bp == static_cast<int>(SBP) && m_expected_dst_bp == static_cast<int>(DBP))
-	{
-		// Get the new position so we can work out the offset.
-		GSVector4i rect_offset = TranslateAlignedRectByPage(m_remembered_src_bp, m_remembered_src_bp + 1, SBW, SPSM, GSVector4i(0, 0, SBW * 64, dy + h), SBP, SPSM, SBW, GSVector4i(sx, sy, sx + w, sy + h), false);
-		rect_offset.x = rect_offset.x - sx;
-		rect_offset.y = rect_offset.y - sy;
-		sx += rect_offset.x;
-		sy += rect_offset.y;
-		dx += rect_offset.x;
-		dy += rect_offset.y;
-		req_resize = true;
-		GL_INS("TC: Detected striped move, realigning from SBP %x->%x DBP %x->%x", SBP, m_remembered_src_bp, DBP, m_remembered_dst_bp);
-
-		SBP = m_remembered_src_bp;
-		DBP = m_remembered_dst_bp;
-	}
-
-	m_expected_src_bp = -1;
-	m_remembered_src_bp = -1;
-	m_expected_dst_bp = -1;
-	m_remembered_dst_bp = -1;
+	TryApplyExpectedStripedMove(SBP, DBP, SBW, SPSM, sx, sy, dx, dy, w, h, req_resize);
+	ClearExpectedStripedMove();
 
 	// Look for an exact match on the targets.
 	GSTextureCache::Target* src = GetExactTarget(SBP, SBW, spsm_s.depth ? DepthStencil : RenderTarget, SBP);
@@ -5371,34 +5468,23 @@ bool GSTextureCache::Move(u32 SBP, u32 SBW, u32 SPSM, int sx, int sy, u32 DBP, u
 		// Page copy
 		if (w == GSLocalMemory::m_psm[src->m_TEX0.PSM].pgs.x && h == GSLocalMemory::m_psm[src->m_TEX0.PSM].pgs.y)
 		{
-			m_expected_src_bp = start_SBP + GS_BLOCKS_PER_PAGE;
-			m_expected_dst_bp = start_DBP + GS_BLOCKS_PER_PAGE;
+			ArmExpectedStripedMove(start_SBP + GS_BLOCKS_PER_PAGE, start_DBP + GS_BLOCKS_PER_PAGE, src, dst);
 		}
 		// Vertical Strips.
 		else if (w == GSLocalMemory::m_psm[src->m_TEX0.PSM].pgs.x)
 		{
-			m_expected_src_bp = GSLocalMemory::GetStartBlockAddress(src->m_TEX0.TBP0, src->m_TEX0.TBW, src->m_TEX0.PSM, GSVector4i(sx + w, 0, sx + w + w, h));
-			m_expected_dst_bp = GSLocalMemory::GetStartBlockAddress(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, GSVector4i(dx + w, 0, dx + w + w, h));
+			ArmExpectedStripedMove(
+				GSLocalMemory::GetStartBlockAddress(src->m_TEX0.TBP0, src->m_TEX0.TBW, src->m_TEX0.PSM, GSVector4i(sx + w, 0, sx + w + w, h)),
+				GSLocalMemory::GetStartBlockAddress(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, GSVector4i(dx + w, 0, dx + w + w, h)),
+				src, dst);
 		}
 		// Horizontal Strips.
 		else
 		{
-			m_expected_src_bp = GSLocalMemory::GetStartBlockAddress(src->m_TEX0.TBP0, src->m_TEX0.TBW, src->m_TEX0.PSM, GSVector4i(0, sy + h, w, sy + h + h));
-			m_expected_dst_bp = GSLocalMemory::GetStartBlockAddress(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, GSVector4i(0, dy + h, w, dy + h + h));
-		}
-
-		// Only check the source, the destination might need expanding.
-		if (static_cast<u32>(m_expected_src_bp) < src->UnwrappedEndBlock() && static_cast<u32>(m_expected_src_bp) >= src->m_TEX0.TBP0)
-		{
-			m_remembered_src_bp = src->m_TEX0.TBP0;
-			m_remembered_dst_bp = dst->m_TEX0.TBP0;
-		}
-		else // If the expected BP is not inside the source, don't bother
-		{
-			m_expected_src_bp = -1;
-			m_remembered_src_bp = -1;
-			m_expected_dst_bp = -1;
-			m_remembered_dst_bp = -1;
+			ArmExpectedStripedMove(
+				GSLocalMemory::GetStartBlockAddress(src->m_TEX0.TBP0, src->m_TEX0.TBW, src->m_TEX0.PSM, GSVector4i(0, sy + h, w, sy + h + h)),
+				GSLocalMemory::GetStartBlockAddress(dst->m_TEX0.TBP0, dst->m_TEX0.TBW, dst->m_TEX0.PSM, GSVector4i(0, dy + h, w, dy + h + h)),
+				src, dst);
 		}
 	}
 	dst->UpdateValidity(GSVector4i(dx, dy, dx + w, dy + h));
@@ -5596,7 +5682,7 @@ GSTextureCache::Target* GSTextureCache::GetExactTarget(u32 BP, u32 BW, int type,
 	{
 		Target* t = *it;
 		const u32 tgt_bw = std::max(t->m_TEX0.TBW, 1U);
-		if ((t->m_TEX0.TBP0 == BP || (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets && t->m_TEX0.TBP0 < BP && !(BP & 0x1f) && (((BP - t->m_TEX0.TBP0) >> 5) % tgt_bw) == 0)) && tgt_bw == BW && t->UnwrappedEndBlock() >= end_bp)
+		if (MatchesExactOrInsideTargetBase(t, BP) && tgt_bw == BW && ContainsSurfaceRange(t, BP, end_bp))
 		{
 			rts.MoveFront(it.Index());
 			return t;
@@ -5613,7 +5699,7 @@ GSTextureCache::Target* GSTextureCache::GetTargetWithSharedBits(u32 BP, u32 PSM)
 	{
 		Target* t = *it;
 		const u32 t_psm = (t->HasValidAlpha()) ? t->m_TEX0.PSM & ~0x1 : t->m_TEX0.PSM;
-		if (GSUtil::HasSharedBits(PSM, t_psm) && (t->m_TEX0.TBP0 == BP || (GSConfig.UserHacks_TextureInsideRt >= GSTextureInRtMode::InsideTargets && t->m_TEX0.TBP0 < BP && t->UnwrappedEndBlock() > BP)))
+		if (GSUtil::HasSharedBits(PSM, t_psm) && (t->m_TEX0.TBP0 == BP || (IsInsideTargetTrackingEnabled() && t->m_TEX0.TBP0 < BP && t->UnwrappedEndBlock() > BP)))
 			return t;
 	}
 
@@ -5629,7 +5715,7 @@ GSTextureCache::Target* GSTextureCache::FindOverlappingTarget(GSTextureCache::Ta
 			if (tgt == target)
 				continue;
 
-			if (CheckOverlap(tgt->m_TEX0.TBP0, tgt->m_end_block, target->m_TEX0.TBP0, target->m_end_block))
+			if (CheckOverlap(tgt->m_TEX0.TBP0, tgt->UnwrappedEndBlock(), target->m_TEX0.TBP0, target->UnwrappedEndBlock()))
 				return tgt;
 		}
 	}
@@ -5643,7 +5729,7 @@ GSTextureCache::Target* GSTextureCache::FindOverlappingTarget(u32 BP, u32 end_bp
 	{
 		for (Target* tgt : m_dst[i])
 		{
-			if (CheckOverlap(tgt->m_TEX0.TBP0, tgt->m_end_block, BP, end_bp))
+			if (CheckOverlap(tgt->m_TEX0.TBP0, tgt->UnwrappedEndBlock(), BP, end_bp))
 				return tgt;
 		}
 	}

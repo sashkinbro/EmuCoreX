@@ -782,25 +782,29 @@ bool GSDeviceOGL::CheckFeatures()
 		return false;
 	}
 
-	// Log extension string for debugging purposes.
+	// Log core identity information once. The full extension dump is very large on Android,
+	// so keep it for explicit debug-device sessions instead of every startup.
 	Console.WriteLn(fmt::format("GL_VENDOR: {}", reinterpret_cast<const char*>(glGetString(GL_VENDOR))));
 	Console.WriteLn(fmt::format("GL_VERSION: {}", reinterpret_cast<const char*>(glGetString(GL_VERSION))));
 	Console.WriteLn(fmt::format("GL_RENDERER: {}", reinterpret_cast<const char*>(glGetString(GL_RENDERER))));
 	Console.WriteLn(fmt::format(
 		"GL_SHADING_LANGUAGE_VERSION: {}", reinterpret_cast<const char*>(glGetString(GL_SHADING_LANGUAGE_VERSION))));
-	std::string extensions = "GL_EXTENSIONS:";
-	GLint num_extensions = 0;
-	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-	for (GLint i = 0; i < num_extensions; i++)
+	if (GSConfig.UseDebugDevice)
 	{
-		const char* ext = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
-		if (ext)
+		std::string extensions = "GL_EXTENSIONS:";
+		GLint num_extensions = 0;
+		glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+		for (GLint i = 0; i < num_extensions; i++)
 		{
-			extensions += ' ';
-			extensions.append(ext);
+			const char* ext = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
+			if (ext)
+			{
+				extensions += ' ';
+				extensions.append(ext);
+			}
 		}
+		DevCon.WriteLn(std::move(extensions));
 	}
-	DevCon.WriteLn(std::move(extensions));
 
 	if (!m_is_gles && !GLAD_GL_ARB_shading_language_420pack)
 	{
@@ -832,11 +836,6 @@ bool GSDeviceOGL::CheckFeatures()
 	if (!GLAD_GL_ARB_texture_barrier)
 	{
 		glTextureBarrier = ReplaceGL::TextureBarrier;
-		if (!use_mali_profile)
-		{
-			Host::AddOSDMessage(
-				"GL_ARB_texture_barrier is not supported, blending will not be accurate.", Host::OSD_ERROR_DURATION);
-		}
 	}
 
 	if (!GLAD_GL_ARB_direct_state_access)
@@ -868,27 +867,55 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.broken_point_sampler = false;
 	m_features.primitive_id = true;
 
-	m_features.framebuffer_fetch = (GLAD_GL_ARM_shader_framebuffer_fetch || GLAD_GL_EXT_shader_framebuffer_fetch);
-	if (m_features.framebuffer_fetch && GSConfig.DisableFramebufferFetch)
+	const bool has_arm_framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
+	const bool has_ext_framebuffer_fetch = GLAD_GL_EXT_shader_framebuffer_fetch;
+	const bool has_texture_barrier_extension = GLAD_GL_ARB_texture_barrier;
+	bool framebuffer_fetch = (has_arm_framebuffer_fetch || has_ext_framebuffer_fetch);
+	if (framebuffer_fetch && GSConfig.DisableFramebufferFetch)
 	{
 		Host::AddOSDMessage(
 			"Framebuffer fetch was found but is disabled. This will reduce performance.", Host::OSD_ERROR_DURATION);
-		m_features.framebuffer_fetch = false;
+		framebuffer_fetch = false;
 	}
 
 	// The EXT framebuffer fetch path on Adreno is fast, but it has proven unreliable
 	// in some depth/stencil-heavy scenes. Prefer the safer fallback path there unless
 	// the user explicitly overrides the barrier mode.
-	if (use_adreno_profile && m_features.framebuffer_fetch && GSConfig.OverrideTextureBarriers == -1)
+	m_features.provoking_vertex_last = true;
+	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
+	m_features.bptc_textures =
+		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
+	m_features.prefer_new_textures = false;
+	m_features.stencil_buffer = true;
+
+	if (use_mali_profile)
 	{
-		m_features.framebuffer_fetch = false;
+		m_features.prefer_new_textures = true;
+		// Keep the Mali auto-profile on the explicit ARM fetch path, but make sure
+		// all dependent feature gates are derived from the final decision below.
+		// This avoids ending up with stale multidraw/depth gates after the profile override.
+		framebuffer_fetch = has_arm_framebuffer_fetch;
 	}
+
+	if (use_adreno_profile)
+	{
+		m_features.prefer_new_textures = true;
+	}
+
+	if (use_adreno_profile && framebuffer_fetch && GSConfig.OverrideTextureBarriers == -1)
+		framebuffer_fetch = false;
+
 	if (GSConfig.OverrideTextureBarriers == 0)
-		m_features.texture_barrier = m_features.framebuffer_fetch; // Force Disabled
+		m_features.texture_barrier = framebuffer_fetch; // Force Disabled
 	else if (GSConfig.OverrideTextureBarriers == 1)
 		m_features.texture_barrier = true; // Force Enabled
+	else if (use_mali_profile)
+		m_features.texture_barrier = framebuffer_fetch;
 	else
-		m_features.texture_barrier = m_features.framebuffer_fetch || GLAD_GL_ARB_texture_barrier;
+		m_features.texture_barrier = framebuffer_fetch || has_texture_barrier_extension;
+
+	m_features.framebuffer_fetch = framebuffer_fetch;
+
 	if (!m_features.texture_barrier)
 	{
 		Host::AddOSDMessage(
@@ -908,28 +935,6 @@ bool GSDeviceOGL::CheckFeatures()
 	// texture_barrier is unavailable. Expose this so GSRendererHW doesn't disable full-barrier
 	// paths before the OpenGL fallback in SendHWDraw() gets a chance to handle them.
 	m_features.multidraw_fb_copy = !m_features.texture_barrier;
-
-	m_features.provoking_vertex_last = true;
-	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
-	m_features.bptc_textures =
-		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
-	m_features.prefer_new_textures = false;
-	m_features.stencil_buffer = true;
-
-	if (use_mali_profile)
-	{
-		m_features.prefer_new_textures = true;
-		m_features.framebuffer_fetch = GLAD_GL_ARM_shader_framebuffer_fetch;
-		if (GSConfig.OverrideTextureBarriers == -1)
-		{
-			m_features.texture_barrier = m_features.framebuffer_fetch;
-		}
-	}
-
-	if (use_adreno_profile)
-	{
-		m_features.prefer_new_textures = true;
-	}
 
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.

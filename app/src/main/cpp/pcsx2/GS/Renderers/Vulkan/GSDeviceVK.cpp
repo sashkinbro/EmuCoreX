@@ -81,6 +81,14 @@ static const char* GetVendorNameFromID(u32 vendor_id)
 	}
 }
 
+#if defined(__ANDROID__)
+static bool ShouldUseConservativeAndroidVulkanBarrierPolicy(RuntimeGpuProfile runtime_profile, std::string_view override_value)
+{
+	return (runtime_profile == RuntimeGpuProfile::Adreno &&
+		GpuProfileDetector::ParseOverride(override_value) == GpuProfileOverride::Auto);
+}
+#endif
+
 static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
 {
 	if (!tex)
@@ -851,23 +859,26 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	m_optional_extensions.vk_swapchain_maintenance1 &= 
 		(swapchain_maintenance1_feature.swapchainMaintenance1 == VK_TRUE);
 
-	Console.WriteLn(
-		"VK_EXT_provoking_vertex is %s", m_optional_extensions.vk_ext_provoking_vertex ? "supported" : "NOT supported");
-	Console.WriteLn(
-		"VK_EXT_memory_budget is %s", m_optional_extensions.vk_ext_memory_budget ? "supported" : "NOT supported");
-	Console.WriteLn("VK_EXT_calibrated_timestamps is %s",
-		m_optional_extensions.vk_ext_calibrated_timestamps ? "supported" : "NOT supported");
-	Console.WriteLn("VK_EXT_rasterization_order_attachment_access is %s",
-		m_optional_extensions.vk_ext_rasterization_order_attachment_access ? "supported" : "NOT supported");
-	Console.WriteLn("VK_%s_swapchain_maintenance1 is %s",
-		m_optional_extensions.vk_swapchain_maintenance1_is_khr ? "KHR" : "EXT",
-		m_optional_extensions.vk_swapchain_maintenance1 ? "supported" : "NOT supported");
-	Console.WriteLn("VK_EXT_full_screen_exclusive is %s",
-		m_optional_extensions.vk_ext_full_screen_exclusive ? "supported" : "NOT supported");
-	Console.WriteLn("VK_KHR_driver_properties is %s",
-		m_optional_extensions.vk_khr_driver_properties ? "supported" : "NOT supported");
-	Console.WriteLn("VK_EXT_attachment_feedback_loop_layout is %s",
-		m_optional_extensions.vk_ext_attachment_feedback_loop_layout ? "supported" : "NOT supported");
+	if (GSConfig.UseDebugDevice)
+	{
+		Console.WriteLn(
+			"VK_EXT_provoking_vertex is %s", m_optional_extensions.vk_ext_provoking_vertex ? "supported" : "NOT supported");
+		Console.WriteLn(
+			"VK_EXT_memory_budget is %s", m_optional_extensions.vk_ext_memory_budget ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_calibrated_timestamps is %s",
+			m_optional_extensions.vk_ext_calibrated_timestamps ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_rasterization_order_attachment_access is %s",
+			m_optional_extensions.vk_ext_rasterization_order_attachment_access ? "supported" : "NOT supported");
+		Console.WriteLn("VK_%s_swapchain_maintenance1 is %s",
+			m_optional_extensions.vk_swapchain_maintenance1_is_khr ? "KHR" : "EXT",
+			m_optional_extensions.vk_swapchain_maintenance1 ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_full_screen_exclusive is %s",
+			m_optional_extensions.vk_ext_full_screen_exclusive ? "supported" : "NOT supported");
+		Console.WriteLn("VK_KHR_driver_properties is %s",
+			m_optional_extensions.vk_khr_driver_properties ? "supported" : "NOT supported");
+		Console.WriteLn("VK_EXT_attachment_feedback_loop_layout is %s",
+			m_optional_extensions.vk_ext_attachment_feedback_loop_layout ? "supported" : "NOT supported");
+	}
 
 	return true;
 }
@@ -2638,6 +2649,8 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 			GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
 				GetVendorNameFromID(m_device_properties.vendorID), m_name);
 		SetRuntimeGPUProfile(profile_selection.runtime_profile);
+		Console.WriteLn("VK: Android runtime GPU profile: %s",
+			GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
 	}
 #else
 	SetRuntimeGPUProfile((m_device_properties.vendorID == 0x13B5u) ? RuntimeGpuProfile::Mali :
@@ -2708,24 +2721,27 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
-	const u32 vendorID = m_device_properties.vendorID;
 	//const bool isAMD = (vendorID == 0x1002 || vendorID == 0x1022);
 	//const bool isNVIDIA = (vendorID == 0x10DE);
 
-	m_features.framebuffer_fetch =
-		m_optional_extensions.vk_ext_rasterization_order_attachment_access && !GSConfig.DisableFramebufferFetch;
-	m_features.texture_barrier = GSConfig.OverrideTextureBarriers != 0;
+	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
+	bool framebuffer_fetch = has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
+	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
 
 #ifdef __ANDROID__
-	// Qualcomm Android drivers are currently corrupting indexed/feedback-heavy scenes with the barrier path.
-	if (IsAdrenoGPUProfile())
+	// Qualcomm Android drivers are currently the riskiest barrier/fbfetch path in this fork,
+	// but explicit user overrides should still be respected for validation and recovery work.
+	if (ShouldUseConservativeAndroidVulkanBarrierPolicy(GetRuntimeGPUProfile(), GSConfig.AndroidGpuProfileOverride))
 	{
-		m_features.texture_barrier = false;
-		m_features.framebuffer_fetch = false;
+		texture_barrier = false;
+		framebuffer_fetch = false;
 	}
 #endif
+
+	m_features.framebuffer_fetch = framebuffer_fetch;
+	m_features.texture_barrier = texture_barrier;
 
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
 	m_features.primitive_id = m_device_features.geometryShader;
@@ -2762,7 +2778,11 @@ bool GSDeviceVK::CheckFeatures()
 		(m_device_features.wideLines && limits.lineWidthRange[0] <= f_upscale && limits.lineWidthRange[1] >= f_upscale);
 
 	// Mobile GPUs tend to emulate wide points/lines expensively, so keep the old vertex-expansion path there.
+#ifdef __ANDROID__
+	if (IsAdrenoGPUProfile() || IsMaliGPUProfile())
+#else
 	if (vendorID == 0x5143u || vendorID == 0x13B5u)
+#endif
 	{
 		m_features.point_expand = false;
 		m_features.line_expand = false;

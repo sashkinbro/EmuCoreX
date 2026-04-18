@@ -456,6 +456,10 @@ protected:
 	std::unique_ptr<GSDownloadTexture> m_uint32_download_texture;
 
 	Source* CreateSource(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const GIFRegCLAMP& CLAMP, Target* t, int x_offset, int y_offset, const GSVector2i* lod, const GSVector4i* src_range, GSTexture* gpu_clut, SourceRegion region, bool force_temporary = false);
+	bool HasExpectedStripedMove(u32 sbp, u32 dbp) const;
+	void ClearExpectedStripedMove();
+	bool TryApplyExpectedStripedMove(u32& SBP, u32& DBP, u32 SBW, u32 SPSM, int& sx, int& sy, int& dx, int& dy, int w, int h, bool& req_resize);
+	void ArmExpectedStripedMove(u32 expected_src_bp, u32 expected_dst_bp, const Target* src, const Target* dst);
 
 	bool PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, const GSVector2i& valid_size, bool is_frame,
 		bool preload, bool preserve_target, const GSVector4i draw_rect, Target* dst, GSTextureCache::Source* src = nullptr);
