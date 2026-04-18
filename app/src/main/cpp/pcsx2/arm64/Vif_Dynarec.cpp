@@ -321,9 +321,11 @@ void VifUnpackNEON_Dynarec::ModUnpack(int upknum, bool PostOp)
 			UnpkLoopIteration &= iteration_mask;
 	}
 
-	if (Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(upknum))
+	if (Arm64GetVifTransitionalUnpackHandling(upknum) ==
+		Arm64VifTransitionalUnpackHandling::SkipExecutionUntilHardwareValidation)
 	{
-		// Transitional policy until hardware validation confirms the masked iteration behavior.
+		// Mirror the current x86 invalid-unpack fallback contract until hardware validation
+		// proves a different ARM64 execution rule for these unpack types.
 		Arm64HandleTransitionalMaskedIterationUnpack(upknum);
 	}
 }

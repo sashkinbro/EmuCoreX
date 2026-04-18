@@ -345,7 +345,8 @@ void VifUnpackNEON_Base::xUnpack(int upknum) const
 		case 3:
 		case 7:
 		case 11:
-			// Transitional policy until hardware validation confirms the masked iteration behavior.
+			// Mirror the current x86 "invalid unpack" fallback contract until hardware validation
+			// proves a different execution policy for ARM64.
 			Arm64HandleTransitionalMaskedIterationUnpack(upknum);
 			break;
 	}

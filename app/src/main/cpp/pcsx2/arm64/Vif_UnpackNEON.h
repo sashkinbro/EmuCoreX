@@ -15,22 +15,47 @@
 #define xmmRow vixl::aarch64::q6
 #define xmmTemp vixl::aarch64::q7
 
-inline bool Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(int upknum)
+enum class Arm64VifMaskedIterationPolicy
+{
+	Stable,
+	TransitionalRequiresHardwareValidation,
+};
+
+enum class Arm64VifTransitionalUnpackHandling
+{
+	NormalExecution,
+	SkipExecutionUntilHardwareValidation,
+};
+
+inline Arm64VifMaskedIterationPolicy Arm64GetVifMaskedIterationPolicy(int upknum)
 {
 	switch (upknum)
 	{
 		case 3:
 		case 7:
 		case 11:
-			return true;
+			return Arm64VifMaskedIterationPolicy::TransitionalRequiresHardwareValidation;
 		default:
-			return false;
+			return Arm64VifMaskedIterationPolicy::Stable;
 	}
+}
+
+inline bool Arm64VifUsesTransitionalMaskedIterationPolicy(int upknum)
+{
+	return Arm64GetVifMaskedIterationPolicy(upknum) ==
+		Arm64VifMaskedIterationPolicy::TransitionalRequiresHardwareValidation;
+}
+
+inline Arm64VifTransitionalUnpackHandling Arm64GetVifTransitionalUnpackHandling(int upknum)
+{
+	return Arm64VifUsesTransitionalMaskedIterationPolicy(upknum) ?
+		Arm64VifTransitionalUnpackHandling::SkipExecutionUntilHardwareValidation :
+		Arm64VifTransitionalUnpackHandling::NormalExecution;
 }
 
 inline void Arm64AssertVifMaskedIterationPolicy(int upknum)
 {
-	pxAssertRel(Arm64VifNeedsHardwareValidationForMaskedIterationPolicy(upknum),
+	pxAssertRel(Arm64VifUsesTransitionalMaskedIterationPolicy(upknum),
 		"ARM64 VIF unpack validation contract unexpectedly changed.");
 }
 
