@@ -490,6 +490,7 @@ object EmulatorBridge {
         }
 
         if (!isNativeLoaded) return inferredMetadata
+        if (isVmActive) return inferredMetadata
 
         return try {
             val rawTitle = NativeApp.getGameTitle(path).orEmpty()

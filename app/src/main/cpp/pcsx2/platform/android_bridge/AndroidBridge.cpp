@@ -984,6 +984,30 @@ static bool ApplyAndroidGsBootstrapDefaults(INISettingsInterface& si, bool only_
     return changed;
 }
 
+static bool ApplyAndroidInputBootstrapDefaults(INISettingsInterface& si, bool only_if_missing)
+{
+    bool changed = false;
+
+    const auto set_bool = [&](const char* key, bool value, bool force_existing_value) {
+        if (only_if_missing && !force_existing_value && si.ContainsValue("InputSources", key))
+            return;
+
+        bool current_value = value;
+        if (si.GetBoolValue("InputSources", key, &current_value) && current_value == value)
+            return;
+
+        si.SetBoolValue("InputSources", key, value);
+        changed = true;
+    };
+
+    // Android routes controller input through MainActivity/GamepadManager -> NativeApp.setPadButton().
+    // Keep the SDL source disabled here so startup does not keep probing a backend which fails to init.
+    set_bool("SDL", false, true);
+    set_bool("XInput", false, false);
+
+    return changed;
+}
+
 static bool SyncManualGsHackToggle(INISettingsInterface& si)
 {
     auto read_bool = [&](const char* key, bool default_value) {
@@ -1127,8 +1151,7 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
             GetSettingsInterfaceStorage()->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
             GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "VsyncEnable", false);
             GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
-            GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "SDL", true);
-            GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "XInput", false);
+            ApplyAndroidInputBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
             GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableSystemConsole", true);
             GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableTimestamps", true);
             GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableVerbose", false);
@@ -1201,6 +1224,7 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
                 GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);
                 needs_save = true;
             }
+            needs_save |= ApplyAndroidInputBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
             needs_save |= ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
             needs_save |= SyncManualGsHackToggle(*GetSettingsInterfaceStorage());
             needs_save |= NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
@@ -1270,8 +1294,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
         GetSettingsInterfaceStorage()->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
         GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "VsyncEnable", false);
         GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
-        GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "SDL", true);
-        GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "XInput", false);
+        ApplyAndroidInputBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
         GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableSystemConsole", true);
         GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableTimestamps", true);
         GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableVerbose", false);
@@ -1344,6 +1367,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
             GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);
             needs_save = true;
         }
+        needs_save |= ApplyAndroidInputBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
         needs_save |= ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
         needs_save |= SyncManualGsHackToggle(*GetSettingsInterfaceStorage());
         needs_save |= NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
@@ -1612,8 +1636,6 @@ Java_com_sbro_emucorex_core_NativeApp_getGameMetadata(JNIEnv *env, jclass clazz,
 
     Error cdvd_lock_error;
     const bool has_cdvd_lock = cdvdLock(&cdvd_lock_error);
-    if (!has_cdvd_lock)
-        Console.Warning(fmt::format("(NativeApp::getGameMetadata) Failed to acquire CDVD lock for '{}': {}", path, cdvd_lock_error.GetDescription()));
 
     bool have_entry = false;
     {
@@ -1637,6 +1659,8 @@ Java_com_sbro_emucorex_core_NativeApp_getGameMetadata(JNIEnv *env, jclass clazz,
     {
         GameList::GetSerialAndCRCForFilename(path.c_str(), &serial, &crc);
     }
+    // If the disc subsystem is busy during active emulation, quietly fall back to
+    // cached/native filename-derived metadata instead of spamming warnings.
 
     std::string title;
     if (!serial.empty())

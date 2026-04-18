@@ -420,17 +420,18 @@ void recMicroVU1::ResumeXGkick()
 
 bool SaveStateBase::vuJITFreeze()
 {
-	auto synchronizeVuThreadForSavestateJitFreeze = [this]() {
+	const auto synchronizeVuThreadForSavestateJitFreeze = [this]() {
 		if (IsSaving())
 			vu1Thread.WaitVU();
 	};
 
-	auto freezeMicroVuPipelineState = [this](microVU& vu) {
+	const auto freezeMicroVuJitPipelineState = [this](microVU& vu) {
+		// This is the active Android save/load contract for compiled microVU pipeline state.
 		Freeze(vu.prog.lpState);
 	};
 
 	synchronizeVuThreadForSavestateJitFreeze();
-	freezeMicroVuPipelineState(microVU0);
-	freezeMicroVuPipelineState(microVU1);
+	freezeMicroVuJitPipelineState(microVU0);
+	freezeMicroVuJitPipelineState(microVU1);
 	return IsOkay();
 }

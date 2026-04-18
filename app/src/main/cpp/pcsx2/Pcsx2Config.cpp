@@ -174,6 +174,84 @@ namespace EmuFolders
 	static std::string GetPortableModePath();
 } // namespace EmuFolders
 
+namespace
+{
+struct EmuFolderLogSnapshot
+{
+	std::string bios;
+	std::string settings;
+	std::string snapshots;
+	std::string savestates;
+	std::string memory_cards;
+	std::string logs;
+	std::string cheats;
+	std::string patches;
+	std::string covers;
+	std::string game_settings;
+	std::string resources;
+	std::string user_resources;
+	std::string cache;
+	std::string textures;
+	std::string input_profiles;
+	std::string videos;
+	std::string debugger_layouts;
+	std::string debugger_settings;
+};
+
+static bool operator==(const EmuFolderLogSnapshot& left, const EmuFolderLogSnapshot& right)
+{
+	return left.bios == right.bios &&
+		left.settings == right.settings &&
+		left.snapshots == right.snapshots &&
+		left.savestates == right.savestates &&
+		left.memory_cards == right.memory_cards &&
+		left.logs == right.logs &&
+		left.cheats == right.cheats &&
+		left.patches == right.patches &&
+		left.covers == right.covers &&
+		left.game_settings == right.game_settings &&
+		left.resources == right.resources &&
+		left.user_resources == right.user_resources &&
+		left.cache == right.cache &&
+		left.textures == right.textures &&
+		left.input_profiles == right.input_profiles &&
+		left.videos == right.videos &&
+		left.debugger_layouts == right.debugger_layouts &&
+		left.debugger_settings == right.debugger_settings;
+}
+
+static void LogEmuFolderSnapshotIfChanged(const EmuFolderLogSnapshot& snapshot)
+{
+	static EmuFolderLogSnapshot s_last_logged_snapshot;
+	static bool s_has_logged_snapshot = false;
+
+	if (s_has_logged_snapshot && snapshot == s_last_logged_snapshot)
+		return;
+
+	s_last_logged_snapshot = snapshot;
+	s_has_logged_snapshot = true;
+
+	Console.WriteLn("BIOS Directory: %s", snapshot.bios.c_str());
+	Console.WriteLn("Settings Directory: %s", snapshot.settings.c_str());
+	Console.WriteLn("Snapshots Directory: %s", snapshot.snapshots.c_str());
+	Console.WriteLn("Savestates Directory: %s", snapshot.savestates.c_str());
+	Console.WriteLn("MemoryCards Directory: %s", snapshot.memory_cards.c_str());
+	Console.WriteLn("Logs Directory: %s", snapshot.logs.c_str());
+	Console.WriteLn("Cheats Directory: %s", snapshot.cheats.c_str());
+	Console.WriteLn("Patches Directory: %s", snapshot.patches.c_str());
+	Console.WriteLn("Covers Directory: %s", snapshot.covers.c_str());
+	Console.WriteLn("Game Settings Directory: %s", snapshot.game_settings.c_str());
+	Console.WriteLn("Resources Directory: %s", snapshot.resources.c_str());
+	Console.WriteLn("User Resources Directory: %s", snapshot.user_resources.c_str());
+	Console.WriteLn("Cache Directory: %s", snapshot.cache.c_str());
+	Console.WriteLn("Textures Directory: %s", snapshot.textures.c_str());
+	Console.WriteLn("Input Profile Directory: %s", snapshot.input_profiles.c_str());
+	Console.WriteLn("Video Dumping Directory: %s", snapshot.videos.c_str());
+	Console.WriteLn("Debugger Layouts Directory: %s", snapshot.debugger_layouts.c_str());
+	Console.WriteLn("Debugger Settings Directory: %s", snapshot.debugger_settings.c_str());
+}
+} // namespace
+
 TraceLogsEE::TraceLogsEE()
 {
 	bitset = 0;
@@ -2325,24 +2403,26 @@ void EmuFolders::LoadConfig(SettingsInterface& si)
 	DebuggerLayouts = LoadPathFromSettings(si, Settings, "DebuggerLayouts", "debuggerlayouts");
 	DebuggerSettings = LoadPathFromSettings(si, Settings, "DebuggerSettings", "debuggersettings");
 
-	Console.WriteLn("BIOS Directory: %s", Bios.c_str());
-	Console.WriteLn("Settings Directory: %s", Settings.c_str());
-	Console.WriteLn("Snapshots Directory: %s", Snapshots.c_str());
-	Console.WriteLn("Savestates Directory: %s", Savestates.c_str());
-	Console.WriteLn("MemoryCards Directory: %s", MemoryCards.c_str());
-	Console.WriteLn("Logs Directory: %s", Logs.c_str());
-	Console.WriteLn("Cheats Directory: %s", Cheats.c_str());
-	Console.WriteLn("Patches Directory: %s", Patches.c_str());
-	Console.WriteLn("Covers Directory: %s", Covers.c_str());
-	Console.WriteLn("Game Settings Directory: %s", GameSettings.c_str());
-	Console.WriteLn("Resources Directory: %s", Resources.c_str());
-	Console.WriteLn("User Resources Directory: %s", UserResources.c_str());
-	Console.WriteLn("Cache Directory: %s", Cache.c_str());
-	Console.WriteLn("Textures Directory: %s", Textures.c_str());
-	Console.WriteLn("Input Profile Directory: %s", InputProfiles.c_str());
-	Console.WriteLn("Video Dumping Directory: %s", Videos.c_str());
-	Console.WriteLn("Debugger Layouts Directory: %s", DebuggerLayouts.c_str());
-	Console.WriteLn("Debugger Settings Directory: %s", DebuggerSettings.c_str());
+	LogEmuFolderSnapshotIfChanged({
+		Bios,
+		Settings,
+		Snapshots,
+		Savestates,
+		MemoryCards,
+		Logs,
+		Cheats,
+		Patches,
+		Covers,
+		GameSettings,
+		Resources,
+		UserResources,
+		Cache,
+		Textures,
+		InputProfiles,
+		Videos,
+		DebuggerLayouts,
+		DebuggerSettings,
+	});
 }
 
 bool EmuFolders::EnsureFoldersExist()

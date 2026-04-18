@@ -9,6 +9,8 @@
 #include "Vif_Dma.h"
 #include "Vif_Dynarec.h"
 
+#include <atomic>
+
 #define vifOp(vifCodeName) _vifT int vifCodeName(int pass, const u32* data)
 #define pass1 if (pass == 0)
 #define pass2 if (pass == 1)
@@ -20,6 +22,29 @@
 			return vifCode_Null<idx>(pass, (u32*)data); \
 	}
 vifOp(vifCode_Null);
+
+namespace
+{
+std::atomic<int> s_vif_bad_cmd_log_budget{16};
+}
+
+_vifT static void vifLogBadCmdContext(const vifStruct& vifX)
+{
+	const int slot = s_vif_bad_cmd_log_budget.fetch_sub(1, std::memory_order_relaxed);
+	if (slot <= 0)
+		return;
+
+	const VifBridgeStateSnapshot bridge = vifX.CaptureBridgeState(&vifXRegs);
+	const u32 gif_busy_mask = idx ? gifUnit.GetVifPath13BusyMask() : gifUnit.GetVifPath12BusyMask();
+
+	Console.Warning(
+		"Vif%d: BadCmdCtx code=%08x cmd=%02x pass=%d tag_addr=%03x tag_size=%u tag_cmd=%02x "
+		"madr=%08x qwc=%x tadr=%08x chcr=%08x stat=%08x bridge=%02x stall=%u resume=%u gifBusy=%u path3Masked=%d canPath3=%d",
+		idx, vifXRegs.code, vifX.cmd, vifX.pass, vifX.tag.addr, vifX.tag.size, vifX.tag.cmd,
+		vifXch.madr, vifXch.qwc, vifXch.tadr, vifXch.chcr._u32, vifXRegs.stat._u32,
+		bridge.flags, bridge.stall_kind, bridge.resume_offset, gif_busy_mask,
+		idx ? (gifUnit.Path3Masked() ? 1 : 0) : 0, idx ? (gifUnit.CanDoPath3() ? 1 : 0) : 1);
+}
 
 //------------------------------------------------------------------
 // Vif0/Vif1 Misc Functions
@@ -558,6 +583,7 @@ vifOp(vifCode_Null)
 		if (!(vifXRegs.err.ME1))
 		{ // Ignore vifcode and tag mismatch error
 			Console.WriteLn("Vif%d: Unknown VifCmd! [%x]", idx, vifX.cmd);
+			vifLogBadCmdContext<idx>(vifX);
 			vifXRegs.stat.ER1 = true;
 			vifX.vifstalled.enabled = VifStallEnable(vifXch);
 			vifX.vifstalled.value = VIF_IRQ_STALL;

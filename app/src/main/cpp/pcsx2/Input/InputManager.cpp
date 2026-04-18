@@ -1794,7 +1794,21 @@ void InputManager::UpdateInputSourceState(SettingsInterface& si, std::unique_loc
 
 void InputManager::ReloadSources(SettingsInterface& si, std::unique_lock<std::mutex>& settings_lock)
 {
+#ifdef __ANDROID__
+	// Android routes controller input through the host Activity/GamepadManager bridge,
+	// so keep the SDL input source dormant even if a legacy config still has it enabled.
+	if (!s_input_sources[static_cast<u32>(InputSourceType::SDL)])
+		s_input_sources[static_cast<u32>(InputSourceType::SDL)] = std::make_unique<SDLInputSource>();
+
+	if (s_input_sources[static_cast<u32>(InputSourceType::SDL)]->IsInitialized())
+	{
+		settings_lock.unlock();
+		s_input_sources[static_cast<u32>(InputSourceType::SDL)]->Shutdown();
+		settings_lock.lock();
+	}
+#else
 	UpdateInputSourceState<SDLInputSource>(si, settings_lock, InputSourceType::SDL);
+#endif
 #ifdef _WIN32
 	UpdateInputSourceState<DInputSource>(si, settings_lock, InputSourceType::DInput);
 	UpdateInputSourceState<XInputSource>(si, settings_lock, InputSourceType::XInput);
