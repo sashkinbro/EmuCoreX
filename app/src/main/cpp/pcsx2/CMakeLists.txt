@@ -121,10 +121,10 @@ set(pcsx2SchedulerHeaders
 set(pcsx2RuntimeSources
 	core/runtime/BuildVersion.cpp
 	core/runtime/GameDatabase.cpp
-	GameList.cpp
-	Host.cpp
-	LayeredSettingsInterface.cpp
-	INISettingsInterface.cpp
+	core/runtime/GameList.cpp
+	platform/host/Host.cpp
+	core/runtime/settings/LayeredSettingsInterface.cpp
+	core/runtime/settings/INISettingsInterface.cpp
 	Patch.cpp
 	Pcsx2Config.cpp
 	core/runtime/PerformanceMetrics.cpp
@@ -136,10 +136,10 @@ set(pcsx2RuntimeHeaders
 	core/runtime/BuildVersion.h
 	Config.h
 	core/runtime/GameDatabase.h
-	GameList.h
-	Host.h
-	INISettingsInterface.h
-	LayeredSettingsInterface.h
+	core/runtime/GameList.h
+	platform/host/Host.h
+	core/runtime/settings/INISettingsInterface.h
+	core/runtime/settings/LayeredSettingsInterface.h
 	Patch.h
 	core/runtime/PerformanceMetrics.h
 	VMManager.h

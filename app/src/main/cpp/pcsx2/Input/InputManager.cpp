@@ -8,7 +8,7 @@
 #include "SIO/Sio.h"
 #include "USB/USB.h"
 #include "VMManager.h"
-#include "LayeredSettingsInterface.h"
+#include "core/runtime/settings/LayeredSettingsInterface.h"
 
 #include "common/Assertions.h"
 #include "common/Console.h"

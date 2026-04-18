@@ -19,7 +19,7 @@
 
 #include "pcsx2/Patch.h"
 #include "pcsx2/core/runtime/PerformanceMetrics.h"
-#include "GameList.h"
+#include "pcsx2/core/runtime/GameList.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSCapture.h"
 #include "GSDumpReplayer.h"
@@ -27,7 +27,7 @@
 #include "ImGui/ImGuiManager.h"
 #include "common/Path.h"
 #include "common/HTTPDownloader.h"
-#include "pcsx2/INISettingsInterface.h"
+#include "pcsx2/core/runtime/settings/INISettingsInterface.h"
 #include "pcsx2/CDVD/CDVD.h"
 #include "pcsx2/CDVD/IsoReader.h"
 #include "3rdparty/rcheevos/include/rc_api_request.h"

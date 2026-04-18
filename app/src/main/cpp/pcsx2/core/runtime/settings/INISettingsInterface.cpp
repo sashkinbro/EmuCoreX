@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "INISettingsInterface.h"
+#include "core/runtime/settings/INISettingsInterface.h"
 
 #include "common/Error.h"
 #include "common/FileSystem.h"

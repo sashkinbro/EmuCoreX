@@ -4,8 +4,8 @@
 #include "core/runtime/BuildVersion.h"
 #include "GS.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
-#include "Host.h"
-#include "LayeredSettingsInterface.h"
+#include "platform/host/Host.h"
+#include "core/runtime/settings/LayeredSettingsInterface.h"
 #include "VMManager.h"
 
 #include "common/Assertions.h"

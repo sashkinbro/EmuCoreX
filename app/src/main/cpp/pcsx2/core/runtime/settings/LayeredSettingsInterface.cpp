@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "LayeredSettingsInterface.h"
+#include "core/runtime/settings/LayeredSettingsInterface.h"
 
 #include "common/Assertions.h"
 

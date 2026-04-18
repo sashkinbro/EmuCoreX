@@ -3,9 +3,9 @@
 
 #include "CDVD/CDVD.h"
 #include "Elfheader.h"
-#include "GameList.h"
+#include "core/runtime/GameList.h"
 #include "Host.h"
-#include "INISettingsInterface.h"
+#include "core/runtime/settings/INISettingsInterface.h"
 #include "VMManager.h"
 
 #include "common/Assertions.h"

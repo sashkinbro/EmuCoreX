@@ -7,6 +7,25 @@ EmuCoreX is a PlayStation 2 library and launcher for Android. It pairs a custom 
 
 Official website: https://emucorex.web.app/
 
+![Status](https://img.shields.io/badge/Status-Early%20Development%20%2F%20Unstable-red)
+
+> [!WARNING]
+> EmuCoreX is currently in the early stages of development. Expect instability, visual issues, performance drops, random slowdowns, and occasional crashes depending on the game, device, renderer, and driver stack.
+>
+> The current Android focus is mid-range and high-end phones. Budget devices are not optimized yet.
+>
+> At this stage, optimization work is mainly focused on Snapdragon devices. MediaTek optimization is still incomplete and may improve later.
+>
+> If you are using a MediaTek device, try the OpenGL renderer first. If that is still unstable or too slow for a specific game, try Software rendering as a fallback.
+>
+> Current rough minimum chipset recommendations as of April 2026:
+> - Snapdragon: Snapdragon 8 Gen 2 or Snapdragon 7+ Gen 3 class devices
+> - MediaTek: Dimensity 9300 or Dimensity 8400 class devices
+>
+> These are practical starting points, not guarantees. Cooling, GPU drivers, RAM bandwidth, renderer choice, and the game itself still matter a lot.
+>
+> Not all games work correctly yet. Compatibility, fixes, and performance optimization are still in active development.
+
 ## Highlights
 
 - PCSX2-based emulation core adapted by EmuCoreX for Android
@@ -38,7 +57,7 @@ EmuCoreX currently targets Android with:
 - `minSdk 29`
 - `targetSdk 36`
 - package id `com.sbro.emucorex`
-- version `0.0.9`
+- version `0.1.1`
 
 ## Building Locally
 

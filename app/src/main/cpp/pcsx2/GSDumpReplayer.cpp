@@ -4,7 +4,7 @@
 #include "GS.h"
 #include "GS/GSLzma.h"
 #include "GSDumpReplayer.h"
-#include "GameList.h"
+#include "core/runtime/GameList.h"
 #include "Gif.h"
 #include "Gif_Unit.h"
 #include "Host.h"
