@@ -108,6 +108,87 @@ static void ClearRecLUT(BASEBLOCK* base, int count);
 static u32 scaleblockcycles();
 static void recExitExecution();
 
+enum class EeDispatcherEventBounceReason
+{
+	WaitLoopTargetReached,
+	StaticBranchCycleDeadlineReached,
+	DynamicBranchCycleDeadlineReached,
+	TimeoutLoopImmediateEvent,
+	TimeoutLoopEarlyExitEvent,
+};
+
+#ifdef PCSX2_DEVBUILD
+struct EeDispatcherEventBounceAudit
+{
+	u64 wait_loop_target_reached = 0;
+	u64 static_branch_cycle_deadline_reached = 0;
+	u64 dynamic_branch_cycle_deadline_reached = 0;
+	u64 timeout_loop_immediate_event = 0;
+	u64 timeout_loop_early_exit_event = 0;
+};
+
+static EeDispatcherEventBounceAudit s_eeDispatcherEventBounceAudit;
+
+static void ResetEeDispatcherEventBounceAudit()
+{
+	s_eeDispatcherEventBounceAudit = {};
+}
+
+static void RecordEeDispatcherEventBounceSite(const EeDispatcherEventBounceReason reason)
+{
+	switch (reason)
+	{
+		case EeDispatcherEventBounceReason::WaitLoopTargetReached:
+			s_eeDispatcherEventBounceAudit.wait_loop_target_reached++;
+			break;
+
+		case EeDispatcherEventBounceReason::StaticBranchCycleDeadlineReached:
+			s_eeDispatcherEventBounceAudit.static_branch_cycle_deadline_reached++;
+			break;
+
+		case EeDispatcherEventBounceReason::DynamicBranchCycleDeadlineReached:
+			s_eeDispatcherEventBounceAudit.dynamic_branch_cycle_deadline_reached++;
+			break;
+
+		case EeDispatcherEventBounceReason::TimeoutLoopImmediateEvent:
+			s_eeDispatcherEventBounceAudit.timeout_loop_immediate_event++;
+			break;
+
+		case EeDispatcherEventBounceReason::TimeoutLoopEarlyExitEvent:
+			s_eeDispatcherEventBounceAudit.timeout_loop_early_exit_event++;
+			break;
+	}
+}
+
+static void PrintEeDispatcherEventBounceAudit()
+{
+	const u64 total =
+		s_eeDispatcherEventBounceAudit.wait_loop_target_reached +
+		s_eeDispatcherEventBounceAudit.static_branch_cycle_deadline_reached +
+		s_eeDispatcherEventBounceAudit.dynamic_branch_cycle_deadline_reached +
+		s_eeDispatcherEventBounceAudit.timeout_loop_immediate_event +
+		s_eeDispatcherEventBounceAudit.timeout_loop_early_exit_event;
+
+	if (total == 0)
+		return;
+
+	DevCon.WriteLn(
+		"[EE/JIT] Dispatcher bounce sites emitted: waitloop=%llu static-deadline=%llu dynamic-deadline=%llu timeout-immediate=%llu timeout-early-exit=%llu",
+		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.wait_loop_target_reached),
+		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.static_branch_cycle_deadline_reached),
+		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.dynamic_branch_cycle_deadline_reached),
+		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.timeout_loop_immediate_event),
+		static_cast<unsigned long long>(s_eeDispatcherEventBounceAudit.timeout_loop_early_exit_event));
+}
+#else
+static __fi void ResetEeDispatcherEventBounceAudit() {}
+static __fi void RecordEeDispatcherEventBounceSite(const EeDispatcherEventBounceReason) {}
+static __fi void PrintEeDispatcherEventBounceAudit() {}
+#endif
+
+static __fi void armEmitDispatcherEventBounce(EeDispatcherEventBounceReason reason);
+static __fi void armEmitDispatcherEventBounce(a64::Condition condition, EeDispatcherEventBounceReason reason);
+
 #ifdef DUMP_BLOCKS
 static ZydisFormatterFunc s_old_print_address;
 
@@ -361,6 +442,18 @@ static const void* JITCompile = nullptr;
 static const void* EnterRecompiledCode = nullptr;
 static const void* DispatchBlockDiscard = nullptr;
 static const void* DispatchPageReset = nullptr;
+
+static __fi void armEmitDispatcherEventBounce(const EeDispatcherEventBounceReason reason)
+{
+	RecordEeDispatcherEventBounceSite(reason);
+	armEmitJmp(DispatcherEvent);
+}
+
+static __fi void armEmitDispatcherEventBounce(const a64::Condition condition, const EeDispatcherEventBounceReason reason)
+{
+	RecordEeDispatcherEventBounceSite(reason);
+	armEmitCondBranch(condition, DispatcherEvent);
+}
 
 static void recEventTest()
 {
@@ -651,6 +744,8 @@ alignas(16) static u8 manual_counter[Ps2MemSize::TotalRam >> 12];
 static void recResetRaw()
 {
 	Console.WriteLn(Color_StrongBlack, "EE/iR5900 Recompiler Reset");
+	PrintEeDispatcherEventBounceAudit();
+	ResetEeDispatcherEventBounceAudit();
 
 	if (CHECK_EXTRAMEM != extraRam)
 	{
@@ -698,6 +793,8 @@ static void recResetRaw()
 
 void recShutdown()
 {
+	PrintEeDispatcherEventBounceAudit();
+
 	recRAMCopy.deallocate();
 	recLutReserve_RAM.deallocate();
 	recLutUnmapped.deallocate();
@@ -1377,7 +1474,7 @@ static void iBranchTest(u32 newpc)
         armAsm->Str(RAX, PTR_CPU(cpuRegs.cycle));
 
 //		xJMP((void*)DispatcherEvent);
-        armEmitJmp(DispatcherEvent);
+        armEmitDispatcherEventBounce(EeDispatcherEventBounceReason::WaitLoopTargetReached);
 	}
 	else
 	{
@@ -1404,7 +1501,9 @@ static void iBranchTest(u32 newpc)
         armBind(&labelSigned);
 
 //		xJMP((void*)DispatcherEvent);
-        armEmitJmp(DispatcherEvent);
+        armEmitDispatcherEventBounce((newpc == 0xffffffff) ?
+			EeDispatcherEventBounceReason::DynamicBranchCycleDeadlineReached :
+			EeDispatcherEventBounceReason::StaticBranchCycleDeadlineReached);
 	}
 }
 
@@ -2160,7 +2259,7 @@ static bool recSkipTimeoutLoop(s32 reg, bool is_timeout_loop)
 //	xMOV(ptr64[&cpuRegs.cycle], rbx);
     armAsm->Str(RBX, PTR_CPU(cpuRegs.cycle));
 //	xJMP((void*)DispatcherEvent);
-    armEmitJmp(DispatcherEvent);
+    armEmitDispatcherEventBounce(EeDispatcherEventBounceReason::TimeoutLoopImmediateEvent);
 //	not_dispatcher.SetTarget();
     armBind(&not_dispatcher);
 
@@ -2183,7 +2282,7 @@ static bool recSkipTimeoutLoop(s32 reg, bool is_timeout_loop)
 //	xMOV(ptr32[&cpuRegs.GPR.r[reg].UL[0]], edx); // write back new value of v0
     armStore(PTR_CPU(cpuRegs.GPR.r[reg].UL[0]), EDX);
 //	xJNZ((void*)DispatcherEvent); // jump to dispatcher if new v0 is not zero (i.e. an event)
-    armEmitCondBranch(a64::ne, DispatcherEvent);
+    armEmitDispatcherEventBounce(a64::ne, EeDispatcherEventBounceReason::TimeoutLoopEarlyExitEvent);
 //	xMOV(ptr32[&cpuRegs.pc], s_nEndBlock); // otherwise end of loop
     armStore(PTR_CPU(cpuRegs.pc), s_nEndBlock);
 //	recBlocks.Link(HWADDR(s_nEndBlock), xJcc32());

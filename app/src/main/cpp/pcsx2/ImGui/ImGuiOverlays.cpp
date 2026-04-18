@@ -333,7 +333,7 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 		if (s_last_update_timer.GetTimeNanoseconds() >= UPDATE_INTERVAL)
 		{
 			s_last_update_timer.Reset();
-			const float speed = PerformanceMetrics::GetSpeed();
+			const float speed_percent = PerformanceMetrics::GetSpeed() * 100.0f;
 
 			s_speed_line.clear();
 			if (GSConfig.OsdShowFPS)
@@ -360,7 +360,7 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 
 			if (GSConfig.OsdShowSpeed)
 			{
-				s_speed_line.append_format("{}Speed: {}%", s_speed_line.empty() ? "" : " | ", static_cast<u32>(std::round(speed)));
+				s_speed_line.append_format("{}Speed: {}%", s_speed_line.empty() ? "" : " | ", static_cast<u32>(std::round(speed_percent)));
 
 				const float target_speed = VMManager::GetTargetSpeed();
 				if (target_speed == 0.0f)
@@ -374,9 +374,9 @@ __ri void ImGuiManager::DrawPerformanceOverlay(float& position_y, float scale, f
 
 			if (!s_speed_line.empty())
 			{
-				if (speed < 95.0f)
+				if (speed_percent < 95.0f)
 					s_speed_line_color = IM_COL32(255, 100, 100, 255); // red
-				else if (speed > 105.0f)
+				else if (speed_percent > 105.0f)
 					s_speed_line_color = IM_COL32(100, 255, 100, 255); // green
 				else
 					s_speed_line_color = white_color;

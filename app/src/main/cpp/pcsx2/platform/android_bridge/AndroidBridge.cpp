@@ -202,8 +202,8 @@ namespace
 
         text += fmt::format(" | VPS: {:.2f}", PerformanceMetrics::GetFPS());
 
-        const float speed = PerformanceMetrics::GetSpeed();
-        text += fmt::format(" | Speed: {}%", static_cast<u32>(std::round(speed)));
+        const float speed_percent = PerformanceMetrics::GetSpeed() * 100.0f;
+        text += fmt::format(" | Speed: {}%", static_cast<u32>(std::round(speed_percent)));
 
         const float target_speed = VMManager::GetTargetSpeed();
         if (target_speed == 0.0f)
@@ -2095,7 +2095,7 @@ void Host::BeginPresentFrame() {
             if (fps <= 0.0f) fps = PerformanceMetrics::GetInternalFPS();
             if (fps <= 0.0f && VMManager::HasValidVM())
                 fps = VMManager::GetFrameRate();
-            const float speed = PerformanceMetrics::GetSpeed();
+            const float speed_percent = PerformanceMetrics::GetSpeed() * 100.0f;
 
             const std::string overlay_text_utf8 = BuildAndroidPerformanceOverlayText();
             jstring overlay_text = env->NewStringUTF(overlay_text_utf8.c_str());
@@ -2105,7 +2105,7 @@ void Host::BeginPresentFrame() {
                 native_app_bridge.on_performance_metrics,
                 overlay_text,
                 fps,
-                speed
+                speed_percent
             );
             env->DeleteLocalRef(overlay_text);
         }

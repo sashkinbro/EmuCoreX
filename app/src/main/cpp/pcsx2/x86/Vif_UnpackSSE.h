@@ -5,6 +5,7 @@
 
 #include "Common.h"
 #include "Vif_Dma.h"
+#include "Vif_UnpackPolicy.h"
 #include "newVif.h"
 
 // --------------------------------------------------------------------------------------

@@ -420,10 +420,17 @@ void recMicroVU1::ResumeXGkick()
 
 bool SaveStateBase::vuJITFreeze()
 {
-	if (IsSaving())
-		vu1Thread.WaitVU();
+	auto synchronizeVuThreadBeforeJitStateFreeze = [this]() {
+		if (IsSaving())
+			vu1Thread.WaitVU();
+	};
 
-	Freeze(microVU0.prog.lpState);
-	Freeze(microVU1.prog.lpState);
+	auto freezeCompiledMicroVuProgramState = [this](microVU& vu) {
+		Freeze(vu.prog.lpState);
+	};
+
+	synchronizeVuThreadBeforeJitStateFreeze();
+	freezeCompiledMicroVuProgramState(microVU0);
+	freezeCompiledMicroVuProgramState(microVU1);
 	return IsOkay();
 }

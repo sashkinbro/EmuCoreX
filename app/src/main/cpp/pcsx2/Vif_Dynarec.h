@@ -5,6 +5,7 @@
 
 #include "Vif.h"
 #include "Vif_HashBucket.h"
+#include "Vif_UnpackPolicy.h"
 #include "VU.h"
 
 typedef u32 (*nVifCall)(void*, const void*);
