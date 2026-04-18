@@ -13,7 +13,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "GS/MultiISA.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "Input/InputManager.h"
 #include "MTGS.h"
 #include "pcsx2/GS.h"

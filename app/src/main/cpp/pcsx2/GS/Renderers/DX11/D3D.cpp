@@ -5,7 +5,7 @@
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/DX11/D3D.h"
 #include "GS/GSExtra.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #ifdef ARCH_X86
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"

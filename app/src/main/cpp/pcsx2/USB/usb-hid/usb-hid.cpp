@@ -23,7 +23,7 @@
  * THE SOFTWARE.
  */
 
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "Input/InputManager.h"
 #include "StateWrapper.h"
 #include "USB/USB.h"

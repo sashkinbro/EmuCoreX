@@ -3,7 +3,7 @@
 
 #include "USB/usb-mic/audiodev-cubeb.h"
 #include "USB/USB.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/Error.h"

@@ -26,7 +26,7 @@ BIOS
 #include "IopHw.h"
 #include "GS/Renderers/Common/GSFunctionMap.h"
 #include "GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "MTVU.h"
 #include "SPU2/spu2.h"
 #include "SaveState.h"

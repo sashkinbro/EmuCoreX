@@ -5,7 +5,7 @@
 #include "core/runtime/BuildVersion.h"
 #include "CDVD/CDVD.h"
 #include "Elfheader.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "GS/Renderers/Common/GSTexture.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiFullscreen.h"

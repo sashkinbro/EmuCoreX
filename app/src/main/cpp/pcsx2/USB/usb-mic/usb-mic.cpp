@@ -34,7 +34,7 @@
 #include "USB/usb-mic/audiodev-cubeb.h"
 #include "USB/usb-mic/audio.h"
 #include "USB/USB.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "StateWrapper.h"
 
 #include "common/Console.h"

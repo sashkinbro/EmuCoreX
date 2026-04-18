@@ -5,7 +5,7 @@
 #include "SIO/Pad/Pad.h"
 #include "SIO/Sio.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "IconsPromptFont.h"
 

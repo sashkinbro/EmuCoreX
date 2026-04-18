@@ -11,7 +11,7 @@
 #include "Config.h"
 #include "GS.h"
 #include "CDVD/CDVDcommon.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "platform/host/audio/AudioStream.h"
 #include "SIO/Memcard/MemoryCardFile.h"
 #include "SIO/Pad/Pad.h"

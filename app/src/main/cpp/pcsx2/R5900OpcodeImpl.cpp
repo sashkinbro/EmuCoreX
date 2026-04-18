@@ -11,7 +11,7 @@
 #include "ps2/BiosTools.h"
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/Breakpoints.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "VMManager.h"
 
 #include "fmt/format.h"

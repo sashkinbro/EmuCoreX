@@ -9,7 +9,7 @@
 #include "GS/GSVector.h"
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "IconsPromptFont.h"
 #include "ImGui/FullscreenUI.h"

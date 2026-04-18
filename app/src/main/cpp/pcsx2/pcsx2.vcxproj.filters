@@ -2283,8 +2283,8 @@
     <ClInclude Include="Input\XInputSource.h">
       <Filter>Misc\Input</Filter>
     </ClInclude>
-    <ClInclude Include="Host.h">
-      <Filter>System</Filter>
+    <ClInclude Include="platform\host\Host.h">
+      <Filter>Misc\Host</Filter>
     </ClInclude>
     <ClInclude Include="GameList.h">
       <Filter>Misc</Filter>
@@ -2374,10 +2374,10 @@
     <ClInclude Include="USB\usb-eyetoy\cam-jpeg.h">
       <Filter>System\Ps2\USB\usb-eyetoy</Filter>
     </ClInclude>
-    <ClInclude Include="Host\AudioStream.h">
+    <ClInclude Include="platform\host\audio\AudioStream.h">
       <Filter>Misc\Host</Filter>
     </ClInclude>
-    <ClInclude Include="Host\AudioStreamTypes.h">
+    <ClInclude Include="platform\host\audio\AudioStreamTypes.h">
       <Filter>Misc\Host</Filter>
     </ClInclude>
     <ClInclude Include="CDVD\BlockdumpFileReader.h">

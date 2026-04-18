@@ -5,7 +5,7 @@
 #include "Gif_Unit.h"
 #include "MTGS.h"
 #include "MTVU.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "VMManager.h"
 

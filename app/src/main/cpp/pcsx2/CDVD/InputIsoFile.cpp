@@ -8,7 +8,7 @@
 #include "CDVD/GzippedFileReader.h"
 #include "CDVD/IsoFileFormats.h"
 #include "Config.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Assertions.h"
 #include "common/Console.h"

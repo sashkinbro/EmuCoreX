@@ -21,7 +21,7 @@
 #include "sockets.h"
 #include "AdapterUtils.h"
 #include "DEV9.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "Sessions/ICMP_Session/ICMP_Session.h"
 #include "Sessions/TCP_Session/TCP_Session.h"

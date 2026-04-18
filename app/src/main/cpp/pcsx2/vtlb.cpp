@@ -22,7 +22,7 @@
 #include "COP0.h"
 #include "Cache.h"
 #include "IopMem.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "VMManager.h"
 
 #include "common/BitUtils.h"

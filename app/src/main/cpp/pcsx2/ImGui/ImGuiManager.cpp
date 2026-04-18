@@ -5,7 +5,7 @@
 #include "Config.h"
 #include "Counters.h"
 #include "GS/GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiFullscreen.h"

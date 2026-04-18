@@ -13,7 +13,7 @@
 #include "GS/GSLzma.h"
 #include "GS/GSExtra.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include <Alloc.h>
 #include <7zCrc.h>

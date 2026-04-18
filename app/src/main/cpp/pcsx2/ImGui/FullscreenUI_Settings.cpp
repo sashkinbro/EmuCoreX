@@ -6,7 +6,7 @@
 #include "GS/GSUtil.h"
 #include "Achievements.h"
 #include "core/runtime/GameList.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "platform/host/audio/AudioStream.h"
 #include "core/runtime/settings/INISettingsInterface.h"
 #include "ImGui/FullscreenUI_Internal.h"

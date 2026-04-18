@@ -16,7 +16,7 @@
 #include "GSDumpReplayer.h"
 #include "core/runtime/GameDatabase.h"
 #include "core/runtime/GameList.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "core/runtime/settings/INISettingsInterface.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiOverlays.h"

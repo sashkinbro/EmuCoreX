@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Input/InputSource.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/StringUtil.h"
 

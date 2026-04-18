@@ -7,7 +7,7 @@
 #include "USB/qemu-usb/USBinternal.h"
 #include "USB/usb-pad/usb-pad-sdl-ff.h"
 #include "USB/USB.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "StateWrapper.h"
 
 #include "common/Console.h"

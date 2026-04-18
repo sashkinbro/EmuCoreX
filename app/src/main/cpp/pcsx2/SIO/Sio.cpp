@@ -7,7 +7,7 @@
 #include "SIO/Memcard/MemoryCardProtocol.h"
 #include "Counters.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsPromptFont.h"
 
 #include <atomic>

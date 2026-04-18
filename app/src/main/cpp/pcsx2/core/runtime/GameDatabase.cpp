@@ -3,7 +3,7 @@
 
 #include "core/runtime/GameDatabase.h"
 #include "GS/GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "vtlb.h"
 

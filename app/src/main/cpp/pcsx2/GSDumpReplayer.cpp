@@ -7,7 +7,7 @@
 #include "core/runtime/GameList.h"
 #include "Gif.h"
 #include "Gif_Unit.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "ImGui/ImGuiManager.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "R3000A.h"

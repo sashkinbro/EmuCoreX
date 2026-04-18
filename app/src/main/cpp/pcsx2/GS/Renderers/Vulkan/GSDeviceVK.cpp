@@ -13,7 +13,7 @@
 #include "GS/Renderers/Common/GSDevice.h"
 
 #include "core/runtime/BuildVersion.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Console.h"
 #include "common/BitUtils.h"

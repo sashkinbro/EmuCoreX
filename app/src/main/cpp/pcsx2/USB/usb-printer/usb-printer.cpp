@@ -13,7 +13,7 @@
 #include "Config.h"
 #include "fmt/format.h"
 #include "StateWrapper.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 
 namespace usb_printer

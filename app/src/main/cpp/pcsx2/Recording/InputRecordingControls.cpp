@@ -8,7 +8,7 @@
 #include "InputRecordingControls.h"
 #include "Utilities/InputRecordingLogger.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "MTGS.h"
 #include "VMManager.h"
 

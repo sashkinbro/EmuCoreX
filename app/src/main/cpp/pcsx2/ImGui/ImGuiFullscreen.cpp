@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "fmt/format.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/Common/GSTexture.h"
 #include "ImGui/FullscreenUI.h"

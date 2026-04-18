@@ -8,7 +8,7 @@
 #include "IconsPromptFont.h"
 #include "IconsFontAwesome.h"
 #include "GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "fmt/format.h"
 

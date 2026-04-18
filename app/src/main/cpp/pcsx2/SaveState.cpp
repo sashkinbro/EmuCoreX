@@ -13,7 +13,7 @@
 #include "Elfheader.h"
 #include "GS.h"
 #include "GS/GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "MTGS.h"
 #include "MTVU.h"
 #include "Patch.h"

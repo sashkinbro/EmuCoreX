@@ -10,7 +10,7 @@
 #include "GS.h" // Required for gsNonMirroredRead()
 #include "Counters.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "R3000A.h"
 #include "IopMem.h"
 #include "VMManager.h"

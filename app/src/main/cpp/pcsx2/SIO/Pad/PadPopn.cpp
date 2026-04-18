@@ -8,7 +8,7 @@
 
 #include "Common.h"
 #include "Input/InputManager.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "IconsPromptFont.h"
 

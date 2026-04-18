@@ -13,7 +13,7 @@
 #include "Achievements.h"
 #include "Config.h"
 #include "core/runtime/GameDatabase.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IopMem.h"
 #include "Memory.h"
 #include "Patch.h"

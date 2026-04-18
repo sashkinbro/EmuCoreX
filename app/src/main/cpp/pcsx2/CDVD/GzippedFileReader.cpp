@@ -3,7 +3,7 @@
 
 #include "Config.h"
 #include "GzippedFileReader.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "CDVD/zlib_indexed.h"
 
 #include "common/Console.h"

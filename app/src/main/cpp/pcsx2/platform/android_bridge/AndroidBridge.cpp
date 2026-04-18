@@ -37,7 +37,7 @@
 #include "Input/InputManager.h"
 #include "ImGui/ImGuiFullscreen.h"
 #include "Achievements.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "ImGui/FullscreenUI.h"
 #include "SIO/Pad/PadDualshock2.h"
 #include "MTGS.h"
@@ -78,20 +78,68 @@ namespace
 		ImGuiManager::SetFonts({font_info});
 	}
 
-	static jclass s_native_app_class = nullptr;
-	static jmethodID s_on_pad_vibration = nullptr;
-    static jmethodID s_native_ensure_resource_dir = nullptr;
-	static jmethodID s_native_open_content_uri = nullptr;
-    static jmethodID s_native_log_method = nullptr;
-    static jmethodID s_on_performance_metrics = nullptr;
-	static std::chrono::steady_clock::time_point s_last_fps_sample_time{};
+	struct NativeAppBridgeCache
+	{
+		jclass app_class = nullptr;
+		jmethodID on_pad_vibration = nullptr;
+		jmethodID ensure_resource_dir = nullptr;
+		jmethodID open_content_uri = nullptr;
+		jmethodID native_log = nullptr;
+		jmethodID on_performance_metrics = nullptr;
+		std::chrono::steady_clock::time_point last_fps_sample_time{};
+	};
 
-	static jclass s_ra_bridge_class = nullptr;
-	static jmethodID s_ra_notify_login_requested = nullptr;
-	static jmethodID s_ra_notify_login_success = nullptr;
-	static jmethodID s_ra_notify_state_changed = nullptr;
-	static jmethodID s_ra_notify_hardcore_changed = nullptr;
-    static std::mutex s_ra_bridge_mutex;
+	struct RetroAchievementsBridgeCache
+	{
+		jclass bridge_class = nullptr;
+		jmethodID notify_login_requested = nullptr;
+		jmethodID notify_login_success = nullptr;
+		jmethodID notify_state_changed = nullptr;
+		jmethodID notify_hardcore_changed = nullptr;
+		std::mutex mutex;
+	};
+
+	static NativeAppBridgeCache& GetNativeAppBridgeCache()
+	{
+		static NativeAppBridgeCache s_native_app_bridge_cache;
+		return s_native_app_bridge_cache;
+	}
+
+	static RetroAchievementsBridgeCache& GetRetroAchievementsBridgeCache()
+	{
+		static RetroAchievementsBridgeCache s_ra_bridge_cache;
+		return s_ra_bridge_cache;
+	}
+
+	struct AndroidSurfaceState
+	{
+		int window_width = 0;
+		int window_height = 0;
+		ANativeWindow* window = nullptr;
+		jobject surface_object = nullptr;
+		std::mutex mutex;
+	};
+
+	struct CpuThreadBridgeState
+	{
+		bool execute_exit = false;
+		std::mutex queue_mutex;
+		std::deque<std::function<void()>> queue;
+		std::thread::id thread_id;
+		bool active = false;
+	};
+
+	static AndroidSurfaceState& GetAndroidSurfaceState()
+	{
+		static AndroidSurfaceState s_android_surface_state;
+		return s_android_surface_state;
+	}
+
+	static CpuThreadBridgeState& GetCpuThreadBridgeState()
+	{
+		static CpuThreadBridgeState s_cpu_thread_bridge_state;
+		return s_cpu_thread_bridge_state;
+	}
 
 	static void ClearJNIExceptions(JNIEnv* env)
 	{
@@ -476,10 +524,12 @@ namespace
 
     static bool EnsureNativeAppMethods(JNIEnv* env)
     {
+        NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
+
         if (!env)
             return false;
 
-        if (!s_native_app_class)
+        if (!native_app_bridge.app_class)
         {
             jclass local = env->FindClass("com/sbro/emucorex/core/NativeApp");
             if (!local)
@@ -488,37 +538,43 @@ namespace
                 return false;
             }
 
-            s_native_app_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
+            native_app_bridge.app_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
             env->DeleteLocalRef(local);
-            if (!s_native_app_class)
+            if (!native_app_bridge.app_class)
             {
                 ClearJNIExceptions(env);
                 return false;
             }
         }
 
-        if (!s_on_pad_vibration)
-            s_on_pad_vibration = env->GetStaticMethodID(s_native_app_class, "onPadVibration", "(IFF)V");
+        if (!native_app_bridge.on_pad_vibration)
+            native_app_bridge.on_pad_vibration =
+                env->GetStaticMethodID(native_app_bridge.app_class, "onPadVibration", "(IFF)V");
 
-        if (!s_native_ensure_resource_dir)
-            s_native_ensure_resource_dir = env->GetStaticMethodID(
-                s_native_app_class, "ensureResourceSubdirectoryCopied", "(Ljava/lang/String;)V");
+        if (!native_app_bridge.ensure_resource_dir)
+            native_app_bridge.ensure_resource_dir = env->GetStaticMethodID(
+                native_app_bridge.app_class, "ensureResourceSubdirectoryCopied", "(Ljava/lang/String;)V");
 
-        if (!s_native_log_method)
-            s_native_log_method = env->GetStaticMethodID(s_native_app_class, "nativeLog", "(Ljava/lang/String;)V");
+        if (!native_app_bridge.native_log)
+            native_app_bridge.native_log =
+                env->GetStaticMethodID(native_app_bridge.app_class, "nativeLog", "(Ljava/lang/String;)V");
 
-        if (!s_native_open_content_uri)
-            s_native_open_content_uri = env->GetStaticMethodID(s_native_app_class, "openContentUri", "(Ljava/lang/String;)I");
+        if (!native_app_bridge.open_content_uri)
+            native_app_bridge.open_content_uri =
+                env->GetStaticMethodID(native_app_bridge.app_class, "openContentUri", "(Ljava/lang/String;)I");
 
-        if (!s_on_performance_metrics)
-            s_on_performance_metrics = env->GetStaticMethodID(s_native_app_class, "onPerformanceMetrics", "(Ljava/lang/String;FF)V");
+        if (!native_app_bridge.on_performance_metrics)
+            native_app_bridge.on_performance_metrics =
+                env->GetStaticMethodID(native_app_bridge.app_class, "onPerformanceMetrics", "(Ljava/lang/String;FF)V");
 
         ClearJNIExceptions(env);
-        return s_native_app_class != nullptr;
+        return native_app_bridge.app_class != nullptr;
     }
 
     static void NativeLogCallback(LOGLEVEL level, ConsoleColors color, std::string_view message)
     {
+        NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
+
         int android_level = ANDROID_LOG_DEBUG;
         switch (level)
         {
@@ -546,44 +602,46 @@ namespace
             static_cast<int>(message.size()), message.data());
 
         auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-        if (!env || !s_native_app_class || !s_native_log_method)
+        if (!env || !native_app_bridge.app_class || !native_app_bridge.native_log)
             return;
 
         jstring j_msg = env->NewStringUTF(std::string(message).c_str());
-        env->CallStaticVoidMethod(s_native_app_class, s_native_log_method, j_msg);
+        env->CallStaticVoidMethod(native_app_bridge.app_class, native_app_bridge.native_log, j_msg);
         env->DeleteLocalRef(j_msg);
         ClearJNIExceptions(env);
     }
 
 	static bool EnsureRetroAchievementsBridge(JNIEnv* env)
 	{
+		RetroAchievementsBridgeCache& ra_bridge = GetRetroAchievementsBridgeCache();
+
 		if (!env)
 			return false;
 
-        std::lock_guard<std::mutex> lock(s_ra_bridge_mutex);
-        if (!s_ra_bridge_class)
+        std::lock_guard<std::mutex> lock(ra_bridge.mutex);
+        if (!ra_bridge.bridge_class)
 		{
 			jclass local = env->FindClass("com/sbro/emucorex/core/utils/RetroAchievementsBridge");
 			if (!local)
 				return false;
 
-			s_ra_bridge_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
+			ra_bridge.bridge_class = reinterpret_cast<jclass>(env->NewGlobalRef(local));
 			env->DeleteLocalRef(local);
-			if (!s_ra_bridge_class)
+			if (!ra_bridge.bridge_class)
 				return false;
 
-			s_ra_notify_login_requested =
-				env->GetStaticMethodID(s_ra_bridge_class, "notifyLoginRequested", "(I)V");
-			s_ra_notify_login_success =
-				env->GetStaticMethodID(s_ra_bridge_class, "notifyLoginSuccess", "(Ljava/lang/String;III)V");
-			s_ra_notify_state_changed = env->GetStaticMethodID(
-				s_ra_bridge_class, "notifyStateChanged",
+			ra_bridge.notify_login_requested =
+				env->GetStaticMethodID(ra_bridge.bridge_class, "notifyLoginRequested", "(I)V");
+			ra_bridge.notify_login_success =
+				env->GetStaticMethodID(ra_bridge.bridge_class, "notifyLoginSuccess", "(Ljava/lang/String;III)V");
+			ra_bridge.notify_state_changed = env->GetStaticMethodID(
+				ra_bridge.bridge_class, "notifyStateChanged",
 				"(ZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIZZZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIZZZ)V");
-			s_ra_notify_hardcore_changed =
-				env->GetStaticMethodID(s_ra_bridge_class, "notifyHardcoreModeChanged", "(Z)V");
+			ra_bridge.notify_hardcore_changed =
+				env->GetStaticMethodID(ra_bridge.bridge_class, "notifyHardcoreModeChanged", "(Z)V");
 
-			if (!s_ra_notify_login_requested || !s_ra_notify_login_success || !s_ra_notify_state_changed ||
-				!s_ra_notify_hardcore_changed)
+			if (!ra_bridge.notify_login_requested || !ra_bridge.notify_login_success ||
+				!ra_bridge.notify_state_changed || !ra_bridge.notify_hardcore_changed)
 			{
 				return false;
 			}
@@ -594,6 +652,7 @@ namespace
 
 	static void NotifyRetroAchievementsState()
 	{
+		RetroAchievementsBridgeCache& ra_bridge = GetRetroAchievementsBridgeCache();
         auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
         if (!env)
             return;
@@ -640,7 +699,7 @@ namespace
 			nullptr;
 
 		env->CallStaticVoidMethod(
-			s_ra_bridge_class, s_ra_notify_state_changed,
+			ra_bridge.bridge_class, ra_bridge.notify_state_changed,
 			achievements_enabled ? JNI_TRUE : JNI_FALSE,
 			have_user ? JNI_TRUE : JNI_FALSE,
 			j_username,
@@ -685,16 +744,17 @@ namespace Host::Internal
 {
 void EnsureAndroidResourceSubdirCopied(const char* relative_path)
 {
+    NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
     if (!env)
         return;
 
-    if (!EnsureNativeAppMethods(env) || !s_native_ensure_resource_dir)
+    if (!EnsureNativeAppMethods(env) || !native_app_bridge.ensure_resource_dir)
         return;
 
     const char* safe_path = relative_path ? relative_path : "";
     jstring j_path = env->NewStringUTF(safe_path);
-    env->CallStaticVoidMethod(s_native_app_class, s_native_ensure_resource_dir, j_path);
+    env->CallStaticVoidMethod(native_app_bridge.app_class, native_app_bridge.ensure_resource_dir, j_path);
     if (j_path)
         env->DeleteLocalRef(j_path);
     ClearJNIExceptions(env);
@@ -703,62 +763,84 @@ void EnsureAndroidResourceSubdirCopied(const char* relative_path)
 
 void AndroidUpdatePadVibration(u32 pad_index, float large_intensity, float small_intensity)
 {
+    NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
     if (!env)
         return;
 
-    if (!EnsureNativeAppMethods(env) || !s_on_pad_vibration)
+    if (!EnsureNativeAppMethods(env) || !native_app_bridge.on_pad_vibration)
         return;
 
-    env->CallStaticVoidMethod(s_native_app_class, s_on_pad_vibration, static_cast<jint>(pad_index),
+    env->CallStaticVoidMethod(native_app_bridge.app_class, native_app_bridge.on_pad_vibration, static_cast<jint>(pad_index),
                               static_cast<jfloat>(large_intensity), static_cast<jfloat>(small_intensity));
 }
 
+struct AndroidSettingsBridgeState
+{
+    std::unique_ptr<INISettingsInterface> interface;
+    u32 batch_depth = 0;
+    bool batch_dirty = false;
+    bool batch_folders_dirty = false;
+};
 
-bool s_execute_exit;
-int s_window_width = 0;
-int s_window_height = 0;
-ANativeWindow* s_window = nullptr;
-static jobject s_surface_object = nullptr;
-static std::mutex s_surface_mutex;
-static std::mutex s_cpu_thread_queue_mutex;
-static std::deque<std::function<void()>> s_cpu_thread_queue;
-static std::thread::id s_cpu_thread_id;
-static bool s_cpu_thread_active = false;
+static AndroidSettingsBridgeState& GetAndroidSettingsBridgeState()
+{
+    static AndroidSettingsBridgeState s_android_settings_bridge_state;
+    return s_android_settings_bridge_state;
+}
 
-static std::unique_ptr<INISettingsInterface> s_settings_interface;
-static u32 s_settings_batch_depth = 0;
-static bool s_settings_batch_dirty = false;
-static bool s_settings_batch_folders_dirty = false;
+static std::unique_ptr<INISettingsInterface>& GetSettingsInterfaceStorage()
+{
+    return GetAndroidSettingsBridgeState().interface;
+}
+
+static u32& GetSettingsBatchDepth()
+{
+    return GetAndroidSettingsBridgeState().batch_depth;
+}
+
+static bool& GetSettingsBatchDirty()
+{
+    return GetAndroidSettingsBridgeState().batch_dirty;
+}
+
+static bool& GetSettingsBatchFoldersDirty()
+{
+    return GetAndroidSettingsBridgeState().batch_folders_dirty;
+}
 
 static bool IsOnCPUThread()
 {
-    std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-    return s_cpu_thread_active && s_cpu_thread_id == std::this_thread::get_id();
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
+    std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+    return cpu_thread_state.active && cpu_thread_state.thread_id == std::this_thread::get_id();
 }
 
 static void SetCPUThreadActive(bool active)
 {
-    std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-    s_cpu_thread_active = active;
-    s_cpu_thread_id = active ? std::this_thread::get_id() : std::thread::id();
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
+    std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+    cpu_thread_state.active = active;
+    cpu_thread_state.thread_id = active ? std::this_thread::get_id() : std::thread::id();
 }
 
 static void QueueCPUThreadWork(std::function<void()> function)
 {
-    std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-    s_cpu_thread_queue.emplace_back(std::move(function));
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
+    std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+    cpu_thread_state.queue.emplace_back(std::move(function));
 }
 
 static void DrainCPUThreadQueue()
 {
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
     std::deque<std::function<void()>> pending;
     {
-        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-        if (s_cpu_thread_queue.empty())
+        std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+        if (cpu_thread_state.queue.empty())
             return;
 
-        pending.swap(s_cpu_thread_queue);
+        pending.swap(cpu_thread_state.queue);
     }
 
     while (!pending.empty())
@@ -797,10 +879,10 @@ static void ApplySettingsForRuntimeChange()
 
 static void FlushPendingSettingsChanges()
 {
-    if (!s_settings_interface)
+    if (!GetSettingsInterfaceStorage())
         return;
 
-    if (s_settings_batch_dirty)
+    if (GetSettingsBatchDirty())
     {
         // Cold-boot startup writes can touch dozens of settings at once. Deferring the actual
         // ApplySettings() until the VM boot path avoids an extra pre-boot reconfigure pass
@@ -808,7 +890,7 @@ static void FlushPendingSettingsChanges()
         if (VMManager::HasValidVM())
             ApplySettingsForRuntimeChange();
 
-        if (s_settings_batch_folders_dirty)
+        if (GetSettingsBatchFoldersDirty())
         {
             if (VMManager::HasValidVM())
                 Host::RunOnCPUThread(&VMManager::Internal::UpdateEmuFolders);
@@ -816,11 +898,11 @@ static void FlushPendingSettingsChanges()
                 VMManager::Internal::UpdateEmuFolders();
         }
 
-        s_settings_interface->Save();
+        GetSettingsInterfaceStorage()->Save();
     }
 
-    s_settings_batch_dirty = false;
-    s_settings_batch_folders_dirty = false;
+    GetSettingsBatchDirty() = false;
+    GetSettingsBatchFoldersDirty() = false;
 }
 
 static void RunGSRuntimeChange(std::function<void()> function, bool apply_settings = true)
@@ -956,9 +1038,9 @@ static T RunOnCPUThreadBlocking(T fallback_value, std::function<T()> function)
 
 static bool IsFullscreenUIEnabled()
 {
-    if (!s_settings_interface)
+    if (!GetSettingsInterfaceStorage())
         return false;
-    return s_settings_interface->GetBoolValue("UI", "EnableFullscreenUI", false);
+    return GetSettingsInterfaceStorage()->GetBoolValue("UI", "EnableFullscreenUI", false);
 }
 
 ////
@@ -1021,102 +1103,102 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
     ConfigureAndroidImGuiFonts();
 
     Log::SetConsoleOutputLevel(LOGLEVEL_DEBUG);
-    if (!s_settings_interface)
+    if (!GetSettingsInterfaceStorage())
     {
         const std::string ini_path = EmuFolders::DataRoot + "/PCSX2-Android.ini";
-        s_settings_interface = std::make_unique<INISettingsInterface>(ini_path);
-        Host::Internal::SetBaseSettingsLayer(s_settings_interface.get());
-        s_settings_interface->Load();
-        if (s_settings_interface->IsEmpty())
+        GetSettingsInterfaceStorage() = std::make_unique<INISettingsInterface>(ini_path);
+        Host::Internal::SetBaseSettingsLayer(GetSettingsInterfaceStorage().get());
+        GetSettingsInterfaceStorage()->Load();
+        if (GetSettingsInterfaceStorage()->IsEmpty())
         {
-            VMManager::SetDefaultSettings(*s_settings_interface, true, true, true, true, true);
-            s_settings_interface->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
-            s_settings_interface->SetIntValue("EmuCore/GS", "VsyncEnable", false);
-            s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
-            s_settings_interface->SetBoolValue("InputSources", "SDL", true);
-            s_settings_interface->SetBoolValue("InputSources", "XInput", false);
-            s_settings_interface->SetBoolValue("Logging", "EnableSystemConsole", true);
-            s_settings_interface->SetBoolValue("Logging", "EnableTimestamps", true);
-            s_settings_interface->SetBoolValue("Logging", "EnableVerbose", false);
-            s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
-            s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowResolution", false);
-            s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
-            s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
-            s_settings_interface->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0); 
-            ApplyAndroidGsBootstrapDefaults(*s_settings_interface, false);
-            s_settings_interface->SetBoolValue("UI", "EnableFullscreenUI", false);
-            s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
-            s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
-            s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
-            s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
-            NormalizeMandatoryFixSettings(*s_settings_interface);
-            s_settings_interface->Save();
+            VMManager::SetDefaultSettings(*GetSettingsInterfaceStorage(), true, true, true, true, true);
+            GetSettingsInterfaceStorage()->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
+            GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "VsyncEnable", false);
+            GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
+            GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "SDL", true);
+            GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "XInput", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableSystemConsole", true);
+            GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableTimestamps", true);
+            GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableVerbose", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowResolution", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
+            GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0); 
+            ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
+            GetSettingsInterfaceStorage()->SetBoolValue("UI", "EnableFullscreenUI", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+            GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "ChallengeMode", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "AndroidMigrationV1", true);
+            NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
+            GetSettingsInterfaceStorage()->Save();
         }
         else
         {
             bool needs_save = false;
-            if (!s_settings_interface->GetBoolValue("Achievements", "AndroidMigrationV1", false))
+            if (!GetSettingsInterfaceStorage()->GetBoolValue("Achievements", "AndroidMigrationV1", false))
             {
-                if (!s_settings_interface->ContainsValue("Achievements", "Enabled"))
-                    s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
-                s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
+                if (!GetSettingsInterfaceStorage()->ContainsValue("Achievements", "Enabled"))
+                    GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
+                GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "AndroidMigrationV1", true);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("Achievements", "ChallengeMode"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("Achievements", "ChallengeMode"))
             {
-                s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
+                GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "ChallengeMode", false);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("UI", "ExpandIntoDisplayCutout"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "ExpandIntoDisplayCutout"))
             {
-                s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+                GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("SPU2/Output", "Backend"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "Backend"))
             {
-                s_settings_interface->SetStringValue(
+                GetSettingsInterfaceStorage()->SetStringValue(
                     "SPU2/Output", "Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND));
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("SPU2/Output", "SyncMode"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "SyncMode"))
             {
-                s_settings_interface->SetStringValue(
+                GetSettingsInterfaceStorage()->SetStringValue(
                     "SPU2/Output", "SyncMode", Pcsx2Config::SPU2Options::GetSyncModeName(Pcsx2Config::SPU2Options::DEFAULT_SYNC_MODE));
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("SPU2/Output", "BufferMS"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "BufferMS"))
             {
-                s_settings_interface->SetUIntValue(
+                GetSettingsInterfaceStorage()->SetUIntValue(
                     "SPU2/Output", "BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("SPU2/Output", "OutputLatencyMS"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMS"))
             {
-                s_settings_interface->SetUIntValue(
+                GetSettingsInterfaceStorage()->SetUIntValue(
                     "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
             {
-                s_settings_interface->SetBoolValue(
+                GetSettingsInterfaceStorage()->SetBoolValue(
                     "SPU2/Output", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL);
                 needs_save = true;
             }
-            if (!s_settings_interface->ContainsValue("UI", "PreferEnglishGameTitles"))
+            if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "PreferEnglishGameTitles"))
             {
-                s_settings_interface->SetBoolValue("UI", "PreferEnglishGameTitles", false);
+                GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);
                 needs_save = true;
             }
-            needs_save |= ApplyAndroidGsBootstrapDefaults(*s_settings_interface, true);
-            needs_save |= SyncManualGsHackToggle(*s_settings_interface);
-            needs_save |= NormalizeMandatoryFixSettings(*s_settings_interface);
+            needs_save |= ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
+            needs_save |= SyncManualGsHackToggle(*GetSettingsInterfaceStorage());
+            needs_save |= NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
             if (needs_save)
-                s_settings_interface->Save();
+                GetSettingsInterfaceStorage()->Save();
         }
     }
     VMManager::Internal::LoadStartupSettings();
-    if (s_settings_interface)
-        s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
+    if (GetSettingsInterfaceStorage())
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
     VMManager::ApplySettings();
     GSConfig.OsdPerformancePos = EmuConfig.GS.OsdPerformancePos;
     if (MTGS::IsOpen()) MTGS::ApplySettings();
@@ -1153,99 +1235,99 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
     ConfigureAndroidImGuiFonts();
 
     Log::SetConsoleOutputLevel(LOGLEVEL_DEBUG);
-    if (s_settings_interface)
-        s_settings_interface->Save();
-    s_settings_interface.reset();
+    if (GetSettingsInterfaceStorage())
+        GetSettingsInterfaceStorage()->Save();
+    GetSettingsInterfaceStorage().reset();
 
     const std::string ini_path = EmuFolders::DataRoot + "/PCSX2-Android.ini";
-    s_settings_interface = std::make_unique<INISettingsInterface>(ini_path);
-    Host::Internal::SetBaseSettingsLayer(s_settings_interface.get());
-    s_settings_interface->Load();
-    if (s_settings_interface->IsEmpty())
+    GetSettingsInterfaceStorage() = std::make_unique<INISettingsInterface>(ini_path);
+    Host::Internal::SetBaseSettingsLayer(GetSettingsInterfaceStorage().get());
+    GetSettingsInterfaceStorage()->Load();
+    if (GetSettingsInterfaceStorage()->IsEmpty())
     {
-            VMManager::SetDefaultSettings(*s_settings_interface, true, true, true, true, true);
-        s_settings_interface->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
-        s_settings_interface->SetIntValue("EmuCore/GS", "VsyncEnable", false);
-        s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
-        s_settings_interface->SetBoolValue("InputSources", "SDL", true);
-        s_settings_interface->SetBoolValue("InputSources", "XInput", false);
-        s_settings_interface->SetBoolValue("Logging", "EnableSystemConsole", true);
-        s_settings_interface->SetBoolValue("Logging", "EnableTimestamps", true);
-        s_settings_interface->SetBoolValue("Logging", "EnableVerbose", false);
-        s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
-        s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowResolution", false);
-        s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
-        s_settings_interface->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
-        s_settings_interface->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0);
-        ApplyAndroidGsBootstrapDefaults(*s_settings_interface, false);
-        s_settings_interface->SetBoolValue("UI", "EnableFullscreenUI", false);
-        s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
-        s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
-        s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
-        s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
-        NormalizeMandatoryFixSettings(*s_settings_interface);
-        s_settings_interface->Save();
+            VMManager::SetDefaultSettings(*GetSettingsInterfaceStorage(), true, true, true, true, true);
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore", "EnableDiscordPresence", true);
+        GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "VsyncEnable", false);
+        GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::OGL));
+        GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "SDL", true);
+        GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "XInput", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableSystemConsole", true);
+        GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableTimestamps", true);
+        GetSettingsInterfaceStorage()->SetBoolValue("Logging", "EnableVerbose", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowFPS", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowResolution", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowGSStats", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
+        GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0);
+        ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
+        GetSettingsInterfaceStorage()->SetBoolValue("UI", "EnableFullscreenUI", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+        GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "ChallengeMode", false);
+        GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "AndroidMigrationV1", true);
+        NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
+        GetSettingsInterfaceStorage()->Save();
     }
     else
     {
         bool needs_save = false;
-        if (!s_settings_interface->GetBoolValue("Achievements", "AndroidMigrationV1", false))
+        if (!GetSettingsInterfaceStorage()->GetBoolValue("Achievements", "AndroidMigrationV1", false))
         {
-            if (!s_settings_interface->ContainsValue("Achievements", "Enabled"))
-                s_settings_interface->SetBoolValue("Achievements", "Enabled", false);
-            s_settings_interface->SetBoolValue("Achievements", "AndroidMigrationV1", true);
+            if (!GetSettingsInterfaceStorage()->ContainsValue("Achievements", "Enabled"))
+                GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "AndroidMigrationV1", true);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("Achievements", "ChallengeMode"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("Achievements", "ChallengeMode"))
         {
-            s_settings_interface->SetBoolValue("Achievements", "ChallengeMode", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "ChallengeMode", false);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("UI", "ExpandIntoDisplayCutout"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "ExpandIntoDisplayCutout"))
         {
-            s_settings_interface->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
+            GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("SPU2/Output", "Backend"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "Backend"))
         {
-            s_settings_interface->SetStringValue(
+            GetSettingsInterfaceStorage()->SetStringValue(
                 "SPU2/Output", "Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND));
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("SPU2/Output", "SyncMode"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "SyncMode"))
         {
-            s_settings_interface->SetStringValue(
+            GetSettingsInterfaceStorage()->SetStringValue(
                 "SPU2/Output", "SyncMode", Pcsx2Config::SPU2Options::GetSyncModeName(Pcsx2Config::SPU2Options::DEFAULT_SYNC_MODE));
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("SPU2/Output", "BufferMS"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "BufferMS"))
         {
-            s_settings_interface->SetUIntValue(
+            GetSettingsInterfaceStorage()->SetUIntValue(
                 "SPU2/Output", "BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("SPU2/Output", "OutputLatencyMS"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMS"))
         {
-            s_settings_interface->SetUIntValue(
+            GetSettingsInterfaceStorage()->SetUIntValue(
                 "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
         {
-            s_settings_interface->SetBoolValue(
+            GetSettingsInterfaceStorage()->SetBoolValue(
                 "SPU2/Output", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL);
             needs_save = true;
         }
-        if (!s_settings_interface->ContainsValue("UI", "PreferEnglishGameTitles"))
+        if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "PreferEnglishGameTitles"))
         {
-            s_settings_interface->SetBoolValue("UI", "PreferEnglishGameTitles", false);
+            GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);
             needs_save = true;
         }
-        needs_save |= ApplyAndroidGsBootstrapDefaults(*s_settings_interface, true);
-        needs_save |= SyncManualGsHackToggle(*s_settings_interface);
-        needs_save |= NormalizeMandatoryFixSettings(*s_settings_interface);
+        needs_save |= ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
+        needs_save |= SyncManualGsHackToggle(*GetSettingsInterfaceStorage());
+        needs_save |= NormalizeMandatoryFixSettings(*GetSettingsInterfaceStorage());
         if (needs_save)
-            s_settings_interface->Save();
+            GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1433,9 +1515,9 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_setPadVibration(JNIEnv *env, jclass clazz,
                                                      jboolean p_enabled) {
-    if (s_settings_interface) {
-        s_settings_interface->SetBoolValue("InputSources", "PadVibration", p_enabled == JNI_TRUE);
-        s_settings_interface->Save();
+    if (GetSettingsInterfaceStorage()) {
+        GetSettingsInterfaceStorage()->SetBoolValue("InputSources", "PadVibration", p_enabled == JNI_TRUE);
+        GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1452,15 +1534,15 @@ Java_com_sbro_emucorex_core_NativeApp_setAspectRatio(JNIEnv *env, jclass clazz,
         EmuConfig.CurrentAspectRatio = static_cast<AspectRatioType>(p_type);
         EmuConfig.CurrentCustomAspectRatio = 0.0f;
     });
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
         const auto aspect_ratio_index = static_cast<size_t>(p_type);
         const char* aspect_ratio_name =
             (aspect_ratio_index < static_cast<size_t>(AspectRatioType::MaxCount))
                 ? Pcsx2Config::GSOptions::AspectRatioNames[aspect_ratio_index]
                 : Pcsx2Config::GSOptions::AspectRatioNames[static_cast<size_t>(AspectRatioType::RAuto4_3_3_2)];
-        s_settings_interface->SetStringValue("EmuCore/GS", "AspectRatio", aspect_ratio_name);
-        s_settings_interface->Save();
+        GetSettingsInterfaceStorage()->SetStringValue("EmuCore/GS", "AspectRatio", aspect_ratio_name);
+        GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1473,10 +1555,10 @@ Java_com_sbro_emucorex_core_NativeApp_renderUpscalemultiplier(JNIEnv *env, jclas
         EmuConfig.GS.UpscaleMultiplier = normalized_value;
         GSConfig.UpscaleMultiplier = normalized_value;
     });
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
-        s_settings_interface->SetFloatValue("EmuCore/GS", "upscale_multiplier", normalized_value);
-        s_settings_interface->Save();
+        GetSettingsInterfaceStorage()->SetFloatValue("EmuCore/GS", "upscale_multiplier", normalized_value);
+        GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1625,10 +1707,10 @@ Java_com_sbro_emucorex_core_NativeApp_renderPreloading(JNIEnv *env, jclass clazz
         GSConfig.TexturePreloading = level;
     });
 
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
-        s_settings_interface->SetIntValue("EmuCore/GS", "texture_preloading", clamped);
-        s_settings_interface->Save();
+        GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "texture_preloading", clamped);
+        GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1640,10 +1722,10 @@ Java_com_sbro_emucorex_core_NativeApp_renderGpu(JNIEnv *env, jclass clazz,
         EmuConfig.GS.Renderer = static_cast<GSRendererType>(p_value);
         GSConfig.Renderer = static_cast<GSRendererType>(p_value);
     });
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
-        s_settings_interface->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(p_value));
-        s_settings_interface->Save();
+        GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(p_value));
+        GetSettingsInterfaceStorage()->Save();
     }
 }
 
@@ -1661,13 +1743,13 @@ Java_com_sbro_emucorex_core_NativeApp_setCustomDriverPath(JNIEnv *env, jclass cl
         GSConfig.CustomDriverPath = driver_path;
     }, false);
 
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
         if (driver_path.empty())
-            s_settings_interface->DeleteValue("EmuCore/GS", "CustomDriverPath");
+            GetSettingsInterfaceStorage()->DeleteValue("EmuCore/GS", "CustomDriverPath");
         else
-            s_settings_interface->SetStringValue("EmuCore/GS", "CustomDriverPath", driver_path.c_str());
-        s_settings_interface->Save();
+            GetSettingsInterfaceStorage()->SetStringValue("EmuCore/GS", "CustomDriverPath", driver_path.c_str());
+        GetSettingsInterfaceStorage()->Save();
     }
 
     if (old_emu_config_path != driver_path || old_gs_config_path != driver_path)
@@ -1690,9 +1772,9 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_sbro_emucorex_core_NativeApp_getCustomDriverPath(JNIEnv *env, jclass clazz) {
     std::string driver_path;
-    if (s_settings_interface)
+    if (GetSettingsInterfaceStorage())
     {
-        s_settings_interface->GetStringValue("EmuCore/GS", "CustomDriverPath", &driver_path);
+        GetSettingsInterfaceStorage()->GetStringValue("EmuCore/GS", "CustomDriverPath", &driver_path);
         EmuConfig.GS.CustomDriverPath = driver_path;
         GSConfig.CustomDriverPath = driver_path;
     }
@@ -1725,9 +1807,9 @@ Java_com_sbro_emucorex_core_NativeApp_setSetting(JNIEnv* env, jclass, jstring j_
     const std::string type = GetJavaString(env, j_type);
     std::string value = GetJavaString(env, j_value);
 
-    if (!s_settings_interface)
+    if (!GetSettingsInterfaceStorage())
         return; 
-    INISettingsInterface& si = *s_settings_interface;
+    INISettingsInterface& si = *GetSettingsInterfaceStorage();
 
     if (type == "bool")
     {
@@ -1755,10 +1837,10 @@ Java_com_sbro_emucorex_core_NativeApp_setSetting(JNIEnv* env, jclass, jstring j_
         si.SetStringValue(section.c_str(), key.c_str(), value.c_str());
     }
 
-    s_settings_batch_dirty = true;
-    s_settings_batch_folders_dirty |= (section == "Folders");
+    GetSettingsBatchDirty() = true;
+    GetSettingsBatchFoldersDirty() |= (section == "Folders");
 
-    if (s_settings_batch_depth == 0)
+    if (GetSettingsBatchDepth() == 0)
         FlushPendingSettingsChanges();
 }
 
@@ -1766,18 +1848,18 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_beginSettingsBatch(JNIEnv*, jclass)
 {
-    s_settings_batch_depth++;
+    GetSettingsBatchDepth()++;
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_endSettingsBatch(JNIEnv*, jclass)
 {
-    if (s_settings_batch_depth == 0)
+    if (GetSettingsBatchDepth() == 0)
         return;
 
-    s_settings_batch_depth--;
-    if (s_settings_batch_depth == 0)
+    GetSettingsBatchDepth()--;
+    if (GetSettingsBatchDepth() == 0)
         FlushPendingSettingsChanges();
 }
 
@@ -1792,43 +1874,43 @@ Java_com_sbro_emucorex_core_NativeApp_getSetting(JNIEnv* env, jclass, jstring j_
     if (type == "bool")
     {
         bool v = false;
-        if (s_settings_interface)
-            s_settings_interface->GetBoolValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetBoolValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(v ? "true" : "false");
     }
     else if (type == "int")
     {
         s32 v = 0;
-        if (s_settings_interface)
-            s_settings_interface->GetIntValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetIntValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(StringUtil::StdStringFromFormat("%d", v).c_str());
     }
     else if (type == "uint")
     {
         u32 v = 0;
-        if (s_settings_interface)
-            s_settings_interface->GetUIntValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetUIntValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(StringUtil::StdStringFromFormat("%u", v).c_str());
     }
     else if (type == "float")
     {
         float v = 0.0f;
-        if (s_settings_interface)
-            s_settings_interface->GetFloatValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetFloatValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(StringUtil::StdStringFromFormat("%g", v).c_str());
     }
     else if (type == "double")
     {
         double v = 0.0;
-        if (s_settings_interface)
-            s_settings_interface->GetDoubleValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetDoubleValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(StringUtil::StdStringFromFormat("%g", v).c_str());
     }
     else 
     {
         std::string v;
-        if (s_settings_interface)
-            s_settings_interface->GetStringValue(section.c_str(), key.c_str(), &v);
+        if (GetSettingsInterfaceStorage())
+            GetSettingsInterfaceStorage()->GetStringValue(section.c_str(), key.c_str(), &v);
         return env->NewStringUTF(v.c_str());
     }
 }
@@ -1844,6 +1926,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass clazz,
                                                             jobject p_surface, jint p_width, jint p_height) {
+    AndroidSurfaceState& surface_state = GetAndroidSurfaceState();
     ANativeWindow* new_window = nullptr;
     jobject new_surface = nullptr;
     if (p_surface != nullptr)
@@ -1853,23 +1936,23 @@ Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass
     }
 
     {
-        std::lock_guard<std::mutex> lock(s_surface_mutex);
-        if(s_window) {
-            ANativeWindow_release(s_window);
-            s_window = nullptr;
+        std::lock_guard<std::mutex> lock(surface_state.mutex);
+        if(surface_state.window) {
+            ANativeWindow_release(surface_state.window);
+            surface_state.window = nullptr;
         }
-        if (s_surface_object)
+        if (surface_state.surface_object)
         {
-            env->DeleteGlobalRef(s_surface_object);
-            s_surface_object = nullptr;
+            env->DeleteGlobalRef(surface_state.surface_object);
+            surface_state.surface_object = nullptr;
         }
 
-        s_window = new_window;
-        s_surface_object = new_surface;
+        surface_state.window = new_window;
+        surface_state.surface_object = new_surface;
         if (p_width > 0)
-            s_window_width = p_width;
+            surface_state.window_width = p_width;
         if (p_height > 0)
-            s_window_height = p_height;
+            surface_state.window_height = p_height;
     }
 
     if(p_width > 0 && p_height > 0) {
@@ -1884,24 +1967,26 @@ Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv *env, jclass
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv *env, jclass clazz) {
+    AndroidSurfaceState& surface_state = GetAndroidSurfaceState();
     {
-        std::lock_guard<std::mutex> lock(s_surface_mutex);
-        if(s_window) {
-            ANativeWindow_release(s_window);
-            s_window = nullptr;
+        std::lock_guard<std::mutex> lock(surface_state.mutex);
+        if(surface_state.window) {
+            ANativeWindow_release(surface_state.window);
+            surface_state.window = nullptr;
         }
-        if (s_surface_object)
+        if (surface_state.surface_object)
         {
-            env->DeleteGlobalRef(s_surface_object);
-            s_surface_object = nullptr;
+            env->DeleteGlobalRef(surface_state.surface_object);
+            surface_state.surface_object = nullptr;
         }
-        s_window_width = 0;
-        s_window_height = 0;
+        surface_state.window_width = 0;
+        surface_state.window_height = 0;
     }
 }
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
 {
+    AndroidSurfaceState& surface_state = GetAndroidSurfaceState();
     static void* s_last_logged_window = nullptr;
     static u32 s_acquire_log_count = 0;
     ANativeWindow* window = nullptr;
@@ -1909,18 +1994,18 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
     int window_height = 0;
 
     {
-        std::lock_guard<std::mutex> lock(s_surface_mutex);
-        if (recreate_window && s_surface_object)
+        std::lock_guard<std::mutex> lock(surface_state.mutex);
+        if (recreate_window && surface_state.surface_object)
         {
             JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
             if (env)
             {
-                ANativeWindow* recreated_window = ANativeWindow_fromSurface(env, s_surface_object);
+                ANativeWindow* recreated_window = ANativeWindow_fromSurface(env, surface_state.surface_object);
                 if (recreated_window)
                 {
-                    if (s_window && s_window != recreated_window)
-                        ANativeWindow_release(s_window);
-                    s_window = recreated_window;
+                    if (surface_state.window && surface_state.window != recreated_window)
+                        ANativeWindow_release(surface_state.window);
+                    surface_state.window = recreated_window;
                 }
                 else
                 {
@@ -1933,9 +2018,9 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
             }
         }
 
-        window = s_window;
-        window_width = s_window_width;
-        window_height = s_window_height;
+        window = surface_state.window;
+        window_width = surface_state.window_width;
+        window_height = surface_state.window_height;
     }
 
     float _fScale = 1.0f;
@@ -1980,6 +2065,7 @@ static u64 s_total_draws = 0;
 static u32 s_total_frames = 0;
 
 void Host::BeginPresentFrame() {
+    NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
     if (GSIsHardwareRenderer())
     {
         static constexpr auto update_stat = [](GSPerfMon::counter_t counter, u64& dst, double& last) {
@@ -1998,12 +2084,13 @@ void Host::BeginPresentFrame() {
 
     // Push metrics to Java every 500ms for both HW and SW renderers.
     const auto now = std::chrono::steady_clock::now();
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - s_last_fps_sample_time).count();
+    const auto elapsed =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - native_app_bridge.last_fps_sample_time).count();
     if (elapsed >= 500) {
-        s_last_fps_sample_time = now;
+        native_app_bridge.last_fps_sample_time = now;
 
         auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
-        if (env && s_native_app_class && s_on_performance_metrics) {
+        if (env && native_app_bridge.app_class && native_app_bridge.on_performance_metrics) {
             float fps = PerformanceMetrics::GetFPS();
             if (fps <= 0.0f) fps = PerformanceMetrics::GetInternalFPS();
             if (fps <= 0.0f && VMManager::HasValidVM())
@@ -2014,8 +2101,8 @@ void Host::BeginPresentFrame() {
             jstring overlay_text = env->NewStringUTF(overlay_text_utf8.c_str());
 
             env->CallStaticVoidMethod(
-                s_native_app_class,
-                s_on_performance_metrics,
+                native_app_bridge.app_class,
+                native_app_bridge.on_performance_metrics,
                 overlay_text,
                 fps,
                 speed
@@ -2035,13 +2122,14 @@ void Host::PumpMessagesOnCPUThread() {
 
 int FileSystem::OpenFDFileContent(const char* filename)
 {
+    NativeAppBridgeCache& native_app_bridge = GetNativeAppBridgeCache();
     auto *env = static_cast<JNIEnv *>(SDL_GetAndroidJNIEnv());
-    if(!env || !EnsureNativeAppMethods(env) || !s_native_open_content_uri) {
+    if(!env || !EnsureNativeAppMethods(env) || !native_app_bridge.open_content_uri) {
         return -1;
     }
 
     jstring j_filename = env->NewStringUTF(filename);
-    int fd = env->CallStaticIntMethod(s_native_app_class, s_native_open_content_uri, j_filename);
+    int fd = env->CallStaticIntMethod(native_app_bridge.app_class, native_app_bridge.open_content_uri, j_filename);
     env->DeleteLocalRef(j_filename);
     return fd;
 }
@@ -2124,6 +2212,7 @@ extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
                                                  jstring p_szpath) {
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
     std::string _szPath = GetJavaString(env, p_szpath);
 
     /////////////////////////////
@@ -2131,7 +2220,7 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     {
     }
 
-    s_execute_exit = false;
+    cpu_thread_state.execute_exit = false;
     SetCPUThreadActive(true);
 
 //    const char* error;
@@ -2178,9 +2267,9 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
                     logged_first_execute = true;
                     Console.WriteLn("runVMThread: first VMManager::Execute() call.");
                 }
-                s_execute_exit = false;
+                cpu_thread_state.execute_exit = false;
                 VMManager::Execute();
-                s_execute_exit = true;
+                cpu_thread_state.execute_exit = true;
             } else {
                 usleep(250000);
             }
@@ -2228,7 +2317,7 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_refreshBIOS(JNIEnv* env, jclass clazz)
 {
-    if (!s_settings_interface)
+    if (!GetSettingsInterfaceStorage())
         return;
 
     if (VMManager::HasValidVM())
@@ -2515,10 +2604,11 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetEnabled(JNIEnv* env, jclass, jboolean enabled)
 {
     (void)env;
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
     const bool enable = (enabled == JNI_TRUE);
-    const bool cpu_thread_active = []() {
-        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-        return s_cpu_thread_active;
+    const bool cpu_thread_active = [&cpu_thread_state]() {
+        std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+        return cpu_thread_state.active;
     }();
     if (!cpu_thread_active)
     {
@@ -2560,10 +2650,11 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetHardcore(JNIEnv* env, jclass, jboolean enabled)
 {
     (void)env;
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
     const bool enable = (enabled == JNI_TRUE);
-    const bool cpu_thread_active = []() {
-        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-        return s_cpu_thread_active;
+    const bool cpu_thread_active = [&cpu_thread_state]() {
+        std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+        return cpu_thread_state.active;
     }();
     if (!cpu_thread_active)
     {
@@ -2604,8 +2695,8 @@ Java_com_sbro_emucorex_core_utils_RetroAchievementsBridge_nativeSetHardcore(JNIE
 void Host::CommitBaseSettingChanges()
 {
     auto lock = GetSettingsLock();
-    if (s_settings_interface)
-        s_settings_interface->Save();
+    if (GetSettingsInterfaceStorage())
+        GetSettingsInterfaceStorage()->Save();
 }
 
 void Host::LoadSettings(SettingsInterface& si, std::unique_lock<std::mutex>& lock)
@@ -2690,12 +2781,13 @@ void Host::SetMouseMode(bool relative_mode, bool hide_cursor)
 
 void Host::RequestResizeHostDisplay(s32 width, s32 height)
 {
+    AndroidSurfaceState& surface_state = GetAndroidSurfaceState();
     int surface_width = 0;
     int surface_height = 0;
     {
-        std::lock_guard<std::mutex> lock(s_surface_mutex);
-        surface_width = s_window_width;
-        surface_height = s_window_height;
+        std::lock_guard<std::mutex> lock(surface_state.mutex);
+        surface_width = surface_state.window_width;
+        surface_height = surface_state.window_height;
     }
 
     if (surface_width <= 0 || surface_height <= 0 || !MTGS::IsOpen())
@@ -2776,6 +2868,8 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block /* = false 
     if (!function)
         return;
 
+    CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
+
     if (IsOnCPUThread())
     {
         function();
@@ -2783,8 +2877,8 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block /* = false 
     }
 
     {
-        std::lock_guard<std::mutex> lock(s_cpu_thread_queue_mutex);
-        if (!s_cpu_thread_active)
+        std::lock_guard<std::mutex> lock(cpu_thread_state.queue_mutex);
+        if (!cpu_thread_state.active)
         {
             function();
             return;
@@ -2858,12 +2952,13 @@ void Host::RequestVMShutdown(bool allow_confirm, bool allow_save_state, bool def
 
 void Host::OnAchievementsLoginSuccess(const char* username, u32 points, u32 sc_points, u32 unread_messages)
 {
+    RetroAchievementsBridgeCache& ra_bridge = GetRetroAchievementsBridgeCache();
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
     if (!EnsureRetroAchievementsBridge(env))
         return;
 
     jstring j_username = username ? env->NewStringUTF(username) : nullptr;
-    env->CallStaticVoidMethod(s_ra_bridge_class, s_ra_notify_login_success, j_username,
+    env->CallStaticVoidMethod(ra_bridge.bridge_class, ra_bridge.notify_login_success, j_username,
                               static_cast<jint>(points), static_cast<jint>(sc_points),
                               static_cast<jint>(unread_messages));
     ClearJNIExceptions(env);
@@ -2877,22 +2972,24 @@ void Host::OnAchievementsLoginSuccess(const char* username, u32 points, u32 sc_p
 
 void Host::OnAchievementsLoginRequested(Achievements::LoginRequestReason reason)
 {
+    RetroAchievementsBridgeCache& ra_bridge = GetRetroAchievementsBridgeCache();
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
     if (!EnsureRetroAchievementsBridge(env))
         return;
 
-    env->CallStaticVoidMethod(s_ra_bridge_class, s_ra_notify_login_requested,
+    env->CallStaticVoidMethod(ra_bridge.bridge_class, ra_bridge.notify_login_requested,
                               static_cast<jint>(reason));
     ClearJNIExceptions(env);
 }
 
 void Host::OnAchievementsHardcoreModeChanged(bool enabled)
 {
+    RetroAchievementsBridgeCache& ra_bridge = GetRetroAchievementsBridgeCache();
     auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
     if (!EnsureRetroAchievementsBridge(env))
         return;
 
-    env->CallStaticVoidMethod(s_ra_bridge_class, s_ra_notify_hardcore_changed,
+    env->CallStaticVoidMethod(ra_bridge.bridge_class, ra_bridge.notify_hardcore_changed,
                               enabled ? JNI_TRUE : JNI_FALSE);
     ClearJNIExceptions(env);
     NotifyRetroAchievementsState();
@@ -3072,3 +3169,4 @@ bool Host::InNoGUIMode()
 {
     return false;
 }
+

@@ -5,7 +5,7 @@
 #include "CDVD/IsoReader.h"
 #include "CDVD/IsoFileFormats.h"
 #include "Config.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 
 #include "common/Assertions.h"

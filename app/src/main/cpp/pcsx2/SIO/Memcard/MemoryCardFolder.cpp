@@ -8,7 +8,7 @@
 #include "common/Path.h"
 
 #include "Config.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsPromptFont.h"
 
 #include "common/Console.h"

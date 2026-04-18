@@ -3,7 +3,7 @@
 
 #include "CDVD/CDVDcommon.h"
 #include "CDVD/IsoHasher.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Error.h"
 #include "common/MD5Digest.h"

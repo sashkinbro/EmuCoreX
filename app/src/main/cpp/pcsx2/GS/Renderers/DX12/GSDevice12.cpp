@@ -9,7 +9,7 @@
 #include "GS/Renderers/DX12/GSDevice12.h"
 #include "GS/Renderers/DX12/D3D12Builders.h"
 #include "GS/Renderers/DX12/D3D12ShaderCache.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "ShaderCacheVersion.h"
 
 #include "common/Console.h"

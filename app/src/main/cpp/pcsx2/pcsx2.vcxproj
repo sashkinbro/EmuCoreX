@@ -699,8 +699,8 @@
     <ClInclude Include="GS\Renderers\Vulkan\VKSwapChain.h">
       <ExcludedFromBuild Condition="'$(Platform)'=='ARM64'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="Host\AudioStream.h" />
-    <ClInclude Include="Host\AudioStreamTypes.h" />
+    <ClInclude Include="platform\host\audio\AudioStream.h" />
+    <ClInclude Include="platform\host\audio\AudioStreamTypes.h" />
     <ClInclude Include="ImGui\FullscreenUI.h" />
     <ClInclude Include="ImGui\FullscreenUI_Internal.h" />
     <ClInclude Include="ImGui\ImGuiAnimated.h" />
@@ -721,7 +721,7 @@
     <ClInclude Include="GS\Renderers\Vulkan\GSTextureVK.h">
       <ExcludedFromBuild Condition="'$(Platform)'=='ARM64'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="Host.h" />
+    <ClInclude Include="platform\host\Host.h" />
     <ClInclude Include="Input\DInputSource.h" />
     <ClInclude Include="Input\InputManager.h" />
     <ClInclude Include="Input\InputSource.h" />

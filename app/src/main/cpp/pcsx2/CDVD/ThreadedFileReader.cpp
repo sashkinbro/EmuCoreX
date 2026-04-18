@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "ThreadedFileReader.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Error.h"
 #include "common/HostSys.h"

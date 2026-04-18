@@ -4,7 +4,7 @@
 #include "Config.h"
 #include "Input/SDLInputSource.h"
 #include "Input/InputManager.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "ImGui/FullscreenUI.h"
 

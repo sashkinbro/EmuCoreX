@@ -8,7 +8,7 @@
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/Common/GSTexture.h"
 #include "SPU2/spu2.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "platform/host/audio/AudioStream.h"
 #include "IconsFontAwesome.h"
 #include "common/Assertions.h"

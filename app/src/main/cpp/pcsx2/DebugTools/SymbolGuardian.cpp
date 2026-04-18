@@ -4,7 +4,7 @@
 #include "SymbolGuardian.h"
 
 #include "DebugInterface.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 SymbolGuardian R5900SymbolGuardian;
 SymbolGuardian R3000SymbolGuardian;

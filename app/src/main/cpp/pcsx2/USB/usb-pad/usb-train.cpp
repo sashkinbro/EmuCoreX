@@ -4,7 +4,7 @@
 #include "usb-train.h"
 
 #include "common/Console.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "IconsPromptFont.h"
 #include "Input/InputManager.h"

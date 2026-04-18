@@ -8,7 +8,7 @@
 #include "Achievements.h"
 #include "CDVD/CDVDdiscReader.h"
 #include "core/runtime/GameList.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "platform/host/audio/AudioStream.h"
 #include "core/runtime/settings/INISettingsInterface.h"
 #include "ImGui/FullscreenUI.h"

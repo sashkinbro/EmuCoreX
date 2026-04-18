@@ -5,7 +5,7 @@
 #include "GS/GSGL.h"
 #include "GS/GS.h"
 #include "GS/GSUtil.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Console.h"
 #include "common/BitUtils.h"

@@ -3,7 +3,7 @@
 
 #include "core/runtime/BuildVersion.h"
 #include "Common.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "Memory.h"
 #include "Elfheader.h"
 #include "SaveState.h"

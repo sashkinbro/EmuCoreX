@@ -4,7 +4,7 @@
 #include "CDVD/CDVD.h"
 #include "Elfheader.h"
 #include "core/runtime/GameList.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "core/runtime/settings/INISettingsInterface.h"
 #include "VMManager.h"
 

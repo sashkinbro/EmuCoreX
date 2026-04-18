@@ -6,7 +6,7 @@
 #include "DebugTools/Breakpoints.h"
 #include "Elfheader.h"
 #include "GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "Memory.h"
 #include "Patch.h"
 #include "core/state/CoreStateExposure.h"

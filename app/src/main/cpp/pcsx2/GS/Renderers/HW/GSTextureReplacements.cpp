@@ -11,7 +11,7 @@
 #include "common/TextureDecompress.h"
 
 #include "Config.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
 #include "GS/GSExtra.h"
 #include "GS/GSLocalMemory.h"

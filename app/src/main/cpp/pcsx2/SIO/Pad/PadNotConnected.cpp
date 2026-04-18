@@ -3,7 +3,7 @@
 
 #include "SIO/Pad/PadNotConnected.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 
 const Pad::ControllerInfo PadNotConnected::ControllerInfo = {Pad::ControllerType::NotConnected, "None",
 	TRANSLATE_NOOP("Pad", "Not Connected"), nullptr, {}, {}, Pad::VibrationCapabilities::NoVibration };

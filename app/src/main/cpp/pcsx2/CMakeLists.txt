@@ -1194,7 +1194,7 @@ if(ANDROID)
 	target_sources(PCSX2 PRIVATE
 		CDVD/Linux/IOCtlSrc.cpp
 		${pcsx2LinuxHeaders}
-		../main.cpp
+		platform/android_bridge/AndroidBridge.cpp
 		../common/Android/JNI.cpp
 	)
 elseif(LINUX)

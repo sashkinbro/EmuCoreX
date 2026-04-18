@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "CDVD/IsoFileFormats.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 
 #include "common/Console.h"
 #include "common/FileSystem.h"

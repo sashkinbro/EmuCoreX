@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GS.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "IconsPromptFont.h"
 #include "ImGui/ImGuiManager.h"
 #include "Input/InputManager.h"

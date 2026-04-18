@@ -6,7 +6,7 @@
 #include "SPU2/Debug.h"
 #include "SPU2/Dma.h"
 #include "platform/host/audio/AudioStream.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "GS/GSCapture.h"
 #include "MTGS.h"
 #include "R3000A.h"

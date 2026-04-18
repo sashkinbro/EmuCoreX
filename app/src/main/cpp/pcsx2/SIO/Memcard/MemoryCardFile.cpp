@@ -18,7 +18,7 @@
 #include <chrono>
 
 #include "Config.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "VMManager.h"
 #include "IconsPromptFont.h"
 

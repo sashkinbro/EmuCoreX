@@ -11,7 +11,7 @@
 #include "Elfheader.h"
 #include "ps2/BiosTools.h"
 #include "Recording/InputRecording.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "R3000A.h"
 #include "Common.h"
 #include "IopBios.h"

@@ -10,7 +10,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "GSDumpReplayer.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "core/runtime/PerformanceMetrics.h"
 #include "pcsx2/Config.h"
 #include "VMManager.h"

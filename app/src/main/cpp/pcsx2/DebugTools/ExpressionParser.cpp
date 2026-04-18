@@ -3,7 +3,7 @@
 
 #include "ExpressionParser.h"
 
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "common/StringUtil.h"
 
 #include <cctype>

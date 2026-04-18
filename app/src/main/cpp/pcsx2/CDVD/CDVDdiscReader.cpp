@@ -3,7 +3,7 @@
 
 #include "CDVDdiscReader.h"
 #include "CDVD/CDVD.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "common/Console.h"
 
 #include "common/Error.h"
