@@ -79,6 +79,8 @@ static __fi void vif1SetGifPathWaitState(bool waiting_for_path3)
 	vif1Regs.stat.VGW = waiting_for_path3;
 }
 
+__fi void vif1SetupTransfer();
+
 bool vif1RequestResumeFromGifPathIdle(u32 resumeCycles)
 {
 	if (!vif1HasGifWait())
@@ -187,9 +189,8 @@ bool _VIF1chain()
 
 	if (vif1ch.qwc == 0)
 	{
-		vif1.inprogress &= ~1;
-		vif1.irqoffset.value = 0;
-		vif1.irqoffset.enabled = false;
+		vif1.SetTransferActive(false);
+		vif1.ClearResumeOffset();
 		return true;
 	}
 
@@ -197,7 +198,7 @@ bool _VIF1chain()
 	if (vif1.dmamode == VIF_NORMAL_TO_MEM_MODE)
 	{
 		vif1TransferToMemory();
-		vif1.inprogress &= ~1;
+		vif1.SetTransferActive(false);
 		return true;
 	}
 
@@ -213,8 +214,8 @@ bool _VIF1chain()
 	VIF_LOG("VIF1chain size=%d, madr=%lx, tadr=%lx",
 		vif1ch.qwc, vif1ch.madr, vif1ch.tadr);
 
-	if (vif1.irqoffset.enabled)
-		return VIF1transfer(pMem + vif1.irqoffset.value, vif1ch.qwc * 4 - vif1.irqoffset.value, false);
+	if (vif1.HasResumeOffset())
+		return VIF1transfer(pMem + vif1.GetResumeOffset(), vif1ch.qwc * 4 - vif1.GetResumeOffset(), false);
 	else
 		return VIF1transfer(pMem, vif1ch.qwc * 4, false);
 }
@@ -246,36 +247,34 @@ static bool vif1TransferChainTagPayload(const tDMA_TAG* ptag)
 
 	VIF_LOG("\tVIF1 SrcChain TTE=1, data = 0x%08x.%08x", masked_tag._u32[3], masked_tag._u32[2]);
 
-	if (vif1.irqoffset.enabled)
+	if (vif1.HasResumeOffset())
 	{
-		ret = VIF1transfer((u32*)&masked_tag + vif1.irqoffset.value, 4 - vif1.irqoffset.value, true);
+		ret = VIF1transfer((u32*)&masked_tag + vif1.GetResumeOffset(), 4 - vif1.GetResumeOffset(), true);
 	}
 	else
 	{
 		// Some games (like killzone) do Tags mid unpack, the nops will just write blank data
 		// to the VU's, which breaks stuff, this is where the 128bit packet will fail, so we ignore the first 2 words.
-		vif1.irqoffset.value = 2;
-		vif1.irqoffset.enabled = true;
+		vif1.SetResumeOffset(2);
 		ret = VIF1transfer((u32*)&masked_tag + 2, 2, true);
 	}
 
-	if (ret || !vif1.irqoffset.enabled)
+	if (ret || !vif1.HasResumeOffset())
 		return true;
 
-	vif1.inprogress &= ~1; // Better clear this so it has to do it again (Jak 1)
+	vif1.SetTransferActive(false); // Better clear this so it has to do it again (Jak 1)
 	vif1ch.qwc = 0; // Gumball 3000 pauses the DMA when the tag stalls so we need to reset the QWC, it'll be gotten again later
 	return false;
 }
 
 static void vif1FinalizeTransferSetupFromTag(const tDMA_TAG* ptag)
 {
-	vif1.irqoffset.value = 0;
-	vif1.irqoffset.enabled = false;
+	vif1.ClearResumeOffset();
 
 	vif1.done |= hwDmacSrcChainWithStack(vif1ch, ptag->ID);
 
 	if (vif1ch.qwc > 0)
-		vif1.inprogress |= 1;
+		vif1.SetTransferActive(true);
 
 	// Check TIE bit of CHCR and IRQ bit of tag.
 	if (vif1ch.chcr.TIE && ptag->IRQ)
@@ -418,7 +417,68 @@ static void vif1UpdateVpsAfterInterruptProgress()
 
 static bool vif1ShouldHoldCompletedDmaOnStall()
 {
-	return vif1.vifstalled.enabled && vif1.done;
+	return vif1.IsWaitingForStallState() && vif1.done;
+}
+
+static bool vif1TryHandleIrqStall()
+{
+	if (!(vif1.irq && vif1.IsIrqStalled()))
+		return false;
+
+	VIF_LOG("VIF IRQ Firing");
+	if (!vif1Regs.stat.ER1)
+		vif1Regs.stat.INT = true;
+
+	// Yakuza watches VIF_STAT so lets do this here.
+	if (((vif1Regs.code >> 24) & 0x7f) != 0x7)
+	{
+		vif1Regs.stat.VIS = true;
+	}
+
+	hwIntcIrq(VIF1intc);
+	--vif1.irq;
+
+	if (!vif1Regs.stat.test(VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
+		return false;
+
+	// NFSHPS stalls when the whole packet has gone across (it stalls in the last 32bit cmd).
+	// In this case VIF will end.
+	vif1RefreshActiveTransferFqc();
+	if ((vif1ch.qwc > 0 || !vif1.done) && !CHECK_VIF1STALLHACK)
+	{
+		vif1Regs.stat.VPS = VPS_DECODING; // Onimusha - Blade Warriors
+		VIF_LOG("VIF1 Stalled");
+		vif1SetActiveDmaStall(true);
+		return true;
+	}
+
+	return false;
+}
+
+static void vif1ContinueActiveTransferProgress()
+{
+	_VIF1chain();
+
+	// VIF_NORMAL_FROM_MEM_MODE is a very slow operation.
+	// Timesplitters 2 depends on this being a bit higher than 128.
+	vif1RefreshActiveTransferFqc();
+	vif1ScheduleDmaProgressFromCurrentState();
+}
+
+static bool vif1TryAdvanceTransferSetup()
+{
+	if (vif1.done)
+		return false;
+
+	if (!(dmacRegs.ctrl.DMAE) || vif1Regs.stat.VSS) // Stopped or DMA Disabled
+		return true;
+
+	if (!vif1.IsTransferActive())
+		vif1SetupTransfer();
+
+	vif1RefreshActiveTransferFqc();
+	vif1ScheduleDmaProgressFromCurrentState();
+	return true;
 }
 
 static void vif1FinalizeCompletedDmaInterrupt()
@@ -432,9 +492,8 @@ static void vif1FinalizeCompletedDmaInterrupt()
 	vif1RefreshActiveTransferFqc();
 
 	vif1ch.chcr.STR = false;
-	vif1.vifstalled.enabled = false;
-	vif1.irqoffset.enabled = false;
-	if (vif1.queued_program)
+	vif1.CompleteDmaTransfer();
+	if (vif1.HasQueuedProgram())
 		vifExecQueue(1);
 	g_vif1Cycles = 0;
 	VIF_LOG("VIF1 DMA End");
@@ -453,7 +512,7 @@ __fi void vif1SetupTransfer()
 
 	vif1ch.madr = ptag[1]._u32; //MADR = ADDR field + SPR
 	g_vif1Cycles += 1; // Add 1 g_vifCycles from the QW read for the tag
-	vif1.inprogress &= ~1;
+	vif1.SetTransferActive(false);
 
 	VIF_LOG("VIF1 Tag %8.8x_%8.8x size=%d, id=%d, madr=%lx, tadr=%lx",
 		ptag[1]._u32, ptag[0]._u32, vif1ch.qwc, ptag->ID, vif1ch.madr, vif1ch.tadr);
@@ -519,69 +578,21 @@ __fi void vif1Interrupt()
 	if (!vif1ch.chcr.STR)
 		return;
 
-	if (vif1.irq && vif1.vifstalled.enabled && vif1.vifstalled.value == VIF_IRQ_STALL)
-	{
-		VIF_LOG("VIF IRQ Firing");
-		if (!vif1Regs.stat.ER1)
-			vif1Regs.stat.INT = true;
+	if (vif1TryHandleIrqStall())
+		return;
 
-		//Yakuza watches VIF_STAT so lets do this here.
-		if (((vif1Regs.code >> 24) & 0x7f) != 0x7)
-		{
-			vif1Regs.stat.VIS = true;
-		}
-
-		hwIntcIrq(VIF1intc);
-		--vif1.irq;
-
-		if (vif1Regs.stat.test(VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
-		{
-			//vif1Regs.stat.FQC = 0;
-
-			//NFSHPS stalls when the whole packet has gone across (it stalls in the last 32bit cmd)
-			//In this case VIF will end
-			vif1RefreshActiveTransferFqc();
-			if ((vif1ch.qwc > 0 || !vif1.done) && !CHECK_VIF1STALLHACK)
-			{
-				vif1Regs.stat.VPS = VPS_DECODING; //If there's more data you need to say it's decoding the next VIF CMD (Onimusha - Blade Warriors)
-				VIF_LOG("VIF1 Stalled");
-				vif1SetActiveDmaStall(true);
-				return;
-			}
-		}
-	}
-
-	vif1.vifstalled.enabled = false;
+	vif1.ClearStallState();
 
 	vif1UpdateVpsAfterInterruptProgress();
 
-	if (vif1.inprogress & 0x1)
+	if (vif1.IsTransferActive())
 	{
-		_VIF1chain();
-		// VIF_NORMAL_FROM_MEM_MODE is a very slow operation.
-		// Timesplitters 2 depends on this beeing a bit higher than 128.
-		vif1RefreshActiveTransferFqc();
-
-		vif1ScheduleDmaProgressFromCurrentState();
+		vif1ContinueActiveTransferProgress();
 		return;
 	}
 
-	if (!vif1.done)
-	{
-
-		if (!(dmacRegs.ctrl.DMAE) || vif1Regs.stat.VSS) //Stopped or DMA Disabled
-		{
-			//Console.WriteLn("vif1 dma masked");
-			return;
-		}
-
-		if ((vif1.inprogress & 0x1) == 0)
-			vif1SetupTransfer();
-		vif1RefreshActiveTransferFqc();
-
-		vif1ScheduleDmaProgressFromCurrentState();
+	if (vif1TryAdvanceTransferSetup())
 		return;
-	}
 
 	if (vif1ShouldHoldCompletedDmaOnStall())
 	{
@@ -600,7 +611,7 @@ void dmaVIF1()
 		vif1ch.tadr, vif1ch.asr0, vif1ch.asr1);
 
 	g_vif1Cycles = 0;
-	vif1.inprogress = 0;
+	vif1.PrepareForDmaStart();
 	vif1SetActiveDmaStall(false);
 
 	if (vif1ch.qwc > 0) // Normal Mode
@@ -631,16 +642,16 @@ void dmaVIF1()
 			else
 				vif1.dmamode = VIF_NORMAL_TO_MEM_MODE;
 
-			if (vif1.irqoffset.enabled && !vif1.done)
+			if (vif1.HasResumeOffset() && !vif1.done)
 				DevCon.Warning("Warning! VIF1 starting a Normal transfer with vif offset set (Possible force stop?)");
 			vif1.done = true;
 		}
 
-		vif1.inprogress |= 1;
+		vif1.SetTransferActive(true);
 	}
 	else
 	{
-		vif1.inprogress &= ~0x1;
+		vif1.SetTransferActive(false);
 		vif1.dmamode = VIF_CHAIN_MODE;
 		vif1.done = false;
 	}

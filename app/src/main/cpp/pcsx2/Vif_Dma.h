@@ -239,6 +239,7 @@ struct vifStruct {
 
 	__fi bool HasQueuedProgram() const { return queued_program; }
 	__fi void SetQueuedProgram(bool queued) { queued_program = queued; }
+	__fi u32 GetQueuedProgramCounter() const { return queued_pc; }
 	__fi void ClearQueuedProgram()
 	{
 		queued_program = false;
@@ -273,6 +274,7 @@ struct vifStruct {
 	}
 	__fi void CompleteDmaTransfer()
 	{
+		ClearTransferProgress();
 		ClearStallState();
 		ClearResumeOffset();
 		NormalizeBridgeState();

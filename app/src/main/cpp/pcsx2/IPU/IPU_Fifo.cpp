@@ -27,11 +27,11 @@ void IPU_Fifo_Input::clear()
 	writepos = 0;
 
 	// Because the FIFO is drained it will request more data immediately
-	IPUCoreStatus.DataRequested = true;
+	IPUCoreStatus.SetInputRequested(true);
 
 	if (ipu1ch.chcr.STR && cpuRegs.eCycle[4] == 0x9999)
 	{
-		CPU_INT(DMAC_TO_IPU, 4);
+		ipuRequestToDmaInputWakeup();
 	}
 }
 
@@ -78,7 +78,7 @@ int IPU_Fifo_Input::write(const u32* pMem, int size)
 	g_BP.IFC += transfer_size;
 
 	if (g_BP.IFC == 8)
-		IPUCoreStatus.DataRequested = false;
+		IPUCoreStatus.SetInputRequested(false);
 
 	return transfer_size;
 }
@@ -89,11 +89,11 @@ int IPU_Fifo_Input::read(void *value)
 	if (g_BP.IFC <= 1)
 	{
 		// IPU FIFO is empty and DMA is waiting so lets tell the DMA we are ready to put data in the FIFO
-		IPUCoreStatus.DataRequested = true;
+		IPUCoreStatus.SetInputRequested(true);
 
 		if(ipu1ch.chcr.STR && cpuRegs.eCycle[4] == 0x9999)
 		{
-			CPU_INT( DMAC_TO_IPU, std::min(8U, ipu1ch.qwc));
+			ipuRequestToDmaInputWakeup(ipu1ch.qwc);
 		}
 
 		if (g_BP.IFC == 0) return 0;
@@ -127,7 +127,7 @@ int IPU_Fifo_Output::write(const u32 *value, uint size)
 	ipuRegs.ctrl.OFC += transfer_size;
 
 	if(ipu0ch.chcr.STR)
-		IPU_INT_FROM(1);
+		ipuRequestFromDma(1);
 
 	return transfer_size;
 }
@@ -172,9 +172,7 @@ void WriteFIFO_IPUin(const mem128_t* value)
 	{
 		if (ipuRegs.ctrl.BUSY /*&& IPUCoreStatus.WaitingOnIPUTo*/)
 		{
-			IPUCoreStatus.WaitingOnIPUFrom = false;
-			IPUCoreStatus.WaitingOnIPUTo = false;
-			IPU_INT_PROCESS(2 * BIAS);
+			ipuRequestProcessAfterInputWrite();
 		}
 	}
 }

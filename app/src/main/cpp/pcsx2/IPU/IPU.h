@@ -13,6 +13,74 @@
 #define IPU_INT_TO( cycles )  if (!(cpuRegs.interrupt & (1<<4))) CPU_INT( DMAC_TO_IPU, cycles )
 #define IPU_INT_FROM( cycles )  CPU_INT( DMAC_FROM_IPU, cycles )
 #define IPU_INT_PROCESS( cycles ) if (!(cpuRegs.interrupt & (1 << IPU_PROCESS))) CPU_INT( IPU_PROCESS, cycles )
+
+static constexpr u32 IPU_PROCESS_WARMUP_CYCLES = 64;
+static constexpr u32 IPU_TO_DMA_WAIT_RESUME_CYCLES = 4 * BIAS;
+static constexpr u32 IPU_INPUT_WRITE_PROCESS_RESUME_CYCLES = 2 * BIAS;
+static constexpr u32 IPU_TO_DMA_MIN_WAKEUP_CYCLES = 4;
+static constexpr u32 IPU_TO_DMA_MAX_FIFO_WAKEUP_QWC = 8;
+
+static __fi void ipuRequestToDma(u32 cycles)
+{
+	if (!(cpuRegs.interrupt & (1 << DMAC_TO_IPU)))
+		CPU_INT(DMAC_TO_IPU, cycles);
+}
+
+static __fi void ipuRequestFromDma(u32 cycles)
+{
+	CPU_INT(DMAC_FROM_IPU, cycles);
+}
+
+static __fi void ipuRequestProcess(u32 cycles)
+{
+	if (!(cpuRegs.interrupt & (1 << IPU_PROCESS)))
+		CPU_INT(IPU_PROCESS, cycles);
+}
+
+static __fi void ipuArmInputFeedWait()
+{
+	IPUCoreStatus.SetWaitingOnInputFeed(true);
+}
+
+static __fi void ipuArmOutputDrainWait()
+{
+	IPUCoreStatus.SetWaitingOnOutputDrain(true);
+}
+
+static __fi void ipuClearTransferWaitsAndRequestProcess(u32 cycles)
+{
+	IPUCoreStatus.ClearTransferWaits();
+	ipuRequestProcess(cycles);
+}
+
+static __fi void ipuRequestDecodeWarmup()
+{
+	ipuClearTransferWaitsAndRequestProcess(IPU_PROCESS_WARMUP_CYCLES);
+}
+
+static __fi void ipuRequestToDmaInputWakeup(u32 available_qwc = IPU_TO_DMA_MIN_WAKEUP_CYCLES)
+{
+	ipuRequestToDma(std::min(IPU_TO_DMA_MAX_FIFO_WAKEUP_QWC, available_qwc));
+}
+
+static __fi void ipuRequestProcessAfterInputWrite()
+{
+	ipuClearTransferWaitsAndRequestProcess(IPU_INPUT_WRITE_PROCESS_RESUME_CYCLES);
+}
+
+static __fi bool ipuIsOutputChannelReady(bool dma_active, u32 output_fifo_qwc, u32 dma_qwc)
+{
+	return dma_active && (output_fifo_qwc == 0) && (dma_qwc != 0);
+}
+
+static __fi bool ipuTryWaitForOutputChannel(bool dma_active, u32 output_fifo_qwc, u32 dma_qwc, int stage, int max_stage)
+{
+	if (ipuIsOutputChannelReady(dma_active, output_fifo_qwc, dma_qwc) || stage > max_stage)
+		return false;
+
+	ipuArmOutputDrainWait();
+	return true;
+}
 //
 // Bitfield Structures
 //
@@ -121,7 +189,7 @@ struct alignas(16) tIPU_BP {
 				// be possible -- so if the fill fails we'll only return 0 if we don't have enough
 				// remaining bits in the FIFO to fill the request.
 				// Used to do ((FP!=0) && (BP + bits) <= 128) if we get here there's defo not enough data now though
-				IPUCoreStatus.WaitingOnIPUTo = true;
+				ipuArmInputFeedWait();
 				return false;
 			}
 

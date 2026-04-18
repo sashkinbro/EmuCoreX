@@ -93,9 +93,7 @@ void ipuReset()
 	std::memset(&ipuRegs, 0, sizeof(ipuRegs));
 	std::memset(&g_BP, 0, sizeof(g_BP));
 	std::memset(&decoder, 0, sizeof(decoder));
-	IPUCoreStatus.DataRequested = false;
-	IPUCoreStatus.WaitingOnIPUFrom= false;
-	IPUCoreStatus.WaitingOnIPUTo = false;
+	IPUCoreStatus.Reset();
 
 	decoder.picture_structure = FRAME_PICTURE;      //default: progressive...my guess:P
 
@@ -531,9 +529,7 @@ __fi void IPUCMD_WRITE(u32 val)
 	// Mana Khemia/Metal Saga start IDEC then change IPU0 expecting there to be a delay before IDEC sends data.
 	if (ipu_cmd.CMD == SCE_IPU_IDEC || ipu_cmd.CMD == SCE_IPU_BDEC)
 	{
-		IPUCoreStatus.WaitingOnIPUFrom = false;
-		IPUCoreStatus.WaitingOnIPUTo = false;
-		IPU_INT_PROCESS(64);
+		ipuRequestDecodeWarmup();
 	}
 	else
 		IPUWorker();

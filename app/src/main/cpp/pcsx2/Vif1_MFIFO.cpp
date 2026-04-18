@@ -133,6 +133,8 @@ static __fi void vif1FinalizeCompletedMfifoInterrupt()
 	g_vif1Cycles = 0;
 	vif1RefreshMfifoActiveTransferFqc();
 	vif1ch.chcr.STR = false;
+	if (vif1.HasQueuedProgram())
+		vifExecQueue(1);
 	hwDmacIrq(DMAC_VIF1);
 	DMA_LOG("VIF1 MFIFO DMA End");
 	vif1SetActiveDmaStall(false);
@@ -272,7 +274,7 @@ static __fi void mfifo_VIF1chain()
 			return;
 
 		if (vif1.HasResumeOffset())
-			VIF1transfer((u32*)pMem + vif1.irqoffset.value, vif1ch.qwc * 4 - vif1.irqoffset.value);
+			VIF1transfer((u32*)pMem + vif1.GetResumeOffset(), vif1ch.qwc * 4 - vif1.GetResumeOffset());
 		else
 			VIF1transfer((u32*)pMem, vif1ch.qwc << 2);
 	}
