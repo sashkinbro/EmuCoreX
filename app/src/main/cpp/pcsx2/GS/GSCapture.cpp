@@ -9,7 +9,7 @@
 #include "GS/Renderers/Common/GSTexture.h"
 #include "SPU2/spu2.h"
 #include "Host.h"
-#include "Host/AudioStream.h"
+#include "platform/host/audio/AudioStream.h"
 #include "IconsFontAwesome.h"
 #include "common/Assertions.h"
 #include "common/Console.h"

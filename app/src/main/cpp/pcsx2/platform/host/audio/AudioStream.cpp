@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "Host/AudioStream.h"
+#include "platform/host/audio/AudioStream.h"
 #include "FreeSurroundDecoder.h"
-#include "Host.h"
+#include "platform/host/Host.h"
 #include "GS/GSVector.h"
 
 #include "common/Assertions.h"

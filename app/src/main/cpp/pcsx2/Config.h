@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Host/AudioStreamTypes.h"
+#include "platform/host/audio/AudioStreamTypes.h"
 
 #include "common/Pcsx2Defs.h"
 #include "common/FPControl.h"

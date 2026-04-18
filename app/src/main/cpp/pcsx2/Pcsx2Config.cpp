@@ -12,7 +12,7 @@
 #include "GS.h"
 #include "CDVD/CDVDcommon.h"
 #include "Host.h"
-#include "Host/AudioStream.h"
+#include "platform/host/audio/AudioStream.h"
 #include "SIO/Memcard/MemoryCardFile.h"
 #include "SIO/Pad/Pad.h"
 #include "USB/USB.h"

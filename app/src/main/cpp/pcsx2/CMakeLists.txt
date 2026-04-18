@@ -893,14 +893,14 @@ set(pcsx2DebugToolsHeaders
 	DebugTools/BiosDebugData.h)
 
 set(pcsx2HostSources
-	Host/AudioStream.cpp
-	Host/CubebAudioStream.cpp
-	Host/OboeAudioStream.cpp
-	Host/SDLAudioStream.cpp)
+	platform/host/audio/AudioStream.cpp
+	platform/host/audio/CubebAudioStream.cpp
+	platform/host/audio/OboeAudioStream.cpp
+	platform/host/audio/SDLAudioStream.cpp)
 
 set(pcsx2HostHeaders
-	Host/AudioStream.h
-	Host/AudioStreamTypes.h)
+	platform/host/audio/AudioStream.h
+	platform/host/audio/AudioStreamTypes.h)
 
 set(pcsx2ImGuiSources
 	ImGui/FullscreenUI.cpp

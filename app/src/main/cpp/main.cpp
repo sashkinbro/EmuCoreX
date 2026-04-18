@@ -23,7 +23,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSCapture.h"
 #include "GSDumpReplayer.h"
-#include "Host/AudioStream.h"
+#include "platform/host/audio/AudioStream.h"
 #include "ImGui/ImGuiManager.h"
 #include "common/Path.h"
 #include "common/HTTPDownloader.h"

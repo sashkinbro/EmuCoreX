@@ -7,7 +7,7 @@
 #include "Achievements.h"
 #include "core/runtime/GameList.h"
 #include "Host.h"
-#include "Host/AudioStream.h"
+#include "platform/host/audio/AudioStream.h"
 #include "core/runtime/settings/INISettingsInterface.h"
 #include "ImGui/FullscreenUI_Internal.h"
 #include "ImGui/ImGuiFullscreen.h"
