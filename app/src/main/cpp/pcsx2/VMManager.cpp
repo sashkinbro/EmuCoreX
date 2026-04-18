@@ -1933,20 +1933,24 @@ bool VMManager::DoLoadState(const char* filename, Error* error)
 		return false;
 	}
 
+	auto finalizeLoadedSavestate = [filename]() {
+		Host::OnSaveStateLoaded(filename, true);
+		if (g_InputRecording.isActive())
+		{
+			g_InputRecording.handleLoadingSavestate();
+			MTGS::PresentCurrentFrame();
+		}
+
+		MemcardBusy::CheckSaveStateDependency();
+		return true;
+	};
+
 	Host::OnSaveStateLoading(filename);
 
 	if (!SaveState_UnzipFromDisk(filename, error))
 		return false;
 
-	Host::OnSaveStateLoaded(filename, true);
-	if (g_InputRecording.isActive())
-	{
-		g_InputRecording.handleLoadingSavestate();
-		MTGS::PresentCurrentFrame();
-	}
-
-	MemcardBusy::CheckSaveStateDependency();
-	return true;
+	return finalizeLoadedSavestate();
 }
 
 void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip_on_thread, bool backup_old_state, std::function<void(const std::string&)> error_callback)
@@ -1957,41 +1961,62 @@ void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		return;
 	}
 
-	Error error;
-	std::unique_ptr<ArchiveEntryList> elist = SaveState_DownloadState(&error);
-	if (!elist)
+	struct SavestateSaveArtifacts
 	{
-		error_callback(error.GetDescription());
-		return;
-	}
+		std::unique_ptr<ArchiveEntryList> archive_entries;
+		std::unique_ptr<SaveStateScreenshotData> screenshot;
+	};
 
-	std::unique_ptr<SaveStateScreenshotData> screenshot = SaveState_SaveScreenshot();
+	auto prepareSavestateSaveArtifacts = [&error_callback]() -> std::optional<SavestateSaveArtifacts> {
+		Error error;
+		SavestateSaveArtifacts artifacts;
+		artifacts.archive_entries = SaveState_DownloadState(&error);
+		if (!artifacts.archive_entries)
+		{
+			error_callback(error.GetDescription());
+			return std::nullopt;
+		}
 
-	if (FileSystem::FileExists(filename) && backup_old_state)
-	{
-		const std::string backup_filename(fmt::format("{}.backup", filename));
+		artifacts.screenshot = SaveState_SaveScreenshot();
+		return artifacts;
+	};
+
+	auto backupExistingSavestateFile = [&error_callback](const char* path) {
+		const std::string backup_filename(fmt::format("{}.backup", path));
 		Console.WriteLn(fmt::format("Creating save state backup {}...", backup_filename));
-		if (!FileSystem::RenamePath(filename, backup_filename.c_str()))
+		if (!FileSystem::RenamePath(path, backup_filename.c_str()))
 		{
 			error_callback(fmt::format(
 				TRANSLATE_FS("VMManager", "Cannot back up old save state '{}'."),
-				Path::GetFileName(filename)));
+				Path::GetFileName(path)));
+			return false;
+		}
+
+		return true;
+	};
+
+	auto dispatchSavestateZipWrite = [&](SavestateSaveArtifacts artifacts) {
+		if (zip_on_thread)
+		{
+			// lock order here is important; the thread could exit before we resume here.
+			std::unique_lock lock(s_save_state_threads_mutex);
+			s_save_state_threads.emplace_back(&VMManager::ZipSaveStateOnThread, std::move(artifacts.archive_entries),
+				std::move(artifacts.screenshot), std::string(filename), slot_for_message, std::move(error_callback));
 			return;
 		}
-	}
 
-	if (zip_on_thread)
-	{
-		// lock order here is important; the thread could exit before we resume here.
-		std::unique_lock lock(s_save_state_threads_mutex);
-		s_save_state_threads.emplace_back(&VMManager::ZipSaveStateOnThread, std::move(elist), std::move(screenshot),
-			std::string(filename), slot_for_message, std::move(error_callback));
-	}
-	else
-	{
-		ZipSaveState(
-			std::move(elist), std::move(screenshot), filename, slot_for_message, std::move(error_callback));
-	}
+		ZipSaveState(std::move(artifacts.archive_entries), std::move(artifacts.screenshot), filename,
+			slot_for_message, std::move(error_callback));
+	};
+
+	std::optional<SavestateSaveArtifacts> artifacts = prepareSavestateSaveArtifacts();
+	if (!artifacts.has_value())
+		return;
+
+	if (FileSystem::FileExists(filename) && backup_old_state && !backupExistingSavestateFile(filename))
+		return;
+
+	dispatchSavestateZipWrite(std::move(*artifacts));
 
 	Host::OnSaveStateSaved(filename);
 	MemcardBusy::CheckSaveStateDependency();
@@ -2004,6 +2029,19 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 {
 	Common::Timer timer;
 
+	auto finalizeSuccessfulSavestateZip = [&](double elapsed_ms) {
+		if (slot_for_message >= 0 && VMManager::HasValidVM())
+		{
+			Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot_for_message), ICON_FA_FLOPPY_DISK,
+				fmt::format(TRANSLATE_FS("VMManager", "Saved state to slot {}."), slot_for_message),
+				Host::OSD_QUICK_DURATION);
+		}
+
+		TraceRegressionMilestone("savestate-save",
+			fmt::format("slot={} file={}", slot_for_message, Path::GetFileName(filename)));
+		DevCon.WriteLn("Zipping save state to '%s' took %.2f ms", filename, elapsed_ms);
+	};
+
 	Error error;
 	if (!SaveState_ZipToDisk(std::move(elist), std::move(screenshot), filename, &error))
 	{
@@ -2011,37 +2049,32 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 		return;
 	}
 
-	if (slot_for_message >= 0 && VMManager::HasValidVM())
-	{
-		Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot_for_message), ICON_FA_FLOPPY_DISK,
-			fmt::format(TRANSLATE_FS("VMManager", "Saved state to slot {}."), slot_for_message),
-			Host::OSD_QUICK_DURATION);
-	}
-
-	TraceRegressionMilestone("savestate-save",
-		fmt::format("slot={} file={}", slot_for_message, Path::GetFileName(filename)));
-	DevCon.WriteLn("Zipping save state to '%s' took %.2f ms", filename, timer.GetTimeMilliseconds());
+	finalizeSuccessfulSavestateZip(timer.GetTimeMilliseconds());
 }
 
 void VMManager::ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
 	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string filename,
 	s32 slot_for_message, std::function<void(const std::string&)> error_callback)
 {
+	auto detachCompletedSaveStateWorker = []() {
+		// remove ourselves from the thread list. if we're joining, we might not be in there.
+		const auto this_id = std::this_thread::get_id();
+		std::unique_lock lock(s_save_state_threads_mutex);
+		for (auto it = s_save_state_threads.begin(); it != s_save_state_threads.end(); ++it)
+		{
+			if (it->get_id() == this_id)
+			{
+				it->detach();
+				s_save_state_threads.erase(it);
+				break;
+			}
+		}
+	};
+
 	ZipSaveState(
 		std::move(elist), std::move(screenshot), filename.c_str(), slot_for_message, std::move(error_callback));
 
-	// remove ourselves from the thread list. if we're joining, we might not be in there.
-	const auto this_id = std::this_thread::get_id();
-	std::unique_lock lock(s_save_state_threads_mutex);
-	for (auto it = s_save_state_threads.begin(); it != s_save_state_threads.end(); ++it)
-	{
-		if (it->get_id() == this_id)
-		{
-			it->detach();
-			s_save_state_threads.erase(it);
-			break;
-		}
-	}
+	detachCompletedSaveStateWorker();
 }
 
 void VMManager::WaitForSaveStateFlush()
