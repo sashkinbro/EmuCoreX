@@ -967,7 +967,6 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 
 		OpEqu(Adapter) &&
 		OpEqu(CustomDriverPath) &&
-		OpEqu(AndroidGpuProfileOverride) &&
 
 		OpEqu(HWDumpDirectory) &&
 		OpEqu(SWDumpDirectory));
@@ -1171,13 +1170,6 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 
 	SettingsWrapEntry(Adapter);
 	SettingsWrapEntry(CustomDriverPath);
-	SettingsWrapEntry(AndroidGpuProfileOverride);
-	if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "mali") == 0)
-		AndroidGpuProfileOverride = "mali";
-	else if (StringUtil::Strcasecmp(AndroidGpuProfileOverride.c_str(), "adreno") == 0)
-		AndroidGpuProfileOverride = "adreno";
-	else
-		AndroidGpuProfileOverride = "auto";
 	SettingsWrapEntry(HWDumpDirectory);
 	if (!HWDumpDirectory.empty() && !Path::IsAbsolute(HWDumpDirectory))
 		HWDumpDirectory = Path::Combine(EmuFolders::DataRoot, HWDumpDirectory);

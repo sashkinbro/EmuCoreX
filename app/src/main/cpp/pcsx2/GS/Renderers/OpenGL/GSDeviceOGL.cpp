@@ -4,7 +4,6 @@
 #include "GS/Renderers/OpenGL/GLContext.h"
 #include "GS/Renderers/OpenGL/GSDeviceOGL.h"
 #include "GS/Renderers/OpenGL/GLState.h"
-#include "GS/Renderers/Common/GSGPUProfile.h"
 #include "GS/GSState.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
@@ -832,15 +831,6 @@ bool GSDeviceOGL::CheckFeatures()
 		Console.WriteLn(Color_Cyan, "GL: Qualcomm Adreno GPU detected.");
 		vendor_id_adreno = true;
 	}
-
-#if defined(__ANDROID__)
-	const GpuProfileSelection profile_selection =
-		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str);
-	SetRuntimeGPUProfile(profile_selection.runtime_profile);
-#else
-	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali :
-		(vendor_id_adreno ? RuntimeGpuProfile::Adreno : RuntimeGpuProfile::Unknown));
-#endif
 
 	GLint major_gl = 0;
 	GLint minor_gl = 0;

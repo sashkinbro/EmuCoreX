@@ -19,6 +19,23 @@ __ri static constexpr bool GSHasBarrierFeedbackSupport(const GSDevice::FeatureSu
 	return features.texture_barrier || features.multidraw_fb_copy;
 }
 
+__ri static constexpr bool GSNeedsBBoxForMultidrawHazardTracking(const GSDevice::FeatureSupport& features)
+{
+	return !features.texture_barrier && features.multidraw_fb_copy;
+}
+
+__ri static constexpr bool GSCanUseTexIsFBWithCurrentOverlap(const GSDevice::FeatureSupport& features,
+	GSRendererHW::PRIM_OVERLAP prim_overlap)
+{
+	return (prim_overlap == GSRendererHW::PRIM_OVERLAP_NO || GSHasBarrierFeedbackSupport(features));
+}
+
+__ri static constexpr bool GSCanUseDATEOneFeedbackPath(const GSDevice::FeatureSupport& features,
+	bool require_one_barrier, bool require_full_barrier)
+{
+	return features.texture_barrier || (features.multidraw_fb_copy && (require_one_barrier || require_full_barrier));
+}
+
 __ri static constexpr bool GSCanUseBarrierColorFeedback(const GSDevice::FeatureSupport& features, bool require_one_barrier,
 	bool require_full_barrier, bool single_pass_feedback, bool needs_depth_feedback)
 {
@@ -43,6 +60,22 @@ __ri static constexpr bool GSNeedsDirectDepthFeedbackBarriers(const GSDevice::Fe
 {
 	return needs_depth_feedback &&
 		(features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth);
+}
+
+__ri static constexpr bool GSCanUseTexIsFBForHLEHardwareDraw(const GSDevice::FeatureSupport& features)
+{
+	return features.framebuffer_fetch || GSHasBarrierFeedbackSupport(features);
+}
+
+__ri static constexpr bool GSHLEHardwareRTFeedbackNeedsBarrier(const GSDevice::FeatureSupport& features)
+{
+	return !features.framebuffer_fetch && GSHasBarrierFeedbackSupport(features);
+}
+
+__ri static constexpr bool GSCanSampleDepthInPlaceForHLEHardwareDraw(
+	const GSDevice::FeatureSupport& features, const GSHWDrawConfig& config)
+{
+	return !config.depth.zwe && features.test_and_sample_depth;
 }
 
 __ri static bool GSPreferMobileFallbackSWBlend(const GSDevice::FeatureSupport& features, bool alpha_eq_less_one,
@@ -7246,8 +7279,8 @@ bool GSRendererHW::CanUseTexIsFB(const GSTextureCache::Target* rt, const GSTextu
 		return true;
 	}
 
-	// No barriers -> we can't use tex-is-fb when there's overlap.
-	if (!(g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy) && m_prim_overlap != PRIM_OVERLAP_NO)
+	// No hazard-feedback support -> we can't use tex-is-fb when there's overlap.
+	if (!GSCanUseTexIsFBWithCurrentOverlap(g_gs_device->Features(), m_prim_overlap))
 	{
 		GL_CACHE("HW: Disabling tex-is-fb due to no barriers.");
 		return false;
@@ -8360,8 +8393,7 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	}
 	else if (DATE_one)
 	{
-		const bool multidraw_fb_copy = features.multidraw_fb_copy && (m_conf.require_one_barrier || m_conf.require_full_barrier);
-		if (features.texture_barrier || multidraw_fb_copy)
+		if (GSCanUseDATEOneFeedbackPath(features, m_conf.require_one_barrier, m_conf.require_full_barrier))
 		{
 			m_conf.require_one_barrier = true;
 			m_conf.ps.date = 5 + m_cached_ctx.TEST.DATM;
@@ -9952,14 +9984,14 @@ void GSRendererHW::EndHLEHardwareDraw(bool force_copy_on_hazard /* = false */)
 	{
 		const GSDevice::FeatureSupport features = g_gs_device->Features();
 
-		if (!force_copy_on_hazard && config.tex == config.rt)
+		if (!force_copy_on_hazard && config.tex == config.rt && GSCanUseTexIsFBForHLEHardwareDraw(features))
 		{
 			// Sample RT 1:1.
-			config.require_one_barrier = !features.framebuffer_fetch;
+			config.require_one_barrier |= GSHLEHardwareRTFeedbackNeedsBarrier(features);
 			config.ps.tex_is_fb = true;
 		}
-		else if (!force_copy_on_hazard && config.tex == config.ds && !config.depth.zwe &&
-				 features.test_and_sample_depth)
+		else if (!force_copy_on_hazard && config.tex == config.ds &&
+				 GSCanSampleDepthInPlaceForHLEHardwareDraw(features, config))
 		{
 			// Safe to read depth buffer.
 		}
@@ -9996,7 +10028,7 @@ std::size_t GSRendererHW::ComputeDrawlistGetSize(float scale)
 {
 	if (m_drawlist.empty())
 	{
-		const bool save_bbox = !g_gs_device->Features().texture_barrier && g_gs_device->Features().multidraw_fb_copy;
+		const bool save_bbox = GSNeedsBBoxForMultidrawHazardTracking(g_gs_device->Features());
 		GetPrimitiveOverlapDrawlist(true, save_bbox, scale);
 	}
 	return m_drawlist.size();

@@ -73,9 +73,35 @@ static bool ContainsSurfaceRange(const GSTextureCache::Surface* surface, u32 bp,
 	return (surface->m_TEX0.TBP0 <= bp && surface->UnwrappedEndBlock() >= end_bp);
 }
 
+static bool ContainsSurfaceBlock(const GSTextureCache::Surface* surface, u32 bp)
+{
+	return ContainsSurfaceRange(surface, bp, bp);
+}
+
 static bool MatchesExactOrInsideTargetBase(const GSTextureCache::Surface* surface, u32 bp)
 {
 	return (surface->m_TEX0.TBP0 == bp || IsAlignedInsideTargetBaseMatch(surface, bp));
+}
+
+static bool MatchesExactOrInsideTrackedTargetBlock(const GSTextureCache::Surface* surface, u32 bp)
+{
+	return (surface->m_TEX0.TBP0 == bp || (IsInsideTargetTrackingEnabled() && surface->m_TEX0.TBP0 < bp &&
+		surface->UnwrappedEndBlock() >= bp));
+}
+
+static GSTextureCache::Target* FindPageMoveTarget(FastList<GSTextureCache::Target*>& targets, u32 bp, u32 end_bp, u32 psm)
+{
+	for (auto it = targets.begin(); it != targets.end(); ++it) // Iterate targets from MRU to LRU.
+	{
+		GSTextureCache::Target* target = *it;
+		if (target->m_TEX0.PSM != psm || !ContainsSurfaceRange(target, bp, end_bp))
+			continue;
+
+		targets.MoveFront(it.Index());
+		return target;
+	}
+
+	return nullptr;
 }
 
 static constexpr u64 MAX_RECENT_UPLOAD_DRAW_DISTANCE = 500;
@@ -108,6 +134,26 @@ static bool DoesUploadTransferFullyCoverRange(const GSState::GSUploadQueue& tran
 	return (DoesUploadTransferOverlapRange(transfer, bp, end_bp, psm) &&
 		GetUploadTransferStartBlock(transfer) <= bp &&
 		GetUploadTransferEndBlock(transfer) >= end_bp);
+}
+
+static bool IsUploadTransferAtBase(const GSState::GSUploadQueue& transfer, u32 bp)
+{
+	return (transfer.blit.DBP == bp);
+}
+
+static bool DoesUploadTransferExactlyMatchRange(const GSState::GSUploadQueue& transfer, u32 bp, u32 end_bp, u32 psm)
+{
+	return (IsUploadTransferAtBase(transfer, bp) &&
+		DoesUploadTransferFullyCoverRange(transfer, bp, end_bp, psm));
+}
+
+static bool CanUploadTransferSeedTargetAlphaValidity(const GSState::GSUploadQueue& transfer, const GIFRegTEX0& tex0,
+	u32 target_bw, u32 end_bp)
+{
+	return (IsUploadTransferAtBase(transfer, tex0.TBP0) &&
+		IsUploadTransferFormatCompatible(transfer, tex0.PSM) &&
+		(transfer.blit.DBW == target_bw ||
+			(GetUploadTransferEndBlock(transfer) >= end_bp && (transfer.blit.DBW * 64) == transfer.rect.z)));
 }
 } // namespace
 
@@ -172,7 +218,7 @@ void GSTextureCache::ArmExpectedStripedMove(u32 expected_src_bp, u32 expected_ds
 	m_expected_dst_bp = static_cast<int>(expected_dst_bp);
 
 	// Only check the source, the destination might need expanding.
-	if (ContainsSurfaceRange(src, expected_src_bp, expected_src_bp))
+	if (ContainsSurfaceBlock(src, expected_src_bp))
 	{
 		m_remembered_src_bp = static_cast<int>(src->m_TEX0.TBP0);
 		m_remembered_dst_bp = static_cast<int>(dst->m_TEX0.TBP0);
@@ -3531,9 +3577,7 @@ GSTextureCache::Target* GSTextureCache::CreateTarget(GIFRegTEX0 TEX0, const GSVe
 				const u32 tex_end = GSLocalMemory::GetUnwrappedEndBlockAddress(TEX0.TBP0, TEX0.TBW, TEX0.PSM, GSVector4i::loadh(size));
 				for (iter = GSRendererHW::GetInstance()->m_draw_transfers.rbegin(); iter != GSRendererHW::GetInstance()->m_draw_transfers.rend();)
 				{
-					const u32 transfer_end = GetUploadTransferEndBlock(*iter);
-					// If the format, and location doesn't overlap
-					if (TEX0.TBP0 == iter->blit.DBP && IsUploadTransferFormatCompatible(*iter, TEX0.PSM) && (iter->blit.DBW == dst->m_TEX0.TBW || (transfer_end >= tex_end && (iter->blit.DBW * 64) == iter->rect.z)))
+					if (CanUploadTransferSeedTargetAlphaValidity(*iter, TEX0, dst->m_TEX0.TBW, tex_end))
 					{
 						dst->m_valid_alpha_high |= iter->blit.DPSM != PSMT4HL;
 						dst->m_valid_alpha_low |= iter->blit.DPSM != PSMT4HH;
@@ -3612,7 +3656,6 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 					if (last_draw - iter->draw > MAX_RECENT_UPLOAD_DRAW_DISTANCE)
 						break;
 
-					const u32 transfer_end = GetUploadTransferEndBlock(*iter);
 					// If the format, and location doesn't overlap
 					if (DoesUploadTransferOverlapRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 					{
@@ -3675,11 +3718,11 @@ bool GSTextureCache::PreloadTarget(GIFRegTEX0 TEX0, const GSVector2i& size, cons
 						if (DoesUploadTransferFullyCoverRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 						{
 							// If it was a clear draw then we can use that as our target size.
-							if (iter->zero_clear && iter->blit.DBP == TEX0.TBP0 && iter->blit.DPSM == TEX0.PSM)
+							if (iter->zero_clear && IsUploadTransferAtBase(*iter, TEX0.TBP0) && iter->blit.DPSM == TEX0.PSM)
 								dst->UpdateValidity(iter->rect);
 
 							// Some games clear RT and Z at the same time, only erase if it's specifically this target.
-							if (iter->blit.DBP == TEX0.TBP0 && transfer_end == rect_end)
+							if (DoesUploadTransferExactlyMatchRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 								transfers.erase(iter.base() - 1);
 
 							break;
@@ -4062,8 +4105,6 @@ GSTextureCache::Target* GSTextureCache::LookupDisplayTarget(GIFRegTEX0 TEX0, con
 			if (last_draw - iter->draw > MAX_RECENT_UPLOAD_DRAW_DISTANCE)
 				break;
 
-			const u32 transfer_end = GetUploadTransferEndBlock(*iter);
-
 			// If the format, and location doesn't overlap
 			if (DoesUploadTransferOverlapRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 			{
@@ -4080,7 +4121,7 @@ GSTextureCache::Target* GSTextureCache::LookupDisplayTarget(GIFRegTEX0 TEX0, con
 					break;
 				}
 
-				if (iter->blit.DBP == TEX0.TBP0 && transfer_end == rect_end)
+				if (DoesUploadTransferExactlyMatchRange(*iter, TEX0.TBP0, rect_end, TEX0.PSM))
 				{
 					iter = std::vector<GSState::GSUploadQueue>::reverse_iterator(GSRendererHW::GetInstance()->m_draw_transfers.erase(iter.base() - 1));
 				}
@@ -5514,7 +5555,7 @@ bool GSTextureCache::ShuffleMove(u32 BP, u32 BW, u32 PSM, int sx, int sy, int dx
 	GSTextureCache::Target* tgt = nullptr;
 	for (auto t : m_dst[RenderTarget])
 	{
-		if (t->m_TEX0.PSM == PSMCT32 && BP >= t->m_TEX0.TBP0 && BP <= t->m_end_block)
+		if (t->m_TEX0.PSM == PSMCT32 && ContainsSurfaceBlock(t, BP))
 		{
 			const SurfaceOffset so(ComputeSurfaceOffset(BP, BW, PSM, GSVector4i(sx, sy, sx + w, sy + h), t));
 			if (so.is_valid)
@@ -5599,22 +5640,11 @@ bool GSTextureCache::PageMove(u32 SBP, u32 DBP, u32 BW, u32 PSM, int sx, int sy,
 	Target* dtgt = nullptr;
 	for (int type = 0; type < 2; type++)
 	{
-		for (Target* tgt : m_dst[type])
-		{
-			// We _could_ do compatible bits here maybe?
-			if (tgt->m_TEX0.PSM != PSM)
-				continue;
-
-			// Check that the end block is in range. If it's not, we can't do this, and have to fall back to local memory.
-			const u32 tgt_end = tgt->UnwrappedEndBlock();
-			if (tgt->m_TEX0.TBP0 <= SBP && src_block_end <= tgt_end)
-				stgt = tgt;
-			if (tgt->m_TEX0.TBP0 <= DBP && dst_block_end <= tgt_end)
-				dtgt = tgt;
-
-			if (stgt && dtgt)
-				break;
-		}
+		auto& targets = m_dst[type];
+		if (!stgt)
+			stgt = FindPageMoveTarget(targets, SBP, src_block_end, PSM);
+		if (!dtgt)
+			dtgt = FindPageMoveTarget(targets, DBP, dst_block_end, PSM);
 
 		if (stgt && dtgt)
 			break;
@@ -5699,7 +5729,7 @@ GSTextureCache::Target* GSTextureCache::GetTargetWithSharedBits(u32 BP, u32 PSM)
 	{
 		Target* t = *it;
 		const u32 t_psm = (t->HasValidAlpha()) ? t->m_TEX0.PSM & ~0x1 : t->m_TEX0.PSM;
-		if (GSUtil::HasSharedBits(PSM, t_psm) && (t->m_TEX0.TBP0 == BP || (IsInsideTargetTrackingEnabled() && t->m_TEX0.TBP0 < BP && t->UnwrappedEndBlock() > BP)))
+		if (GSUtil::HasSharedBits(PSM, t_psm) && MatchesExactOrInsideTrackedTargetBlock(t, BP))
 			return t;
 	}
 

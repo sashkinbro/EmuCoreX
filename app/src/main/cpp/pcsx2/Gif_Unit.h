@@ -235,29 +235,6 @@ struct Gif_Path
 		return (lo == 0 && hi == 0);
 	}
 
-	void TraceZeroGifTag() const
-	{
-		static u32 s_zero_tag_logs = 0;
-		if (s_zero_tag_logs >= 64 || curOffset + 16 > curSize || !IsZeroQword(&buffer[curOffset]))
-			return;
-
-		u64 prev_lo, prev_hi, tag_lo, tag_hi, next_lo, next_hi;
-		ReadQword(buffer, curSize, (curOffset >= 16) ? curOffset - 16 : curSize, prev_lo, prev_hi);
-		ReadQword(buffer, curSize, curOffset, tag_lo, tag_hi);
-		ReadQword(buffer, curSize, curOffset + 16, next_lo, next_hi);
-
-		s_zero_tag_logs++;
-		Console.WriteLn(
-			"GIFTagZero path=%u apath=%u curOffset=%u curSize=%u gsPackOff=%u gsPackSize=%u read=%d state=%u p1q=%u p2q=%u p3q=%u m3r=%u m3p=%u prev=%016llx:%016llx tag=%016llx:%016llx next=%016llx:%016llx",
-			static_cast<u32>(idx) + 1, static_cast<u32>(gifRegs.stat.APATH),
-			curOffset, curSize, gsPack.offset, gsPack.size, getReadAmount(), static_cast<u32>(state),
-			static_cast<u32>(gifRegs.stat.P1Q), static_cast<u32>(gifRegs.stat.P2Q), static_cast<u32>(gifRegs.stat.P3Q),
-			static_cast<u32>(gifRegs.stat.M3R), static_cast<u32>(gifRegs.stat.M3P),
-			static_cast<unsigned long long>(prev_hi), static_cast<unsigned long long>(prev_lo),
-			static_cast<unsigned long long>(tag_hi), static_cast<unsigned long long>(tag_lo),
-			static_cast<unsigned long long>(next_hi), static_cast<unsigned long long>(next_lo));
-	}
-
 	std::atomic<int> readAmount; // Amount of data MTGS still needs to read
 	u8* buffer;                  // Path packet buffer
 	u32 buffSize;                // Full size of buffer
@@ -408,7 +385,6 @@ struct Gif_Path
 					RealignPacket();
 				}
 
-				TraceZeroGifTag();
 				gifTag.setTag(&buffer[curOffset], 1);
 
 				if (gifTag.tag.NLOOP == 0 && !gifTag.tag.EOP)

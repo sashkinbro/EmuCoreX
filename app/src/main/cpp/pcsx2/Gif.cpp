@@ -19,19 +19,6 @@ bool CheckPaths();
 void GIFdma();
 void mfifoGIFtransfer();
 
-static void gifLogPath3Sync(const char* event)
-{
-	static u32 s_gif_path3_logs = 0;
-	if (s_gif_path3_logs++ >= 64)
-		return;
-
-	Console.WriteLn(
-		"GIFPath3[%s] cycle=%u apath=%u p3state=%u masked=%d canPath3=%d gifqwc=%x fifo=%d vifVGW=%d vifqwc=%x vifstat=%08x",
-		event, cpuRegs.cycle, gifRegs.stat.APATH, static_cast<u32>(gifUnit.gifPath[GIF_PATH_3].state),
-		gifUnit.Path3Masked() ? 1 : 0, gifUnit.CanDoPath3() ? 1 : 0, gifch.qwc, gif_fifo.fifoSize,
-		vif1HasGifWait() ? 1 : 0, vif1ch.qwc, vif1Regs.stat._u32);
-}
-
 static bool gifShouldStallActivePath3Dma()
 {
 	return gifUnit.Path3Masked() || !gifUnit.CanDoPath3();
@@ -58,7 +45,6 @@ static bool gifTryResumeVifFromPath3Idle(const char* event, bool require_pending
 	if (!vif1RequestResumeFromGifPathIdle(1))
 		return false;
 
-	gifLogPath3Sync(event);
 	if (gifShouldKickDmaLoopAfterPath3Resume(require_pending_work))
 		GifDMAInt(16);
 

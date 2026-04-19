@@ -273,7 +273,11 @@ float PerformanceMetrics::GetInternalFPS()
 
 float PerformanceMetrics::GetSpeed()
 {
-	return (s_internal_fps > 0.0f) ? (s_fps / s_internal_fps) : 0.0f;
+	const float frame_rate = VMManager::GetFrameRate();
+	const float target_speed = VMManager::GetTargetSpeed();
+	const float speed_scalar = (target_speed > 0.0f) ? target_speed : 1.0f;
+	const float expected_vps = frame_rate * speed_scalar;
+	return (expected_vps > 0.0f) ? (s_fps / expected_vps) : 0.0f;
 }
 
 float PerformanceMetrics::GetAverageFrameTime()

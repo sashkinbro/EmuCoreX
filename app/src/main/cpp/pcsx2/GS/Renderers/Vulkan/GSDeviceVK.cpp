@@ -5,7 +5,6 @@
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
-#include "GS/Renderers/Common/GSGPUProfile.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
@@ -59,39 +58,6 @@ static bool IsDATMConvertShader(ShaderConvert i)
 static bool IsDATEModePrimIDInit(u32 flag)
 {
 	return flag == 1 || flag == 2;
-}
-
-static const char* GetVendorNameFromID(u32 vendor_id)
-{
-	switch (vendor_id)
-	{
-		case 0x13B5u:
-			return "ARM";
-		case 0x5143u:
-			return "Qualcomm";
-		case 0x1002u:
-		case 0x1022u:
-			return "AMD";
-		case 0x10DEu:
-			return "NVIDIA";
-		case 0x8086u:
-			return "Intel";
-		default:
-			return "Unknown";
-	}
-}
-
-static RuntimeGpuProfile GetRuntimeProfileFromVendorId(u32 vendor_id)
-{
-	switch (vendor_id)
-	{
-		case 0x13B5u:
-			return RuntimeGpuProfile::Mali;
-		case 0x5143u:
-			return RuntimeGpuProfile::Adreno;
-		default:
-			return RuntimeGpuProfile::Unknown;
-	}
 }
 
 static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool texture_barrier,
@@ -2687,18 +2653,6 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 
 	// Stores the GPU name
 	m_name = m_device_properties.deviceName;
-#if defined(__ANDROID__)
-	{
-		const GpuProfileSelection profile_selection =
-			GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
-				GetVendorNameFromID(m_device_properties.vendorID), m_name);
-		SetRuntimeGPUProfile(profile_selection.runtime_profile);
-		Console.WriteLn("VK: Android runtime GPU profile: %s",
-			GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
-	}
-#else
-	SetRuntimeGPUProfile(GetRuntimeProfileFromVendorId(m_device_properties.vendorID));
-#endif
 
 	// We need this to be at least 32 byte aligned for AVX2 stores.
 	m_device_properties.limits.minUniformBufferOffsetAlignment =

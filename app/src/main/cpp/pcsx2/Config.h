@@ -921,7 +921,6 @@ struct Pcsx2Config
 
 		std::string Adapter;
 		std::string CustomDriverPath;
-		std::string AndroidGpuProfileOverride = "auto";
 		std::string HWDumpDirectory;
 		std::string SWDumpDirectory;
 
