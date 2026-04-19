@@ -12,6 +12,47 @@
 #include "common/StringUtil.h"
 #include <bit>
 
+namespace
+{
+__ri static constexpr bool GSHasBarrierFeedbackSupport(const GSDevice::FeatureSupport& features)
+{
+	return features.texture_barrier || features.multidraw_fb_copy;
+}
+
+__ri static constexpr bool GSCanUseBarrierColorFeedback(const GSDevice::FeatureSupport& features, bool require_one_barrier,
+	bool require_full_barrier, bool single_pass_feedback, bool needs_depth_feedback)
+{
+	return !needs_depth_feedback && GSHasBarrierFeedbackSupport(features) &&
+		((require_one_barrier && single_pass_feedback) || require_full_barrier);
+}
+
+__ri static constexpr bool GSCanUseFramebufferFetchColorFeedback(const GSDevice::FeatureSupport& features,
+	bool needs_depth_feedback)
+{
+	return features.framebuffer_fetch && !needs_depth_feedback;
+}
+
+__ri static constexpr bool GSUsesDepthAsRTFeedback(const GSDevice::FeatureSupport& features, bool needs_depth_feedback)
+{
+	return needs_depth_feedback &&
+		(features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT);
+}
+
+__ri static constexpr bool GSNeedsDirectDepthFeedbackBarriers(const GSDevice::FeatureSupport& features,
+	bool needs_depth_feedback)
+{
+	return needs_depth_feedback &&
+		(features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth);
+}
+
+__ri static bool GSPreferLegacyMaliSWBlend(const GSDevice::FeatureSupport& features, bool alpha_eq_less_one,
+	bool alpha_c0_high_max_one)
+{
+	return g_gs_device && g_gs_device->IsMaliGPUProfile() && !features.framebuffer_fetch &&
+		(alpha_eq_less_one || alpha_c0_high_max_one);
+}
+}
+
 GSRendererHW::GSRendererHW()
 	: GSRenderer()
 {
@@ -5779,8 +5820,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 	const bool alpha_eq_one = alpha_c0_eq_one || alpha_c2_eq_one;
 	const bool alpha_high_one = alpha_c0_high_min_one || alpha_c2_high_one;
 	const bool alpha_eq_less_one = alpha_c0_eq_less_max_one || alpha_c2_eq_less_one;
-	const bool alpha_mali_custom_set = g_gs_device && g_gs_device->IsMaliGPUProfile() &&
-		(alpha_eq_less_one || alpha_c0_high_max_one);
+	const bool prefer_legacy_mali_sw_blend =
+		GSPreferLegacyMaliSWBlend(features, alpha_eq_less_one, alpha_c0_high_max_one);
 
 	// Optimize blending equations, must be done before index calculation
 	if ((m_conf.ps.blend_a == m_conf.ps.blend_b) || ((m_conf.ps.blend_b == m_conf.ps.blend_d) && alpha_eq_one))
@@ -5908,7 +5949,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 	const bool blend_multipass_group = blend_multi_pass_support && !features.texture_barrier &&
 		(bmix1_multi_pass1 || bmix1_multi_pass2 || bmix3_multi_pass || (blend_flag & (BLEND_HW3 | BLEND_HW4 | BLEND_HW5 | BLEND_HW6 | BLEND_HW7 | BLEND_HW8 | BLEND_HW9)));
 
-	const bool barriers_supported = features.texture_barrier || features.multidraw_fb_copy;
+	const bool barriers_supported = GSHasBarrierFeedbackSupport(features);
 	const bool blend_requires_barrier =
 		// We don't want the cases to be enabled if barriers aren't supported so limit it to no overlap.
 		(no_prim_overlap || barriers_supported)
@@ -5952,7 +5993,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 			// Enable sw blending for barriers.
 			sw_blending |= blend_requires_barrier || prefer_sw_blend;
 			// Keep the old Mali path forcing SW blending on the problematic alpha ranges.
-			sw_blending |= (free_blend || alpha_mali_custom_set);
+			sw_blending |= (free_blend || prefer_legacy_mali_sw_blend);
 			// Do not run BLEND MIX if sw blending is already present, it's less accurate.
 			blend_mix &= !sw_blending;
 			sw_blending |= blend_mix;
@@ -5977,7 +6018,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 	}
 
 	if (m_conf.alpha_test == GSHWDrawConfig::AlphaTestMode::FEEDBACK &&
-		features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT)
+		GSUsesDepthAsRTFeedback(features, m_conf.ps.IsFeedbackLoopDepth()))
 	{
 		// If we are doing feedback alpha test with a second RT we must use SW blending to avoid
 		// mixing dual source blending with multiple render targets.
@@ -7447,21 +7488,19 @@ void GSRendererHW::EmulateAlphaTest(const bool& DATE, bool& DATE_BARRIER, bool& 
 
 	// If we already have the required barriers for the accurate feedback path and
 	// do not require depth feedback.
-	const bool free_barrier_feedback =
-		((m_conf.require_one_barrier && feedback_one_pass) || m_conf.require_full_barrier) &&
-		(features.texture_barrier || features.multidraw_fb_copy) &&
-		!afail_needs_depth;
+	const bool barrier_feedback_supported = GSHasBarrierFeedbackSupport(features);
+	const bool free_barrier_feedback = GSCanUseBarrierColorFeedback(features, m_conf.require_one_barrier,
+		m_conf.require_full_barrier, feedback_one_pass, afail_needs_depth);
 
 	// Determine if we can use FB-fetch for color only feedback.
-	const bool free_fbfetch_feedback = features.framebuffer_fetch && !afail_needs_depth;
+	const bool free_fbfetch_feedback = GSCanUseFramebufferFetchColorFeedback(features, afail_needs_depth);
 
 	// Determine if we have the correct features for depth feedback.
 	const bool depth_feedback_supported = features.depth_feedback != GSDevice::DepthFeedbackSupport::None;
 
 	// Determine if the method for doing depth feedback uses multiple render targets.
 	// This should not be used in conjunction with dual source blend.
-	const bool depth_as_rt_feedback = afail_needs_depth &&
-		(features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT);
+	const bool depth_as_rt_feedback = GSUsesDepthAsRTFeedback(features, afail_needs_depth);
 
 	// We need depth feedback but do not have the correct features.
 	const bool avoid_feedback = afail_needs_depth && !depth_feedback_supported;
@@ -7486,8 +7525,9 @@ void GSRendererHW::EmulateAlphaTest(const bool& DATE, bool& DATE_BARRIER, bool& 
 
 		m_conf.ps.color_feedback |= afail_needs_rt;
 		m_conf.ps.depth_feedback |= afail_needs_depth;
+		m_conf.ps.no_color1 |= depth_as_rt_feedback;
 
-		if (!free_fbfetch_feedback && (features.texture_barrier || features.multidraw_fb_copy))
+		if (!free_fbfetch_feedback && barrier_feedback_supported)
 		{
 			m_conf.require_one_barrier |= feedback_one_pass;
 			m_conf.require_full_barrier |= !feedback_one_pass;
@@ -8382,8 +8422,8 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 
 		// If we use depth feedback directly, we must use barriers for the depth texture.
 		// If we use depth-as-color feedback, then FB fetch can be used for depth also.
-		bool need_barriers_for_depth = m_conf.ps.IsFeedbackLoopDepth() &&
-		                               (features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth);
+		const bool need_barriers_for_depth =
+			GSNeedsDirectDepthFeedbackBarriers(features, m_conf.ps.IsFeedbackLoopDepth());
 
 		if (!need_barriers_for_depth)
 		{
@@ -8396,12 +8436,13 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	pxAssert(!m_conf.require_full_barrier || !m_conf.ps.colclip_hw);
 
 	// Swap full barrier for one barrier when there's no overlap, or a shuffle.
-	if ((features.texture_barrier || features.multidraw_fb_copy) && m_conf.require_full_barrier && (m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle || m_channel_shuffle))
+	if (GSHasBarrierFeedbackSupport(features) && m_conf.require_full_barrier &&
+		(m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle || m_channel_shuffle))
 	{
 		m_conf.require_full_barrier = false;
 		m_conf.require_one_barrier = true;
 	}
-	else if (!(features.texture_barrier || features.multidraw_fb_copy))
+	else if (!GSHasBarrierFeedbackSupport(features))
 	{
 		// These shouldn't be enabled if texture barriers aren't supported, make sure they are off.
 		m_conf.ps.write_rg = 0;
@@ -9954,8 +9995,7 @@ std::size_t GSRendererHW::ComputeDrawlistGetSize(float scale)
 void GSRendererHW::StartDepthAsRTFeedback()
 {
 	// Create a temporary depth color target
-	if (m_conf.ds && m_conf.ps.IsFeedbackLoopDepth() &&
-		g_gs_device->Features().depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT)
+	if (m_conf.ds && GSUsesDepthAsRTFeedback(g_gs_device->Features(), m_conf.ps.IsFeedbackLoopDepth()))
 	{
 		GL_PUSH("HW: Creating temporary R32 RT for depth feedback");
 
