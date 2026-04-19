@@ -1252,11 +1252,6 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 	${LIBC_LIBRARIES}
 )
 
-if(ANDROID AND USE_VULKAN AND TARGET adrenotools)
-	target_link_libraries(PCSX2_FLAGS INTERFACE adrenotools)
-	target_compile_definitions(PCSX2_FLAGS INTERFACE USE_ADRENOTOOLS)
-endif()
-
 if(USE_DISCORD_SDK)
 	if(TARGET discord_partner_sdk::discord_partner_sdk)
 		target_link_libraries(PCSX2_FLAGS INTERFACE discord_partner_sdk::discord_partner_sdk)

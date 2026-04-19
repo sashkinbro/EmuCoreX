@@ -1838,7 +1838,7 @@ Java_com_sbro_emucorex_core_NativeApp_setNativeLibraryDir(JNIEnv *env, jclass cl
     std::string native_lib_dir = GetJavaString(env, p_path);
     if (!native_lib_dir.empty())
     {
-        // Set env variable for libadrenotools to use
+        // Preserve the app native library directory for direct Vulkan library lookup.
         setenv("ANDROID_NATIVE_LIB_DIR", native_lib_dir.c_str(), 1);
     }
 }

@@ -17,6 +17,7 @@ enum class GpuProfileOverride : u8
 
 enum class RuntimeGpuProfile : u8
 {
+	Unknown,
 	Mali,
 	Adreno,
 };
@@ -24,7 +25,7 @@ enum class RuntimeGpuProfile : u8
 struct GpuProfileSelection
 {
 	GpuProfileOverride override_mode = GpuProfileOverride::Auto;
-	RuntimeGpuProfile runtime_profile = RuntimeGpuProfile::Adreno;
+	RuntimeGpuProfile runtime_profile = RuntimeGpuProfile::Unknown;
 	std::string hints;
 };
 

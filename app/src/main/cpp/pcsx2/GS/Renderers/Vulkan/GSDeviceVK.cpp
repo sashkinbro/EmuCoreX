@@ -81,11 +81,45 @@ static const char* GetVendorNameFromID(u32 vendor_id)
 	}
 }
 
-#if defined(__ANDROID__)
-static bool ShouldUseConservativeAndroidVulkanBarrierPolicy(RuntimeGpuProfile runtime_profile, std::string_view override_value)
+static RuntimeGpuProfile GetRuntimeProfileFromVendorId(u32 vendor_id)
 {
-	return (runtime_profile == RuntimeGpuProfile::Adreno &&
-		GpuProfileDetector::ParseOverride(override_value) == GpuProfileOverride::Auto);
+	switch (vendor_id)
+	{
+		case 0x13B5u:
+			return RuntimeGpuProfile::Mali;
+		case 0x5143u:
+			return RuntimeGpuProfile::Adreno;
+		default:
+			return RuntimeGpuProfile::Unknown;
+	}
+}
+
+static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool texture_barrier,
+	GSDepthFeedbackMode mode)
+{
+	switch (mode)
+	{
+		case GSDepthFeedbackMode::DepthAsRT:
+			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::Depth:
+			return texture_barrier ? GSDevice::DepthFeedbackSupport::Depth :
+				GSDevice::DepthFeedbackSupport::None;
+		case GSDepthFeedbackMode::Auto:
+			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::None:
+		default:
+			return GSDevice::DepthFeedbackSupport::None;
+	}
+}
+
+#if defined(__ANDROID__)
+static bool ShouldUseConservativeAndroidVulkanFeedbackPath()
+{
+	// The Android Vulkan RT feedback path currently shows post-load corruption where the first
+	// draw looks correct and a later feedback-loop transition introduces reflection/highlight
+	// artifacts. Prefer the explicit barrier/input-attachment route until fb-fetch is revalidated
+	// against the newer GS core on Android as a whole.
+	return true;
 }
 #endif
 
@@ -1662,7 +1696,7 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	}
 
 	const VkSubpassDescriptionFlags subpass_flags =
-		(key.color_feedback_loop && m_optional_extensions.vk_ext_rasterization_order_attachment_access) ?
+		(key.color_feedback_loop && UsesRasterizationOrderAttachmentAccessForFeedback()) ?
 			VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT :
 			0;
 	const VkSubpassDescription subpass = {subpass_flags, VK_PIPELINE_BIND_POINT_GRAPHICS, num_subpass_inputs,
@@ -2653,8 +2687,7 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 			GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
 	}
 #else
-	SetRuntimeGPUProfile((m_device_properties.vendorID == 0x13B5u) ? RuntimeGpuProfile::Mali :
-		RuntimeGpuProfile::Adreno);
+	SetRuntimeGPUProfile(GetRuntimeProfileFromVendorId(m_device_properties.vendorID));
 #endif
 
 	// We need this to be at least 32 byte aligned for AVX2 stores.
@@ -2731,13 +2764,10 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.broken_point_sampler = false;
 
 #ifdef __ANDROID__
-	// Qualcomm Android drivers are currently the riskiest barrier/fbfetch path in this fork,
-	// but explicit user overrides should still be respected for validation and recovery work.
-	if (ShouldUseConservativeAndroidVulkanBarrierPolicy(GetRuntimeGPUProfile(), GSConfig.AndroidGpuProfileOverride))
-	{
-		texture_barrier = false;
+	// Prefer the explicit Android Vulkan feedback route for now. This keeps texture barriers on,
+	// but avoids the fb-fetch/raster-order path until it is revalidated against the newer GS core.
+	if (ShouldUseConservativeAndroidVulkanFeedbackPath())
 		framebuffer_fetch = false;
-	}
 #endif
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
@@ -2777,26 +2807,20 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.line_expand =
 		(m_device_features.wideLines && limits.lineWidthRange[0] <= f_upscale && limits.lineWidthRange[1] >= f_upscale);
 
-	// Mobile GPUs tend to emulate wide points/lines expensively, so keep the old vertex-expansion path there.
+	// Mobile Vulkan drivers tend to emulate wide points/lines expensively, so keep the vertex-expansion
+	// path on Android instead of routing this through legacy Mali/Adreno profile policy.
 #ifdef __ANDROID__
-	if (IsAdrenoGPUProfile() || IsMaliGPUProfile())
+	const bool prefer_vertex_expansion_for_mobile = true;
 #else
-	if (vendorID == 0x5143u || vendorID == 0x13B5u)
+	const bool prefer_vertex_expansion_for_mobile = (vendorID == 0x5143u || vendorID == 0x13B5u);
 #endif
+	if (prefer_vertex_expansion_for_mobile)
 	{
 		m_features.point_expand = false;
 		m_features.line_expand = false;
 	}
 
-	if (m_features.texture_barrier && (GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Auto ||
-		GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Depth))
-	{
-		m_features.depth_feedback = GSDevice::DepthFeedbackSupport::Depth;
-	}
-	else
-	{
-		m_features.depth_feedback = GSDevice::DepthFeedbackSupport::None;
-	}
+	m_features.depth_feedback = GetVKDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
 
 	DevCon.WriteLn("Optional features:%s%s%s%s%s", m_features.primitive_id ? " primitive_id" : "",
 		m_features.texture_barrier ? " texture_barrier" : "", m_features.framebuffer_fetch ? " framebuffer_fetch" : "",

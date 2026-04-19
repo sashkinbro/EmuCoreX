@@ -17,9 +17,6 @@
 #include <string>
 
 #ifdef __ANDROID__
-#ifdef USE_ADRENOTOOLS
-#include <adrenotools/driver.h>
-#endif
 #include <dlfcn.h>
 #endif
 
@@ -63,14 +60,6 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 		char* libvulkan_env = getenv("LIBVULKAN_PATH");
 		if (libvulkan_env)
 			custom_driver_path = libvulkan_env;
-#if defined(USE_ADRENOTOOLS)
-		if (custom_driver_path.empty())
-		{
-			char* adreno_tools_path = getenv("ADRENOTOOLS_LIBVULKAN_PATH");
-			if (adreno_tools_path)
-				custom_driver_path = adreno_tools_path;
-		}
-#endif
 	}
 	else
 	{
@@ -79,93 +68,19 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 
 	if (!custom_driver_path.empty())
 	{
-#if defined(USE_ADRENOTOOLS)
-		std::string custom_driver_dir;
-		std::string custom_driver_name;
-
-		const size_t last_slash = custom_driver_path.find_last_of("/\\");
-		if (last_slash != std::string::npos)
-		{
-			custom_driver_dir = custom_driver_path.substr(0, last_slash + 1);
-			custom_driver_name = custom_driver_path.substr(last_slash + 1);
-		}
-		else
-		{
-			custom_driver_name = custom_driver_path;
-		}
-
-		const char* hook_lib_dir = getenv("ANDROID_NATIVE_LIB_DIR");
-		if (!hook_lib_dir)
-			hook_lib_dir = getenv("ANDROID_DATA_DIR");
-
-		if (hook_lib_dir && !custom_driver_dir.empty() && !custom_driver_name.empty())
-		{
-			Console.WriteLn(Color_StrongGreen,
-				"Vulkan: Using libadrenotools to load custom driver: %s from %s",
-				custom_driver_name.c_str(), custom_driver_dir.c_str());
-
-			void* vulkan_handle = adrenotools_open_libvulkan(
-				RTLD_NOW | RTLD_LOCAL,
-				ADRENOTOOLS_DRIVER_CUSTOM,
-				nullptr,
-				hook_lib_dir,
-				custom_driver_dir.c_str(),
-				custom_driver_name.c_str(),
-				nullptr,
-				nullptr);
-
-			if (vulkan_handle)
-			{
-				s_vulkan_library.Adopt(vulkan_handle);
-				Console.WriteLn(Color_StrongGreen,
-					"Vulkan: Successfully loaded custom driver via libadrenotools");
-			}
-			else
-			{
-				Console.Warning(
-					"Vulkan: libadrenotools failed to load custom driver, falling back to direct loading");
-				if (s_vulkan_library.Open(custom_driver_path.c_str(), error))
-				{
-					Console.WriteLn(Color_StrongGreen,
-						"Vulkan: Successfully loaded custom driver directly");
-				}
-				else
-				{
-					Console.Warning(
-						"Vulkan: Failed to load custom driver from '%s', falling back to system driver",
-						custom_driver_path.c_str());
-				}
-			}
-		}
-		else
-		{
-			Console.Warning(
-				"Vulkan: libadrenotools requires ANDROID_NATIVE_LIB_DIR and valid custom driver path, falling back to direct loading");
-			if (s_vulkan_library.Open(custom_driver_path.c_str(), error))
-			{
-				Console.WriteLn(Color_StrongGreen,
-					"Vulkan: Successfully loaded custom driver directly");
-			}
-			else
-			{
-				Console.Warning(
-					"Vulkan: Failed to load custom driver from '%s', falling back to system driver",
-					custom_driver_path.c_str());
-			}
-		}
-#else
 		Console.WriteLn(Color_StrongGreen, "Vulkan: Attempting to load custom driver from: %s",
 			custom_driver_path.c_str());
 		if (s_vulkan_library.Open(custom_driver_path.c_str(), error))
 		{
-			Console.WriteLn(Color_StrongGreen, "Vulkan: Successfully loaded custom driver");
+			Console.WriteLn(Color_StrongGreen,
+				"Vulkan: Successfully loaded custom driver directly");
 		}
 		else
 		{
-			Console.Warning("Vulkan: Failed to load custom driver from '%s', falling back to system driver",
+			Console.Warning(
+				"Vulkan: Failed to load custom driver from '%s', falling back to system driver",
 				custom_driver_path.c_str());
 		}
-#endif
 	}
 
 	if (!s_vulkan_library.IsOpen())

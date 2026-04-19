@@ -33,6 +33,80 @@ static constexpr u32 VERTEX_UNIFORM_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr u32 FRAGMENT_UNIFORM_BUFFER_SIZE = 8 * 1024 * 1024;
 static constexpr u32 TEXTURE_UPLOAD_BUFFER_SIZE = 128 * 1024 * 1024;
 
+static constexpr bool ShouldUseOGLInsideTargetFallbackOnGLES(bool is_gles,
+	const GSDevice::FeatureSupport& features, GSTextureInRtMode current_mode)
+{
+	return is_gles && !features.texture_barrier && (current_mode == GSTextureInRtMode::Disabled);
+}
+
+static constexpr GSDevice::DepthFeedbackSupport GetOGLDepthFeedbackSupport(bool texture_barrier,
+	GSDepthFeedbackMode mode)
+{
+	switch (mode)
+	{
+		case GSDepthFeedbackMode::DepthAsRT:
+			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::Depth:
+			return texture_barrier ? GSDevice::DepthFeedbackSupport::Depth :
+				GSDevice::DepthFeedbackSupport::None;
+		case GSDepthFeedbackMode::Auto:
+			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::None:
+		default:
+			return GSDevice::DepthFeedbackSupport::None;
+	}
+}
+
+static constexpr bool ShouldBindOGLColorFeedbackTexture(const GSDevice::FeatureSupport& features,
+	const GSHWDrawConfig& config)
+{
+	return features.texture_barrier && (config.require_one_barrier || config.require_full_barrier);
+}
+
+static constexpr bool ShouldBindOGLDepthFeedbackTexture(const GSDevice::FeatureSupport& features,
+	const GSHWDrawConfig& config)
+{
+	if (!config.ps.IsFeedbackLoopDepth())
+		return false;
+
+	return ShouldBindOGLColorFeedbackTexture(features, config) ||
+		(features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT);
+}
+
+static constexpr GSTexture* GetOGLDepthFeedbackTexture(const GSDevice::FeatureSupport& features,
+	const GSHWDrawConfig& config)
+{
+	return (features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT) ? config.ds_as_rt :
+		(features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth ? config.ds : nullptr);
+}
+
+static constexpr bool HasOGLMultiDrawCopyFallback(const GSDevice::FeatureSupport& features,
+	const GSHWDrawConfig& config)
+{
+	return features.multidraw_fb_copy && (config.require_one_barrier || config.require_full_barrier);
+}
+
+static constexpr bool ShouldIssueOGLHazardBarrier(const GSDevice::FeatureSupport& features,
+	bool framebuffer_optimization_needs_barrier, bool rt_hazard_barrier)
+{
+	return features.texture_barrier && framebuffer_optimization_needs_barrier && rt_hazard_barrier;
+}
+
+static constexpr bool ShouldCloneOGLRenderTargetForFeedback(const GSDevice::FeatureSupport& features,
+	const GSHWDrawConfig& config, GSTexture* draw_rt)
+{
+	return draw_rt &&
+		(config.require_one_barrier || (config.require_full_barrier && HasOGLMultiDrawCopyFallback(features, config)) ||
+			(config.tex && config.tex == config.rt)) &&
+		!features.texture_barrier;
+}
+
+static constexpr bool ShouldCloneOGLDepthFeedbackTarget(const GSDevice::FeatureSupport& features,
+	GSTexture* draw_ds_as_rt)
+{
+	return draw_ds_as_rt && !features.texture_barrier;
+}
+
 namespace ReplaceGL
 {
 	static void GLAPIENTRY ScissorIndexed(GLuint index, GLint left, GLint bottom, GLsizei width, GLsizei height)
@@ -763,12 +837,9 @@ bool GSDeviceOGL::CheckFeatures()
 	const GpuProfileSelection profile_selection =
 		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str);
 	SetRuntimeGPUProfile(profile_selection.runtime_profile);
-	const bool use_mali_profile = IsMaliGPUProfile();
-	const bool use_adreno_profile = IsAdrenoGPUProfile();
 #else
-	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali : RuntimeGpuProfile::Adreno);
-	const bool use_mali_profile = vendor_id_mali;
-	const bool use_adreno_profile = vendor_id_adreno;
+	SetRuntimeGPUProfile(vendor_id_mali ? RuntimeGpuProfile::Mali :
+		(vendor_id_adreno ? RuntimeGpuProfile::Adreno : RuntimeGpuProfile::Unknown));
 #endif
 
 	GLint major_gl = 0;
@@ -878,39 +949,17 @@ bool GSDeviceOGL::CheckFeatures()
 		framebuffer_fetch = false;
 	}
 
-	// The EXT framebuffer fetch path on Adreno is fast, but it has proven unreliable
-	// in some depth/stencil-heavy scenes. Prefer the safer fallback path there unless
-	// the user explicitly overrides the barrier mode.
 	m_features.provoking_vertex_last = true;
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
 	m_features.bptc_textures =
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
-	m_features.prefer_new_textures = false;
+	m_features.prefer_new_textures = m_is_gles;
 	m_features.stencil_buffer = true;
-
-	if (use_mali_profile)
-	{
-		m_features.prefer_new_textures = true;
-		// Keep the Mali auto-profile on the explicit ARM fetch path, but make sure
-		// all dependent feature gates are derived from the final decision below.
-		// This avoids ending up with stale multidraw/depth gates after the profile override.
-		framebuffer_fetch = has_arm_framebuffer_fetch;
-	}
-
-	if (use_adreno_profile)
-	{
-		m_features.prefer_new_textures = true;
-	}
-
-	if (use_adreno_profile && framebuffer_fetch && GSConfig.OverrideTextureBarriers == -1)
-		framebuffer_fetch = false;
 
 	if (GSConfig.OverrideTextureBarriers == 0)
 		m_features.texture_barrier = framebuffer_fetch; // Force Disabled
 	else if (GSConfig.OverrideTextureBarriers == 1)
 		m_features.texture_barrier = true; // Force Enabled
-	else if (use_mali_profile)
-		m_features.texture_barrier = framebuffer_fetch;
 	else
 		m_features.texture_barrier = framebuffer_fetch || has_texture_barrier_extension;
 
@@ -922,11 +971,10 @@ bool GSDeviceOGL::CheckFeatures()
 			"GL_ARB_texture_barrier is not supported, blending will not be accurate.", Host::OSD_ERROR_DURATION);
 	}
 
-	// Without texture barriers on Adreno/GLES, feedback hazards can be missed when a texture is sourced
-	// from a region inside an existing render target. Enable inside-target tracking so tex-in-RT draws are
-	// treated as target-backed sources instead of plain textures.
-	if (use_adreno_profile && !m_features.texture_barrier &&
-		GSConfig.UserHacks_TextureInsideRt == GSTextureInRtMode::Disabled)
+	// Without texture barriers on Android GLES, feedback hazards can be missed when a texture is sourced
+	// from a region inside an existing render target. Keep inside-target tracking enabled in that case so
+	// tex-in-RT draws are treated as target-backed sources instead of plain textures.
+	if (ShouldUseOGLInsideTargetFallbackOnGLES(m_is_gles, m_features, GSConfig.UserHacks_TextureInsideRt))
 	{
 		GSConfig.UserHacks_TextureInsideRt = GSTextureInRtMode::InsideTargets;
 	}
@@ -938,29 +986,8 @@ bool GSDeviceOGL::CheckFeatures()
 
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 	// Depth-as-RT feedback works from a copied R32 target, so it doesn't need texture barriers.
-	// Keep direct depth sampling gated on barriers, but allow the safer copy-based path on GLES.
-	if (m_features.texture_barrier || GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::DepthAsRT ||
-		GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Auto)
-	{
-		// Auto select chooses depth-as-rt as it appears to be more compatible across hardware.
-		if (GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::DepthAsRT ||
-			GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Auto)
-		{
-			m_features.depth_feedback = GSDevice::DepthFeedbackSupport::DepthAsRT;
-		}
-		else if (m_features.texture_barrier && GSConfig.DepthFeedbackMode == GSDepthFeedbackMode::Depth)
-		{
-			m_features.depth_feedback = GSDevice::DepthFeedbackSupport::Depth;
-		}
-		else
-		{
-			m_features.depth_feedback = GSDevice::DepthFeedbackSupport::None;
-		}
-	}
-	else
-	{
-		m_features.depth_feedback = GSDevice::DepthFeedbackSupport::None;
-	}
+	// Direct depth feedback still requires texture barriers.
+	m_features.depth_feedback = GetOGLDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
 
 	if (GLAD_GL_ARB_shader_storage_buffer_object)
 	{
@@ -1560,8 +1587,6 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define HAS_EXT_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_EXT_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
-	header += fmt::format("#define GPU_PROFILE_MALI {}\n", IsMaliGPUProfile() ? 1 : 0);
-	header += fmt::format("#define GPU_PROFILE_ADRENO {}\n", IsAdrenoGPUProfile() ? 1 : 0);
 
 	if (GLAD_GL_ARB_conservative_depth)
 	{
@@ -2914,13 +2939,10 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		PSSetShaderResource(0, config.tex);
 	if (config.pal)
 		PSSetShaderResource(1, config.pal);
-	if (m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier))
+	if (ShouldBindOGLColorFeedbackTexture(m_features, config))
 		PSSetShaderResource(2, colclip_rt ? colclip_rt : config.rt);
-	if (config.ps.IsFeedbackLoopDepth() &&
-		((m_features.texture_barrier && (config.require_one_barrier || config.require_full_barrier)) ||
-		 m_features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT))
-		PSSetShaderResource(4, m_features.depth_feedback == GSDevice::DepthFeedbackSupport::DepthAsRT ? config.ds_as_rt :
-		                       m_features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth ? config.ds : nullptr);
+	if (ShouldBindOGLDepthFeedbackTexture(m_features, config))
+		PSSetShaderResource(4, GetOGLDepthFeedbackTexture(m_features, config));
 
 	SetupSampler(config.sampler);
 
@@ -3044,7 +3066,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 	}
 
 	// Be careful of the rt already being bound and the blend using the RT without a barrier.
-	if (fb_optimization_needs_barrier && rt_hazard_barrier)
+	if (ShouldIssueOGLHazardBarrier(m_features, fb_optimization_needs_barrier, rt_hazard_barrier))
 	{
 		// Ensure all depth writes are finished before sampling
 		GL_INS("GL: Texture barrier to flush depth or rt before reading");
@@ -3052,10 +3074,9 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		glTextureBarrier();
 	}
 
-	const bool multidraw_fb_copy = m_features.multidraw_fb_copy && (config.require_one_barrier || config.require_full_barrier);
+	const bool multidraw_fb_copy = HasOGLMultiDrawCopyFallback(m_features, config);
 
-	if (draw_rt && (config.require_one_barrier || (config.require_full_barrier && multidraw_fb_copy) ||
-		(config.tex && config.tex == config.rt)) && !m_features.texture_barrier)
+	if (ShouldCloneOGLRenderTargetForFeedback(m_features, config, draw_rt))
 	{
 		// Requires a copy of the RT.
 		draw_rt_clone = CreateTexture(rtsize.x, rtsize.y, 1, draw_rt->GetFormat(), true);
@@ -3075,7 +3096,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 			Console.Warning("GL: Failed to allocate temp texture for RT copy.");
 	}
 
-	if (draw_ds_as_rt && !m_features.texture_barrier)
+	if (ShouldCloneOGLDepthFeedbackTarget(m_features, draw_ds_as_rt))
 	{
 		const GSVector2i dssize = draw_ds_as_rt->GetSize();
 		draw_ds_clone = CreateTexture(dssize.x, dssize.y, 1, draw_ds_as_rt->GetFormat(), true);

@@ -45,11 +45,15 @@ __ri static constexpr bool GSNeedsDirectDepthFeedbackBarriers(const GSDevice::Fe
 		(features.depth_feedback == GSDevice::DepthFeedbackSupport::Depth);
 }
 
-__ri static bool GSPreferLegacyMaliSWBlend(const GSDevice::FeatureSupport& features, bool alpha_eq_less_one,
+__ri static bool GSPreferMobileFallbackSWBlend(const GSDevice::FeatureSupport& features, bool alpha_eq_less_one,
 	bool alpha_c0_high_max_one)
 {
-	return g_gs_device && g_gs_device->IsMaliGPUProfile() && !features.framebuffer_fetch &&
-		(alpha_eq_less_one || alpha_c0_high_max_one);
+#if defined(__ANDROID__)
+	return g_gs_device && g_gs_device->GetRenderAPI() == RenderAPI::OpenGL &&
+		!features.framebuffer_fetch && (alpha_eq_less_one || alpha_c0_high_max_one);
+#else
+	return false;
+#endif
 }
 }
 
@@ -5820,8 +5824,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 	const bool alpha_eq_one = alpha_c0_eq_one || alpha_c2_eq_one;
 	const bool alpha_high_one = alpha_c0_high_min_one || alpha_c2_high_one;
 	const bool alpha_eq_less_one = alpha_c0_eq_less_max_one || alpha_c2_eq_less_one;
-	const bool prefer_legacy_mali_sw_blend =
-		GSPreferLegacyMaliSWBlend(features, alpha_eq_less_one, alpha_c0_high_max_one);
+	const bool prefer_mobile_fallback_sw_blend =
+		GSPreferMobileFallbackSWBlend(features, alpha_eq_less_one, alpha_c0_high_max_one);
 
 	// Optimize blending equations, must be done before index calculation
 	if ((m_conf.ps.blend_a == m_conf.ps.blend_b) || ((m_conf.ps.blend_b == m_conf.ps.blend_d) && alpha_eq_one))
@@ -5992,8 +5996,8 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, const boo
 			accumulation_blend &= !prefer_sw_blend;
 			// Enable sw blending for barriers.
 			sw_blending |= blend_requires_barrier || prefer_sw_blend;
-			// Keep the old Mali path forcing SW blending on the problematic alpha ranges.
-			sw_blending |= (free_blend || prefer_legacy_mali_sw_blend);
+			// On Android GL without framebuffer fetch, keep the fallback SW blend on problematic alpha ranges.
+			sw_blending |= (free_blend || prefer_mobile_fallback_sw_blend);
 			// Do not run BLEND MIX if sw blending is already present, it's less accurate.
 			blend_mix &= !sw_blending;
 			sw_blending |= blend_mix;
@@ -8436,7 +8440,13 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	pxAssert(!m_conf.require_full_barrier || !m_conf.ps.colclip_hw);
 
 	// Swap full barrier for one barrier when there's no overlap, or a shuffle.
+	// Keep the stricter path for real RT/depth feedback-loop draws, because downgrading
+	// them to a single pre-draw barrier can surface read-after-write corruption when the
+	// overlap heuristic is optimistic.
+	const bool preserve_full_barrier_for_feedback =
+		m_conf.ps.IsFeedbackLoopRT() || m_conf.ps.IsFeedbackLoopDepth();
 	if (GSHasBarrierFeedbackSupport(features) && m_conf.require_full_barrier &&
+		!preserve_full_barrier_for_feedback &&
 		(m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle || m_channel_shuffle))
 	{
 		m_conf.require_full_barrier = false;

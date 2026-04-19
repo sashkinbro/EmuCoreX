@@ -98,6 +98,13 @@ static bool LooksLikeAdreno(std::string_view lowered_hints)
 	return (has_adreno || has_qualcomm);
 }
 
+static bool LooksLikeMali(std::string_view lowered_hints)
+{
+	const bool has_mali = ContainsAny(lowered_hints, {"mali", "immortalis", "valhall", "bifrost"});
+	const bool has_arm = ContainsAny(lowered_hints, {"arm"});
+	return (has_mali || has_arm);
+}
+
 } // namespace
 
 GpuProfileOverride GpuProfileDetector::ParseOverride(std::string_view value)
@@ -143,6 +150,8 @@ const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
 {
 	switch (value)
 	{
+		case RuntimeGpuProfile::Unknown:
+			return "Unknown";
 		case RuntimeGpuProfile::Mali:
 			return "Mali";
 		case RuntimeGpuProfile::Adreno:
@@ -172,19 +181,18 @@ GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value,
 
 	const std::string lowered_hints = ToLowerASCII(selection.hints);
 
-#if defined(__ANDROID__)
-	if (LooksLikeAdreno(lowered_hints))
+	if (LooksLikeMali(lowered_hints))
+	{
+		selection.runtime_profile = RuntimeGpuProfile::Mali;
+	}
+	else if (LooksLikeAdreno(lowered_hints))
 	{
 		selection.runtime_profile = RuntimeGpuProfile::Adreno;
 	}
 	else
 	{
-		// Per Android policy for this fork: unknown/non-Adreno devices default to Mali profile.
-		selection.runtime_profile = RuntimeGpuProfile::Mali;
+		selection.runtime_profile = RuntimeGpuProfile::Unknown;
 	}
-#else
-	selection.runtime_profile = RuntimeGpuProfile::Adreno;
-#endif
 
 	return selection;
 }
