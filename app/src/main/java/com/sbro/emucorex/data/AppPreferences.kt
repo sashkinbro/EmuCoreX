@@ -111,6 +111,7 @@ data class SettingsSnapshot(
     val enableAutoGamepad: Boolean = true,
     val hideOverlayOnGamepad: Boolean = true,
     val gamepadBindings: Map<String, Int> = emptyMap(),
+    val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
     val frameLimitEnabled: Boolean = false,
@@ -626,6 +627,7 @@ class AppPreferences(private val context: Context) {
                 enableAutoGamepad = prefs[ENABLE_AUTO_GAMEPAD] ?: true,
                 hideOverlayOnGamepad = prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true,
                 gamepadBindings = decodeGamepadBindings(prefs[GAMEPAD_BINDINGS]),
+                gamepadBindingsByPad = decodeGamepadBindingsByPad(prefs[GAMEPAD_BINDINGS]),
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
                 frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: false,
@@ -844,25 +846,88 @@ class AppPreferences(private val context: Context) {
         return array.toString()
     }
 
-    private fun decodeGamepadBindings(raw: String?): Map<String, Int> {
+    private fun decodeGamepadBindingsByPad(raw: String?): Map<Int, Map<String, Int>> {
         if (raw.isNullOrBlank()) return emptyMap()
         return runCatching {
             val json = JSONObject(raw)
-            buildMap {
+            val nested = buildMap {
                 json.keys().forEach { key ->
-                    val value = json.optInt(key, Int.MIN_VALUE)
-                    if (value != Int.MIN_VALUE) put(key, value)
+                    val padIndex = key.toIntOrNull() ?: return@forEach
+                    val valueObject = json.optJSONObject(key) ?: return@forEach
+                    val bindings = buildMap {
+                        valueObject.keys().forEach { actionId ->
+                            val keyCode = valueObject.optInt(actionId, Int.MIN_VALUE)
+                            if (keyCode != Int.MIN_VALUE) put(actionId, keyCode)
+                        }
+                    }
+                    if (bindings.isNotEmpty()) put(padIndex.coerceIn(0, 1), bindings)
                 }
+            }
+            if (nested.isNotEmpty()) {
+                nested
+            } else {
+                val legacy = buildMap {
+                    json.keys().forEach { key ->
+                        val value = json.optInt(key, Int.MIN_VALUE)
+                        if (value != Int.MIN_VALUE) put(key, value)
+                    }
+                }
+                if (legacy.isEmpty()) emptyMap() else mapOf(0 to legacy)
             }
         }.getOrDefault(emptyMap())
     }
 
-    private fun encodeGamepadBindings(bindings: Map<String, Int>): String {
+    private fun decodeGamepadBindings(raw: String?): Map<String, Int> {
+        return decodeGamepadBindingsByPad(raw)[0].orEmpty()
+    }
+
+    private fun encodeGamepadBindingsByPad(bindingsByPad: Map<Int, Map<String, Int>>): String {
         return JSONObject().apply {
-            bindings.toSortedMap().forEach { (actionId, keyCode) ->
-                put(actionId, keyCode)
+            bindingsByPad.toSortedMap().forEach { (padIndex, bindings) ->
+                if (bindings.isEmpty()) return@forEach
+                put(
+                    padIndex.toString(),
+                    JSONObject().apply {
+                        bindings.toSortedMap().forEach { (actionId, keyCode) ->
+                            put(actionId, keyCode)
+                        }
+                    }
+                )
             }
         }.toString()
+    }
+
+    private fun encodeGamepadBindings(bindings: Map<String, Int>): String {
+        return encodeGamepadBindingsByPad(if (bindings.isEmpty()) emptyMap() else mapOf(0 to bindings))
+    }
+
+    private fun normalizeGamepadPadIndex(padIndex: Int): Int = padIndex.coerceIn(0, 1)
+
+    private fun decodeGamepadBindingsForPad(raw: String?, padIndex: Int): Map<String, Int> {
+        return decodeGamepadBindingsByPad(raw)[normalizeGamepadPadIndex(padIndex)].orEmpty()
+    }
+
+    private fun updateGamepadBindingsForPad(
+        prefs: MutablePreferences,
+        padIndex: Int,
+        transform: (MutableMap<String, Int>) -> Unit
+    ) {
+        val normalizedPadIndex = normalizeGamepadPadIndex(padIndex)
+        val updated = decodeGamepadBindingsByPad(prefs[GAMEPAD_BINDINGS])
+            .mapValues { (_, bindings) -> bindings.toMutableMap() }
+            .toMutableMap()
+        val padBindings = updated[normalizedPadIndex]?.toMutableMap() ?: mutableMapOf()
+        transform(padBindings)
+        if (padBindings.isEmpty()) {
+            updated.remove(normalizedPadIndex)
+        } else {
+            updated[normalizedPadIndex] = padBindings
+        }
+        if (updated.isEmpty()) {
+            prefs.remove(GAMEPAD_BINDINGS)
+        } else {
+            prefs[GAMEPAD_BINDINGS] = encodeGamepadBindingsByPad(updated)
+        }
     }
 
     // Overlay customization
@@ -1371,24 +1436,48 @@ class AppPreferences(private val context: Context) {
         decodeGamepadBindings(prefs[GAMEPAD_BINDINGS])
     }
 
+    val gamepadBindingsByPad: Flow<Map<Int, Map<String, Int>>> = context.dataStore.data.map { prefs ->
+        decodeGamepadBindingsByPad(prefs[GAMEPAD_BINDINGS])
+    }
+
     suspend fun setGamepadBinding(actionId: String, keyCode: Int) {
+        setGamepadBinding(0, actionId, keyCode)
+    }
+
+    suspend fun setGamepadBinding(padIndex: Int, actionId: String, keyCode: Int) {
         context.dataStore.edit { prefs ->
-            val updated = decodeGamepadBindings(prefs[GAMEPAD_BINDINGS]).toMutableMap()
-            updated.entries.removeAll { it.value == keyCode }
-            updated[actionId] = keyCode
-            prefs[GAMEPAD_BINDINGS] = encodeGamepadBindings(updated)
+            updateGamepadBindingsForPad(prefs, padIndex) { updated ->
+                updated.entries.removeAll { it.value == keyCode }
+                updated[actionId] = keyCode
+            }
         }
     }
 
     suspend fun clearGamepadBinding(actionId: String) {
+        clearGamepadBinding(0, actionId)
+    }
+
+    suspend fun clearGamepadBinding(padIndex: Int, actionId: String) {
         context.dataStore.edit { prefs ->
-            val updated = decodeGamepadBindings(prefs[GAMEPAD_BINDINGS]).toMutableMap()
-            updated.remove(actionId)
-            if (updated.isEmpty()) prefs.remove(GAMEPAD_BINDINGS) else prefs[GAMEPAD_BINDINGS] = encodeGamepadBindings(updated)
+            updateGamepadBindingsForPad(prefs, padIndex) { updated ->
+                updated.remove(actionId)
+            }
         }
     }
 
     suspend fun resetGamepadBindings() {
+        resetGamepadBindingsForPad(0)
+    }
+
+    suspend fun resetGamepadBindingsForPad(padIndex: Int) {
+        context.dataStore.edit { prefs ->
+            updateGamepadBindingsForPad(prefs, padIndex) { updated ->
+                updated.clear()
+            }
+        }
+    }
+
+    suspend fun resetAllGamepadBindings() {
         context.dataStore.edit { prefs ->
             prefs.remove(GAMEPAD_BINDINGS)
         }

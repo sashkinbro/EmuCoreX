@@ -621,9 +621,13 @@ object EmulatorBridge {
     }
 
     fun setPadButton(index: Int, range: Int, pressed: Boolean) {
+        setPadButton(0, index, range, pressed)
+    }
+
+    fun setPadButton(padIndex: Int, index: Int, range: Int, pressed: Boolean) {
         if (!isNativeLoaded) return
         try {
-            NativeApp.setPadButton(index, range, pressed)
+            NativeApp.setPadButton(padIndex, index, range, pressed)
         } catch (_: Exception) { }
     }
 
@@ -636,8 +640,18 @@ object EmulatorBridge {
         }
     }
 
+    fun resetPadState(padIndex: Int) {
+        if (!isNativeLoaded) return
+        launchSerial {
+            try {
+                NativeApp.resetPadState(padIndex)
+            } catch (_: Exception) { }
+        }
+    }
+
     suspend fun setPadVibration(enabled: Boolean) {
         setSetting("InputSources", "PadVibration", "bool", enabled.toString())
+        runCatching { NativeApp.setPadVibration(enabled) }
     }
 
     fun onSurfaceCreated() {

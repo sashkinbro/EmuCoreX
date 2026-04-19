@@ -28,6 +28,10 @@
 #include <variant>
 #include <vector>
 
+#if defined(__ANDROID__)
+void AndroidUpdatePadVibration(u32 pad_index, float large_intensity, float small_intensity);
+#endif
+
 // ------------------------------------------------------------------------
 // Constants
 // ------------------------------------------------------------------------
@@ -1388,6 +1392,7 @@ void InputManager::SetUSBVibrationIntensity(u32 port, float large_or_single_moto
 
 void InputManager::SetPadVibrationIntensity(u32 pad_index, float large_or_single_motor_intensity, float small_motor_intensity)
 {
+	bool updated_intensity = false;
 	for (PadVibrationBinding& pad : s_pad_vibration_array)
 	{
 		if (pad.pad_index != pad_index)
@@ -1432,7 +1437,13 @@ void InputManager::SetPadVibrationIntensity(u32 pad_index, float large_or_single
 
 		large_motor.last_intensity = large_or_single_motor_intensity;
 		small_motor.last_intensity = small_motor_intensity;
+		updated_intensity = true;
 	}
+
+#if defined(__ANDROID__)
+	if (updated_intensity)
+		AndroidUpdatePadVibration(pad_index, large_or_single_motor_intensity, small_motor_intensity);
+#endif
 }
 
 void InputManager::PauseVibration()
@@ -1449,6 +1460,10 @@ void InputManager::PauseVibration()
 			motor.last_update_time = 0;
 			motor.source->UpdateMotorState(motor.binding, 0.0f);
 		}
+
+#if defined(__ANDROID__)
+		AndroidUpdatePadVibration(binding.pad_index, 0.0f, 0.0f);
+#endif
 	}
 }
 

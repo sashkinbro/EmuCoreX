@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">长按任何设置的标签即可恢复其默认值。此操作在设置、游戏管理器和游戏内菜单中都有效，方便您在测试时快速撤销更改。</string>
     <string name="got_it">知道了</string>
     <string name="game_settings_manager_section_screen">屏幕</string>
+    <string name="settings_gamepad_player_1">玩家 1</string>
+    <string name="settings_gamepad_player_2">玩家 2</string>
+    <string name="settings_gamepad_mapping_player_connected">%1$s 控制器：%2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">%1$s 控制器未连接。您仍然可以配置其映射。</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">按下 %1$s 的按钮以将其绑定到 %2$s。</string>
 </resources>

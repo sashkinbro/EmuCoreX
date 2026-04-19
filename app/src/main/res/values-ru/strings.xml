@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">Нажмите и удерживайте название любой настройки, чтобы восстановить ее значение по умолчанию. Это работает в Настройках, в Менеджере игр и во внутриигровом меню, поэтому во время тестирования можно быстро отменять изменения.</string>
     <string name="got_it">Понятно</string>
     <string name="game_settings_manager_section_screen">Экран</string>
+    <string name="settings_gamepad_player_1">Игрок 1</string>
+    <string name="settings_gamepad_player_2">Игрок 2</string>
+    <string name="settings_gamepad_mapping_player_connected">Контроллер %1$s: %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">Контроллер %1$s не подключен. Вы всё равно можете настроить его привязку.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Нажмите кнопку для %1$s, чтобы привязать её к %2$s.</string>
 </resources>

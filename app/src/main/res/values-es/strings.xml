@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">Mantén pulsada la etiqueta de cualquier ajuste para restaurar su valor predeterminado. Esto funciona en Ajustes, en el Administrador de juegos y en el menú dentro del juego, para que puedas deshacer cambios rápidamente mientras pruebas.</string>
     <string name="got_it">Entendido</string>
     <string name="game_settings_manager_section_screen">Pantalla</string>
+    <string name="settings_gamepad_player_1">Jugador 1</string>
+    <string name="settings_gamepad_player_2">Jugador 2</string>
+    <string name="settings_gamepad_mapping_player_connected">Mando de %1$s: %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">El mando de %1$s no está conectado. Aún puedes configurar su asignación.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Presiona un botón de %1$s para asignarlo a %2$s.</string>
 </resources>

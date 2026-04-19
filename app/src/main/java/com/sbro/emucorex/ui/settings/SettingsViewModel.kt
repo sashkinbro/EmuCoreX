@@ -101,6 +101,7 @@ data class SettingsUiState(
     val enableAutoGamepad: Boolean = true,
     val hideOverlayOnGamepad: Boolean = true,
     val gamepadBindings: Map<String, Int> = emptyMap(),
+    val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
     val frameLimitEnabled: Boolean = false,
@@ -203,6 +204,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableAutoGamepad = snapshot.enableAutoGamepad,
             hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
             gamepadBindings = snapshot.gamepadBindings,
+            gamepadBindingsByPad = snapshot.gamepadBindingsByPad,
             gpuDriverType = snapshot.gpuDriverType,
             customDriverPath = snapshot.customDriverPath,
             frameLimitEnabled = snapshot.frameLimitEnabled,
@@ -272,20 +274,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setGamepadBinding(actionId: String, keyCode: Int) {
+        setGamepadBinding(0, actionId, keyCode)
+    }
+
+    fun setGamepadBinding(padIndex: Int, actionId: String, keyCode: Int) {
         viewModelScope.launch {
-            preferences.setGamepadBinding(actionId, keyCode)
+            preferences.setGamepadBinding(padIndex, actionId, keyCode)
         }
     }
 
     fun clearGamepadBinding(actionId: String) {
+        clearGamepadBinding(0, actionId)
+    }
+
+    fun clearGamepadBinding(padIndex: Int, actionId: String) {
         viewModelScope.launch {
-            preferences.clearGamepadBinding(actionId)
+            preferences.clearGamepadBinding(padIndex, actionId)
         }
     }
 
     fun resetGamepadBindings() {
+        resetGamepadBindingsForPad(0)
+    }
+
+    fun resetGamepadBindingsForPad(padIndex: Int) {
         viewModelScope.launch {
-            preferences.resetGamepadBindings()
+            preferences.resetGamepadBindingsForPad(padIndex)
+        }
+    }
+
+    fun resetAllGamepadBindings() {
+        viewModelScope.launch {
+            preferences.resetAllGamepadBindings()
         }
     }
 

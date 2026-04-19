@@ -165,6 +165,7 @@ fun SettingsScreen(
     var cheatEditorFileName by remember { mutableStateOf<String?>(null) }
     var cheatEditorText by remember { mutableStateOf("") }
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
+    var pendingGamepadPadIndex by rememberSaveable { mutableStateOf(0) }
     var showTopBarMenu by remember { mutableStateOf(false) }
     var showResetAllSettingsDialog by remember { mutableStateOf(false) }
     var showCoverUrlDialog by remember { mutableStateOf(false) }
@@ -247,8 +248,8 @@ fun SettingsScreen(
     DisposableEffect(pendingGamepadActionId) {
         val actionId = pendingGamepadActionId
         if (actionId != null) {
-            GamepadManager.startBindingCapture { keyCode ->
-                viewModel.setGamepadBinding(actionId, keyCode)
+            GamepadManager.startBindingCapture(pendingGamepadPadIndex) { keyCode ->
+                viewModel.setGamepadBinding(pendingGamepadPadIndex, actionId, keyCode)
                 pendingGamepadActionId = null
             }
         } else {
@@ -376,7 +377,10 @@ fun SettingsScreen(
                         ?.fileName ?: "$gameKey.pnach"
                     cheatEditorText = cheatRepository.getImportedCheatText(gameKey).orEmpty()
                 },
-                onRequestGamepadBinding = { pendingGamepadActionId = it },
+                onRequestGamepadBinding = { padIndex, actionId ->
+                    pendingGamepadPadIndex = padIndex
+                    pendingGamepadActionId = actionId
+                },
                 searchQuery = searchQuery,
                 onSearchResultSelected = { tab ->
                     selectedTab = tab
@@ -447,7 +451,8 @@ fun SettingsScreen(
             text = {
                 Text(
                     stringResource(
-                        R.string.settings_gamepad_mapping_listening_desc,
+                        R.string.settings_gamepad_mapping_listening_player_desc,
+                        gamepadPlayerLabel(pendingGamepadPadIndex),
                         gamepadActionLabel(pendingGamepadActionId.orEmpty())
                     )
                 )
@@ -918,7 +923,7 @@ private fun SettingsContent(
     openLanguageSheet: () -> Unit,
     cheatEntries: List<CheatFileEntry>,
     onOpenCheatEditor: (String) -> Unit,
-    onRequestGamepadBinding: (String) -> Unit,
+    onRequestGamepadBinding: (Int, String) -> Unit,
     onSearchResultSelected: (SettingsTab) -> Unit,
     onOpenMemoryCardManager: (() -> Unit)? = null,
     onEditControlsClick: (() -> Unit)? = null,
@@ -931,6 +936,7 @@ private fun SettingsContent(
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
     val searchEntries = rememberSettingsSearchEntries()
     val notSetLabel = stringResource(R.string.settings_not_set)
+    var selectedGamepadPadIndex by rememberSaveable { mutableStateOf(0) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1194,18 +1200,41 @@ private fun SettingsContent(
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_mapping_title)) {
-                        val connectedControllerName = GamepadManager.firstConnectedControllerName()
+                        val selectedBindings = uiState.gamepadBindingsByPad[selectedGamepadPadIndex].orEmpty()
+                        val connectedControllerName = GamepadManager.connectedControllerName(selectedGamepadPadIndex)
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(end = 4.dp)
+                        ) {
+                            items(listOf(0, 1)) { padIndex ->
+                                FilterChip(
+                                    selected = selectedGamepadPadIndex == padIndex,
+                                    onClick = { selectedGamepadPadIndex = padIndex },
+                                    label = { Text(gamepadPlayerLabel(padIndex)) }
+                                )
+                            }
+                        }
                         SettingsInlineNote(
                             text = connectedControllerName?.let {
-                                stringResource(R.string.settings_gamepad_mapping_connected, it)
-                            } ?: stringResource(R.string.settings_gamepad_mapping_disconnected)
+                                stringResource(
+                                    R.string.settings_gamepad_mapping_player_connected,
+                                    gamepadPlayerLabel(selectedGamepadPadIndex),
+                                    it
+                                )
+                            } ?: stringResource(
+                                R.string.settings_gamepad_mapping_player_disconnected,
+                                gamepadPlayerLabel(selectedGamepadPadIndex)
+                            )
                         )
                         for (action in gamepadActions) {
                             val assignedKeyCode = GamepadManager.resolveBindingForAction(
                                 actionId = action.id,
-                                customBindings = uiState.gamepadBindings
+                                customBindings = selectedBindings
                             )
-                            val isCustomBinding = uiState.gamepadBindings.containsKey(action.id)
+                            val isCustomBinding = selectedBindings.containsKey(action.id)
                             GamepadBindingRow(
                                 title = gamepadActionLabel(action.id),
                                 value = assignedKeyCode?.let(GamepadManager::keyCodeLabel)
@@ -1213,9 +1242,9 @@ private fun SettingsContent(
                                 autoLabel = if (isCustomBinding) null else {
                                     stringResource(R.string.settings_gamepad_mapping_auto_format)
                                 },
-                                onBindClick = { onRequestGamepadBinding(action.id) },
+                                onBindClick = { onRequestGamepadBinding(selectedGamepadPadIndex, action.id) },
                                 onClearClick = if (isCustomBinding) {
-                                    { viewModel.clearGamepadBinding(action.id) }
+                                    { viewModel.clearGamepadBinding(selectedGamepadPadIndex, action.id) }
                                 } else {
                                     null
                                 }
@@ -1225,7 +1254,7 @@ private fun SettingsContent(
                             icon = Icons.Rounded.SettingsSuggest,
                             label = stringResource(R.string.settings_gamepad_mapping_reset_title),
                             value = stringResource(R.string.settings_gamepad_mapping_reset_desc),
-                            onClick = viewModel::resetGamepadBindings
+                            onClick = { viewModel.resetGamepadBindingsForPad(selectedGamepadPadIndex) }
                         )
                     }
                 }
@@ -2734,6 +2763,13 @@ private fun gamepadActionLabel(actionId: String): String = when (actionId) {
     "square" -> "\u25a1"
     "triangle" -> "\u25b3"
     else -> stringResource(gamepadActionLabelRes(actionId))
+}
+
+@Composable
+private fun gamepadPlayerLabel(padIndex: Int): String {
+    return stringResource(
+        if (padIndex == 0) R.string.settings_gamepad_player_1 else R.string.settings_gamepad_player_2
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">Halte die Bezeichnung einer beliebigen Einstellung gedrückt, um den Standardwert wiederherzustellen. Das funktioniert in den Einstellungen, im Spielmanager und im In-Game-Menü, damit du Änderungen beim Testen schnell rückgängig machen kannst.</string>
     <string name="got_it">Verstanden</string>
     <string name="game_settings_manager_section_screen">Bildschirm</string>
+    <string name="settings_gamepad_player_1">Spieler 1</string>
+    <string name="settings_gamepad_player_2">Spieler 2</string>
+    <string name="settings_gamepad_mapping_player_connected">%1$s-Controller: %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">%1$s-Controller ist nicht verbunden. Du kannst die Belegung aber trotzdem konfigurieren.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Drücke eine Taste für %1$s, um sie %2$s zuzuweisen.</string>
 </resources>

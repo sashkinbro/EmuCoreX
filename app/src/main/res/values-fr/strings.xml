@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">Appuyez longuement sur le libellé de n\'importe quel réglage pour restaurer sa valeur par défaut. Cela fonctionne dans les Paramètres, dans le gestionnaire de jeux et dans le menu en jeu, afin que vous puissiez annuler rapidement vos changements pendant les tests.</string>
     <string name="got_it">Compris</string>
     <string name="game_settings_manager_section_screen">Écran</string>
+    <string name="settings_gamepad_player_1">Joueur 1</string>
+    <string name="settings_gamepad_player_2">Joueur 2</string>
+    <string name="settings_gamepad_mapping_player_connected">Manette %1$s : %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">La manette %1$s n\'est pas connectée. Vous pouvez toujours configurer son mappage.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Appuyez sur un bouton pour %1$s pour l\'attribuer à %2$s.</string>
 </resources>

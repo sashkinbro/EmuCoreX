@@ -911,4 +911,9 @@
     <string name="screen_settings_reset_hint_body">Pressione e segure o rótulo de qualquer configuração para restaurar seu valor padrão. Isso funciona em Configurações, no Gerenciador de jogos e no menu dentro do jogo, para que você possa desfazer mudanças rapidamente durante os testes.</string>
     <string name="got_it">Entendi</string>
     <string name="game_settings_manager_section_screen">Tela</string>
+    <string name="settings_gamepad_player_1">Jogador 1</string>
+    <string name="settings_gamepad_player_2">Jogador 2</string>
+    <string name="settings_gamepad_mapping_player_connected">Controle do %1$s: %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">O controle do %1$s não está conectado. Você ainda pode configurar seu mapeamento.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Pressione um botão para o %1$s para vinculá-lo a %2$s.</string>
 </resources>

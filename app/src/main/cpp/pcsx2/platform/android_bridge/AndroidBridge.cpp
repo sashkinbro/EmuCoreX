@@ -1450,12 +1450,13 @@ static u32 AndroidMouseButtonMaskToPointerIndex(const jint button)
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_setPadButton(JNIEnv *env, jclass clazz,
-                                                  jint p_index, jint p_range, jboolean p_pressed) {
+                                                  jint p_padIndex, jint p_index, jint p_range, jboolean p_pressed) {
     if (VMManager::HasValidVM()) {
+        const u32 pad_index = std::min<u32>(static_cast<u32>(std::max(p_padIndex, 0)), 1u);
         const GenericInputBinding generic_key = AndroidKeyToGeneric(p_index);
         float value = (p_range > 0) ? (static_cast<float>(p_range) / 255.0f) : (p_pressed ? 1.0f : 0.0f);
-        Host::RunOnCPUThread([generic_key, value]() {
-            SetPadButtonState(0, generic_key, value);
+        Host::RunOnCPUThread([pad_index, generic_key, value]() {
+            SetPadButtonState(pad_index, generic_key, value);
         });
     }
 }
@@ -1497,7 +1498,19 @@ Java_com_sbro_emucorex_core_NativeApp_resetKeyStatus(JNIEnv *env, jclass clazz) 
     if (VMManager::HasValidVM()) {
         Host::RunOnCPUThread([]() {
             ResetPadState(0);
+            ResetPadState(1);
             InputManager::PauseVibration();
+        });
+    }
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_core_NativeApp_resetPadState(JNIEnv *env, jclass clazz, jint p_padIndex) {
+    if (VMManager::HasValidVM()) {
+        const u32 pad_index = std::min<u32>(static_cast<u32>(std::max(p_padIndex, 0)), 1u);
+        Host::RunOnCPUThread([pad_index]() {
+            ResetPadState(pad_index);
         });
     }
 }
@@ -2296,6 +2309,7 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     if (boot_result == VMBootResult::StartupSuccess)
     {
         ResetPadState(0);
+        ResetPadState(1);
         InputManager::PauseVibration();
 
         Console.WriteLn("runVMThread: VMManager::Initialize() returned StartupSuccess.");

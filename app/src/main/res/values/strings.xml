@@ -625,11 +625,16 @@
     <string name="settings_gamepad_mapping_title">Gamepad Button Mapping</string>
     <string name="settings_gamepad_mapping_connected">Connected controller: %1$s</string>
     <string name="settings_gamepad_mapping_disconnected">Connect a physical gamepad to test and remap buttons.</string>
+    <string name="settings_gamepad_player_1">Player 1</string>
+    <string name="settings_gamepad_player_2">Player 2</string>
+    <string name="settings_gamepad_mapping_player_connected">%1$s controller: %2$s</string>
+    <string name="settings_gamepad_mapping_player_disconnected">%1$s controller is not connected. You can still configure its mapping.</string>
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Reset Gamepad Mapping</string>
     <string name="settings_gamepad_mapping_reset_desc">Restore the default physical button layout.</string>
     <string name="settings_gamepad_mapping_listening_title">Waiting For Button</string>
     <string name="settings_gamepad_mapping_listening_desc">Press a button on the connected controller to bind it to %1$s.</string>
+    <string name="settings_gamepad_mapping_listening_player_desc">Press a button for %1$s to bind it to %2$s.</string>
     <string name="settings_gamepad_mapping_clear">Clear</string>
     <string name="settings_gamepad_action_cross">Cross</string>
     <string name="settings_gamepad_action_circle">Circle</string>

@@ -309,7 +309,7 @@ fun EmulationScreen(
     val preferences = remember(context) { AppPreferences(context) }
     val globalDefaults by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val overlayDefaults by preferences.overlayLayoutSnapshot.collectAsState(initial = OverlayLayoutSnapshot())
-    val gamepadBindings by preferences.gamepadBindings.collectAsState(initial = emptyMap())
+    val gamepadBindingsByPad by preferences.gamepadBindingsByPad.collectAsState(initial = emptyMap())
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val scope = rememberCoroutineScope()
     val rootCutoutPadding = WindowInsets.displayCutout.asPaddingValues()
@@ -338,6 +338,8 @@ fun EmulationScreen(
     var showControlsEditor by remember { mutableStateOf(false) }
     var showGamepadMappingDialog by remember { mutableStateOf(false) }
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
+    var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
+    var selectedGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     var showOverlayShortcut by remember { mutableStateOf(false) }
     var resumeAfterEditor by remember { mutableStateOf(false) }
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
@@ -499,9 +501,9 @@ fun EmulationScreen(
     DisposableEffect(pendingGamepadActionId) {
         val actionId = pendingGamepadActionId
         if (actionId != null) {
-            GamepadManager.startBindingCapture { keyCode ->
+            GamepadManager.startBindingCapture(pendingGamepadPadIndex) { keyCode ->
                 scope.launch {
-                    preferences.setGamepadBinding(actionId, keyCode)
+                    preferences.setGamepadBinding(pendingGamepadPadIndex, actionId, keyCode)
                 }
                 pendingGamepadActionId = null
             }
@@ -1146,6 +1148,8 @@ fun EmulationScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    val connectedControllerName = GamepadManager.connectedControllerName(selectedGamepadPadIndex)
+                    val selectedBindings = gamepadBindingsByPad[selectedGamepadPadIndex].orEmpty()
                     Column(
                         modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1155,11 +1159,26 @@ fun EmulationScreen(
                             style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        val connectedControllerName = GamepadManager.firstConnectedControllerName()
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0, 1).forEach { padIndex ->
+                                FilterChip(
+                                    selected = selectedGamepadPadIndex == padIndex,
+                                    onClick = { selectedGamepadPadIndex = padIndex },
+                                    label = { Text(gamepadPlayerLabel(padIndex)) }
+                                )
+                            }
+                        }
                         Text(
                             text = connectedControllerName?.let {
-                                stringResource(R.string.settings_gamepad_mapping_connected, it)
-                            } ?: stringResource(R.string.settings_gamepad_mapping_disconnected),
+                                stringResource(
+                                    R.string.settings_gamepad_mapping_player_connected,
+                                    gamepadPlayerLabel(selectedGamepadPadIndex),
+                                    it
+                                )
+                            } ?: stringResource(
+                                R.string.settings_gamepad_mapping_player_disconnected,
+                                gamepadPlayerLabel(selectedGamepadPadIndex)
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1175,19 +1194,22 @@ fun EmulationScreen(
                         gamepadActions.forEach { action ->
                             val assignedKeyCode = GamepadManager.resolveBindingForAction(
                                 actionId = action.id,
-                                customBindings = gamepadBindings
+                                customBindings = selectedBindings
                             )
-                            val isCustomBinding = gamepadBindings.containsKey(action.id)
+                            val isCustomBinding = selectedBindings.containsKey(action.id)
                             EmulationGamepadBindingRow(
                                 title = gamepadActionLabel(action.id),
                                 value = assignedKeyCode?.let(GamepadManager::keyCodeLabel)
                                     ?: stringResource(R.string.settings_not_set),
                                 autoLabel = if (isCustomBinding) null else stringResource(R.string.settings_gamepad_mapping_auto_format),
-                                onBindClick = { pendingGamepadActionId = action.id },
+                                onBindClick = {
+                                    pendingGamepadPadIndex = selectedGamepadPadIndex
+                                    pendingGamepadActionId = action.id
+                                },
                                 onClearClick = if (isCustomBinding) {
                                     {
                                         scope.launch {
-                                            preferences.clearGamepadBinding(action.id)
+                                            preferences.clearGamepadBinding(selectedGamepadPadIndex, action.id)
                                         }
                                     }
                                 } else {
@@ -1201,7 +1223,7 @@ fun EmulationScreen(
                                 text = stringResource(R.string.settings_gamepad_mapping_reset_title),
                                 onClick = {
                                     scope.launch {
-                                        preferences.resetGamepadBindings()
+                                        preferences.resetGamepadBindingsForPad(selectedGamepadPadIndex)
                                     }
                                 },
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
@@ -1250,7 +1272,8 @@ fun EmulationScreen(
             text = {
                 Text(
                     stringResource(
-                        R.string.settings_gamepad_mapping_listening_desc,
+                        R.string.settings_gamepad_mapping_listening_player_desc,
+                        gamepadPlayerLabel(pendingGamepadPadIndex),
                         gamepadActionLabel(pendingGamepadActionId.orEmpty())
                     )
                 )
@@ -3617,6 +3640,13 @@ private fun gamepadActionLabel(actionId: String): String = when (actionId) {
     "square" -> "\u25a1"
     "triangle" -> "\u25b3"
     else -> stringResource(gamepadActionLabelRes(actionId))
+}
+
+@Composable
+private fun gamepadPlayerLabel(padIndex: Int): String {
+    return stringResource(
+        if (padIndex == 0) R.string.settings_gamepad_player_1 else R.string.settings_gamepad_player_2
+    )
 }
 
 @Composable
