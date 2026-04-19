@@ -101,11 +101,10 @@ static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool t
 	{
 		case GSDepthFeedbackMode::DepthAsRT:
 			return GSDevice::DepthFeedbackSupport::DepthAsRT;
+		case GSDepthFeedbackMode::Auto:
 		case GSDepthFeedbackMode::Depth:
 			return texture_barrier ? GSDevice::DepthFeedbackSupport::Depth :
 				GSDevice::DepthFeedbackSupport::None;
-		case GSDepthFeedbackMode::Auto:
-			return GSDevice::DepthFeedbackSupport::DepthAsRT;
 		case GSDepthFeedbackMode::None:
 		default:
 			return GSDevice::DepthFeedbackSupport::None;
@@ -119,7 +118,7 @@ static bool ShouldUseConservativeAndroidVulkanFeedbackPath()
 	// draw looks correct and a later feedback-loop transition introduces reflection/highlight
 	// artifacts. Prefer the explicit barrier/input-attachment route until fb-fetch is revalidated
 	// against the newer GS core on Android as a whole.
-	return true;
+	return false;
 }
 #endif
 
@@ -1031,13 +1030,19 @@ bool GSDeviceVK::CreateCommandBuffers()
 bool GSDeviceVK::CreateGlobalDescriptorPool()
 {
 	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 128},
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128},
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 65536},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 32768},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 16384},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024},
 		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2},
 		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2},
 	};
 
 	VkDescriptorPoolCreateInfo pool_create_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, nullptr,
 		VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-		1024, // TODO: tweak this
+		131072, // Expanded pool limit for mobile fallback rendering
 		static_cast<u32>(std::size(pool_sizes)), pool_sizes};
 
 	VkResult res = vkCreateDescriptorPool(m_device, &pool_create_info, nullptr, &m_global_descriptor_pool);
@@ -1695,10 +1700,15 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 		num_attachments++;
 	}
 
-	const VkSubpassDescriptionFlags subpass_flags =
-		(key.color_feedback_loop && UsesRasterizationOrderAttachmentAccessForFeedback()) ?
-			VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT :
-			0;
+	VkSubpassDescriptionFlags subpass_flags = 0;
+	if (UsesRasterizationOrderAttachmentAccessForFeedback())
+	{
+		if (key.color_feedback_loop)
+			subpass_flags |= VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT;
+		if (key.depth_sampling)
+			subpass_flags |= (VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_DEPTH_ACCESS_BIT_EXT |
+							  VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_STENCIL_ACCESS_BIT_EXT);
+	}
 	const VkSubpassDescription subpass = {subpass_flags, VK_PIPELINE_BIND_POINT_GRAPHICS, num_subpass_inputs,
 		num_subpass_inputs ? input_reference.data() : nullptr, color_reference_ptr ? 1u : 0u,
 		color_reference_ptr ? color_reference_ptr : nullptr, nullptr, depth_reference_ptr, 0, nullptr};
@@ -3957,15 +3967,9 @@ bool GSDeviceVK::CreatePipelineLayouts()
 		dslb.SetPushFlag();
 	dslb.AddBinding(TFX_TEXTURE_TEXTURE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PALETTE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
-	dslb.AddBinding(TFX_TEXTURE_RT,
-		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT :
-																                              VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-		1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_RT, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PRIMID, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
-	dslb.AddBinding(TFX_TEXTURE_DEPTH,
-		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT :
-		                                                           VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-		1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_DEPTH, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	if ((m_tfx_texture_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
 		return false;
 	Vulkan::SetObjectName(dev, m_tfx_texture_ds_layout, "TFX texture descriptor layout");
@@ -5643,16 +5647,8 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		}
 		if (flags & DIRTY_FLAG_TFX_TEXTURE_RT)
 		{
-			if (m_features.texture_barrier && !UseFeedbackLoopLayout())
-			{
-				dsub.AddInputAttachmentDescriptorWrite(
-					VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
-			}
-			else
-			{
-				dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(),
-					m_tfx_textures[TFX_TEXTURE_RT]->GetVkLayout());
-			}
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(),
+				m_tfx_textures[TFX_TEXTURE_RT]->GetVkLayout());
 		}
 		if (flags & DIRTY_FLAG_TFX_TEXTURE_PRIMID)
 		{
@@ -5661,16 +5657,8 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		}
 		if (flags & DIRTY_FLAG_TFX_TEXTURE_DEPTH)
 		{
-			if (m_features.texture_barrier && !UseFeedbackLoopLayout())
-			{
-				dsub.AddInputAttachmentDescriptorWrite(
-					VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
-			}
-			else
-			{
-				dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(),
-					m_tfx_textures[TFX_TEXTURE_DEPTH]->GetVkLayout());
-			}
+			dsub.AddImageDescriptorWrite(VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(),
+				m_tfx_textures[TFX_TEXTURE_DEPTH]->GetVkLayout());
 		}
 
 		if (m_optional_extensions.vk_khr_push_descriptor)

@@ -1001,6 +1001,7 @@ bool GSDeviceOGL::CheckFeatures()
 		m_features.vs_expand = (!GSConfig.DisableVertexShaderExpand && !buggy_vs_expand && max_vertex_ssbos > 0 &&
 								GLAD_GL_ARB_gpu_shader5);
 	}
+
 	if (!m_features.vs_expand)
 		Console.Warning("GL: Vertex expansion is not supported. This will reduce performance.");
 
@@ -1009,6 +1010,17 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.point_expand =
 		(point_range[0] <= GSConfig.UpscaleMultiplier && point_range[1] >= GSConfig.UpscaleMultiplier);
 	m_features.line_expand = false;
+
+#ifdef __ANDROID__
+	const bool prefer_vertex_expansion_for_mobile = true;
+#else
+	const bool prefer_vertex_expansion_for_mobile = (vendor_id_adreno || vendor_id_mali);
+#endif
+	if (prefer_vertex_expansion_for_mobile)
+	{
+		m_features.point_expand = false;
+		m_features.line_expand = false;
+	}
 
 	GLint max_texture_size = 1024;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
