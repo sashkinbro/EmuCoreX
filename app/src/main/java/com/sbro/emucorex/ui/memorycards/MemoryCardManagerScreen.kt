@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -83,6 +83,7 @@ fun MemoryCardManagerScreen(
     val repository = remember(context) { MemoryCardRepository(context, AppPreferences(context)) }
     val scope = rememberCoroutineScope()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val createSuccessMessage = stringResource(R.string.memory_card_create_success)
     val createFailureMessage = stringResource(R.string.memory_card_create_failed)
@@ -295,7 +296,6 @@ fun MemoryCardManagerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -303,7 +303,7 @@ fun MemoryCardManagerScreen(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding,
                 top = 0.dp,
-                bottom = 24.dp
+                bottom = 24.dp + bottomInset
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

@@ -29,7 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -158,6 +158,7 @@ fun SettingsScreen(
     }
     val configuration = LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
     val cheatRepository = remember(context) { CheatRepository(context) }
     var cheatEntries by remember { mutableStateOf(cheatRepository.listImportedCheatFiles()) }
@@ -322,7 +323,6 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .navigationBarsPadding()
                 .verticalScroll(settingsScrollState)
         ) {
             SettingsCompactTopBar(
@@ -394,6 +394,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(bottomInset))
         }
     }
 
@@ -2787,11 +2789,12 @@ private fun CheatEditorSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
+        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = ScreenHorizontalPadding, vertical = 12.dp)
-                .navigationBarsPadding(),
+                .padding(bottom = bottomInset),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -2842,13 +2845,13 @@ fun LanguageSettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val options = rememberLanguageOptions()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
         Row(
@@ -2892,6 +2895,8 @@ fun LanguageSettingsScreen(
             }
             Spacer(modifier = Modifier.height(18.dp))
         }
+
+        Spacer(modifier = Modifier.height(bottomInset))
     }
 }
 

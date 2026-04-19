@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
+private const val LIGHT_NAVIGATION_BAR_SCRIM = 0x04000000
+private const val DARK_NAVIGATION_BAR_SCRIM = 0x0A000000
+
 class MainActivity : ComponentActivity() {
     private var appliedLanguageTag: String? = null
     @Volatile
@@ -43,16 +46,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().setKeepOnScreenCondition { keepSplashVisible }
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT
-            ),
-            navigationBarStyle = SystemBarStyle.auto(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT
-            )
-        )
+        applyEdgeToEdge()
         super.onCreate(savedInstanceState)
         restoredFromSavedState = savedInstanceState != null
 
@@ -98,21 +92,25 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun applySystemBarTheme(darkTheme: Boolean) {
+        applyEdgeToEdge()
+
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        val useDarkIcons = !darkTheme
+        controller.isAppearanceLightStatusBars = useDarkIcons
+        controller.isAppearanceLightNavigationBars = useDarkIcons
+    }
+
+    private fun applyEdgeToEdge() {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 Color.TRANSPARENT,
                 Color.TRANSPARENT
             ),
             navigationBarStyle = SystemBarStyle.auto(
-                Color.TRANSPARENT,
-                Color.TRANSPARENT
+                LIGHT_NAVIGATION_BAR_SCRIM,
+                DARK_NAVIGATION_BAR_SCRIM
             )
         )
-
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        val useDarkIcons = !darkTheme
-        controller.isAppearanceLightStatusBars = useDarkIcons
-        controller.isAppearanceLightNavigationBars = useDarkIcons
     }
 
     override fun onNewIntent(intent: android.content.Intent) {

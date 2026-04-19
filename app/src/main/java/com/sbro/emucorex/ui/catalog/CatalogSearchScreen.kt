@@ -8,7 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +24,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -91,6 +93,7 @@ fun CatalogSearchScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val gridState = rememberSaveable(saver = LazyGridState.Saver) {
         LazyGridState()
     }
@@ -130,7 +133,6 @@ fun CatalogSearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
     ) {
         when {
             uiState.isLoading -> {
@@ -159,7 +161,7 @@ fun CatalogSearchScreen(
                         start = ScreenHorizontalPadding,
                         end = ScreenHorizontalPadding,
                         top = topInset,
-                        bottom = 110.dp
+                        bottom = 110.dp + bottomInset
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -370,7 +372,7 @@ fun CatalogSearchScreen(
                     visible = showScrollToTop,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 24.dp),
+                        .padding(end = 16.dp, bottom = 16.dp + bottomInset),
                     onClick = {
                         scope.launch {
                             gridState.animateScrollToItem(0)
@@ -394,25 +396,27 @@ private fun ScrollToTopButton(
         exit = fadeOut(tween(140)) + scaleOut(tween(140)),
         modifier = modifier
     ) {
-        Surface(
-            modifier = Modifier.gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-            tonalElevation = 2.dp,
-            shadowElevation = 4.dp,
-            onClick = onClick
-        ) {
-            Box(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowUp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp)
+        val shape = RoundedCornerShape(18.dp)
+        val interactionSource = remember { MutableInteractionSource() }
+
+        Box(
+            modifier = Modifier
+                .gamepadFocusableCard(shape = shape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f), shape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
                 )
-            }
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowUp,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }

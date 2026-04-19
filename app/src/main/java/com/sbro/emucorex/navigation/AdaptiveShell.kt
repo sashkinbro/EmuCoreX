@@ -124,7 +124,8 @@ fun AdaptiveShell(
         )
     }
     val configuration = LocalConfiguration.current
-    val isWide = configuration.screenWidthDp >= 900
+    val isTabletClass = configuration.smallestScreenWidthDp >= 600
+    val isWide = isTabletClass && configuration.screenWidthDp >= 900
 
     if (isWide) {
         Row(
@@ -197,8 +198,13 @@ private fun CompactAdaptiveShell(
 ) {
     val configuration = LocalConfiguration.current
     val statusPadding = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isLandscapeCompact = configuration.screenWidthDp > configuration.screenHeightDp
-    val drawerWidthFraction = if (isLandscapeCompact) 0.54f else 0.74f
+    val drawerWidthFraction = when {
+        isLandscapeCompact && isTabletClass -> 0.54f
+        isLandscapeCompact -> 0.46f
+        else -> 0.74f
+    }
     val selectedDrawerItemFocusRequester = remember { FocusRequester() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -259,7 +265,7 @@ private fun CompactAdaptiveShell(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(drawerWidthFraction)
-                    .widthIn(min = 292.dp, max = 360.dp),
+                    .widthIn(min = 292.dp, max = if (isTabletClass) 360.dp else 320.dp),
                 drawerShape = RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp),
                 drawerContainerColor = MaterialTheme.colorScheme.surface,
                 drawerContentColor = MaterialTheme.colorScheme.onSurface,

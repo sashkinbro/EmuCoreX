@@ -28,7 +28,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -105,6 +107,7 @@ fun OnboardingScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenWidthDp >= 600
     var isCompleting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
     
@@ -365,9 +368,8 @@ fun OnboardingScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .navigationBarsPadding()
                             .displayCutoutPadding()
-                            .padding(bottom = 16.dp, top = 8.dp)
+                            .padding(bottom = 16.dp + bottomInset, top = 8.dp)
                     ) {
                         OnboardingPageIndicator(
                             currentPage = uiState.currentPage,
@@ -405,12 +407,11 @@ fun OnboardingScreen(
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
                             .statusBarsPadding()
-                            .navigationBarsPadding()
                             .padding(
                                 start = 24.dp,
                                 end = 24.dp,
                                 top = 48.dp,
-                                bottom = 160.dp
+                                bottom = 160.dp + bottomInset
                             ),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -448,8 +449,7 @@ fun OnboardingScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 24.dp)
+                        .padding(bottom = 24.dp + bottomInset)
                         .padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {

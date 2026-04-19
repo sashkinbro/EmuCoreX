@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -109,6 +110,7 @@ fun AchievementsHubScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var username by rememberSaveable(retroState.storedUsername) { mutableStateOf(retroState.storedUsername.orEmpty()) }
     var password by rememberSaveable { mutableStateOf("") }
     val hubState by produceState(
@@ -144,7 +146,7 @@ fun AchievementsHubScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 28.dp),
+            .padding(bottom = 28.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         AchievementsTopBar(
@@ -221,6 +223,7 @@ fun AccountUnlockedAchievementsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val contentState by produceState(
         initialValue = AccountUnlockedContentState(),
         key1 = retroState.enabled,
@@ -284,7 +287,7 @@ fun AccountUnlockedAchievementsScreen(
                         start = ScreenHorizontalPadding,
                         end = ScreenHorizontalPadding,
                         top = 0.dp,
-                        bottom = 24.dp
+                        bottom = 24.dp + bottomInset
                     ),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
@@ -310,6 +313,7 @@ fun GameAchievementsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val listState = rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val showScrollToTop = listState.firstVisibleItemIndex > 2 || listState.firstVisibleItemScrollOffset > 900
@@ -355,7 +359,7 @@ fun GameAchievementsScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 100.dp),
+            contentPadding = PaddingValues(bottom = 100.dp + bottomInset),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
@@ -420,7 +424,7 @@ fun GameAchievementsScreen(
             visible = showScrollToTop,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 24.dp),
+                .padding(end = 16.dp, bottom = 16.dp + bottomInset),
             onClick = {
                 scope.launch {
                     listState.animateScrollToItem(0)

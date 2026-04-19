@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -30,7 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -122,13 +123,16 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val isWide = configuration.screenWidthDp >= 900
+    val isTabletClass = configuration.smallestScreenWidthDp >= 600
+    val isWide = isTabletClass && configuration.screenWidthDp >= 900
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalInset = ScreenHorizontalPadding
     val sectionTopSpacing = 2.dp
     val sectionInnerSpacing = 4.dp
-    val minCellSize = if (isLandscape) 94 else 102
-    val columnsCount = maxOf(1, (configuration.screenWidthDp + 12) / (minCellSize + 12))
+    val minCellSize = if (isLandscape) 94.dp else 102.dp
+    val contentWidthDp = if (isWide) (configuration.screenWidthDp - 332).coerceAtLeast(320) else configuration.screenWidthDp
+    val columnsCount = maxOf(1, (contentWidthDp + 12) / (minCellSize.value.toInt() + 12))
     val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()
@@ -162,7 +166,6 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
     ) {
         if (uiState.isBootstrapping || uiState.isLoading) {
             LoadingState()
@@ -175,7 +178,7 @@ fun HomeScreen(
                 topInset = topInset
             )
         } else {
-            val columns = GridCells.Fixed(if (isListView) 1 else columnsCount)
+            val columns = if (isListView) GridCells.Fixed(1) else GridCells.Adaptive(minSize = minCellSize)
 
             LazyVerticalGrid(
                 columns = columns,
@@ -183,7 +186,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
                     top = topInset + 4.dp,
-                    bottom = 100.dp
+                    bottom = 76.dp + bottomInset
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -507,7 +510,7 @@ fun HomeScreen(
                     visible = showScrollToTop,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 24.dp),
+                        .padding(end = 16.dp, bottom = 16.dp + bottomInset),
                     onClick = {
                         scope.launch {
                             gridState.animateScrollToItem(0)
@@ -530,24 +533,27 @@ private fun ScrollToTopButton(
         exit = fadeOut(tween(140)) + scaleOut(tween(140)),
         modifier = modifier
     ) {
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-            tonalElevation = 2.dp,
-            shadowElevation = 4.dp,
-            onClick = onClick
-        ) {
-            Box(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowUp,
-                    contentDescription = stringResource(R.string.back),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp)
+        val shape = RoundedCornerShape(18.dp)
+        val interactionSource = remember { MutableInteractionSource() }
+
+        Box(
+            modifier = Modifier
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
                 )
-            }
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.back),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }

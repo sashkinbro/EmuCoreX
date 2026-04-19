@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
@@ -81,6 +81,7 @@ fun SaveManagerScreen(
     val repository = remember(context) { SaveStateRepository(context) }
     val scope = rememberCoroutineScope()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val backupSuccessMessage = stringResource(R.string.save_manager_backup_success)
     val backupFailureMessage = stringResource(R.string.save_manager_backup_failed)
     val restoreSuccessMessage = stringResource(R.string.save_manager_restore_success)
@@ -242,7 +243,6 @@ fun SaveManagerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -250,7 +250,7 @@ fun SaveManagerScreen(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding,
                 top = 0.dp,
-                bottom = 24.dp
+                bottom = 24.dp + bottomInset
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
