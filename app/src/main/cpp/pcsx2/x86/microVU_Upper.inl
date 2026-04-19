@@ -535,25 +535,42 @@ static void mVU_FTOIx(mP, const a64::MemOperand& addr, microOpcode opEnum)
 			return;
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
+		const xmm& t2 = mVU.regAlloc->allocReg();
+		const xmm& t3 = mVU.regAlloc->allocReg();
+		const xmm& t4 = mVU.regAlloc->allocReg();
 
-		// cvttps2dq returns 0x8000000 for any unrepresentable values.
-		// We want it to return 0x8000000 for negative and 0x7fffffff for positive.
-		// So for unrepresentable positive values, xor with 0xffffffff to turn 0x80000000 into 0x7fffffff.
+		// Match the interpreter's floatToInt<> saturation rule explicitly on ARM64:
+		// if exponent >= 0x4f000000, return 0x80000000 for negative inputs and
+		// 0x7fffffff for non-negative inputs; otherwise truncate toward zero.
 		if (addr.IsValid()) {
 //            xMUL.PS(Fs, ptr128[addr]);
             armAsm->Fmul(Fs.V4S(), Fs.V4S(), armLoadPtrV(addr).V4S());
         }
-//		xMOVAPS(t1, Fs);
-        armAsm->Mov(t1.Q(), Fs.Q());
-//		xPCMP.GTD(t1, ptr128[mVUglob.I32MAXF]);
-        armAsm->Cmgt(t1.V4S(), t1.V4S(), armLoadPtrV(PTR_CPU(mVUglob.I32MAXF)).V4S());
+
+		armAsm->Mov(t1.Q(), Fs.Q()); // Preserve the original bit pattern.
+		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.exponent)).V16B());
+		armAsm->Cmhs(t2.V4S(), t2.V4S(), armLoadPtrV(PTR_CPU(mVUglob.I32MAXF)).V4S()); // invalid lanes
+
 //		xCVTTPS2DQ(Fs, Fs);
         armAsm->Fcvtzs(Fs.V4S(), Fs.V4S());
-//		xPXOR(Fs, t1);
-        armAsm->Eor(Fs.V16B(), Fs.V16B(), t1.V16B());
+
+		// Build the interpreter-compatible saturation value per lane.
+		armAsm->And(t3.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.signbit)).V16B());
+		armAsm->Sshr(t4.V4S(), t3.V4S(), 31); // 0xffffffff for negative, 0x0 for non-negative
+		armAsm->Ldr(t1.Q(), PTR_MVUCONST(sse4_compvals[1][0])); // 0x7fffffff
+		armAsm->Bic(t1.V16B(), t1.V16B(), t4.V16B());
+		armAsm->Orr(t1.V16B(), t1.V16B(), t3.V16B());
+
+		// Replace invalid lanes with the interpreter-compatible saturation value.
+		armAsm->And(t1.V16B(), t1.V16B(), t2.V16B());
+		armAsm->Bic(Fs.V16B(), Fs.V16B(), t2.V16B());
+		armAsm->Orr(Fs.V16B(), Fs.V16B(), t1.V16B());
 
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
+		mVU.regAlloc->clearNeeded(t2);
+		mVU.regAlloc->clearNeeded(t3);
+		mVU.regAlloc->clearNeeded(t4);
 		mVU.profiler.EmitOp(opEnum);
 	}
 	pass3
@@ -602,26 +619,36 @@ mVUop(mVU_CLIP)
 		const xmm& Ft = mVU.regAlloc->allocReg(_Ft_, 0, 0x1);
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
+		const xmm& t3 = mVU.regAlloc->allocReg();
 
 		mVUunpack_xyzw(Ft, Ft, 0);
 		mVUallocCFLAGa(mVU, gprT1, cFLAG.lastWrite);
         armAsm->Lsl(gprT1, gprT1, 6);
 
-        armAsm->Ldr(t1, PTR_CPU(mVUglob.exponent));
-        armAsm->And(t1.V16B(), t1.V16B(), Fs.V16B());
-        armAsm->Eor(t2.V16B(), t2.V16B(), t2.V16B());
-        armAsm->Cmeq(t1.V4S(), t1.V4S(), t2.V4S()); // Denormal check
-        armAsm->Bic(t1.V16B(), Fs.V16B(), t1.V16B()); // If denormal, set to zero, which can't be greater than any nonnegative denormal in Ft
-        armAsm->And(Ft.V16B(), Ft.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
+		// Match the interpreter:
+		// value = abs(Ft.w), except exponent==0 lanes use 0x007fffff.
+		armAsm->Mov(t1.Q(), Ft.Q());
+		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.exponent)).V16B());
+		armAsm->Eor(t3.V16B(), t3.V16B(), t3.V16B());
+		armAsm->Cmeq(t2.V4S(), t2.V4S(), t3.V4S()); // exponent == 0 -> zero / denormal
+		armAsm->And(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
 
-        armAsm->Ldr(Fs, PTR_CPU(mVUglob.signbit));
-        armAsm->Eor(Fs.V16B(), Fs.V16B(), t1.V16B()); // Negate
-        armAsm->Cmgt(t1.V4S(), t1.V4S(), Ft.V4S()); // +w, +z, +y, +x
-        armAsm->Cmgt(Fs.V4S(), Fs.V4S(), Ft.V4S()); // -w, -z, -y, -x
+		armAsm->Movi(t3.V4S(), 0);
+		armAsm->Mov(a64::WRegister(gprT2), 0x007fffff);
+		armAsm->Ins(t3.V4S(), 0, a64::WRegister(gprT2));
+		armAsm->Dup(t3.V4S(), t3.V4S(), 0);
+		armAsm->And(t3.V16B(), t3.V16B(), t2.V16B());
+		armAsm->Bic(t1.V16B(), t1.V16B(), t2.V16B());
+		armAsm->Orr(t1.V16B(), t1.V16B(), t3.V16B());
 
-        armPBLENDW(Fs, t1);                // Squish together
-        armPACKSSWB(Fs, Fs);               // Convert u16 to u8
-        armPMOVMSKB(a64::WRegister(gprT2), Fs); // Get bitmask
+        armAsm->Ldr(t2, PTR_CPU(mVUglob.signbit));
+        armAsm->Eor(t3.V16B(), t2.V16B(), Fs.V16B()); // Negate
+        armAsm->Cmgt(t2.V4S(), Fs.V4S(), t1.V4S()); // +w, +z, +y, +x
+        armAsm->Cmgt(t3.V4S(), t3.V4S(), t1.V4S()); // -w, -z, -y, -x
+
+        armPBLENDW(t3, t2);                // Squish together
+        armPACKSSWB(t3, t3);               // Convert u16 to u8
+        armPMOVMSKB(a64::WRegister(gprT2), t3); // Get bitmask
         armAsm->And(a64::WRegister(gprT2), a64::WRegister(gprT2), 0x3f);
         armAsm->And(a64::WRegister(gprT1), a64::WRegister(gprT1), 0x00ffffff);
         armAsm->Orr(a64::WRegister(gprT1), a64::WRegister(gprT1), a64::WRegister(gprT2));
@@ -631,6 +658,7 @@ mVUop(mVU_CLIP)
 		mVU.regAlloc->clearNeeded(Ft);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
+		mVU.regAlloc->clearNeeded(t3);
 		mVU.profiler.EmitOp(opCLIP);
 	}
 	pass3

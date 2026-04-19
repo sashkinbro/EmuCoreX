@@ -14,7 +14,7 @@
 
 static __ri u32 VU_MAC_UPDATE( int shift, VURegs * VU, float f )
 {
-	u32 v = *(u32*)&f;
+	u32 v = std::bit_cast<u32>(f);
 	int exp = (v >> 23) & 0xff;
 	u32 s = v & 0x80000000;
 

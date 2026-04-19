@@ -443,22 +443,22 @@ static float vuDouble(u32 f)
 	{
 		case 0x0:
 			f &= 0x80000000;
-			return *(float*)&f;
+			return std::bit_cast<float>(f);
 			break;
 		case 0x7f800000:
 			if (CHECK_VU_OVERFLOW(0))
 			{
 				u32 d = (f & 0x80000000) | 0x7f7fffff;
-				return *(float*)&d;
+				return std::bit_cast<float>(d);
 			}
 			break;
 	}
-	return *(float*)&f;
+	return std::bit_cast<float>(f);
 }
 #else
 static __fi float vuDouble(u32 f)
 {
-	return *(float*)&f;
+	return std::bit_cast<float>(f);
 }
 #endif
 
@@ -1704,7 +1704,7 @@ static __ri float _vuCalculateEATAN(float inputvalue) {
 
 	result += eatanconst[8];
 
-	result = vuDouble(*(u32*)&result);
+	result = vuDouble(std::bit_cast<u32>(result));
 
 	return result;
 }
@@ -1787,7 +1787,7 @@ static __ri void _vuESIN(VURegs* VU)
 	float p = vuDouble(VU->VF[_Fs_].UL[_Fsf_]);
 
 	p = (sinconsts[0] * p) + (sinconsts[1] * pow(p, 3)) + (sinconsts[2] * pow(p, 5)) + (sinconsts[3] * pow(p, 7)) + (sinconsts[4] * pow(p, 9));
-	VU->p.F = vuDouble(*(u32*)&p);
+	VU->p.F = vuDouble(std::bit_cast<u32>(p));
 }
 
 static __ri void _vuEEXP(VURegs* VU)
@@ -1798,7 +1798,7 @@ static __ri void _vuEEXP(VURegs* VU)
 
 	p = 1.0f + (consts[0] * p) + (consts[1] * pow(p, 2)) + (consts[2] * pow(p, 3)) + (consts[3] * pow(p, 4)) + (consts[4] * pow(p, 5)) + (consts[5] * pow(p, 6));
 	p = pow(p, 4);
-	p = vuDouble(*(u32*)&p);
+	p = vuDouble(std::bit_cast<u32>(p));
 	p = 1 / p;
 
 	VU->p.F = p;

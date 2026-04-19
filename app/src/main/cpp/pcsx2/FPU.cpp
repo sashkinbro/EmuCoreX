@@ -170,14 +170,14 @@ float fpuDouble(u32 f)
 	switch(f & 0x7f800000){
 		case 0x0:
 			f &= 0x80000000;
-			return *(float*)&f;
+			return std::bit_cast<float>(f);
 			break;
 		case 0x7f800000:
 			f = (f & 0x80000000)|0x7f7fffff;
-			return *(float*)&f;
+			return std::bit_cast<float>(f);
 			break;
 		default:
-			return *(float*)&f;
+			return std::bit_cast<float>(f);
 			break;
 	}
 }
