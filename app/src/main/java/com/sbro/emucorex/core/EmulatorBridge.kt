@@ -235,6 +235,11 @@ object EmulatorBridge {
         enableFxaa: Boolean = false,
         casMode: Int = 0,
         casSharpness: Int = 50,
+        shadeBoostEnabled: Boolean = false,
+        shadeBoostBrightness: Int = 50,
+        shadeBoostContrast: Int = 50,
+        shadeBoostSaturation: Int = 50,
+        shadeBoostGamma: Int = 50,
         anisotropicFiltering: Int = 0,
         enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
         widescreenPatches: Boolean = false,
@@ -359,6 +364,11 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "fxaa", "bool", enableFxaa.toString()))
                 add(settingOp("EmuCore/GS", "CASMode", "int", casMode.toString()))
                 add(settingOp("EmuCore/GS", "CASSharpness", "int", casSharpness.toString()))
+                add(settingOp("EmuCore/GS", "ShadeBoost", "bool", shadeBoostEnabled.toString()))
+                add(settingOp("EmuCore/GS", "ShadeBoost_Brightness", "int", shadeBoostBrightness.toString()))
+                add(settingOp("EmuCore/GS", "ShadeBoost_Contrast", "int", shadeBoostContrast.toString()))
+                add(settingOp("EmuCore/GS", "ShadeBoost_Saturation", "int", shadeBoostSaturation.toString()))
+                add(settingOp("EmuCore/GS", "ShadeBoost_Gamma", "int", shadeBoostGamma.toString()))
                 add(settingOp("EmuCore/GS", "MaxAnisotropy", "int", anisotropicFiltering.toString()))
                 add(settingOp("EmuCore/GS", "hw_mipmap", "bool", enableHwMipmapping.toString()))
                 add(settingOp("EmuCore", "EnableWideScreenPatches", "bool", widescreenPatches.toString()))

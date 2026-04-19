@@ -895,4 +895,20 @@
     <string name="detail_comment_device">设备</string>
     <string name="detail_comment_unknown_user">玩家</string>
     <string name="detail_comments_load_more">再加载 3 条</string>
+    <string name="emulation_screen_tab">屏幕</string>
+    <string name="settings_shadeboost">屏幕色彩增强</string>
+    <string name="settings_shadeboost_brightness">亮度</string>
+    <string name="settings_shadeboost_contrast">对比度</string>
+    <string name="settings_shadeboost_saturation">饱和度</string>
+    <string name="settings_shadeboost_gamma">伽马</string>
+    <string name="settings_help_shadeboost">在帧渲染后应用核心的后期处理图像控制。可用其调整泛白的场景、过亮的游戏或需要增加冲击力的显示器，而无需修改渲染器的其他部分。</string>
+    <string name="settings_help_shadeboost_brightness">调高或调低最终图像的整体亮度。如果画面看起来太暗或太平淡，请先尝试在此处进行小幅调整。</string>
+    <string name="settings_help_shadeboost_contrast">控制明暗区域之间的差异。较高的值会使高光和阴影更强烈，而较低的值会使图像更柔和。</string>
+    <string name="settings_help_shadeboost_saturation">调整色彩的浓度。如果游戏画面显得平淡，请提高此值；如果输出变得过于刺眼或出现噪点，请降低此值。</string>
+    <string name="settings_help_shadeboost_gamma">调整中间色调，而不像亮度那样对整个图像产生强烈影响。当菜单或游戏画面看起来偏灰或丢失暗部细节时非常有用。</string>
+    <string name="screen_settings_menu_desc">在不改变核心渲染路径的情况下调整最终图像。这些控件非常适合针对每个游戏修复平淡、刺眼或过暗的输出画面。</string>
+    <string name="screen_settings_reset_hint_title">设置提示</string>
+    <string name="screen_settings_reset_hint_body">长按任何设置的标签即可恢复其默认值。此操作在设置、游戏管理器和游戏内菜单中都有效，方便您在测试时快速撤销更改。</string>
+    <string name="got_it">知道了</string>
+    <string name="game_settings_manager_section_screen">屏幕</string>
 </resources>

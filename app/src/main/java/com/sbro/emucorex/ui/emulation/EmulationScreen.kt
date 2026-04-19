@@ -91,6 +91,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -222,6 +223,7 @@ private enum class EmulationMenuTab {
     Session,
     Overlay,
     Basic,
+    Screen,
     Advanced,
     Achievements
 }
@@ -949,6 +951,11 @@ fun EmulationScreen(
                     onSetEnableFxaa = { viewModel.setEnableFxaa(it) },
                     onSetCasMode = { viewModel.setCasMode(it) },
                     onSetCasSharpness = { viewModel.setCasSharpness(it) },
+                    onSetShadeBoostEnabled = { viewModel.setShadeBoostEnabled(it) },
+                    onSetShadeBoostBrightness = { viewModel.setShadeBoostBrightness(it) },
+                    onSetShadeBoostContrast = { viewModel.setShadeBoostContrast(it) },
+                    onSetShadeBoostSaturation = { viewModel.setShadeBoostSaturation(it) },
+                    onSetShadeBoostGamma = { viewModel.setShadeBoostGamma(it) },
                     onSetAnisotropicFiltering = { viewModel.setAnisotropicFiltering(it) },
                     onSetEnableHwMipmapping = { viewModel.setEnableHwMipmapping(it) },
                     onSetCpuSpriteRenderSize = { viewModel.setCpuSpriteRenderSize(it) },
@@ -2048,6 +2055,11 @@ private fun EmulationSidebarMenu(
     onSetEnableFxaa: (Boolean) -> Unit,
     onSetCasMode: (Int) -> Unit,
     onSetCasSharpness: (Int) -> Unit,
+    onSetShadeBoostEnabled: (Boolean) -> Unit,
+    onSetShadeBoostBrightness: (Int) -> Unit,
+    onSetShadeBoostContrast: (Int) -> Unit,
+    onSetShadeBoostSaturation: (Int) -> Unit,
+    onSetShadeBoostGamma: (Int) -> Unit,
     onSetAnisotropicFiltering: (Int) -> Unit,
     onSetEnableHwMipmapping: (Boolean) -> Unit,
     onSetCpuSpriteRenderSize: (Int) -> Unit,
@@ -2101,7 +2113,8 @@ private fun EmulationSidebarMenu(
         uiState.compactControls -> 28.dp
         else -> 36.dp
     }
-    var selectedMenuTab by remember { mutableStateOf(EmulationMenuTab.Session) }
+    var selectedMenuTabName by rememberSaveable { mutableStateOf(EmulationMenuTab.Session.name) }
+    val selectedMenuTab = remember(selectedMenuTabName) { EmulationMenuTab.valueOf(selectedMenuTabName) }
 
     Row(
         modifier = modifier
@@ -2735,6 +2748,82 @@ private fun EmulationSidebarMenu(
                 )
                     }
 
+                    EmulationMenuTab.Screen -> {
+                        SidebarSectionTitle(
+                            text = stringResource(R.string.emulation_screen_tab).uppercase(),
+                            color = sectionTitleColor,
+                            topPadding = sectionLabelTopPadding,
+                            horizontalInset = sectionLabelInset
+                        )
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.screen_settings_menu_desc),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_shadeboost),
+                            checked = uiState.shadeBoostEnabled,
+                            onCheckedChange = onSetShadeBoostEnabled,
+                            helpText = stringResource(R.string.settings_help_shadeboost),
+                            onResetToDefault = { onSetShadeBoostEnabled(globalDefaults.shadeBoostEnabled) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_shadeboost_brightness),
+                            valueLabelForValue = { it.toString() },
+                            value = uiState.shadeBoostBrightness.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { onSetShadeBoostBrightness(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                            onResetToDefault = { onSetShadeBoostBrightness(globalDefaults.shadeBoostBrightness) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_shadeboost_contrast),
+                            valueLabelForValue = { it.toString() },
+                            value = uiState.shadeBoostContrast.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { onSetShadeBoostContrast(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                            onResetToDefault = { onSetShadeBoostContrast(globalDefaults.shadeBoostContrast) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_shadeboost_saturation),
+                            valueLabelForValue = { it.toString() },
+                            value = uiState.shadeBoostSaturation.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { onSetShadeBoostSaturation(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                            onResetToDefault = { onSetShadeBoostSaturation(globalDefaults.shadeBoostSaturation) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_shadeboost_gamma),
+                            valueLabelForValue = { it.toString() },
+                            value = uiState.shadeBoostGamma.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { onSetShadeBoostGamma(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                            onResetToDefault = { onSetShadeBoostGamma(globalDefaults.shadeBoostGamma) }
+                        )
+                    }
+
                     EmulationMenuTab.Advanced -> {
                         SidebarSectionTitle(
                             text = stringResource(R.string.settings_hardware_fixes).uppercase(),
@@ -3050,31 +3139,37 @@ private fun EmulationSidebarMenu(
                     icon = Icons.Rounded.Menu,
                     contentDescription = stringResource(R.string.emulation_session_tab),
                     selected = selectedMenuTab == EmulationMenuTab.Session,
-                    onClick = { selectedMenuTab = EmulationMenuTab.Session }
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Session.name }
                 )
                 EmulationMenuRailButton(
                     icon = Icons.Rounded.Gamepad,
                     contentDescription = stringResource(R.string.emulation_overlay_tab),
                     selected = selectedMenuTab == EmulationMenuTab.Overlay,
-                    onClick = { selectedMenuTab = EmulationMenuTab.Overlay }
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Overlay.name }
                 )
                 EmulationMenuRailButton(
                     icon = Icons.Rounded.SettingsSuggest,
                     contentDescription = stringResource(R.string.emulation_basic_settings),
                     selected = selectedMenuTab == EmulationMenuTab.Basic,
-                    onClick = { selectedMenuTab = EmulationMenuTab.Basic }
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Basic.name }
+                )
+                EmulationMenuRailButton(
+                    icon = Icons.Rounded.Fullscreen,
+                    contentDescription = stringResource(R.string.emulation_screen_tab),
+                    selected = selectedMenuTab == EmulationMenuTab.Screen,
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Screen.name }
                 )
                 EmulationMenuRailButton(
                     icon = Icons.Rounded.Star,
                     contentDescription = stringResource(R.string.emulation_advanced_settings),
                     selected = selectedMenuTab == EmulationMenuTab.Advanced,
-                    onClick = { selectedMenuTab = EmulationMenuTab.Advanced }
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Advanced.name }
                 )
                 EmulationMenuRailButton(
                     icon = Icons.Rounded.LockOpen,
                     contentDescription = stringResource(R.string.emulation_achievements_tab),
                     selected = selectedMenuTab == EmulationMenuTab.Achievements,
-                    onClick = { selectedMenuTab = EmulationMenuTab.Achievements }
+                    onClick = { selectedMenuTabName = EmulationMenuTab.Achievements.name }
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 EmulationMenuRailButton(
@@ -3087,6 +3182,7 @@ private fun EmulationSidebarMenu(
             }
         }
     }
+
 }
 
 @Composable

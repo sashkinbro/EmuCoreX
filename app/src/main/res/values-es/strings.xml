@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Dispositivo</string>
     <string name="detail_comment_unknown_user">Jugador</string>
     <string name="detail_comments_load_more">Cargar 3 más</string>
+    <string name="emulation_screen_tab">Pantalla</string>
+    <string name="settings_shadeboost">Mejora de color de pantalla</string>
+    <string name="settings_shadeboost_brightness">Brillo</string>
+    <string name="settings_shadeboost_contrast">Contraste</string>
+    <string name="settings_shadeboost_saturation">Saturación</string>
+    <string name="settings_shadeboost_gamma">Gamma</string>
+    <string name="settings_help_shadeboost">Aplica los controles básicos de imagen de posprocesamiento después de renderizar el fotograma. Úsalo para ajustar escenas descoloridas, juegos demasiado brillantes o pantallas que necesitan un poco más de fuerza sin tocar el resto del renderizador.</string>
+    <string name="settings_help_shadeboost_brightness">Aumenta o disminuye el nivel de luz general de la imagen final. Haz pequeños cambios aquí primero si la imagen se ve demasiado oscura o plana.</string>
+    <string name="settings_help_shadeboost_contrast">Controla la separación entre áreas claras y oscuras. Los valores más altos hacen que las luces y las sombras sean más fuertes, mientras que los valores más bajos suavizan la imagen.</string>
+    <string name="settings_help_shadeboost_saturation">Ajusta la intensidad de los colores. Auméntala si un juego parece apagado o redúcela si el resultado se vuelve demasiado intenso o con ruido.</string>
+    <string name="settings_help_shadeboost_gamma">Desplaza los tonos medios sin forzar toda la imagen tanto como el brillo. Es útil cuando los menús o el juego se ven ligeramente grises o empastados.</string>
+    <string name="screen_settings_menu_desc">Ajusta la imagen final sin cambiar la ruta principal de renderizado. Estos controles son ideales para arreglar una salida apagada, dura o demasiado oscura en cada juego.</string>
+    <string name="screen_settings_reset_hint_title">Consejo de ajustes</string>
+    <string name="screen_settings_reset_hint_body">Mantén pulsada la etiqueta de cualquier ajuste para restaurar su valor predeterminado. Esto funciona en Ajustes, en el Administrador de juegos y en el menú dentro del juego, para que puedas deshacer cambios rápidamente mientras pruebas.</string>
+    <string name="got_it">Entendido</string>
+    <string name="game_settings_manager_section_screen">Pantalla</string>
 </resources>

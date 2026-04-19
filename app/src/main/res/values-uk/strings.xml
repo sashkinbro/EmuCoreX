@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Пристрій</string>
     <string name="detail_comment_unknown_user">Гравець</string>
     <string name="detail_comments_load_more">Завантажити ще 3</string>
+    <string name="emulation_screen_tab">Екран</string>
+    <string name="settings_shadeboost">Покращення кольору екрана</string>
+    <string name="settings_shadeboost_brightness">Яскравість</string>
+    <string name="settings_shadeboost_contrast">Контрастність</string>
+    <string name="settings_shadeboost_saturation">Насиченість</string>
+    <string name="settings_shadeboost_gamma">Гамма</string>
+    <string name="settings_help_shadeboost">Застосовує основні елементи керування постобробкою зображення після рендерингу кадру. Використовуйте їх для налаштування бляклих сцен, надто яскравих ігор або дисплеїв, яким потрібно трохи більше виразності, не зачіпаючи іншу частину рендерера.</string>
+    <string name="settings_help_shadeboost_brightness">Підвищує або знижує загальний рівень освітленості фінального зображення. Спочатку спробуйте внести невеликі зміни тут, якщо картинка виглядає занадто темною або плоскою.</string>
+    <string name="settings_help_shadeboost_contrast">Контролює поділ між світлими та темними ділянками. Вищі значення посилюють світло і тіні, а нижчі — пом\'якшують зображення.</string>
+    <string name="settings_help_shadeboost_saturation">Регулює інтенсивність кольорів. Збільште значення, якщо гра здається тьмяною, або зменште, якщо картинка стає занадто яскравою чи «шумною».</string>
+    <string name="settings_help_shadeboost_gamma">Зсовує півтони, не так сильно впливаючи на все зображення, як яскравість. Корисно, коли меню або ігровий процес виглядають злегка сірими або зі втраченими деталями в тінях.</string>
+    <string name="screen_settings_menu_desc">Налаштовуйте фінальне зображення без зміни основного шляху рендерингу. Ці елементи керування чудово підходять для виправлення тьмяного, різкого або занадто темного виведення для кожної гри окремо.</string>
+    <string name="screen_settings_reset_hint_title">Підказка щодо налаштувань</string>
+    <string name="screen_settings_reset_hint_body">Натисніть і утримуйте назву будь-якого налаштування, щоб відновити його значення за замовчуванням. Це працює в Налаштуваннях, у Менеджері ігор і у внутрішньоігровому меню, тож під час тестування можна швидко скасувати зміни.</string>
+    <string name="got_it">Зрозуміло</string>
+    <string name="game_settings_manager_section_screen">Екран</string>
 </resources>

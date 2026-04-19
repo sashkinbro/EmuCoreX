@@ -85,8 +85,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -124,6 +126,7 @@ import com.sbro.emucorex.data.SettingsBackupRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
+import com.sbro.emucorex.ui.common.ScreenSettingsResetHintDialog
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -149,6 +152,10 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val preferences = remember(context) { AppPreferences(context) }
+    val screenSettingsResetHintShown by produceState<Boolean?>(initialValue = null, preferences) {
+        preferences.screenSettingsResetHintShown.collect { value = it }
+    }
     val configuration = LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
@@ -162,6 +169,7 @@ fun SettingsScreen(
     var showResetAllSettingsDialog by remember { mutableStateOf(false) }
     var showCoverUrlDialog by remember { mutableStateOf(false) }
     var showBiosDialog by remember { mutableStateOf(false) }
+    var showScreenSettingsResetHint by rememberSaveable { mutableStateOf(false) }
     var pendingCoverUrl by remember { mutableStateOf("") }
     var searchEnabled by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -188,6 +196,14 @@ fun SettingsScreen(
     val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
     val notSetLabel = stringResource(R.string.settings_not_set)
     val settingsScrollState = rememberScrollState()
+
+    LaunchedEffect(screenSettingsResetHintShown) {
+        when (screenSettingsResetHintShown) {
+            false -> showScreenSettingsResetHint = true
+            true -> showScreenSettingsResetHint = false
+            null -> Unit
+        }
+    }
 
     if (!uiState.isLoaded) {
         Box(
@@ -522,6 +538,17 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showBiosDialog = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showScreenSettingsResetHint) {
+        ScreenSettingsResetHintDialog(
+            onDismiss = {
+                showScreenSettingsResetHint = false
+                scope.launch {
+                    preferences.setScreenSettingsResetHintShown(true)
                 }
             }
         )

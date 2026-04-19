@@ -131,6 +131,7 @@
     <string name="emulation_achievements_tab">Achievements</string>
     <string name="emulation_session_tab">Session</string>
     <string name="emulation_overlay_tab">Overlay</string>
+    <string name="emulation_screen_tab">Screen</string>
     <string name="emulation_stick_scale">Stick scale</string>
     <string name="emulation_close_menu">Close menu</string>
     <string name="emulation_achievements_bios_unavailable">Achievements are only available while a game is loaded. BIOS boot does not expose RetroAchievements data.</string>
@@ -866,6 +867,20 @@
     <string name="settings_cas_mode_off">Off</string>
     <string name="settings_cas_mode_sharpen_only">Sharpen Only</string>
     <string name="settings_cas_mode_sharpen_resize">Sharpen + Resize</string>
+    <string name="settings_shadeboost">Screen color boost</string>
+    <string name="settings_shadeboost_brightness">Brightness</string>
+    <string name="settings_shadeboost_contrast">Contrast</string>
+    <string name="settings_shadeboost_saturation">Saturation</string>
+    <string name="settings_shadeboost_gamma">Gamma</string>
+    <string name="settings_help_shadeboost">Applies the core post-processing image controls after the frame is rendered. Use it to tune washed-out scenes, over-bright games, or displays that need a little more punch without touching the rest of the renderer.</string>
+    <string name="settings_help_shadeboost_brightness">Raises or lowers the overall light level of the final image. Use small changes here first if the picture looks too dark or too flat.</string>
+    <string name="settings_help_shadeboost_contrast">Controls the separation between bright and dark areas. Higher values make highlights and shadows stronger, while lower values soften the image.</string>
+    <string name="settings_help_shadeboost_saturation">Adjusts how intense the colors look. Increase it if a game appears dull, or lower it if the output becomes too vivid or noisy.</string>
+    <string name="settings_help_shadeboost_gamma">Shifts mid-tones without pushing the whole image as hard as brightness. It is useful when menus or gameplay look slightly grey or slightly crushed.</string>
+    <string name="screen_settings_menu_desc">Tune the final image without changing the core renderer path. These controls are great for fixing dull, harsh, or overly dark output on a per-game basis.</string>
+    <string name="screen_settings_reset_hint_title">Settings tip</string>
+    <string name="screen_settings_reset_hint_body">Long-press the label of any setting to restore its default value. This works in Settings, in the Game Manager, and in the in-game menu, so you can quickly undo changes while testing.</string>
+    <string name="got_it">Got it</string>
     <string name="shell_game_settings_manager">Game Manager</string>
     <string name="game_settings_manager_title">Game Manager</string>
     <string name="game_settings_manager_subtitle">Manage per-game profiles, edit core settings, and move them between devices.</string>
@@ -891,6 +906,7 @@
     <string name="game_settings_manager_section_profile">Profile</string>
     <string name="game_settings_manager_section_runtime">Runtime</string>
     <string name="game_settings_manager_section_graphics">Graphics</string>
+    <string name="game_settings_manager_section_screen">Screen</string>
     <string name="game_settings_overlay_section">Game profile</string>
     <string name="game_settings_overlay_profile_active">This game uses its own saved settings profile.</string>
     <string name="game_settings_overlay_profile_inactive">This game is currently using your global default settings.</string>

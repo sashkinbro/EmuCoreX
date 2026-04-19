@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Appareil</string>
     <string name="detail_comment_unknown_user">Joueur</string>
     <string name="detail_comments_load_more">Charger 3 de plus</string>
+    <string name="emulation_screen_tab">Écran</string>
+    <string name="settings_shadeboost">Boost des couleurs de l\'écran</string>
+    <string name="settings_shadeboost_brightness">Luminosité</string>
+    <string name="settings_shadeboost_contrast">Contraste</string>
+    <string name="settings_shadeboost_saturation">Saturation</string>
+    <string name="settings_shadeboost_gamma">Gamma</string>
+    <string name="settings_help_shadeboost">Applique les contrôles d\'image de post-traitement de base après le rendu de l\'image. Utilisez-le pour ajuster les scènes délavées, les jeux trop lumineux ou les écrans qui ont besoin d\'un peu plus de peps sans toucher au reste du moteur de rendu.</string>
+    <string name="settings_help_shadeboost_brightness">Augmente ou diminue le niveau de lumière global de l\'image finale. Utilisez d\'abord de petites modifications ici si l\'image semble trop sombre ou trop plate.</string>
+    <string name="settings_help_shadeboost_contrast">Contrôle la séparation entre les zones claires et sombres. Des valeurs plus élevées renforcent les hautes lumières et les ombres, tandis que des valeurs plus faibles adoucissent l\'image.</string>
+    <string name="settings_help_shadeboost_saturation">Ajuste l\'intensité des couleurs. Augmentez-la si un jeu paraît terne, ou diminuez-la si le rendu devient trop vif ou bruité.</string>
+    <string name="settings_help_shadeboost_gamma">Décale les tons moyens sans pousser toute l\'image aussi fort que la luminosité. C\'est utile lorsque les menus ou le jeu semblent légèrement gris ou bouchés.</string>
+    <string name="screen_settings_menu_desc">Ajustez l\'image finale sans modifier le chemin de rendu principal. Ces contrôles sont parfaits pour corriger un rendu terne, dur ou trop sombre jeu par jeu.</string>
+    <string name="screen_settings_reset_hint_title">Astuce de réglage</string>
+    <string name="screen_settings_reset_hint_body">Appuyez longuement sur le libellé de n\'importe quel réglage pour restaurer sa valeur par défaut. Cela fonctionne dans les Paramètres, dans le gestionnaire de jeux et dans le menu en jeu, afin que vous puissiez annuler rapidement vos changements pendant les tests.</string>
+    <string name="got_it">Compris</string>
+    <string name="game_settings_manager_section_screen">Écran</string>
 </resources>

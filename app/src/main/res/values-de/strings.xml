@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Gerät</string>
     <string name="detail_comment_unknown_user">Spieler</string>
     <string name="detail_comments_load_more">3 weitere laden</string>
+    <string name="emulation_screen_tab">Bildschirm</string>
+    <string name="settings_shadeboost">Bildschirm-Farbverstärkung</string>
+    <string name="settings_shadeboost_brightness">Helligkeit</string>
+    <string name="settings_shadeboost_contrast">Kontrast</string>
+    <string name="settings_shadeboost_saturation">Sättigung</string>
+    <string name="settings_shadeboost_gamma">Gamma</string>
+    <string name="settings_help_shadeboost">Wendet die zentralen Post-Processing-Bildsteuerungen nach dem Rendern des Frames an. Verwende dies, um verwaschene Szenen, übermäßig helle Spiele oder Displays abzustimmen, die etwas mehr Kraft benötigen, ohne den Rest des Renderers zu berühren.</string>
+    <string name="settings_help_shadeboost_brightness">Erhöht oder senkt die allgemeine Helligkeit des endgültigen Bildes. Verwende hier zuerst kleine Änderungen, wenn das Bild zu dunkel oder zu flach wirkt.</string>
+    <string name="settings_help_shadeboost_contrast">Steuert die Trennung zwischen hellen und dunklen Bereichen. Höhere Werte machen Lichter und Schatten stärker, während niedrigere Werte das Bild weicher machen.</string>
+    <string name="settings_help_shadeboost_saturation">Passt die Intensität der Farben an. Erhöhe den Wert, wenn ein Spiel blass erscheint, oder senke ihn, wenn die Ausgabe zu lebhaft oder verrauscht wird.</string>
+    <string name="settings_help_shadeboost_gamma">Verschiebt die Mitteltöne, ohne das gesamte Bild so stark zu beeinflussen wie die Helligkeit. Nützlich, wenn Menüs oder das Gameplay leicht grau oder detailarm wirken.</string>
+    <string name="screen_settings_menu_desc">Passe das endgültige Bild an, ohne den Kern-Rendering-Pfad zu ändern. Diese Steuerelemente eignen sich hervorragend, um eine blasse, harte oder übermäßig dunkle Ausgabe pro Spiel zu korrigieren.</string>
+    <string name="screen_settings_reset_hint_title">Einstellungstipp</string>
+    <string name="screen_settings_reset_hint_body">Halte die Bezeichnung einer beliebigen Einstellung gedrückt, um den Standardwert wiederherzustellen. Das funktioniert in den Einstellungen, im Spielmanager und im In-Game-Menü, damit du Änderungen beim Testen schnell rückgängig machen kannst.</string>
+    <string name="got_it">Verstanden</string>
+    <string name="game_settings_manager_section_screen">Bildschirm</string>
 </resources>

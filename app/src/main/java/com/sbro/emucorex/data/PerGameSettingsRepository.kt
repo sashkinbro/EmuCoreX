@@ -35,6 +35,11 @@ data class PerGameSettings(
     val enableFxaa: Boolean = false,
     val casMode: Int = 0,
     val casSharpness: Int = 50,
+    val shadeBoostEnabled: Boolean = false,
+    val shadeBoostBrightness: Int = 50,
+    val shadeBoostContrast: Int = 50,
+    val shadeBoostSaturation: Int = 50,
+    val shadeBoostGamma: Int = 50,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val enableWidescreenPatches: Boolean = false,
@@ -178,6 +183,11 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         enableFxaa = optBoolean("enableFxaa", false),
         casMode = optInt("casMode", 0),
         casSharpness = optInt("casSharpness", 50),
+        shadeBoostEnabled = optBoolean("shadeBoostEnabled", false),
+        shadeBoostBrightness = optInt("shadeBoostBrightness", 50).coerceIn(1, 100),
+        shadeBoostContrast = optInt("shadeBoostContrast", 50).coerceIn(1, 100),
+        shadeBoostSaturation = optInt("shadeBoostSaturation", 50).coerceIn(1, 100),
+        shadeBoostGamma = optInt("shadeBoostGamma", 50).coerceIn(1, 100),
         anisotropicFiltering = optInt("anisotropicFiltering", 0),
         enableHwMipmapping = optBoolean("enableHwMipmapping", GsHackDefaults.HW_MIPMAPPING_DEFAULT),
         enableWidescreenPatches = optBoolean("enableWidescreenPatches", false),
@@ -243,6 +253,11 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("enableFxaa")) put("enableFxaa", enableFxaa)
         if (shouldWrite("casMode")) put("casMode", casMode)
         if (shouldWrite("casSharpness")) put("casSharpness", casSharpness)
+        if (shouldWrite("shadeBoostEnabled")) put("shadeBoostEnabled", shadeBoostEnabled)
+        if (shouldWrite("shadeBoostBrightness")) put("shadeBoostBrightness", shadeBoostBrightness)
+        if (shouldWrite("shadeBoostContrast")) put("shadeBoostContrast", shadeBoostContrast)
+        if (shouldWrite("shadeBoostSaturation")) put("shadeBoostSaturation", shadeBoostSaturation)
+        if (shouldWrite("shadeBoostGamma")) put("shadeBoostGamma", shadeBoostGamma)
         if (shouldWrite("anisotropicFiltering")) put("anisotropicFiltering", anisotropicFiltering)
         if (shouldWrite("enableHwMipmapping")) put("enableHwMipmapping", enableHwMipmapping)
         if (shouldWrite("enableWidescreenPatches")) put("enableWidescreenPatches", enableWidescreenPatches)

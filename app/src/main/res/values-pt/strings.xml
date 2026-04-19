@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Dispositivo</string>
     <string name="detail_comment_unknown_user">Jogador</string>
     <string name="detail_comments_load_more">Carregar mais 3</string>
+    <string name="emulation_screen_tab">Tela</string>
+    <string name="settings_shadeboost">Reforço de cor da tela</string>
+    <string name="settings_shadeboost_brightness">Brilho</string>
+    <string name="settings_shadeboost_contrast">Contraste</string>
+    <string name="settings_shadeboost_saturation">Saturação</string>
+    <string name="settings_shadeboost_gamma">Gama</string>
+    <string name="settings_help_shadeboost">Aplica os controles básicos de pós-processamento de imagem após a renderização do quadro. Use para ajustar cenas desbotadas, jogos muito claros ou telas que precisam de um pouco mais de destaque sem tocar no restante do renderizador.</string>
+    <string name="settings_help_shadeboost_brightness">Aumenta ou diminui o nível de luz geral da imagem final. Faça pequenas alterações aqui primeiro se a imagem parecer muito escura ou muito plana.</string>
+    <string name="settings_help_shadeboost_contrast">Controla a separação entre áreas claras e escuras. Valores mais altos tornam os realces e as sombras mais fortes, enquanto valores menores suavizam a imagem.</string>
+    <string name="settings_help_shadeboost_saturation">Ajusta a intensidade das cores. Aumente se um jogo parecer opaco ou diminua se a saída ficar muito vívida ou com ruído.</string>
+    <string name="settings_help_shadeboost_gamma">Desloca os tons médios sem forçar toda a imagem tanto quanto o brilho. É útil quando os menus ou a jogabilidade parecem levemente cinzas ou esmagados (sem detalhes).</string>
+    <string name="screen_settings_menu_desc">Ajuste a imagem final sem alterar o caminho principal de renderização. Esses controles são ótimos para corrigir saídas opacas, duras ou excessivamente escuras em cada jogo.</string>
+    <string name="screen_settings_reset_hint_title">Dica de configurações</string>
+    <string name="screen_settings_reset_hint_body">Pressione e segure o rótulo de qualquer configuração para restaurar seu valor padrão. Isso funciona em Configurações, no Gerenciador de jogos e no menu dentro do jogo, para que você possa desfazer mudanças rapidamente durante os testes.</string>
+    <string name="got_it">Entendi</string>
+    <string name="game_settings_manager_section_screen">Tela</string>
 </resources>

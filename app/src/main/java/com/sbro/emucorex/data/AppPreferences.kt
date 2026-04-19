@@ -68,6 +68,11 @@ data class SettingsSnapshot(
     val enableFxaa: Boolean = false,
     val casMode: Int = 0,
     val casSharpness: Int = 50,
+    val shadeBoostEnabled: Boolean = false,
+    val shadeBoostBrightness: Int = 50,
+    val shadeBoostContrast: Int = 50,
+    val shadeBoostSaturation: Int = 50,
+    val shadeBoostGamma: Int = 50,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val anisotropicFiltering: Int = 0,
@@ -239,6 +244,11 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_FXAA = booleanPreferencesKey("enable_fxaa")
         private val CAS_MODE = intPreferencesKey("cas_mode")
         private val CAS_SHARPNESS = intPreferencesKey("cas_sharpness")
+        private val SHADEBOOST_ENABLED = booleanPreferencesKey("shadeboost_enabled")
+        private val SHADEBOOST_BRIGHTNESS = intPreferencesKey("shadeboost_brightness")
+        private val SHADEBOOST_CONTRAST = intPreferencesKey("shadeboost_contrast")
+        private val SHADEBOOST_SATURATION = intPreferencesKey("shadeboost_saturation")
+        private val SHADEBOOST_GAMMA = intPreferencesKey("shadeboost_gamma")
         private val ENABLE_WIDESCREEN_PATCHES = booleanPreferencesKey("enable_widescreen_patches")
         private val ENABLE_NO_INTERLACING_PATCHES = booleanPreferencesKey("enable_no_interlacing_patches")
         private val ANISOTROPIC_FILTERING = intPreferencesKey("anisotropic_filtering")
@@ -277,6 +287,7 @@ class AppPreferences(private val context: Context) {
         private val GAMEPAD_BINDINGS = stringPreferencesKey("gamepad_bindings")
         private val GPU_DRIVER_TYPE = intPreferencesKey("gpu_driver_type")
         private val CUSTOM_DRIVER_PATH = stringPreferencesKey("custom_driver_path")
+        private val SCREEN_SETTINGS_RESET_HINT_SHOWN = booleanPreferencesKey("screen_settings_reset_hint_shown")
         private val FRAME_LIMIT_ENABLED = booleanPreferencesKey("frame_limit_enabled")
         private val TARGET_FPS = intPreferencesKey("target_fps")
         private val MEMORY_CARD_SLOT1 = stringPreferencesKey("memory_card_slot_1")
@@ -364,6 +375,14 @@ class AppPreferences(private val context: Context) {
             if (path == null) prefs.remove(CUSTOM_DRIVER_PATH)
             else prefs[CUSTOM_DRIVER_PATH] = path
         }
+    }
+
+    val screenSettingsResetHintShown: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SCREEN_SETTINGS_RESET_HINT_SHOWN] ?: false
+    }
+
+    suspend fun setScreenSettingsResetHintShown(shown: Boolean) {
+        context.dataStore.edit { it[SCREEN_SETTINGS_RESET_HINT_SHOWN] = shown }
     }
 
     val frameLimitEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -564,6 +583,11 @@ class AppPreferences(private val context: Context) {
                 enableFxaa = prefs[ENABLE_FXAA] ?: false,
                 casMode = prefs[CAS_MODE] ?: 0,
                 casSharpness = prefs[CAS_SHARPNESS] ?: 50,
+                shadeBoostEnabled = prefs[SHADEBOOST_ENABLED] ?: false,
+                shadeBoostBrightness = prefs[SHADEBOOST_BRIGHTNESS] ?: 50,
+                shadeBoostContrast = prefs[SHADEBOOST_CONTRAST] ?: 50,
+                shadeBoostSaturation = prefs[SHADEBOOST_SATURATION] ?: 50,
+                shadeBoostGamma = prefs[SHADEBOOST_GAMMA] ?: 50,
                 enableWidescreenPatches = prefs[ENABLE_WIDESCREEN_PATCHES] ?: false,
                 enableNoInterlacingPatches = prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false,
                 anisotropicFiltering = prefs[ANISOTROPIC_FILTERING] ?: 0,
@@ -981,6 +1005,46 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setCasSharpness(value: Int) {
         context.dataStore.edit { it[CAS_SHARPNESS] = value.coerceIn(0, 100) }
+    }
+
+    val shadeBoostEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[SHADEBOOST_ENABLED] ?: false
+    }
+
+    suspend fun setShadeBoostEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[SHADEBOOST_ENABLED] = enabled }
+    }
+
+    val shadeBoostBrightness: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[SHADEBOOST_BRIGHTNESS] ?: 50
+    }
+
+    suspend fun setShadeBoostBrightness(value: Int) {
+        context.dataStore.edit { it[SHADEBOOST_BRIGHTNESS] = value.coerceIn(1, 100) }
+    }
+
+    val shadeBoostContrast: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[SHADEBOOST_CONTRAST] ?: 50
+    }
+
+    suspend fun setShadeBoostContrast(value: Int) {
+        context.dataStore.edit { it[SHADEBOOST_CONTRAST] = value.coerceIn(1, 100) }
+    }
+
+    val shadeBoostSaturation: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[SHADEBOOST_SATURATION] ?: 50
+    }
+
+    suspend fun setShadeBoostSaturation(value: Int) {
+        context.dataStore.edit { it[SHADEBOOST_SATURATION] = value.coerceIn(1, 100) }
+    }
+
+    val shadeBoostGamma: Flow<Int> = context.dataStore.data.map { prefs ->
+        prefs[SHADEBOOST_GAMMA] ?: 50
+    }
+
+    suspend fun setShadeBoostGamma(value: Int) {
+        context.dataStore.edit { it[SHADEBOOST_GAMMA] = value.coerceIn(1, 100) }
     }
 
     // Widescreen Patches

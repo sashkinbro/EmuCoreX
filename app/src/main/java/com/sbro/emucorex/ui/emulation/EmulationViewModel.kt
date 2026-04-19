@@ -83,6 +83,11 @@ data class EmulationUiState(
     val enableFxaa: Boolean = false,
     val casMode: Int = 0,
     val casSharpness: Int = 50,
+    val shadeBoostEnabled: Boolean = false,
+    val shadeBoostBrightness: Int = 50,
+    val shadeBoostContrast: Int = 50,
+    val shadeBoostSaturation: Int = 50,
+    val shadeBoostGamma: Int = 50,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = true,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -147,6 +152,11 @@ private data class EmulationLaunchConfig(
     val enableFxaa: Boolean,
     val casMode: Int,
     val casSharpness: Int,
+    val shadeBoostEnabled: Boolean,
+    val shadeBoostBrightness: Int,
+    val shadeBoostContrast: Int,
+    val shadeBoostSaturation: Int,
+    val shadeBoostGamma: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val widescreenPatches: Boolean,
@@ -205,6 +215,11 @@ private data class LiveRuntimeSnapshot(
     val enableFxaa: Boolean,
     val casMode: Int,
     val casSharpness: Int,
+    val shadeBoostEnabled: Boolean,
+    val shadeBoostBrightness: Int,
+    val shadeBoostContrast: Int,
+    val shadeBoostSaturation: Int,
+    val shadeBoostGamma: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val cpuSpriteRenderSize: Int,
@@ -404,6 +419,31 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.casSharpness.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(casSharpness = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.shadeBoostEnabled.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(shadeBoostEnabled = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.shadeBoostBrightness.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(shadeBoostBrightness = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.shadeBoostContrast.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(shadeBoostContrast = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.shadeBoostSaturation.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(shadeBoostSaturation = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.shadeBoostGamma.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(shadeBoostGamma = value) }
             }
         }
         viewModelScope.launch {
@@ -655,6 +695,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     enableFxaa = config.enableFxaa,
                     casMode = config.casMode,
                     casSharpness = config.casSharpness,
+                    shadeBoostEnabled = config.shadeBoostEnabled,
+                    shadeBoostBrightness = config.shadeBoostBrightness,
+                    shadeBoostContrast = config.shadeBoostContrast,
+                    shadeBoostSaturation = config.shadeBoostSaturation,
+                    shadeBoostGamma = config.shadeBoostGamma,
                     anisotropicFiltering = config.anisotropicFiltering,
                     enableHwMipmapping = config.enableHwMipmapping,
                     widescreenPatches = config.widescreenPatches,
@@ -790,6 +835,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     enableFxaa = liveRuntime.enableFxaa,
                     casMode = liveRuntime.casMode,
                     casSharpness = liveRuntime.casSharpness,
+                    shadeBoostEnabled = liveRuntime.shadeBoostEnabled,
+                    shadeBoostBrightness = liveRuntime.shadeBoostBrightness,
+                    shadeBoostContrast = liveRuntime.shadeBoostContrast,
+                    shadeBoostSaturation = liveRuntime.shadeBoostSaturation,
+                    shadeBoostGamma = liveRuntime.shadeBoostGamma,
                     anisotropicFiltering = liveRuntime.anisotropicFiltering,
                     enableHwMipmapping = liveRuntime.enableHwMipmapping,
                     cpuSpriteRenderSize = liveRuntime.cpuSpriteRenderSize,
@@ -1359,6 +1409,70 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun setShadeBoostEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val newState = markPerformancePresetCustom(_uiState.value).copy(shadeBoostEnabled = enabled)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setShadeBoostEnabled(enabled)
+            }
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setShadeBoostBrightness(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(shadeBoostBrightness = clamped)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setShadeBoostBrightness(clamped)
+            }
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Brightness", "int", clamped.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setShadeBoostContrast(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(shadeBoostContrast = clamped)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setShadeBoostContrast(clamped)
+            }
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Contrast", "int", clamped.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setShadeBoostSaturation(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(shadeBoostSaturation = clamped)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setShadeBoostSaturation(clamped)
+            }
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Saturation", "int", clamped.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setShadeBoostGamma(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            val newState = markPerformancePresetCustom(_uiState.value).copy(shadeBoostGamma = clamped)
+            persistRuntimeState(newState) {
+                preferences.setPerformancePreset(PerformancePresets.CUSTOM)
+                preferences.setShadeBoostGamma(clamped)
+            }
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Gamma", "int", clamped.toString())
+            updateCrashContext()
+        }
+    }
+
     fun setAnisotropicFiltering(value: Int) {
         viewModelScope.launch {
             val newState = markPerformancePresetCustom(_uiState.value).copy(anisotropicFiltering = value)
@@ -1884,6 +1998,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableFxaa = preferences.enableFxaa.first(),
             casMode = preferences.casMode.first(),
             casSharpness = preferences.casSharpness.first(),
+            shadeBoostEnabled = preferences.shadeBoostEnabled.first(),
+            shadeBoostBrightness = preferences.shadeBoostBrightness.first(),
+            shadeBoostContrast = preferences.shadeBoostContrast.first(),
+            shadeBoostSaturation = preferences.shadeBoostSaturation.first(),
+            shadeBoostGamma = preferences.shadeBoostGamma.first(),
             anisotropicFiltering = preferences.anisotropicFiltering.first(),
             enableHwMipmapping = preferences.enableHwMipmapping.first(),
             widescreenPatches = preferences.enableWidescreenPatches.first(),
@@ -1945,6 +2064,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableFxaa = preferences.enableFxaa.first(),
             casMode = preferences.casMode.first(),
             casSharpness = preferences.casSharpness.first(),
+            shadeBoostEnabled = preferences.shadeBoostEnabled.first(),
+            shadeBoostBrightness = preferences.shadeBoostBrightness.first(),
+            shadeBoostContrast = preferences.shadeBoostContrast.first(),
+            shadeBoostSaturation = preferences.shadeBoostSaturation.first(),
+            shadeBoostGamma = preferences.shadeBoostGamma.first(),
             anisotropicFiltering = preferences.anisotropicFiltering.first(),
             enableHwMipmapping = preferences.enableHwMipmapping.first(),
             cpuSpriteRenderSize = preferences.cpuSpriteRenderSize.first(),
@@ -2004,6 +2128,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableFxaa = pick("enableFxaa", enableFxaa) { enableFxaa },
             casMode = pick("casMode", casMode) { casMode },
             casSharpness = pick("casSharpness", casSharpness) { casSharpness },
+            shadeBoostEnabled = pick("shadeBoostEnabled", shadeBoostEnabled) { shadeBoostEnabled },
+            shadeBoostBrightness = pick("shadeBoostBrightness", shadeBoostBrightness) { shadeBoostBrightness },
+            shadeBoostContrast = pick("shadeBoostContrast", shadeBoostContrast) { shadeBoostContrast },
+            shadeBoostSaturation = pick("shadeBoostSaturation", shadeBoostSaturation) { shadeBoostSaturation },
+            shadeBoostGamma = pick("shadeBoostGamma", shadeBoostGamma) { shadeBoostGamma },
             anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
             enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
             widescreenPatches = pick("enableWidescreenPatches", widescreenPatches) { enableWidescreenPatches },
@@ -2065,6 +2194,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableFxaa = pick("enableFxaa", enableFxaa) { enableFxaa },
             casMode = pick("casMode", casMode) { casMode },
             casSharpness = pick("casSharpness", casSharpness) { casSharpness },
+            shadeBoostEnabled = pick("shadeBoostEnabled", shadeBoostEnabled) { shadeBoostEnabled },
+            shadeBoostBrightness = pick("shadeBoostBrightness", shadeBoostBrightness) { shadeBoostBrightness },
+            shadeBoostContrast = pick("shadeBoostContrast", shadeBoostContrast) { shadeBoostContrast },
+            shadeBoostSaturation = pick("shadeBoostSaturation", shadeBoostSaturation) { shadeBoostSaturation },
+            shadeBoostGamma = pick("shadeBoostGamma", shadeBoostGamma) { shadeBoostGamma },
             anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
             enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
             cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize) { cpuSpriteRenderSize },
@@ -2142,6 +2276,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableFxaa = enableFxaa,
             casMode = casMode,
             casSharpness = casSharpness,
+            shadeBoostEnabled = shadeBoostEnabled,
+            shadeBoostBrightness = shadeBoostBrightness,
+            shadeBoostContrast = shadeBoostContrast,
+            shadeBoostSaturation = shadeBoostSaturation,
+            shadeBoostGamma = shadeBoostGamma,
             anisotropicFiltering = anisotropicFiltering,
             enableHwMipmapping = enableHwMipmapping,
             enableWidescreenPatches = globalWidescreenPatches,
@@ -2196,6 +2335,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (enableFxaa != preferences.enableFxaa.first()) add("enableFxaa")
             if (casMode != preferences.casMode.first()) add("casMode")
             if (casSharpness != preferences.casSharpness.first()) add("casSharpness")
+            if (shadeBoostEnabled != preferences.shadeBoostEnabled.first()) add("shadeBoostEnabled")
+            if (shadeBoostBrightness != preferences.shadeBoostBrightness.first()) add("shadeBoostBrightness")
+            if (shadeBoostContrast != preferences.shadeBoostContrast.first()) add("shadeBoostContrast")
+            if (shadeBoostSaturation != preferences.shadeBoostSaturation.first()) add("shadeBoostSaturation")
+            if (shadeBoostGamma != preferences.shadeBoostGamma.first()) add("shadeBoostGamma")
             if (anisotropicFiltering != preferences.anisotropicFiltering.first()) add("anisotropicFiltering")
             if (enableHwMipmapping != preferences.enableHwMipmapping.first()) add("enableHwMipmapping")
             if (profile.enableWidescreenPatches != globalWidescreenPatches) add("enableWidescreenPatches")

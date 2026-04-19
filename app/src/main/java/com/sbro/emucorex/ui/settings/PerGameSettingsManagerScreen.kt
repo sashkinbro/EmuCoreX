@@ -47,11 +47,15 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -71,9 +75,11 @@ import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.ScreenSettingsResetHintDialog
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import org.json.JSONObject
 import java.text.DateFormat
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -439,8 +445,13 @@ private fun GameSettingsEditorDialog(
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val screenSettingsResetHintShown by produceState<Boolean?>(initialValue = null, preferences) {
+        preferences.screenSettingsResetHintShown.collect { value = it }
+    }
+    val scope = rememberCoroutineScope()
     val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
     var draft by remember(profile) { mutableStateOf(profile) }
+    var showScreenSettingsResetHint by rememberSaveable(profile.gameKey) { mutableStateOf(false) }
     val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial) {
         settingsSnapshot.toPerGameSettings(
             GameItem(
@@ -452,6 +463,13 @@ private fun GameSettingsEditorDialog(
                 serial = profile.gameSerial
             )
         )
+    }
+    LaunchedEffect(profile.gameKey, screenSettingsResetHintShown) {
+        when (screenSettingsResetHintShown) {
+            false -> showScreenSettingsResetHint = true
+            true -> showScreenSettingsResetHint = false
+            null -> Unit
+        }
     }
     Dialog(onDismissRequest = onDismiss) {
         Box(
@@ -720,6 +738,55 @@ private fun GameSettingsEditorDialog(
                             onResetToDefault = { draft = draft.copy(enableFxaa = defaultProfile.enableFxaa) }
                         )
                     }
+                    EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
+                        ToggleRow(
+                            title = stringResource(R.string.settings_shadeboost),
+                            checked = draft.shadeBoostEnabled,
+                            onCheckedChange = { draft = draft.copy(shadeBoostEnabled = it) },
+                            helpText = stringResource(R.string.settings_help_shadeboost),
+                            onResetToDefault = { draft = draft.copy(shadeBoostEnabled = defaultProfile.shadeBoostEnabled) }
+                        )
+                        SliderRow(
+                            title = stringResource(R.string.settings_shadeboost_brightness),
+                            value = draft.shadeBoostBrightness.toFloat(),
+                            valueLabel = draft.shadeBoostBrightness.toString(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { draft = draft.copy(shadeBoostBrightness = it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                            onResetToDefault = { draft = draft.copy(shadeBoostBrightness = defaultProfile.shadeBoostBrightness) }
+                        )
+                        SliderRow(
+                            title = stringResource(R.string.settings_shadeboost_contrast),
+                            value = draft.shadeBoostContrast.toFloat(),
+                            valueLabel = draft.shadeBoostContrast.toString(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { draft = draft.copy(shadeBoostContrast = it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                            onResetToDefault = { draft = draft.copy(shadeBoostContrast = defaultProfile.shadeBoostContrast) }
+                        )
+                        SliderRow(
+                            title = stringResource(R.string.settings_shadeboost_saturation),
+                            value = draft.shadeBoostSaturation.toFloat(),
+                            valueLabel = draft.shadeBoostSaturation.toString(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { draft = draft.copy(shadeBoostSaturation = it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                            onResetToDefault = { draft = draft.copy(shadeBoostSaturation = defaultProfile.shadeBoostSaturation) }
+                        )
+                        SliderRow(
+                            title = stringResource(R.string.settings_shadeboost_gamma),
+                            value = draft.shadeBoostGamma.toFloat(),
+                            valueLabel = draft.shadeBoostGamma.toString(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { draft = draft.copy(shadeBoostGamma = it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                            onResetToDefault = { draft = draft.copy(shadeBoostGamma = defaultProfile.shadeBoostGamma) }
+                        )
+                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     Row(
@@ -738,6 +805,16 @@ private fun GameSettingsEditorDialog(
                 }
             }
         }
+    }
+    if (showScreenSettingsResetHint) {
+        ScreenSettingsResetHintDialog(
+            onDismiss = {
+                showScreenSettingsResetHint = false
+                scope.launch {
+                    preferences.setScreenSettingsResetHintShown(true)
+                }
+            }
+        )
     }
 }
 
@@ -1081,6 +1158,11 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         enableFxaa = enableFxaa,
         casMode = casMode,
         casSharpness = casSharpness,
+        shadeBoostEnabled = shadeBoostEnabled,
+        shadeBoostBrightness = shadeBoostBrightness,
+        shadeBoostContrast = shadeBoostContrast,
+        shadeBoostSaturation = shadeBoostSaturation,
+        shadeBoostGamma = shadeBoostGamma,
         anisotropicFiltering = anisotropicFiltering,
         enableHwMipmapping = enableHwMipmapping,
         enableWidescreenPatches = enableWidescreenPatches,

@@ -895,4 +895,20 @@
     <string name="detail_comment_device">Устройство</string>
     <string name="detail_comment_unknown_user">Игрок</string>
     <string name="detail_comments_load_more">Загрузить еще 3</string>
+    <string name="emulation_screen_tab">Экран</string>
+    <string name="settings_shadeboost">Улучшение цвета экрана</string>
+    <string name="settings_shadeboost_brightness">Яркость</string>
+    <string name="settings_shadeboost_contrast">Контрастность</string>
+    <string name="settings_shadeboost_saturation">Насыщенность</string>
+    <string name="settings_shadeboost_gamma">Гамма</string>
+    <string name="settings_help_shadeboost">Применяет основные элементы управления постобработкой изображения после рендеринга кадра. Используйте их для настройки блеклых сцен, слишком ярких игр или дисплеев, которым нужно немного больше выразительности, не затрагивая остальную часть рендерера.</string>
+    <string name="settings_help_shadeboost_brightness">Повышает или понижает общий уровень освещенности финального изображения. Сначала попробуйте внести небольшие изменения здесь, если картинка выглядит слишком темной или плоской.</string>
+    <string name="settings_help_shadeboost_contrast">Контролирует разделение между светлыми и темными участками. Более высокие значения усиливают свет и тени, а более низкие — смягчают изображение.</string>
+    <string name="settings_help_shadeboost_saturation">Регулирует интенсивность цветов. Увеличьте значение, если игра кажется тусклой, или уменьшите, если картинка становится слишком яркой или «шумной».</string>
+    <string name="settings_help_shadeboost_gamma">Сдвигает полутона, не так сильно влияя на все изображение, как яркость. Полезно, когда меню или геймплей выглядят слегка серыми или с потерянными деталями в тенях.</string>
+    <string name="screen_settings_menu_desc">Настраивайте финальное изображение без изменения основного пути рендеринга. Эти элементы управления отлично подходят для исправления тусклого, резкого или слишком темного вывода для каждой игры отдельно.</string>
+    <string name="screen_settings_reset_hint_title">Подсказка по настройкам</string>
+    <string name="screen_settings_reset_hint_body">Нажмите и удерживайте название любой настройки, чтобы восстановить ее значение по умолчанию. Это работает в Настройках, в Менеджере игр и во внутриигровом меню, поэтому во время тестирования можно быстро отменять изменения.</string>
+    <string name="got_it">Понятно</string>
+    <string name="game_settings_manager_section_screen">Экран</string>
 </resources>
