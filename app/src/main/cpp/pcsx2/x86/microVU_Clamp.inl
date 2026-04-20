@@ -55,9 +55,9 @@ void mVUclamp2(microVU& mVU, const xmm& reg, const xmm& regT1in, int xyzw, bool 
 	{
 		int i = (xyzw == 1 || xyzw == 2 || xyzw == 4 || xyzw == 8) ? 0 : 1;
 //		xPMIN.SD(reg, ptr128[&sse4_maxvals[i][0]]);
-        armAsm->Smin(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_maxvals[i][0])).V4S());
+        armAsm->Fminnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_maxvals[i][0])).V4S());
 //		xPMIN.UD(reg, ptr128[&sse4_minvals[i][0]]);
-        armAsm->Umin(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_minvals[i][0])).V4S());
+        armAsm->Fmaxnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_minvals[i][0])).V4S());
 		return;
 	}
 	else

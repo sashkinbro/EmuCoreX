@@ -105,6 +105,7 @@ struct FPControlRegister
 	u64 bitmask;
 
 	static constexpr u64 FZ_BIT = (0x1ULL << 24);
+	static constexpr u64 DN_BIT = (0x1ULL << 25);
 	static constexpr u32 RMODE_SHIFT = 22;
 	static constexpr u64 RMODE_MASK = 0x3ULL;
 	static constexpr u64 RMODE_BITS = (RMODE_MASK << RMODE_SHIFT);
@@ -125,8 +126,8 @@ struct FPControlRegister
 
 	__fi static constexpr FPControlRegister GetDefault()
 	{
-		// 0x0 - all exceptions masked, nearest rounding
-		return FPControlRegister{0x0};
+		// FZ=1, DN=1, all exceptions masked, nearest rounding
+		return FPControlRegister{FZ_BIT | DN_BIT};
 	}
 
 	__fi constexpr FPControlRegister& EnableExceptions()
@@ -184,6 +185,20 @@ struct FPControlRegister
 			bitmask |= FZ_BIT;
 		else
 			bitmask &= ~FZ_BIT;
+		return *this;
+	}
+
+	__fi constexpr bool GetDefaultNaN() const
+	{
+		return ((bitmask & DN_BIT) != 0);
+	}
+
+	__fi constexpr FPControlRegister SetDefaultNaN(bool dn)
+	{
+		if (dn)
+			bitmask |= DN_BIT;
+		else
+			bitmask &= ~DN_BIT;
 		return *this;
 	}
 

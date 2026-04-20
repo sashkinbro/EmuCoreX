@@ -14,31 +14,22 @@
 // Test if Vector is +/- Zero
 static __fi void testZero(const xmm& xmmReg, const xmm& xmmTemp, const x32& gprTemp)
 {
-//	xXOR.PS(xmmTemp, xmmTemp);
-    armAsm->Eor(xmmTemp.V16B(), xmmTemp.V16B(), xmmTemp.V16B());
-//	xCMPEQ.SS(xmmTemp, xmmReg);
-    armAsm->Fcmeq(xmmTemp.S(), xmmTemp.S(), xmmReg.S());
-//	xPTEST(xmmTemp, xmmTemp);
-    armAsm->Fcmp(xmmTemp.S(), 0.0);
+    (void)xmmTemp;
+    armAsm->Fmov(a64::WRegister(gprTemp), xmmReg.S());
+    armAsm->And(a64::WRegister(gprTemp), a64::WRegister(gprTemp), 0x7fffffff);
+    armAsm->Cmp(a64::WRegister(gprTemp), 0);
 }
 
 // Test if Vector is Negative (Set Flags and Makes Positive)
 static __fi void testNeg(mV, const xmm& xmmReg, const x32& gprTemp)
 {
-    (void)gprTemp;
-//	xForwardJZ8 skip;
-    a64::Label neg;
+    armAsm->Fmov(a64::WRegister(gprTemp), xmmReg.S());
+    armAsm->Tst(a64::WRegister(gprTemp), 0x80000000);
     a64::Label skip;
-    armAsm->Fcmp(xmmReg.S(), 0.0);
-    armAsm->B(&neg, a64::Condition::lt);
-    armAsm->B(&skip);
-    armBind(&neg);
-//		xMOV(ptr32[&mVU.divFlag], divI);
+    armAsm->B(&skip, a64::Condition::eq);
         armAsm->Mov(a64::WRegister(EAX), divI);
         armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
-//		xAND.PS(xmmReg, ptr128[mVUglob.absclip]);
         armAsm->And(xmmReg.V16B(), xmmReg.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
-//	skip.SetTarget();
     armBind(&skip);
 }
 
@@ -53,55 +44,38 @@ mVUop(mVU_DIV)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
 
-		testZero(Ft, t1, gprT1); // Test if Ft is zero
-//		xForwardJZ8 cjmp; // Skip if not zero
-        a64::Label cjmp;
-        armAsm->B(&cjmp, a64::Condition::eq);
+		testZero(Ft, t1, gprT1);
+		a64::Label cjmp;
+		armAsm->B(&cjmp, a64::Condition::ne); // Skip if not zero
 
-			testZero(Fs, t1, gprT1); // Test if Fs is zero
-//			xForwardJZ8 ajmp;
-            a64::Label ajmp;
-            armAsm->B(&ajmp, a64::Condition::eq);
-//				xMOV(ptr32[&mVU.divFlag], divI); // Set invalid flag (0/0)
-                armAsm->Mov(a64::WRegister(EAX), divI);
-                armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
-//				xForwardJump8 bjmp;
-                a64::Label bjmp;
-                armAsm->B(&bjmp);
-//			ajmp.SetTarget();
-            armBind(&ajmp);
-//				xMOV(ptr32[&mVU.divFlag], divD); // Zero divide (only when not 0/0)
-                armAsm->Mov(a64::WRegister(EAX), divD);
-                armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
-//			bjmp.SetTarget();
-            armBind(&bjmp);
+			testZero(Fs, t1, gprT1);
+			a64::Label ajmp;
+			armAsm->B(&ajmp, a64::Condition::ne);
+				armAsm->Mov(a64::WRegister(EAX), divI); // Set invalid flag (0/0)
+				a64::Label bjmp;
+				armAsm->B(&bjmp);
+			armBind(&ajmp);
+				armAsm->Mov(a64::WRegister(EAX), divD); // Zero divide (only when not 0/0)
+			armBind(&bjmp);
+            armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
 
-//			xXOR.PS(Fs, Ft);
-            armAsm->Eor(Fs.V16B(), Fs.V16B(), Ft.V16B());
-//			xAND.PS(Fs, ptr128[mVUglob.signbit]);
-            armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
-//			xOR.PS (Fs, ptr128[mVUglob.maxvals]); // If division by zero, then xmmFs = +/- fmax
-            armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B());
+			armAsm->Eor(Fs.V16B(), Fs.V16B(), Ft.V16B());
+			armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
+			armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B());
 
-//			xForwardJump8 djmp;
-            a64::Label djmp;
-            armAsm->B(&djmp);
-//		cjmp.SetTarget();
-        armBind(&cjmp);
-//			xMOV(ptr32[&mVU.divFlag], 0); // Clear I/D flags
-            armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag));
+			a64::Label djmp;
+			armAsm->B(&djmp);
+		armBind(&cjmp);
+			armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag)); // Clear I/D flags
 			SSE_DIVSS(mVU, Fs, Ft);
 			mVUclamp1(mVU, Fs, t1, 8, true);
-//		djmp.SetTarget();
-        armBind(&djmp);
+		armBind(&djmp);
 
 		writeQreg(Fs, mVUinfo.writeQ);
 
 		if (mVU.cop2)
 		{
-//			xAND(gprF0, ~0xc0000);
             armAsm->And(gprF0, gprF0, ~0xc0000);
-//			xOR(gprF0, ptr32[&mVU.divFlag]);
             armAsm->Ldr(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
             armAsm->Orr(gprF0, gprF0, EAX);
 		}
@@ -121,23 +95,18 @@ mVUop(mVU_SQRT)
 	{
 		const xmm& Ft = mVU.regAlloc->allocReg(_Ft_, 0, (1 << (3 - _Ftf_)));
 
-//		xMOV(ptr32[&mVU.divFlag], 0); // Clear I/D flags
-        armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag));
+		armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag)); // Clear I/D flags
 		testNeg(mVU, Ft, gprT1); // Check for negative sqrt
 
 		if (CHECK_VU_OVERFLOW(mVU.index)) { // Clamp infinities (only need to do positive clamp since xmmFt is positive)
-//            xMIN.SS(Ft, ptr32[mVUglob.maxvals]);
             armAsm->Fminnm(Ft.S(), Ft.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).S());
         }
-//		xSQRT.SS(Ft, Ft);
         armAsm->Fsqrt(Ft.S(), Ft.S());
 		writeQreg(Ft, mVUinfo.writeQ);
 
 		if (mVU.cop2)
 		{
-//			xAND(gprF0, ~0xc0000);
             armAsm->And(gprF0, gprF0, ~0xc0000);
-//			xOR(gprF0, ptr32[&mVU.divFlag]);
             armAsm->Ldr(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
             armAsm->Orr(gprF0, gprF0, EAX);
 		}
@@ -156,61 +125,41 @@ mVUop(mVU_RSQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& Ft = mVU.regAlloc->allocReg(_Ft_, 0, (1 << (3 - _Ftf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
-		const xmm& t2 = mVU.regAlloc->allocReg();
 
-//		xMOV(ptr32[&mVU.divFlag], 0); // Clear I/D flags
-        armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag));
-		// Preserve the original xor-sign for the zero-result path before Ft is abs/sqrt transformed.
-		armAsm->Eor(t2.V16B(), Fs.V16B(), Ft.V16B());
-		armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
+		armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag)); // Clear I/D flags
 		testNeg(mVU, Ft, gprT1); // Check for negative sqrt
 
-//		xSQRT.SS(Ft, Ft);
-        armAsm->Fsqrt(Ft.S(), Ft.S());
+		armAsm->Fsqrt(Ft.S(), Ft.S());
 		testZero(Ft, t1, gprT1); // Test if Ft is zero
-//		xForwardJZ8 ajmp; // Skip if not zero
-        a64::Label ajmp;
-        armAsm->B(&ajmp, a64::Condition::eq);
+		a64::Label ajmp;
+		armAsm->B(&ajmp, a64::Condition::ne); // Skip if not zero
 
 			testZero(Fs, t1, gprT1); // Test if Fs is zero
-//			xForwardJZ8 bjmp; // Skip if none are
-            a64::Label bjmp;
-            a64::Label cjmp;
-            armAsm->B(&bjmp, a64::Condition::eq);
-//				xMOV(ptr32[&mVU.divFlag], divI); // Set invalid flag (0/0)
-                armAsm->Mov(a64::WRegister(EAX), divI);
-                armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
-                armAsm->Mov(Fs.Q(), t2.Q()); // 0/0 -> signed zero, matching the interpreter.
-//				xForwardJump8 cjmp;
-                armAsm->B(&cjmp);
-//			bjmp.SetTarget();
-            armBind(&bjmp);
-//				xMOV(ptr32[&mVU.divFlag], divD); // Zero divide flag (only when not 0/0)
-                armAsm->Mov(a64::WRegister(EAX), divD);
-                armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
-                armAsm->Mov(Fs.Q(), t2.Q());
-//			xOR.PS(Fs, ptr128[mVUglob.maxvals]); // xmmFs = +/-Max
-                armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B());
-//			cjmp.SetTarget();
-            armBind(&cjmp);
+			a64::Label bjmp;
+			armAsm->B(&bjmp, a64::Condition::ne); // Skip if none are
+				armAsm->Mov(a64::WRegister(EAX), divI); // Set invalid flag (0/0)
+				a64::Label cjmp;
+				armAsm->B(&cjmp);
+			armBind(&bjmp);
+				armAsm->Mov(a64::WRegister(EAX), divD); // Zero divide flag (only when not 0/0)
+			armBind(&cjmp);
+            armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
 
-//			xForwardJump8 djmp;
-            a64::Label djmp;
-            armAsm->B(&djmp);
-//		ajmp.SetTarget();
-        armBind(&ajmp);
+			armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
+			armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B()); // xmmFs = +/-Max
+
+			a64::Label djmp;
+			armAsm->B(&djmp);
+		armBind(&ajmp);
 			SSE_DIVSS(mVU, Fs, Ft);
 			mVUclamp1(mVU, Fs, t1, 8, true);
-//		djmp.SetTarget();
-        armBind(&djmp);
+		armBind(&djmp);
 
 		writeQreg(Fs, mVUinfo.writeQ);
 
 		if (mVU.cop2)
 		{
-//			xAND(gprF0, ~0xc0000);
             armAsm->And(gprF0, gprF0, ~0xc0000);
-//			xOR(gprF0, ptr32[&mVU.divFlag]);
             armAsm->Ldr(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
             armAsm->Orr(gprF0, gprF0, EAX);
 		}
@@ -218,7 +167,6 @@ mVUop(mVU_RSQRT)
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(Ft);
 		mVU.regAlloc->clearNeeded(t1);
-		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opRSQRT);
 	}
 	pass3 { mVUlog("RSQRT Q, vf%02d%s, vf%02d%s", _Fs_, _Fsf_String, _Ft_, _Ftf_String); }
@@ -598,25 +546,16 @@ mVUop(mVU_ERSQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-        a64::Label end;
-        a64::Label calc;
-        a64::Label skip_div;
-        armAsm->Fcmp(Fs.S(), 0.0);
-        armAsm->B(&calc, a64::Condition::ge);
-        armAsm->B(&end);
-        armBind(&calc);
-//		xSQRT.SS      (xmmPQ, Fs);
+        
+        // Match official: abs(Fs) -> SQRT -> 1.0 / result
+        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
-        armAsm->Fcmp(xmmPQ.S(), 0.0);
-        armAsm->B(&skip_div, a64::Condition::eq);
-//		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
+        
         armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-        armBind(&skip_div);
-        armBind(&end);
+
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
@@ -724,16 +663,11 @@ mVUop(mVU_ESQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-        a64::Label calc;
-        a64::Label end;
-        armAsm->Fcmp(Fs.S(), 0.0);
-        armAsm->B(&calc, a64::Condition::ge);
-        armAsm->B(&end);
-//		xSQRT.SS(xmmPQ, Fs);
-        armBind(&calc);
+        
+        // Match official: abs(Fs) -> SQRT
+        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
-        armBind(&end);
+
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);

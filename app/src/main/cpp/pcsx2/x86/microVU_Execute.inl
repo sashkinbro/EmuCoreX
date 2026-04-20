@@ -38,14 +38,14 @@ void mVUdispatcherAB(mV)
             armEmitCall(reinterpret_cast<void*>(mVUexecuteVU0));
         }
         else        {
-//            xFastCall((void*)mVUexecuteVU1, arg1reg, arg2reg);
             armEmitCall(reinterpret_cast<void*>(mVUexecuteVU1));
         }
 
 		// Load VU's MXCSR state
 		if (mvuNeedsFPCRUpdate(mVU)) {
-//            xLDMXCSR(ptr32[isVU0 ? &EmuConfig.Cpu.VU0FPCR.bitmask : &EmuConfig.Cpu.VU1FPCR.bitmask]);
-            armAsm->Msr(a64::FPCR, armLoad64(isVU0 ? PTR_CONFIG(VU0FPCR.bitmask) : PTR_CONFIG(VU1FPCR.bitmask)));
+            armAsm->Ldr(a64::w30, isVU0 ? PTR_CONFIG(VU0FPCR.bitmask) : PTR_CONFIG(VU1FPCR.bitmask));
+            armAsm->Orr(a64::w30, a64::w30, 0x3C00000); // Force FZ (bit 24), DN (bit 25) and Round to Zero (bits 22-23)
+            armAsm->Msr(a64::FPCR, a64::x30);
         }
 
         // Load Regs
