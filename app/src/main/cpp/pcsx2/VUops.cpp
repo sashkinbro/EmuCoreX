@@ -6,6 +6,7 @@
 #include "GS.h"
 #include "Gif_Unit.h"
 #include "MTVU.h"
+#include "Vif_Dma.h"
 
 #include <cmath>
 u32 laststall = 0;
@@ -1890,12 +1891,9 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 			VUM_LOG("XGKICK transfer finished");
 			VU1.xgkickenable = false;
 			VU0.VI[REG_VPU_STAT].UL &= ~(1 << 12);
-			// Check if VIF is waiting for the GIF to not be busy
-			if (vif1Regs.stat.VGW)
-			{
-				vif1Regs.stat.VGW = false;
-				CPU_INT(DMAC_VIF1, 8);
-			}
+			// Route VIF1 wakeup through the shared bridge helper so MFIFO and
+			// normal DMA both resume via the active scheduler target.
+			vif1ResumeDmaFromGifPathSignal(8);
 		}
 	}
 	if (flush)

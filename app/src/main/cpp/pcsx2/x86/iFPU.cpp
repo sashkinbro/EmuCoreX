@@ -691,11 +691,11 @@ void FPU_MUL_REV(int regd, int regt) { FPU_MUL(regd, regt, true); } //reversed o
 
 void ARM_MAXSS_XMM_to_XMM(int regd, int regt) {
     auto regD = a64::QRegister(regd);
-    armAsm->Fmaxnm(regD.V4S(), regD.V4S(), a64::QRegister(regt).V4S());
+    armAsm->Fmaxnm(regD.S(), regD.S(), a64::QRegister(regt).S());
 }
 void ARM_MINSS_XMM_to_XMM(int regd, int regt) {
     auto regD = a64::QRegister(regd);
-    armAsm->Fminnm(regD.V4S(), regD.V4S(), a64::QRegister(regt).V4S());
+    armAsm->Fminnm(regD.S(), regD.S(), a64::QRegister(regt).S());
 }
 
 //------------------------------------------------------------------

@@ -72,7 +72,7 @@ namespace a64 = vixl::aarch64;
 // Named contracts for backend-local banks. Callers should address them by role
 // instead of treating them as mixed state-root fields.
 #define PTR_CONFIG(field) PTR_RUNTIME(config.field)
-#define PTR_MVUCONST(field) PTR_CPU(mVUss4.field)
+#define PTR_MVUCONST(field) PTR_RUNTIME(mVUss4.field)
 
 // microVU
 #define RSTATE_MVU a64::x28

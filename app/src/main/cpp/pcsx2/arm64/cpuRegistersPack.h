@@ -135,16 +135,11 @@ struct Arm64BackendRuntime
 
 struct Arm64CpuRuntimePack
 {
-    // Keep the legacy field names/offset roots intact while we split off only
-    // the volatile ARM64 runtime block first. This avoids breaking the current
-    // JIT contract and still starts moving backend-local state out of the core.
+    // Canonical VM state first. ARM64 helper/config state lives under runtime.
     alignas(16) cpuRegisters cpuRegs{};
     alignas(16) fpuRegisters fpuRegs{};
     alignas(16) psxRegisters psxRegs{};
     alignas(16) VURegs vuRegs[2]{};
-    alignas(16) ShuffleLanes shuffle;
-    alignas(16) Arm64MvuSse4 mVUss4{};
-    alignas(32) Arm64MvuGlobals mVUglob{};
     alignas(64) vtlb_private::MapData vtlbdata;
     Arm64BackendRuntime runtime{};
 };

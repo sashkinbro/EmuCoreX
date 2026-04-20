@@ -1104,7 +1104,7 @@ void armPMOVMSKB(const a64::Register& regDst, const a64::VRegister& regSrc)
 
 void armSHUFPS(const a64::VRegister& dstreg, const a64::VRegister& srcreg, int pIndex)
 {
-    armAsm->Mov(RQSCRATCH3, armLoadPtrV(PTR_CPU(shuffle.data[pIndex][1])).Q());
+    armAsm->Mov(RQSCRATCH3, armLoadPtrV(PTR_RUNTIME(shuffle.data[pIndex][1])).Q());
     ////
     armAsm->Mov(RQSCRATCH2, srcreg);
     armAsm->Mov(RQSCRATCH, dstreg);
@@ -1113,7 +1113,7 @@ void armSHUFPS(const a64::VRegister& dstreg, const a64::VRegister& srcreg, int p
 
 void armPSHUFD(const a64::VRegister& dstreg, const a64::VRegister& srcreg, int pIndex)
 {
-    armAsm->Mov(RQSCRATCH3, armLoadPtrV(PTR_CPU(shuffle.data[pIndex][0])).Q());
+    armAsm->Mov(RQSCRATCH3, armLoadPtrV(PTR_RUNTIME(shuffle.data[pIndex][0])).Q());
     armAsm->Tbl(dstreg.V16B(), srcreg.V16B(), RQSCRATCH3.V16B());
 }
 

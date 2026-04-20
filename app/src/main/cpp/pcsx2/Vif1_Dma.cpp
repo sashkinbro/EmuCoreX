@@ -86,6 +86,7 @@ bool vif1RequestResumeFromGifPathIdle(u32 resumeCycles)
 	if (!vif1HasGifWait())
 		return false;
 
+	vif1ClearGifWait();
 	vif1RequestDmaRetry(resumeCycles);
 	return true;
 }

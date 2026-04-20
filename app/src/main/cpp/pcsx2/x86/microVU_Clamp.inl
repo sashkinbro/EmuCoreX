@@ -30,15 +30,15 @@ void mVUclamp1(microVU& mVU, const xmm& reg, const xmm& regT1, int xyzw, bool bC
 		{
 			case 1: case 2: case 4: case 8:
 //				xMIN.SS(reg, ptr32[mVUglob.maxvals]);
-    armAsm->Fminnm(reg.S(), reg.S(), armLoadPtrV(PTR_CPU(mVUglob.maxvals)).S());
+    armAsm->Fminnm(reg.S(), reg.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).S());
 //				xMAX.SS(reg, ptr32[mVUglob.minvals]);
-    armAsm->Fmaxnm(reg.S(), reg.S(), armLoadPtrV(PTR_CPU(mVUglob.minvals)).S());
+    armAsm->Fmaxnm(reg.S(), reg.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.minvals)).S());
 				break;
 			default:
 //				xMIN.PS(reg, ptr32[mVUglob.maxvals]);
-    armAsm->Fminnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_CPU(mVUglob.maxvals)).V4S());
+    armAsm->Fminnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V4S());
 //				xMAX.PS(reg, ptr32[mVUglob.minvals]);
-    armAsm->Fmaxnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_CPU(mVUglob.minvals)).V4S());
+    armAsm->Fmaxnm(reg.V4S(), reg.V4S(), armLoadPtrV(PTR_RUNTIME(mVUglob.minvals)).V4S());
 				break;
 		}
 	}

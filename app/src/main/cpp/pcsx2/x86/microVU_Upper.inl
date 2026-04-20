@@ -454,7 +454,7 @@ mVUop(mVU_ABS)
 			return;
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
 //		xAND.PS(Fs, ptr128[mVUglob.absclip]);
-        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
+        armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opABS);
 	}
@@ -548,14 +548,14 @@ static void mVU_FTOIx(mP, const a64::MemOperand& addr, microOpcode opEnum)
         }
 
 		armAsm->Mov(t1.Q(), Fs.Q()); // Preserve the original bit pattern.
-		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.exponent)).V16B());
-		armAsm->Cmhs(t2.V4S(), t2.V4S(), armLoadPtrV(PTR_CPU(mVUglob.I32MAXF)).V4S()); // invalid lanes
+		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.exponent)).V16B());
+		armAsm->Cmhs(t2.V4S(), t2.V4S(), armLoadPtrV(PTR_RUNTIME(mVUglob.I32MAXF)).V4S()); // invalid lanes
 
 //		xCVTTPS2DQ(Fs, Fs);
         armAsm->Fcvtzs(Fs.V4S(), Fs.V4S());
 
 		// Build the interpreter-compatible saturation value per lane.
-		armAsm->And(t3.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.signbit)).V16B());
+		armAsm->And(t3.V16B(), t1.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
 		armAsm->Sshr(t4.V4S(), t3.V4S(), 31); // 0xffffffff for negative, 0x0 for non-negative
 		armAsm->Ldr(t1.Q(), PTR_MVUCONST(sse4_compvals[1][0])); // 0x7fffffff
 		armAsm->Bic(t1.V16B(), t1.V16B(), t4.V16B());
@@ -628,10 +628,10 @@ mVUop(mVU_CLIP)
 		// Match the interpreter:
 		// value = abs(Ft.w), except exponent==0 lanes use 0x007fffff.
 		armAsm->Mov(t1.Q(), Ft.Q());
-		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.exponent)).V16B());
+		armAsm->And(t2.V16B(), t1.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.exponent)).V16B());
 		armAsm->Eor(t3.V16B(), t3.V16B(), t3.V16B());
 		armAsm->Cmeq(t2.V4S(), t2.V4S(), t3.V4S()); // exponent == 0 -> zero / denormal
-		armAsm->And(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_CPU(mVUglob.absclip)).V16B());
+		armAsm->And(t1.V16B(), t1.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
 
 		armAsm->Movi(t3.V4S(), 0);
 		armAsm->Mov(a64::WRegister(gprT2), 0x007fffff);
@@ -641,7 +641,7 @@ mVUop(mVU_CLIP)
 		armAsm->Bic(t1.V16B(), t1.V16B(), t2.V16B());
 		armAsm->Orr(t1.V16B(), t1.V16B(), t3.V16B());
 
-        armAsm->Ldr(t2, PTR_CPU(mVUglob.signbit));
+        armAsm->Ldr(t2, PTR_RUNTIME(mVUglob.signbit));
         armAsm->Eor(t3.V16B(), t2.V16B(), Fs.V16B()); // Negate
         armAsm->Cmgt(t2.V4S(), Fs.V4S(), t1.V4S()); // +w, +z, +y, +x
         armAsm->Cmgt(t3.V4S(), t3.V4S(), t1.V4S()); // -w, -z, -y, -x
@@ -755,11 +755,11 @@ mVUop(mVU_MINIy)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIy,  0);  }
 mVUop(mVU_MINIz)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIz,  0);  }
 mVUop(mVU_MINIw)  { mVU_FMACa(mVU, recPass, 2, 4, false, opMINIw,  0);  }
 mVUop(mVU_FTOI0)  { mVU_FTOIx(mX, a64::MemOperand(),              opFTOI0);      }
-mVUop(mVU_FTOI4)  { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_4),    opFTOI4);      }
-mVUop(mVU_FTOI12) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_12),   opFTOI12);     }
-mVUop(mVU_FTOI15) { mVU_FTOIx(mX, PTR_CPU(mVUglob.FTOI_15),   opFTOI15);     }
+mVUop(mVU_FTOI4)  { mVU_FTOIx(mX, PTR_RUNTIME(mVUglob.FTOI_4),    opFTOI4);      }
+mVUop(mVU_FTOI12) { mVU_FTOIx(mX, PTR_RUNTIME(mVUglob.FTOI_12),   opFTOI12);     }
+mVUop(mVU_FTOI15) { mVU_FTOIx(mX, PTR_RUNTIME(mVUglob.FTOI_15),   opFTOI15);     }
 mVUop(mVU_ITOF0)  { mVU_ITOFx(mX, a64::MemOperand(),              opITOF0);      }
-mVUop(mVU_ITOF4)  { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_4),    opITOF4);      }
-mVUop(mVU_ITOF12) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_12),   opITOF12);     }
-mVUop(mVU_ITOF15) { mVU_ITOFx(mX, PTR_CPU(mVUglob.ITOF_15),   opITOF15);     }
+mVUop(mVU_ITOF4)  { mVU_ITOFx(mX, PTR_RUNTIME(mVUglob.ITOF_4),    opITOF4);      }
+mVUop(mVU_ITOF12) { mVU_ITOFx(mX, PTR_RUNTIME(mVUglob.ITOF_12),   opITOF12);     }
+mVUop(mVU_ITOF15) { mVU_ITOFx(mX, PTR_RUNTIME(mVUglob.ITOF_15),   opITOF15);     }
 mVUop(mVU_NOP)    { pass2 { mVU.profiler.EmitOp(opNOP); } pass3 { mVUlog("NOP"); } }
