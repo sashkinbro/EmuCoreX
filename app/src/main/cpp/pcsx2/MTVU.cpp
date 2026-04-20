@@ -354,7 +354,7 @@ u32 VU_Thread::Get_vuCycles()
 void VU_Thread::Get_MTVUChanges()
 {
 	// Note: Atomic communication is with Gif_Unit.cpp Gif_HandlerAD_MTVU
-	u32 interrupts = mtvuInterrupts.load(std::memory_order_relaxed);
+	u32 interrupts = mtvuInterrupts.load(std::memory_order_acquire);
 	if (!interrupts)
 		return;
 
@@ -364,7 +364,7 @@ void VU_Thread::Get_MTVUChanges()
 		const u64 signal = gsSignal.load(std::memory_order_relaxed);
 		// If load of signal was moved after clearing the flag, the other thread could write a new value before we load without noticing the double signal
 		// Prevent that with release semantics
-		mtvuInterrupts.fetch_and(~InterruptFlagSignal, std::memory_order_release);
+		mtvuInterrupts.fetch_and(~InterruptFlagSignal, std::memory_order_acq_rel);
 		GUNIT_WARN("SIGNAL firing");
 		const u32 signalMsk = (u32)(signal >> 32);
 		const u32 signalData = (u32)signal;
@@ -387,7 +387,7 @@ void VU_Thread::Get_MTVUChanges()
 	}
 	if (interrupts & InterruptFlagFinish)
 	{
-		mtvuInterrupts.fetch_and(~InterruptFlagFinish, std::memory_order_relaxed);
+		mtvuInterrupts.fetch_and(~InterruptFlagFinish, std::memory_order_acq_rel);
 		GUNIT_WARN("Finish firing");
 		gifUnit.gsFINISH.gsFINISHFired = false;
 		gifUnit.gsFINISH.gsFINISHPending = true;
@@ -397,7 +397,7 @@ void VU_Thread::Get_MTVUChanges()
 	}
 	if (interrupts & InterruptFlagLabel)
 	{
-		mtvuInterrupts.fetch_and(~InterruptFlagLabel, std::memory_order_acquire);
+		mtvuInterrupts.fetch_and(~InterruptFlagLabel, std::memory_order_acq_rel);
 		// If other thread updates gsLabel for a second interrupt, that's okay.  Worst case we think there's a label interrupt but gsLabel is 0
 		// We do not want the exchange of gsLabel to move ahead of clearing the flag, or the other thread could add more work before we clear the flag, resulting in an update with the flag unset
 		// acquire semantics should supply that guarantee
@@ -409,7 +409,7 @@ void VU_Thread::Get_MTVUChanges()
 	}
 	if (interrupts & InterruptFlagVUEBit)
 	{
-		mtvuInterrupts.fetch_and(~InterruptFlagVUEBit, std::memory_order_relaxed);
+		mtvuInterrupts.fetch_and(~InterruptFlagVUEBit, std::memory_order_acq_rel);
 
 		if(INSTANT_VU1)
 			VU0.VI[REG_VPU_STAT].UL &= ~0xFF00;
@@ -417,7 +417,7 @@ void VU_Thread::Get_MTVUChanges()
 	}
 	if (interrupts & InterruptFlagVUTBit)
 	{
-		mtvuInterrupts.fetch_and(~InterruptFlagVUTBit, std::memory_order_relaxed);
+		mtvuInterrupts.fetch_and(~InterruptFlagVUTBit, std::memory_order_acq_rel);
 		VU0.VI[REG_VPU_STAT].UL &= ~0xFF00;
 		VU0.VI[REG_VPU_STAT].UL |= 0x0400;
 		//DevCon.Warning("T-Bit registered %x", VU0.VI[REG_VPU_STAT].UL);

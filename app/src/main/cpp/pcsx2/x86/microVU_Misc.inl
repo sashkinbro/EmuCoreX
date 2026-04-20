@@ -64,11 +64,11 @@ void mVUloadIreg(const xmm& reg, int xyzw, VURegs* vuRegs)
 //	xMOVSSZX(reg, ptr32[&vuRegs->VI[REG_I].UL]);
     if (vuRegs == &::vuRegs[1])
     {
-        armAsm->Ldr(reg, PTR_CPU(vuRegs[1].VI[REG_I].UL));
+        armAsm->Ldr(reg.S(), PTR_CPU(vuRegs[1].VI[REG_I].UL));
     }
     else
     {
-        armAsm->Ldr(reg, PTR_CPU(vuRegs[0].VI[REG_I].UL));
+        armAsm->Ldr(reg.S(), PTR_CPU(vuRegs[0].VI[REG_I].UL));
     }
 	if (!_XYZWss(xyzw)) {
 //        xSHUF.PS(reg, reg, 0);

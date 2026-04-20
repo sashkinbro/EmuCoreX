@@ -25,13 +25,14 @@ static __fi void testZero(const xmm& xmmReg, const xmm& xmmTemp, const x32& gprT
 // Test if Vector is Negative (Set Flags and Makes Positive)
 static __fi void testNeg(mV, const xmm& xmmReg, const x32& gprTemp)
 {
-//	xMOVMSKPS(gprTemp, xmmReg);
-    armMOVMSKPS(gprTemp, xmmReg);
-//	xTEST(gprTemp, 1);
-    armAsm->Tst(gprTemp, 1);
+    (void)gprTemp;
 //	xForwardJZ8 skip;
+    a64::Label neg;
     a64::Label skip;
-    armAsm->B(&skip, a64::Condition::eq);
+    armAsm->Fcmp(xmmReg.S(), 0.0);
+    armAsm->B(&neg, a64::Condition::lt);
+    armAsm->B(&skip);
+    armBind(&neg);
 //		xMOV(ptr32[&mVU.divFlag], divI);
         armAsm->Mov(a64::WRegister(EAX), divI);
         armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
@@ -155,9 +156,13 @@ mVUop(mVU_RSQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& Ft = mVU.regAlloc->allocReg(_Ft_, 0, (1 << (3 - _Ftf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
+		const xmm& t2 = mVU.regAlloc->allocReg();
 
 //		xMOV(ptr32[&mVU.divFlag], 0); // Clear I/D flags
         armAsm->Str(a64::wzr, PTR_MVU(microVU[mVU.index].divFlag));
+		// Preserve the original xor-sign for the zero-result path before Ft is abs/sqrt transformed.
+		armAsm->Eor(t2.V16B(), Fs.V16B(), Ft.V16B());
+		armAsm->And(t2.V16B(), t2.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
 		testNeg(mVU, Ft, gprT1); // Check for negative sqrt
 
 //		xSQRT.SS(Ft, Ft);
@@ -170,25 +175,24 @@ mVUop(mVU_RSQRT)
 			testZero(Fs, t1, gprT1); // Test if Fs is zero
 //			xForwardJZ8 bjmp; // Skip if none are
             a64::Label bjmp;
+            a64::Label cjmp;
             armAsm->B(&bjmp, a64::Condition::eq);
 //				xMOV(ptr32[&mVU.divFlag], divI); // Set invalid flag (0/0)
                 armAsm->Mov(a64::WRegister(EAX), divI);
                 armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
+                armAsm->Mov(Fs.Q(), t2.Q()); // 0/0 -> signed zero, matching the interpreter.
 //				xForwardJump8 cjmp;
-                a64::Label cjmp;
                 armAsm->B(&cjmp);
 //			bjmp.SetTarget();
             armBind(&bjmp);
 //				xMOV(ptr32[&mVU.divFlag], divD); // Zero divide flag (only when not 0/0)
                 armAsm->Mov(a64::WRegister(EAX), divD);
                 armAsm->Str(a64::WRegister(EAX), PTR_MVU(microVU[mVU.index].divFlag));
+                armAsm->Mov(Fs.Q(), t2.Q());
+//			xOR.PS(Fs, ptr128[mVUglob.maxvals]); // xmmFs = +/-Max
+                armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B());
 //			cjmp.SetTarget();
             armBind(&cjmp);
-
-//			xAND.PS(Fs, ptr128[mVUglob.signbit]);
-            armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.signbit)).V16B());
-//			xOR.PS(Fs, ptr128[mVUglob.maxvals]); // xmmFs = +/-Max
-            armAsm->Orr(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.maxvals)).V16B());
 
 //			xForwardJump8 djmp;
             a64::Label djmp;
@@ -214,6 +218,7 @@ mVUop(mVU_RSQRT)
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(Ft);
 		mVU.regAlloc->clearNeeded(t1);
+		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opRSQRT);
 	}
 	pass3 { mVUlog("RSQRT Q, vf%02d%s, vf%02d%s", _Fs_, _Fsf_String, _Ft_, _Ftf_String); }
@@ -406,7 +411,7 @@ mVUop(mVU_EEXP)
 		SSE_MULSS(mVU, xmmPQ, xmmPQ);
 		SSE_MULSS(mVU, xmmPQ, xmmPQ);
 //		xMOVSSZX(t2, ptr32[mVUglob.one]);
-    armAsm->Ldr(t2, PTR_RUNTIME(mVUglob.one));
+    armAsm->Ldr(t2.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, t2, xmmPQ);
 //		xMOVSS(xmmPQ, t2);
         armAsm->Mov(xmmPQ.S(), 0, t2.S(), 0);
@@ -425,15 +430,13 @@ static __fi void mVU_sumXYZ(mV, const xmm& PQ, const xmm& Fs)
 {
 //	xDP.PS(Fs, Fs, 0x71);
 //	xMOVSS(PQ, Fs);
+    const xmm& sum = PQ.Is(RQSCRATCH) ? RQSCRATCH2 : RQSCRATCH;
 
-    armAsm->Fmul(PQ.V4S(), Fs.V4S(), Fs.V4S());
-    armAsm->Ins(PQ.V4S(), 3, a64::wzr);
-
-    armAsm->Faddp(PQ.V4S(), PQ.V4S(), PQ.V4S());
-    armAsm->Faddp(PQ.S(), PQ.V2S());
-
-    armAsm->Fmov(EAX, PQ.S());
-    armAsm->Fmov(PQ.S(), EAX);
+    armAsm->Fmul(sum.V4S(), Fs.V4S(), Fs.V4S());
+    armAsm->Ins(sum.V4S(), 3, a64::wzr);
+    armAsm->Faddp(sum.V4S(), sum.V4S(), sum.V4S());
+    armAsm->Faddp(sum.S(), sum.V2S());
+    armAsm->Mov(PQ.S(), 0, sum.S(), 0);
 }
 
 mVUop(mVU_ELENG)
@@ -483,7 +486,7 @@ mVUop(mVU_ERCPR)
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs, PTR_RUNTIME(mVUglob.one));
+    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -516,7 +519,7 @@ mVUop(mVU_ERLENG)
         armAsm->Fsqrt(RQSCRATCH.S(), RQSCRATCH.S());
         armAsm->Mov(xmmPQ.S(), 0, RQSCRATCH.S(), 0);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs, PTR_RUNTIME(mVUglob.one));
+    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -546,7 +549,7 @@ mVUop(mVU_ERSADD)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU_sumXYZ(mVU, xmmPQ, Fs);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs, PTR_RUNTIME(mVUglob.one));
+    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
@@ -579,7 +582,7 @@ mVUop(mVU_ERSQRT)
 //		xSQRT.SS      (xmmPQ, Fs);
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs, PTR_RUNTIME(mVUglob.one));
+    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);

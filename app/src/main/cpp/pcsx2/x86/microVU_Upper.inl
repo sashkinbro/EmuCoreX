@@ -97,8 +97,11 @@ static void mVUupdateFlags(mV, const xmm& reg, const xmm& regT1in = a64::NoVReg,
         armAsm->Mov(regT1.Q(), regT2.Q());
 //		xAND.PS(regT1, ptr128[&sse4_compvals[1][0]]); // Remove sign flags (we don't care)
         armAsm->And(regT1.V16B(), regT1.V16B(), armLoadPtrV(PTR_MVUCONST(sse4_compvals[1][0])).V16B());
-//		xCMPNLT.PS(regT1, ptr128[&sse4_compvals[0][0]]); // Compare if T1 == FLT_MAX
-        armAsm->Fcmeq(regT1.V4S(), regT1.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_compvals[0][0])).V4S());
+//		xCMPNLT.PS(regT1, ptr128[&sse4_compvals[0][0]]); // Compare if T1 >= FLT_MAX or unordered
+        armAsm->Fcmeq(RQSCRATCH.V4S(), regT1.V4S(), regT1.V4S()); // ordered lanes -> 0xffffffff, NaN -> 0x0
+        armAsm->Cmeq(RQSCRATCH.V4S(), RQSCRATCH.V4S(), 0);        // unordered lanes -> 0xffffffff
+        armAsm->Fcmge(regT1.V4S(), regT1.V4S(), armLoadPtrV(PTR_MVUCONST(sse4_compvals[0][0])).V4S());
+        armAsm->Orr(regT1.V16B(), regT1.V16B(), RQSCRATCH.V16B());
 //		xMOVMSKPS(gprT2, regT1); // Grab sign bits  for equal results
         armMOVMSKPS(gprT2, regT1);
 //		xAND(gprT2, AND_XYZW); // Grab "Is FLT_MAX" bits from the previous calculation

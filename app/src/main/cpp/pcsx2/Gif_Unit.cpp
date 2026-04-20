@@ -90,12 +90,13 @@ void Gif_HandlerAD_MTVU(u8* pMem)
 	if (reg == GIF_A_D_REG_SIGNAL)
 	{ // SIGNAL
 		if (vu1Thread.mtvuInterrupts.load(std::memory_order_acquire) & VU_Thread::InterruptFlagSignal)
+			Console.Error("GIF Handler MTVU - Double SIGNAL Not Handled");
 		vu1Thread.gsSignal.store(((u64)data[1] << 32) | data[0], std::memory_order_relaxed);
 		vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagSignal, std::memory_order_release);
 	}
 	else if (reg == GIF_A_D_REG_FINISH)
 	{ // FINISH
-		vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagFinish, std::memory_order_relaxed);
+		vu1Thread.mtvuInterrupts.fetch_or(VU_Thread::InterruptFlagFinish, std::memory_order_release);
 	}
 	else if (reg == GIF_A_D_REG_LABEL)
 	{ // LABEL
@@ -104,7 +105,7 @@ void Gif_HandlerAD_MTVU(u8* pMem)
 		u32 labelMsk = data[1];
 		u64 existing = 0;
 		u64 wanted = ((u64)labelMsk << 32) | labelData;
-		while (!vu1Thread.gsLabel.compare_exchange_weak(existing, wanted, std::memory_order_relaxed))
+		while (!vu1Thread.gsLabel.compare_exchange_weak(existing, wanted, std::memory_order_release, std::memory_order_relaxed))
 		{
 			u32 existingData = (u32)existing;
 			u32 existingMsk = (u32)(existing >> 32);
