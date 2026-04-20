@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">Контролер %1$s: %2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">Контролер %1$s не підключено. Ви все ще можете налаштувати його прив\'язку.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Натисніть кнопку для %1$s, щоб прив\'язати її до %2$s.</string>
+    <string name="settings_help_left_stick_sensitivity">Регулює, як швидко лівий сенсорний стік досягає сильнішого вводу руху. Вищі значення змушують його реагувати швидше, а нижчі — полегшують дрібні коригування руху.</string>
+    <string name="settings_help_right_stick_sensitivity">Регулює, як швидко правий сенсорний стік досягає сильнішого вводу. Вищі значення прискорюють реакцію камери або прицілювання, а нижчі — дають вам точніший контроль.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Ігнорує невеликі фізичні рухи стіка біля центру. Збільште значення, якщо ваш контролер дрейфує сам по собі (дрифт); зробіть його нижчим, якщо хочете швидшого відгуку біля центру.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Регулює силу реакції фізичного лівого стіка після обробки мертвої зони. Вищі значення швидше досягають повного руху, а нижчі — полегшують точні рухи.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Регулює силу реакції фізичного правого стіка після обробки мертвої зони. Вищі значення прискорюють рух камери або прицілювання, а нижчі — дають вам точніший контроль.</string>
+    <string name="settings_left_stick_sensitivity">Чутливість лівого стіка</string>
+    <string name="settings_right_stick_sensitivity">Чутливість правого стіка</string>
+    <string name="settings_touch_controls_section">Сенсорне керування</string>
+    <string name="settings_gamepad_controls_section">Фізичний геймпад</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Підключіть геймпад, щоб налаштувати параметри фізичних стіків.</string>
+    <string name="settings_gamepad_stick_deadzone">Мертва зона стіка</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Чутливість лівого стіка</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Чутливість правого стіка</string>
 </resources>

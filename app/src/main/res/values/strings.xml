@@ -351,6 +351,11 @@
     <string name="settings_help_no_interlacing_patches">Applies no-interlacing patches where available. This is worth trying in games with combing, shimmer, or flicker from original interlaced output, but availability depends on the title.</string>
     <string name="settings_help_overlay_scale">Changes the size of on-screen buttons and sticks. Increase it if touch accuracy matters more than screen space; lower it if the overlay covers too much of the image.</string>
     <string name="settings_help_overlay_opacity">Controls how solid or transparent the touch controls look. Lower opacity keeps the game view cleaner, while higher opacity makes buttons easier to see in dark or busy scenes.</string>
+    <string name="settings_help_left_stick_sensitivity">Adjusts how quickly the left touch stick reaches stronger movement input. Higher values react faster, while lower values make small movement corrections easier.</string>
+    <string name="settings_help_right_stick_sensitivity">Adjusts how quickly the right touch stick reaches stronger input. Higher values make camera or aim changes react faster, while lower values give you finer control.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Ignores small physical stick movements near the center. Raise it if your controller drifts on its own; keep it lower if you want faster response around center.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Adjusts how strongly the physical left stick responds after deadzone processing. Higher values reach full movement faster, while lower values make fine movement easier.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Adjusts how strongly the physical right stick responds after deadzone processing. Higher values make camera or aim movement react faster, while lower values give you finer control.</string>
     <string name="settings_help_hide_overlay_on_gamepad">Hides the touch overlay whenever a physical controller is active. This makes the screen cleaner, but turn it off if you still want touch buttons available while a controller is connected.</string>
     <string name="settings_help_compact_controls">Uses a tighter overlay layout that takes less space around the edges of the screen. Good for smaller phones, but some players may prefer the larger spacing of the standard layout.</string>
     <string name="settings_help_stick_scale">Changes the size of the analog stick touch areas. Larger values make them easier to grab during action-heavy games, while smaller values leave more room for the picture and nearby buttons.</string>
@@ -432,6 +437,14 @@
     <string name="settings_memory_cards_tab">Memory Cards</string>
     <string name="settings_overlay_scale">Overlay Scale</string>
     <string name="settings_overlay_opacity">Overlay Opacity</string>
+    <string name="settings_left_stick_sensitivity">Left Stick Sensitivity</string>
+    <string name="settings_right_stick_sensitivity">Right Stick Sensitivity</string>
+    <string name="settings_touch_controls_section">Touch Controls</string>
+    <string name="settings_gamepad_controls_section">Physical Gamepad</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Connect a gamepad to adjust physical stick settings.</string>
+    <string name="settings_gamepad_stick_deadzone">Stick Deadzone</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Left Stick Sensitivity</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Right Stick Sensitivity</string>
     <string name="settings_gamepad_auto">Auto-detect Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Hide Overlay on Gamepad</string>
 

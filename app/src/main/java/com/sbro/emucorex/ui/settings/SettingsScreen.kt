@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -84,6 +83,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -108,7 +108,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
-import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.buildUpscaleOptions
@@ -147,7 +146,6 @@ fun SettingsScreen(
     onBackClick: (() -> Unit)? = null,
     onOpenLanguageScreen: (() -> Unit)? = null,
     onOpenMemoryCardManager: (() -> Unit)? = null,
-    onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -156,7 +154,7 @@ fun SettingsScreen(
     val screenSettingsResetHintShown by produceState<Boolean?>(initialValue = null, preferences) {
         preferences.screenSettingsResetHintShown.collect { value = it }
     }
-    val configuration = LocalConfiguration.current
+    LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
@@ -166,7 +164,7 @@ fun SettingsScreen(
     var cheatEditorFileName by remember { mutableStateOf<String?>(null) }
     var cheatEditorText by remember { mutableStateOf("") }
     var pendingGamepadActionId by remember { mutableStateOf<String?>(null) }
-    var pendingGamepadPadIndex by rememberSaveable { mutableStateOf(0) }
+    var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     var showTopBarMenu by remember { mutableStateOf(false) }
     var showResetAllSettingsDialog by remember { mutableStateOf(false) }
     var showCoverUrlDialog by remember { mutableStateOf(false) }
@@ -181,7 +179,7 @@ fun SettingsScreen(
     val backupRepository = remember(context) {
         SettingsBackupRepository(
             context = context,
-            preferences = com.sbro.emucorex.data.AppPreferences(context),
+            preferences = AppPreferences(context),
             perGameSettingsRepository = PerGameSettingsRepository(context),
             cheatRepository = CheatRepository(context)
         )
@@ -196,7 +194,7 @@ fun SettingsScreen(
     val cheatsDeletedMessage = stringResource(R.string.settings_cheats_deleted)
     val coverUrlCopiedMessage = stringResource(R.string.settings_cover_download_url_copied)
     val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
-    val notSetLabel = stringResource(R.string.settings_not_set)
+    stringResource(R.string.settings_not_set)
     val settingsScrollState = rememberScrollState()
 
     LaunchedEffect(screenSettingsResetHintShown) {
@@ -388,7 +386,6 @@ fun SettingsScreen(
                     searchQuery = ""
                 },
                 onOpenMemoryCardManager = onOpenMemoryCardManager,
-                onEditControlsClick = onEditControlsClick,
                 viewModel = viewModel,
                 topInset = 0.dp,
                 modifier = Modifier
@@ -780,100 +777,6 @@ private fun SettingsCompactTopBar(
 }
 
 @Composable
-private fun SettingsTabRail(
-    selectedTab: SettingsTab,
-    onSelected: (SettingsTab) -> Unit,
-    topInset: androidx.compose.ui.unit.Dp,
-    selectedTabFocusRequester: FocusRequester,
-    searchEnabled: Boolean,
-    searchQuery: String,
-    onSearchEnabledChange: (Boolean) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val tabs = remember { SettingsTab.entries.toList() }
-    Surface(
-        modifier = modifier.fillMaxHeight(),
-        shape = RoundedCornerShape(30.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
-    ) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item(key = "topInset") {
-                Spacer(modifier = Modifier.height(topInset))
-            }
-            item(key = "title") {
-                if (searchEnabled) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
-                        placeholder = { Text(stringResource(R.string.settings_search_placeholder)) },
-                        trailingIcon = {
-                            IconButton(onClick = { onSearchEnabledChange(false) }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Close,
-                                    contentDescription = stringResource(R.string.settings_search)
-                                )
-                            }
-                        }
-                    )
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_title),
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { onSearchEnabledChange(true) }) {
-                            Icon(
-                                imageVector = Icons.Rounded.Search,
-                                contentDescription = stringResource(R.string.settings_search)
-                            )
-                        }
-                    }
-                }
-            }
-            items(items = tabs, key = { it.name }) { tab ->
-                FilterChip(
-                    modifier = if (tab == selectedTab) {
-                        Modifier.focusRequester(selectedTabFocusRequester)
-                    } else {
-                        Modifier
-                    },
-                    selected = selectedTab == tab,
-                    onClick = { onSelected(tab) },
-                    label = { Text(text = tab.label()) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = tab.icon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SettingsTabRow(
     selectedTab: SettingsTab,
     onSelected: (SettingsTab) -> Unit,
@@ -927,18 +830,17 @@ private fun SettingsContent(
     onOpenCheatEditor: (String) -> Unit,
     onRequestGamepadBinding: (Int, String) -> Unit,
     onSearchResultSelected: (SettingsTab) -> Unit,
-    onOpenMemoryCardManager: (() -> Unit)? = null,
-    onEditControlsClick: (() -> Unit)? = null,
     viewModel: SettingsViewModel,
     topInset: androidx.compose.ui.unit.Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenMemoryCardManager: (() -> Unit)? = null
 ) {
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
     val searchEntries = rememberSettingsSearchEntries()
     val notSetLabel = stringResource(R.string.settings_not_set)
-    var selectedGamepadPadIndex by rememberSaveable { mutableStateOf(0) }
+    var selectedGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1171,6 +1073,28 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_overlay_opacity),
                             onResetToDefault = { viewModel.setOverlayOpacity(overlayDefaults.overlayOpacity) }
                         )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_left_stick_sensitivity),
+                            subtitle = "${uiState.leftStickSensitivity}%",
+                            value = uiState.leftStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 14,
+                            onValueChange = { viewModel.setLeftStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_left_stick_sensitivity),
+                            onResetToDefault = { viewModel.setLeftStickSensitivity(overlayDefaults.leftStickSensitivity) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_right_stick_sensitivity),
+                            subtitle = "${uiState.rightStickSensitivity}%",
+                            value = uiState.rightStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 14,
+                            onValueChange = { viewModel.setRightStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_right_stick_sensitivity),
+                            onResetToDefault = { viewModel.setRightStickSensitivity(overlayDefaults.rightStickSensitivity) }
+                        )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_section)) {
                         ToggleItem(
@@ -1199,6 +1123,39 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setPadVibration,
                             helpText = stringResource(R.string.settings_help_pad_vibration),
                             onResetToDefault = { viewModel.setPadVibration(defaults.padVibration) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_gamepad_stick_deadzone),
+                            subtitle = "${uiState.gamepadStickDeadzone}%",
+                            value = uiState.gamepadStickDeadzone.toFloat(),
+                            range = 0f..35f,
+                            steps = 6,
+                            onValueChange = { viewModel.setGamepadStickDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
+                            onResetToDefault = { viewModel.setGamepadStickDeadzone(defaults.gamepadStickDeadzone) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_gamepad_left_stick_sensitivity),
+                            subtitle = "${uiState.gamepadLeftStickSensitivity}%",
+                            value = uiState.gamepadLeftStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 14,
+                            onValueChange = { viewModel.setGamepadLeftStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
+                            onResetToDefault = { viewModel.setGamepadLeftStickSensitivity(defaults.gamepadLeftStickSensitivity) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_gamepad_right_stick_sensitivity),
+                            subtitle = "${uiState.gamepadRightStickSensitivity}%",
+                            value = uiState.gamepadRightStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 14,
+                            onValueChange = { viewModel.setGamepadRightStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
+                            onResetToDefault = { viewModel.setGamepadRightStickSensitivity(defaults.gamepadRightStickSensitivity) }
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_mapping_title)) {
@@ -1292,7 +1249,7 @@ private fun SettingsContent(
                     val repository = remember(context) {
                         MemoryCardRepository(context, AppPreferences(context))
                     }
-                    var memoryCardCount by remember { mutableStateOf(0) }
+                    var memoryCardCount by remember { mutableIntStateOf(0) }
                     var slot1Name by remember { mutableStateOf<String?>(null) }
                     var slot2Name by remember { mutableStateOf<String?>(null) }
 
@@ -2182,8 +2139,13 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Graphics, R.string.settings_no_interlacing_patches),
         entry(SettingsTab.Controls, R.string.settings_overlay_scale),
         entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
+        entry(SettingsTab.Controls, R.string.settings_left_stick_sensitivity),
+        entry(SettingsTab.Controls, R.string.settings_right_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_gamepad_auto),
         entry(SettingsTab.Controls, R.string.settings_gamepad_hide_overlay),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_stick_deadzone),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_sensitivity),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_pad_vibration),
         entry(SettingsTab.Paths, R.string.settings_bios_path),
         entry(SettingsTab.Paths, R.string.settings_game_path),
@@ -2975,8 +2937,8 @@ private fun LanguageOptionCard(
 private data class LanguageUiOption(
     val tag: String?,
     val badge: String,
-    @StringRes val titleRes: Int,
-    @StringRes val subtitleRes: Int? = null
+    @param:StringRes val titleRes: Int,
+    @param:StringRes val subtitleRes: Int? = null
 )
 
 @Composable

@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">Manette %1$s : %2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">La manette %1$s n\'est pas connectée. Vous pouvez toujours configurer son mappage.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Appuyez sur un bouton pour %1$s pour l\'attribuer à %2$s.</string>
+    <string name="settings_help_left_stick_sensitivity">Ajuste la rapidité avec laquelle le stick tactile gauche atteint une entrée de mouvement plus forte. Des valeurs plus élevées réagissent plus vite, tandis que des valeurs plus faibles facilitent les petites corrections de mouvement.</string>
+    <string name="settings_help_right_stick_sensitivity">Ajuste la rapidité avec laquelle le stick tactile droit atteint une entrée plus forte. Des valeurs plus élevées font réagir la caméra ou la visée plus vite, tandis que des valeurs plus faibles vous donnent un contrôle plus précis.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Ignore les petits mouvements physiques du stick près du centre. Augmentez-la si votre manette dérive toute seule (drift) ; gardez-la plus basse si vous souhaitez une réponse plus rapide autour du centre.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Ajuste la force de réaction du stick physique gauche après le traitement de la zone morte. Des valeurs plus élevées atteignent le mouvement complet plus vite, tandis que des valeurs plus faibles facilitent les mouvements précis.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Ajuste la force de réaction du stick physique droit après le traitement de la zone morte. Des valeurs plus élevées font réagir le mouvement de la caméra ou de la visée plus vite, tandis que des valeurs plus faibles vous donnent un contrôle plus précis.</string>
+    <string name="settings_left_stick_sensitivity">Sensibilité du stick gauche</string>
+    <string name="settings_right_stick_sensitivity">Sensibilité du stick droit</string>
+    <string name="settings_touch_controls_section">Contrôles tactiles</string>
+    <string name="settings_gamepad_controls_section">Manette physique</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Connectez une manette pour ajuster les paramètres des sticks physiques.</string>
+    <string name="settings_gamepad_stick_deadzone">Zone morte du stick</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Sensibilité du stick gauche</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Sensibilité du stick droit</string>
 </resources>

@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">%1$s 控制器：%2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">%1$s 控制器未连接。您仍然可以配置其映射。</string>
     <string name="settings_gamepad_mapping_listening_player_desc">按下 %1$s 的按钮以将其绑定到 %2$s。</string>
+    <string name="settings_help_left_stick_sensitivity">调整左侧虚拟摇杆达到更强移动输入的快慢。较高的值反应更快，而较低的值使微小的移动修正更容易。</string>
+    <string name="settings_help_right_stick_sensitivity">调整右侧虚拟摇杆达到更强输入的快慢。较高的值可使相机或瞄准的改变反应更快，而较低的值可提供更精细的控制。</string>
+    <string name="settings_help_gamepad_stick_deadzone">忽略中心附近轻微的物理摇杆移动。如果您的控制器会自动漂移，请调高此值；如果您希望在中心附近有更快的响应，请保持较低值。</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">调整物理左摇杆在死区处理后响应的强度。较高的值会更快达到满量程移动，而较低的值使精细移动更容易。</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">调整物理右摇杆在死区处理后响应的强度。较高的值会使相机或瞄准移动的反应更快，而较低的值可提供更精细的控制。</string>
+    <string name="settings_left_stick_sensitivity">左摇杆灵敏度</string>
+    <string name="settings_right_stick_sensitivity">右摇杆灵敏度</string>
+    <string name="settings_touch_controls_section">触屏控制</string>
+    <string name="settings_gamepad_controls_section">物理手柄</string>
+    <string name="settings_gamepad_controls_disconnected_hint">连接手柄以调整物理摇杆设置。</string>
+    <string name="settings_gamepad_stick_deadzone">摇杆死区</string>
+    <string name="settings_gamepad_left_stick_sensitivity">左摇杆灵敏度</string>
+    <string name="settings_gamepad_right_stick_sensitivity">右摇杆灵敏度</string>
 </resources>

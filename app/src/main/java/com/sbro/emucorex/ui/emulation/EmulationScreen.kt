@@ -2,10 +2,10 @@ package com.sbro.emucorex.ui.emulation
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
-import android.widget.Toast
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -21,11 +21,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -46,7 +45,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -67,7 +65,6 @@ import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -103,26 +100,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -131,10 +125,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
@@ -151,39 +145,12 @@ import com.sbro.emucorex.data.RetroAchievementGameData
 import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.BitmapPathImage
-import com.sbro.emucorex.ui.common.OverlayBottomAnchorPadding
-import com.sbro.emucorex.ui.common.OverlayActionGapLandscape
-import com.sbro.emucorex.ui.common.OverlayActionGapPortrait
-import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
-import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
-import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
-import com.sbro.emucorex.ui.common.OverlayCenterInlineGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterInlineGapPortrait
-import com.sbro.emucorex.ui.common.OverlayCenterSelectOpticalNudgeX
-import com.sbro.emucorex.ui.common.OverlayCenterStartOpticalNudgeX
-import com.sbro.emucorex.ui.common.OverlayCenterToggleOpticalNudgeY
-import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
-import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
-import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
-import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
-import com.sbro.emucorex.ui.common.OverlayRightShoulderGapOffset
-import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
-import com.sbro.emucorex.ui.common.OverlayShoulderVerticalGap
-import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.VectorAnalogStick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
-import com.sbro.emucorex.ui.common.overlayActionOffset
-import com.sbro.emucorex.ui.common.overlayClusterStep
-import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
-import com.sbro.emucorex.ui.common.overlayInlineGroupOffset
-import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
-import com.sbro.emucorex.ui.common.overlayDrawableForControl
-import com.sbro.emucorex.ui.common.overlayDpadOffset
+import com.sbro.emucorex.ui.common.buildOverlayCanvasLayout
+import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
-import com.sbro.emucorex.ui.theme.AccentPrimary
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
 import kotlinx.coroutines.Dispatchers
@@ -193,30 +160,30 @@ import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private object PadKey {
-    const val Up = 19
-    const val Right = 22
-    const val Down = 20
-    const val Left = 21
-    const val Triangle = 100
-    const val Circle = 97
-    const val Cross = 96
-    const val Square = 99
-    const val Select = 109
-    const val Start = 108
+    const val UP = 19
+    const val RIGHT = 22
+    const val DOWN = 20
+    const val LEFT = 21
+    const val TRIANGLE = 100
+    const val CIRCLE = 97
+    const val CROSS = 96
+    const val SQUARE = 99
+    const val SELECT = 109
+    const val START = 108
     const val L1 = 102
     const val L2 = 104
     const val R1 = 103
     const val R2 = 105
     const val L3 = 106
     const val R3 = 107
-    const val LeftStickUp = 110
-    const val LeftStickRight = 111
-    const val LeftStickDown = 112
-    const val LeftStickLeft = 113
-    const val RightStickUp = 120
-    const val RightStickRight = 121
-    const val RightStickDown = 122
-    const val RightStickLeft = 123
+    const val LEFT_STICK_UP = 110
+    const val LEFT_STICK_RIGHT = 111
+    const val LEFT_STICK_DOWN = 112
+    const val LEFT_STICK_LEFT = 113
+    const val RIGHT_STICK_UP = 120
+    const val RIGHT_STICK_RIGHT = 121
+    const val RIGHT_STICK_DOWN = 122
+    const val RIGHT_STICK_LEFT = 123
 }
 
 private enum class EmulationMenuTab {
@@ -373,6 +340,11 @@ fun EmulationScreen(
         viewModel.stopEmulation(onExit = onExit)
     })
     val dismissExitClick = rememberDebouncedClick(onClick = { showExitDialog = false })
+    val dismissCheatsDialog: () -> Unit = { showCheatsDialog = false }
+    val dismissCheatsDialogClick = rememberDebouncedClick(onClick = dismissCheatsDialog)
+    val dismissGamepadMappingDialog: () -> Unit = { showGamepadMappingDialog = false }
+    val dismissGamepadMappingDialogClick = rememberDebouncedClick(onClick = dismissGamepadMappingDialog)
+    val sessionRestoredUnavailableMessage = stringResource(R.string.emulation_session_restored_unavailable)
 
     BackHandler(enabled = true) {
         toggleMenuClick()
@@ -382,7 +354,7 @@ fun EmulationScreen(
         if (!restoredAfterProcessDeath) return@LaunchedEffect
         Toast.makeText(
             context,
-            context.getString(R.string.emulation_session_restored_unavailable),
+            sessionRestoredUnavailableMessage,
             Toast.LENGTH_LONG
         ).show()
         onExit()
@@ -860,6 +832,8 @@ fun EmulationScreen(
                     .graphicsLayer(alpha = alpha),
                 scaleFactor = scaleFactor,
                 stickScaleFactor = uiState.stickScale / 100f,
+                leftStickSensitivity = uiState.leftStickSensitivity / 100f,
+                rightStickSensitivity = uiState.rightStickSensitivity / 100f,
                 stickSurfaceMode = uiState.stickSurfaceMode,
                 dpadOffset = uiState.dpadOffset,
                 lstickOffset = uiState.lstickOffset,
@@ -910,6 +884,7 @@ fun EmulationScreen(
 
                 EmulationSidebarMenu(
                     uiState = uiState,
+                    gamepadConnected = gamepadConnected.value,
                     currentGamePath = gamePath,
                     retroState = retroAchievementsState,
                     globalDefaults = globalDefaults,
@@ -931,6 +906,11 @@ fun EmulationScreen(
                     onSetCompactControls = { viewModel.setCompactControls(it) },
                     onSetKeepScreenOn = { viewModel.setKeepScreenOn(it) },
                     onSetStickScale = { viewModel.setStickScale(it) },
+                    onSetLeftStickSensitivity = { viewModel.setLeftStickSensitivity(it) },
+                    onSetRightStickSensitivity = { viewModel.setRightStickSensitivity(it) },
+                    onSetGamepadStickDeadzone = { viewModel.setGamepadStickDeadzone(it) },
+                    onSetGamepadLeftStickSensitivity = { viewModel.setGamepadLeftStickSensitivity(it) },
+                    onSetGamepadRightStickSensitivity = { viewModel.setGamepadRightStickSensitivity(it) },
                     onToggleControls = toggleControlsClick,
                     onOpenControlsEditor = { showControlsEditor = true },
                     onOpenGamepadMapping = { showGamepadMappingDialog = true },
@@ -1094,7 +1074,7 @@ fun EmulationScreen(
 
     if (showCheatsDialog) {
         AlertDialog(
-            onDismissRequest = { showCheatsDialog = false },
+            onDismissRequest = dismissCheatsDialog,
             title = { Text(stringResource(R.string.emulation_cheats_title)) },
             text = {
                 if (uiState.availableCheats.isEmpty()) {
@@ -1126,7 +1106,7 @@ fun EmulationScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCheatsDialog = false }) {
+                TextButton(onClick = dismissCheatsDialogClick) {
                     Text(stringResource(android.R.string.ok))
                 }
             }
@@ -1134,7 +1114,7 @@ fun EmulationScreen(
     }
 
     if (showGamepadMappingDialog) {
-        Dialog(onDismissRequest = { showGamepadMappingDialog = false }) {
+        Dialog(onDismissRequest = dismissGamepadMappingDialog) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1243,7 +1223,7 @@ fun EmulationScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End
                         ) {
-                            TextButton(onClick = { showGamepadMappingDialog = false }) {
+                            TextButton(onClick = dismissGamepadMappingDialogClick) {
                                 Text(stringResource(android.R.string.ok))
                             }
                         }
@@ -1352,6 +1332,8 @@ private fun OnScreenControls(
     modifier: Modifier = Modifier,
     scaleFactor: Float,
     stickScaleFactor: Float = 1.0f,
+    leftStickSensitivity: Float = 1.0f,
+    rightStickSensitivity: Float = 1.0f,
     stickSurfaceMode: Boolean = false,
     dpadOffset: Pair<Float, Float>,
     lstickOffset: Pair<Float, Float>,
@@ -1364,9 +1346,7 @@ private fun OnScreenControls(
     onToggleLeftInputMode: () -> Unit,
     onPadInput: (Int, Int, Boolean) -> Unit
 ) {
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
     val safeLeft = maxOf(cutoutPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr), navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr))
@@ -1374,336 +1354,129 @@ private fun OnScreenControls(
     val safeTop = maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
     val safeBottom = maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
     val safeHorizontalInset = maxOf(safeLeft, safeRight)
-
-    // Scaled sizes
-    val dpadSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val actionSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val analogSize = ((if (isLandscape) 120 else 140) * scaleFactor * stickScaleFactor).dp
-    val shoulderW = ((if (isLandscape) 65 else 72) * scaleFactor).dp
-    val shoulderH = ((if (isLandscape) 32 else 36) * scaleFactor).dp
-    val centerW = ((if (isLandscape) 60 else 68) * scaleFactor).dp
-    val centerH = ((if (isLandscape) 26 else 30) * scaleFactor).dp
-    val wideCenterW = centerW * 1.2f
-    val centerColumnGap = (if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait) * scaleFactor
-    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
-    val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
-    val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
-    val actionGap = if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait
-    val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
-    val actionButtonSize = actionSize / 3.1f
-    val actionStep = overlayClusterStep(actionButtonSize, actionGap)
-    val actionClusterExtent = actionStep + actionButtonSize
-    val rightStickBaseX = -(actionClusterExtent + 12.dp)
-
-    val baseEdgePad = if (isLandscape) 28.dp else 12.dp
-    val baseBottomPad = if (isLandscape) 24.dp else 36.dp
-    val edgePadStart = baseEdgePad + safeHorizontalInset
-    val edgePadEnd = baseEdgePad + safeHorizontalInset
-    val edgePadTop = maxOf(OverlayShoulderTopPadding, safeTop + 4.dp)
-    val bottomPad = baseBottomPad + safeBottom
-    fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
-        return controlLayouts[id]
-            ?: AppPreferences.defaultOverlayControlLayouts(defaultScale)[id]
-            ?: OverlayControlLayout(scale = defaultScale)
+    fun buttonPressHandler(id: String): ((Boolean) -> Unit)? = when (id) {
+        "l2" -> { pressed -> onPadInput(PadKey.L2, 0, pressed) }
+        "l1" -> { pressed -> onPadInput(PadKey.L1, 0, pressed) }
+        "r2" -> { pressed -> onPadInput(PadKey.R2, 0, pressed) }
+        "r1" -> { pressed -> onPadInput(PadKey.R1, 0, pressed) }
+        "dpad_up" -> { pressed -> onPadInput(PadKey.UP, 0, pressed) }
+        "dpad_down" -> { pressed -> onPadInput(PadKey.DOWN, 0, pressed) }
+        "dpad_left" -> { pressed -> onPadInput(PadKey.LEFT, 0, pressed) }
+        "dpad_right" -> { pressed -> onPadInput(PadKey.RIGHT, 0, pressed) }
+        "triangle" -> { pressed -> onPadInput(PadKey.TRIANGLE, 0, pressed) }
+        "cross" -> { pressed -> onPadInput(PadKey.CROSS, 0, pressed) }
+        "square" -> { pressed -> onPadInput(PadKey.SQUARE, 0, pressed) }
+        "circle" -> { pressed -> onPadInput(PadKey.CIRCLE, 0, pressed) }
+        "select" -> { pressed -> onPadInput(PadKey.SELECT, 0, pressed) }
+        "start" -> { pressed -> onPadInput(PadKey.START, 0, pressed) }
+        "l3" -> { pressed -> onPadInput(PadKey.L3, 0, pressed) }
+        "r3" -> { pressed -> onPadInput(PadKey.R3, 0, pressed) }
+        else -> null
     }
 
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = edgePadTop, start = edgePadStart)
-                .offset { IntOffset(lbtnOffset.first.roundToInt(), lbtnOffset.second.roundToInt()) }
-        ) {
-            val l2 = layoutFor("l2")
-            val l1 = layoutFor("l1")
-            TouchButtonGroup(
-                specs = buildList {
-                    if (l2.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "l2",
-                                drawableRes = requireNotNull(overlayDrawableForControl("l2")),
-                                width = shoulderW * (l2.scale / 100f),
-                                height = shoulderH * (l2.scale / 100f),
-                                x = l2.offset.first.dp,
-                                y = l2.offset.second.dp,
-                                shape = RoundedCornerShape(10.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.L2, 0, pressed) }
-                            )
-                        )
-                    }
-                    if (l1.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "l1",
-                                drawableRes = requireNotNull(overlayDrawableForControl("l1")),
-                                width = shoulderW * (l1.scale / 100f),
-                                height = shoulderH * (l1.scale / 100f),
-                                x = l1.offset.first.dp,
-                                y = OverlayShoulderVerticalGap + l1.offset.second.dp,
-                                shape = RoundedCornerShape(10.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.L1, 0, pressed) }
-                            )
-                        )
-                    }
-                }
-            )
-        }
+    BoxWithConstraints(modifier = modifier) {
+        val layout = buildOverlayCanvasLayout(
+            canvasWidth = maxWidth,
+            canvasHeight = maxHeight,
+            density = density,
+            scaleFactor = scaleFactor,
+            stickScaleFactor = stickScaleFactor,
+            dpadOffset = dpadOffset,
+            lstickOffset = lstickOffset,
+            rstickOffset = rstickOffset,
+            actionOffset = actionOffset,
+            lbtnOffset = lbtnOffset,
+            rbtnOffset = rbtnOffset,
+            centerOffset = centerOffset,
+            controlLayouts = controlLayouts,
+            safeHorizontalInset = safeHorizontalInset,
+            safeTopInset = safeTop,
+            safeBottomInset = safeBottom
+        )
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = edgePadTop, end = edgePadEnd)
-                .offset { IntOffset(rbtnOffset.first.roundToInt(), rbtnOffset.second.roundToInt()) }
-        ) {
-            val r1 = layoutFor("r1")
-            val r2 = layoutFor("r2")
-            TouchButtonGroup(
-                specs = buildList {
-                    if (r2.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "r2",
-                                drawableRes = requireNotNull(overlayDrawableForControl("r2")),
-                                width = shoulderW * (r2.scale / 100f),
-                                height = shoulderH * (r2.scale / 100f),
-                                x = OverlayRightShoulderBaseOffset + r2.offset.first.dp,
-                                y = r2.offset.second.dp,
-                                shape = RoundedCornerShape(10.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.R2, 0, pressed) }
-                            )
-                        )
-                    }
-                    if (r1.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "r1",
-                                drawableRes = requireNotNull(overlayDrawableForControl("r1")),
-                                width = shoulderW * (r1.scale / 100f),
-                                height = shoulderH * (r1.scale / 100f),
-                                x = OverlayRightShoulderBaseOffset + r1.offset.first.dp,
-                                y = OverlayRightShoulderGapOffset + r1.offset.second.dp,
-                                shape = RoundedCornerShape(10.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.R1, 0, pressed) }
-                            )
-                        )
-                    }
-                }
-            )
-        }
-
-        // Left side — D-Pad + Left Stick
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = edgePadStart, bottom = bottomPad)
-        ) {
-            DPadCluster(
-                onPadInput = onPadInput,
-                clusterSize = dpadSize,
-                controlLayouts = controlLayouts,
-                modifier = Modifier
-                    .offset { IntOffset(dpadOffset.first.roundToInt(), dpadOffset.second.roundToInt()) }
-            )
-            val leftStick = layoutFor("left_stick", (stickScaleFactor * 100f).roundToInt())
-            if (leftStick.visible) {
-                val leftStickSize = analogSize * (leftStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
-                val leftStickBase = (dpadSize - leftStickSize) / 2f
-                VectorAnalogStick(
-                    analogSize = leftStickSize,
-                    surfaceOnly = stickSurfaceMode,
-                    onValueChange = { x, y ->
-                        updateAnalogStick(
-                            x = x,
-                            y = y,
-                            upKey = PadKey.LeftStickUp,
-                            rightKey = PadKey.LeftStickRight,
-                            downKey = PadKey.LeftStickDown,
-                            leftKey = PadKey.LeftStickLeft,
-                            onPadInput = onPadInput
-                        )
-                    },
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                leftStickBase.roundToPx() + lstickOffset.first.roundToInt() + leftStick.offset.first.roundToInt(),
-                                leftStickBase.roundToPx() + lstickOffset.second.roundToInt() + leftStick.offset.second.roundToInt()
-                            )
-                        }
+        fun runtimeSpecs(specs: List<com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec>): List<TouchButtonSpec> {
+            return specs.filter { it.visible }.map { spec ->
+                TouchButtonSpec(
+                    id = spec.id,
+                    drawableRes = spec.drawableRes,
+                    width = spec.width,
+                    height = spec.height,
+                    x = spec.x,
+                    y = spec.y,
+                    shape = spec.shape,
+                    onPressChange = buttonPressHandler(spec.id),
+                    onClick = if (spec.id == "left_input_toggle") onToggleLeftInputMode else null
                 )
             }
         }
 
-        // Right side — Actions + Right Stick
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = edgePadEnd, bottom = bottomPad)
-        ) {
-            ActionCluster(
-                onPadInput = onPadInput,
-                clusterSize = actionSize,
-                controlLayouts = controlLayouts,
-                modifier = Modifier
-                    .offset { IntOffset(actionOffset.first.roundToInt(), actionOffset.second.roundToInt()) }
-            )
-            val rightStick = layoutFor("right_stick", (stickScaleFactor * 100f).roundToInt())
-            if (rightStick.visible) {
-                VectorAnalogStick(
-                    analogSize = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
-                    surfaceOnly = stickSurfaceMode,
-                    onValueChange = { x, y ->
-                        updateAnalogStick(
-                            x = x,
-                            y = y,
-                            upKey = PadKey.RightStickUp,
-                            rightKey = PadKey.RightStickRight,
-                            downKey = PadKey.RightStickDown,
-                            leftKey = PadKey.RightStickLeft,
-                            onPadInput = onPadInput
-                        )
-                    },
-                    modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                rightStickBaseX.roundToPx() + rstickOffset.first.roundToInt() + rightStick.offset.first.roundToInt(),
-                                rstickOffset.second.roundToInt() + rightStick.offset.second.roundToInt()
-                            )
-                        }
-                )
-            }
+        val leftShoulderSpecs = runtimeSpecs(layout.leftShoulders)
+        if (leftShoulderSpecs.isNotEmpty()) {
+            TouchButtonGroup(specs = leftShoulderSpecs)
         }
 
-            val select = layoutFor("select")
-            val toggle = layoutFor("left_input_toggle")
-            val start = layoutFor("start")
-            val l3 = layoutFor("l3")
-            val r3 = layoutFor("r3")
-            val l3Width = centerW * (l3.scale / 100f)
-            val r3Width = centerW * (r3.scale / 100f)
-            val selectWidth = wideCenterW * (select.scale / 100f)
-            val toggleSize = centerH * (toggle.scale / 100f)
-            val startWidth = wideCenterW * (start.scale / 100f)
-            val centerItems = buildList {
-                if (l3.visible) add("l3" to l3Width)
-                if (select.visible) add("select" to selectWidth)
-                if (toggle.visible) add("left_input_toggle" to toggleSize)
-                if (start.visible) add("start" to startWidth)
-                if (r3.visible) add("r3" to r3Width)
-            }
-            val centerInlineWidths = centerItems.map { it.second }
-            fun centerInlineX(id: String): Dp {
-                val index = centerItems.indexOfFirst { it.first == id }
-                return if (index >= 0) {
-                    overlayInlineGroupOffset(centerInlineWidths, centerInlineGap, index)
-                } else {
-                    0.dp
-                }
-            }
-            val l3X = centerInlineX("l3") + l3.offset.first.dp
-            val selectX = centerInlineX("select") + OverlayCenterSelectOpticalNudgeX + select.offset.first.dp
-            val toggleX = centerInlineX("left_input_toggle") + toggle.offset.first.dp
-            val startX = centerInlineX("start") + OverlayCenterStartOpticalNudgeX + start.offset.first.dp
-            val r3X = centerInlineX("r3") + r3.offset.first.dp
-            val centerBounds = buildList {
-                if (select.visible) add(selectX to selectWidth)
-                if (toggle.visible) add(toggleX to toggleSize)
-                if (start.visible) add(startX to startWidth)
-                if (l3.visible) add(l3X to l3Width)
-                if (r3.visible) add(r3X to r3Width)
-            }
-            val centerVisualShift = if (centerBounds.isNotEmpty()) {
-                val left = centerBounds.minOf { it.first }
-                -left
-            } else {
-                0.dp
-            }
+        val rightShoulderSpecs = runtimeSpecs(layout.rightShoulders)
+        if (rightShoulderSpecs.isNotEmpty()) {
+            TouchButtonGroup(specs = rightShoulderSpecs)
+        }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
-                .offset {
-                    IntOffset(
-                        OverlayCenterBaseShiftX.roundToPx() + centerOffset.first.roundToInt() + centerVisualShift.roundToPx(),
-                        centerOffset.second.roundToInt()
+        val dpadSpecs = runtimeSpecs(layout.dpadButtons)
+        if (dpadSpecs.isNotEmpty()) {
+            TouchButtonGroup(specs = dpadSpecs)
+        }
+
+        layout.leftStick?.takeIf { it.visible }?.let { stick ->
+            VectorAnalogStick(
+                analogSize = stick.size,
+                surfaceOnly = stickSurfaceMode,
+                onValueChange = { x, y ->
+                    updateAnalogStick(
+                        x = x,
+                        y = y,
+                        sensitivity = leftStickSensitivity,
+                        upKey = PadKey.LEFT_STICK_UP,
+                        rightKey = PadKey.LEFT_STICK_RIGHT,
+                        downKey = PadKey.LEFT_STICK_DOWN,
+                        leftKey = PadKey.LEFT_STICK_LEFT,
+                        onPadInput = onPadInput
                     )
-                }
-        ) {
-            TouchButtonGroup(
-                specs = buildList {
-                    if (select.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "select",
-                                drawableRes = requireNotNull(overlayDrawableForControl("select")),
-                                width = selectWidth,
-                                height = centerH * (select.scale / 100f),
-                                x = selectX,
-                                y = select.offset.second.dp,
-                                shape = RoundedCornerShape(8.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.Select, 0, pressed) }
-                            )
-                        )
-                    }
-                    if (toggle.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "left_input_toggle",
-                                drawableRes = requireNotNull(overlayDrawableForControl("left_input_toggle")),
-                                width = toggleSize,
-                                height = toggleSize,
-                                x = toggleX,
-                                y = OverlayCenterToggleOpticalNudgeY + toggle.offset.second.dp,
-                                shape = CircleShape,
-                                onClick = onToggleLeftInputMode
-                            )
-                        )
-                    }
-                    if (start.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "start",
-                                drawableRes = requireNotNull(overlayDrawableForControl("start")),
-                                width = startWidth,
-                                height = centerH * (start.scale / 100f),
-                                x = startX,
-                                y = start.offset.second.dp,
-                                shape = RoundedCornerShape(8.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.Start, 0, pressed) }
-                            )
-                        )
-                    }
-                    if (l3.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "l3",
-                                drawableRes = requireNotNull(overlayDrawableForControl("l3")),
-                                width = l3Width,
-                                height = centerH * (l3.scale / 100f),
-                                x = l3X,
-                                y = l3.offset.second.dp,
-                                shape = RoundedCornerShape(8.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.L3, 0, pressed) }
-                            )
-                        )
-                    }
-                    if (r3.visible) {
-                        add(
-                            TouchButtonSpec(
-                                id = "r3",
-                                drawableRes = requireNotNull(overlayDrawableForControl("r3")),
-                                width = r3Width,
-                                height = centerH * (r3.scale / 100f),
-                                x = r3X,
-                                y = r3.offset.second.dp,
-                                shape = RoundedCornerShape(8.dp),
-                                onPressChange = { pressed -> onPadInput(PadKey.R3, 0, pressed) }
-                            )
-                        )
-                    }
+                },
+                modifier = Modifier.offset {
+                    IntOffset(stick.x.roundToPx(), stick.y.roundToPx())
                 }
             )
+        }
+
+        val actionSpecs = runtimeSpecs(layout.actionButtons)
+        if (actionSpecs.isNotEmpty()) {
+            TouchButtonGroup(specs = actionSpecs)
+        }
+
+        layout.rightStick?.takeIf { it.visible }?.let { stick ->
+            VectorAnalogStick(
+                analogSize = stick.size,
+                surfaceOnly = stickSurfaceMode,
+                onValueChange = { x, y ->
+                    updateAnalogStick(
+                        x = x,
+                        y = y,
+                        sensitivity = rightStickSensitivity,
+                        upKey = PadKey.RIGHT_STICK_UP,
+                        rightKey = PadKey.RIGHT_STICK_RIGHT,
+                        downKey = PadKey.RIGHT_STICK_DOWN,
+                        leftKey = PadKey.RIGHT_STICK_LEFT,
+                        onPadInput = onPadInput
+                    )
+                },
+                modifier = Modifier.offset {
+                    IntOffset(stick.x.roundToPx(), stick.y.roundToPx())
+                }
+            )
+        }
+
+        val centerSpecs = runtimeSpecs(layout.centerButtons)
+        if (centerSpecs.isNotEmpty()) {
+            TouchButtonGroup(specs = centerSpecs)
         }
     }
 }
@@ -1844,197 +1617,26 @@ private fun TouchButtonGroup(
 
 private fun updateAnalogStick(
     x: Float, y: Float,
+    sensitivity: Float = 1f,
     upKey: Int, rightKey: Int, downKey: Int, leftKey: Int,
     onPadInput: (Int, Int, Boolean) -> Unit
 ) {
-    val right = (x.coerceAtLeast(0f) * 255f).roundToInt()
-    val left = ((-x).coerceAtLeast(0f) * 255f).roundToInt()
-    val down = (y.coerceAtLeast(0f) * 255f).roundToInt()
-    val up = ((-y).coerceAtLeast(0f) * 255f).roundToInt()
+    val scaledX = (x * sensitivity.coerceIn(0.5f, 2f)).coerceIn(-1f, 1f)
+    val scaledY = (y * sensitivity.coerceIn(0.5f, 2f)).coerceIn(-1f, 1f)
+    val right = (scaledX.coerceAtLeast(0f) * 255f).roundToInt()
+    val left = ((-scaledX).coerceAtLeast(0f) * 255f).roundToInt()
+    val down = (scaledY.coerceAtLeast(0f) * 255f).roundToInt()
+    val up = ((-scaledY).coerceAtLeast(0f) * 255f).roundToInt()
     onPadInput(upKey, up, up > 0)
     onPadInput(rightKey, right, right > 0)
     onPadInput(downKey, down, down > 0)
     onPadInput(leftKey, left, left > 0)
 }
 
-@SuppressLint("ConfigurationScreenWidthHeight")
-@Composable
-private fun DPadCluster(
-    onPadInput: (Int, Int, Boolean) -> Unit,
-    clusterSize: androidx.compose.ui.unit.Dp,
-    controlLayouts: Map<String, OverlayControlLayout>,
-    modifier: Modifier = Modifier
-) {
-    val btnSize = clusterSize / 3f
-    val clusterGap = if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp) {
-        OverlayClusterGapLandscape
-    } else {
-        OverlayClusterGapPortrait
-    }
-    val step = overlayClusterStep(btnSize, clusterGap)
-    val clusterExtent = step + btnSize
-    val centerOffset = (clusterExtent - btnSize) / 2f
-
-    Box(modifier = modifier) {
-        val defaults = AppPreferences.defaultOverlayControlLayouts()
-        val up = controlLayouts["dpad_up"] ?: defaults["dpad_up"] ?: OverlayControlLayout()
-        val down = controlLayouts["dpad_down"] ?: defaults["dpad_down"] ?: OverlayControlLayout()
-        val left = controlLayouts["dpad_left"] ?: defaults["dpad_left"] ?: OverlayControlLayout()
-        val right = controlLayouts["dpad_right"] ?: defaults["dpad_right"] ?: OverlayControlLayout()
-        TouchButtonGroup(
-            specs = buildList {
-                if (up.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "dpad_up",
-                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_up")),
-                            width = btnSize * (up.scale / 100f),
-                            height = btnSize * (up.scale / 100f),
-                            x = centerOffset + up.offset.first.dp,
-                            y = 0.dp + up.offset.second.dp,
-                            shape = RoundedCornerShape(8.dp),
-                            onPressChange = { pressed -> onPadInput(PadKey.Up, 0, pressed) }
-                        )
-                    )
-                }
-                if (down.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "dpad_down",
-                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_down")),
-                            width = btnSize * (down.scale / 100f),
-                            height = btnSize * (down.scale / 100f),
-                            x = centerOffset + down.offset.first.dp,
-                            y = step + down.offset.second.dp,
-                            shape = RoundedCornerShape(8.dp),
-                            onPressChange = { pressed -> onPadInput(PadKey.Down, 0, pressed) }
-                        )
-                    )
-                }
-                if (left.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "dpad_left",
-                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_left")),
-                            width = btnSize * (left.scale / 100f),
-                            height = btnSize * (left.scale / 100f),
-                            x = 0.dp + left.offset.first.dp,
-                            y = centerOffset + left.offset.second.dp,
-                            shape = RoundedCornerShape(8.dp),
-                            onPressChange = { pressed -> onPadInput(PadKey.Left, 0, pressed) }
-                        )
-                    )
-                }
-                if (right.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "dpad_right",
-                            drawableRes = requireNotNull(overlayDrawableForControl("dpad_right")),
-                            width = btnSize * (right.scale / 100f),
-                            height = btnSize * (right.scale / 100f),
-                            x = step + right.offset.first.dp,
-                            y = centerOffset + right.offset.second.dp,
-                            shape = RoundedCornerShape(8.dp),
-                            onPressChange = { pressed -> onPadInput(PadKey.Right, 0, pressed) }
-                        )
-                    )
-                }
-            }
-        )
-    }
-}
-
-@SuppressLint("ConfigurationScreenWidthHeight")
-@Composable
-private fun ActionCluster(
-    onPadInput: (Int, Int, Boolean) -> Unit,
-    clusterSize: androidx.compose.ui.unit.Dp,
-    controlLayouts: Map<String, OverlayControlLayout>,
-    modifier: Modifier = Modifier
-) {
-    val btnSize = clusterSize / 3.1f
-    val clusterGap = if (LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp) {
-        OverlayActionGapLandscape
-    } else {
-        OverlayActionGapPortrait
-    }
-    val step = overlayClusterStep(btnSize, clusterGap)
-    val clusterExtent = step + btnSize
-    val centerOffset = (clusterExtent - btnSize) / 2f
-
-    Box(
-        modifier = modifier
-    ) {
-        val triangle = controlLayouts["triangle"] ?: OverlayControlLayout()
-        val cross = controlLayouts["cross"] ?: OverlayControlLayout()
-        val square = controlLayouts["square"] ?: OverlayControlLayout()
-        val circle = controlLayouts["circle"] ?: OverlayControlLayout()
-        TouchButtonGroup(
-            specs = buildList {
-                if (triangle.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "triangle",
-                            drawableRes = requireNotNull(overlayDrawableForControl("triangle")),
-                            width = btnSize * (triangle.scale / 100f),
-                            height = btnSize * (triangle.scale / 100f),
-                            x = centerOffset + triangle.offset.first.dp,
-                            y = 0.dp + triangle.offset.second.dp,
-                            shape = CircleShape,
-                            onPressChange = { pressed -> onPadInput(PadKey.Triangle, 0, pressed) }
-                        )
-                    )
-                }
-                if (cross.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "cross",
-                            drawableRes = requireNotNull(overlayDrawableForControl("cross")),
-                            width = btnSize * (cross.scale / 100f),
-                            height = btnSize * (cross.scale / 100f),
-                            x = centerOffset + cross.offset.first.dp,
-                            y = step + cross.offset.second.dp,
-                            shape = CircleShape,
-                            onPressChange = { pressed -> onPadInput(PadKey.Cross, 0, pressed) }
-                        )
-                    )
-                }
-                if (square.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "square",
-                            drawableRes = requireNotNull(overlayDrawableForControl("square")),
-                            width = btnSize * (square.scale / 100f),
-                            height = btnSize * (square.scale / 100f),
-                            x = 0.dp + square.offset.first.dp,
-                            y = centerOffset + square.offset.second.dp,
-                            shape = CircleShape,
-                            onPressChange = { pressed -> onPadInput(PadKey.Square, 0, pressed) }
-                        )
-                    )
-                }
-                if (circle.visible) {
-                    add(
-                        TouchButtonSpec(
-                            id = "circle",
-                            drawableRes = requireNotNull(overlayDrawableForControl("circle")),
-                            width = btnSize * (circle.scale / 100f),
-                            height = btnSize * (circle.scale / 100f),
-                            x = step + circle.offset.first.dp,
-                            y = centerOffset + circle.offset.second.dp,
-                            shape = CircleShape,
-                            onPressChange = { pressed -> onPadInput(PadKey.Circle, 0, pressed) }
-                        )
-                    )
-                }
-            }
-        )
-    }
-}
-
 @Composable
 private fun EmulationSidebarMenu(
     uiState: EmulationUiState,
+    gamepadConnected: Boolean,
     currentGamePath: String?,
     retroState: com.sbro.emucorex.core.utils.RetroAchievementsUiState,
     globalDefaults: SettingsSnapshot,
@@ -2056,6 +1658,11 @@ private fun EmulationSidebarMenu(
     onSetCompactControls: (Boolean) -> Unit,
     onSetKeepScreenOn: (Boolean) -> Unit,
     onSetStickScale: (Int) -> Unit,
+    onSetLeftStickSensitivity: (Int) -> Unit,
+    onSetRightStickSensitivity: (Int) -> Unit,
+    onSetGamepadStickDeadzone: (Int) -> Unit,
+    onSetGamepadLeftStickSensitivity: (Int) -> Unit,
+    onSetGamepadRightStickSensitivity: (Int) -> Unit,
     onToggleControls: () -> Unit,
     onOpenControlsEditor: () -> Unit,
     onOpenGamepadMapping: () -> Unit,
@@ -2116,7 +1723,7 @@ private fun EmulationSidebarMenu(
     modifier: Modifier = Modifier
 ) {
     val sectionTitleColor = MaterialTheme.colorScheme.primary
-    val contentPadding = 16.dp
+    16.dp
     val sectionSpacing = 16.dp
     val sectionLabelInset = 4.dp
     val sectionLabelTopPadding = 8.dp
@@ -2435,6 +2042,8 @@ private fun EmulationSidebarMenu(
                             onResetToDefault = { onSetKeepScreenOn(globalDefaults.keepScreenOn) }
                         )
 
+                        OverlaySubsectionLabel(text = stringResource(R.string.settings_touch_controls_section))
+
                         LiveSliderRow(
                             title = stringResource(R.string.settings_overlay_scale),
                             valueLabelForValue = { "$it%" },
@@ -2468,6 +2077,28 @@ private fun EmulationSidebarMenu(
                             onResetToDefault = { onSetStickScale(overlayDefaults.stickScale) }
                         )
 
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_left_stick_sensitivity),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.leftStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 149,
+                            onValueChange = { onSetLeftStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_left_stick_sensitivity),
+                            onResetToDefault = { onSetLeftStickSensitivity(AppPreferences.DEFAULT_STICK_SENSITIVITY) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_right_stick_sensitivity),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.rightStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 149,
+                            onValueChange = { onSetRightStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_right_stick_sensitivity),
+                            onResetToDefault = { onSetRightStickSensitivity(AppPreferences.DEFAULT_STICK_SENSITIVITY) }
+                        )
+
                         MenuButton(
                             icon = Icons.Rounded.TouchApp,
                             text = stringResource(R.string.settings_edit_controls),
@@ -2475,10 +2106,57 @@ private fun EmulationSidebarMenu(
                             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
                         )
 
+                        OverlaySubsectionLabel(text = stringResource(R.string.settings_gamepad_controls_section))
+
+                        if (!gamepadConnected) {
+                            Text(
+                                text = stringResource(R.string.settings_gamepad_controls_disconnected_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_stick_deadzone),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadStickDeadzone.toFloat(),
+                            range = 0f..35f,
+                            steps = 34,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadStickDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
+                            onResetToDefault = { onSetGamepadStickDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_left_stick_sensitivity),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadLeftStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 149,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadLeftStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
+                            onResetToDefault = { onSetGamepadLeftStickSensitivity(AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_right_stick_sensitivity),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadRightStickSensitivity.toFloat(),
+                            range = 50f..200f,
+                            steps = 149,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadRightStickSensitivity(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
+                            onResetToDefault = { onSetGamepadRightStickSensitivity(AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY) }
+                        )
+
                         MenuButton(
                             icon = Icons.Rounded.Gamepad,
                             text = stringResource(R.string.settings_gamepad_mapping_title),
                             onClick = onOpenGamepadMapping,
+                            enabled = gamepadConnected,
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)
                         )
                     }
@@ -3308,7 +2986,7 @@ private fun OverlayAchievementsPane(
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    subtitle.takeIf { !it.isNullOrBlank() && it != headerTitle }?.let {
+                    subtitle.takeIf { it.isNotBlank() && it != headerTitle }?.let {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
@@ -4000,6 +3678,19 @@ private fun LiveChipsSelectionRow(
 }
 
 @Composable
+private fun OverlaySubsectionLabel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.padding(top = 4.dp)
+    )
+}
+
+@Composable
 private fun LiveSliderRow(
     title: String,
     @androidx.annotation.StringRes valueLabelResId: Int? = null,
@@ -4007,6 +3698,7 @@ private fun LiveSliderRow(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
+    enabled: Boolean = true,
     onValueChange: (Float) -> Unit,
     helpText: String? = null,
     onResetToDefault: (() -> Unit)? = null
@@ -4022,11 +3714,17 @@ private fun LiveSliderRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = {},
-                    onLongClick = onResetToDefault
+                .then(
+                    if (enabled) {
+                        Modifier.combinedClickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = {},
+                            onLongClick = onResetToDefault
+                        )
+                    } else {
+                        Modifier
+                    }
                 ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -4039,7 +3737,11 @@ private fun LiveSliderRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (enabled) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
+                    },
                     modifier = Modifier.weight(1f, fill = false)
                 )
                 helpText?.let {
@@ -4050,15 +3752,24 @@ private fun LiveSliderRow(
                 text = valueLabelResId?.let { stringResource(it, sliderValue.toInt()) }
                     ?: valueLabelForValue(sliderValue.toInt()),
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.primary
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f)
+                }
             )
         }
         Slider(
             value = sliderValue,
             onValueChange = { sliderValue = it },
-            onValueChangeFinished = { onValueChange(sliderValue) },
+            onValueChangeFinished = {
+                if (enabled) {
+                    onValueChange(sliderValue)
+                }
+            },
             valueRange = range,
             steps = steps,
+            enabled = enabled,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary

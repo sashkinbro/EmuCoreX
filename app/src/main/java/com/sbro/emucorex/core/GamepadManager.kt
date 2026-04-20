@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.sign
 
 object GamepadManager {
     data class MappableButtonAction(
@@ -50,7 +51,6 @@ object GamepadManager {
         var lastUpdateElapsedMs: Long = 0L
     )
 
-    private const val ANALOG_DEADZONE = 0.15f
     private const val MAX_PAD_SLOTS = 2
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
     private const val RUMBLE_PULSE_DURATION_MS = 80L
@@ -68,6 +68,12 @@ object GamepadManager {
     private var customBindingsByPad: Map<Int, Map<String, Int>> = emptyMap()
     @Volatile
     private var customBindingsByPadAndKeyCode: Map<Int, Map<Int, Int>> = emptyMap()
+    @Volatile
+    private var analogDeadzone = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE / 100f
+    @Volatile
+    private var leftStickSensitivity = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY / 100f
+    @Volatile
+    private var rightStickSensitivity = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY / 100f
 
     private val connectionLock = Any()
     private val deviceToPadIndex = linkedMapOf<Int, Int>()
@@ -141,6 +147,21 @@ object GamepadManager {
                 if (!enabled) {
                     stopAllGamepadVibrations()
                 }
+            }
+        }
+        scope.launch {
+            preferences.gamepadStickDeadzone.collectLatest { value ->
+                analogDeadzone = (value.coerceIn(0, 35) / 100f)
+            }
+        }
+        scope.launch {
+            preferences.gamepadLeftStickSensitivity.collectLatest { value ->
+                leftStickSensitivity = value.coerceIn(50, 200) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadRightStickSensitivity.collectLatest { value ->
+                rightStickSensitivity = value.coerceIn(50, 200) / 100f
             }
         }
         refreshConnectedGamepads()
@@ -246,8 +267,8 @@ object GamepadManager {
             analogStatesByDeviceId.getOrPut(event.deviceId) { AnalogState() }
         }
 
-        val leftX = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_X))
-        val leftY = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_Y))
+        val leftX = processStickAxis(event.getAxisValue(MotionEvent.AXIS_X), leftStickSensitivity)
+        val leftY = processStickAxis(event.getAxisValue(MotionEvent.AXIS_Y), leftStickSensitivity)
         if (leftX != state.prevLeftX || leftY != state.prevLeftY) {
             dispatchAnalogStick(
                 padIndex = padIndex,
@@ -262,8 +283,8 @@ object GamepadManager {
             state.prevLeftY = leftY
         }
 
-        val rightX = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_Z))
-        val rightY = applyDeadzone(event.getAxisValue(MotionEvent.AXIS_RZ))
+        val rightX = processStickAxis(event.getAxisValue(MotionEvent.AXIS_Z), rightStickSensitivity)
+        val rightY = processStickAxis(event.getAxisValue(MotionEvent.AXIS_RZ), rightStickSensitivity)
         if (rightX != state.prevRightX || rightY != state.prevRightY) {
             dispatchAnalogStick(
                 padIndex = padIndex,
@@ -380,8 +401,17 @@ object GamepadManager {
         }
     }
 
+    private fun processStickAxis(value: Float, sensitivity: Float): Float {
+        val deadzoned = applyDeadzone(value)
+        return (deadzoned * sensitivity.coerceIn(0.5f, 2f)).coerceIn(-1f, 1f)
+    }
+
     private fun applyDeadzone(value: Float): Float {
-        return if (abs(value) < ANALOG_DEADZONE) 0f else value
+        val deadzone = analogDeadzone.coerceIn(0f, 0.35f)
+        val magnitude = abs(value)
+        if (magnitude <= deadzone) return 0f
+        val normalized = ((magnitude - deadzone) / (1f - deadzone)).coerceIn(0f, 1f)
+        return normalized * sign(value)
     }
 
     private fun normalizePadIndex(padIndex: Int): Int = padIndex.coerceIn(0, MAX_PAD_SLOTS - 1)

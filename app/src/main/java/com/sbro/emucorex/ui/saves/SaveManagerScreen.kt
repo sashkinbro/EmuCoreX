@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -95,7 +96,7 @@ fun SaveManagerScreen(
     var isPreparingEntries by remember(gamePath, gameTitle) { mutableStateOf(true) }
     var isResolvingEntries by remember(gamePath, gameTitle) { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SaveStateEntryInfo?>(null) }
-    var refreshGeneration by remember(gamePath, gameTitle) { mutableStateOf(0) }
+    var refreshGeneration by remember(gamePath, gameTitle) { mutableIntStateOf(0) }
 
     val isFiltered = !gamePath.isNullOrBlank()
     val screenSubtitle = remember(isFiltered, gameTitle, entries) {

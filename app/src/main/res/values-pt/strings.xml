@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">Controle do %1$s: %2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">O controle do %1$s não está conectado. Você ainda pode configurar seu mapeamento.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Pressione um botão para o %1$s para vinculá-lo a %2$s.</string>
+    <string name="settings_help_left_stick_sensitivity">Ajusta a rapidez com que a alavanca de toque esquerda atinge uma entrada de movimento mais forte. Valores mais altos reagem mais rápido, enquanto valores mais baixos facilitam pequenas correções de movimento.</string>
+    <string name="settings_help_right_stick_sensitivity">Ajusta a rapidez com que a alavanca de toque direita atinge uma entrada mais forte. Valores mais altos fazem com que mudanças de câmera ou mira reajam mais rápido, enquanto valores mais baixos oferecem um controle mais preciso.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Ignora pequenos movimentos físicos da alavanca perto do centro. Aumente se o seu controle apresentar desvio sozinho (drift); mantenha mais baixo se quiser uma resposta mais rápida ao redor do centro.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Ajusta a intensidade com que a alavanca física esquerda responde após o processamento da zona morta. Valores mais altos atingem o movimento completo mais rápido, enquanto valores mais baixos facilitam movimentos precisos.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Ajusta a intensidade com que a alavanca física direita responde após o processamento da zona morta. Valores mais altos fazem com que o movimento da câmera ou da mira reaja mais rápido, enquanto valores mais baixos oferecem um controle mais preciso.</string>
+    <string name="settings_left_stick_sensitivity">Sensibilidade do analógico esquerdo</string>
+    <string name="settings_right_stick_sensitivity">Sensibilidade do analógico direito</string>
+    <string name="settings_touch_controls_section">Controles por toque</string>
+    <string name="settings_gamepad_controls_section">Gamepad físico</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Conecte um gamepad para ajustar as configurações dos analógicos físicos.</string>
+    <string name="settings_gamepad_stick_deadzone">Zona morta do analógico</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Sensibilidade do analógico esquerdo</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Sensibilidade do analógico direito</string>
 </resources>

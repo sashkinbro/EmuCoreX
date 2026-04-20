@@ -57,6 +57,11 @@ data class EmulationUiState(
     val rbtnOffset: Pair<Float, Float> = AppPreferences.DEFAULT_RBTN_OFFSET_X to AppPreferences.DEFAULT_RBTN_OFFSET_Y,
     val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
+    val leftStickSensitivity: Int = 100,
+    val rightStickSensitivity: Int = 100,
+    val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
+    val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
     val fps: String = "0.0",
@@ -329,6 +334,21 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.compactControls.collect { enabled ->
                 _uiState.value = _uiState.value.copy(compactControls = enabled)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadStickDeadzone.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadStickDeadzone = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadLeftStickSensitivity.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadLeftStickSensitivity = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadRightStickSensitivity.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = value)
             }
         }
         viewModelScope.launch {
@@ -1107,6 +1127,46 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 controlLayouts = updatedLayouts
             )
             _uiState.value = updatedState
+        }
+    }
+
+    fun setLeftStickSensitivity(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(50, 200)
+            preferences.setLeftStickSensitivity(normalized)
+            _uiState.value = _uiState.value.copy(leftStickSensitivity = normalized)
+        }
+    }
+
+    fun setRightStickSensitivity(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(50, 200)
+            preferences.setRightStickSensitivity(normalized)
+            _uiState.value = _uiState.value.copy(rightStickSensitivity = normalized)
+        }
+    }
+
+    fun setGamepadStickDeadzone(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(0, 35)
+            preferences.setGamepadStickDeadzone(normalized)
+            _uiState.value = _uiState.value.copy(gamepadStickDeadzone = normalized)
+        }
+    }
+
+    fun setGamepadLeftStickSensitivity(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(50, 200)
+            preferences.setGamepadLeftStickSensitivity(normalized)
+            _uiState.value = _uiState.value.copy(gamepadLeftStickSensitivity = normalized)
+        }
+    }
+
+    fun setGamepadRightStickSensitivity(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(50, 200)
+            preferences.setGamepadRightStickSensitivity(normalized)
+            _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = normalized)
         }
     }
 
@@ -1902,6 +1962,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             rbtnOffset = snapshot.rbtnOffset,
             centerOffset = snapshot.centerOffset,
             stickScale = snapshot.stickScale,
+            leftStickSensitivity = snapshot.leftStickSensitivity,
+            rightStickSensitivity = snapshot.rightStickSensitivity,
             stickSurfaceMode = snapshot.stickSurfaceMode,
             controlLayouts = snapshot.controlLayouts
         )
@@ -2626,7 +2688,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
-        NativeApp.setPerformanceOverlayMode(false, false)
+        NativeApp.setPerformanceOverlayMode(visible = false, detailed = false)
         NativeApp.setPerformanceListener(null)
         if (_uiState.value.isRunning) {
             EmulatorBridge.resetKeyStatus()

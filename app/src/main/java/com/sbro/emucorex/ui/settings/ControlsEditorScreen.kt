@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
@@ -41,16 +41,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -65,36 +63,9 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.ui.emulation.EmulationUiState
-import com.sbro.emucorex.ui.common.OverlayActionGapLandscape
-import com.sbro.emucorex.ui.common.OverlayActionGapPortrait
-import com.sbro.emucorex.ui.common.OverlayBottomAnchorPadding
-import com.sbro.emucorex.ui.common.OverlayCenterBaseShiftX
-import com.sbro.emucorex.ui.common.OverlayCenterBottomPadding
-import com.sbro.emucorex.ui.common.OverlayCenterColumnGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterColumnGapPortrait
-import com.sbro.emucorex.ui.common.OverlayCenterInlineGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterInlineGapPortrait
-import com.sbro.emucorex.ui.common.OverlayCenterSelectOpticalNudgeX
-import com.sbro.emucorex.ui.common.OverlayCenterStartOpticalNudgeX
-import com.sbro.emucorex.ui.common.OverlayCenterToggleOpticalNudgeY
-import com.sbro.emucorex.ui.common.OverlayCenterRowGapLandscape
-import com.sbro.emucorex.ui.common.OverlayCenterRowGapPortrait
-import com.sbro.emucorex.ui.common.OverlayClusterGapLandscape
-import com.sbro.emucorex.ui.common.OverlayClusterGapPortrait
-import com.sbro.emucorex.ui.common.OverlayRightShoulderBaseOffset
-import com.sbro.emucorex.ui.common.OverlayRightShoulderGapOffset
-import com.sbro.emucorex.ui.common.OverlayShoulderTopPadding
-import com.sbro.emucorex.ui.common.OverlayShoulderVerticalGap
 import com.sbro.emucorex.ui.common.VectorAnalogStick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
-import com.sbro.emucorex.ui.common.overlayActionOffset
-import com.sbro.emucorex.ui.common.overlayCenterButtonOffset
-import com.sbro.emucorex.ui.common.overlayInlineGroupOffset
-import com.sbro.emucorex.ui.common.overlayCenterSecondRowOffset
-import com.sbro.emucorex.ui.common.overlayClusterStep
-import com.sbro.emucorex.ui.common.overlayDpadOffset
-import com.sbro.emucorex.ui.common.overlayDrawableForControl
-import kotlin.math.roundToInt
+import com.sbro.emucorex.ui.common.buildOverlayCanvasLayout
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -135,13 +106,10 @@ fun ControlsEditorScreen(
             ?: OverlayControlLayout(scale = defaultScale)
     }
 
-    fun moveControlLocally(controlId: String, delta: Pair<Float, Float>) {
+    fun setControlOffsetLocally(controlId: String, offset: Pair<Float, Float>) {
         val current = currentLayoutFor(controlId, if (controlId.contains("stick")) state.stickScale else 100)
         editorControlLayouts = editorControlLayouts.toMutableMap().apply {
-            put(
-                controlId,
-                current.copy(offset = (current.offset.first + delta.first) to (current.offset.second + delta.second))
-            )
+            put(controlId, current.copy(offset = offset))
         }
     }
 
@@ -190,7 +158,7 @@ fun ControlsEditorScreen(
             controlLayouts = editorControlLayouts,
             selectedControlId = selectedControlId,
             onSelectControl = { selectedControlId = it },
-            onMoveControlBy = ::moveControlLocally,
+            onSetControlOffset = ::setControlOffsetLocally,
             onCommitControlPosition = ::persistControlPosition,
             overlayHorizontalSafeInset = overlayHorizontalSafeInset,
             overlayTopSafeInset = overlayTopSafeInset,
@@ -391,39 +359,14 @@ private fun PreviewLayout(
     controlLayouts: Map<String, OverlayControlLayout>,
     selectedControlId: String?,
     onSelectControl: (String) -> Unit,
-    onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
+    onSetControlOffset: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit,
+    modifier: Modifier = Modifier,
     overlayHorizontalSafeInset: Dp? = null,
     overlayTopSafeInset: Dp? = null,
-    overlayBottomSafeInset: Dp? = null,
-    modifier: Modifier = Modifier
+    overlayBottomSafeInset: Dp? = null
 ) {
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val scaleFactor = state.overlayScale / 100f
-    val stickScaleFactor = state.stickScale / 100f
-    val dpadSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val actionSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val analogSize = ((if (isLandscape) 120 else 140) * scaleFactor * stickScaleFactor).dp
-    val shoulderW = ((if (isLandscape) 65 else 72) * scaleFactor).dp
-    val shoulderH = ((if (isLandscape) 32 else 36) * scaleFactor).dp
-    val centerW = ((if (isLandscape) 60 else 68) * scaleFactor).dp
-    val centerH = ((if (isLandscape) 26 else 30) * scaleFactor).dp
-    val wideCenterW = centerW * 1.2f
-    val centerColumnGap = (if (isLandscape) OverlayCenterColumnGapLandscape else OverlayCenterColumnGapPortrait) * scaleFactor
-    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
-    val centerRowGap = (if (isLandscape) OverlayCenterRowGapLandscape else OverlayCenterRowGapPortrait) * scaleFactor
-    val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
-    val actionGap = if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait
-    val dpadStep = overlayClusterStep(dpadSize / 3f, clusterGap)
-    val actionStep = overlayClusterStep(actionSize / 3.1f, actionGap)
-    val actionButtonSize = actionSize / 3.1f
-    val actionClusterExtent = actionStep + actionButtonSize
-    val rightStickBaseX = -(actionClusterExtent + 12.dp)
-
-    val baseEdgePad = if (isLandscape) 28.dp else 12.dp
-    val baseBottomPad = if (isLandscape) 24.dp else 36.dp
     val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
     val safeHorizontalInset = overlayHorizontalSafeInset ?: maxOf(
@@ -438,305 +381,129 @@ private fun PreviewLayout(
     )
     val safeTop = overlayTopSafeInset ?: maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
     val safeBottom = overlayBottomSafeInset ?: maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
-    val edgePadStart = baseEdgePad + safeHorizontalInset
-    val edgePadEnd = baseEdgePad + safeHorizontalInset
-    val edgePadTop = maxOf(OverlayShoulderTopPadding, safeTop + 4.dp)
-    val bottomPad = baseBottomPad + safeBottom
-    fun Float.pxToDp(): Dp = with(density) { this@pxToDp.toDp() }
-
-    fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
-        return controlLayouts[id]
-            ?: AppPreferences.defaultOverlayControlLayouts(defaultScale)[id]
-            ?: OverlayControlLayout(scale = defaultScale)
-    }
-
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = edgePadTop, start = edgePadStart)
-                .offset { IntOffset(state.lbtnOffset.first.roundToInt(), state.lbtnOffset.second.roundToInt()) }
-        ) {
-            PreviewShoulder(
-                id = "l2",
-                layout = layoutFor("l2"),
-                width = shoulderW,
-                height = shoulderH,
-                selected = selectedControlId == "l2",
-                y = 0.dp,
-                onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
-                onCommitControlPosition = onCommitControlPosition
-            )
-            PreviewShoulder(
-                id = "l1",
-                layout = layoutFor("l1"),
-                width = shoulderW,
-                height = shoulderH,
-                selected = selectedControlId == "l1",
-                y = OverlayShoulderVerticalGap,
-                onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
-                onCommitControlPosition = onCommitControlPosition
-            )
+        val layout = buildOverlayCanvasLayout(
+            canvasWidth = maxWidth,
+            canvasHeight = maxHeight,
+            density = density,
+            scaleFactor = state.overlayScale / 100f,
+            stickScaleFactor = state.stickScale / 100f,
+            dpadOffset = state.dpadOffset,
+            lstickOffset = state.lstickOffset,
+            rstickOffset = state.rstickOffset,
+            actionOffset = state.actionOffset,
+            lbtnOffset = state.lbtnOffset,
+            rbtnOffset = state.rbtnOffset,
+            centerOffset = state.centerOffset,
+            controlLayouts = controlLayouts,
+            safeHorizontalInset = safeHorizontalInset,
+            safeTopInset = safeTop,
+            safeBottomInset = safeBottom,
+            previewMode = true
+        )
+
+        val showLeftStick = layout.leftStick?.visible == true
+
+        fun shouldShowButton(id: String): Boolean = when (id) {
+            "dpad_up", "dpad_down", "dpad_left", "dpad_right" -> !showLeftStick
+            else -> true
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = edgePadTop, end = edgePadEnd)
-                .offset { IntOffset(state.rbtnOffset.first.roundToInt(), state.rbtnOffset.second.roundToInt()) }
-        ) {
-            PreviewShoulder(
-                id = "r2",
-                layout = layoutFor("r2"),
-                width = shoulderW,
-                height = shoulderH,
-                selected = selectedControlId == "r2",
-                x = OverlayRightShoulderBaseOffset,
-                y = 0.dp,
-                onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
-                onCommitControlPosition = onCommitControlPosition
-            )
-            PreviewShoulder(
-                id = "r1",
-                layout = layoutFor("r1"),
-                width = shoulderW,
-                height = shoulderH,
-                selected = selectedControlId == "r1",
-                x = OverlayRightShoulderBaseOffset,
-                y = OverlayRightShoulderGapOffset,
-                onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
-                onCommitControlPosition = onCommitControlPosition
-            )
+        fun clampOffset(
+            currentOffset: Pair<Float, Float>,
+            delta: Pair<Float, Float>,
+            baseX: Dp,
+            baseY: Dp,
+            width: Dp,
+            height: Dp
+        ): Pair<Float, Float> {
+            val baseXPx = with(density) { baseX.toPx() }
+            val baseYPx = with(density) { baseY.toPx() }
+            val currentX = baseXPx + currentOffset.first
+            val currentY = baseYPx + currentOffset.second
+            val widthPx = with(density) { width.toPx() }
+            val heightPx = with(density) { height.toPx() }
+            val canvasWidthPx = with(density) { maxWidth.toPx() }
+            val canvasHeightPx = with(density) { maxHeight.toPx() }
+            val nextX = (currentX + delta.first).coerceIn(0f, (canvasWidthPx - widthPx).coerceAtLeast(0f))
+            val nextY = (currentY + delta.second).coerceIn(0f, (canvasHeightPx - heightPx).coerceAtLeast(0f))
+            return (nextX - baseXPx) to (nextY - baseYPx)
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = edgePadStart, bottom = bottomPad)
-        ) {
-            val leftStickLayout = layoutFor("left_stick", state.stickScale)
-            listOf(
-                "dpad_up" to overlayDpadOffset(dpadStep, "up"),
-                "dpad_down" to overlayDpadOffset(dpadStep, "down"),
-                "dpad_left" to overlayDpadOffset(dpadStep, "left"),
-                "dpad_right" to overlayDpadOffset(dpadStep, "right")
-            ).takeIf { !leftStickLayout.visible }?.forEach { (id, baseOffset) ->
-                val layout = layoutFor(id)
-                PreviewButton(
-                    id = id,
-                    layout = layout,
-                    width = dpadSize / 3f,
-                    height = dpadSize / 3f,
-                    shape = RoundedCornerShape(8.dp),
-                    selected = selectedControlId == id,
-                    x = baseOffset.first + state.dpadOffset.first.pxToDp(),
-                    y = baseOffset.second + state.dpadOffset.second.pxToDp(),
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
+        fun moveButton(controlId: String, spec: com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec, delta: Pair<Float, Float>) {
+            val current = controlLayouts[controlId] ?: OverlayControlLayout()
+            onSetControlOffset(
+                controlId,
+                clampOffset(
+                    currentOffset = current.offset,
+                    delta = delta,
+                    baseX = spec.baseX,
+                    baseY = spec.baseY,
+                    width = spec.width,
+                    height = spec.height
                 )
-            }
-
-            val leftStickSize = analogSize * (leftStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
-            val leftStickBase = (dpadSize - leftStickSize) / 2f
-            if (leftStickLayout.visible) {
-                PreviewStick(
-                    id = "left_stick",
-                    layout = leftStickLayout,
-                    selected = selectedControlId == "left_stick",
-                    size = leftStickSize,
-                    surfaceOnly = state.stickSurfaceMode,
-                    x = leftStickBase + state.lstickOffset.first.pxToDp(),
-                    y = leftStickBase + state.lstickOffset.second.pxToDp(),
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
+            )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = edgePadEnd, bottom = bottomPad)
-        ) {
-            listOf(
-                "triangle" to overlayActionOffset(actionStep, "triangle"),
-                "square" to overlayActionOffset(actionStep, "square"),
-                "circle" to overlayActionOffset(actionStep, "circle"),
-                "cross" to overlayActionOffset(actionStep, "cross")
-            ).forEach { (id, baseOffset) ->
-                val layout = layoutFor(id)
-                PreviewButton(
-                    id = id,
-                    layout = layout,
-                    width = actionSize / 3.1f,
-                    height = actionSize / 3.1f,
-                    shape = CircleShape,
-                    selected = selectedControlId == id,
-                    x = baseOffset.first + state.actionOffset.first.pxToDp(),
-                    y = baseOffset.second + state.actionOffset.second.pxToDp(),
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
+        fun moveStick(controlId: String, spec: com.sbro.emucorex.ui.common.OverlayCanvasStickSpec, delta: Pair<Float, Float>) {
+            val current = controlLayouts[controlId] ?: OverlayControlLayout(scale = state.stickScale)
+            onSetControlOffset(
+                controlId,
+                clampOffset(
+                    currentOffset = current.offset,
+                    delta = delta,
+                    baseX = spec.baseX,
+                    baseY = spec.baseY,
+                    width = spec.size,
+                    height = spec.size
                 )
-            }
+            )
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = edgePadEnd, bottom = bottomPad)
-        ) {
-            val rightStick = layoutFor("right_stick", state.stickScale)
-            PreviewStick(
-                id = "right_stick",
-                layout = rightStick,
-                selected = selectedControlId == "right_stick",
-                size = analogSize * (rightStick.scale / (stickScaleFactor * 100f).coerceAtLeast(1f)),
+        layout.allButtons
+            .filter { shouldShowButton(it.id) }
+            .forEach { spec ->
+            val baseZIndex = when (spec.id) {
+                "select", "left_input_toggle", "start", "l3", "r3" -> 3f
+                else -> 1f
+            }
+            PreviewCanvasButton(
+                spec = spec,
+                selected = selectedControlId == spec.id,
+                onSelectControl = onSelectControl,
+                onMoveControlBy = { id, delta -> moveButton(id, spec, delta) },
+                onCommitControlPosition = onCommitControlPosition,
+                baseZIndex = baseZIndex
+            )
+        }
+
+        layout.leftStick
+            ?.takeIf { showLeftStick }
+            ?.let { spec ->
+            PreviewCanvasStick(
+                spec = spec,
+                selected = selectedControlId == spec.id,
                 surfaceOnly = state.stickSurfaceMode,
-                x = rightStickBaseX + state.rstickOffset.first.pxToDp(),
-                y = state.rstickOffset.second.pxToDp(),
                 onSelectControl = onSelectControl,
-                onMoveControlBy = onMoveControlBy,
+                onMoveControlBy = { id, delta -> moveStick(id, spec, delta) },
                 onCommitControlPosition = onCommitControlPosition
             )
         }
 
-            val selectLayout = layoutFor("select")
-            val toggleLayout = layoutFor("left_input_toggle")
-            val startLayout = layoutFor("start")
-            val l3Layout = layoutFor("l3")
-            val r3Layout = layoutFor("r3")
-            val l3Width = centerW * (l3Layout.scale / 100f)
-            val r3Width = centerW * (r3Layout.scale / 100f)
-            val selectWidth = wideCenterW * (selectLayout.scale / 100f)
-            val toggleSize = centerH * (toggleLayout.scale / 100f)
-            val startWidth = wideCenterW * (startLayout.scale / 100f)
-            val visibleCenterItems = buildList {
-                if (l3Layout.visible) add("l3" to l3Width)
-                if (selectLayout.visible) add("select" to selectWidth)
-                if (toggleLayout.visible) add("left_input_toggle" to toggleSize)
-                if (startLayout.visible) add("start" to startWidth)
-                if (r3Layout.visible) add("r3" to r3Width)
-            }
-            val visibleCenterWidths = visibleCenterItems.map { it.second }
-            fun visibleCenterX(id: String): Dp? {
-                val index = visibleCenterItems.indexOfFirst { it.first == id }
-                return if (index >= 0) overlayInlineGroupOffset(visibleCenterWidths, centerInlineGap, index) else null
-            }
-            val visibleCenterBounds = visibleCenterItems.mapNotNull { (id, width) ->
-                visibleCenterX(id)?.let { it to (it + width) }
-            }
-            val visibleCenterLeft = visibleCenterBounds.minOfOrNull { it.first }
-            val visibleCenterRight = visibleCenterBounds.maxOfOrNull { it.second }
-            val fallbackCenterWidths = listOf(l3Width, selectWidth, toggleSize, startWidth, r3Width)
-            val l3X = visibleCenterX("l3") ?: (
-                visibleCenterLeft?.let { it - centerInlineGap - l3Width }
-                    ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 0)
-                )
-            val selectX = (visibleCenterX("select")
-                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 1)) +
-                OverlayCenterSelectOpticalNudgeX
-            val toggleX = visibleCenterX("left_input_toggle")
-                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 2)
-            val startX = (visibleCenterX("start")
-                ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 3)) +
-                OverlayCenterStartOpticalNudgeX
-            val r3X = visibleCenterX("r3") ?: (
-                visibleCenterRight?.let { it + centerInlineGap }
-                    ?: overlayInlineGroupOffset(fallbackCenterWidths, centerInlineGap, index = 4)
-                )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding))
-                .offset {
-                    IntOffset(
-                        OverlayCenterBaseShiftX.roundToPx() + state.centerOffset.first.roundToInt(),
-                        state.centerOffset.second.roundToInt()
-                    )
-                }
-        ) {
-            layoutFor("select").let { layout ->
-                PreviewCenter(
-                    id = "select",
-                    layout = layout,
-                    width = selectWidth,
-                    height = centerH,
-                    x = selectX,
-                    selected = selectedControlId == "select",
-                    y = 0.dp,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
-            layoutFor("left_input_toggle").let { layout ->
-                PreviewCenter(
-                    id = "left_input_toggle",
-                    layout = layout,
-                    width = toggleSize,
-                    height = centerH,
-                    x = toggleX,
-                    selected = selectedControlId == "left_input_toggle",
-                    y = OverlayCenterToggleOpticalNudgeY,
-                    isToggle = true,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
-            layoutFor("start").let { layout ->
-                PreviewCenter(
-                    id = "start",
-                    layout = layout,
-                    width = startWidth,
-                    height = centerH,
-                    x = startX,
-                    selected = selectedControlId == "start",
-                    y = 0.dp,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
-            layoutFor("l3").let { layout ->
-                PreviewCenter(
-                    id = "l3",
-                    layout = layout,
-                    width = l3Width,
-                    height = centerH,
-                    x = l3X,
-                    selected = selectedControlId == "l3",
-                    y = 0.dp,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
-            layoutFor("r3").let { layout ->
-                PreviewCenter(
-                    id = "r3",
-                    layout = layout,
-                    width = r3Width,
-                    height = centerH,
-                    x = r3X,
-                    selected = selectedControlId == "r3",
-                    y = 0.dp,
-                    onSelectControl = onSelectControl,
-                    onMoveControlBy = onMoveControlBy,
-                    onCommitControlPosition = onCommitControlPosition
-                )
-            }
+        layout.rightStick
+            ?.let { spec ->
+            PreviewCanvasStick(
+                spec = spec,
+                selected = selectedControlId == spec.id,
+                surfaceOnly = state.stickSurfaceMode,
+                onSelectControl = onSelectControl,
+                onMoveControlBy = { id, delta -> moveStick(id, spec, delta) },
+                onCommitControlPosition = onCommitControlPosition
+            )
         }
     }
 }
@@ -749,27 +516,31 @@ private fun DraggableControl(
     onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit,
     modifier: Modifier = Modifier,
+    baseZIndex: Float = 0f,
     content: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val currentOnSelectControl by rememberUpdatedState(onSelectControl)
+    val currentOnMoveControlBy by rememberUpdatedState(onMoveControlBy)
+    val currentOnCommitControlPosition by rememberUpdatedState(onCommitControlPosition)
     Box(
         modifier = modifier
-            .zIndex(if (selected) 1f else 0f)
+            .zIndex(baseZIndex + if (selected) 10f else 0f)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
             ) {
-                onSelectControl(id)
+                currentOnSelectControl(id)
             }
             .pointerInput(id) {
                 detectDragGestures(
-                    onDragStart = { onSelectControl(id) },
-                    onDragEnd = { onCommitControlPosition(id) },
-                    onDragCancel = { onCommitControlPosition(id) }
+                    onDragStart = { currentOnSelectControl(id) },
+                    onDragEnd = { currentOnCommitControlPosition(id) },
+                    onDragCancel = { currentOnCommitControlPosition(id) }
                 ) { change, dragAmount ->
                     change.consume()
-                    onSelectControl(id)
-                    onMoveControlBy(id, dragAmount.x to dragAmount.y)
+                    currentOnSelectControl(id)
+                    currentOnMoveControlBy(id, dragAmount.x to dragAmount.y)
                 }
             }
     ) {
@@ -778,38 +549,34 @@ private fun DraggableControl(
 }
 
 @Composable
-private fun PreviewShoulder(
-    id: String,
-    layout: OverlayControlLayout,
-    width: Dp,
-    height: Dp,
+private fun PreviewCanvasButton(
+    spec: com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec,
     selected: Boolean,
-    x: Dp = 0.dp,
-    y: Dp = 0.dp,
     onSelectControl: (String) -> Unit,
     onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
-    onCommitControlPosition: (String) -> Unit
+    onCommitControlPosition: (String) -> Unit,
+    baseZIndex: Float = 0f
 ) {
     DraggableControl(
-        id = id,
+        id = spec.id,
         selected = selected,
         onSelectControl = onSelectControl,
         onMoveControlBy = onMoveControlBy,
         onCommitControlPosition = onCommitControlPosition,
+        baseZIndex = baseZIndex,
         modifier = Modifier.offset {
             IntOffset(
-                x.roundToPx() + layout.offset.first.roundToInt(),
-                y.roundToPx() + layout.offset.second.roundToInt()
+                spec.x.roundToPx(),
+                spec.y.roundToPx()
             )
         }
     ) {
         VectorOverlayButton(
-            drawableRes = requireNotNull(overlayDrawableForControl(id)),
-            width = width * (layout.scale / 100f),
-            height = height * (layout.scale / 100f),
-            shape = RoundedCornerShape(10.dp),
-            contentScale = ContentScale.FillBounds,
-            alpha = if (layout.visible) 1f else 0.38f,
+            drawableRes = spec.drawableRes,
+            width = spec.width,
+            height = spec.height,
+            shape = spec.shape,
+            alpha = if (spec.visible) 1f else 0.38f,
             selected = selected,
             interactive = false
         )
@@ -817,116 +584,33 @@ private fun PreviewShoulder(
 }
 
 @Composable
-private fun PreviewButton(
-    id: String,
-    layout: OverlayControlLayout,
-    width: Dp,
-    height: Dp,
-    shape: Shape,
+private fun PreviewCanvasStick(
+    spec: com.sbro.emucorex.ui.common.OverlayCanvasStickSpec,
     selected: Boolean,
-    x: Dp,
-    y: Dp,
-    onSelectControl: (String) -> Unit,
-    onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
-    onCommitControlPosition: (String) -> Unit
-) {
-    DraggableControl(
-        id = id,
-        selected = selected,
-        onSelectControl = onSelectControl,
-        onMoveControlBy = onMoveControlBy,
-        onCommitControlPosition = onCommitControlPosition,
-        modifier = Modifier.offset {
-            IntOffset(
-                x.roundToPx() + layout.offset.first.roundToInt(),
-                y.roundToPx() + layout.offset.second.roundToInt()
-            )
-        }
-    ) {
-        VectorOverlayButton(
-            drawableRes = requireNotNull(overlayDrawableForControl(id)),
-            width = width * (layout.scale / 100f),
-            height = height * (layout.scale / 100f),
-            shape = shape,
-            alpha = if (layout.visible) 1f else 0.38f,
-            selected = selected,
-            interactive = false
-        )
-    }
-}
-
-@Composable
-private fun PreviewStick(
-    id: String,
-    layout: OverlayControlLayout,
-    selected: Boolean,
-    size: Dp,
     surfaceOnly: Boolean = false,
-    x: Dp,
-    y: Dp,
     onSelectControl: (String) -> Unit,
     onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit
 ) {
     DraggableControl(
-        id = id,
+        id = spec.id,
         selected = selected,
         onSelectControl = onSelectControl,
         onMoveControlBy = onMoveControlBy,
         onCommitControlPosition = onCommitControlPosition,
         modifier = Modifier.offset {
             IntOffset(
-                x.roundToPx() + layout.offset.first.roundToInt(),
-                y.roundToPx() + layout.offset.second.roundToInt()
+                spec.x.roundToPx(),
+                spec.y.roundToPx()
             )
-        }
+        },
+        baseZIndex = 2f
     ) {
         VectorAnalogStick(
-            analogSize = size,
-            alpha = if (layout.visible) 1f else 0.38f,
+            analogSize = spec.size,
+            alpha = if (spec.visible) 1f else 0.38f,
             selected = selected,
             surfaceOnly = surfaceOnly,
-            interactive = false
-        )
-    }
-}
-
-@Composable
-private fun PreviewCenter(
-    id: String,
-    layout: OverlayControlLayout,
-    width: Dp,
-    height: Dp,
-    x: Dp,
-    selected: Boolean,
-    y: Dp,
-    isToggle: Boolean = false,
-    onSelectControl: (String) -> Unit,
-    onMoveControlBy: (String, Pair<Float, Float>) -> Unit,
-    onCommitControlPosition: (String) -> Unit
-) {
-    val scaledWidth = width * (layout.scale / 100f)
-    val scaledHeight = height * (layout.scale / 100f)
-    DraggableControl(
-        id = id,
-        selected = selected,
-        onSelectControl = onSelectControl,
-        onMoveControlBy = onMoveControlBy,
-        onCommitControlPosition = onCommitControlPosition,
-        modifier = Modifier.offset {
-            IntOffset(
-                x.roundToPx() + layout.offset.first.roundToInt(),
-                y.roundToPx() + layout.offset.second.roundToInt()
-            )
-        }
-    ) {
-        VectorOverlayButton(
-            drawableRes = requireNotNull(overlayDrawableForControl(id)),
-            width = scaledWidth,
-            height = scaledHeight,
-            shape = if (isToggle) CircleShape else RoundedCornerShape(8.dp),
-            alpha = if (layout.visible) 1f else 0.38f,
-            selected = selected,
             interactive = false
         )
     }

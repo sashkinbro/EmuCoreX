@@ -97,9 +97,14 @@ data class SettingsUiState(
     val overlayScale: Int = 100,
     val overlayOpacity: Int = 80,
     val overlayShow: Boolean = true,
+    val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
+    val rightStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
     // Gamepad
     val enableAutoGamepad: Boolean = true,
     val hideOverlayOnGamepad: Boolean = true,
+    val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
+    val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadBindings: Map<String, Int> = emptyMap(),
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
@@ -201,8 +206,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             overlayScale = snapshot.overlayScale,
             overlayOpacity = snapshot.overlayOpacity,
             overlayShow = snapshot.overlayShow,
+            leftStickSensitivity = snapshot.leftStickSensitivity,
+            rightStickSensitivity = snapshot.rightStickSensitivity,
             enableAutoGamepad = snapshot.enableAutoGamepad,
             hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
+            gamepadStickDeadzone = snapshot.gamepadStickDeadzone,
+            gamepadLeftStickSensitivity = snapshot.gamepadLeftStickSensitivity,
+            gamepadRightStickSensitivity = snapshot.gamepadRightStickSensitivity,
             gamepadBindings = snapshot.gamepadBindings,
             gamepadBindingsByPad = snapshot.gamepadBindingsByPad,
             gpuDriverType = snapshot.gpuDriverType,
@@ -273,18 +283,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setGamepadBinding(actionId: String, keyCode: Int) {
-        setGamepadBinding(0, actionId, keyCode)
-    }
-
     fun setGamepadBinding(padIndex: Int, actionId: String, keyCode: Int) {
         viewModelScope.launch {
             preferences.setGamepadBinding(padIndex, actionId, keyCode)
         }
-    }
-
-    fun clearGamepadBinding(actionId: String) {
-        clearGamepadBinding(0, actionId)
     }
 
     fun clearGamepadBinding(padIndex: Int, actionId: String) {
@@ -293,19 +295,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun resetGamepadBindings() {
-        resetGamepadBindingsForPad(0)
-    }
-
     fun resetGamepadBindingsForPad(padIndex: Int) {
         viewModelScope.launch {
             preferences.resetGamepadBindingsForPad(padIndex)
-        }
-    }
-
-    fun resetAllGamepadBindings() {
-        viewModelScope.launch {
-            preferences.resetAllGamepadBindings()
         }
     }
 
@@ -778,10 +770,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // Overlay
     fun setOverlayScale(value: Int) { viewModelScope.launch { preferences.setOverlayScale(value) } }
     fun setOverlayOpacity(value: Int) { viewModelScope.launch { preferences.setOverlayOpacity(value) } }
+    fun setLeftStickSensitivity(value: Int) { viewModelScope.launch { preferences.setLeftStickSensitivity(value) } }
+    fun setRightStickSensitivity(value: Int) { viewModelScope.launch { preferences.setRightStickSensitivity(value) } }
 
     // Gamepad
     fun setEnableAutoGamepad(enabled: Boolean) { viewModelScope.launch { preferences.setEnableAutoGamepad(enabled) } }
     fun setHideOverlayOnGamepad(enabled: Boolean) { viewModelScope.launch { preferences.setHideOverlayOnGamepad(enabled) } }
+    fun setGamepadStickDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadStickDeadzone(value) } }
+    fun setGamepadLeftStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickSensitivity(value) } }
+    fun setGamepadRightStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickSensitivity(value) } }
 
     fun setBiosPath(uri: Uri) {
         val application = getApplication<Application>()

@@ -379,12 +379,6 @@ private fun SideNavigation(
             it()
         }
     }
-    val navigateControlsEditor = onNavigateControlsEditor?.let {
-        rememberDebouncedClick {
-            onCloseDrawer()
-            it()
-        }
-    }
     val navigateDataTransfer = onNavigateDataTransfer?.let {
         rememberDebouncedClick {
             onCloseDrawer()
@@ -559,13 +553,6 @@ private fun SideNavigation(
                         icon = Icons.Rounded.Tune,
                         label = stringResource(R.string.shell_game_settings_manager),
                         onClick = navigateGameSettingsManager
-                    )
-                }
-                if (navigateControlsEditor != null) {
-                    ShellAction(
-                        icon = Icons.Rounded.SettingsSuggest,
-                        label = stringResource(R.string.settings_edit_controls),
-                        onClick = navigateControlsEditor
                     )
                 }
                 if (resetAllSettings != null) {

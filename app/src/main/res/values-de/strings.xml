@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">%1$s-Controller: %2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">%1$s-Controller ist nicht verbunden. Du kannst die Belegung aber trotzdem konfigurieren.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Drücke eine Taste für %1$s, um sie %2$s zuzuweisen.</string>
+    <string name="settings_help_left_stick_sensitivity">Passt an, wie schnell der linke Touch-Stick eine stärkere Bewegungseingabe erreicht. Höhere Werte reagieren schneller, während niedrigere Werte kleine Bewegungskorrekturen erleichtern.</string>
+    <string name="settings_help_right_stick_sensitivity">Passt an, wie schnell der rechte Touch-Stick eine stärkere Eingabe erreicht. Höhere Werte lassen Kamera- oder Zieländerungen schneller reagieren, während niedrigere Werte eine feinere Kontrolle ermöglichen.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Ignoriert kleine physische Stick-Bewegungen nahe der Mitte. Erhöhe den Wert, wenn dein Controller von alleine driftet; halte ihn niedriger, wenn du eine schnellere Reaktion um die Mitte herum wünschst.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Passt an, wie stark der physische linke Stick nach der Deadzone-Verarbeitung reagiert. Höhere Werte erreichen die volle Bewegung schneller, während niedrigere Werte feine Bewegungen erleichtern.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Passt an, wie stark der physische rechte Stick nach der Deadzone-Verarbeitung reagiert. Höhere Werte lassen Kamera- oder Zielbewegungen schneller reagieren, während niedrigere Werte eine feinere Kontrolle ermöglichen.</string>
+    <string name="settings_left_stick_sensitivity">Empfindlichkeit des linken Sticks</string>
+    <string name="settings_right_stick_sensitivity">Empfindlichkeit des rechten Sticks</string>
+    <string name="settings_touch_controls_section">Touch-Steuerung</string>
+    <string name="settings_gamepad_controls_section">Physisches Gamepad</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Verbinde ein Gamepad, um die Einstellungen für physische Sticks anzupassen.</string>
+    <string name="settings_gamepad_stick_deadzone">Stick-Deadzone</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Empfindlichkeit des linken Sticks</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Empfindlichkeit des rechten Sticks</string>
 </resources>

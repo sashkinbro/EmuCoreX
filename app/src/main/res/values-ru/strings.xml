@@ -916,4 +916,17 @@
     <string name="settings_gamepad_mapping_player_connected">Контроллер %1$s: %2$s</string>
     <string name="settings_gamepad_mapping_player_disconnected">Контроллер %1$s не подключен. Вы всё равно можете настроить его привязку.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Нажмите кнопку для %1$s, чтобы привязать её к %2$s.</string>
+    <string name="settings_help_left_stick_sensitivity">Регулирует, как быстро левый сенсорный стик достигает более сильного ввода движения. Более высокие значения заставляют его реагировать быстрее, а более низкие — облегчают мелкие корректировки движения.</string>
+    <string name="settings_help_right_stick_sensitivity">Регулирует, как быстро правый сенсорный стик достигает более сильного ввода. Более высокие значения ускоряют реакцию камеры или прицеливания, а более низкие — дают вам более точный контроль.</string>
+    <string name="settings_help_gamepad_stick_deadzone">Игнорирует небольшие физические движения стика около центра. Увеличьте значение, если ваш контроллер дрейфует сам по себе; сделайте его ниже, если хотите более быстрого отклика около центра.</string>
+    <string name="settings_help_gamepad_left_stick_sensitivity">Регулирует силу реакции физического левого стика после обработки мертвой зоны. Более высокие значения быстрее достигают полного движения, а более низкие — облегчают точные движения.</string>
+    <string name="settings_help_gamepad_right_stick_sensitivity">Регулирует силу реакции физического правого стика после обработки мертвой зоны. Более высокие значения ускоряют реакцию камеры или прицеливания, а более низкие — дают вам более точный контроль.</string>
+    <string name="settings_left_stick_sensitivity">Чувствительность левого стика</string>
+    <string name="settings_right_stick_sensitivity">Чувствительность правого стика</string>
+    <string name="settings_touch_controls_section">Сенсорное управление</string>
+    <string name="settings_gamepad_controls_section">Физический геймпад</string>
+    <string name="settings_gamepad_controls_disconnected_hint">Подключите геймпад, чтобы настроить параметры физических стиков.</string>
+    <string name="settings_gamepad_stick_deadzone">Мертвая зона стика</string>
+    <string name="settings_gamepad_left_stick_sensitivity">Чувствительность левого стика</string>
+    <string name="settings_gamepad_right_stick_sensitivity">Чувствительность правого стика</string>
 </resources>
