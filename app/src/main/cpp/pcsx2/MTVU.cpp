@@ -6,7 +6,6 @@
 #include "MTVU.h"
 #include "VMManager.h"
 #include "Vif_Dynarec.h"
-#include "common/FPControl.h"
 
 #include <thread>
 
@@ -128,7 +127,6 @@ void VU_Thread::Reset()
 void VU_Thread::ExecuteRingBuffer()
 {
 	Threading::SetNameOfCurrentThread("MTVU");
-	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 
 	for (;;)
 	{
@@ -143,7 +141,6 @@ void VU_Thread::ExecuteRingBuffer()
 			{
 				case MTVU_VU_EXECUTE:
 				{
-					FPControlRegister::SetCurrent(EmuConfig.Cpu.VU1FPCR);
 					VU1.cycle = 0;
 					s32 addr = Read();
 					vifRegs.top = Read();
@@ -188,7 +185,6 @@ void VU_Thread::ExecuteRingBuffer()
 					break;
 				case MTVU_VIF_UNPACK:
 				{
-					FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 					u32 vif_copy_size = static_cast<u32>((uptr)&vif.StructEnd - (uptr)&vif.tag);
 					Read(&vif.tag, vif_copy_size);
 					ReadRegs(&vifRegs);

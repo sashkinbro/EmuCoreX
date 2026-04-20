@@ -1114,6 +1114,14 @@ void armSHUFPS(const a64::VRegister& dstreg, const a64::VRegister& srcreg, int p
 void armPSHUFD(const a64::VRegister& dstreg, const a64::VRegister& srcreg, int pIndex)
 {
     armAsm->Mov(RQSCRATCH3, armLoadPtrV(PTR_RUNTIME(shuffle.data[pIndex][0])).Q());
+    if (dstreg.Is(srcreg))
+    {
+        const a64::VRegister& src_copy = dstreg.Is(RQSCRATCH) ? RQSCRATCH2 : RQSCRATCH;
+        armAsm->Mov(src_copy, srcreg);
+        armAsm->Tbl(dstreg.V16B(), src_copy.V16B(), RQSCRATCH3.V16B());
+        return;
+    }
+
     armAsm->Tbl(dstreg.V16B(), srcreg.V16B(), RQSCRATCH3.V16B());
 }
 

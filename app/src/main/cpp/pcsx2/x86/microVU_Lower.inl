@@ -481,18 +481,24 @@ mVUop(mVU_ERCPR)
 	pass2
 	{
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& t1 = mVU.regAlloc->allocReg();
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        a64::Label end;
+        armAsm->Fcmp(Fs.S(), 0.0);
+        armAsm->B(&end, a64::Condition::eq);
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
-		SSE_DIVSS(mVU, Fs, xmmPQ);
+        armAsm->Ldr(t1.S(), PTR_RUNTIME(mVUglob.one));
+		SSE_DIVSS(mVU, t1, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        armAsm->Mov(xmmPQ.S(), 0, t1.S(), 0);
+        armBind(&end);
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
+		mVU.regAlloc->clearNeeded(t1);
 		mVU.profiler.EmitOp(opERCPR);
 	}
 	pass3 { mVUlog("ERCPR P"); }
@@ -515,14 +521,25 @@ mVUop(mVU_ERLENG)
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU_sumXYZ(mVU, RQSCRATCH, Fs);
-//		xSQRT.SS       (xmmPQ, xmmPQ);
-        armAsm->Fsqrt(RQSCRATCH.S(), RQSCRATCH.S());
         armAsm->Mov(xmmPQ.S(), 0, RQSCRATCH.S(), 0);
+        a64::Label end;
+        a64::Label calc;
+        a64::Label skip_div;
+        armAsm->Fcmp(RQSCRATCH.S(), 0.0);
+        armAsm->B(&calc, a64::Condition::ge);
+        armAsm->B(&end);
+        armBind(&calc);
+//		xSQRT.SS       (xmmPQ, xmmPQ);
+        armAsm->Fsqrt(xmmPQ.S(), RQSCRATCH.S());
+        armAsm->Fcmp(xmmPQ.S(), 0.0);
+        armAsm->B(&skip_div, a64::Condition::eq);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
+        armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        armBind(&skip_div);
+        armBind(&end);
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
@@ -548,11 +565,15 @@ mVUop(mVU_ERSADD)
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU_sumXYZ(mVU, xmmPQ, Fs);
+        a64::Label end;
+        armAsm->Fcmp(xmmPQ.S(), 0.0);
+        armAsm->B(&end, a64::Condition::eq);
 //		xMOVSSZX       (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
+        armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS (mVU, Fs, xmmPQ);
 //		xMOVSS         (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        armBind(&end);
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
@@ -577,15 +598,25 @@ mVUop(mVU_ERSQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xAND.PS       (Fs, ptr128[mVUglob.absclip]);
-    armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
+        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        a64::Label end;
+        a64::Label calc;
+        a64::Label skip_div;
+        armAsm->Fcmp(Fs.S(), 0.0);
+        armAsm->B(&calc, a64::Condition::ge);
+        armAsm->B(&end);
+        armBind(&calc);
 //		xSQRT.SS      (xmmPQ, Fs);
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
+        armAsm->Fcmp(xmmPQ.S(), 0.0);
+        armAsm->B(&skip_div, a64::Condition::eq);
 //		xMOVSSZX      (Fs, ptr32[mVUglob.one]);
-    armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
+        armAsm->Ldr(Fs.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, Fs, xmmPQ);
 //		xMOVSS        (xmmPQ, Fs);
         armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        armBind(&skip_div);
+        armBind(&end);
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
@@ -693,10 +724,16 @@ mVUop(mVU_ESQRT)
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xAND.PS (Fs, ptr128[mVUglob.absclip]);
-    armAsm->And(Fs.V16B(), Fs.V16B(), armLoadPtrV(PTR_RUNTIME(mVUglob.absclip)).V16B());
+        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
+        a64::Label calc;
+        a64::Label end;
+        armAsm->Fcmp(Fs.S(), 0.0);
+        armAsm->B(&calc, a64::Condition::ge);
+        armAsm->B(&end);
 //		xSQRT.SS(xmmPQ, Fs);
+        armBind(&calc);
         armAsm->Fsqrt(xmmPQ.S(), Fs.S());
+        armBind(&end);
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
