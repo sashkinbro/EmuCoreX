@@ -38,6 +38,7 @@ void setupMacroOp(int mode, const char* opName)
 	if (mode & 0x01) // Q-Reg will be Read
 	{
 //		xMOVSSZX(xmmPQ, ptr32[&vu0Regs.VI[REG_Q].UL]);
+        armAsm->Eor(xmmPQ.V16B(), xmmPQ.V16B(), xmmPQ.V16B());
         armAsm->Ldr(xmmPQ.S(), PTR_CPU(vuRegs[0].VI[REG_Q].UL));
 	}
 	if (mode & 0x08 && (!CHECK_VU_FLAGHACK || g_pCurInstInfo->info & EEINST_COP2_CLIP_FLAG)) // Clip Instruction
@@ -598,6 +599,7 @@ static void recCTC2()
 //			mVUallocSFLAGd(&vu0Regs.VI[REG_STATUS_FLAG].UL);
             mVUallocSFLAGd(PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL));
 //			xMOVDZX(xRegisterSSE(xmmtemp), eax); // TODO(Stenzek): This can be a broadcast.
+            armAsm->Eor(regQ.V16B(), regQ.V16B(), regQ.V16B());
             armAsm->Fmov(regQ.S(), EAX);
 //			xSHUF.PS(xRegisterSSE(xmmtemp), xRegisterSSE(xmmtemp), 0);
             armSHUFPS(regQ, regQ, 0);
@@ -773,10 +775,12 @@ static void recCTC2()
 							const int gprreg = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_READ);
 							if (gprreg >= 0) {
 //                                xMOVDZX(xRegisterSSE(xmmreg), xRegister32(gprreg));
+                                armAsm->Eor(regQ.V16B(), regQ.V16B(), regQ.V16B());
                                 armAsm->Fmov(regQ.S(), a64::Register(gprreg, a64::kWRegSize));
                             }
 							else {
 //                                xMOVSSZX(xRegisterSSE(xmmreg), ptr32[&cpuRegs.GPR.r[_Rt_].SD[0]]);
+                                armAsm->Eor(regQ.V16B(), regQ.V16B(), regQ.V16B());
                                 armLoad(regQ.S(), PTR_CPU(cpuRegs.GPR.r[_Rt_].SD[0]));
                             }
 //							xSHUF.PS(xRegisterSSE(xmmreg), xRegisterSSE(xmmreg), 0);

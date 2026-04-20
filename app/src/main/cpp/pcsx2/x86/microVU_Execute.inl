@@ -54,6 +54,7 @@ void mVUdispatcherAB(mV)
 //		xMOVAPS (xmmPQ, ptr128[&mVU.regs().VI[REG_Q].UL]);
         armAsm->Ldr(xmmPQ, PTR_CPU(vuRegs[mVU.index].VI[REG_Q].UL));
 //		xMOVDZX (xmmT2, ptr32[&mVU.regs().pending_q]);
+        armAsm->Eor(xmmT2.V16B(), xmmT2.V16B(), xmmT2.V16B());
         armAsm->Ldr(xmmT2.S(), PTR_CPU(vuRegs[mVU.index].pending_q));
 //		xSHUF.PS(xmmPQ, xmmT1, 0); // wzyx = PPQQ
         armSHUFPS(xmmPQ, xmmT1, 0);
@@ -69,6 +70,7 @@ void mVUdispatcherAB(mV)
         {
             //Load in other P instance
 //			xMOVDZX(xmmT2, ptr32[&mVU.regs().pending_p]);
+            armAsm->Eor(xmmT2.V16B(), xmmT2.V16B(), xmmT2.V16B());
             armAsm->Ldr(xmmT2.S(), PTR_CPU(vuRegs[mVU.index].pending_p));
 //			xPSHUF.D(xmmPQ, xmmPQ, 0x1B);
             armPSHUFD(xmmPQ, xmmPQ, 0x1B);

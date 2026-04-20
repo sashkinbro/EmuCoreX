@@ -843,6 +843,7 @@ int _allocVFtoXMMreg(int vfreg, int mode)
 	{
 		if (vfreg == 33) {
 //            xMOVSSZX(xRegisterSSE(xmmreg), ptr[&VU0.VI[REG_I].F]);
+            armAsm->Eor(a64::QRegister(xmmreg).V16B(), a64::QRegister(xmmreg).V16B(), a64::QRegister(xmmreg).V16B());
             armAsm->Ldr(a64::QRegister(xmmreg).S(), PTR_CPU(vuRegs[0].VI[REG_I].F));
         }
 		else if (vfreg == 32) {

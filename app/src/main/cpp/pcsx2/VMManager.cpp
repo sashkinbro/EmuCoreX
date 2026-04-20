@@ -682,6 +682,16 @@ void VMManager::ReloadInputBindings(bool force)
 
 void VMManager::LoadCoreSettings(SettingsInterface& si)
 {
+	enum class InvestigationCpuOverride
+	{
+		None,
+		ForceVU1Interpreter,
+		ForceVU0Interpreter,
+		ForceVU0VU1Interpreter,
+		ForceEEInterpreter,
+	};
+	static constexpr InvestigationCpuOverride investigation_cpu_override = InvestigationCpuOverride::None;
+
 	SettingsLoadWrapper slw(si);
 	EmuConfig.LoadSave(slw);
 	Patch::ApplyPatchSettingOverrides();
@@ -696,6 +706,36 @@ void VMManager::LoadCoreSettings(SettingsInterface& si)
 	// Force MTVU off when playing back GS dumps, it doesn't get used.
 	if (GSDumpReplayer::IsReplayingDump())
 		EmuConfig.Speedhacks.vuThread = false;
+
+	// Temporary investigation override for binary-searching corruption sources.
+	switch (investigation_cpu_override)
+	{
+		case InvestigationCpuOverride::None:
+			break;
+
+		case InvestigationCpuOverride::ForceVU1Interpreter:
+			EmuConfig.Cpu.Recompiler.EnableVU1 = false;
+			EmuConfig.Speedhacks.vuThread = false;
+			Console.WriteLn("(VMManager) Investigation override active: forcing VU1 interpreter (EnableVU1=false, MTVU=false)");
+			break;
+
+		case InvestigationCpuOverride::ForceVU0Interpreter:
+			EmuConfig.Cpu.Recompiler.EnableVU0 = false;
+			Console.WriteLn("(VMManager) Investigation override active: forcing VU0 interpreter (EnableVU0=false)");
+			break;
+
+		case InvestigationCpuOverride::ForceVU0VU1Interpreter:
+			EmuConfig.Cpu.Recompiler.EnableVU0 = false;
+			EmuConfig.Cpu.Recompiler.EnableVU1 = false;
+			EmuConfig.Speedhacks.vuThread = false;
+			Console.WriteLn("(VMManager) Investigation override active: forcing VU0+VU1 interpreters (EnableVU0=false, EnableVU1=false, MTVU=false)");
+			break;
+
+		case InvestigationCpuOverride::ForceEEInterpreter:
+			EmuConfig.Cpu.Recompiler.EnableEE = false;
+			Console.WriteLn("(VMManager) Investigation override active: forcing EE interpreter (EnableEE=false)");
+			break;
+	}
 }
 
 void VMManager::LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock)

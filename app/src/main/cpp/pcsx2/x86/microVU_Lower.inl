@@ -1317,6 +1317,7 @@ mVUop(mVU_MFIR)
             armAsm->Sxth(regS, regS);
 			// TODO: Broadcast instead
 //			xMOVDZX(Ft, regS);
+            armAsm->Eor(Ft.V16B(), Ft.V16B(), Ft.V16B());
             armAsm->Fmov(Ft.S(), regS);
 			if (!_XYZW_SS)
 				mVUunpack_xyzw(Ft, Ft, 0);

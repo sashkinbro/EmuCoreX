@@ -30,23 +30,27 @@ void mVUloadReg(const xmm& reg, const a64::MemOperand& ptr, int xyzw)
     {
         case 8: {
 //            xMOVSSZX(reg, ptr32[ptr]);
+            armAsm->Eor(reg.V16B(), reg.V16B(), reg.V16B());
             armAsm->Ldr(reg.S(), ptr);
             break; // X
         }
         case 4: {
 //            xMOVSSZX(reg, ptr32[ptr + 4]);
+            armAsm->Eor(reg.V16B(), reg.V16B(), reg.V16B());
             armGetMemOperandInRegister(RXVIXLSCRATCH, ptr, 4);
             armAsm->Ldr(reg.S(), a64::MemOperand(RXVIXLSCRATCH));
             break; // Y
         }
         case 2: {
 //            xMOVSSZX(reg, ptr32[ptr + 8]);
+            armAsm->Eor(reg.V16B(), reg.V16B(), reg.V16B());
             armGetMemOperandInRegister(RXVIXLSCRATCH, ptr, 8);
             armAsm->Ldr(reg.S(), a64::MemOperand(RXVIXLSCRATCH));
             break; // Z
         }
         case 1: {
 //            xMOVSSZX(reg, ptr32[ptr + 12]);
+            armAsm->Eor(reg.V16B(), reg.V16B(), reg.V16B());
             armGetMemOperandInRegister(RXVIXLSCRATCH, ptr, 12);
             armAsm->Ldr(reg.S(), a64::MemOperand(RXVIXLSCRATCH));
             break; // W
@@ -62,6 +66,7 @@ void mVUloadReg(const xmm& reg, const a64::MemOperand& ptr, int xyzw)
 void mVUloadIreg(const xmm& reg, int xyzw, VURegs* vuRegs)
 {
 //	xMOVSSZX(reg, ptr32[&vuRegs->VI[REG_I].UL]);
+    armAsm->Eor(reg.V16B(), reg.V16B(), reg.V16B());
     if (vuRegs == &::vuRegs[1])
     {
         armAsm->Ldr(reg.S(), PTR_CPU(vuRegs[1].VI[REG_I].UL));
