@@ -33,6 +33,183 @@ static __fi void testNeg(mV, const xmm& xmmReg, const x32& gprTemp)
     armBind(&skip);
 }
 
+static __fi float mVU_EFU_VuFloat(u32 bits)
+{
+#ifndef INT_VUDOUBLEHACK
+	switch (bits & 0x7f800000)
+	{
+		case 0x0:
+			bits &= 0x80000000;
+			return std::bit_cast<float>(bits);
+		case 0x7f800000:
+			if (CHECK_VU_OVERFLOW(0))
+			{
+				const u32 clamped = (bits & 0x80000000) | 0x7f7fffff;
+				return std::bit_cast<float>(clamped);
+			}
+			break;
+	}
+#endif
+	return std::bit_cast<float>(bits);
+}
+
+static __fi u32 mVU_EFU_ToBits(float value)
+{
+	return std::bit_cast<u32>(value);
+}
+
+static __fi float mVU_EFU_SumXYZ(u32 x, u32 y, u32 z)
+{
+	return (mVU_EFU_VuFloat(x) * mVU_EFU_VuFloat(x)) +
+		(mVU_EFU_VuFloat(y) * mVU_EFU_VuFloat(y)) +
+		(mVU_EFU_VuFloat(z) * mVU_EFU_VuFloat(z));
+}
+
+static __fi float mVU_EFU_CalculateEATAN(float input_value)
+{
+	static constexpr float eatan_consts[9] = {
+		0.999999344348907f, -0.333298563957214f, 0.199465364217758f, -0.13085337519646f,
+		0.096420042216778f, -0.055909886956215f, 0.021861229091883f, -0.004054057877511f,
+		0.785398185253143f,
+	};
+
+	float result = (eatan_consts[0] * input_value) + (eatan_consts[1] * std::pow(input_value, 3)) +
+		(eatan_consts[2] * std::pow(input_value, 5)) + (eatan_consts[3] * std::pow(input_value, 7)) +
+		(eatan_consts[4] * std::pow(input_value, 9)) + (eatan_consts[5] * std::pow(input_value, 11)) +
+		(eatan_consts[6] * std::pow(input_value, 13)) + (eatan_consts[7] * std::pow(input_value, 15));
+
+	result += eatan_consts[8];
+	return mVU_EFU_VuFloat(std::bit_cast<u32>(result));
+}
+
+static __fi u32 mVU_EFU_ESADD(u32 x, u32 y, u32 z)
+{
+	return mVU_EFU_ToBits(mVU_EFU_SumXYZ(x, y, z));
+}
+
+static __fi u32 mVU_EFU_ERSADD(u32 x, u32 y, u32 z)
+{
+	float p = mVU_EFU_SumXYZ(x, y, z);
+	if (p != 0.0f)
+		p = 1.0f / p;
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ELENG(u32 x, u32 y, u32 z)
+{
+	float p = mVU_EFU_SumXYZ(x, y, z);
+	if (p >= 0.0f)
+		p = std::sqrt(p);
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ERLENG(u32 x, u32 y, u32 z)
+{
+	float p = mVU_EFU_SumXYZ(x, y, z);
+	if (p >= 0.0f)
+	{
+		p = std::sqrt(p);
+		if (p != 0.0f)
+			p = 1.0f / p;
+	}
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_EATAN(u32 fs)
+{
+	return mVU_EFU_ToBits(mVU_EFU_CalculateEATAN(mVU_EFU_VuFloat(fs)));
+}
+
+static __fi u32 mVU_EFU_EATANxy(u32 x, u32 y)
+{
+	float p = 0.0f;
+	if (mVU_EFU_VuFloat(x) != 0.0f)
+		p = mVU_EFU_CalculateEATAN(mVU_EFU_VuFloat(y) / mVU_EFU_VuFloat(x));
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_EATANxz(u32 x, u32 z)
+{
+	float p = 0.0f;
+	if (mVU_EFU_VuFloat(x) != 0.0f)
+		p = mVU_EFU_CalculateEATAN(mVU_EFU_VuFloat(z) / mVU_EFU_VuFloat(x));
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ERCPR(u32 fs)
+{
+	float p = mVU_EFU_VuFloat(fs);
+	if (p != 0.0f)
+		p = 1.0f / p;
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_EEXP(u32 fs)
+{
+	static constexpr float exp_consts[6] = {
+		0.249998688697815f, 0.031257584691048f, 0.002591371303424f,
+		0.000171562001924f, 0.000005430199963f, 0.000000690600018f,
+	};
+
+	float p = mVU_EFU_VuFloat(fs);
+	p = 1.0f + (exp_consts[0] * p) + (exp_consts[1] * std::pow(p, 2)) + (exp_consts[2] * std::pow(p, 3)) +
+		(exp_consts[3] * std::pow(p, 4)) + (exp_consts[4] * std::pow(p, 5)) + (exp_consts[5] * std::pow(p, 6));
+	p = std::pow(p, 4);
+	p = mVU_EFU_VuFloat(std::bit_cast<u32>(p));
+	p = 1.0f / p;
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ERSQRT(u32 fs)
+{
+	float p = mVU_EFU_VuFloat(fs);
+	if (p >= 0.0f)
+	{
+		p = std::sqrt(p);
+		if (p != 0.0f)
+			p = 1.0f / p;
+	}
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ESQRT(u32 fs)
+{
+	float p = mVU_EFU_VuFloat(fs);
+	if (p >= 0.0f)
+		p = std::sqrt(p);
+	return mVU_EFU_ToBits(p);
+}
+
+static __fi u32 mVU_EFU_ESIN(u32 fs)
+{
+	static constexpr float sin_consts[5] = {
+		1.0f, -0.166666567325592f, 0.008333025500178f, -0.000198074136279f, 0.000002601886990f,
+	};
+
+	float p = mVU_EFU_VuFloat(fs);
+	p = (sin_consts[0] * p) + (sin_consts[1] * std::pow(p, 3)) + (sin_consts[2] * std::pow(p, 5)) +
+		(sin_consts[3] * std::pow(p, 7)) + (sin_consts[4] * std::pow(p, 9));
+	return mVU_EFU_ToBits(mVU_EFU_VuFloat(std::bit_cast<u32>(p)));
+}
+
+static __fi u32 mVU_EFU_ESUM(u32 x, u32 y, u32 z, u32 w)
+{
+	const float p = mVU_EFU_VuFloat(x) + mVU_EFU_VuFloat(y) + mVU_EFU_VuFloat(z) + mVU_EFU_VuFloat(w);
+	return mVU_EFU_ToBits(p);
+}
+
+template <typename Fn>
+static __fi void mVU_EFUArm64WritePFromCall(mV, Fn fn)
+{
+	mVUbackupRegs(mVU);
+	armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+	fn();
+	armAsm->Fmov(RQSCRATCH.S(), EAX);
+	mVUrestoreRegs(mVU);
+	armAsm->Mov(xmmPQ.S(), 0, RQSCRATCH.S(), 0);
+	armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+}
+
 mVUop(mVU_DIV)
 {
 	pass1 { mVUanalyzeFDIV(mVU, _Fs_, _Fsf_, _Ft_, _Ftf_, 7); }
@@ -220,6 +397,13 @@ mVUop(mVU_EATAN)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATAN));
+		});
+		mVU.profiler.EmitOp(opEATAN);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
@@ -237,6 +421,7 @@ mVUop(mVU_EATAN)
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATAN);
+#endif
 	}
 	pass3 { mVUlog("EATAN P"); }
 }
@@ -254,6 +439,14 @@ mVUop(mVU_EATANxy)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATANxy));
+		});
+		mVU.profiler.EmitOp(opEATANxy);
+#else
 		const xmm& t1 = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 		const xmm& Fs = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
@@ -271,6 +464,7 @@ mVUop(mVU_EATANxy)
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATANxy);
+#endif
 	}
 	pass3 { mVUlog("EATANxy P"); }
 }
@@ -288,6 +482,14 @@ mVUop(mVU_EATANxz)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATANxz));
+		});
+		mVU.profiler.EmitOp(opEATANxz);
+#else
 		const xmm& t1 = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 		const xmm& Fs = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
@@ -305,6 +507,7 @@ mVUop(mVU_EATANxz)
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATANxz);
+#endif
 	}
 	pass3 { mVUlog("EATANxz P"); }
 }
@@ -330,6 +533,13 @@ mVUop(mVU_EEXP)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EEXP));
+		});
+		mVU.profiler.EmitOp(opEEXP);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
@@ -369,6 +579,7 @@ mVUop(mVU_EEXP)
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEEXP);
+#endif
 	}
 	pass3 { mVUlog("EEXP P"); }
 }
@@ -400,6 +611,15 @@ mVUop(mVU_ELENG)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armAsm->Ldr(EDX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ELENG));
+		});
+		mVU.profiler.EmitOp(opELENG);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, _X_Y_Z_W);
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -411,6 +631,7 @@ mVUop(mVU_ELENG)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opELENG);
+#endif
 	}
 	pass3 { mVUlog("ELENG P"); }
 }
@@ -428,6 +649,13 @@ mVUop(mVU_ERCPR)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ERCPR));
+		});
+		mVU.profiler.EmitOp(opERCPR);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
@@ -448,6 +676,7 @@ mVUop(mVU_ERCPR)
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.profiler.EmitOp(opERCPR);
+#endif
 	}
 	pass3 { mVUlog("ERCPR P"); }
 }
@@ -465,6 +694,15 @@ mVUop(mVU_ERLENG)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armAsm->Ldr(EDX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ERLENG));
+		});
+		mVU.profiler.EmitOp(opERLENG);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, _X_Y_Z_W);
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -492,6 +730,7 @@ mVUop(mVU_ERLENG)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opERLENG);
+#endif
 	}
 	pass3 { mVUlog("ERLENG P"); }
 }
@@ -509,6 +748,15 @@ mVUop(mVU_ERSADD)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armAsm->Ldr(EDX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ERSADD));
+		});
+		mVU.profiler.EmitOp(opERSADD);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, _X_Y_Z_W);
 //		xPSHUF.D       (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -526,6 +774,7 @@ mVUop(mVU_ERSADD)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opERSADD);
+#endif
 	}
 	pass3 { mVUlog("ERSADD P"); }
 }
@@ -543,6 +792,13 @@ mVUop(mVU_ERSQRT)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ERSQRT));
+		});
+		mVU.profiler.EmitOp(opERSQRT);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -560,6 +816,7 @@ mVUop(mVU_ERSQRT)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opERSQRT);
+#endif
 	}
 	pass3 { mVUlog("ERSQRT P"); }
 }
@@ -577,6 +834,15 @@ mVUop(mVU_ESADD)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armAsm->Ldr(EDX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ESADD));
+		});
+		mVU.profiler.EmitOp(opESADD);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, _X_Y_Z_W);
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -585,6 +851,7 @@ mVUop(mVU_ESADD)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opESADD);
+#endif
 	}
 	pass3 { mVUlog("ESADD P"); }
 }
@@ -602,6 +869,13 @@ mVUop(mVU_ESIN)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ESIN));
+		});
+		mVU.profiler.EmitOp(opESIN);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
@@ -643,6 +917,7 @@ mVUop(mVU_ESIN)
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opESIN);
+#endif
 	}
 	pass3 { mVUlog("ESIN P"); }
 }
@@ -660,6 +935,13 @@ mVUop(mVU_ESQRT)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ESQRT));
+		});
+		mVU.profiler.EmitOp(opESQRT);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
@@ -672,6 +954,7 @@ mVUop(mVU_ESQRT)
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.profiler.EmitOp(opESQRT);
+#endif
 	}
 	pass3 { mVUlog("ESQRT P"); }
 }
@@ -689,6 +972,16 @@ mVUop(mVU_ESUM)
 	}
 	pass2
 	{
+#if defined(_M_ARM64) || defined(__aarch64__)
+		mVU_EFUArm64WritePFromCall(mVU, [&]() {
+			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
+			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
+			armAsm->Ldr(EDX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
+			armAsm->Ldr(RWARG4, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[3]));
+			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ESUM));
+		});
+		mVU.profiler.EmitOp(opESUM);
+#else
 		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, _X_Y_Z_W);
 		const xmm& t1 = mVU.regAlloc->allocReg();
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
@@ -706,6 +999,7 @@ mVUop(mVU_ESUM)
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.profiler.EmitOp(opESUM);
+#endif
 	}
 	pass3 { mVUlog("ESUM P"); }
 }

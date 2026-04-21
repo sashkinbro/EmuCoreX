@@ -335,7 +335,6 @@ void recMicroVU1::Shutdown()
 {
 	if (vu1Thread.IsOpen())
 		vu1Thread.WaitVU();
-	VU1Trace::Shutdown();
 	mVUclose(microVU1);
 }
 
@@ -394,28 +393,9 @@ void recMicroVU1::Execute(u32 cycles)
 			return;
 	}
 
-	if (VU1Trace::HasRecompilerCapture())
-	{
-		for (u32 i = 0; i < cycles; i++)
-		{
-			const u32 executed_pc = (VU1.VI[REG_TPC].UL << 3);
-			VU1.VI[REG_TPC].UL <<= 3;
-			((mVUrecCall)microVU1.startFunct)(VU1.VI[REG_TPC].UL, 1);
-			VU1.VI[REG_TPC].UL >>= 3;
-			VU1Trace::LogRecompilerStep(executed_pc);
-
-			if (!THREAD_VU1 && !(VU0.VI[REG_VPU_STAT].UL & 0x100))
-				break;
-			if (!VU1Trace::HasRecompilerCapture())
-				break;
-		}
-	}
-	else
-	{
-		VU1.VI[REG_TPC].UL <<= 3;
-		((mVUrecCall)microVU1.startFunct)(VU1.VI[REG_TPC].UL, cycles);
-		VU1.VI[REG_TPC].UL >>= 3;
-	}
+	VU1.VI[REG_TPC].UL <<= 3;
+	((mVUrecCall)microVU1.startFunct)(VU1.VI[REG_TPC].UL, cycles);
+	VU1.VI[REG_TPC].UL >>= 3;
 
 	if (microVU1.regs().flags & 0x4 && !THREAD_VU1)
 	{

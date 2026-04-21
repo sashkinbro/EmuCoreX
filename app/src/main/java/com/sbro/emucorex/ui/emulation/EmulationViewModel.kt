@@ -772,6 +772,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val launchPath = when {
                     bootToBios -> ""
                     path.isNullOrBlank() -> null
+                    path.startsWith("content://") && DocumentPathResolver.getDisplayName(getApplication(), path)
+                        .substringAfterLast('.', "").equals("elf", ignoreCase = true) ->
+                            DocumentPathResolver.prepareElfLaunchPath(getApplication(), path)
                     path.startsWith("content://") -> path
                     else -> DocumentPathResolver.resolveFilePath(getApplication(), path)
                 }
@@ -2540,97 +2543,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             )
             delay(2000)
             _uiState.value = _uiState.value.copy(toastMessage = null)
-        }
-    }
-
-    fun captureVu1Trace(durationMs: Int = 1_000) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val shouldResume = _uiState.value.showMenu || _uiState.value.isPaused
-            val capturePath = lifecycleMutex.withLock {
-                if (isShuttingDown) {
-                    null
-                } else {
-                    try {
-                        EmulatorBridge.captureVu1Trace(durationMs)
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-            }
-
-            val success = !capturePath.isNullOrBlank()
-            if (success && shouldResume) {
-                runCatching { EmulatorBridge.resume() }
-            }
-
-            _uiState.value = _uiState.value.copy(
-                showMenu = if (success && shouldResume) false else _uiState.value.showMenu,
-                isPaused = if (success && shouldResume) false else _uiState.value.isPaused,
-                toastMessage = if (success) "vu1_trace_started" else "vu1_trace_failed"
-            )
-            updateCrashContext(launchState = if (success && shouldResume) "running" else null)
-            delay(2500)
-            if (_uiState.value.toastMessage == "vu1_trace_started" || _uiState.value.toastMessage == "vu1_trace_failed") {
-                _uiState.value = _uiState.value.copy(toastMessage = null)
-            }
-        }
-    }
-
-    fun armVu1TraceOnNextResume(durationMs: Int = 1_000) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val success = lifecycleMutex.withLock {
-                if (isShuttingDown) {
-                    false
-                } else {
-                    try {
-                        EmulatorBridge.armVu1TraceOnNextResume(durationMs)
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-            }
-
-            _uiState.value = _uiState.value.copy(
-                toastMessage = if (success) "vu1_trace_resume_armed" else "vu1_trace_failed"
-            )
-            delay(2500)
-            if (_uiState.value.toastMessage == "vu1_trace_resume_armed" || _uiState.value.toastMessage == "vu1_trace_failed") {
-                _uiState.value = _uiState.value.copy(toastMessage = null)
-            }
-        }
-    }
-
-    fun traceVu1FromQuickLoad(durationMs: Int = 1_000) {
-        val slot = _uiState.value.currentSlot
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.value = _uiState.value.copy(
-                isActionInProgress = true,
-                actionLabel = "loading"
-            )
-
-            val success = lifecycleMutex.withLock {
-                if (isShuttingDown) {
-                    false
-                } else {
-                    try {
-                        EmulatorBridge.armVu1TraceOnNextResume(durationMs) &&
-                            EmulatorBridge.loadState(slot)
-                    } catch (_: Exception) {
-                        false
-                    }
-                }
-            }
-
-            _uiState.value = _uiState.value.copy(
-                isActionInProgress = false,
-                actionLabel = null,
-                toastMessage = if (success) "vu1_trace_resume_armed" else "vu1_trace_failed"
-            )
-            updateCrashContext(launchState = if (success) "running" else null)
-            delay(2500)
-            if (_uiState.value.toastMessage == "vu1_trace_resume_armed" || _uiState.value.toastMessage == "vu1_trace_failed") {
-                _uiState.value = _uiState.value.copy(toastMessage = null)
-            }
         }
     }
 

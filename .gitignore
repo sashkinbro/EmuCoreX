@@ -37,6 +37,8 @@ app/release/
 Logs/
 *.log
 hs_err_pid*
+/autotests/
+/tests/
 
 # Nested repositories and local vendor metadata
 **/.git/

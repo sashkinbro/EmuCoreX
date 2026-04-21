@@ -7,6 +7,7 @@
 #include "IopMem.h"
 #include "R3000A.h"
 #include "R5900.h"
+#include "AutoTestTTYCapture.h"
 #include "ps2/BiosTools.h"
 #include "VMManager.h"
 
@@ -24,6 +25,10 @@
 #include <algorithm>
 
 #include <fcntl.h>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -94,6 +99,17 @@ void Hle_ClearHostRoot()
 
 namespace R3000A
 {
+	static inline void AndroidTTYLogIOP(const std::string& text)
+	{
+#ifdef __ANDROID__
+		if (!text.empty())
+			__android_log_print(ANDROID_LOG_INFO, "EmuCoreX-TTY", "[IOP] %s", text.c_str());
+#else
+		(void)text;
+#endif
+
+		AutoTestTTYCapture::Append(text);
+	}
 
 #define v0 (psxRegs.GPR.n.v0)
 #define a0 (psxRegs.GPR.n.a0)
@@ -901,7 +917,9 @@ namespace R3000A
 			if (fd == 1) // stdout
 			{
 				const std::string s = Ra1;
-				iopConLog(ShiftJIS_ConvertString(s.data(), a2));
+				const std::string text = ShiftJIS_ConvertString(s.data(), a2);
+				iopConLog(text);
+				AndroidTTYLogIOP(text);
 				pc = ra;
 				v0 = a2;
 				return 1;
@@ -1060,7 +1078,9 @@ namespace R3000A
 			}
 			pxAssertRel(ptmp >= tmp && ptmp < std::end(tmp), "Overflowed tmp buffer");
 			*ptmp = 0;
-			iopConLog(ShiftJIS_ConvertString(tmp, 1023));
+			const std::string text = ShiftJIS_ConvertString(tmp, 1023);
+			iopConLog(text);
+			AndroidTTYLogIOP(text);
 
 			return 1;
 		}

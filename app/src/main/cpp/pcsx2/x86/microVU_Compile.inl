@@ -227,9 +227,8 @@ void mVUexecuteInstruction(mV)
 
 __ri void mVUtraceInstruction(mV)
 {
-	// Disabled in the compiled JIT path because even a guarded callback check in
-	// this hot loop regresses VU1-heavy scenes on device. Recompiler capture is
-	// handled from recMicroVU1::Execute() only when explicitly armed.
+	// Recompiler tracing is handled from recMicroVU1::Execute() by forcing
+	// single-instruction blocks and logging from C++ after each block completes.
 }
 
 //------------------------------------------------------------------

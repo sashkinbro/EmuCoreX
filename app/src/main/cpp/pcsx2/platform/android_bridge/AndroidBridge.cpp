@@ -10,7 +10,7 @@
 #include "common/ZipHelpers.h"
 #include "common/Error.h"
 #include "pcsx2/GS.h"
-#include "pcsx2/VU1Trace.h"
+#include "pcsx2/AutoTestTTYCapture.h"
 #include "pcsx2/core/runtime/BuildVersion.h"
 #include "pcsx2/VMManager.h"
 #include "pcsx2/Config.h"
@@ -2275,14 +2275,18 @@ Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeConsumeLastError(JNIEnv* e
 extern "C"
 JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
-                                                 jstring p_szpath) {
+                                                 jstring p_szpath);
+
+static jboolean BootVmFromPath(JNIEnv* env, jstring p_szpath, bool require_elf)
+{
     CpuThreadBridgeState& cpu_thread_state = GetCpuThreadBridgeState();
     std::string _szPath = GetJavaString(env, p_szpath);
+    const bool is_elf = require_elf || VMManager::IsElfFileName(_szPath);
 
-    /////////////////////////////
+    if (require_elf && !is_elf)
+        return JNI_FALSE;
 
-    {
-    }
+    AutoTestTTYCapture::End();
 
     cpu_thread_state.execute_exit = false;
     SetCPUThreadActive(true);
@@ -2294,7 +2298,15 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
 
     // fast_boot : (false: bios->game, true: direct-to-game)
     VMBootParameters boot_params;
-    boot_params.filename = _szPath;
+    if (require_elf)
+    {
+        boot_params.elf_override = _szPath;
+        boot_params.filename.clear();
+    }
+    else
+    {
+        boot_params.filename = _szPath;
+    }
 
     if (!VMManager::Internal::CPUThreadInitialize()) {
         VMManager::Internal::CPUThreadShutdown();
@@ -2309,6 +2321,9 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     const VMBootResult boot_result = VMManager::Initialize(boot_params, &error);
     if (boot_result == VMBootResult::StartupSuccess)
     {
+        if (is_elf)
+            AutoTestTTYCapture::BeginForElf(_szPath);
+
         ResetPadState(0);
         ResetPadState(1);
         InputManager::PauseVibration();
@@ -2342,11 +2357,14 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
         ////
         Console.WriteLn("runVMThread: calling VMManager::Shutdown(false).");
         VMManager::Shutdown(false);
+        AutoTestTTYCapture::End();
     }
     else if (error.IsValid())
     {
         Host::ReportErrorAsync("VM Boot Failed", error.GetDescription());
     }
+
+    AutoTestTTYCapture::End();
     ////
     VMManager::Internal::CPUThreadShutdown();
     SetCPUThreadActive(false);
@@ -2354,7 +2372,19 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     return (boot_result == VMBootResult::StartupSuccess) ? JNI_TRUE : JNI_FALSE;
 }
 
-static std::atomic<u32> s_vu1_trace_resume_duration_ms{0};
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv* env, jclass clazz, jstring p_szpath)
+{
+    return BootVmFromPath(env, p_szpath, false);
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorex_core_NativeApp_bootElf(JNIEnv* env, jclass clazz, jstring p_szpath)
+{
+    return BootVmFromPath(env, p_szpath, true);
+}
 
 extern "C"
 JNIEXPORT void JNICALL
@@ -2369,9 +2399,6 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_resume(JNIEnv *env, jclass clazz) {
     Host::RunOnCPUThread([] {
         VMManager::SetPaused(false);
-        const u32 pending_duration = s_vu1_trace_resume_duration_ms.exchange(0, std::memory_order_acq_rel);
-        if (pending_duration > 0 && VMManager::HasValidVM())
-            VU1Trace::BeginCapture(pending_duration);
     });
 }
 
@@ -2401,43 +2428,6 @@ JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_core_NativeApp_hasValidVm(JNIEnv*, jclass)
 {
     return VMManager::HasValidVM() ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_sbro_emucorex_core_NativeApp_captureVu1Trace(JNIEnv* env, jclass, jint duration_ms)
-{
-    if (!VMManager::HasValidVM())
-        return nullptr;
-
-    const std::string path = RunOnCPUThreadBlocking<std::string>(std::string(), [duration_ms]() {
-        if (!VMManager::HasValidVM())
-            return std::string();
-
-        return VU1Trace::BeginCapture(static_cast<u32>(std::max(duration_ms, 1)));
-    });
-
-    if (path.empty())
-        return nullptr;
-
-    return env->NewStringUTF(path.c_str());
-}
-
-extern "C"
-JNIEXPORT jboolean JNICALL
-Java_com_sbro_emucorex_core_NativeApp_armVu1TraceOnNextResume(JNIEnv*, jclass, jint duration_ms)
-{
-    if (!VMManager::HasValidVM())
-        return JNI_FALSE;
-
-    const u32 clamped_duration = static_cast<u32>(std::max(duration_ms, 1));
-    s_vu1_trace_resume_duration_ms.store(clamped_duration, std::memory_order_release);
-
-    Host::AddOSDMessage(
-        fmt::format("VU1 trace armed for next resume ({} ms)", clamped_duration),
-        Host::OSD_INFO_DURATION);
-
-    return JNI_TRUE;
 }
 
 

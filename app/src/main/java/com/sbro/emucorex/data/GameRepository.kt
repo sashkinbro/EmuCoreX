@@ -23,7 +23,7 @@ data class GameItem(
 class GameRepository {
 
     companion object {
-        private val SUPPORTED_EXTENSIONS = setOf("iso", "bin", "chd", "cso", "gz")
+        private val SUPPORTED_EXTENSIONS = setOf("iso", "bin", "chd", "cso", "gz", "elf")
         private val COVER_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
         private val COVER_DIRECTORY_NAMES = setOf("covers", "cover", "art", "artwork", "boxart", "box art")
     }

@@ -115,9 +115,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val effectivePath = migratedPath ?: path
                 currentLibraryRoot = effectivePath
                 val isAccessible = SetupValidator.isGameFolderAccessible(context, effectivePath)
+                if (isAccessible) {
+                    libraryInitialized = true
+                    updateBootstrapState()
+                }
                 _uiState.value = _uiState.value.copy(
                     gameFolderSet = isAccessible,
-                    isLoading = isAccessible
+                    isLoading = false,
+                    isRefreshing = isAccessible
                 )
                 if (isAccessible && effectivePath != null) {
                     requestLibraryScan(effectivePath, isInitialLoad = !libraryInitialized)
@@ -265,7 +270,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (shouldDeferLibraryWork(path, isInitialLoad)) return@withLock
                 val cacheSnapshot = resolveCacheSnapshot(path)
                 val cachedGames = cacheSnapshot.games
-                val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
+                val showFullScreenLoader = false
                 _uiState.value = _uiState.value.copy(
                     isLoading = showFullScreenLoader,
                     isRefreshing = !showFullScreenLoader
@@ -317,7 +322,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 if (shouldDeferLibraryWork(rootPath, isInitialLoad)) return@withLock
                 val cacheSnapshot = resolveCacheSnapshot(rootPath)
                 val cachedGames = cacheSnapshot.games
-                val showFullScreenLoader = isInitialLoad && cachedGames.isEmpty()
+                val showFullScreenLoader = false
                 _uiState.value = _uiState.value.copy(
                     isLoading = showFullScreenLoader,
                     isRefreshing = !showFullScreenLoader

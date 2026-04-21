@@ -1553,7 +1553,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 	if (!s_elf_override.empty())
 	{
-		if (!FileSystem::FileExists(s_elf_override.c_str()))
+		if (s_elf_override.rfind("content://", 0) != 0 && !FileSystem::FileExists(s_elf_override.c_str()))
 		{
 			Error::SetStringFmt(error,
 				TRANSLATE_FS("VMManager", "Requested boot ELF '{}' does not exist."), s_elf_override);

@@ -929,9 +929,6 @@
     <string name="settings_gamepad_stick_deadzone">Мертва зона стіка</string>
     <string name="settings_gamepad_left_stick_sensitivity">Чутливість лівого стіка</string>
     <string name="settings_gamepad_right_stick_sensitivity">Чутливість правого стіка</string>
-    <string name="emulation_vu1_trace_capture">Захоплення трасування VU1 (1 с)</string>
-    <string name="emulation_vu1_trace_started">Трасування VU1 активовано на 1 секунду.</string>
-    <string name="emulation_vu1_trace_failed">Не вдалося розпочати трасування VU1.</string>
     <string name="settings_jit_tab">JIT</string>
     <string name="settings_jit_section">JIT / Інтерпретатор</string>
     <string name="settings_jit_section_note">Вимкніть рекомпілятор, щоб примусово перевести цей блок на інтерпретатор. Використовуйте це для ізоляції помилок і відстеження збоїв, а не для звичайної гри.</string>
@@ -948,7 +945,4 @@
     <string name="settings_help_enable_iop_recompiler">Керує рекомпілятором IOP, що використовується для процесора вводу-виводу, успадкованого від PlayStation 1. Зазвичай він залишається увімкненим. Вимикайте його лише під час ізоляції низькорівневої поведінки IOP, звуку, контролера або проблем сумісності, пов\'язаних із DMA.</string>
     <string name="settings_help_enable_vu0_recompiler">Керує рекомпілятором векторного модуля 0 (VU0). VU0 використовується в деяких іграх для логічних і математичних обчислень. Вимикайте його лише для тестування сумісності, якщо ви підозрюєте, що код, згенерований VU0, дає неправильні результати.</string>
     <string name="settings_help_enable_vu1_recompiler">Керує рекомпілятором векторного модуля 1 (VU1). VU1 виконує великий обсяг робіт з трансформації та геометрії в багатьох іграх. Вимикайте його, коли вам потрібно порівняти вивід JIT з інтерпретатором, дослідити спотворення рендерингу або зробити трасування VU1 для зневадження.</string>
-    <string name="emulation_vu1_trace_capture_on_resume">Активувати трасування VU1 для наступного відновлення/завантаження</string>
-    <string name="emulation_vu1_trace_quick_load">Трасування VU1 зі швидкого завантаження</string>
-    <string name="emulation_vu1_trace_resume_armed">Трасування VU1 активовано для наступного відновлення/завантаження.</string>
 </resources>

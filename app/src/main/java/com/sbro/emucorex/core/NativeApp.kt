@@ -75,13 +75,12 @@ object NativeApp {
     @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int)
     @JvmStatic external fun onNativeSurfaceDestroyed()
     @JvmStatic external fun runVMThread(path: String): Boolean
+    @JvmStatic external fun bootElf(path: String): Boolean
     @JvmStatic external fun pause()
     @JvmStatic external fun resume()
     @JvmStatic external fun shutdown()
     @JvmStatic external fun refreshBIOS()
     @JvmStatic external fun hasValidVm(): Boolean
-    @JvmStatic external fun captureVu1Trace(durationMs: Int): String?
-    @JvmStatic external fun armVu1TraceOnNextResume(durationMs: Int): Boolean
     @JvmStatic external fun getGameSerial(): String?
     @JvmStatic external fun saveStateToSlot(slot: Int): Boolean
     @JvmStatic external fun loadStateFromSlot(slot: Int): Boolean

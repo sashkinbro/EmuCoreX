@@ -929,9 +929,6 @@
     <string name="settings_gamepad_stick_deadzone">Zona morta do analógico</string>
     <string name="settings_gamepad_left_stick_sensitivity">Sensibilidade do analógico esquerdo</string>
     <string name="settings_gamepad_right_stick_sensitivity">Sensibilidade do analógico direito</string>
-    <string name="emulation_vu1_trace_capture">Capturar rastreamento da VU1 (1s)</string>
-    <string name="emulation_vu1_trace_started">Rastreamento da VU1 ativado por 1 segundo.</string>
-    <string name="emulation_vu1_trace_failed">Não foi possível iniciar o rastreamento da VU1.</string>
     <string name="settings_jit_tab">JIT</string>
     <string name="settings_jit_section">JIT / Intérprete</string>
     <string name="settings_jit_section_note">Desative um recompilador para forçar o bloco no intérprete. Use para isolamento e rastreamento de falhas, não para jogabilidade normal.</string>
@@ -948,7 +945,4 @@
     <string name="settings_help_enable_iop_recompiler">Controla o recompilador IOP usado para o processador de E/S derivado do PlayStation 1. Isso geralmente fica ativado. Desligue-o apenas ao isolar comportamentos de IOP de baixo nível, áudio, controle ou problemas de compatibilidade relacionados a DMA.</string>
     <string name="settings_help_enable_vu0_recompiler">Controla o recompilador da Unidade Vetorial 0. A VU0 é usada por algumas lógicas de jogos e cargas de trabalho matemáticas. Desative-o apenas para testes de compatibilidade se suspeitar que o código gerado pela VU0 está produzindo resultados incorretos.</string>
     <string name="settings_help_enable_vu1_recompiler">Controla o recompilador da Unidade Vetorial 1. A VU1 conduz uma grande quantidade de trabalho de transformação e geometria em muitos jogos. Desative-o quando precisar comparar a saída do JIT com o intérprete, investigar corrupção de renderização ou capturar rastreamentos da VU1 para depuração.</string>
-    <string name="emulation_vu1_trace_capture_on_resume">Ativar rastreamento da VU1 para a próxima retomada/carregamento</string>
-    <string name="emulation_vu1_trace_quick_load">Rastreamento da VU1 a partir do carregamento rápido</string>
-    <string name="emulation_vu1_trace_resume_armed">Rastreamento da VU1 ativado para a próxima retomada/carregamento.</string>
 </resources>

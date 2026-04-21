@@ -431,6 +431,15 @@ object EmulatorBridge {
 
     suspend fun startEmulation(path: String): Boolean {
         if (!isNativeLoaded) return false
+        val isElf = when {
+            path.substringAfterLast('.', "").equals("elf", ignoreCase = true) -> true
+            path.startsWith("content://") -> {
+                val context = getContext()
+                val displayName = context?.let { DocumentPathResolver.getDisplayName(it, path) }.orEmpty()
+                displayName.substringAfterLast('.', "").equals("elf", ignoreCase = true)
+            }
+            else -> false
+        }
         val pathType = when {
             path.startsWith("content://") -> "content"
             path.isBlank() -> "bios"
@@ -442,8 +451,8 @@ object EmulatorBridge {
             isVmActive = true
             shutdownRequested = false
             val result = try {
-                NativeApp.logCrashBreadcrumb("startEmulation entering native runVMThread")
-                NativeApp.runVMThread(path)
+                NativeApp.logCrashBreadcrumb("startEmulation entering native ${if (isElf) "bootElf" else "runVMThread"}")
+                if (isElf) NativeApp.bootElf(path) else NativeApp.runVMThread(path)
             } catch (_: Exception) {
                 NativeApp.logCrashBreadcrumb("startEmulation exception before native start returned")
                 false
@@ -506,9 +515,11 @@ object EmulatorBridge {
             }
             else -> parseMetadataFromName(File(path).nameWithoutExtension)
         }
+        val extension = path.substringAfterLast('.', "").lowercase()
 
         if (!isNativeLoaded) return inferredMetadata
         if (isVmActive) return inferredMetadata
+        if (extension == "elf") return inferredMetadata
 
         return try {
             val rawTitle = NativeApp.getGameTitle(path).orEmpty()
@@ -570,28 +581,6 @@ object EmulatorBridge {
                     runCatching { NativeApp.resume() }
                 }
                 success
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
-
-    suspend fun captureVu1Trace(durationMs: Int): String? {
-        if (!isNativeLoaded || !isVmActive) return null
-        return runSerial {
-            try {
-                NativeApp.captureVu1Trace(durationMs)
-            } catch (_: Exception) {
-                null
-            }
-        }
-    }
-
-    suspend fun armVu1TraceOnNextResume(durationMs: Int): Boolean {
-        if (!isNativeLoaded || !isVmActive) return false
-        return runSerial {
-            try {
-                NativeApp.armVu1TraceOnNextResume(durationMs)
             } catch (_: Exception) {
                 false
             }

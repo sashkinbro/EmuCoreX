@@ -207,19 +207,10 @@ fun AppNavigation(
             preferences.onboardingCompleted,
             preferences.biosPath,
             preferences.gamePath
-        ) { _, biosPath, gamePath ->
-            val hasRequiredPaths =
-                !biosPath.isNullOrBlank() &&
-                !gamePath.isNullOrBlank()
-            val biosReady = BiosValidator.hasUsableBiosFiles(context, biosPath)
-            val gameFolderPresent = SetupValidator.isGameFolderPresentForStartup(context, gamePath)
-            val setupReadyFromStoredPaths = hasRequiredPaths && biosReady && gameFolderPresent
-            val shouldOpenHome = setupReadyFromStoredPaths
-            if (!shouldOpenHome) {
-                StartupDestination.ONBOARDING
-            } else {
-                StartupDestination.HOME
-            }
+        ) { onboardingCompleted, biosPath, gamePath ->
+            val hasRequiredPaths = !biosPath.isNullOrBlank() && !gamePath.isNullOrBlank()
+            val shouldOpenHome = onboardingCompleted && hasRequiredPaths
+            if (shouldOpenHome) StartupDestination.HOME else StartupDestination.ONBOARDING
         }.first()
     }
     if (startupDestination == null) {
@@ -896,5 +887,5 @@ fun AppNavigation(
 
 private fun isSupportedGameImage(fileName: String): Boolean {
     val extension = fileName.substringAfterLast('.', "").lowercase()
-    return extension in setOf("iso", "bin", "chd", "cso", "gz")
+    return extension in setOf("iso", "bin", "chd", "cso", "gz", "elf")
 }

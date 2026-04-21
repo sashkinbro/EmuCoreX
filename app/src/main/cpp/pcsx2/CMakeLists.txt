@@ -150,6 +150,7 @@ set(pcsx2Sources
 	Achievements.cpp
 	Cache.cpp
 	COP2.cpp
+	AutoTestTTYCapture.cpp
 	Elfheader.cpp
 	FW.cpp
 	FiFo.cpp
@@ -202,7 +203,6 @@ set(pcsx2Sources
 	VU0microInterp.cpp
 	VU1micro.cpp
 	VU1microInterp.cpp
-	VU1Trace.cpp
 	VUflags.cpp
 	VUmicroMem.cpp
 	VUops.cpp
@@ -211,6 +211,7 @@ set(pcsx2Sources
 # Main pcsx2 header
 set(pcsx2Headers
 	Achievements.h
+	AutoTestTTYCapture.h
 	Cache.h
 	Common.h
 	core/runtime/GameDatabase.h

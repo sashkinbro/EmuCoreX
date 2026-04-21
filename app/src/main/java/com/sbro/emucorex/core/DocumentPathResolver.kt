@@ -179,6 +179,22 @@ object DocumentPathResolver {
         return DocumentFile.fromSingleUri(context, uri)?.length() ?: 0L
     }
 
+    fun prepareElfLaunchPath(context: Context, rawPath: String): String? {
+        if (rawPath.isBlank()) return null
+        if (!rawPath.startsWith("content://")) return rawPath
+
+        val uri = rawPath.toUri()
+        val single = DocumentFile.fromSingleUri(context, uri)
+        val displayName = single?.name ?: getDisplayName(context, rawPath)
+        if (!displayName.substringAfterLast('.', "").equals("elf", ignoreCase = true)) {
+            return rawPath
+        }
+
+        val targetDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "imported-elfs")
+        val targetFile = File(targetDir, sanitizeFileName(displayName.ifBlank { "autotest.elf" }))
+        return copyUriToFile(context, uri, targetFile)
+    }
+
     private fun resolveExternalStoragePath(uri: Uri): String? {
         val documentId = runCatching { DocumentsContract.getDocumentId(uri) }.getOrNull()
             ?: runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()

@@ -7,6 +7,7 @@
 
 #include "R5900.h"
 #include "R5900OpcodeTables.h"
+#include "AutoTestTTYCapture.h"
 #include "GS.h"
 #include "ps2/BiosTools.h"
 #include "DebugTools/DebugInterface.h"
@@ -16,8 +17,24 @@
 
 #include "fmt/format.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 GS_VideoMode gsVideoMode = GS_VideoMode::Uninitialized;
 bool gsIsInterlaced = false;
+
+static inline void AndroidTTYLogEE(const std::string& text)
+{
+#ifdef __ANDROID__
+	if (!text.empty())
+		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX-TTY", "[EE] %s", text.c_str());
+#else
+	(void)text;
+#endif
+
+	AutoTestTTYCapture::Append(text);
+}
 
 static __fi bool _add64_Overflow( s64 x, s64 y, s64 &ret )
 {
@@ -217,7 +234,9 @@ static int __Deci2Call(int call, u32 *addr)
 				memcpy(deci2buffer, pdeciaddr, copylen );
 				deci2buffer[copylen] = '\0';
 
-				eeConLog( ShiftJIS_ConvertString(deci2buffer) );
+				const std::string text = ShiftJIS_ConvertString(deci2buffer);
+				eeConLog(text);
+				AndroidTTYLogEE(text);
 			}
 			((u32*)PSM(deci2addr))[3] = 0;
 			return 1;
@@ -1128,7 +1147,9 @@ void SYSCALL()
 		{
 			if (cpuRegs.GPR.n.a0.UL[0] == 0x10)
 			{
-				eeConLog(ShiftJIS_ConvertString((char*)PSM(memRead32(cpuRegs.GPR.n.a1.UL[0]))));
+				const std::string text = ShiftJIS_ConvertString((char*)PSM(memRead32(cpuRegs.GPR.n.a1.UL[0])));
+				eeConLog(text);
+				AndroidTTYLogEE(text);
 			}
 			else
 				__Deci2Call(cpuRegs.GPR.n.a0.UL[0], (u32*)PSM(cpuRegs.GPR.n.a1.UL[0]));
@@ -1185,6 +1206,7 @@ void SYSCALL()
 				);
 
 				eeConLog(buf);
+				AndroidTTYLogEE(buf);
 			}
 			break;
 		}
