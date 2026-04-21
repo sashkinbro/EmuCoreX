@@ -26,9 +26,24 @@ namespace
 
 	State s_state;
 
+	static const char* GetEEBackendLabel()
+	{
+		return EmuConfig.Cpu.Recompiler.EnableEE ? "ee_rec" : "ee_interp";
+	}
+
+	static const char* GetVU0BackendLabel()
+	{
+		return EmuConfig.Cpu.Recompiler.EnableVU0 ? "vu0_microvu" : "vu0_interpreter";
+	}
+
 	static const char* GetVU1BackendLabel()
 	{
 		return EmuConfig.Cpu.Recompiler.EnableVU1 ? "vu1_microvu" : "vu1_interpreter";
+	}
+
+	static std::string GetBackendLabel()
+	{
+		return fmt::format("{}_{}_{}", GetEEBackendLabel(), GetVU0BackendLabel(), GetVU1BackendLabel());
 	}
 } // namespace
 
@@ -57,7 +72,7 @@ void BeginForElf(const std::string& elf_path)
 	if (test_name.empty())
 		test_name = "autotest";
 
-	s_state.path = Path::Combine(autotest_dir, fmt::format("{}_{}.log", test_name, GetVU1BackendLabel()));
+	s_state.path = Path::Combine(autotest_dir, fmt::format("{}_{}.log", test_name, GetBackendLabel()));
 	s_state.file = FileSystem::OpenCFile(s_state.path.c_str(), "wb");
 	if (!s_state.file)
 	{

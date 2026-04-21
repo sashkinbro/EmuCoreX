@@ -112,23 +112,25 @@ void recCFC1(void)
 	EE::Profiler.EmitOp(eeOpcode::CFC1);
 
 	const int regt = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_WRITE);
-	if (_Fs_ >= 16)
-	{
-        auto reg32 = a64::WRegister(regt);
+	auto reg32 = a64::WRegister(regt);
 
-//		xMOV(xRegister32(regt), ptr32[&fpuRegs.fprc[31]]);
-        armLoad(reg32, PTR_CPU(fpuRegs.fprc[31]));
-//		xAND(xRegister32(regt), 0x0083c078); //remove always-zero bits
-        armAsm->And(reg32, reg32, 0x0083c078);
-//		xOR(xRegister32(regt), 0x01000001); //set always-one bits
-        armAsm->Orr(reg32, reg32, 0x01000001);
-//		xMOVSX(xRegister64(regt), xRegister32(regt));
-        armAsm->Sxtw(a64::XRegister(regt), reg32);
+	if (_Fs_ == 31)
+	{
+		// Match the interpreter exactly: only FCR31 is readable as-is.
+		armLoad(reg32, PTR_CPU(fpuRegs.fprc[31]));
+		armAsm->Sxtw(a64::XRegister(regt), reg32);
+	}
+	else if (_Fs_ == 0)
+	{
+		// The interpreter reports the PS2-visible revision value, not the raw reset storage.
+		armAsm->Mov(reg32, 0x2E00);
+		armAsm->Sxtw(a64::XRegister(regt), reg32);
 	}
 	else
 	{
-//		xMOVSX(xRegister64(regt), ptr32[&fpuRegs.fprc[0]]);
-        armLoadsw(a64::XRegister(regt), PTR_CPU(fpuRegs.fprc[0]));
+		// All other FCR indices read back as zero in the interpreter path.
+		armAsm->Mov(reg32, 0);
+		armAsm->Sxtw(a64::XRegister(regt), reg32);
 	}
 }
 
@@ -1297,14 +1299,23 @@ void recCVT_W()
 	//kill register allocation for dst because we write directly to fpuRegs.fpr[_Fd_]
 	_deleteFPtoXMMreg(_Fd_, DELETE_REG_FREE_NO_WRITEBACK);
 
-	// cvttss2si converts unrepresentable values to 0x80000000, so negative values are already handled.
-	// So we just need to handle positive values.
-//	xCMP(edx, 0x4f000000); // If the input is greater than INT_MAX
-    armAsm->Cmp(EDX, 0x4f000000);
-//	xMOV(edx, 0x7fffffff);
-    armAsm->Mov(EDX, 0x7fffffff);
-//	xCMOVGE(eax, edx);     // Saturate it
-    armAsm->Csel(EAX, EDX, EAX, a64::Condition::ge);
+	// ARM64's FCVTZS returns zero for NaNs, but the EE saturates by sign:
+	// positive NaN/Inf -> 0x7fffffff, negative NaN/Inf -> 0x80000000.
+	// It also saturates any magnitude larger than the CVT.W range.
+    armAsm->And(ECX, EDX, 0x7fffffff);     // abs(raw)
+    armAsm->Cmp(ECX, 0x4f000000);          // abs(raw) >= range boundary?
+
+    a64::Label cvt_done, cvt_negative_sat;
+    armAsm->B(&cvt_done, a64::Condition::lo);
+
+    armAsm->Tbnz(EDX, 31, &cvt_negative_sat);
+    armAsm->Mov(EAX, 0x7fffffff);          // positive overflow / NaN / Inf saturates positive
+    armAsm->B(&cvt_done);
+
+    armBind(&cvt_negative_sat);
+    armAsm->Mov(EAX, 0x80000000);
+
+    armBind(&cvt_done);
 
 	//Write the result
 //	xMOV(ptr[&fpuRegs.fpr[_Fd_]], eax);
@@ -2213,7 +2224,7 @@ void recSQRT_S_xmm(int info)
 		roundmode_nearest = EmuConfig.Cpu.FPUFPCR;
 		roundmode_nearest.SetRoundMode(FPRoundMode::Nearest);
 //		xLDMXCSR(ptr32[&roundmode_nearest.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(armMemOperandPtr(&roundmode_nearest.bitmask)));
 		roundmodeFlag = true;
 	}
 

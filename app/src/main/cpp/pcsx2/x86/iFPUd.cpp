@@ -128,39 +128,34 @@ namespace DOUBLE {
 void ToDouble(int reg)
 {
     auto regQ = a64::QRegister(reg);
+	// Match the interpreter's fpuDouble() semantics exactly:
+	// - denormals/zero collapse to signed zero
+	// - all exp=255 encodings collapse to signed finite max
+	// - normal values convert directly
+    a64::Label exp_zero, exp_max, done;
 
-//	xUCOMI.SS(xRegisterSSE(reg), ptr[s_const.pos_inf]); // Sets ZF if reg is equal or incomparable to pos_inf
-    armAsm->Fcmp(regQ.S(), armLoadPtrV(PTR_MVUCONST(s_const.pos_inf)).S());
-//	u8* to_complex = JE8(0); // Complex conversion if positive infinity or NaN
-    a64::Label to_complex;
-    armAsm->B(&to_complex, a64::Condition::eq);
-//	xUCOMI.SS(xRegisterSSE(reg), ptr[s_const.neg_inf]);
-    armAsm->Fcmp(regQ.S(), armLoadPtrV(PTR_MVUCONST(s_const.neg_inf)).S());
-//	u8* to_complex2 = JE8(0); // Complex conversion if negative infinity
-    a64::Label to_complex2;
-    armAsm->B(&to_complex2, a64::Condition::eq);
+    armAsm->Fmov(EAX, regQ.S());
+    armAsm->And(ECX, EAX, 0x7f800000);
+    armAsm->Cbz(ECX, &exp_zero);
+    armAsm->Cmp(ECX, 0x7f800000);
+    armAsm->B(&exp_max, a64::Condition::eq);
 
-//	xCVTSS2SD(xRegisterSSE(reg), xRegisterSSE(reg)); // Simply convert
     armAsm->Fcvt(regQ.V1D(), regQ.S());
-//	u8* end = JMP8(0);
-    a64::Label end;
-    armAsm->B(&end);
+    armAsm->B(&done);
 
-//	x86SetJ8(to_complex);
-    armBind(&to_complex);
-//	x86SetJ8(to_complex2);
-    armBind(&to_complex2);
-
-	// Special conversion for when IEEE sees the value in reg as an INF/NaN
-//	xPSUB.D(xRegisterSSE(reg), ptr[s_const.one_exp]); // Lower exponent by one
-    armAsm->Sub(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_MVUCONST(s_const.one_exp)).V4S());
-//	xCVTSS2SD(xRegisterSSE(reg), xRegisterSSE(reg));
+    armBind(&exp_zero);
+    armAsm->And(EAX, EAX, 0x80000000);
+    armAsm->Fmov(regQ.S(), EAX);
     armAsm->Fcvt(regQ.V1D(), regQ.S());
-//	xPADD.Q(xRegisterSSE(reg), ptr[s_const.dbl_one_exp]); // Raise exponent by one
-    armAsm->Fadd(regQ.V2D(), regQ.V2D(), armLoadPtrV(PTR_MVUCONST(s_const.dbl_one_exp)).V2D());
+    armAsm->B(&done);
 
-//	x86SetJ8(end);
-    armBind(&end);
+    armBind(&exp_max);
+    armAsm->And(EAX, EAX, 0x80000000);
+    armAsm->Orr(EAX, EAX, 0x7f7fffff);
+    armAsm->Fmov(regQ.S(), EAX);
+    armAsm->Fcvt(regQ.V1D(), regQ.S());
+
+    armBind(&done);
 }
 
 //------------------------------------------------------------------
@@ -203,13 +198,13 @@ void ToPS2FPU_Full(int reg, bool flags, int absreg, bool acc, bool addsub)
     armAsm->Fcmp(regAbs.V1D(), armLoadPtrV(PTR_MVUCONST(s_const.dbl_cvt_overflow)).V1D());
 //	u8* to_complex = JAE8(0);
     a64::Label to_complex;
-    armAsm->B(&to_complex, a64::Condition::cs);
+    armAsm->B(&to_complex, a64::Condition::ge);
 
 //	xUCOMI.SD(xRegisterSSE(absreg), ptr[&s_const.dbl_underflow]);
     armAsm->Fcmp(regAbs.V1D(), armLoadPtrV(PTR_MVUCONST(s_const.dbl_underflow)).V1D());
 //	u8* to_underflow = JB8(0);
     a64::Label to_underflow;
-    armAsm->B(&to_underflow, a64::Condition::cc);
+    armAsm->B(&to_underflow, a64::Condition::mi);
 
 //	xCVTSD2SS(xRegisterSSE(reg), xRegisterSSE(reg)); //simply convert
     armAsm->Fcvt(regQ.S(), regQ.V1D());
@@ -224,7 +219,7 @@ void ToPS2FPU_Full(int reg, bool flags, int absreg, bool acc, bool addsub)
     armAsm->Fcmp(regAbs.V1D(), armLoadPtrV(PTR_MVUCONST(s_const.dbl_ps2_overflow)).V1D());
 //	u8* to_overflow = JAE8(0);
     a64::Label to_overflow;
-    armAsm->B(&to_overflow, a64::Condition::cs);
+    armAsm->B(&to_overflow, a64::Condition::ge);
 
 //	xPSUB.Q(xRegisterSSE(reg), ptr[&s_const.dbl_one_exp]); //lower exponent
     armAsm->Sub(regQ.V2D(), regQ.V2D(), armLoadPtrV(PTR_MVUCONST(s_const.dbl_one_exp)).V2D());
@@ -241,8 +236,9 @@ void ToPS2FPU_Full(int reg, bool flags, int absreg, bool acc, bool addsub)
     armBind(&to_overflow);
 //	xCVTSD2SS(xRegisterSSE(reg), xRegisterSSE(reg));
     armAsm->Fcvt(regQ.S(), regQ.V1D());
-//	xOR.PS(xRegisterSSE(reg), ptr[&s_const.pos]); //clamp
-    armAsm->Orr(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.pos)).V16B());
+// Preserve the sign from the overflowed single result, then clamp to PS2 finite max.
+    armAsm->And(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.neg[0])).V16B());
+    armAsm->Orr(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V16B());
 	if (flags && FPU_FLAGS_OVERFLOW) {
 //        xOR(ptr32[&fpuRegs.fprc[31]], (FPUflagO | FPUflagSO));
         armOrr(PTR_CPU(fpuRegs.fprc[31]), (FPUflagO | FPUflagSO));
@@ -317,6 +313,12 @@ void ToPS2FPU(int reg, bool flags, int absreg, bool acc, bool addsub = false)
 {
 	if (FPU_RESULT) {
         ToPS2FPU_Full(reg, flags, absreg, acc, addsub);
+        if (CHECK_FPU_OVERFLOW)
+        {
+            auto regQ = a64::QRegister(reg);
+            armAsm->Smin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V4S());
+            armAsm->Umin(regQ.V4S(), regQ.V4S(), armLoadPtrV(PTR_MVUCONST(g_minvals[0])).V4S());
+        }
     }
 	else
 	{
@@ -337,8 +339,9 @@ void SetMaxValue(int regd)
     auto regQ = a64::QRegister(regd);
 
 	if (FPU_RESULT) {
-//        xOR.PS(xRegisterSSE(regd), ptr[&s_const.pos[0]]); // set regd to maximum
-        armAsm->Orr(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.pos[0])).V16B());
+		// Keep the sign bit from regd and clamp to the PS2 finite max value.
+        armAsm->And(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.neg[0])).V16B());
+        armAsm->Orr(regQ.V16B(), regQ.V16B(), armLoadPtrV(PTR_MVUCONST(g_maxvals[0])).V16B());
     }
 	else
 	{
@@ -1007,11 +1010,11 @@ void recMINMAX(int info, bool ismin)
     armAsm->Orr(regT.V16B(), regT.V16B(), armLoadPtrV(PTR_MVUCONST(minmax_mask[4])).V16B());
 	if (ismin) {
 //        xMIN.SD(xRegisterSSE(sreg), xRegisterSSE(treg));
-        armAsm->Fminnm(regS.V1D(), regS.V1D(), regT.V1D());
+        armAsm->Fmin(regS.V1D(), regS.V1D(), regT.V1D());
     }
 	else {
 //        xMAX.SD(xRegisterSSE(sreg), xRegisterSSE(treg));
-        armAsm->Fmaxnm(regS.V1D(), regS.V1D(), regT.V1D());
+        armAsm->Fmax(regS.V1D(), regS.V1D(), regT.V1D());
     }
 
 //	xMOVSS(xRegisterSSE(EEREC_D), xRegisterSSE(sreg));
@@ -1159,7 +1162,7 @@ void recSQRT_S_xmm(int info)
 		roundmode_nearest = EmuConfig.Cpu.FPUFPCR;
 		roundmode_nearest.SetRoundMode(FPRoundMode::Nearest);
 //		xLDMXCSR(ptr32[&roundmode_nearest.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(armMemOperandPtr(&roundmode_nearest.bitmask)));
 		roundmodeFlag = 1;
 	}
 
@@ -1180,6 +1183,10 @@ void recSQRT_S_xmm(int info)
 //		u8* pjmp = JZ8(0); //Skip if none are
         a64::Label pjmp;
         armAsm->Cbz(EAX, &pjmp);
+//			if Ft is -0, preserve the sign and skip invalid handling.
+        armAsm->Fmov(EDX, regED.S());
+        armAsm->And(EDX, EDX, 0x7fffffff);
+        armAsm->Cbz(EDX, &pjmp);
 //			xOR(ptr32[&fpuRegs.fprc[31]], FPUflagI | FPUflagSI); // Set I and SI flags
             armOrr(PTR_CPU(fpuRegs.fprc[31]), FPUflagI | FPUflagSI);
 //			xAND.PS(xRegisterSSE(EEREC_D), ptr[&s_const.pos[0]]); // Make EEREC_D Positive
@@ -1231,6 +1238,9 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
 	int t1reg = _allocTempXMMreg(XMMT_FPS);
     auto regT1 = a64::QRegister(t1reg);
 
+    armMOVMSKPS(EDX, regT);
+    armAsm->And(EDX, EDX, 1);
+
 //	xAND(ptr32[&fpuRegs.fprc[31]], ~(FPUflagI | FPUflagD)); // Clear I and D flags
     armAnd(PTR_CPU(fpuRegs.fprc[31]), ~(FPUflagI | FPUflagD));
 
@@ -1241,6 +1251,10 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
     armAsm->And(EAX, EAX, 1);
 //	pjmp2 = JZ8(0); //Skip if not set
     armAsm->Cbz(EAX, &pjmp2);
+//		if Ft is -0, preserve the sign and skip invalid handling.
+        armAsm->Fmov(ECX, regT.S());
+        armAsm->And(ECX, ECX, 0x7fffffff);
+        armAsm->Cbz(ECX, &pjmp2);
 //		xOR(ptr32[&fpuRegs.fprc[31]], FPUflagI | FPUflagSI); // Set I and SI flags
         armOrr(PTR_CPU(fpuRegs.fprc[31]), FPUflagI | FPUflagSI);
 //		xAND.PS(xRegisterSSE(regt), ptr[&s_const.pos[0]]); // Make regt Positive
@@ -1337,7 +1351,7 @@ void recRSQRT_S_xmm(int info)
 		roundmode_nearest = EmuConfig.Cpu.FPUFPCR;
 		roundmode_nearest.SetRoundMode(FPRoundMode::Nearest);
 //		xLDMXCSR(ptr32[&roundmode_nearest.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+        armAsm->Msr(a64::FPCR, armLoad64(armMemOperandPtr(&roundmode_nearest.bitmask)));
 		roundmodeFlag = true;
 	}
 

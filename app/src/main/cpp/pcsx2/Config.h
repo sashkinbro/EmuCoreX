@@ -1518,12 +1518,11 @@ namespace EmuFolders
 
 #define CHECK_FPU_OVERFLOW (EmuConfig.Cpu.Recompiler.fpuOverflow)
 #if defined(__ANDROID__)
-#define CHECK_FPU_EXTRA_OVERFLOW 0 // Temporarily keep Android on the simpler FPU clamp path until arm64 full-mode is stable again.
-#define CHECK_FPU_FULL 0
+#define CHECK_FPU_EXTRA_OVERFLOW 1 // EE FPU autotests require the interpreter-compatible operand clamp path on Android ARM64.
 #else
 #define CHECK_FPU_EXTRA_OVERFLOW (EmuConfig.Cpu.Recompiler.fpuExtraOverflow) // If enabled, Operands are checked for infinities before being used in the FPU recs
-#define CHECK_FPU_FULL (EmuConfig.Cpu.Recompiler.fpuFullMode)
 #endif
+#define CHECK_FPU_FULL (EmuConfig.Cpu.Recompiler.fpuFullMode)
 #define CHECK_FPU_EXTRA_FLAGS 1 // Always enabled now // Sets D/I flags on FPU instructions
 
 //------------ EE Recompiler defines - Comment to disable a recompiler ---------------
