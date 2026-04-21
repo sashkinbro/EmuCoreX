@@ -400,7 +400,11 @@ fun HomeScreen(
                 // Empty / Games logic
                 if (uiState.games.isEmpty()) {
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                        NoGamesState()
+                        if (uiState.isRefreshing) {
+                            LoadingState()
+                        } else {
+                            NoGamesState()
+                        }
                     }
                 } else {
                     if (uiState.recentGames.isNotEmpty()) {
