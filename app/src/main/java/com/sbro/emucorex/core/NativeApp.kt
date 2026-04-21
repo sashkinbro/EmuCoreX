@@ -80,6 +80,7 @@ object NativeApp {
     @JvmStatic external fun shutdown()
     @JvmStatic external fun refreshBIOS()
     @JvmStatic external fun hasValidVm(): Boolean
+    @JvmStatic external fun captureVu1Trace(durationMs: Int): String?
     @JvmStatic external fun getGameSerial(): String?
     @JvmStatic external fun saveStateToSlot(slot: Int): Boolean
     @JvmStatic external fun loadStateFromSlot(slot: Int): Boolean

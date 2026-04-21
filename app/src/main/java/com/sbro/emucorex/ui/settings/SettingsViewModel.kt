@@ -48,6 +48,10 @@ data class SettingsUiState(
     // Extended settings
     val eeCycleRate: Int = 0,
     val eeCycleSkip: Int = 0,
+    val enableEeRecompiler: Boolean = true,
+    val enableIopRecompiler: Boolean = true,
+    val enableVu0Recompiler: Boolean = true,
+    val enableVu1Recompiler: Boolean = true,
     val enableMtvu: Boolean = true,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = true,
@@ -158,6 +162,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             performanceProfile = snapshot.performanceProfile,
             eeCycleRate = snapshot.eeCycleRate,
             eeCycleSkip = snapshot.eeCycleSkip,
+            enableEeRecompiler = snapshot.enableEeRecompiler,
+            enableIopRecompiler = snapshot.enableIopRecompiler,
+            enableVu0Recompiler = snapshot.enableVu0Recompiler,
+            enableVu1Recompiler = snapshot.enableVu1Recompiler,
             enableMtvu = snapshot.enableMtvu,
             enableFastCdvd = snapshot.enableFastCdvd,
             enableCheats = snapshot.enableCheats,
@@ -341,6 +349,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             markPerformancePresetCustom()
             preferences.setEeCycleSkip(value)
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "EECycleSkip", "int", value.toString())
+        }
+    }
+
+    fun setEnableEeRecompiler(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableEeRecompiler(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableEE", "bool", enabled.toString())
+        }
+    }
+
+    fun setEnableIopRecompiler(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableIopRecompiler(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableIOP", "bool", enabled.toString())
+        }
+    }
+
+    fun setEnableVu0Recompiler(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableVu0Recompiler(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableVU0", "bool", enabled.toString())
+        }
+    }
+
+    fun setEnableVu1Recompiler(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableVu1Recompiler(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableVU1", "bool", enabled.toString())
         }
     }
 
@@ -796,6 +836,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 upscaleMultiplier = _uiState.value.upscaleMultiplier,
                 gpuDriverType = _uiState.value.gpuDriverType,
                 customDriverPath = _uiState.value.customDriverPath,
+                enableEeRecompiler = _uiState.value.enableEeRecompiler,
+                enableIopRecompiler = _uiState.value.enableIopRecompiler,
+                enableVu0Recompiler = _uiState.value.enableVu0Recompiler,
+                enableVu1Recompiler = _uiState.value.enableVu1Recompiler,
                 hwDownloadMode = _uiState.value.hwDownloadMode,
                 textureFiltering = _uiState.value.textureFiltering,
                 trilinearFiltering = _uiState.value.trilinearFiltering,

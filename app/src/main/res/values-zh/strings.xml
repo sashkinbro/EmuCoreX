@@ -929,4 +929,23 @@
     <string name="settings_gamepad_stick_deadzone">摇杆死区</string>
     <string name="settings_gamepad_left_stick_sensitivity">左摇杆灵敏度</string>
     <string name="settings_gamepad_right_stick_sensitivity">右摇杆灵敏度</string>
+    <string name="emulation_vu1_trace_capture">捕获 VU1 追踪 (1秒)</string>
+    <string name="emulation_vu1_trace_started">VU1 追踪已启用，持续 1 秒。</string>
+    <string name="emulation_vu1_trace_failed">无法启动 VU1 追踪。</string>
+    <string name="settings_jit_tab">JIT</string>
+    <string name="settings_jit_section">JIT / 解释器</string>
+    <string name="settings_jit_section_note">关闭重编译器以强制该模块使用解释器。这仅用于隔离问题和追踪崩溃，不适合正常游玩。</string>
+    <string name="settings_enable_ee_recompiler">EE 重编译器</string>
+    <string name="settings_enable_ee_recompiler_desc">主 Emotion Engine CPU JIT。禁用它以强制使用 EE 解释器。</string>
+    <string name="settings_enable_iop_recompiler">IOP 重编译器</string>
+    <string name="settings_enable_iop_recompiler_desc">PS1 侧 I/O 处理器 JIT。禁用它以强制使用 IOP 解释器。</string>
+    <string name="settings_enable_vu0_recompiler">VU0 重编译器</string>
+    <string name="settings_enable_vu0_recompiler_desc">向量单元 0 微重编译器。禁用它以强制使用 VU0 解释器。</string>
+    <string name="settings_enable_vu1_recompiler">VU1 重编译器</string>
+    <string name="settings_enable_vu1_recompiler_desc">向量单元 1 微重编译器。禁用它以强制使用 VU1 解释器。</string>
+    <string name="settings_jit_mtvu_note">如果您禁用了 VU1 重编译器，请同时关闭下方的 MTVU。MTVU 仅在启用 VU1 重编译时才有意义。</string>
+    <string name="settings_help_enable_ee_recompiler">控制用于 Emotion Engine 的主要 PlayStation 2 CPU 重编译器。在正常游玩时请保持启用状态。仅在测试与 CPU 相关的错误、崩溃或时序问题时才将其禁用，因为解释器模式要慢得多。</string>
+    <string name="settings_help_enable_iop_recompiler">控制用于源自 PlayStation 1 的 I/O 处理器的 IOP 重编译器。这通常保持启用状态。仅在隔离底层 IOP 行为、音频、控制器或与 DMA 相关的兼容性问题时才将其关闭。</string>
+    <string name="settings_help_enable_vu0_recompiler">控制向量单元 0 (VU0) 重编译器。VU0 用于某些游戏逻辑和数学工作负载。如果怀疑 VU0 生成的代码产生了错误的结果，请仅在进行兼容性测试时将其禁用。</string>
+    <string name="settings_help_enable_vu1_recompiler">控制向量单元 1 (VU1) 重编译器。VU1 在许多游戏中驱动着大量的变换和几何工作。当您需要将 JIT 输出与解释器进行比较、调查渲染损坏或捕获 VU1 追踪以进行调试时，请将其禁用。</string>
 </resources>

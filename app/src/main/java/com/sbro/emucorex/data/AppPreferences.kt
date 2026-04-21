@@ -55,6 +55,10 @@ data class SettingsSnapshot(
     val setupComplete: Boolean = false,
     val eeCycleRate: Int = PerformanceProfiles.safeConfig.eeCycleRate,
     val eeCycleSkip: Int = PerformanceProfiles.safeConfig.eeCycleSkip,
+    val enableEeRecompiler: Boolean = true,
+    val enableIopRecompiler: Boolean = true,
+    val enableVu0Recompiler: Boolean = true,
+    val enableVu1Recompiler: Boolean = true,
     val enableMtvu: Boolean = true,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = true,
@@ -242,6 +246,10 @@ class AppPreferences(private val context: Context) {
         // Extended emulator settings
         private val EE_CYCLE_RATE = intPreferencesKey("ee_cycle_rate")
         private val EE_CYCLE_SKIP = intPreferencesKey("ee_cycle_skip")
+        private val ENABLE_EE_RECOMPILER = booleanPreferencesKey("enable_ee_recompiler")
+        private val ENABLE_IOP_RECOMPILER = booleanPreferencesKey("enable_iop_recompiler")
+        private val ENABLE_VU0_RECOMPILER = booleanPreferencesKey("enable_vu0_recompiler")
+        private val ENABLE_VU1_RECOMPILER = booleanPreferencesKey("enable_vu1_recompiler")
         private val ENABLE_MTVU = booleanPreferencesKey("enable_mtvu")
         private val ENABLE_FAST_CDVD = booleanPreferencesKey("enable_fast_cdvd")
         private val ENABLE_CHEATS = booleanPreferencesKey("enable_cheats")
@@ -586,6 +594,10 @@ class AppPreferences(private val context: Context) {
                 setupComplete = prefs[ONBOARDING_COMPLETED] ?: false,
                 eeCycleRate = prefs[EE_CYCLE_RATE] ?: profileConfig.eeCycleRate,
                 eeCycleSkip = prefs[EE_CYCLE_SKIP] ?: profileConfig.eeCycleSkip,
+                enableEeRecompiler = prefs[ENABLE_EE_RECOMPILER] ?: true,
+                enableIopRecompiler = prefs[ENABLE_IOP_RECOMPILER] ?: true,
+                enableVu0Recompiler = prefs[ENABLE_VU0_RECOMPILER] ?: true,
+                enableVu1Recompiler = prefs[ENABLE_VU1_RECOMPILER] ?: true,
                 enableMtvu = prefs[ENABLE_MTVU] ?: true,
                 enableFastCdvd = prefs[ENABLE_FAST_CDVD] ?: false,
                 enableCheats = prefs[ENABLE_CHEATS] ?: true,
@@ -1021,6 +1033,38 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setEeCycleSkip(value: Int) {
         context.dataStore.edit { it[EE_CYCLE_SKIP] = value.coerceIn(0, 3) }
+    }
+
+    val enableEeRecompiler: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_EE_RECOMPILER] ?: true
+    }
+
+    suspend fun setEnableEeRecompiler(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_EE_RECOMPILER] = enabled }
+    }
+
+    val enableIopRecompiler: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_IOP_RECOMPILER] ?: true
+    }
+
+    suspend fun setEnableIopRecompiler(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_IOP_RECOMPILER] = enabled }
+    }
+
+    val enableVu0Recompiler: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_VU0_RECOMPILER] ?: true
+    }
+
+    suspend fun setEnableVu0Recompiler(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_VU0_RECOMPILER] = enabled }
+    }
+
+    val enableVu1Recompiler: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_VU1_RECOMPILER] ?: true
+    }
+
+    suspend fun setEnableVu1Recompiler(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_VU1_RECOMPILER] = enabled }
     }
 
     // MTVU (Multi-Threaded VU1)
@@ -1803,6 +1847,10 @@ class AppPreferences(private val context: Context) {
             put("gamepadRightStickSensitivity", prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY)
             put("eeCycleRate", prefs[EE_CYCLE_RATE] ?: 0)
             put("eeCycleSkip", prefs[EE_CYCLE_SKIP] ?: 0)
+            put("enableEeRecompiler", prefs[ENABLE_EE_RECOMPILER] ?: true)
+            put("enableIopRecompiler", prefs[ENABLE_IOP_RECOMPILER] ?: true)
+            put("enableVu0Recompiler", prefs[ENABLE_VU0_RECOMPILER] ?: true)
+            put("enableVu1Recompiler", prefs[ENABLE_VU1_RECOMPILER] ?: true)
             put("enableMtvu", prefs[ENABLE_MTVU] ?: true)
             put("enableFastCdvd", prefs[ENABLE_FAST_CDVD] ?: false)
             put("hwDownloadMode", prefs[HW_DOWNLOAD_MODE] ?: 0)
@@ -1917,6 +1965,10 @@ class AppPreferences(private val context: Context) {
             prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] = json.optInt("gamepadRightStickSensitivity", DEFAULT_GAMEPAD_STICK_SENSITIVITY).coerceIn(50, 200)
             prefs[EE_CYCLE_RATE] = json.optInt("eeCycleRate", 0)
             prefs[EE_CYCLE_SKIP] = json.optInt("eeCycleSkip", 0)
+            prefs[ENABLE_EE_RECOMPILER] = json.optBoolean("enableEeRecompiler", true)
+            prefs[ENABLE_IOP_RECOMPILER] = json.optBoolean("enableIopRecompiler", true)
+            prefs[ENABLE_VU0_RECOMPILER] = json.optBoolean("enableVu0Recompiler", true)
+            prefs[ENABLE_VU1_RECOMPILER] = json.optBoolean("enableVu1Recompiler", true)
             prefs[ENABLE_MTVU] = json.optBoolean("enableMtvu", true)
             prefs[ENABLE_FAST_CDVD] = json.optBoolean("enableFastCdvd", false)
             prefs[HW_DOWNLOAD_MODE] = json.optInt("hwDownloadMode", 0).coerceIn(0, 3)

@@ -929,4 +929,23 @@
     <string name="settings_gamepad_stick_deadzone">Мертвая зона стика</string>
     <string name="settings_gamepad_left_stick_sensitivity">Чувствительность левого стика</string>
     <string name="settings_gamepad_right_stick_sensitivity">Чувствительность правого стика</string>
+    <string name="emulation_vu1_trace_capture">Захват трассировки VU1 (1 с)</string>
+    <string name="emulation_vu1_trace_started">Трассировка VU1 активирована на 1 секунду.</string>
+    <string name="emulation_vu1_trace_failed">Не удалось начать трассировку VU1.</string>
+    <string name="settings_jit_tab">JIT</string>
+    <string name="settings_jit_section">JIT / Интерпретатор</string>
+    <string name="settings_jit_section_note">Отключите рекомпилятор, чтобы принудительно перевести этот блок на интерпретатор. Используйте это для изоляции ошибок и отслеживания сбоев, а не для обычной игры.</string>
+    <string name="settings_enable_ee_recompiler">Рекомпилятор EE</string>
+    <string name="settings_enable_ee_recompiler_desc">JIT основного процессора Emotion Engine. Отключите, чтобы принудительно использовать интерпретатор EE.</string>
+    <string name="settings_enable_iop_recompiler">Рекомпилятор IOP</string>
+    <string name="settings_enable_iop_recompiler_desc">JIT процессора ввода-вывода со стороны PS1. Отключите, чтобы принудительно использовать интерпретатор IOP.</string>
+    <string name="settings_enable_vu0_recompiler">Рекомпилятор VU0</string>
+    <string name="settings_enable_vu0_recompiler_desc">Микрорекомпилятор векторного модуля 0. Отключите, чтобы принудительно использовать интерпретатор VU0.</string>
+    <string name="settings_enable_vu1_recompiler">Рекомпилятор VU1</string>
+    <string name="settings_enable_vu1_recompiler_desc">Микрорекомпилятор векторного модуля 1. Отключите, чтобы принудительно использовать интерпретатор VU1.</string>
+    <string name="settings_jit_mtvu_note">Если вы отключите рекомпилятор VU1, также отключите MTVU ниже. MTVU имеет смысл только при включенной рекомпиляции VU1.</string>
+    <string name="settings_help_enable_ee_recompiler">Управляет рекомпилятором основного процессора PlayStation 2 для Emotion Engine. Оставьте его включенным для обычной игры. Отключайте его только при тестировании ошибок, связанных с процессором, сбоев или проблем с таймингами, поскольку режим интерпретатора работает намного медленнее.</string>
+    <string name="settings_help_enable_iop_recompiler">Управляет рекомпилятором IOP, используемым для процессора ввода-вывода, унаследованного от PlayStation 1. Обычно он остается включенным. Отключайте его только при изоляции низкоуровневого поведения IOP, звука, контроллера или проблем совместимости, связанных с DMA.</string>
+    <string name="settings_help_enable_vu0_recompiler">Управляет рекомпилятором векторного модуля 0 (VU0). VU0 используется в некоторых играх для логических и математических вычислений. Отключайте его только для тестирования совместимости, если вы подозреваете, что код, сгенерированный VU0, дает неверные результаты.</string>
+    <string name="settings_help_enable_vu1_recompiler">Управляет рекомпилятором векторного модуля 1 (VU1). VU1 выполняет большой объем работ по трансформации и геометрии во многих играх. Отключайте его, когда вам нужно сравнить вывод JIT с интерпретатором, исследовать искажения рендеринга или сделать трассировку VU1 для отладки.</string>
 </resources>

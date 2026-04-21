@@ -929,4 +929,23 @@
     <string name="settings_gamepad_stick_deadzone">Zone morte du stick</string>
     <string name="settings_gamepad_left_stick_sensitivity">Sensibilité du stick gauche</string>
     <string name="settings_gamepad_right_stick_sensitivity">Sensibilité du stick droit</string>
+    <string name="emulation_vu1_trace_capture">Capturer la trace VU1 (1 s)</string>
+    <string name="emulation_vu1_trace_started">Trace VU1 armée pour 1 seconde.</string>
+    <string name="emulation_vu1_trace_failed">Impossible de démarrer la trace VU1.</string>
+    <string name="settings_jit_tab">JIT</string>
+    <string name="settings_jit_section">JIT / Interpréteur</string>
+    <string name="settings_jit_section_note">Désactivez un recompilateur pour forcer ce bloc sur l\'interpréteur. Utilisez cette option pour l\'isolation et le traçage des plantages, pas pour jouer normalement.</string>
+    <string name="settings_enable_ee_recompiler">Recompilateur EE</string>
+    <string name="settings_enable_ee_recompiler_desc">JIT du CPU Emotion Engine principal. Désactivez-le pour forcer l\'interpréteur EE.</string>
+    <string name="settings_enable_iop_recompiler">Recompilateur IOP</string>
+    <string name="settings_enable_iop_recompiler_desc">JIT du processeur d\'E/S côté PS1. Désactivez-le pour forcer l\'interpréteur IOP.</string>
+    <string name="settings_enable_vu0_recompiler">Recompilateur VU0</string>
+    <string name="settings_enable_vu0_recompiler_desc">Micro-recompilateur de l\'unité vectorielle 0. Désactivez-le pour forcer l\'interpréteur VU0.</string>
+    <string name="settings_enable_vu1_recompiler">Recompilateur VU1</string>
+    <string name="settings_enable_vu1_recompiler_desc">Micro-recompilateur de l\'unité vectorielle 1. Désactivez-le pour forcer l\'interpréteur VU1.</string>
+    <string name="settings_jit_mtvu_note">Si vous désactivez le recompilateur VU1, désactivez également MTVU ci-dessous. MTVU n\'a de sens que si la recompilation VU1 est activée.</string>
+    <string name="settings_help_enable_ee_recompiler">Contrôle le recompilateur du CPU principal de la PlayStation 2 pour l\'Emotion Engine. Laissez cette option activée pour jouer normalement. Ne la désactivez que pour tester des bugs, des plantages ou des problèmes de synchronisation liés au CPU, car le mode interpréteur est beaucoup plus lent.</string>
+    <string name="settings_help_enable_iop_recompiler">Contrôle le recompilateur IOP utilisé pour le processeur d\'E/S dérivé de la PlayStation 1. Cette option reste généralement activée. Ne la désactivez que pour isoler les comportements IOP de bas niveau, l\'audio, la manette ou les problèmes de compatibilité liés à l\'accès direct en mémoire (DMA).</string>
+    <string name="settings_help_enable_vu0_recompiler">Contrôle le recompilateur de l\'unité vectorielle 0. L\'unité VU0 est utilisée par certaines logiques de jeu et charges de travail mathématiques. Ne la désactivez que pour les tests de compatibilité si vous pensez que le code généré par l\'unité VU0 produit des résultats incorrects.</string>
+    <string name="settings_help_enable_vu1_recompiler">Contrôle le recompilateur de l\'unité vectorielle 1. L\'unité VU1 gère une grande quantité de travail de transformation et de géométrie dans de nombreux jeux. Désactivez-la lorsque vous devez comparer la sortie JIT à celle de l\'interpréteur, examiner la corruption du rendu ou capturer des traces VU1 pour le débogage.</string>
 </resources>

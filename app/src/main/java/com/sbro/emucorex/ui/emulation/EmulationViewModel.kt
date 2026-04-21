@@ -140,6 +140,10 @@ private data class EmulationLaunchConfig(
     val gpuDriverType: Int,
     val customDriverPath: String?,
     val aspectRatio: Int,
+    val enableEeRecompiler: Boolean,
+    val enableIopRecompiler: Boolean,
+    val enableVu0Recompiler: Boolean,
+    val enableVu1Recompiler: Boolean,
     val mtvu: Boolean,
     val fastCdvd: Boolean,
     val enableCheats: Boolean,
@@ -698,6 +702,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gpuDriverType = config.gpuDriverType,
                     customDriverPath = config.customDriverPath,
                     aspectRatio = config.aspectRatio,
+                    enableEeRecompiler = config.enableEeRecompiler,
+                    enableIopRecompiler = config.enableIopRecompiler,
+                    enableVu0Recompiler = config.enableVu0Recompiler,
+                    enableVu1Recompiler = config.enableVu1Recompiler,
                     mtvu = config.mtvu,
                     fastCdvd = config.fastCdvd,
                     enableCheats = config.enableCheats,
@@ -2043,6 +2051,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gpuDriverType = preferences.gpuDriverType.first(),
             customDriverPath = preferences.customDriverPath.first(),
             aspectRatio = preferences.aspectRatio.first(),
+            enableEeRecompiler = preferences.enableEeRecompiler.first(),
+            enableIopRecompiler = preferences.enableIopRecompiler.first(),
+            enableVu0Recompiler = preferences.enableVu0Recompiler.first(),
+            enableVu1Recompiler = preferences.enableVu1Recompiler.first(),
             mtvu = preferences.enableMtvu.first(),
             fastCdvd = preferences.enableFastCdvd.first(),
             enableCheats = preferences.enableCheats.first(),
@@ -2528,6 +2540,39 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             )
             delay(2000)
             _uiState.value = _uiState.value.copy(toastMessage = null)
+        }
+    }
+
+    fun captureVu1Trace(durationMs: Int = 1_000) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val shouldResume = _uiState.value.showMenu || _uiState.value.isPaused
+            val capturePath = lifecycleMutex.withLock {
+                if (isShuttingDown) {
+                    null
+                } else {
+                    try {
+                        EmulatorBridge.captureVu1Trace(durationMs)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }
+
+            val success = !capturePath.isNullOrBlank()
+            if (success && shouldResume) {
+                runCatching { EmulatorBridge.resume() }
+            }
+
+            _uiState.value = _uiState.value.copy(
+                showMenu = if (success && shouldResume) false else _uiState.value.showMenu,
+                isPaused = if (success && shouldResume) false else _uiState.value.isPaused,
+                toastMessage = if (success) "vu1_trace_started" else "vu1_trace_failed"
+            )
+            updateCrashContext(launchState = if (success && shouldResume) "running" else null)
+            delay(2500)
+            if (_uiState.value.toastMessage == "vu1_trace_started" || _uiState.value.toastMessage == "vu1_trace_failed") {
+                _uiState.value = _uiState.value.copy(toastMessage = null)
+            }
         }
     }
 

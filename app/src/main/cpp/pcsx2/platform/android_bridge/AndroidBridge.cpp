@@ -10,6 +10,7 @@
 #include "common/ZipHelpers.h"
 #include "common/Error.h"
 #include "pcsx2/GS.h"
+#include "pcsx2/VU1Trace.h"
 #include "pcsx2/core/runtime/BuildVersion.h"
 #include "pcsx2/VMManager.h"
 #include "pcsx2/Config.h"
@@ -2395,6 +2396,26 @@ JNIEXPORT jboolean JNICALL
 Java_com_sbro_emucorex_core_NativeApp_hasValidVm(JNIEnv*, jclass)
 {
     return VMManager::HasValidVM() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_sbro_emucorex_core_NativeApp_captureVu1Trace(JNIEnv* env, jclass, jint duration_ms)
+{
+    if (!VMManager::HasValidVM())
+        return nullptr;
+
+    const std::string path = RunOnCPUThreadBlocking<std::string>(std::string(), [duration_ms]() {
+        if (!VMManager::HasValidVM())
+            return std::string();
+
+        return VU1Trace::BeginCapture(static_cast<u32>(std::max(duration_ms, 1)));
+    });
+
+    if (path.empty())
+        return nullptr;
+
+    return env->NewStringUTF(path.c_str());
 }
 
 

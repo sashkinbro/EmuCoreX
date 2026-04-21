@@ -135,7 +135,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Paths, MemoryCards, Covers, DataTransfer, Performance, SpeedHacks, Cheats, Advanced, About
+    General, Graphics, Controls, Paths, MemoryCards, Covers, DataTransfer, Performance, Jit, SpeedHacks, Cheats, Advanced, About
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -1363,6 +1363,55 @@ private fun SettingsContent(
                     }
                 }
 
+                SettingsTab.Jit -> {
+                    SettingsSection(title = stringResource(R.string.settings_jit_section)) {
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_enable_ee_recompiler),
+                            subtitle = stringResource(R.string.settings_enable_ee_recompiler_desc),
+                            checked = uiState.enableEeRecompiler,
+                            onCheckedChange = viewModel::setEnableEeRecompiler,
+                            helpText = stringResource(R.string.settings_help_enable_ee_recompiler),
+                            onResetToDefault = { viewModel.setEnableEeRecompiler(defaults.enableEeRecompiler) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_enable_iop_recompiler),
+                            subtitle = stringResource(R.string.settings_enable_iop_recompiler_desc),
+                            checked = uiState.enableIopRecompiler,
+                            onCheckedChange = viewModel::setEnableIopRecompiler,
+                            helpText = stringResource(R.string.settings_help_enable_iop_recompiler),
+                            onResetToDefault = { viewModel.setEnableIopRecompiler(defaults.enableIopRecompiler) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_enable_vu0_recompiler),
+                            subtitle = stringResource(R.string.settings_enable_vu0_recompiler_desc),
+                            checked = uiState.enableVu0Recompiler,
+                            onCheckedChange = viewModel::setEnableVu0Recompiler,
+                            helpText = stringResource(R.string.settings_help_enable_vu0_recompiler),
+                            onResetToDefault = { viewModel.setEnableVu0Recompiler(defaults.enableVu0Recompiler) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_enable_vu1_recompiler),
+                            subtitle = stringResource(R.string.settings_enable_vu1_recompiler_desc),
+                            checked = uiState.enableVu1Recompiler,
+                            onCheckedChange = viewModel::setEnableVu1Recompiler,
+                            helpText = stringResource(R.string.settings_help_enable_vu1_recompiler),
+                            onResetToDefault = { viewModel.setEnableVu1Recompiler(defaults.enableVu1Recompiler) }
+                        )
+                        SettingsInlineNote(
+                            text = stringResource(R.string.settings_jit_section_note)
+                        )
+                        if (!uiState.enableVu1Recompiler && uiState.enableMtvu) {
+                            SettingsInlineNote(
+                                text = stringResource(R.string.settings_jit_mtvu_note)
+                            )
+                        }
+                    }
+                }
+
                 SettingsTab.SpeedHacks -> {
                     SettingsSection(title = stringResource(R.string.settings_speed_hacks)) {
                         ChoiceSection(
@@ -2158,6 +2207,10 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Performance, R.string.settings_show_fps),
         entry(SettingsTab.Performance, R.string.settings_fps_overlay_mode),
         entry(SettingsTab.Performance, R.string.settings_fps_overlay_position),
+        entry(SettingsTab.Jit, R.string.settings_enable_ee_recompiler),
+        entry(SettingsTab.Jit, R.string.settings_enable_iop_recompiler),
+        entry(SettingsTab.Jit, R.string.settings_enable_vu0_recompiler),
+        entry(SettingsTab.Jit, R.string.settings_enable_vu1_recompiler),
         entry(SettingsTab.SpeedHacks, R.string.settings_frame_limiter),
         entry(SettingsTab.SpeedHacks, R.string.settings_target_fps),
         entry(SettingsTab.SpeedHacks, R.string.settings_ee_cycle_rate),
@@ -2984,6 +3037,7 @@ private fun SettingsTab.label(): String {
         SettingsTab.Covers -> stringResource(R.string.settings_covers_tab)
         SettingsTab.DataTransfer -> stringResource(R.string.settings_data_transfer_tab)
         SettingsTab.Performance -> stringResource(R.string.settings_performance_tab)
+        SettingsTab.Jit -> stringResource(R.string.settings_jit_tab)
         SettingsTab.SpeedHacks -> stringResource(R.string.settings_speedhacks_tab)
         SettingsTab.Cheats -> stringResource(R.string.settings_cheats_tab)
         SettingsTab.Advanced -> stringResource(R.string.settings_advanced_tab)
@@ -3002,6 +3056,7 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.Covers -> Icons.Rounded.Link
         SettingsTab.DataTransfer -> Icons.Rounded.SaveAs
         SettingsTab.Performance -> Icons.Rounded.Speed
+        SettingsTab.Jit -> Icons.Rounded.Speed
         SettingsTab.SpeedHacks -> Icons.Rounded.Speed
         SettingsTab.Cheats -> Icons.Rounded.Star
         SettingsTab.Advanced -> Icons.Rounded.SettingsSuggest
@@ -3018,6 +3073,7 @@ private fun String.toSettingsTab(): SettingsTab {
         "covers", "cover-art", "cover_art" -> SettingsTab.Covers
         "data_transfer", "transfer", "backup", "data-transfer" -> SettingsTab.DataTransfer
         "performance" -> SettingsTab.Performance
+        "jit" -> SettingsTab.Jit
         "speedhacks", "speed_hacks", "speed-hacks" -> SettingsTab.SpeedHacks
         "cheats", "cheat" -> SettingsTab.Cheats
         "advanced" -> SettingsTab.Advanced

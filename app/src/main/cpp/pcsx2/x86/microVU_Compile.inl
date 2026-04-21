@@ -225,6 +225,21 @@ void mVUexecuteInstruction(mV)
 	flushRegs(mVU);
 }
 
+__ri void mVUtraceInstruction(mV)
+{
+	if (!isVU1)
+		return;
+
+	a64::Label skip;
+	armAsm->Ldrb(a64::w16, armMemOperandPtr(&VU1Trace::g_recompiler_capture_active));
+	armAsm->Cbz(a64::w16, &skip);
+	mVUbackupRegs(mVU, true);
+	armAsm->Mov(EAX, xPC);
+	armEmitCall(reinterpret_cast<void*>(VU1Trace::LogRecompilerStep));
+	mVUrestoreRegs(mVU, true);
+	armBind(&skip);
+}
+
 //------------------------------------------------------------------
 // Warnings / Errors / Illegal Instructions
 //------------------------------------------------------------------
@@ -953,6 +968,7 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		}
 
 		mVUexecuteInstruction(mVU);
+		mVUtraceInstruction(mVU);
 		if (!mVUinfo.isBdelay && !mVUlow.branch) //T/D Bit on branch is handled after the branch, branch delay slots are executed.
 		{
 			if (mVUup.tBit)

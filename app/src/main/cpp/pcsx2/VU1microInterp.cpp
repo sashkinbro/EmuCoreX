@@ -4,6 +4,7 @@
 #include "Common.h"
 
 #include "VUmicro.h"
+#include "VU1Trace.h"
 #include "GS.h"
 #include "Gif_Unit.h"
 #include "MTVU.h"
@@ -253,7 +254,10 @@ void InterpVU1::SetStartPC(u32 startPC)
 void InterpVU1::Step()
 {
 	VU1.VI[REG_TPC].UL &= VU1_PROGMASK;
+	const u32 executed_pc = VU1.VI[REG_TPC].UL;
 	vu1Exec(&VU1);
+	if (VU1Trace::HasInterpreterCapture())
+		VU1Trace::LogInterpreterStep(VU1, executed_pc);
 }
 
 void InterpVU1::Execute(u32 cycles)

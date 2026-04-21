@@ -51,6 +51,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.LockOpen
@@ -693,6 +694,8 @@ fun EmulationScreen(
                 "bios_missing" -> stringResource(R.string.emulation_bios_missing)
                 "launch_failed" -> stringResource(R.string.emulation_launch_failed)
                 "launch_path_error" -> stringResource(R.string.emulation_launch_path_error)
+                "vu1_trace_started" -> stringResource(R.string.emulation_vu1_trace_started)
+                "vu1_trace_failed" -> stringResource(R.string.emulation_vu1_trace_failed)
                 else -> ""
             }
             Box(
@@ -893,6 +896,7 @@ fun EmulationScreen(
                     onPauseToggle = togglePauseClick,
                     onQuickSave = requestQuickSaveClick,
                     onQuickLoad = requestQuickLoadClick,
+                    onCaptureVu1Trace = { viewModel.captureVu1Trace() },
                     onSaveGameSettingsProfile = { viewModel.saveCurrentGameSettingsProfile() },
                     onResetGameSettingsProfile = { viewModel.resetCurrentGameSettingsProfile() },
                     onNextSlot = { viewModel.setSlot(uiState.currentSlot + 1) },
@@ -1645,6 +1649,7 @@ private fun EmulationSidebarMenu(
     onPauseToggle: () -> Unit,
     onQuickSave: () -> Unit,
     onQuickLoad: () -> Unit,
+    onCaptureVu1Trace: () -> Unit,
     onSaveGameSettingsProfile: () -> Unit,
     onResetGameSettingsProfile: () -> Unit,
     onNextSlot: () -> Unit,
@@ -1900,6 +1905,14 @@ private fun EmulationSidebarMenu(
                                 )
                             }
                         }
+
+                        MenuButton(
+                            icon = Icons.Rounded.BugReport,
+                            text = stringResource(R.string.emulation_vu1_trace_capture),
+                            onClick = onCaptureVu1Trace,
+                            enabled = !uiState.isActionInProgress,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+                        )
 
                         SidebarSectionTitle(
                             text = stringResource(R.string.game_settings_overlay_section).uppercase(),

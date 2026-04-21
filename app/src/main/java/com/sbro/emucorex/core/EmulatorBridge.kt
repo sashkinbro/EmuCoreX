@@ -218,6 +218,10 @@ object EmulatorBridge {
         gpuDriverType: Int = 0,
         customDriverPath: String? = null,
         aspectRatio: Int = 1,
+        enableEeRecompiler: Boolean = true,
+        enableIopRecompiler: Boolean = true,
+        enableVu0Recompiler: Boolean = true,
+        enableVu1Recompiler: Boolean = true,
         mtvu: Boolean = true,
         fastCdvd: Boolean = false,
         enableCheats: Boolean = true,
@@ -343,6 +347,10 @@ object EmulatorBridge {
                 add(settingOp("Filenames", "BIOS", "string", preferredBiosFile.orEmpty()))
                 add(refreshBiosOp())
                 add(settingOp("EmuCoreX", "OpenGLTextureDebugLog", "bool", (resolvedRenderer == 12).toString()))
+                add(settingOp("EmuCore/CPU/Recompiler", "EnableEE", "bool", enableEeRecompiler.toString()))
+                add(settingOp("EmuCore/CPU/Recompiler", "EnableIOP", "bool", enableIopRecompiler.toString()))
+                add(settingOp("EmuCore/CPU/Recompiler", "EnableVU0", "bool", enableVu0Recompiler.toString()))
+                add(settingOp("EmuCore/CPU/Recompiler", "EnableVU1", "bool", enableVu1Recompiler.toString()))
                 add(settingOp("EmuCore/Speedhacks", "vuThread", "bool", mtvu.toString()))
                 add(settingOp("EmuCore/Speedhacks", "fastCDVD", "bool", fastCdvd.toString()))
                 add(settingOp("EmuCore", "EnableCheats", "bool", enableCheats.toString()))
@@ -564,6 +572,17 @@ object EmulatorBridge {
                 success
             } catch (_: Exception) {
                 false
+            }
+        }
+    }
+
+    suspend fun captureVu1Trace(durationMs: Int): String? {
+        if (!isNativeLoaded || !isVmActive) return null
+        return runSerial {
+            try {
+                NativeApp.captureVu1Trace(durationMs)
+            } catch (_: Exception) {
+                null
             }
         }
     }
