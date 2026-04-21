@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.NavHost
@@ -228,8 +229,8 @@ fun AppNavigation(
     var blockRestoredEmulationRoute by remember(restoredFromSavedState) {
         mutableStateOf(restoredFromSavedState)
     }
-    val unsupportedGameImageMessage = context.getString(R.string.shell_launch_game_unsupported)
-    val continueUnavailableMessage = context.getString(R.string.home_game_menu_continue_unavailable)
+    val unsupportedGameImageMessage = stringResource(R.string.shell_launch_game_unsupported)
+    val continueUnavailableMessage = stringResource(R.string.home_game_menu_continue_unavailable)
     LaunchedEffect(currentBackStackEntry?.destination, restoredFromSavedState) {
         if (!restoredFromSavedState) return@LaunchedEffect
         val destination = currentBackStackEntry?.destination ?: return@LaunchedEffect

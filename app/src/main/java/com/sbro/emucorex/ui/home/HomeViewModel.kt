@@ -115,24 +115,26 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val effectivePath = migratedPath ?: path
                 currentLibraryRoot = effectivePath
                 val isAccessible = SetupValidator.isGameFolderAccessible(context, effectivePath)
-                if (isAccessible) {
-                    libraryInitialized = true
-                    updateBootstrapState()
-                }
-                _uiState.value = _uiState.value.copy(
-                    gameFolderSet = isAccessible,
-                    isLoading = false,
-                    isRefreshing = isAccessible
-                )
                 if (isAccessible && effectivePath != null) {
+                    libraryInitialized = false
+                    updateBootstrapState()
+                    _uiState.value = _uiState.value.copy(
+                        gameFolderSet = true,
+                        isLoading = true,
+                        isRefreshing = false
+                    )
                     requestLibraryScan(effectivePath, isInitialLoad = !libraryInitialized)
                 } else {
                     allGames = emptyList()
                     currentLibraryRoot = null
                     libraryInitialized = true
+                    _uiState.value = _uiState.value.copy(
+                        gameFolderSet = false,
+                        isLoading = false,
+                        isRefreshing = false
+                    )
                     publishVisibleGames()
                     updateBootstrapState()
-                    _uiState.value = _uiState.value.copy(isLoading = false, isRefreshing = false)
                 }
             }
         }
