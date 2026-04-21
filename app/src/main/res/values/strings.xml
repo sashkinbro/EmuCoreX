@@ -96,7 +96,10 @@
     <string name="emulation_loaded">Loaded</string>
     <string name="emulation_load_failed">Failed to load save state.</string>
     <string name="emulation_vu1_trace_capture">Capture VU1 Trace (1s)</string>
+    <string name="emulation_vu1_trace_capture_on_resume">Arm VU1 Trace For Next Resume/Load</string>
+    <string name="emulation_vu1_trace_quick_load">Trace VU1 From Quick Load</string>
     <string name="emulation_vu1_trace_started">VU1 trace armed for 1 second.</string>
+    <string name="emulation_vu1_trace_resume_armed">VU1 trace armed for the next resume/load.</string>
     <string name="emulation_vu1_trace_failed">Unable to start VU1 trace.</string>
     <string name="emulation_fps">FPS: %s</string>
     <string name="emulation_bios_missing">Add a BIOS file first.</string>

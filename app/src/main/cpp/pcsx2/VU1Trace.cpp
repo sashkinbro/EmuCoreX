@@ -28,6 +28,7 @@ namespace
 		std::chrono::steady_clock::time_point deadline = {};
 		Engine engine = Engine::Interpreter;
 		u64 step_count = 0;
+		u32 max_steps = 0;
 		u32 flush_counter = 0;
 		bool active = false;
 	};
@@ -74,11 +75,13 @@ namespace
 			"serial=%s\n"
 			"crc=%08X\n"
 			"duration_ms=%u\n"
+			"max_steps=%u\n"
 			"format=pc,cycle,lower,upper,vf00..vf31(hex xyzw)\n",
 			GetEngineLabel(state.engine),
 			serial.c_str(),
 			crc,
-			duration_ms);
+			duration_ms,
+			state.max_steps);
 		if (header_result >= 0)
 			std::fflush(state.file.get());
 	}
@@ -103,6 +106,7 @@ namespace
 		state.path.clear();
 		state.deadline = {};
 		state.step_count = 0;
+		state.max_steps = 0;
 		state.flush_counter = 0;
 		state.active = false;
 		SetActiveFlags(engine, false);
@@ -179,7 +183,9 @@ namespace
 			else
 			{
 				WriteStepLocked(state, vu, executed_pc);
-				if (std::chrono::steady_clock::now() >= state.deadline)
+				if (state.max_steps != 0 && state.step_count >= state.max_steps)
+					finished_path = CloseCaptureLocked(state, "step_limit");
+				else if (std::chrono::steady_clock::now() >= state.deadline)
 					finished_path = CloseCaptureLocked(state, "deadline");
 			}
 		}
@@ -229,6 +235,7 @@ std::string BeginCapture(const u32 duration_ms)
 		state.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(clamped_duration);
 		state.engine = engine;
 		state.step_count = 0;
+		state.max_steps = DEFAULT_MAX_TRACE_STEPS;
 		state.flush_counter = 0;
 		state.active = true;
 		ClearAllActiveFlags();
@@ -256,6 +263,11 @@ void Shutdown()
 bool HasInterpreterCapture()
 {
 	return g_interpreter_capture_active.load(std::memory_order_acquire) != 0;
+}
+
+bool HasRecompilerCapture()
+{
+	return g_recompiler_capture_active.load(std::memory_order_acquire) != 0;
 }
 
 void LogInterpreterStep(const VURegs& vu, const u32 executed_pc)

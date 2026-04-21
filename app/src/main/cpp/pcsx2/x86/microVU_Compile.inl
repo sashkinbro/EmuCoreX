@@ -227,17 +227,9 @@ void mVUexecuteInstruction(mV)
 
 __ri void mVUtraceInstruction(mV)
 {
-	if (!isVU1)
-		return;
-
-	a64::Label skip;
-	armAsm->Ldrb(a64::w16, armMemOperandPtr(&VU1Trace::g_recompiler_capture_active));
-	armAsm->Cbz(a64::w16, &skip);
-	mVUbackupRegs(mVU, true);
-	armAsm->Mov(EAX, xPC);
-	armEmitCall(reinterpret_cast<void*>(VU1Trace::LogRecompilerStep));
-	mVUrestoreRegs(mVU, true);
-	armBind(&skip);
+	// Disabled in the compiled JIT path because even a guarded callback check in
+	// this hot loop regresses VU1-heavy scenes on device. Recompiler capture is
+	// handled from recMicroVU1::Execute() only when explicitly armed.
 }
 
 //------------------------------------------------------------------

@@ -2354,6 +2354,8 @@ Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv *env, jclass clazz,
     return (boot_result == VMBootResult::StartupSuccess) ? JNI_TRUE : JNI_FALSE;
 }
 
+static std::atomic<u32> s_vu1_trace_resume_duration_ms{0};
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_pause(JNIEnv *env, jclass clazz) {
@@ -2367,6 +2369,9 @@ JNIEXPORT void JNICALL
 Java_com_sbro_emucorex_core_NativeApp_resume(JNIEnv *env, jclass clazz) {
     Host::RunOnCPUThread([] {
         VMManager::SetPaused(false);
+        const u32 pending_duration = s_vu1_trace_resume_duration_ms.exchange(0, std::memory_order_acq_rel);
+        if (pending_duration > 0 && VMManager::HasValidVM())
+            VU1Trace::BeginCapture(pending_duration);
     });
 }
 
@@ -2416,6 +2421,23 @@ Java_com_sbro_emucorex_core_NativeApp_captureVu1Trace(JNIEnv* env, jclass, jint 
         return nullptr;
 
     return env->NewStringUTF(path.c_str());
+}
+
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_com_sbro_emucorex_core_NativeApp_armVu1TraceOnNextResume(JNIEnv*, jclass, jint duration_ms)
+{
+    if (!VMManager::HasValidVM())
+        return JNI_FALSE;
+
+    const u32 clamped_duration = static_cast<u32>(std::max(duration_ms, 1));
+    s_vu1_trace_resume_duration_ms.store(clamped_duration, std::memory_order_release);
+
+    Host::AddOSDMessage(
+        fmt::format("VU1 trace armed for next resume ({} ms)", clamped_duration),
+        Host::OSD_INFO_DURATION);
+
+    return JNI_TRUE;
 }
 
 

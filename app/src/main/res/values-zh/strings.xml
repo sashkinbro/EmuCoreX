@@ -948,4 +948,7 @@
     <string name="settings_help_enable_iop_recompiler">控制用于源自 PlayStation 1 的 I/O 处理器的 IOP 重编译器。这通常保持启用状态。仅在隔离底层 IOP 行为、音频、控制器或与 DMA 相关的兼容性问题时才将其关闭。</string>
     <string name="settings_help_enable_vu0_recompiler">控制向量单元 0 (VU0) 重编译器。VU0 用于某些游戏逻辑和数学工作负载。如果怀疑 VU0 生成的代码产生了错误的结果，请仅在进行兼容性测试时将其禁用。</string>
     <string name="settings_help_enable_vu1_recompiler">控制向量单元 1 (VU1) 重编译器。VU1 在许多游戏中驱动着大量的变换和几何工作。当您需要将 JIT 输出与解释器进行比较、调查渲染损坏或捕获 VU1 追踪以进行调试时，请将其禁用。</string>
+    <string name="emulation_vu1_trace_capture_on_resume">为下一次恢复/加载启用 VU1 追踪</string>
+    <string name="emulation_vu1_trace_quick_load">从快速加载开始 VU1 追踪</string>
+    <string name="emulation_vu1_trace_resume_armed">已为下一次恢复/加载启用 VU1 追踪。</string>
 </resources>

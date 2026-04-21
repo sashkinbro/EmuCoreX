@@ -948,4 +948,7 @@
     <string name="settings_help_enable_iop_recompiler">Contrôle le recompilateur IOP utilisé pour le processeur d\'E/S dérivé de la PlayStation 1. Cette option reste généralement activée. Ne la désactivez que pour isoler les comportements IOP de bas niveau, l\'audio, la manette ou les problèmes de compatibilité liés à l\'accès direct en mémoire (DMA).</string>
     <string name="settings_help_enable_vu0_recompiler">Contrôle le recompilateur de l\'unité vectorielle 0. L\'unité VU0 est utilisée par certaines logiques de jeu et charges de travail mathématiques. Ne la désactivez que pour les tests de compatibilité si vous pensez que le code généré par l\'unité VU0 produit des résultats incorrects.</string>
     <string name="settings_help_enable_vu1_recompiler">Contrôle le recompilateur de l\'unité vectorielle 1. L\'unité VU1 gère une grande quantité de travail de transformation et de géométrie dans de nombreux jeux. Désactivez-la lorsque vous devez comparer la sortie JIT à celle de l\'interpréteur, examiner la corruption du rendu ou capturer des traces VU1 pour le débogage.</string>
+    <string name="emulation_vu1_trace_capture_on_resume">Armer la trace VU1 pour la prochaine reprise/le prochain chargement</string>
+    <string name="emulation_vu1_trace_quick_load">Trace VU1 depuis le chargement rapide</string>
+    <string name="emulation_vu1_trace_resume_armed">Trace VU1 armée pour la prochaine reprise/le prochain chargement.</string>
 </resources>

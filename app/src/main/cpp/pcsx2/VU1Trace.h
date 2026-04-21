@@ -20,10 +20,13 @@ namespace VU1Trace
 
 	extern std::atomic<u8> g_recompiler_capture_active;
 
+	constexpr u32 DEFAULT_MAX_TRACE_STEPS = 2048;
+
 	std::string BeginCapture(u32 duration_ms);
 	void Shutdown();
 
 	bool HasInterpreterCapture();
+	bool HasRecompilerCapture();
 	void LogInterpreterStep(const VURegs& vu, u32 executed_pc);
 	void LogRecompilerStep(u32 executed_pc);
 } // namespace VU1Trace

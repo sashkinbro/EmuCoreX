@@ -587,6 +587,17 @@ object EmulatorBridge {
         }
     }
 
+    suspend fun armVu1TraceOnNextResume(durationMs: Int): Boolean {
+        if (!isNativeLoaded || !isVmActive) return false
+        return runSerial {
+            try {
+                NativeApp.armVu1TraceOnNextResume(durationMs)
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
     fun hasSaveStateForGame(path: String, slot: Int): Boolean {
         if (!isNativeLoaded) return false
         if (path.startsWith("/") && !File(path).exists()) return false

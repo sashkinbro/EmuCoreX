@@ -695,6 +695,7 @@ fun EmulationScreen(
                 "launch_failed" -> stringResource(R.string.emulation_launch_failed)
                 "launch_path_error" -> stringResource(R.string.emulation_launch_path_error)
                 "vu1_trace_started" -> stringResource(R.string.emulation_vu1_trace_started)
+                "vu1_trace_resume_armed" -> stringResource(R.string.emulation_vu1_trace_resume_armed)
                 "vu1_trace_failed" -> stringResource(R.string.emulation_vu1_trace_failed)
                 else -> ""
             }
@@ -897,6 +898,7 @@ fun EmulationScreen(
                     onQuickSave = requestQuickSaveClick,
                     onQuickLoad = requestQuickLoadClick,
                     onCaptureVu1Trace = { viewModel.captureVu1Trace() },
+                    onArmVu1TraceOnNextResume = { viewModel.traceVu1FromQuickLoad() },
                     onSaveGameSettingsProfile = { viewModel.saveCurrentGameSettingsProfile() },
                     onResetGameSettingsProfile = { viewModel.resetCurrentGameSettingsProfile() },
                     onNextSlot = { viewModel.setSlot(uiState.currentSlot + 1) },
@@ -1650,6 +1652,7 @@ private fun EmulationSidebarMenu(
     onQuickSave: () -> Unit,
     onQuickLoad: () -> Unit,
     onCaptureVu1Trace: () -> Unit,
+    onArmVu1TraceOnNextResume: () -> Unit,
     onSaveGameSettingsProfile: () -> Unit,
     onResetGameSettingsProfile: () -> Unit,
     onNextSlot: () -> Unit,
@@ -1910,6 +1913,14 @@ private fun EmulationSidebarMenu(
                             icon = Icons.Rounded.BugReport,
                             text = stringResource(R.string.emulation_vu1_trace_capture),
                             onClick = onCaptureVu1Trace,
+                            enabled = !uiState.isActionInProgress,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
+                        )
+
+                        MenuButton(
+                            icon = Icons.Rounded.BugReport,
+                            text = stringResource(R.string.emulation_vu1_trace_quick_load),
+                            onClick = onArmVu1TraceOnNextResume,
                             enabled = !uiState.isActionInProgress,
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.50f)
                         )
