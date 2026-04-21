@@ -7,17 +7,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,8 +30,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -48,8 +48,8 @@ import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.SaveStateRepository
-import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
 import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
+import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
 import com.sbro.emucorex.ui.achievements.GameAchievementsScreen
 import com.sbro.emucorex.ui.catalog.CatalogSearchScreen
 import com.sbro.emucorex.ui.detail.GameDetailScreen
@@ -63,9 +63,14 @@ import com.sbro.emucorex.ui.settings.LanguageSettingsScreen
 import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
 import com.sbro.emucorex.ui.settings.PerGameSettingsQuickEditorDialog
 import com.sbro.emucorex.ui.settings.SettingsScreen
-import kotlinx.coroutines.launch
+import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -209,8 +214,9 @@ fun AppNavigation(
             preferences.biosPath,
             preferences.gamePath
         ) { onboardingCompleted, biosPath, gamePath ->
-            val hasRequiredPaths = !biosPath.isNullOrBlank() && !gamePath.isNullOrBlank()
-            val shouldOpenHome = onboardingCompleted && hasRequiredPaths
+            val hasUsableBios = BiosValidator.hasUsableBiosFiles(context, biosPath)
+            val hasGameFolder = SetupValidator.isGameFolderPresentForStartup(context, gamePath)
+            val shouldOpenHome = onboardingCompleted && hasUsableBios && hasGameFolder
             if (shouldOpenHome) StartupDestination.HOME else StartupDestination.ONBOARDING
         }.first()
     }
@@ -218,8 +224,17 @@ fun AppNavigation(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
         )
+        {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                PremiumLoadingAnimation(size = 80.dp)
+            }
+        }
         return
     }
 

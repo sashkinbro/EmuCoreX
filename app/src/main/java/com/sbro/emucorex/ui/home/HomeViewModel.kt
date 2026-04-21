@@ -116,14 +116,29 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 currentLibraryRoot = effectivePath
                 val isAccessible = SetupValidator.isGameFolderAccessible(context, effectivePath)
                 if (isAccessible && effectivePath != null) {
-                    libraryInitialized = false
-                    updateBootstrapState()
-                    _uiState.value = _uiState.value.copy(
-                        gameFolderSet = true,
-                        isLoading = true,
-                        isRefreshing = false
-                    )
-                    requestLibraryScan(effectivePath, isInitialLoad = !libraryInitialized)
+                    val cacheSnapshot = resolveCacheSnapshot(effectivePath)
+                    val hasCachedGames = cacheSnapshot.games.isNotEmpty()
+                    if (hasCachedGames) {
+                        allGames = cacheSnapshot.games
+                        currentLibraryRoot = effectivePath
+                        libraryInitialized = true
+                        _uiState.value = _uiState.value.copy(
+                            gameFolderSet = true,
+                            isLoading = false,
+                            isRefreshing = !shouldSkipAutoRescan(isInitialLoad = true, cacheSnapshot = cacheSnapshot)
+                        )
+                        publishVisibleGames()
+                        updateBootstrapState()
+                    } else {
+                        libraryInitialized = false
+                        updateBootstrapState()
+                        _uiState.value = _uiState.value.copy(
+                            gameFolderSet = true,
+                            isLoading = true,
+                            isRefreshing = false
+                        )
+                    }
+                    requestLibraryScan(effectivePath, isInitialLoad = true)
                 } else {
                     allGames = emptyList()
                     currentLibraryRoot = null
@@ -269,50 +284,54 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun scanGames(path: String, isInitialLoad: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             scanMutex.withLock {
-                if (shouldDeferLibraryWork(path, isInitialLoad)) return@withLock
-                val cacheSnapshot = resolveCacheSnapshot(path)
-                val cachedGames = cacheSnapshot.games
-                val showFullScreenLoader = false
-                _uiState.value = _uiState.value.copy(
-                    isLoading = showFullScreenLoader,
-                    isRefreshing = !showFullScreenLoader
-                )
-                publishCachedGamesIfAvailable(path, cachedGames)
-                if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                try {
+                    if (shouldDeferLibraryWork(path, isInitialLoad)) return@withLock
+                    val cacheSnapshot = resolveCacheSnapshot(path)
+                    val cachedGames = cacheSnapshot.games
+                    val showFullScreenLoader = false
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = showFullScreenLoader,
+                        isRefreshing = !showFullScreenLoader
+                    )
+                    publishCachedGamesIfAvailable(path, cachedGames)
+                    if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                        libraryInitialized = true
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false
+                        )
+                        updateBootstrapState()
+                        syncMissingCovers()
+                        return@withLock
+                    }
+                    val scannedGames = repository.scanDirectory(
+                        path,
+                        getApplication(),
+                        cachedGames.associateBy { it.path },
+                        shouldAbort = { EmulatorBridge.isVmActive() }
+                    )
+                    if (EmulatorBridge.isVmActive()) {
+                        queueDeferredLibraryWork(path, isInitialLoad = false)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false
+                        )
+                        return@withLock
+                    }
+                    allGames = scannedGames
+                    currentLibraryRoot = path
                     libraryInitialized = true
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isRefreshing = false
                     )
+                    publishVisibleGames()
                     updateBootstrapState()
+                    libraryCacheRepository.save(path, allGames, preferEnglishGameTitles)
                     syncMissingCovers()
-                    return@withLock
+                } catch (_: Exception) {
+                    completeLibraryScanWithFallback(path)
                 }
-                val scannedGames = repository.scanDirectory(
-                    path,
-                    getApplication(),
-                    cachedGames.associateBy { it.path },
-                    shouldAbort = { EmulatorBridge.isVmActive() }
-                )
-                if (EmulatorBridge.isVmActive()) {
-                    queueDeferredLibraryWork(path, isInitialLoad = false)
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isRefreshing = false
-                    )
-                    return@withLock
-                }
-                allGames = scannedGames
-                currentLibraryRoot = path
-                libraryInitialized = true
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isRefreshing = false
-                )
-                publishVisibleGames()
-                updateBootstrapState()
-                libraryCacheRepository.save(path, allGames, preferEnglishGameTitles)
-                syncMissingCovers()
             }
         }
     }
@@ -321,53 +340,68 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             scanMutex.withLock {
                 val rootPath = uri.toString()
-                if (shouldDeferLibraryWork(rootPath, isInitialLoad)) return@withLock
-                val cacheSnapshot = resolveCacheSnapshot(rootPath)
-                val cachedGames = cacheSnapshot.games
-                val showFullScreenLoader = false
-                _uiState.value = _uiState.value.copy(
-                    isLoading = showFullScreenLoader,
-                    isRefreshing = !showFullScreenLoader
-                )
-                publishCachedGamesIfAvailable(rootPath, cachedGames)
-                if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                try {
+                    if (shouldDeferLibraryWork(rootPath, isInitialLoad)) return@withLock
+                    val cacheSnapshot = resolveCacheSnapshot(rootPath)
+                    val cachedGames = cacheSnapshot.games
+                    val showFullScreenLoader = false
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = showFullScreenLoader,
+                        isRefreshing = !showFullScreenLoader
+                    )
+                    publishCachedGamesIfAvailable(rootPath, cachedGames)
+                    if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
+                        libraryInitialized = true
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false
+                        )
+                        updateBootstrapState()
+                        syncMissingCovers()
+                        return@withLock
+                    }
+                    val context = getApplication<Application>()
+                    val scannedGames = repository.scanDirectoryFromUri(
+                        uri,
+                        context,
+                        cachedGames.associateBy { it.path },
+                        shouldAbort = { EmulatorBridge.isVmActive() }
+                    )
+                    if (EmulatorBridge.isVmActive()) {
+                        queueDeferredLibraryWork(rootPath, isInitialLoad = false)
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isRefreshing = false
+                        )
+                        return@withLock
+                    }
+                    allGames = scannedGames
+                    currentLibraryRoot = rootPath
                     libraryInitialized = true
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isRefreshing = false
                     )
+                    publishVisibleGames()
                     updateBootstrapState()
+                    libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
                     syncMissingCovers()
-                    return@withLock
+                } catch (_: Exception) {
+                    completeLibraryScanWithFallback(rootPath)
                 }
-                val context = getApplication<Application>()
-                val scannedGames = repository.scanDirectoryFromUri(
-                    uri,
-                    context,
-                    cachedGames.associateBy { it.path },
-                    shouldAbort = { EmulatorBridge.isVmActive() }
-                )
-                if (EmulatorBridge.isVmActive()) {
-                    queueDeferredLibraryWork(rootPath, isInitialLoad = false)
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isRefreshing = false
-                    )
-                    return@withLock
-                }
-                allGames = scannedGames
-                currentLibraryRoot = rootPath
-                libraryInitialized = true
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isRefreshing = false
-                )
-                publishVisibleGames()
-                updateBootstrapState()
-                libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
-                syncMissingCovers()
             }
         }
+    }
+
+    private fun completeLibraryScanWithFallback(rootPath: String) {
+        currentLibraryRoot = rootPath
+        libraryInitialized = true
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            isRefreshing = false
+        )
+        publishVisibleGames()
+        updateBootstrapState()
     }
 
     private fun requestLibraryScan(rootPath: String, isInitialLoad: Boolean = false) {
