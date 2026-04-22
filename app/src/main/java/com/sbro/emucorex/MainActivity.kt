@@ -21,6 +21,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
 import com.sbro.emucorex.core.AppLocaleManager
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.GamepadUiActions
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.navigation.AppNavigation
@@ -126,6 +127,12 @@ class MainActivity : ComponentActivity() {
             if (GamepadManager.isEmulationInputEnabled()) {
                 if (GamepadManager.handleKeyEvent(event)) return true
             } else {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                    when (event.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_LEFT -> if (GamepadUiActions.navigateLeft()) return true
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> if (GamepadUiActions.navigateRight()) return true
+                    }
+                }
                 return true
             }
         }
@@ -143,6 +150,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onGenericMotionEvent(event: MotionEvent?): Boolean {
         if (event != null && GamepadManager.isGameController(event.device) && !GamepadManager.isEmulationInputEnabled()) {
+            if (GamepadUiActions.handleHorizontalMotion(event)) return true
             return true
         }
         if (event != null && GamepadManager.handleMotionEvent(event)) return true

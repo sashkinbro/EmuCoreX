@@ -960,4 +960,8 @@
     <string name="home_game_menu_custom_cover">Benutzerdefiniertes Cover auswählen</string>
     <string name="home_game_menu_custom_cover_applied">Benutzerdefiniertes Cover angewendet.</string>
     <string name="home_game_menu_custom_cover_failed">Fehler beim Anwenden des benutzerdefinierten Covers.</string>
+    <string name="home_shelf_hint">Wische zum Durchsuchen. Tippe auf das zentrierte Spiel, um es zu starten. Halte es gedrückt für weitere Aktionen.</string>
+    <string name="home_shelf_games_counter">%1$d von %2$d</string>
+    <string name="home_view_shelf">Cover-Regal anzeigen</string>
+    <string name="home_exit_shelf">Cover-Regal verlassen</string>
 </resources>

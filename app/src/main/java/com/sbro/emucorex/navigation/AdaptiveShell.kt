@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Tune
@@ -84,6 +83,7 @@ private enum class MobileLeadingAction {
 @Composable
 fun AdaptiveShell(
     selected: PrimaryDestination,
+    drawerEnabled: Boolean = true,
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateFormats: () -> Unit,
@@ -112,7 +112,6 @@ fun AdaptiveShell(
             onNavigateAchievements = onNavigateAchievements,
             onNavigateCheats = onNavigateCheats,
             onNavigateGameSettingsManager = onNavigateGameSettingsManager,
-            onNavigateControlsEditor = onNavigateControlsEditor,
             onNavigateDataTransfer = onNavigateDataTransfer,
             onResetAllSettings = onResetAllSettings,
             onNavigateSaveManager = onNavigateSaveManager,
@@ -152,6 +151,7 @@ fun AdaptiveShell(
     } else {
         CompactAdaptiveShell(
             selected = selected,
+            drawerEnabled = drawerEnabled,
             onNavigateHome = onNavigateHome,
             onNavigateSearch = onNavigateSearch,
             onNavigateFormats = onNavigateFormats,
@@ -178,6 +178,7 @@ fun AdaptiveShell(
 @Composable
 private fun CompactAdaptiveShell(
     selected: PrimaryDestination,
+    drawerEnabled: Boolean,
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateFormats: () -> Unit,
@@ -210,9 +211,10 @@ private fun CompactAdaptiveShell(
     val scope = rememberCoroutineScope()
 
     val mobileLeadingAction = if (
+        !drawerEnabled || (
         selected != PrimaryDestination.Home &&
         onBackClick != null
-    ) {
+    )) {
         MobileLeadingAction.Back
     } else {
         MobileLeadingAction.Drawer
@@ -258,7 +260,7 @@ private fun CompactAdaptiveShell(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
-        gesturesEnabled = mobileLeadingAction == MobileLeadingAction.Drawer,
+        gesturesEnabled = drawerEnabled && mobileLeadingAction == MobileLeadingAction.Drawer,
         scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.42f),
         drawerContent = {
             ModalDrawerSheet(
@@ -281,7 +283,6 @@ private fun CompactAdaptiveShell(
                     onNavigateAchievements = onNavigateAchievements,
                     onNavigateCheats = onNavigateCheats,
                     onNavigateGameSettingsManager = onNavigateGameSettingsManager,
-                    onNavigateControlsEditor = onNavigateControlsEditor,
                     onNavigateDataTransfer = onNavigateDataTransfer,
                     onResetAllSettings = onResetAllSettings,
                     onNavigateSaveManager = onNavigateSaveManager,
@@ -299,7 +300,7 @@ private fun CompactAdaptiveShell(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             content(
-                if (mobileLeadingAction == MobileLeadingAction.Drawer) {
+                if (drawerEnabled && mobileLeadingAction == MobileLeadingAction.Drawer) {
                     leadingActionClick
                 } else {
                     null
@@ -343,7 +344,6 @@ private fun SideNavigation(
     onNavigateAchievements: () -> Unit,
     onNavigateCheats: (() -> Unit)?,
     onNavigateGameSettingsManager: (() -> Unit)?,
-    onNavigateControlsEditor: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
     onResetAllSettings: (() -> Unit)?,
     onNavigateSaveManager: (() -> Unit)?,

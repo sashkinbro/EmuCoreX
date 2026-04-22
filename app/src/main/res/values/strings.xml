@@ -16,11 +16,15 @@
     <string name="home_refresh">Refresh</string>
     <string name="home_view_list">Show as list</string>
     <string name="home_view_grid">Show as grid</string>
+    <string name="home_view_shelf">Show cover shelf</string>
+    <string name="home_exit_shelf">Exit cover shelf</string>
     <string name="home_search">Search games</string>
     <string name="home_game_count">Total games: %d</string>
     <string name="home_library_desc">Your library, setup, and quick actions in one place.</string>
     <string name="home_recent_title">Recently opened</string>
     <string name="home_recent_label">Continue</string>
+    <string name="home_shelf_hint">Swipe to browse. Tap the centered game to launch. Long press for more actions.</string>
+    <string name="home_shelf_games_counter">%1$d of %2$d</string>
     <string name="home_setup_title">Finish setup</string>
     <string name="home_setup_subtitle">Choose a BIOS file and your games folder to get started.</string>
     <string name="home_finish_setup">Open Setup</string>

@@ -45,7 +45,7 @@ enum class HomeSortOption {
 }
 
 enum class HomeLibraryViewMode {
-    GRID, LIST
+    GRID, LIST, SHELF
 }
 
 data class HomeUiState(
@@ -63,6 +63,7 @@ data class HomeUiState(
     val searchQuery: String = "",
     val sortOption: HomeSortOption = HomeSortOption.TITLE_ASC,
     val libraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID,
+    val lastStandardLibraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID,
     val isCoverArtDisabled: Boolean = true
 )
 
@@ -202,8 +203,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             preferences.homeLibraryViewMode.distinctUntilChanged().collect { mode ->
+                val resolvedMode = when (mode) {
+                    1 -> HomeLibraryViewMode.LIST
+                    2 -> HomeLibraryViewMode.SHELF
+                    else -> HomeLibraryViewMode.GRID
+                }
+                val lastStandardMode = when (resolvedMode) {
+                    HomeLibraryViewMode.SHELF -> _uiState.value.lastStandardLibraryViewMode
+                    else -> resolvedMode
+                }
                 _uiState.value = _uiState.value.copy(
-                    libraryViewMode = if (mode == 1) HomeLibraryViewMode.LIST else HomeLibraryViewMode.GRID
+                    libraryViewMode = resolvedMode,
+                    lastStandardLibraryViewMode = lastStandardMode
                 )
             }
         }
@@ -297,9 +308,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLibraryViewMode() {
         viewModelScope.launch {
-            preferences.setHomeLibraryViewMode(
-                if (_uiState.value.libraryViewMode == HomeLibraryViewMode.GRID) 1 else 0
-            )
+            val state = _uiState.value
+            val targetMode = when (state.libraryViewMode) {
+                HomeLibraryViewMode.GRID -> HomeLibraryViewMode.LIST
+                HomeLibraryViewMode.LIST -> HomeLibraryViewMode.GRID
+                HomeLibraryViewMode.SHELF -> state.lastStandardLibraryViewMode
+            }
+            preferences.setHomeLibraryViewMode(targetMode.toPreferenceValue())
+        }
+    }
+
+    fun toggleShelfMode() {
+        viewModelScope.launch {
+            val state = _uiState.value
+            val targetMode = if (state.libraryViewMode == HomeLibraryViewMode.SHELF) {
+                state.lastStandardLibraryViewMode
+            } else {
+                HomeLibraryViewMode.SHELF
+            }
+            preferences.setHomeLibraryViewMode(targetMode.toPreferenceValue())
         }
     }
 
@@ -702,4 +729,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             .lowercase(Locale.ROOT)
             .trim()
     }
+}
+
+private fun HomeLibraryViewMode.toPreferenceValue(): Int = when (this) {
+    HomeLibraryViewMode.GRID -> 0
+    HomeLibraryViewMode.LIST -> 1
+    HomeLibraryViewMode.SHELF -> 2
 }

@@ -960,4 +960,8 @@
     <string name="home_game_menu_custom_cover">Escolher capa personalizada</string>
     <string name="home_game_menu_custom_cover_applied">Capa personalizada aplicada.</string>
     <string name="home_game_menu_custom_cover_failed">Falha ao aplicar a capa personalizada.</string>
+    <string name="home_shelf_hint">Deslize para navegar. Toque no jogo centralizado para iniciar. Mantenha pressionado para mais ações.</string>
+    <string name="home_shelf_games_counter">%1$d de %2$d</string>
+    <string name="home_view_shelf">Mostrar estante de capas</string>
+    <string name="home_exit_shelf">Sair da estante de capas</string>
 </resources>

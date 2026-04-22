@@ -960,4 +960,8 @@
     <string name="home_game_menu_custom_cover">选择自定义封面</string>
     <string name="home_game_menu_custom_cover_applied">已应用自定义封面。</string>
     <string name="home_game_menu_custom_cover_failed">无法应用自定义封面。</string>
+    <string name="home_shelf_hint">滑动以浏览。点击居中的游戏即可启动。长按可执行更多操作。</string>
+    <string name="home_shelf_games_counter">%1$d / %2$d</string>
+    <string name="home_view_shelf">显示封面书架</string>
+    <string name="home_exit_shelf">退出封面书架</string>
 </resources>

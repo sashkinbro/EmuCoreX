@@ -960,4 +960,8 @@
     <string name="home_game_menu_custom_cover">Elegir portada personalizada</string>
     <string name="home_game_menu_custom_cover_applied">Portada personalizada aplicada.</string>
     <string name="home_game_menu_custom_cover_failed">Error al aplicar la portada personalizada.</string>
+    <string name="home_shelf_hint">Desliza para explorar. Toca el juego central para iniciar. Mantén pulsado para más acciones.</string>
+    <string name="home_shelf_games_counter">%1$d de %2$d</string>
+    <string name="home_view_shelf">Mostrar estantería de portadas</string>
+    <string name="home_exit_shelf">Salir de la estantería de portadas</string>
 </resources>

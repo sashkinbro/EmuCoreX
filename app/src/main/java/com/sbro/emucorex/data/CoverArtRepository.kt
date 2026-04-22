@@ -31,8 +31,13 @@ class CoverArtRepository(private val context: Context) {
         }
     }
 
-    fun findCachedCoverPath(serial: String?): String? {
-        if (resolveCoverArtStyle() == AppPreferences.COVER_ART_STYLE_DISABLED) {
+    fun findCachedCoverPath(
+        serial: String?,
+        styleOverride: Int? = null,
+        ignoreDisabled: Boolean = false
+    ): String? {
+        val style = resolveCoverArtStyle(styleOverride)
+        if (!ignoreDisabled && style == AppPreferences.COVER_ART_STYLE_DISABLED) {
             return null
         }
         val normalizedSerial = normalizeSerial(serial)
@@ -40,7 +45,6 @@ class CoverArtRepository(private val context: Context) {
             Log.d(TAG, "No serial provided")
             return null
         }
-        val style = resolveCoverArtStyle()
         val preferredFiles = if (style == AppPreferences.COVER_ART_STYLE_3D) {
             listOf(
                 File(cacheDirectory, "${normalizedSerial}_3d.png"),
@@ -57,12 +61,21 @@ class CoverArtRepository(private val context: Context) {
         return found?.absolutePath
     }
 
-    fun findCachedCoverUri(serial: String?): String? {
-        return findCachedCoverPath(serial)
+    fun findCachedCoverUri(
+        serial: String?,
+        styleOverride: Int? = null,
+        ignoreDisabled: Boolean = false
+    ): String? {
+        return findCachedCoverPath(serial, styleOverride, ignoreDisabled)
     }
 
-    fun downloadCover(serial: String?): String? {
-        if (resolveCoverArtStyle() == AppPreferences.COVER_ART_STYLE_DISABLED) {
+    fun downloadCover(
+        serial: String?,
+        styleOverride: Int? = null,
+        ignoreDisabled: Boolean = false
+    ): String? {
+        val style = resolveCoverArtStyle(styleOverride)
+        if (!ignoreDisabled && style == AppPreferences.COVER_ART_STYLE_DISABLED) {
             Log.d(TAG, "Cover download skipped: cover art style is disabled")
             return null
         }
@@ -71,8 +84,7 @@ class CoverArtRepository(private val context: Context) {
             Log.w(TAG, "Cannot download cover: invalid serial '$serial'")
             return null
         }
-        val coverBaseUrl = resolveCoverBaseUrl()
-        val style = resolveCoverArtStyle()
+        val coverBaseUrl = resolveCoverBaseUrl(style)
         val targetExtension = if (style == AppPreferences.COVER_ART_STYLE_3D) "png" else "jpg"
 
         Log.d(TAG, "========== COVER DOWNLOAD START ==========")
@@ -227,14 +239,13 @@ class CoverArtRepository(private val context: Context) {
             .also { Log.d(TAG, "Normalized: '$serial' -> '$it'") }
     }
 
-    private fun resolveCoverBaseUrl(): String {
+    private fun resolveCoverBaseUrl(style: Int = resolveCoverArtStyle()): String {
         val preferences = AppPreferences(context)
         val configuredUrls = preferences.getCoverDownloadBaseUrlSync()
             ?.split(Regex("\\s+"))
             ?.map { it.trim().trimEnd('/') }
             ?.filter { it.isNotBlank() }
             .orEmpty()
-        val style = preferences.getCoverArtStyleSync()
         if (configuredUrls.isNotEmpty()) {
             return if (style == AppPreferences.COVER_ART_STYLE_3D) {
                 configuredUrls.getOrNull(1) ?: configuredUrls.first()
@@ -249,8 +260,8 @@ class CoverArtRepository(private val context: Context) {
         }
     }
 
-    private fun resolveCoverArtStyle(): Int {
-        return AppPreferences(context).getCoverArtStyleSync()
+    private fun resolveCoverArtStyle(styleOverride: Int? = null): Int {
+        return styleOverride ?: AppPreferences(context).getCoverArtStyleSync()
     }
 
     private fun cacheFileName(serial: String, style: Int, extension: String): String {

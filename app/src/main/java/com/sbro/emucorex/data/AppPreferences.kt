@@ -827,7 +827,7 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun setHomeLibraryViewMode(mode: Int) {
-        context.dataStore.edit { it[HOME_LIBRARY_VIEW_MODE] = mode.coerceIn(0, 1) }
+        context.dataStore.edit { it[HOME_LIBRARY_VIEW_MODE] = mode.coerceIn(0, 2) }
     }
 
     suspend fun markGameLaunched(path: String, title: String, serial: String? = null) {
@@ -1968,7 +1968,7 @@ class AppPreferences(private val context: Context) {
             prefs[SHOW_HOME_SEARCH] = json.optBoolean("showHomeSearch", true)
             prefs[PREFER_ENGLISH_GAME_TITLES] = json.optBoolean("preferEnglishGameTitles", false)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
-            prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 1)
+            prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 2)
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
             prefs[OVERLAY_OPACITY] = json.optInt("overlayOpacity", 80)
             prefs[OVERLAY_SHOW] = json.optBoolean("overlayShow", true)

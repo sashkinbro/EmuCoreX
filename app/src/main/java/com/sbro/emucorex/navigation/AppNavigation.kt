@@ -241,6 +241,7 @@ fun AppNavigation(
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val scope = rememberCoroutineScope()
+    var homeDrawerEnabled by remember { mutableStateOf(true) }
     var blockRestoredEmulationRoute by remember(restoredFromSavedState) {
         mutableStateOf(restoredFromSavedState)
     }
@@ -504,6 +505,7 @@ fun AppNavigation(
             composable<HomeRoute> {
                 AdaptiveShell(
                     selected = PrimaryDestination.Home,
+                    drawerEnabled = homeDrawerEnabled,
                     onNavigateHome = { },
                     onNavigateSearch = {
                         navController.navigate(CatalogSearchRoute) {
@@ -574,7 +576,10 @@ fun AppNavigation(
                         onCreateShortcutClick = { game ->
                             GameLaunchShortcut.requestPinnedShortcut(context, game)
                         },
-                        onMenuClick = openDrawer
+                        onMenuClick = openDrawer,
+                        onShelfModeChanged = { isShelfMode ->
+                            homeDrawerEnabled = !isShelfMode
+                        }
                     )
                 }
             }
