@@ -950,4 +950,11 @@
     <string name="settings_gamepad_mode_desc">选择连接的一个手柄是替换触屏控制还是与触屏控制同时工作。</string>
     <string name="settings_gamepad_mode_replace_touch">替换触控</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">触控 + 手柄</string>
+    <string name="settings_emulation_tab">模拟</string>
+    <string name="settings_fixes_tab">修复</string>
+    <string name="settings_library_tab">游戏库</string>
+    <string name="settings_rendering_section">渲染</string>
+    <string name="settings_shadeboost_desc">在渲染后调整最终图像的色彩。</string>
+    <string name="settings_patches_section">补丁</string>
+    <string name="settings_reset_to_default_toast">已恢复默认值。</string>
 </resources>

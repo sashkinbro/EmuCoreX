@@ -135,7 +135,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Paths, MemoryCards, Covers, DataTransfer, Performance, Jit, SpeedHacks, Cheats, Advanced, About
+    General, Graphics, Controls, Emulation, Fixes, Library, About
 }
 
 @SuppressLint("ConfigurationScreenWidthHeight")
@@ -970,18 +970,6 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setAspectRatio(defaults.aspectRatio) }
                         )
                         ChoiceSection(
-                            title = stringResource(R.string.settings_texture_filtering),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_texture_filtering_nearest),
-                                1 to stringResource(R.string.settings_texture_filtering_bilinear),
-                                2 to stringResource(R.string.settings_texture_filtering_trilinear)
-                            ),
-                            selectedValue = uiState.textureFiltering,
-                            onSelect = viewModel::setTextureFiltering,
-                            helpText = stringResource(R.string.settings_help_texture_filtering),
-                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
-                        )
-                        ChoiceSection(
                             title = stringResource(R.string.settings_anisotropic_filtering),
                             options = listOf(
                                 0 to stringResource(R.string.settings_aniso_off),
@@ -1028,23 +1016,105 @@ private fun SettingsContent(
                                 onResetToDefault = { viewModel.setCasSharpness(defaults.casSharpness) }
                             )
                         }
-                        ToggleItem(
-                            icon = Icons.Rounded.Visibility,
-                            title = stringResource(R.string.settings_widescreen_patches),
-                            subtitle = stringResource(R.string.settings_widescreen_patches_desc),
-                            checked = uiState.enableWidescreenPatches,
-                            onCheckedChange = viewModel::setEnableWidescreenPatches,
-                            helpText = stringResource(R.string.settings_help_widescreen_patches),
-                            onResetToDefault = { viewModel.setEnableWidescreenPatches(defaults.enableWidescreenPatches) }
+                    }
+                    SettingsSection(title = stringResource(R.string.settings_rendering_section)) {
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_hw_download_mode),
+                            options = hwDownloadModeOptions(),
+                            selectedValue = uiState.hwDownloadMode,
+                            onSelect = viewModel::setHwDownloadMode,
+                            helpText = stringResource(R.string.settings_help_hw_download_mode),
+                            onResetToDefault = { viewModel.setHwDownloadMode(defaults.hwDownloadMode) }
+                        )
+                        SettingsInlineNote(
+                            text = stringResource(R.string.settings_hw_download_mode_desc)
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_blending_accuracy),
+                            options = blendingAccuracyOptions(),
+                            selectedValue = uiState.blendingAccuracy,
+                            onSelect = viewModel::setBlendingAccuracy,
+                            helpText = stringResource(R.string.settings_help_blending_accuracy),
+                            onResetToDefault = { viewModel.setBlendingAccuracy(defaults.blendingAccuracy) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_texture_preloading),
+                            options = texturePreloadingOptions(),
+                            selectedValue = uiState.texturePreloading,
+                            onSelect = viewModel::setTexturePreloading,
+                            helpText = stringResource(R.string.settings_help_texture_preloading),
+                            onResetToDefault = { viewModel.setTexturePreloading(defaults.texturePreloading) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_bilinear_filtering),
+                            options = bilinearFilteringOptions(),
+                            selectedValue = uiState.textureFiltering,
+                            onSelect = viewModel::setTextureFiltering,
+                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_trilinear_filtering),
+                            options = trilinearFilteringOptions(),
+                            selectedValue = uiState.trilinearFiltering,
+                            onSelect = viewModel::setTrilinearFiltering,
+                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                            onResetToDefault = { viewModel.setTrilinearFiltering(defaults.trilinearFiltering) }
                         )
                         ToggleItem(
-                            icon = Icons.Rounded.Visibility,
-                            title = stringResource(R.string.settings_no_interlacing_patches),
-                            subtitle = stringResource(R.string.settings_no_interlacing_patches_desc),
-                            checked = uiState.enableNoInterlacingPatches,
-                            onCheckedChange = viewModel::setEnableNoInterlacingPatches,
-                            helpText = stringResource(R.string.settings_help_no_interlacing_patches),
-                            onResetToDefault = { viewModel.setEnableNoInterlacingPatches(defaults.enableNoInterlacingPatches) }
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_hw_mipmapping),
+                            subtitle = stringResource(R.string.settings_hw_mipmapping_desc),
+                            checked = uiState.enableHwMipmapping,
+                            onCheckedChange = viewModel::setEnableHwMipmapping,
+                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                            onResetToDefault = { viewModel.setEnableHwMipmapping(defaults.enableHwMipmapping) }
+                        )
+                    }
+                    SettingsSection(title = stringResource(R.string.emulation_screen_tab)) {
+                        SliderItem(
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_shadeboost_brightness),
+                            subtitle = uiState.shadeBoostBrightness.toString(),
+                            value = uiState.shadeBoostBrightness.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { viewModel.setShadeBoostBrightness(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                            onResetToDefault = { viewModel.setShadeBoostBrightness(defaults.shadeBoostBrightness) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_shadeboost_contrast),
+                            subtitle = uiState.shadeBoostContrast.toString(),
+                            value = uiState.shadeBoostContrast.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { viewModel.setShadeBoostContrast(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                            onResetToDefault = { viewModel.setShadeBoostContrast(defaults.shadeBoostContrast) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_shadeboost_saturation),
+                            subtitle = uiState.shadeBoostSaturation.toString(),
+                            value = uiState.shadeBoostSaturation.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { viewModel.setShadeBoostSaturation(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                            onResetToDefault = { viewModel.setShadeBoostSaturation(defaults.shadeBoostSaturation) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.GraphicEq,
+                            title = stringResource(R.string.settings_shadeboost_gamma),
+                            subtitle = uiState.shadeBoostGamma.toString(),
+                            value = uiState.shadeBoostGamma.toFloat(),
+                            range = 1f..100f,
+                            steps = 98,
+                            onValueChange = { viewModel.setShadeBoostGamma(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                            onResetToDefault = { viewModel.setShadeBoostGamma(defaults.shadeBoostGamma) }
                         )
                     }
                 }
@@ -1221,7 +1291,7 @@ private fun SettingsContent(
                     }
                 }
 
-                SettingsTab.Paths -> {
+                SettingsTab.Library -> {
                     val biosDisplayName = remember(uiState.biosPath, context, notSetLabel) {
                         uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
                             ?: notSetLabel
@@ -1230,6 +1300,31 @@ private fun SettingsContent(
                         uiState.gamePath?.let { DocumentPathResolver.getDisplayName(context, it) }
                             ?: notSetLabel
                     }
+                    val repository = remember(context) {
+                        MemoryCardRepository(context, AppPreferences(context))
+                    }
+                    var memoryCardCount by remember { mutableIntStateOf(0) }
+                    var slot1Name by remember { mutableStateOf<String?>(null) }
+                    var slot2Name by remember { mutableStateOf<String?>(null) }
+                    val builtInCoverSourceLabel = stringResource(R.string.settings_cover_download_url_builtin)
+                    val coverDownloadDisabledLabel = stringResource(R.string.settings_cover_download_url_disabled)
+                    val customCoverSourceLabel = stringResource(R.string.settings_cover_download_url_custom)
+                    val coverUrlDisplay = if (!uiState.coverDownloadBaseUrl.isNullOrBlank()) {
+                        customCoverSourceLabel
+                    } else if (uiState.coverArtStyle == AppPreferences.COVER_ART_STYLE_DISABLED) {
+                        coverDownloadDisabledLabel
+                    } else {
+                        builtInCoverSourceLabel
+                    }
+
+                    LaunchedEffect(repository) {
+                        val assignments = repository.ensureDefaultCardsAssigned()
+                        val cards = repository.listCards()
+                        memoryCardCount = cards.size
+                        slot1Name = assignments.slot1
+                        slot2Name = assignments.slot2
+                    }
+
                     SettingsSection(title = stringResource(R.string.settings_paths)) {
                         SettingsItem(
                             icon = Icons.Rounded.Memory,
@@ -1245,23 +1340,6 @@ private fun SettingsContent(
                             onClick = launchGamePicker,
                             helpText = stringResource(R.string.settings_help_game_path)
                         )
-                    }
-                }
-
-                SettingsTab.MemoryCards -> {
-                    val repository = remember(context) {
-                        MemoryCardRepository(context, AppPreferences(context))
-                    }
-                    var memoryCardCount by remember { mutableIntStateOf(0) }
-                    var slot1Name by remember { mutableStateOf<String?>(null) }
-                    var slot2Name by remember { mutableStateOf<String?>(null) }
-
-                    LaunchedEffect(repository) {
-                        val assignments = repository.ensureDefaultCardsAssigned()
-                        val cards = repository.listCards()
-                        memoryCardCount = cards.size
-                        slot1Name = assignments.slot1
-                        slot2Name = assignments.slot2
                     }
 
                     SettingsSection(title = stringResource(R.string.settings_memory_cards_tab)) {
@@ -1280,19 +1358,7 @@ private fun SettingsContent(
                             )
                         )
                     }
-                }
 
-                SettingsTab.Covers -> {
-                    val builtInCoverSourceLabel = stringResource(R.string.settings_cover_download_url_builtin)
-                    val coverDownloadDisabledLabel = stringResource(R.string.settings_cover_download_url_disabled)
-                    val customCoverSourceLabel = stringResource(R.string.settings_cover_download_url_custom)
-                    val coverUrlDisplay = if (!uiState.coverDownloadBaseUrl.isNullOrBlank()) {
-                        customCoverSourceLabel
-                    } else if (uiState.coverArtStyle == AppPreferences.COVER_ART_STYLE_DISABLED) {
-                        coverDownloadDisabledLabel
-                    } else {
-                        builtInCoverSourceLabel
-                    }
                     SettingsSection(title = stringResource(R.string.settings_covers_tab)) {
                         ChoiceSection(
                             title = stringResource(R.string.settings_cover_art_style),
@@ -1314,9 +1380,7 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_cover_download_url)
                         )
                     }
-                }
 
-                SettingsTab.DataTransfer -> {
                     SettingsSection(title = stringResource(R.string.settings_backup_section_title)) {
                         SettingsItem(
                             icon = Icons.Rounded.Save,
@@ -1333,7 +1397,7 @@ private fun SettingsContent(
                     }
                 }
 
-                SettingsTab.Performance -> {
+                SettingsTab.Emulation -> {
                     SettingsSection(title = stringResource(R.string.emulation_performance_stats)) {
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -1364,9 +1428,6 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setFpsOverlayCorner(defaults.fpsOverlayCorner) }
                         )
                     }
-                }
-
-                SettingsTab.Jit -> {
                     SettingsSection(title = stringResource(R.string.settings_jit_section)) {
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -1413,9 +1474,6 @@ private fun SettingsContent(
                             )
                         }
                     }
-                }
-
-                SettingsTab.SpeedHacks -> {
                     SettingsSection(title = stringResource(R.string.settings_speed_hacks)) {
                         ChoiceSection(
                             title = stringResource(R.string.onboarding_profile_title),
@@ -1506,6 +1564,20 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
                             onResetToDefault = { viewModel.setSkipDuplicateFrames(defaults.skipDuplicateFrames) }
                         )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_frame_skip),
+                            options = listOf(
+                                0 to stringResource(R.string.settings_frame_skip_off),
+                                1 to "1",
+                                2 to "2",
+                                3 to "3",
+                                4 to "4"
+                            ),
+                            selectedValue = uiState.frameSkip,
+                            onSelect = viewModel::setFrameSkip,
+                            helpText = stringResource(R.string.settings_help_frame_skip),
+                            onResetToDefault = { viewModel.setFrameSkip(defaults.frameSkip) }
+                        )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_mtvu),
@@ -1524,86 +1596,7 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_fast_cdvd),
                             onResetToDefault = { viewModel.setEnableFastCdvd(defaults.enableFastCdvd) }
                         )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_hw_download_mode),
-                            options = hwDownloadModeOptions(),
-                            selectedValue = uiState.hwDownloadMode,
-                            onSelect = viewModel::setHwDownloadMode,
-                            helpText = stringResource(R.string.settings_help_hw_download_mode),
-                            onResetToDefault = { viewModel.setHwDownloadMode(defaults.hwDownloadMode) }
-                        )
-                        SettingsInlineNote(
-                            text = stringResource(R.string.settings_hw_download_mode_desc)
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_blending_accuracy),
-                            options = blendingAccuracyOptions(),
-                            selectedValue = uiState.blendingAccuracy,
-                            onSelect = viewModel::setBlendingAccuracy,
-                            helpText = stringResource(R.string.settings_help_blending_accuracy),
-                            onResetToDefault = { viewModel.setBlendingAccuracy(defaults.blendingAccuracy) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_texture_preloading),
-                            options = texturePreloadingOptions(),
-                            selectedValue = uiState.texturePreloading,
-                            onSelect = viewModel::setTexturePreloading,
-                            helpText = stringResource(R.string.settings_help_texture_preloading),
-                            onResetToDefault = { viewModel.setTexturePreloading(defaults.texturePreloading) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_bilinear_filtering),
-                            options = bilinearFilteringOptions(),
-                            selectedValue = uiState.textureFiltering,
-                            onSelect = viewModel::setTextureFiltering,
-                            helpText = stringResource(R.string.settings_help_bilinear_filtering),
-                            onResetToDefault = { viewModel.setTextureFiltering(defaults.textureFiltering) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_trilinear_filtering),
-                            options = trilinearFilteringOptions(),
-                            selectedValue = uiState.trilinearFiltering,
-                            onSelect = viewModel::setTrilinearFiltering,
-                            helpText = stringResource(R.string.settings_help_trilinear_filtering),
-                            onResetToDefault = { viewModel.setTrilinearFiltering(defaults.trilinearFiltering) }
-                        )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_anisotropic_filtering),
-                            options = anisotropicFilteringOptions(),
-                            selectedValue = uiState.anisotropicFiltering,
-                            onSelect = viewModel::setAnisotropicFiltering,
-                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
-                            onResetToDefault = { viewModel.setAnisotropicFiltering(defaults.anisotropicFiltering) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.GraphicEq,
-                            title = stringResource(R.string.settings_hw_mipmapping),
-                            subtitle = stringResource(R.string.settings_hw_mipmapping_desc),
-                            checked = uiState.enableHwMipmapping,
-                            onCheckedChange = viewModel::setEnableHwMipmapping,
-                            helpText = stringResource(R.string.settings_help_hw_mipmapping),
-                            onResetToDefault = { viewModel.setEnableHwMipmapping(defaults.enableHwMipmapping) }
-                        )
                     }
-                    SettingsSection(title = stringResource(R.string.settings_frame_control)) {
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_frame_skip),
-                            options = listOf(
-                                0 to stringResource(R.string.settings_frame_skip_off),
-                                1 to "1",
-                                2 to "2",
-                                3 to "3",
-                                4 to "4"
-                            ),
-                            selectedValue = uiState.frameSkip,
-                            onSelect = viewModel::setFrameSkip,
-                            helpText = stringResource(R.string.settings_help_frame_skip),
-                            onResetToDefault = { viewModel.setFrameSkip(defaults.frameSkip) }
-                        )
-                    }
-                }
-
-                SettingsTab.Cheats -> {
                     SettingsSection(title = stringResource(R.string.settings_cheats_tab)) {
                         ToggleItem(
                             icon = Icons.Rounded.Star,
@@ -1649,7 +1642,27 @@ private fun SettingsContent(
                     }
                 }
 
-                SettingsTab.Advanced -> {
+                SettingsTab.Fixes -> {
+                    SettingsSection(title = stringResource(R.string.settings_patches_section)) {
+                        ToggleItem(
+                            icon = Icons.Rounded.Visibility,
+                            title = stringResource(R.string.settings_widescreen_patches),
+                            subtitle = stringResource(R.string.settings_widescreen_patches_desc),
+                            checked = uiState.enableWidescreenPatches,
+                            onCheckedChange = viewModel::setEnableWidescreenPatches,
+                            helpText = stringResource(R.string.settings_help_widescreen_patches),
+                            onResetToDefault = { viewModel.setEnableWidescreenPatches(defaults.enableWidescreenPatches) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Visibility,
+                            title = stringResource(R.string.settings_no_interlacing_patches),
+                            subtitle = stringResource(R.string.settings_no_interlacing_patches_desc),
+                            checked = uiState.enableNoInterlacingPatches,
+                            onCheckedChange = viewModel::setEnableNoInterlacingPatches,
+                            helpText = stringResource(R.string.settings_help_no_interlacing_patches),
+                            onResetToDefault = { viewModel.setEnableNoInterlacingPatches(defaults.enableNoInterlacingPatches) }
+                        )
+                    }
                     SettingsSection(title = stringResource(R.string.settings_hardware_fixes)) {
                         ChoiceSection(
                             title = stringResource(R.string.settings_cpu_sprite_render_size),
@@ -2136,6 +2149,8 @@ private fun CoverUrlExampleRow(
     onLongClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -2179,16 +2194,21 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_prefer_english_game_titles),
         entry(SettingsTab.Graphics, R.string.settings_renderer),
         entry(SettingsTab.Graphics, R.string.settings_gpu_driver),
+        entry(SettingsTab.Graphics, R.string.settings_gpu_driver_path),
         entry(SettingsTab.Graphics, R.string.settings_upscale),
         entry(SettingsTab.Graphics, R.string.settings_aspect_ratio),
-        entry(SettingsTab.Graphics, R.string.settings_texture_filtering),
         entry(SettingsTab.Graphics, R.string.settings_bilinear_filtering),
         entry(SettingsTab.Graphics, R.string.settings_trilinear_filtering),
+        entry(SettingsTab.Graphics, R.string.settings_hw_download_mode),
+        entry(SettingsTab.Graphics, R.string.settings_blending_accuracy),
+        entry(SettingsTab.Graphics, R.string.settings_texture_preloading),
         entry(SettingsTab.Graphics, R.string.settings_anisotropic_filtering),
         entry(SettingsTab.Graphics, R.string.settings_fxaa),
         entry(SettingsTab.Graphics, R.string.settings_cas),
-        entry(SettingsTab.Graphics, R.string.settings_widescreen_patches),
-        entry(SettingsTab.Graphics, R.string.settings_no_interlacing_patches),
+        entry(SettingsTab.Graphics, R.string.settings_hw_mipmapping),
+        entry(SettingsTab.Graphics, R.string.settings_shadeboost),
+        entry(SettingsTab.Fixes, R.string.settings_widescreen_patches),
+        entry(SettingsTab.Fixes, R.string.settings_no_interlacing_patches),
         entry(SettingsTab.Controls, R.string.settings_overlay_scale),
         entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
         entry(SettingsTab.Controls, R.string.settings_left_stick_sensitivity),
@@ -2199,32 +2219,32 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_pad_vibration),
-        entry(SettingsTab.Paths, R.string.settings_bios_path),
-        entry(SettingsTab.Paths, R.string.settings_game_path),
-        entry(SettingsTab.MemoryCards, R.string.settings_memory_cards_tab),
-        entry(SettingsTab.Graphics, R.string.settings_gpu_driver_path),
-        entry(SettingsTab.Covers, R.string.settings_cover_art_style),
-        entry(SettingsTab.Covers, R.string.settings_cover_download_url),
-        entry(SettingsTab.DataTransfer, R.string.settings_backup_export_title),
-        entry(SettingsTab.DataTransfer, R.string.settings_backup_restore_title),
-        entry(SettingsTab.Performance, R.string.settings_show_fps),
-        entry(SettingsTab.Performance, R.string.settings_fps_overlay_mode),
-        entry(SettingsTab.Performance, R.string.settings_fps_overlay_position),
-        entry(SettingsTab.Jit, R.string.settings_enable_ee_recompiler),
-        entry(SettingsTab.Jit, R.string.settings_enable_iop_recompiler),
-        entry(SettingsTab.Jit, R.string.settings_enable_vu0_recompiler),
-        entry(SettingsTab.Jit, R.string.settings_enable_vu1_recompiler),
-        entry(SettingsTab.SpeedHacks, R.string.settings_frame_limiter),
-        entry(SettingsTab.SpeedHacks, R.string.settings_target_fps),
-        entry(SettingsTab.SpeedHacks, R.string.settings_ee_cycle_rate),
-        entry(SettingsTab.SpeedHacks, R.string.settings_ee_cycle_skip),
-        entry(SettingsTab.SpeedHacks, R.string.settings_mtvu),
-        entry(SettingsTab.SpeedHacks, R.string.settings_fast_cdvd),
-        entry(SettingsTab.Cheats, R.string.settings_enable_cheats),
-        entry(SettingsTab.Advanced, R.string.settings_hw_download_mode),
-        entry(SettingsTab.Advanced, R.string.settings_blending_accuracy),
-        entry(SettingsTab.Advanced, R.string.settings_texture_preloading),
-        entry(SettingsTab.Advanced, R.string.settings_hw_mipmapping)
+        entry(SettingsTab.Library, R.string.settings_bios_path),
+        entry(SettingsTab.Library, R.string.settings_game_path),
+        entry(SettingsTab.Library, R.string.settings_memory_cards_tab),
+        entry(SettingsTab.Library, R.string.settings_cover_art_style),
+        entry(SettingsTab.Library, R.string.settings_cover_download_url),
+        entry(SettingsTab.Library, R.string.settings_backup_export_title),
+        entry(SettingsTab.Library, R.string.settings_backup_restore_title),
+        entry(SettingsTab.Emulation, R.string.settings_show_fps),
+        entry(SettingsTab.Emulation, R.string.settings_fps_overlay_mode),
+        entry(SettingsTab.Emulation, R.string.settings_fps_overlay_position),
+        entry(SettingsTab.Emulation, R.string.settings_enable_ee_recompiler),
+        entry(SettingsTab.Emulation, R.string.settings_enable_iop_recompiler),
+        entry(SettingsTab.Emulation, R.string.settings_enable_vu0_recompiler),
+        entry(SettingsTab.Emulation, R.string.settings_enable_vu1_recompiler),
+        entry(SettingsTab.Emulation, R.string.settings_frame_limiter),
+        entry(SettingsTab.Emulation, R.string.settings_target_fps),
+        entry(SettingsTab.Emulation, R.string.settings_ee_cycle_rate),
+        entry(SettingsTab.Emulation, R.string.settings_ee_cycle_skip),
+        entry(SettingsTab.Emulation, R.string.settings_mtvu),
+        entry(SettingsTab.Emulation, R.string.settings_fast_cdvd),
+        entry(SettingsTab.Emulation, R.string.settings_enable_cheats),
+        entry(SettingsTab.Emulation, R.string.settings_frame_skip),
+        entry(SettingsTab.Fixes, R.string.settings_cpu_sprite_render_size),
+        entry(SettingsTab.Fixes, R.string.settings_gpu_target_clut),
+        entry(SettingsTab.Fixes, R.string.settings_half_pixel_offset),
+        entry(SettingsTab.Fixes, R.string.settings_bilinear_upscale)
     )
 }
 
@@ -2350,6 +2370,8 @@ private fun ToggleItem(
     onResetToDefault: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -2359,7 +2381,12 @@ private fun ToggleItem(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { onCheckedChange(!checked) },
-                onLongClick = onResetToDefault
+                onLongClick = onResetToDefault?.let {
+                    {
+                        it()
+                        Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                    }
+                }
             ),
         shape = RoundedCornerShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
@@ -2433,6 +2460,8 @@ private fun SliderItem(
 ) {
     var sliderValue by remember { mutableFloatStateOf(value) }
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
 
     LaunchedEffect(value) {
         sliderValue = value
@@ -2446,7 +2475,12 @@ private fun SliderItem(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {},
-                onLongClick = onResetToDefault
+                onLongClick = onResetToDefault?.let {
+                    {
+                        it()
+                        Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                    }
+                }
             )
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2513,6 +2547,8 @@ private fun ChoiceSection(
     onResetToDefault: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier
@@ -2521,7 +2557,12 @@ private fun ChoiceSection(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = {},
-                    onLongClick = onResetToDefault
+                    onLongClick = onResetToDefault?.let {
+                        {
+                            it()
+                            Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -3035,15 +3076,9 @@ private fun SettingsTab.label(): String {
         SettingsTab.General -> stringResource(R.string.settings_general_tab)
         SettingsTab.Graphics -> stringResource(R.string.settings_graphics_tab)
         SettingsTab.Controls -> stringResource(R.string.settings_controls_tab)
-        SettingsTab.Paths -> stringResource(R.string.settings_paths_tab)
-        SettingsTab.MemoryCards -> stringResource(R.string.settings_memory_cards_tab)
-        SettingsTab.Covers -> stringResource(R.string.settings_covers_tab)
-        SettingsTab.DataTransfer -> stringResource(R.string.settings_data_transfer_tab)
-        SettingsTab.Performance -> stringResource(R.string.settings_performance_tab)
-        SettingsTab.Jit -> stringResource(R.string.settings_jit_tab)
-        SettingsTab.SpeedHacks -> stringResource(R.string.settings_speedhacks_tab)
-        SettingsTab.Cheats -> stringResource(R.string.settings_cheats_tab)
-        SettingsTab.Advanced -> stringResource(R.string.settings_advanced_tab)
+        SettingsTab.Emulation -> stringResource(R.string.settings_emulation_tab)
+        SettingsTab.Fixes -> stringResource(R.string.settings_fixes_tab)
+        SettingsTab.Library -> stringResource(R.string.settings_library_tab)
         SettingsTab.About -> stringResource(R.string.settings_about)
     }
 }
@@ -3054,15 +3089,9 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.General -> Icons.Rounded.Tune
         SettingsTab.Graphics -> Icons.Rounded.GraphicEq
         SettingsTab.Controls -> Icons.Rounded.Gamepad
-        SettingsTab.Paths -> Icons.Rounded.FolderOpen
-        SettingsTab.MemoryCards -> Icons.Rounded.Memory
-        SettingsTab.Covers -> Icons.Rounded.Link
-        SettingsTab.DataTransfer -> Icons.Rounded.SaveAs
-        SettingsTab.Performance -> Icons.Rounded.Speed
-        SettingsTab.Jit -> Icons.Rounded.Speed
-        SettingsTab.SpeedHacks -> Icons.Rounded.Speed
-        SettingsTab.Cheats -> Icons.Rounded.Star
-        SettingsTab.Advanced -> Icons.Rounded.SettingsSuggest
+        SettingsTab.Emulation -> Icons.Rounded.Speed
+        SettingsTab.Fixes -> Icons.Rounded.SettingsSuggest
+        SettingsTab.Library -> Icons.Rounded.FolderOpen
         SettingsTab.About -> Icons.Rounded.Info
     }
 }
@@ -3071,15 +3100,10 @@ private fun String.toSettingsTab(): SettingsTab {
     return when (lowercase()) {
         "graphics" -> SettingsTab.Graphics
         "controls" -> SettingsTab.Controls
-        "paths", "files" -> SettingsTab.Paths
-        "memorycards", "memory_cards", "memory-cards", "memcards" -> SettingsTab.MemoryCards
-        "covers", "cover-art", "cover_art" -> SettingsTab.Covers
-        "data_transfer", "transfer", "backup", "data-transfer" -> SettingsTab.DataTransfer
-        "performance" -> SettingsTab.Performance
-        "jit" -> SettingsTab.Jit
-        "speedhacks", "speed_hacks", "speed-hacks" -> SettingsTab.SpeedHacks
-        "cheats", "cheat" -> SettingsTab.Cheats
-        "advanced" -> SettingsTab.Advanced
+        "paths", "files", "memorycards", "memory_cards", "memory-cards", "memcards", "covers",
+        "cover-art", "cover_art", "data_transfer", "transfer", "backup", "data-transfer", "library" -> SettingsTab.Library
+        "performance", "jit", "speedhacks", "speed_hacks", "speed-hacks", "cheats", "cheat", "emulation" -> SettingsTab.Emulation
+        "advanced", "fixes", "hacks" -> SettingsTab.Fixes
         "about" -> SettingsTab.About
         else -> SettingsTab.General
     }

@@ -66,10 +66,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,8 +141,8 @@ fun GameDetailScreen(
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val debouncedBack = rememberDebouncedClick(onClick = onBackClick)
-    var selectedScreenshotIndex by remember { mutableIntStateOf(-1) }
-    var selectedVideoIndex by remember { mutableIntStateOf(-1) }
+    var selectedScreenshotIndex by rememberSaveable { mutableIntStateOf(-1) }
+    var selectedVideoIndex by rememberSaveable { mutableIntStateOf(-1) }
     val horizontalInset = ScreenHorizontalPadding
     val contentMaxWidth = if (isLandscape) 760.dp else Dp.Unspecified
     val heroMaxWidth = if (isLandscape) 240.dp else Dp.Unspecified
@@ -1240,18 +1242,6 @@ private fun VideoPlayerOverlay(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val layoutDirection = LocalLayoutDirection.current
-    val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
-    val landscapeStartInset = if (isLandscape) {
-        statusInsets.calculateLeftPadding(layoutDirection) + 16.dp
-    } else {
-        0.dp
-    }
-    val landscapeEndInset = if (isLandscape) {
-        statusInsets.calculateRightPadding(layoutDirection) + 16.dp
-    } else {
-        0.dp
-    }
 
     androidx.compose.runtime.DisposableEffect(activity) {
         val window = activity?.window
@@ -1281,6 +1271,10 @@ private fun VideoPlayerOverlay(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
                 )
+                val controller = WindowInsetsControllerCompat(dialogWindow, dialogWindow.decorView)
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
             onDispose { }
         }
@@ -1289,20 +1283,27 @@ private fun VideoPlayerOverlay(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
-                .windowInsetsPadding(WindowInsets.displayCutout)
         ) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                Fit16x9(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(start = landscapeStartInset, end = landscapeEndInset)
-                ) { width, height ->
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val videoRatio = 16f / 9f
+                    val screenRatio = maxWidth / maxHeight
+
+                    val (videoWidth, videoHeight) = if (screenRatio > videoRatio) {
+                        (maxHeight * videoRatio) to maxHeight
+                    } else {
+                        maxWidth to (maxWidth / videoRatio)
+                    }
+
                     Box(
                         modifier = Modifier
-                            .size(width = width, height = height)
+                            .size(width = videoWidth, height = videoHeight)
                             .background(Color.Black)
                     ) {
                         YouTubePlayerBlock(
@@ -1333,35 +1334,6 @@ private fun VideoPlayerOverlay(
     }
 }
 
-@Composable
-private fun Fit16x9(
-    modifier: Modifier = Modifier,
-    content: @Composable (widthDp: Dp, heightDp: Dp) -> Unit
-) {
-    BoxWithConstraints(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        val density = LocalDensity.current
-        val maxWidthPx = with(density) { maxWidth.toPx() }
-        val maxHeightPx = with(density) { maxHeight.toPx() }
-        val videoRatio = 16f / 9f
-
-        val heightFromWidth = maxWidthPx / videoRatio
-        val widthFromHeight = maxHeightPx * videoRatio
-
-        val (finalWidth, finalHeight) = if (heightFromWidth <= maxHeightPx) {
-            maxWidthPx to heightFromWidth
-        } else {
-            widthFromHeight to maxHeightPx
-        }
-
-        content(
-            with(density) { finalWidth.toDp() },
-            with(density) { finalHeight.toDp() }
-        )
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable

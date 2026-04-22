@@ -950,4 +950,11 @@
     <string name="settings_gamepad_mode_desc">Escolha se um gamepad conectado substitui os controles por toque ou funciona junto com eles.</string>
     <string name="settings_gamepad_mode_replace_touch">Substituir toque</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Toque + Gamepad</string>
+    <string name="settings_emulation_tab">Emulação</string>
+    <string name="settings_fixes_tab">Correções</string>
+    <string name="settings_library_tab">Biblioteca</string>
+    <string name="settings_rendering_section">Renderização</string>
+    <string name="settings_shadeboost_desc">Ajuste as cores da imagem final após a renderização.</string>
+    <string name="settings_patches_section">Patches</string>
+    <string name="settings_reset_to_default_toast">Valor padrão restaurado.</string>
 </resources>

@@ -524,6 +524,14 @@ private fun GameSettingsEditorDialog(
                                 onResetToDefault = { draft = draft.copy(renderer = normalizeManagerRenderer(defaultProfile.renderer)) }
                             )
                             SelectionRow(
+                                title = stringResource(R.string.settings_upscale),
+                                options = buildUpscaleOptions(nativeUpscaleLabel),
+                                selectedValue = upscaleMultiplierValue(draft.upscaleMultiplier),
+                                onSelected = { draft = draft.copy(upscaleMultiplier = it.toFloat()) },
+                                helpText = stringResource(R.string.settings_help_upscale),
+                                onResetToDefault = { draft = draft.copy(upscaleMultiplier = defaultProfile.upscaleMultiplier) }
+                            )
+                            SelectionRow(
                                 title = stringResource(R.string.settings_aspect_ratio),
                                 options = listOf(
                                     1 to stringResource(R.string.settings_aspect_ratio_auto),
@@ -536,14 +544,6 @@ private fun GameSettingsEditorDialog(
                                 onSelected = { draft = draft.copy(aspectRatio = it) },
                                 helpText = stringResource(R.string.settings_help_aspect_ratio),
                                 onResetToDefault = { draft = draft.copy(aspectRatio = defaultProfile.aspectRatio) }
-                            )
-                            SelectionRow(
-                                title = stringResource(R.string.settings_upscale),
-                                options = buildUpscaleOptions(nativeUpscaleLabel),
-                                selectedValue = upscaleMultiplierValue(draft.upscaleMultiplier),
-                                onSelected = { draft = draft.copy(upscaleMultiplier = it.toFloat()) },
-                                helpText = stringResource(R.string.settings_help_upscale),
-                                onResetToDefault = { draft = draft.copy(upscaleMultiplier = defaultProfile.upscaleMultiplier) }
                             )
                         }
                         EditorSection(title = stringResource(R.string.game_settings_manager_section_runtime)) {
@@ -571,6 +571,22 @@ private fun GameSettingsEditorDialog(
                                 onCheckedChange = { draft = draft.copy(frameLimitEnabled = it) },
                                 helpText = stringResource(R.string.settings_help_frame_limiter),
                                 onResetToDefault = { draft = draft.copy(frameLimitEnabled = defaultProfile.frameLimitEnabled) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_ee_cycle_rate),
+                                options = eeCycleRateOptions(),
+                                selectedValue = draft.eeCycleRate,
+                                onSelected = { draft = draft.copy(eeCycleRate = it) },
+                                helpText = stringResource(R.string.settings_help_ee_cycle_rate),
+                                onResetToDefault = { draft = draft.copy(eeCycleRate = defaultProfile.eeCycleRate) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_ee_cycle_skip),
+                                options = eeCycleSkipOptions(),
+                                selectedValue = draft.eeCycleSkip,
+                                onSelected = { draft = draft.copy(eeCycleSkip = it) },
+                                helpText = stringResource(R.string.settings_help_ee_cycle_skip),
+                                onResetToDefault = { draft = draft.copy(eeCycleSkip = defaultProfile.eeCycleSkip) }
                             )
                             SelectionRow(
                                 title = stringResource(R.string.settings_target_fps_mode),
@@ -620,6 +636,20 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_skip_duplicate_frames),
                                 onResetToDefault = { draft = draft.copy(skipDuplicateFrames = defaultProfile.skipDuplicateFrames) }
                             )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_frame_skip),
+                                options = listOf(
+                                    0 to stringResource(R.string.settings_frame_skip_off),
+                                    1 to "1",
+                                    2 to "2",
+                                    3 to "3",
+                                    4 to "4"
+                                ),
+                                selectedValue = draft.frameSkip,
+                                onSelected = { draft = draft.copy(frameSkip = it) },
+                                helpText = stringResource(R.string.settings_help_frame_skip),
+                                onResetToDefault = { draft = draft.copy(frameSkip = defaultProfile.frameSkip) }
+                            )
                             ToggleRow(
                                 title = stringResource(R.string.settings_enable_cheats),
                                 checked = draft.enableCheats,
@@ -627,6 +657,201 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_cheats),
                                 onResetToDefault = { draft = draft.copy(enableCheats = defaultProfile.enableCheats) }
                             )
+                        }
+                        EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
+                            SelectionRow(
+                                title = stringResource(R.string.settings_bilinear_filtering),
+                                options = bilinearFilteringOptions(),
+                                selectedValue = draft.textureFiltering,
+                                onSelected = { draft = draft.copy(textureFiltering = it) },
+                                helpText = stringResource(R.string.settings_help_bilinear_filtering),
+                                onResetToDefault = { draft = draft.copy(textureFiltering = defaultProfile.textureFiltering) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_trilinear_filtering),
+                                options = trilinearFilteringOptions(),
+                                selectedValue = draft.trilinearFiltering,
+                                onSelected = { draft = draft.copy(trilinearFiltering = it) },
+                                helpText = stringResource(R.string.settings_help_trilinear_filtering),
+                                onResetToDefault = { draft = draft.copy(trilinearFiltering = defaultProfile.trilinearFiltering) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_hw_download_mode),
+                                options = hwDownloadModeOptions(),
+                                selectedValue = draft.hwDownloadMode,
+                                onSelected = { draft = draft.copy(hwDownloadMode = it) },
+                                helpText = stringResource(R.string.settings_help_hw_download_mode),
+                                onResetToDefault = { draft = draft.copy(hwDownloadMode = defaultProfile.hwDownloadMode) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_blending_accuracy),
+                                options = blendingAccuracyOptions(),
+                                selectedValue = draft.blendingAccuracy,
+                                onSelected = { draft = draft.copy(blendingAccuracy = it) },
+                                helpText = stringResource(R.string.settings_help_blending_accuracy),
+                                onResetToDefault = { draft = draft.copy(blendingAccuracy = defaultProfile.blendingAccuracy) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_texture_preloading),
+                                options = texturePreloadingOptions(),
+                                selectedValue = draft.texturePreloading,
+                                onSelected = { draft = draft.copy(texturePreloading = it) },
+                                helpText = stringResource(R.string.settings_help_texture_preloading),
+                                onResetToDefault = { draft = draft.copy(texturePreloading = defaultProfile.texturePreloading) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_anisotropic_filtering),
+                                options = anisotropicFilteringOptions(),
+                                selectedValue = draft.anisotropicFiltering,
+                                onSelected = { draft = draft.copy(anisotropicFiltering = it) },
+                                helpText = stringResource(R.string.settings_help_anisotropic_filtering),
+                                onResetToDefault = { draft = draft.copy(anisotropicFiltering = defaultProfile.anisotropicFiltering) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_fxaa),
+                                checked = draft.enableFxaa,
+                                onCheckedChange = { draft = draft.copy(enableFxaa = it) },
+                                helpText = stringResource(R.string.settings_help_fxaa),
+                                onResetToDefault = { draft = draft.copy(enableFxaa = defaultProfile.enableFxaa) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_cas),
+                                options = casModeOptions(),
+                                selectedValue = draft.casMode,
+                                onSelected = { draft = draft.copy(casMode = it) },
+                                helpText = stringResource(R.string.settings_help_cas),
+                                onResetToDefault = { draft = draft.copy(casMode = defaultProfile.casMode) }
+                            )
+                            if (draft.casMode != 0) {
+                                SliderRow(
+                                    title = stringResource(R.string.settings_cas_sharpness),
+                                    value = draft.casSharpness.toFloat(),
+                                    valueLabel = stringResource(
+                                        R.string.settings_cas_sharpness_value,
+                                        draft.casSharpness
+                                    ),
+                                    range = 0f..100f,
+                                    steps = 99,
+                                    onValueChange = { draft = draft.copy(casSharpness = it.toInt()) },
+                                    helpText = stringResource(R.string.settings_help_cas_sharpness),
+                                    onResetToDefault = { draft = draft.copy(casSharpness = defaultProfile.casSharpness) }
+                                )
+                            }
+                            ToggleRow(
+                                title = stringResource(R.string.settings_hw_mipmapping),
+                                checked = draft.enableHwMipmapping,
+                                onCheckedChange = { draft = draft.copy(enableHwMipmapping = it) },
+                                helpText = stringResource(R.string.settings_help_hw_mipmapping),
+                                onResetToDefault = { draft = draft.copy(enableHwMipmapping = defaultProfile.enableHwMipmapping) }
+                            )
+                        }
+                        EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
+                            SliderRow(
+                                title = stringResource(R.string.settings_shadeboost_brightness),
+                                value = draft.shadeBoostBrightness.toFloat(),
+                                valueLabel = draft.shadeBoostBrightness.toString(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = {
+                                    val brightness = it.toInt()
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = isShadeBoostActive(
+                                            brightness = brightness,
+                                            contrast = draft.shadeBoostContrast,
+                                            saturation = draft.shadeBoostSaturation,
+                                            gamma = draft.shadeBoostGamma
+                                        ),
+                                        shadeBoostBrightness = brightness
+                                    )
+                                },
+                                helpText = stringResource(R.string.settings_help_shadeboost_brightness),
+                                onResetToDefault = {
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = defaultProfile.shadeBoostEnabled,
+                                        shadeBoostBrightness = defaultProfile.shadeBoostBrightness
+                                    )
+                                }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_shadeboost_contrast),
+                                value = draft.shadeBoostContrast.toFloat(),
+                                valueLabel = draft.shadeBoostContrast.toString(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = {
+                                    val contrast = it.toInt()
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = isShadeBoostActive(
+                                            brightness = draft.shadeBoostBrightness,
+                                            contrast = contrast,
+                                            saturation = draft.shadeBoostSaturation,
+                                            gamma = draft.shadeBoostGamma
+                                        ),
+                                        shadeBoostContrast = contrast
+                                    )
+                                },
+                                helpText = stringResource(R.string.settings_help_shadeboost_contrast),
+                                onResetToDefault = {
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = defaultProfile.shadeBoostEnabled,
+                                        shadeBoostContrast = defaultProfile.shadeBoostContrast
+                                    )
+                                }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_shadeboost_saturation),
+                                value = draft.shadeBoostSaturation.toFloat(),
+                                valueLabel = draft.shadeBoostSaturation.toString(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = {
+                                    val saturation = it.toInt()
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = isShadeBoostActive(
+                                            brightness = draft.shadeBoostBrightness,
+                                            contrast = draft.shadeBoostContrast,
+                                            saturation = saturation,
+                                            gamma = draft.shadeBoostGamma
+                                        ),
+                                        shadeBoostSaturation = saturation
+                                    )
+                                },
+                                helpText = stringResource(R.string.settings_help_shadeboost_saturation),
+                                onResetToDefault = {
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = defaultProfile.shadeBoostEnabled,
+                                        shadeBoostSaturation = defaultProfile.shadeBoostSaturation
+                                    )
+                                }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_shadeboost_gamma),
+                                value = draft.shadeBoostGamma.toFloat(),
+                                valueLabel = draft.shadeBoostGamma.toString(),
+                                range = 1f..100f,
+                                steps = 98,
+                                onValueChange = {
+                                    val gamma = it.toInt()
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = isShadeBoostActive(
+                                            brightness = draft.shadeBoostBrightness,
+                                            contrast = draft.shadeBoostContrast,
+                                            saturation = draft.shadeBoostSaturation,
+                                            gamma = gamma
+                                        ),
+                                        shadeBoostGamma = gamma
+                                    )
+                                },
+                                helpText = stringResource(R.string.settings_help_shadeboost_gamma),
+                                onResetToDefault = {
+                                    draft = draft.copy(
+                                        shadeBoostEnabled = defaultProfile.shadeBoostEnabled,
+                                        shadeBoostGamma = defaultProfile.shadeBoostGamma
+                                    )
+                                }
+                            )
+                        }
+                        EditorSection(title = stringResource(R.string.settings_patches_section)) {
                             ToggleRow(
                                 title = stringResource(R.string.settings_widescreen_patches),
                                 checked = draft.enableWidescreenPatches,
@@ -641,153 +866,224 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_no_interlacing_patches),
                                 onResetToDefault = { draft = draft.copy(enableNoInterlacingPatches = defaultProfile.enableNoInterlacingPatches) }
                             )
-                        SelectionRow(
-                            title = stringResource(R.string.settings_ee_cycle_rate),
-                            options = eeCycleRateOptions(),
-                            selectedValue = draft.eeCycleRate,
-                            onSelected = { draft = draft.copy(eeCycleRate = it) },
-                            helpText = stringResource(R.string.settings_help_ee_cycle_rate),
-                            onResetToDefault = { draft = draft.copy(eeCycleRate = defaultProfile.eeCycleRate) }
-                        )
-                        SelectionRow(
-                            title = stringResource(R.string.settings_ee_cycle_skip),
-                            options = eeCycleSkipOptions(),
-                            selectedValue = draft.eeCycleSkip,
-                            onSelected = { draft = draft.copy(eeCycleSkip = it) },
-                            helpText = stringResource(R.string.settings_help_ee_cycle_skip),
-                            onResetToDefault = { draft = draft.copy(eeCycleSkip = defaultProfile.eeCycleSkip) }
-                        )
-                    }
-                    EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
-                        SelectionRow(
-                            title = stringResource(R.string.settings_frame_skip),
-                            options = (0..3).map { it to it.toString() },
-                                selectedValue = draft.frameSkip,
-                                onSelected = { draft = draft.copy(frameSkip = it) },
-                                helpText = stringResource(R.string.settings_help_frame_skip),
-                                onResetToDefault = { draft = draft.copy(frameSkip = defaultProfile.frameSkip) }
+                        }
+                        EditorSection(title = stringResource(R.string.settings_hardware_fixes)) {
+                            SelectionRow(
+                                title = stringResource(R.string.settings_cpu_sprite_render_size),
+                                options = cpuSpriteRenderSizeOptions(),
+                                selectedValue = draft.cpuSpriteRenderSize,
+                                onSelected = { draft = draft.copy(cpuSpriteRenderSize = it) },
+                                helpText = stringResource(R.string.settings_help_cpu_sprite_render_size),
+                                onResetToDefault = { draft = draft.copy(cpuSpriteRenderSize = defaultProfile.cpuSpriteRenderSize) }
                             )
                             SelectionRow(
-                                title = stringResource(R.string.settings_bilinear_filtering),
-                                options = listOf(
-                                    0 to stringResource(R.string.settings_bilinear_filtering_nearest),
-                                    1 to stringResource(R.string.settings_bilinear_filtering_ps2),
-                                    2 to stringResource(R.string.settings_bilinear_filtering_forced),
-                                    3 to stringResource(R.string.settings_bilinear_filtering_no_sprite)
-                                ),
-                                selectedValue = draft.textureFiltering,
-                                onSelected = { draft = draft.copy(textureFiltering = it) },
-                                helpText = stringResource(R.string.settings_help_bilinear_filtering),
-                                onResetToDefault = { draft = draft.copy(textureFiltering = defaultProfile.textureFiltering) }
+                                title = stringResource(R.string.settings_cpu_sprite_render_level),
+                                options = cpuSpriteRenderLevelOptions(),
+                                selectedValue = draft.cpuSpriteRenderLevel,
+                                onSelected = { draft = draft.copy(cpuSpriteRenderLevel = it) },
+                                helpText = stringResource(R.string.settings_help_cpu_sprite_render_level),
+                                onResetToDefault = { draft = draft.copy(cpuSpriteRenderLevel = defaultProfile.cpuSpriteRenderLevel) }
                             )
                             SelectionRow(
-                                title = stringResource(R.string.settings_trilinear_filtering),
-                                options = listOf(
-                                    0 to stringResource(R.string.settings_trilinear_filtering_auto),
-                                    1 to stringResource(R.string.settings_trilinear_filtering_off),
-                                    2 to stringResource(R.string.settings_trilinear_filtering_ps2),
-                                    3 to stringResource(R.string.settings_trilinear_filtering_forced)
-                                ),
-                                selectedValue = draft.trilinearFiltering,
-                                onSelected = { draft = draft.copy(trilinearFiltering = it) },
-                                helpText = stringResource(R.string.settings_help_trilinear_filtering),
-                                onResetToDefault = { draft = draft.copy(trilinearFiltering = defaultProfile.trilinearFiltering) }
+                                title = stringResource(R.string.settings_software_clut_render),
+                                options = softwareClutRenderOptions(),
+                                selectedValue = draft.softwareClutRender,
+                                onSelected = { draft = draft.copy(softwareClutRender = it) },
+                                helpText = stringResource(R.string.settings_help_software_clut_render),
+                                onResetToDefault = { draft = draft.copy(softwareClutRender = defaultProfile.softwareClutRender) }
                             )
                             SelectionRow(
-                                title = stringResource(R.string.settings_hw_download_mode),
-                                options = listOf(
-                                    0 to stringResource(R.string.settings_hw_download_mode_disabled),
-                                    1 to stringResource(R.string.settings_hw_download_mode_accurate),
-                                    2 to stringResource(R.string.settings_hw_download_mode_unsynchronized)
-                            ),
-                            selectedValue = draft.hwDownloadMode,
-                            onSelected = { draft = draft.copy(hwDownloadMode = it) },
-                            helpText = stringResource(R.string.settings_help_hw_download_mode),
-                            onResetToDefault = { draft = draft.copy(hwDownloadMode = defaultProfile.hwDownloadMode) }
-                        )
-                        SelectionRow(
-                            title = stringResource(R.string.settings_blending_accuracy),
-                            options = blendingAccuracyOptions(),
-                            selectedValue = draft.blendingAccuracy,
-                            onSelected = { draft = draft.copy(blendingAccuracy = it) },
-                            helpText = stringResource(R.string.settings_help_blending_accuracy),
-                            onResetToDefault = { draft = draft.copy(blendingAccuracy = defaultProfile.blendingAccuracy) }
-                        )
-                        SelectionRow(
-                            title = stringResource(R.string.settings_texture_preloading),
-                            options = texturePreloadingOptions(),
-                            selectedValue = draft.texturePreloading,
-                            onSelected = { draft = draft.copy(texturePreloading = it) },
-                            helpText = stringResource(R.string.settings_help_texture_preloading),
-                            onResetToDefault = { draft = draft.copy(texturePreloading = defaultProfile.texturePreloading) }
-                        )
-                        SelectionRow(
-                            title = stringResource(R.string.settings_anisotropic_filtering),
-                            options = anisotropicFilteringOptions(),
-                            selectedValue = draft.anisotropicFiltering,
-                            onSelected = { draft = draft.copy(anisotropicFiltering = it) },
-                            helpText = stringResource(R.string.settings_help_anisotropic_filtering),
-                            onResetToDefault = { draft = draft.copy(anisotropicFiltering = defaultProfile.anisotropicFiltering) }
-                        )
-                        ToggleRow(
-                            title = stringResource(R.string.settings_fxaa),
-                            checked = draft.enableFxaa,
-                            onCheckedChange = { draft = draft.copy(enableFxaa = it) },
-                            helpText = stringResource(R.string.settings_help_fxaa),
-                            onResetToDefault = { draft = draft.copy(enableFxaa = defaultProfile.enableFxaa) }
-                        )
+                                title = stringResource(R.string.settings_gpu_target_clut),
+                                options = gpuTargetClutOptions(),
+                                selectedValue = draft.gpuTargetClutMode,
+                                onSelected = { draft = draft.copy(gpuTargetClutMode = it) },
+                                helpText = stringResource(R.string.settings_help_gpu_target_clut),
+                                onResetToDefault = { draft = draft.copy(gpuTargetClutMode = defaultProfile.gpuTargetClutMode) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_auto_flush_hardware),
+                                options = autoFlushHardwareOptions(),
+                                selectedValue = draft.autoFlushHardware,
+                                onSelected = { draft = draft.copy(autoFlushHardware = it) },
+                                helpText = stringResource(R.string.settings_help_auto_flush_hardware),
+                                onResetToDefault = { draft = draft.copy(autoFlushHardware = defaultProfile.autoFlushHardware) }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_skip_draw_start),
+                                value = draft.skipDrawStart.toFloat(),
+                                valueLabel = draft.skipDrawStart.toString(),
+                                range = 0f..100f,
+                                steps = 99,
+                                onValueChange = { draft = draft.copy(skipDrawStart = it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_skip_draw_start),
+                                onResetToDefault = { draft = draft.copy(skipDrawStart = defaultProfile.skipDrawStart) }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_skip_draw_end),
+                                value = draft.skipDrawEnd.toFloat(),
+                                valueLabel = draft.skipDrawEnd.toString(),
+                                range = 0f..100f,
+                                steps = 99,
+                                onValueChange = { draft = draft.copy(skipDrawEnd = it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_skip_draw_end),
+                                onResetToDefault = { draft = draft.copy(skipDrawEnd = defaultProfile.skipDrawEnd) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_cpu_framebuffer_conversion),
+                                checked = draft.cpuFramebufferConversion,
+                                onCheckedChange = { draft = draft.copy(cpuFramebufferConversion = it) },
+                                helpText = stringResource(R.string.settings_help_cpu_framebuffer_conversion),
+                                onResetToDefault = { draft = draft.copy(cpuFramebufferConversion = defaultProfile.cpuFramebufferConversion) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_disable_depth_conversion),
+                                checked = draft.disableDepthConversion,
+                                onCheckedChange = { draft = draft.copy(disableDepthConversion = it) },
+                                helpText = stringResource(R.string.settings_help_disable_depth_conversion),
+                                onResetToDefault = { draft = draft.copy(disableDepthConversion = defaultProfile.disableDepthConversion) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_disable_safe_features),
+                                checked = draft.disableSafeFeatures,
+                                onCheckedChange = { draft = draft.copy(disableSafeFeatures = it) },
+                                helpText = stringResource(R.string.settings_help_disable_safe_features),
+                                onResetToDefault = { draft = draft.copy(disableSafeFeatures = defaultProfile.disableSafeFeatures) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_disable_render_fixes),
+                                checked = draft.disableRenderFixes,
+                                onCheckedChange = { draft = draft.copy(disableRenderFixes = it) },
+                                helpText = stringResource(R.string.settings_help_disable_render_fixes),
+                                onResetToDefault = { draft = draft.copy(disableRenderFixes = defaultProfile.disableRenderFixes) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_preload_frame_data),
+                                checked = draft.preloadFrameData,
+                                onCheckedChange = { draft = draft.copy(preloadFrameData = it) },
+                                helpText = stringResource(R.string.settings_help_preload_frame_data),
+                                onResetToDefault = { draft = draft.copy(preloadFrameData = defaultProfile.preloadFrameData) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_disable_partial_invalidation),
+                                checked = draft.disablePartialInvalidation,
+                                onCheckedChange = { draft = draft.copy(disablePartialInvalidation = it) },
+                                helpText = stringResource(R.string.settings_help_disable_partial_invalidation),
+                                onResetToDefault = { draft = draft.copy(disablePartialInvalidation = defaultProfile.disablePartialInvalidation) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_texture_inside_rt),
+                                options = textureInsideRtOptions(),
+                                selectedValue = draft.textureInsideRt,
+                                onSelected = { draft = draft.copy(textureInsideRt = it) },
+                                helpText = stringResource(R.string.settings_help_texture_inside_rt),
+                                onResetToDefault = { draft = draft.copy(textureInsideRt = defaultProfile.textureInsideRt) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_read_targets_on_close),
+                                checked = draft.readTargetsOnClose,
+                                onCheckedChange = { draft = draft.copy(readTargetsOnClose = it) },
+                                helpText = stringResource(R.string.settings_help_read_targets_on_close),
+                                onResetToDefault = { draft = draft.copy(readTargetsOnClose = defaultProfile.readTargetsOnClose) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_estimate_texture_region),
+                                checked = draft.estimateTextureRegion,
+                                onCheckedChange = { draft = draft.copy(estimateTextureRegion = it) },
+                                helpText = stringResource(R.string.settings_help_estimate_texture_region),
+                                onResetToDefault = { draft = draft.copy(estimateTextureRegion = defaultProfile.estimateTextureRegion) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_gpu_palette_conversion),
+                                checked = draft.gpuPaletteConversion,
+                                onCheckedChange = { draft = draft.copy(gpuPaletteConversion = it) },
+                                helpText = stringResource(R.string.settings_help_gpu_palette_conversion),
+                                onResetToDefault = { draft = draft.copy(gpuPaletteConversion = defaultProfile.gpuPaletteConversion) }
+                            )
+                        }
+                        EditorSection(title = stringResource(R.string.settings_upscaling_fixes)) {
+                            SelectionRow(
+                                title = stringResource(R.string.settings_half_pixel_offset),
+                                options = halfPixelOffsetOptions(),
+                                selectedValue = draft.halfPixelOffset,
+                                onSelected = { draft = draft.copy(halfPixelOffset = it) },
+                                helpText = stringResource(R.string.settings_help_half_pixel_offset),
+                                onResetToDefault = { draft = draft.copy(halfPixelOffset = defaultProfile.halfPixelOffset) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_native_scaling),
+                                options = nativeScalingOptions(),
+                                selectedValue = draft.nativeScaling,
+                                onSelected = { draft = draft.copy(nativeScaling = it) },
+                                helpText = stringResource(R.string.settings_help_native_scaling),
+                                onResetToDefault = { draft = draft.copy(nativeScaling = defaultProfile.nativeScaling) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_round_sprite),
+                                options = roundSpriteOptions(),
+                                selectedValue = draft.roundSprite,
+                                onSelected = { draft = draft.copy(roundSprite = it) },
+                                helpText = stringResource(R.string.settings_help_round_sprite),
+                                onResetToDefault = { draft = draft.copy(roundSprite = defaultProfile.roundSprite) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_bilinear_upscale),
+                                options = bilinearUpscaleOptions(),
+                                selectedValue = draft.bilinearUpscale,
+                                onSelected = { draft = draft.copy(bilinearUpscale = it) },
+                                helpText = stringResource(R.string.settings_help_bilinear_upscale),
+                                onResetToDefault = { draft = draft.copy(bilinearUpscale = defaultProfile.bilinearUpscale) }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_texture_offset_x),
+                                value = draft.textureOffsetX.toFloat(),
+                                valueLabel = draft.textureOffsetX.toString(),
+                                range = -512f..512f,
+                                steps = 1023,
+                                onValueChange = { draft = draft.copy(textureOffsetX = it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_texture_offset_x),
+                                onResetToDefault = { draft = draft.copy(textureOffsetX = defaultProfile.textureOffsetX) }
+                            )
+                            SliderRow(
+                                title = stringResource(R.string.settings_texture_offset_y),
+                                value = draft.textureOffsetY.toFloat(),
+                                valueLabel = draft.textureOffsetY.toString(),
+                                range = -512f..512f,
+                                steps = 1023,
+                                onValueChange = { draft = draft.copy(textureOffsetY = it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_texture_offset_y),
+                                onResetToDefault = { draft = draft.copy(textureOffsetY = defaultProfile.textureOffsetY) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_align_sprite),
+                                checked = draft.alignSprite,
+                                onCheckedChange = { draft = draft.copy(alignSprite = it) },
+                                helpText = stringResource(R.string.settings_help_align_sprite),
+                                onResetToDefault = { draft = draft.copy(alignSprite = defaultProfile.alignSprite) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_merge_sprite),
+                                checked = draft.mergeSprite,
+                                onCheckedChange = { draft = draft.copy(mergeSprite = it) },
+                                helpText = stringResource(R.string.settings_help_merge_sprite),
+                                onResetToDefault = { draft = draft.copy(mergeSprite = defaultProfile.mergeSprite) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_force_even_sprite_position),
+                                checked = draft.forceEvenSpritePosition,
+                                onCheckedChange = { draft = draft.copy(forceEvenSpritePosition = it) },
+                                helpText = stringResource(R.string.settings_help_force_even_sprite_position),
+                                onResetToDefault = { draft = draft.copy(forceEvenSpritePosition = defaultProfile.forceEvenSpritePosition) }
+                            )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_native_palette_draw),
+                                checked = draft.nativePaletteDraw,
+                                onCheckedChange = { draft = draft.copy(nativePaletteDraw = it) },
+                                helpText = stringResource(R.string.settings_help_native_palette_draw),
+                                onResetToDefault = { draft = draft.copy(nativePaletteDraw = defaultProfile.nativePaletteDraw) }
+                            )
+                        }
                     }
-                    EditorSection(title = stringResource(R.string.game_settings_manager_section_screen)) {
-                        ToggleRow(
-                            title = stringResource(R.string.settings_shadeboost),
-                            checked = draft.shadeBoostEnabled,
-                            onCheckedChange = { draft = draft.copy(shadeBoostEnabled = it) },
-                            helpText = stringResource(R.string.settings_help_shadeboost),
-                            onResetToDefault = { draft = draft.copy(shadeBoostEnabled = defaultProfile.shadeBoostEnabled) }
-                        )
-                        SliderRow(
-                            title = stringResource(R.string.settings_shadeboost_brightness),
-                            value = draft.shadeBoostBrightness.toFloat(),
-                            valueLabel = draft.shadeBoostBrightness.toString(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { draft = draft.copy(shadeBoostBrightness = it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_brightness),
-                            onResetToDefault = { draft = draft.copy(shadeBoostBrightness = defaultProfile.shadeBoostBrightness) }
-                        )
-                        SliderRow(
-                            title = stringResource(R.string.settings_shadeboost_contrast),
-                            value = draft.shadeBoostContrast.toFloat(),
-                            valueLabel = draft.shadeBoostContrast.toString(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { draft = draft.copy(shadeBoostContrast = it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_contrast),
-                            onResetToDefault = { draft = draft.copy(shadeBoostContrast = defaultProfile.shadeBoostContrast) }
-                        )
-                        SliderRow(
-                            title = stringResource(R.string.settings_shadeboost_saturation),
-                            value = draft.shadeBoostSaturation.toFloat(),
-                            valueLabel = draft.shadeBoostSaturation.toString(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { draft = draft.copy(shadeBoostSaturation = it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_saturation),
-                            onResetToDefault = { draft = draft.copy(shadeBoostSaturation = defaultProfile.shadeBoostSaturation) }
-                        )
-                        SliderRow(
-                            title = stringResource(R.string.settings_shadeboost_gamma),
-                            value = draft.shadeBoostGamma.toFloat(),
-                            valueLabel = draft.shadeBoostGamma.toString(),
-                            range = 1f..100f,
-                            steps = 98,
-                            onValueChange = { draft = draft.copy(shadeBoostGamma = it.toInt()) },
-                            helpText = stringResource(R.string.settings_help_shadeboost_gamma),
-                            onResetToDefault = { draft = draft.copy(shadeBoostGamma = defaultProfile.shadeBoostGamma) }
-                        )
-                    }
-                }
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -854,13 +1150,20 @@ private fun SelectionRow(
     onResetToDefault: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {},
-                onLongClick = onResetToDefault
+                onLongClick = onResetToDefault?.let {
+                    {
+                        it()
+                        Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                    }
+                }
             ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -899,6 +1202,8 @@ private fun ToggleRow(
     onResetToDefault: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -906,7 +1211,12 @@ private fun ToggleRow(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { onCheckedChange(!checked) },
-                onLongClick = onResetToDefault
+                onLongClick = onResetToDefault?.let {
+                    {
+                        it()
+                        Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                    }
+                }
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -944,6 +1254,8 @@ private fun SliderRow(
     onResetToDefault: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier
@@ -952,7 +1264,12 @@ private fun SliderRow(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = {},
-                    onLongClick = onResetToDefault
+                    onLongClick = onResetToDefault?.let {
+                        {
+                            it()
+                            Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 ),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1115,6 +1432,108 @@ private fun anisotropicFilteringOptions(): List<Pair<Int, String>> = listOf(
     16 to "16x"
 )
 
+@Composable
+private fun bilinearFilteringOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_bilinear_filtering_nearest),
+    1 to stringResource(R.string.settings_bilinear_filtering_forced),
+    2 to stringResource(R.string.settings_bilinear_filtering_ps2),
+    3 to stringResource(R.string.settings_bilinear_filtering_no_sprite)
+)
+
+@Composable
+private fun trilinearFilteringOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_trilinear_filtering_auto),
+    1 to stringResource(R.string.settings_trilinear_filtering_off),
+    2 to stringResource(R.string.settings_trilinear_filtering_ps2),
+    3 to stringResource(R.string.settings_trilinear_filtering_forced)
+)
+
+@Composable
+private fun hwDownloadModeOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_hw_download_mode_accurate),
+    1 to stringResource(R.string.settings_hw_download_mode_no_readbacks),
+    2 to stringResource(R.string.settings_hw_download_mode_unsynchronized),
+    3 to stringResource(R.string.settings_hw_download_mode_disabled)
+)
+
+@Composable
+private fun casModeOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_cas_mode_off),
+    1 to stringResource(R.string.settings_cas_mode_sharpen_only),
+    2 to stringResource(R.string.settings_cas_mode_sharpen_resize)
+)
+
+@Composable
+private fun cpuSpriteRenderSizeOptions(): List<Pair<Int, String>> = (0..10).map { value ->
+    value to if (value == 0) stringResource(R.string.settings_disabled_short) else value.toString()
+}
+
+@Composable
+private fun cpuSpriteRenderLevelOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_cpu_sprite_render_level_sprites),
+    1 to stringResource(R.string.settings_cpu_sprite_render_level_triangles),
+    2 to stringResource(R.string.settings_cpu_sprite_render_level_blended)
+)
+
+@Composable
+private fun softwareClutRenderOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_disabled_short),
+    1 to stringResource(R.string.settings_normal_short),
+    2 to stringResource(R.string.settings_aggressive_short)
+)
+
+@Composable
+private fun gpuTargetClutOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+    1 to stringResource(R.string.settings_gpu_target_clut_exact),
+    2 to stringResource(R.string.settings_gpu_target_clut_inside)
+)
+
+@Composable
+private fun autoFlushHardwareOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+    1 to stringResource(R.string.settings_auto_flush_sprites),
+    2 to stringResource(R.string.settings_auto_flush_all)
+)
+
+@Composable
+private fun textureInsideRtOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_hw_download_mode_disabled),
+    1 to stringResource(R.string.settings_texture_inside_rt_inside),
+    2 to stringResource(R.string.settings_texture_inside_rt_merge)
+)
+
+@Composable
+private fun halfPixelOffsetOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_half_pixel_off),
+    1 to stringResource(R.string.settings_half_pixel_normal),
+    2 to stringResource(R.string.settings_half_pixel_special),
+    3 to stringResource(R.string.settings_half_pixel_special_aggressive),
+    4 to stringResource(R.string.settings_half_pixel_native),
+    5 to stringResource(R.string.settings_half_pixel_native_tex)
+)
+
+@Composable
+private fun nativeScalingOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_native_scaling_off),
+    1 to stringResource(R.string.settings_native_scaling_normal),
+    2 to stringResource(R.string.settings_native_scaling_aggressive)
+)
+
+@Composable
+private fun roundSpriteOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_half_pixel_off),
+    1 to stringResource(R.string.settings_round_sprite_half),
+    2 to stringResource(R.string.settings_round_sprite_full)
+)
+
+@Composable
+private fun bilinearUpscaleOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_trilinear_filtering_auto),
+    1 to stringResource(R.string.settings_bilinear_upscale_force_bilinear),
+    2 to stringResource(R.string.settings_bilinear_upscale_force_nearest)
+)
+
 private fun rendererLabel(renderer: Int): Int = when (normalizeManagerRenderer(renderer)) {
     12 -> R.string.settings_renderer_opengl
     13 -> R.string.settings_renderer_software
@@ -1126,6 +1545,15 @@ private fun normalizeManagerRenderer(renderer: Int): Int {
         12, 13, 14 -> renderer
         else -> EmulatorBridge.DEFAULT_RENDERER
     }
+}
+
+private fun isShadeBoostActive(
+    brightness: Int,
+    contrast: Int,
+    saturation: Int,
+    gamma: Int
+): Boolean {
+    return brightness != 50 || contrast != 50 || saturation != 50 || gamma != 50
 }
 
 private fun resolveManualTargetFps(currentTargetFps: Int, defaultTargetFps: Int): Int {

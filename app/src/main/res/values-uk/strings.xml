@@ -950,4 +950,11 @@
     <string name="settings_gamepad_mode_desc">Виберіть, чи має один підключений геймпад замінювати сенсорне керування, чи працювати паралельно з ним.</string>
     <string name="settings_gamepad_mode_replace_touch">Замінити сенсор</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Сенсор + Геймпад</string>
+    <string name="settings_emulation_tab">Емуляція</string>
+    <string name="settings_fixes_tab">Виправлення</string>
+    <string name="settings_library_tab">Бібліотека</string>
+    <string name="settings_rendering_section">Рендеринг</string>
+    <string name="settings_shadeboost_desc">Налаштуйте кольори фінального зображення після рендерингу.</string>
+    <string name="settings_patches_section">Патчі</string>
+    <string name="settings_reset_to_default_toast">Відновлено значення за замовчуванням.</string>
 </resources>

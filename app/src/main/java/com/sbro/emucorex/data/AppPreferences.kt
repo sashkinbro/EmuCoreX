@@ -123,7 +123,7 @@ data class SettingsSnapshot(
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
-    val frameLimitEnabled: Boolean = false,
+    val frameLimitEnabled: Boolean = true,
     val targetFps: Int = 0
 )
 
@@ -410,7 +410,7 @@ class AppPreferences(private val context: Context) {
     }
 
     val frameLimitEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[FRAME_LIMIT_ENABLED] ?: false
+        prefs[FRAME_LIMIT_ENABLED] ?: true
     }
 
     suspend fun setFrameLimitEnabled(enabled: Boolean) {
@@ -611,7 +611,13 @@ class AppPreferences(private val context: Context) {
                 enableFxaa = prefs[ENABLE_FXAA] ?: false,
                 casMode = prefs[CAS_MODE] ?: 0,
                 casSharpness = prefs[CAS_SHARPNESS] ?: 50,
-                shadeBoostEnabled = prefs[SHADEBOOST_ENABLED] ?: false,
+                shadeBoostEnabled = resolveShadeBoostEnabled(
+                    explicitValue = prefs[SHADEBOOST_ENABLED],
+                    brightness = prefs[SHADEBOOST_BRIGHTNESS] ?: 50,
+                    contrast = prefs[SHADEBOOST_CONTRAST] ?: 50,
+                    saturation = prefs[SHADEBOOST_SATURATION] ?: 50,
+                    gamma = prefs[SHADEBOOST_GAMMA] ?: 50
+                ),
                 shadeBoostBrightness = prefs[SHADEBOOST_BRIGHTNESS] ?: 50,
                 shadeBoostContrast = prefs[SHADEBOOST_CONTRAST] ?: 50,
                 shadeBoostSaturation = prefs[SHADEBOOST_SATURATION] ?: 50,
@@ -662,7 +668,7 @@ class AppPreferences(private val context: Context) {
                 gamepadBindingsByPad = decodeGamepadBindingsByPad(prefs[GAMEPAD_BINDINGS]),
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
-                frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: false,
+                frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: true,
                 targetFps = prefs[TARGET_FPS] ?: 0
             )
         }
@@ -1169,7 +1175,13 @@ class AppPreferences(private val context: Context) {
     }
 
     val shadeBoostEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[SHADEBOOST_ENABLED] ?: false
+        resolveShadeBoostEnabled(
+            explicitValue = prefs[SHADEBOOST_ENABLED],
+            brightness = prefs[SHADEBOOST_BRIGHTNESS] ?: 50,
+            contrast = prefs[SHADEBOOST_CONTRAST] ?: 50,
+            saturation = prefs[SHADEBOOST_SATURATION] ?: 50,
+            gamma = prefs[SHADEBOOST_GAMMA] ?: 50
+        )
     }
 
     suspend fun setShadeBoostEnabled(enabled: Boolean) {
@@ -1900,7 +1912,7 @@ class AppPreferences(private val context: Context) {
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
             put("gpuDriverType", prefs[GPU_DRIVER_TYPE] ?: 0)
             put("customDriverPath", prefs[CUSTOM_DRIVER_PATH])
-            put("frameLimitEnabled", prefs[FRAME_LIMIT_ENABLED] ?: false)
+            put("frameLimitEnabled", prefs[FRAME_LIMIT_ENABLED] ?: true)
             put("targetFps", prefs[TARGET_FPS] ?: 0)
             put("overlayLayoutVersion", prefs[OVERLAY_LAYOUT_VERSION] ?: 0)
             put("dpadOffset", prefs[DPAD_OFFSET])
@@ -2017,7 +2029,7 @@ class AppPreferences(private val context: Context) {
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
             prefs[GPU_DRIVER_TYPE] = json.optInt("gpuDriverType", 0)
             json.optString("customDriverPath").takeIf { it.isNotBlank() }?.let { prefs[CUSTOM_DRIVER_PATH] = it } ?: prefs.remove(CUSTOM_DRIVER_PATH)
-            prefs[FRAME_LIMIT_ENABLED] = json.optBoolean("frameLimitEnabled", false)
+            prefs[FRAME_LIMIT_ENABLED] = json.optBoolean("frameLimitEnabled", true)
             prefs[TARGET_FPS] = json.optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) }
             val importedOverlayVersion = json.optInt("overlayLayoutVersion", 0)
             json.optString("dpadOffset").takeIf { it.isNotBlank() }?.let {
@@ -2064,5 +2076,29 @@ class AppPreferences(private val context: Context) {
             has("upscaleMultiplier") -> optInt("upscaleMultiplier", 1).toFloat()
             else -> 1f
         }.let(::normalizeUpscale)
+    }
+
+    private fun resolveShadeBoostEnabled(
+        explicitValue: Boolean?,
+        brightness: Int,
+        contrast: Int,
+        saturation: Int,
+        gamma: Int
+    ): Boolean {
+        return explicitValue == true || isShadeBoostActive(
+            brightness = brightness,
+            contrast = contrast,
+            saturation = saturation,
+            gamma = gamma
+        )
+    }
+
+    private fun isShadeBoostActive(
+        brightness: Int,
+        contrast: Int,
+        saturation: Int,
+        gamma: Int
+    ): Boolean {
+        return brightness != 50 || contrast != 50 || saturation != 50 || gamma != 50
     }
 }

@@ -230,7 +230,7 @@ object EmulatorBridge {
         eeCycleSkip: Int = 0,
         frameSkip: Int = 0,
         skipDuplicateFrames: Boolean = false,
-        frameLimitEnabled: Boolean = false,
+        frameLimitEnabled: Boolean = true,
         targetFps: Int = 0,
         textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
         trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,

@@ -950,4 +950,11 @@
     <string name="settings_gamepad_mode_desc">Choisissez si une manette connectée remplace les contrôles tactiles ou fonctionne avec eux.</string>
     <string name="settings_gamepad_mode_replace_touch">Remplacer le tactile</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Tactile + Manette</string>
+    <string name="settings_emulation_tab">Émulation</string>
+    <string name="settings_fixes_tab">Correctifs</string>
+    <string name="settings_library_tab">Bibliothèque</string>
+    <string name="settings_rendering_section">Rendu</string>
+    <string name="settings_shadeboost_desc">Ajustez les couleurs de l\'image finale après le rendu.</string>
+    <string name="settings_patches_section">Patchs</string>
+    <string name="settings_reset_to_default_toast">Valeur par défaut restaurée.</string>
 </resources>

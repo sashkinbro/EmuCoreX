@@ -950,4 +950,11 @@
     <string name="settings_gamepad_mode_desc">Выберите, должен ли один подключенный геймпад заменять сенсорное управление или работать параллельно с ним.</string>
     <string name="settings_gamepad_mode_replace_touch">Заменить сенсор</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Сенсор + Геймпад</string>
+    <string name="settings_emulation_tab">Эмуляция</string>
+    <string name="settings_fixes_tab">Исправления</string>
+    <string name="settings_library_tab">Библиотека</string>
+    <string name="settings_rendering_section">Рендеринг</string>
+    <string name="settings_shadeboost_desc">Настройте цвета финального изображения после рендеринга.</string>
+    <string name="settings_patches_section">Патчи</string>
+    <string name="settings_reset_to_default_toast">Восстановлено значение по умолчанию.</string>
 </resources>

@@ -26,7 +26,7 @@ data class PerGameSettings(
     val eeCycleSkip: Int = 0,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = false,
-    val frameLimitEnabled: Boolean = false,
+    val frameLimitEnabled: Boolean = true,
     val targetFps: Int = 0,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
@@ -174,7 +174,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         eeCycleSkip = optInt("eeCycleSkip", 0),
         frameSkip = optInt("frameSkip", 0),
         skipDuplicateFrames = optBoolean("skipDuplicateFrames", false),
-        frameLimitEnabled = optBoolean("frameLimitEnabled", false),
+        frameLimitEnabled = optBoolean("frameLimitEnabled", true),
         targetFps = optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) },
         textureFiltering = optInt("textureFiltering", GsHackDefaults.BILINEAR_FILTERING_DEFAULT),
         trilinearFiltering = optInt("trilinearFiltering", GsHackDefaults.TRILINEAR_FILTERING_DEFAULT),
@@ -183,7 +183,12 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         enableFxaa = optBoolean("enableFxaa", false),
         casMode = optInt("casMode", 0),
         casSharpness = optInt("casSharpness", 50),
-        shadeBoostEnabled = optBoolean("shadeBoostEnabled", false),
+        shadeBoostEnabled = optBoolean("shadeBoostEnabled", false) || isShadeBoostActive(
+            brightness = optInt("shadeBoostBrightness", 50).coerceIn(1, 100),
+            contrast = optInt("shadeBoostContrast", 50).coerceIn(1, 100),
+            saturation = optInt("shadeBoostSaturation", 50).coerceIn(1, 100),
+            gamma = optInt("shadeBoostGamma", 50).coerceIn(1, 100)
+        ),
         shadeBoostBrightness = optInt("shadeBoostBrightness", 50).coerceIn(1, 100),
         shadeBoostContrast = optInt("shadeBoostContrast", 50).coerceIn(1, 100),
         shadeBoostSaturation = optInt("shadeBoostSaturation", 50).coerceIn(1, 100),
@@ -308,6 +313,15 @@ private fun JSONObject.readUpscaleMultiplier(): Float {
         has("upscaleMultiplier") -> optInt("upscaleMultiplier", 1).toFloat()
         else -> 1f
     }.let(::normalizeUpscale)
+}
+
+private fun isShadeBoostActive(
+    brightness: Int,
+    contrast: Int,
+    saturation: Int,
+    gamma: Int
+): Boolean {
+    return brightness != 50 || contrast != 50 || saturation != 50 || gamma != 50
 }
 
 private fun PerGameSettings.withManualHardwareFixesCleared(): PerGameSettings {

@@ -152,6 +152,10 @@
     <string name="settings_title">Settings</string>
     <string name="settings_general_tab">General</string>
     <string name="settings_graphics_tab">Video</string>
+    <string name="settings_emulation_tab">Emulation</string>
+    <string name="settings_fixes_tab">Fixes</string>
+    <string name="settings_library_tab">Library</string>
+    <string name="settings_patches_section">Patches</string>
     <string name="settings_paths_tab">Files</string>
     <string name="settings_covers_tab">Covers</string>
     <string name="settings_data_transfer_tab">Transfer</string>
@@ -502,6 +506,7 @@
     <string name="settings_touch_controls">Touch Controls</string>
     <string name="settings_gamepad_section">Gamepad</string>
     <string name="settings_speed_hacks">Speed Hacks</string>
+    <string name="settings_rendering_section">Rendering</string>
     <string name="settings_cheats_tab">Cheats</string>
     <string name="settings_enable_cheats">Enable Cheats</string>
     <string name="settings_enable_cheats_desc">Allows the core to load active cheats from pnach files.</string>
@@ -907,6 +912,7 @@
     <string name="settings_cas_mode_sharpen_only">Sharpen Only</string>
     <string name="settings_cas_mode_sharpen_resize">Sharpen + Resize</string>
     <string name="settings_shadeboost">Screen color boost</string>
+    <string name="settings_shadeboost_desc">Adjust the final image colors after rendering.</string>
     <string name="settings_shadeboost_brightness">Brightness</string>
     <string name="settings_shadeboost_contrast">Contrast</string>
     <string name="settings_shadeboost_saturation">Saturation</string>
@@ -919,6 +925,7 @@
     <string name="screen_settings_menu_desc">Tune the final image without changing the core renderer path. These controls are great for fixing dull, harsh, or overly dark output on a per-game basis.</string>
     <string name="screen_settings_reset_hint_title">Settings tip</string>
     <string name="screen_settings_reset_hint_body">Long-press the label of any setting to restore its default value. This works in Settings, in the Game Manager, and in the in-game menu, so you can quickly undo changes while testing.</string>
+    <string name="settings_reset_to_default_toast">Restored default value.</string>
     <string name="got_it">Got it</string>
     <string name="shell_game_settings_manager">Game Manager</string>
     <string name="game_settings_manager_title">Game Manager</string>

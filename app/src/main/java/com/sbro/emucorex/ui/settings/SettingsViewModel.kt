@@ -65,6 +65,11 @@ data class SettingsUiState(
     val enableFxaa: Boolean = false,
     val casMode: Int = 0,
     val casSharpness: Int = 50,
+    val shadeBoostEnabled: Boolean = false,
+    val shadeBoostBrightness: Int = 50,
+    val shadeBoostContrast: Int = 50,
+    val shadeBoostSaturation: Int = 50,
+    val shadeBoostGamma: Int = 50,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val anisotropicFiltering: Int = 0,
@@ -113,7 +118,7 @@ data class SettingsUiState(
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
-    val frameLimitEnabled: Boolean = false,
+    val frameLimitEnabled: Boolean = true,
     val targetFps: Int = 0
 )
 
@@ -179,6 +184,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableFxaa = snapshot.enableFxaa,
             casMode = snapshot.casMode,
             casSharpness = snapshot.casSharpness,
+            shadeBoostEnabled = snapshot.shadeBoostEnabled,
+            shadeBoostBrightness = snapshot.shadeBoostBrightness,
+            shadeBoostContrast = snapshot.shadeBoostContrast,
+            shadeBoostSaturation = snapshot.shadeBoostSaturation,
+            shadeBoostGamma = snapshot.shadeBoostGamma,
             enableWidescreenPatches = snapshot.enableWidescreenPatches,
             enableNoInterlacingPatches = snapshot.enableNoInterlacingPatches,
             anisotropicFiltering = snapshot.anisotropicFiltering,
@@ -491,6 +501,91 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             preferences.setCasSharpness(value)
             EmulatorBridge.setSetting("EmuCore/GS", "CASSharpness", "int", value.toString())
         }
+    }
+
+    fun setShadeBoostEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setShadeBoostEnabled(enabled)
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+        }
+    }
+
+    fun setShadeBoostBrightness(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            markPerformancePresetCustom()
+            val enabled = isShadeBoostActive(
+                brightness = clamped,
+                contrast = _uiState.value.shadeBoostContrast,
+                saturation = _uiState.value.shadeBoostSaturation,
+                gamma = _uiState.value.shadeBoostGamma
+            )
+            preferences.setShadeBoostEnabled(enabled)
+            preferences.setShadeBoostBrightness(clamped)
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Brightness", "int", clamped.toString())
+        }
+    }
+
+    fun setShadeBoostContrast(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            markPerformancePresetCustom()
+            val enabled = isShadeBoostActive(
+                brightness = _uiState.value.shadeBoostBrightness,
+                contrast = clamped,
+                saturation = _uiState.value.shadeBoostSaturation,
+                gamma = _uiState.value.shadeBoostGamma
+            )
+            preferences.setShadeBoostEnabled(enabled)
+            preferences.setShadeBoostContrast(clamped)
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Contrast", "int", clamped.toString())
+        }
+    }
+
+    fun setShadeBoostSaturation(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            markPerformancePresetCustom()
+            val enabled = isShadeBoostActive(
+                brightness = _uiState.value.shadeBoostBrightness,
+                contrast = _uiState.value.shadeBoostContrast,
+                saturation = clamped,
+                gamma = _uiState.value.shadeBoostGamma
+            )
+            preferences.setShadeBoostEnabled(enabled)
+            preferences.setShadeBoostSaturation(clamped)
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Saturation", "int", clamped.toString())
+        }
+    }
+
+    fun setShadeBoostGamma(value: Int) {
+        viewModelScope.launch {
+            val clamped = value.coerceIn(1, 100)
+            markPerformancePresetCustom()
+            val enabled = isShadeBoostActive(
+                brightness = _uiState.value.shadeBoostBrightness,
+                contrast = _uiState.value.shadeBoostContrast,
+                saturation = _uiState.value.shadeBoostSaturation,
+                gamma = clamped
+            )
+            preferences.setShadeBoostEnabled(enabled)
+            preferences.setShadeBoostGamma(clamped)
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost", "bool", enabled.toString())
+            EmulatorBridge.setSetting("EmuCore/GS", "ShadeBoost_Gamma", "int", clamped.toString())
+        }
+    }
+
+    private fun isShadeBoostActive(
+        brightness: Int,
+        contrast: Int,
+        saturation: Int,
+        gamma: Int
+    ): Boolean {
+        return brightness != 50 || contrast != 50 || saturation != 50 || gamma != 50
     }
 
     fun setEnableWidescreenPatches(enabled: Boolean) {
