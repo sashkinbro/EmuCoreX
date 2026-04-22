@@ -97,6 +97,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
@@ -125,6 +126,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
+    val customCoverRepository = remember(context) { CustomGameCoverRepository(context) }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isWide = isTabletClass && configuration.screenWidthDp >= 900
@@ -154,6 +156,7 @@ fun HomeScreen(
         uri?.let { viewModel.onBiosFolderSelected(it) }
     }
     var pendingCustomCoverGame by remember { mutableStateOf<GameItem?>(null) }
+    var gameAwaitingPickerLaunch by remember { mutableStateOf<GameItem?>(null) }
     val customCoverAppliedMessage = stringResource(R.string.home_game_menu_custom_cover_applied)
     val customCoverFailedMessage = stringResource(R.string.home_game_menu_custom_cover_failed)
     val customCoverPicker = rememberLauncherForActivityResult(
@@ -171,6 +174,12 @@ fun HomeScreen(
                 ).show()
             }
         }
+    }
+    LaunchedEffect(gameAwaitingPickerLaunch) {
+        val game = gameAwaitingPickerLaunch ?: return@LaunchedEffect
+        pendingCustomCoverGame = game
+        gameAwaitingPickerLaunch = null
+        customCoverPicker.launch("image/*")
     }
 
     var showSortMenu by remember { mutableStateOf(false) }
@@ -451,6 +460,8 @@ fun HomeScreen(
                                         items = uiState.recentGames,
                                         key = { _, game -> "recent_${game.path}" }
                                     ) { index, game ->
+                                        val showCoverPlaceholder = uiState.isCoverArtDisabled &&
+                                            !customCoverRepository.isCustomCoverPath(game.coverArtPath)
                                         RecentGameCard(
                                             modifier = Modifier
                                                 .padding(
@@ -460,9 +471,9 @@ fun HomeScreen(
                                                 .then(
                                                     if (index == 0) Modifier.focusRequester(initialGamepadFocusRequester)
                                                     else Modifier
-                                                ),
+                                            ),
                                             game = game,
-                                            showCenteredTitlePlaceholder = uiState.isCoverArtDisabled,
+                                            showCenteredTitlePlaceholder = showCoverPlaceholder,
                                             onClick = { onGameClick(game) },
                                             onLongClickStart = { onGameClick(game) },
                                             onLongClickContinue = { onContinueGame(game) },
@@ -470,8 +481,7 @@ fun HomeScreen(
                                             onLongClickManage = { onManageGameClick(game) },
                                             onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                             onLongClickCustomCover = {
-                                                pendingCustomCoverGame = game
-                                                customCoverPicker.launch("image/*")
+                                                gameAwaitingPickerLaunch = game
                                             },
                                             compact = isLandscape
                                         )
@@ -494,6 +504,8 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     rowGames.forEach { game ->
+                                        val showCoverPlaceholder = uiState.isCoverArtDisabled &&
+                                            !customCoverRepository.isCustomCoverPath(game.coverArtPath)
                                         Box(modifier = Modifier.weight(1f)) {
                                             val itemModifier = if (uiState.recentGames.isEmpty() && game == uiState.games.first()) {
                                                 Modifier.focusRequester(initialGamepadFocusRequester)
@@ -504,7 +516,7 @@ fun HomeScreen(
                                                 GameListCard(
                                                     modifier = itemModifier,
                                                     game = game,
-                                                    isCoverArtDisabled = uiState.isCoverArtDisabled,
+                                                    isCoverArtDisabled = showCoverPlaceholder,
                                                     onClick = { onGameClick(game) },
                                                     onLongClickStart = { onGameClick(game) },
                                                     onLongClickContinue = { onContinueGame(game) },
@@ -512,15 +524,14 @@ fun HomeScreen(
                                                     onLongClickManage = { onManageGameClick(game) },
                                                     onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                     onLongClickCustomCover = {
-                                                        pendingCustomCoverGame = game
-                                                        customCoverPicker.launch("image/*")
+                                                        gameAwaitingPickerLaunch = game
                                                     }
                                                 )
                                             } else {
                                                 GameCard(
                                                     modifier = itemModifier,
                                                     game = game,
-                                                    showCenteredTitlePlaceholder = uiState.isCoverArtDisabled,
+                                                    showCenteredTitlePlaceholder = showCoverPlaceholder,
                                                     onClick = { onGameClick(game) },
                                                     onLongClickStart = { onGameClick(game) },
                                                     onLongClickContinue = { onContinueGame(game) },
@@ -528,8 +539,7 @@ fun HomeScreen(
                                                     onLongClickManage = { onManageGameClick(game) },
                                                     onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                     onLongClickCustomCover = {
-                                                        pendingCustomCoverGame = game
-                                                        customCoverPicker.launch("image/*")
+                                                        gameAwaitingPickerLaunch = game
                                                     }
                                                 )
                                             }

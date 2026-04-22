@@ -19,7 +19,12 @@ class CustomGameCoverRepository(context: Context) {
         return directory
             .listFiles()
             .orEmpty()
-            .filter { it.isFile && it.name.startsWith("$key.") && it.length() > 0L }
+            .filter {
+                it.isFile &&
+                    it.name.startsWith("$key.") &&
+                    !it.name.endsWith(".tmp") &&
+                    it.length() > 0L
+            }
             .maxByOrNull(File::lastModified)
             ?.absolutePath
     }
@@ -32,7 +37,10 @@ class CustomGameCoverRepository(context: Context) {
 
         return runCatching {
             directory.mkdirs()
-            appContext.contentResolver.openInputStream(sourceUri)?.use { input ->
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+            openSourceStream(sourceUri)?.use { input ->
                 tempFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
@@ -57,6 +65,8 @@ class CustomGameCoverRepository(context: Context) {
             }
 
             targetFile.absolutePath
+        }.onFailure {
+            tempFile.delete()
         }.getOrNull()
     }
 
@@ -71,7 +81,7 @@ class CustomGameCoverRepository(context: Context) {
         return directory
             .listFiles()
             .orEmpty()
-            .filter { it.isFile && it.name.startsWith("$key.") }
+            .filter { it.isFile && it.name.startsWith("$key.") && !it.name.endsWith(".tmp") }
     }
 
     private fun resolveExtension(sourceUri: Uri): String {
@@ -91,6 +101,10 @@ class CustomGameCoverRepository(context: Context) {
             ?.takeIf { it.matches(Regex("[a-z0-9]{2,5}")) }
         return if (pathExtension == "jpeg") "jpg" else pathExtension ?: "img"
     }
+
+    private fun openSourceStream(sourceUri: Uri) =
+        appContext.contentResolver.openInputStream(sourceUri)
+            ?: appContext.contentResolver.openAssetFileDescriptor(sourceUri, "r")?.createInputStream()
 
     private fun stableKey(gamePath: String): String {
         val digest = MessageDigest.getInstance("SHA-1")
