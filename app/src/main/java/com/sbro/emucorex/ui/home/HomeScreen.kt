@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -88,6 +89,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -292,7 +294,10 @@ fun HomeScreen(
                             modifier = Modifier.widthIn(min = 88.dp),
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            IconButton(onClick = { viewModel.refreshGames() }) {
+                            IconButton(
+                                onClick = { viewModel.refreshGames() },
+                                enabled = !uiState.isLoading && !uiState.isRefreshing
+                            ) {
                                 if (uiState.isRefreshing) {
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(20.dp),
@@ -915,7 +920,7 @@ private fun RecentGameCard(
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                         textAlign = TextAlign.Center,
-                        maxLines = 4,
+                        maxLines = if (compact) 3 else 4,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxSize()
@@ -1013,17 +1018,11 @@ private fun GameCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         ) {
             if (showCenteredTitlePlaceholder) {
-                Text(
-                    text = game.title,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp, vertical = 12.dp)
-                        .wrapContentSize(Alignment.Center)
+                GridCoverPlaceholder(
+                    modifier = Modifier.fillMaxSize(),
+                    title = game.title,
+                    titleMaxLines = 4,
+                    contentScale = ContentScale.Crop
                 )
             } else {
                 GameCoverArt(
@@ -1123,7 +1122,12 @@ private fun GameListCard(
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
-                if (!isCoverArtDisabled) {
+                if (isCoverArtDisabled) {
+                    CoverPlaceholderArt(
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillHeight
+                    )
+                } else {
                     GameCoverArt(
                         coverPath = game.coverArtPath,
                         fallbackTitle = game.title,
@@ -1200,6 +1204,49 @@ private fun GameListCard(
             )
         }
     }
+}
+
+@Composable
+private fun GridCoverPlaceholder(
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    titleMaxLines: Int = 3,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        CoverPlaceholderArt(
+            modifier = Modifier.fillMaxSize(),
+            contentScale = contentScale
+        )
+
+        if (!title.isNullOrBlank()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = titleMaxLines,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverPlaceholderArt(
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    Image(
+        painter = painterResource(R.drawable.game_cover_placeholder_bg),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = contentScale,
+        alpha = 0.98f
+    )
 }
 
 @Composable

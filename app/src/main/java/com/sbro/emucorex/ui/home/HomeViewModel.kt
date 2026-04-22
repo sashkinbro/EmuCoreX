@@ -68,7 +68,8 @@ data class HomeUiState(
 
 private data class DeferredLibraryScan(
     val rootPath: String,
-    val isInitialLoad: Boolean
+    val isInitialLoad: Boolean,
+    val showRefreshIndicator: Boolean
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -128,7 +129,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value = _uiState.value.copy(
                             gameFolderSet = true,
                             isLoading = false,
-                            isRefreshing = !shouldSkipAutoRescan(isInitialLoad = true, cacheSnapshot = cacheSnapshot)
+                            isRefreshing = false
                         )
                         publishVisibleGames()
                         updateBootstrapState()
@@ -257,8 +258,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshGames() {
         viewModelScope.launch {
+            if (_uiState.value.isLoading || _uiState.value.isRefreshing) return@launch
             val path = preferences.gamePath.first() ?: return@launch
-            requestLibraryScan(path)
+            requestLibraryScan(path, showRefreshIndicator = true)
         }
     }
 
@@ -301,17 +303,21 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun scanGames(path: String, isInitialLoad: Boolean = false) {
+    private fun scanGames(
+        path: String,
+        isInitialLoad: Boolean = false,
+        showRefreshIndicator: Boolean = false
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             scanMutex.withLock {
                 try {
-                    if (shouldDeferLibraryWork(path, isInitialLoad)) return@withLock
+                    if (shouldDeferLibraryWork(path, isInitialLoad, showRefreshIndicator)) return@withLock
                     val cacheSnapshot = resolveCacheSnapshot(path)
                     val cachedGames = cacheSnapshot.games
                     val showFullScreenLoader = false
                     _uiState.value = _uiState.value.copy(
                         isLoading = showFullScreenLoader,
-                        isRefreshing = !showFullScreenLoader
+                        isRefreshing = showRefreshIndicator && !showFullScreenLoader
                     )
                     publishCachedGamesIfAvailable(path, cachedGames)
                     if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
@@ -331,7 +337,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         shouldAbort = { EmulatorBridge.isVmActive() }
                     )
                     if (EmulatorBridge.isVmActive()) {
-                        queueDeferredLibraryWork(path, isInitialLoad = false)
+                        queueDeferredLibraryWork(
+                            rootPath = path,
+                            isInitialLoad = false,
+                            showRefreshIndicator = showRefreshIndicator
+                        )
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isRefreshing = false
@@ -356,18 +366,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun scanGamesFromUri(uri: Uri, isInitialLoad: Boolean = false) {
+    private fun scanGamesFromUri(
+        uri: Uri,
+        isInitialLoad: Boolean = false,
+        showRefreshIndicator: Boolean = false
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             scanMutex.withLock {
                 val rootPath = uri.toString()
                 try {
-                    if (shouldDeferLibraryWork(rootPath, isInitialLoad)) return@withLock
+                    if (shouldDeferLibraryWork(rootPath, isInitialLoad, showRefreshIndicator)) return@withLock
                     val cacheSnapshot = resolveCacheSnapshot(rootPath)
                     val cachedGames = cacheSnapshot.games
                     val showFullScreenLoader = false
                     _uiState.value = _uiState.value.copy(
                         isLoading = showFullScreenLoader,
-                        isRefreshing = !showFullScreenLoader
+                        isRefreshing = showRefreshIndicator && !showFullScreenLoader
                     )
                     publishCachedGamesIfAvailable(rootPath, cachedGames)
                     if (shouldSkipAutoRescan(isInitialLoad, cacheSnapshot)) {
@@ -388,7 +402,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         shouldAbort = { EmulatorBridge.isVmActive() }
                     )
                     if (EmulatorBridge.isVmActive()) {
-                        queueDeferredLibraryWork(rootPath, isInitialLoad = false)
+                        queueDeferredLibraryWork(
+                            rootPath = rootPath,
+                            isInitialLoad = false,
+                            showRefreshIndicator = showRefreshIndicator
+                        )
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isRefreshing = false
@@ -424,20 +442,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         updateBootstrapState()
     }
 
-    private fun requestLibraryScan(rootPath: String, isInitialLoad: Boolean = false) {
-        if (shouldDeferLibraryWork(rootPath, isInitialLoad)) return
+    private fun requestLibraryScan(
+        rootPath: String,
+        isInitialLoad: Boolean = false,
+        showRefreshIndicator: Boolean = false
+    ) {
+        if (shouldDeferLibraryWork(rootPath, isInitialLoad, showRefreshIndicator)) return
         if (rootPath.startsWith("content://")) {
-            scanGamesFromUri(rootPath.toUri(), isInitialLoad)
+            scanGamesFromUri(rootPath.toUri(), isInitialLoad, showRefreshIndicator)
         } else {
-            scanGames(rootPath, isInitialLoad)
+            scanGames(rootPath, isInitialLoad, showRefreshIndicator)
         }
     }
 
-    private fun shouldDeferLibraryWork(rootPath: String, isInitialLoad: Boolean): Boolean {
+    private fun shouldDeferLibraryWork(
+        rootPath: String,
+        isInitialLoad: Boolean,
+        showRefreshIndicator: Boolean
+    ): Boolean {
         if (!EmulatorBridge.isVmActive()) return false
         val cacheSnapshot = resolveCacheSnapshot(rootPath)
         publishCachedGamesIfAvailable(rootPath, cacheSnapshot.games)
-        queueDeferredLibraryWork(rootPath, isInitialLoad)
+        queueDeferredLibraryWork(rootPath, isInitialLoad, showRefreshIndicator)
         _uiState.value = _uiState.value.copy(
             isLoading = false,
             isRefreshing = false
@@ -446,11 +472,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
-    private fun queueDeferredLibraryWork(rootPath: String, isInitialLoad: Boolean) {
+    private fun queueDeferredLibraryWork(
+        rootPath: String,
+        isInitialLoad: Boolean,
+        showRefreshIndicator: Boolean
+    ) {
         val existing = deferredLibraryScan
         deferredLibraryScan = DeferredLibraryScan(
             rootPath = rootPath,
-            isInitialLoad = isInitialLoad || existing?.isInitialLoad == true
+            isInitialLoad = isInitialLoad || existing?.isInitialLoad == true,
+            showRefreshIndicator = showRefreshIndicator || existing?.showRefreshIndicator == true
         )
         startDeferredWorkMonitor()
     }
@@ -468,7 +499,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     val pendingScan = deferredLibraryScan
                     if (pendingScan != null) {
                         deferredLibraryScan = null
-                        requestLibraryScan(pendingScan.rootPath, pendingScan.isInitialLoad)
+                        requestLibraryScan(
+                            rootPath = pendingScan.rootPath,
+                            isInitialLoad = pendingScan.isInitialLoad,
+                            showRefreshIndicator = pendingScan.showRefreshIndicator
+                        )
                         return@launch
                     }
 
