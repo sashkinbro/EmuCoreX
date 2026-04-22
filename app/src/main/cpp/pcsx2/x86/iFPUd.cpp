@@ -615,6 +615,11 @@ void recFPUOp(int info, int regd, int op, bool acc)
 
 	recFPUOpXMM_to_XMM[op](sreg, treg);
 
+	if (EmuConfig.Cpu.FPUFPCR.GetRoundMode() != FPRoundMode::Nearest)
+	{
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+	}
+
 	ToPS2FPU(sreg, true, treg, acc, true);
 //	xMOVSS(xRegisterSSE(regd), xRegisterSSE(sreg));
     armAsm->Mov(a64::QRegister(regd).S(), 0, a64::QRegister(sreg).S(), 0);
@@ -809,6 +814,11 @@ void recDIVhelper1(int regd, int regt) // Sets flags
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
+    if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+    {
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+    }
+
 	ToPS2FPU(regd, false, regt, false);
 
 //	x86SetJ32(bjmp32);
@@ -824,6 +834,11 @@ void recDIVhelper2(int regd, int regt) // Doesn't sets flags
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     auto regD = a64::QRegister(regd);
     armAsm->Fdiv(regD.V1D(), regD.V1D(), a64::QRegister(regt).V1D());
+
+    if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+    {
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+    }
 
 	ToPS2FPU(regd, false, regt, false);
 }
@@ -892,12 +907,6 @@ void recMaddsub(int info, int regd, int op, bool acc)
     auto regS = a64::QRegister(sreg);
     auto regT = a64::QRegister(treg);
 
-
-//	xTEST(ptr32[&fpuRegs.fprc[31]], FPUflagO);
-    armAsm->Tst(armLoad(PTR_CPU(fpuRegs.fprc[31])), FPUflagO);
-//	u8* mulovf = JNZ8(0);
-    a64::Label mulovf;
-    armAsm->B(&mulovf, a64::Condition::ne);
 	ToDouble(sreg); //else, convert
 
 //	xTEST(ptr32[&fpuRegs.ACCflag], 1);
@@ -909,15 +918,6 @@ void recMaddsub(int info, int regd, int op, bool acc)
 //	u8* operation = JMP8(0);
     a64::Label operation;
     armAsm->B(&operation);
-
-//	x86SetJ8(mulovf);
-    armBind(&mulovf);
-	if (op == 1) { //sub
-//        xXOR.PS(xRegisterSSE(sreg), ptr[s_const.neg]);
-    armAsm->Eor(regS.V16B(), regS.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.neg)).V16B());
-    }
-//	xMOVAPS(xRegisterSSE(treg), xRegisterSSE(sreg)); //fall through below
-    armAsm->Mov(regT, regS);
 
 //	x86SetJ8(accovf);
     armBind(&accovf);
@@ -947,6 +947,11 @@ void recMaddsub(int info, int regd, int op, bool acc)
 //        xADD.SD(xRegisterSSE(treg), xRegisterSSE(sreg));
         armAsm->Fadd(regT.V1D(), regT.V1D(), regS.V1D());
     }
+
+	if (EmuConfig.Cpu.FPUFPCR.GetRoundMode() != FPRoundMode::Nearest)
+	{
+        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+	}
 
 	ToPS2FPU(treg, true, sreg, acc, true);
 //	x86SetJ32(skipall);
@@ -1295,6 +1300,13 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
             armOrr(PTR_CPU(fpuRegs.fprc[31]), FPUflagD | FPUflagSD);
 //		x86SetJ8(qjmp2);
         armBind(&qjmp2);
+
+        // For RSQRT divide-by-zero, the result sign follows Ft.
+        armAsm->And(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.pos[0])).V16B());
+        a64::Label positive_max;
+        armAsm->Cbz(EDX, &positive_max);
+        armAsm->Orr(regD.V16B(), regD.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.neg[0])).V16B());
+        armBind(&positive_max);
 
 		SetMaxValue(regd); //clamp to max
 //		pjmp32 = JMP32(0);

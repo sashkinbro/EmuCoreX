@@ -736,6 +736,16 @@ void VMManager::LoadCoreSettings(SettingsInterface& si)
 			Console.WriteLn("(VMManager) Investigation override active: forcing EE interpreter (EnableEE=false)");
 			break;
 	}
+
+#ifdef __ANDROID__
+	if (!s_elf_override.empty())
+	{
+		// Autotest/homebrew ELF runs need the precise EE FPU JIT path and PS2-default EE round modes.
+		EmuConfig.Cpu.Recompiler.SetEEClampMode(3);
+		EmuConfig.Cpu.FPUFPCR.SetRoundMode(FPRoundMode::ChopZero);
+		EmuConfig.Cpu.FPUDivFPCR.SetRoundMode(FPRoundMode::Nearest);
+	}
+#endif
 }
 
 void VMManager::LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock)

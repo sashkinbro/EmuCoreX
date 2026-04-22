@@ -649,7 +649,7 @@ static void addConstantAndWriteBackToHiLoRd(int hiloID, u64 constant)
 //	xMOV(ehi, ptr[&cpuRegs.HI.UL[hiloID * 2]]);
     armLoad(ehi, PTR_CPU(cpuRegs.HI.UL[hiloID * 2]));
 //	xADD(eax, (u32)(constant & 0xffffffff));
-    armAsm->Add(EAX, EAX, (u32)(constant & 0xffffffff));
+    armAsm->Adds(EAX, EAX, (u32)(constant & 0xffffffff));
 //	xADC(ehi, (u32)(constant >> 32));
     armAsm->Adc(ehi, ehi, (u32)(constant >> 32));
 	writeBackMAddToHiLoRd(hiloID);
@@ -658,7 +658,7 @@ static void addConstantAndWriteBackToHiLoRd(int hiloID, u64 constant)
 static void addEaxEdxAndWriteBackToHiLoRd(int hiloID)
 {
 //	xADD(eax, ptr[&cpuRegs.LO.UL[hiloID * 2]]);
-    armAsm->Add(EAX, EAX, armLoad(PTR_CPU(cpuRegs.LO.UL[hiloID * 2])));
+    armAsm->Adds(EAX, EAX, armLoad(PTR_CPU(cpuRegs.LO.UL[hiloID * 2])));
 //	xADC(edx, ptr[&cpuRegs.HI.UL[hiloID * 2]]);
     armAsm->Adc(EDX, EDX, armLoad(PTR_CPU(cpuRegs.HI.UL[hiloID * 2])));
 
@@ -702,7 +702,7 @@ void recMADD()
 //		xMUL(ptr32[&cpuRegs.GPR.r[_Rt_].UL[0]]);
         armAsm->Smull(RAX, EAX, armLoad(PTR_CPU(cpuRegs.GPR.r[_Rt_].UL[0])));
 	}
-    armAsm->Lsr(RDX, RAX, 32);
+    armAsm->Asr(RDX, RAX, 32);
 
 	addEaxEdxAndWriteBackToHiLoRd(0);
 }
@@ -786,7 +786,7 @@ void recMADD1()
 //		xMUL(ptr32[&cpuRegs.GPR.r[_Rt_].UL[0]]);
         armAsm->Smull(RAX, EAX, armLoad(PTR_CPU(cpuRegs.GPR.r[_Rt_].UL[0])));
 	}
-    armAsm->Lsr(RDX, RAX, 32);
+    armAsm->Asr(RDX, RAX, 32);
 
 	addEaxEdxAndWriteBackToHiLoRd(1);
 }
