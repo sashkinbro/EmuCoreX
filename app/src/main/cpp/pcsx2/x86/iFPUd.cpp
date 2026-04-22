@@ -613,12 +613,14 @@ void recFPUOp(int info, int regd, int op, bool acc)
 
 	ToDouble(sreg); ToDouble(treg);
 
-	recFPUOpXMM_to_XMM[op](sreg, treg);
+	// Ensure the PS2 EE round mode (ChopZero) is live for BOTH the double-precision
+	// add/sub AND the subsequent fcvt double->single inside ToPS2FPU. A prior DIV/SQRT
+	// may have switched FPCR to Nearest; without re-applying FPUFPCR here the narrowing
+	// step rounds to nearest and we see results one ULP above the EE-correct value
+	// (e.g. 7F7FFFFF instead of 7F7FFFFE for CF_MAX +/- 1.0).
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 
-	if (EmuConfig.Cpu.FPUFPCR.GetRoundMode() != FPRoundMode::Nearest)
-	{
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
-	}
+	recFPUOpXMM_to_XMM[op](sreg, treg);
 
 	ToPS2FPU(sreg, true, treg, acc, true);
 //	xMOVSS(xRegisterSSE(regd), xRegisterSSE(sreg));
@@ -907,6 +909,19 @@ void recMaddsub(int info, int regd, int op, bool acc)
     auto regS = a64::QRegister(sreg);
     auto regT = a64::QRegister(treg);
 
+	// MADD/MSUB (acc=false) must NOT take the mulovf shortcut: the EE
+	// interpreter sanitises the clamped MUL result via fpuDouble (NaN/INF ->
+	// posFmax) and then ADDs it to ACC in double, which can cancel to zero
+	// when ACC sign is opposite. MADDA/MSUBA (acc=true) keeps the MUL result
+	// in double form directly, so the clamped-value shortcut does match.
+	a64::Label mulovf;
+	if (acc)
+	{
+//	xTEST(ptr32[&fpuRegs.fprc[31]], FPUflagO);
+    armAsm->Tst(armLoad(PTR_CPU(fpuRegs.fprc[31])), FPUflagO);
+//	u8* mulovf = JNZ8(0);
+    armAsm->B(&mulovf, a64::Condition::ne);
+	}
 	ToDouble(sreg); //else, convert
 
 //	xTEST(ptr32[&fpuRegs.ACCflag], 1);
@@ -918,6 +933,18 @@ void recMaddsub(int info, int regd, int op, bool acc)
 //	u8* operation = JMP8(0);
     a64::Label operation;
     armAsm->B(&operation);
+
+	if (acc)
+	{
+//	x86SetJ8(mulovf);
+    armBind(&mulovf);
+	if (op == 1) { //sub
+//        xXOR.PS(xRegisterSSE(sreg), ptr[s_const.neg]);
+        armAsm->Eor(regS.V16B(), regS.V16B(), armLoadPtrV(PTR_MVUCONST(s_const.neg)).V16B());
+    }
+//	xMOVAPS(xRegisterSSE(treg), xRegisterSSE(sreg)); //fall through below
+    armAsm->Mov(regT, regS);
+	}
 
 //	x86SetJ8(accovf);
     armBind(&accovf);
@@ -939,6 +966,9 @@ void recMaddsub(int info, int regd, int op, bool acc)
 
 //	x86SetJ8(operation);
     armBind(&operation);
+	// Apply PS2 EE round mode (ChopZero) for the double add/sub AND the following
+	// fcvt double->single in ToPS2FPU. See recFPUOp for rationale.
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 	if (op == 1) {
 //        xSUB.SD(xRegisterSSE(treg), xRegisterSSE(sreg));
         armAsm->Fsub(regT.V1D(), regT.V1D(), regS.V1D());
@@ -947,11 +977,6 @@ void recMaddsub(int info, int regd, int op, bool acc)
 //        xADD.SD(xRegisterSSE(treg), xRegisterSSE(sreg));
         armAsm->Fadd(regT.V1D(), regT.V1D(), regS.V1D());
     }
-
-	if (EmuConfig.Cpu.FPUFPCR.GetRoundMode() != FPRoundMode::Nearest)
-	{
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
-	}
 
 	ToPS2FPU(treg, true, sreg, acc, true);
 //	x86SetJ32(skipall);
@@ -1211,12 +1236,12 @@ void recSQRT_S_xmm(int info)
 //	xSQRT.SD(xRegisterSSE(EEREC_D), xRegisterSSE(EEREC_D));
     armAsm->Fsqrt(regED.V1D(), regED.V1D());
 
-	ToPS2FPU(EEREC_D, false, t1reg, false);
-
+	// Restore PS2 FPU rounding (ChopZero) BEFORE narrowing so fcvt truncates per EE semantics.
 	if (roundmodeFlag == 1) {
-//        xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
         armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
     }
+
+	ToPS2FPU(EEREC_D, false, t1reg, false);
 
 	_freeXMMreg(t1reg);
 }
@@ -1321,6 +1346,9 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
+	// RSQRT: keep host FPCR in Nearest for the narrowing step to match the EE
+	// interpreter, which rounds RSQRT results to nearest in C++ (vs SQRT that
+	// rounds toward zero, handled in recSQRT_S_xmm).
 	ToPS2FPU(regd, false, regt, false);
 //	x86SetJ32(pjmp32);
     armBind(&pjmp32);
@@ -1343,6 +1371,9 @@ void recRSQRThelper2(int regd, int regt) // Preforms the RSQRT function when reg
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
+	// RSQRT: keep host FPCR in Nearest for the narrowing step to match the EE
+	// interpreter, which rounds RSQRT results to nearest in C++ (vs SQRT that
+	// rounds toward zero, handled in recSQRT_S_xmm).
 	ToPS2FPU(regd, false, regt, false);
 }
 

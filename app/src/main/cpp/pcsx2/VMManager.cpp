@@ -746,6 +746,12 @@ void VMManager::LoadCoreSettings(SettingsInterface& si)
 		EmuConfig.Cpu.FPUDivFPCR.SetRoundMode(FPRoundMode::Nearest);
 	}
 #endif
+
+	// The ARM64 JIT reads FPUFPCR/FPUDivFPCR via the backend runtime-config mirror
+	// (see PTR_CONFIG). Keep that mirror in sync with EmuConfig whenever core
+	// settings reload, otherwise emitted MSR FPCR instructions load a stale (or
+	// zero/Nearest) mask and EE arithmetic silently rounds to nearest.
+	Arm64RefreshRuntimeBackendConfig();
 }
 
 void VMManager::LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock)

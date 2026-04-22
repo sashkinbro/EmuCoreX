@@ -965,6 +965,9 @@
     <string name="home_game_menu_load_save">Load save state</string>
     <string name="home_game_menu_manager">Game manager</string>
     <string name="home_game_menu_shortcut">Create shortcut</string>
+    <string name="home_game_menu_custom_cover">Choose custom cover</string>
+    <string name="home_game_menu_custom_cover_applied">Custom cover applied.</string>
+    <string name="home_game_menu_custom_cover_failed">Failed to apply custom cover.</string>
     <string name="save">Save</string>
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>

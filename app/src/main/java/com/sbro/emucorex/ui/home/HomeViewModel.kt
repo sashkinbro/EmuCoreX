@@ -10,6 +10,7 @@ import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.CoverArtRepository
+import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameLibraryCacheRepository
 import com.sbro.emucorex.data.GameLibraryCacheSnapshot
@@ -31,6 +32,7 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.text.Normalizer
 
 enum class HomeSortOption {
@@ -77,6 +79,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = GameRepository()
     private val libraryCacheRepository = GameLibraryCacheRepository(application)
+    private val customGameCoverRepository = CustomGameCoverRepository(application)
     private val preferences = AppPreferences(application)
     private var allGames: List<GameItem> = emptyList()
     private var recentEntries: List<RecentGameEntry> = emptyList()
@@ -257,6 +260,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val path = preferences.gamePath.first() ?: return@launch
             requestLibraryScan(path)
         }
+    }
+
+    suspend fun setCustomCover(game: GameItem, sourceUri: Uri): Boolean {
+        val customCoverPath = withContext(Dispatchers.IO) {
+            customGameCoverRepository.saveCustomCover(game.path, sourceUri)
+        } ?: return false
+
+        synchronized(this) {
+            allGames = allGames.map { current ->
+                if (current.path == game.path) current.copy(coverArtPath = customCoverPath) else current
+            }
+        }
+        publishVisibleGames()
+        currentLibraryRoot?.let { rootPath ->
+            libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
+        }
+        return true
     }
 
     fun updateSearchQuery(query: String) {
@@ -607,11 +627,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val rootPath = currentLibraryRoot ?: return
         val context = getApplication<Application>()
         val coverRepository = CoverArtRepository(context)
+        val customCoverRepository = CustomGameCoverRepository(context)
         val cachePrefix = java.io.File(context.cacheDir, "game-covers").absolutePath
 
         synchronized(this) {
             allGames = allGames.map { game ->
                 val currentPath = game.coverArtPath
+                if (customCoverRepository.isCustomCoverPath(currentPath)) {
+                    return@map game
+                }
                 if (currentPath != null && currentPath.startsWith(cachePrefix, ignoreCase = true)) {
                     game.copy(coverArtPath = coverRepository.findCachedCoverPath(game.serial))
                 } else {

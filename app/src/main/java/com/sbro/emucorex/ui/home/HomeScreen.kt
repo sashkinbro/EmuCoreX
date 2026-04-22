@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.home
 
 import android.annotation.SuppressLint
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -86,6 +87,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -122,6 +124,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
+    val context = LocalContext.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isWide = isTabletClass && configuration.screenWidthDp >= 900
@@ -149,6 +152,25 @@ fun HomeScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let { viewModel.onBiosFolderSelected(it) }
+    }
+    var pendingCustomCoverGame by remember { mutableStateOf<GameItem?>(null) }
+    val customCoverAppliedMessage = stringResource(R.string.home_game_menu_custom_cover_applied)
+    val customCoverFailedMessage = stringResource(R.string.home_game_menu_custom_cover_failed)
+    val customCoverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        val targetGame = pendingCustomCoverGame
+        pendingCustomCoverGame = null
+        if (uri != null && targetGame != null) {
+            scope.launch {
+                val success = viewModel.setCustomCover(targetGame, uri)
+                Toast.makeText(
+                    context,
+                    if (success) customCoverAppliedMessage else customCoverFailedMessage,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     var showSortMenu by remember { mutableStateOf(false) }
@@ -442,6 +464,15 @@ fun HomeScreen(
                                             game = game,
                                             showCenteredTitlePlaceholder = uiState.isCoverArtDisabled,
                                             onClick = { onGameClick(game) },
+                                            onLongClickStart = { onGameClick(game) },
+                                            onLongClickContinue = { onContinueGame(game) },
+                                            onLongClickLoadSave = { onLoadSaveClick(game) },
+                                            onLongClickManage = { onManageGameClick(game) },
+                                            onLongClickCreateShortcut = { onCreateShortcutClick(game) },
+                                            onLongClickCustomCover = {
+                                                pendingCustomCoverGame = game
+                                                customCoverPicker.launch(arrayOf("image/*"))
+                                            },
                                             compact = isLandscape
                                         )
                                     }
@@ -479,7 +510,11 @@ fun HomeScreen(
                                                     onLongClickContinue = { onContinueGame(game) },
                                                     onLongClickLoadSave = { onLoadSaveClick(game) },
                                                     onLongClickManage = { onManageGameClick(game) },
-                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) }
+                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) },
+                                                    onLongClickCustomCover = {
+                                                        pendingCustomCoverGame = game
+                                                        customCoverPicker.launch(arrayOf("image/*"))
+                                                    }
                                                 )
                                             } else {
                                                 GameCard(
@@ -491,7 +526,11 @@ fun HomeScreen(
                                                     onLongClickContinue = { onContinueGame(game) },
                                                     onLongClickLoadSave = { onLoadSaveClick(game) },
                                                     onLongClickManage = { onManageGameClick(game) },
-                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) }
+                                                    onLongClickCreateShortcut = { onCreateShortcutClick(game) },
+                                                    onLongClickCustomCover = {
+                                                        pendingCustomCoverGame = game
+                                                        customCoverPicker.launch(arrayOf("image/*"))
+                                                    }
                                                 )
                                             }
                                         }
@@ -817,51 +856,103 @@ private fun RecentGameCard(
     game: GameItem,
     showCenteredTitlePlaceholder: Boolean,
     onClick: () -> Unit,
+    onLongClickStart: () -> Unit,
+    onLongClickContinue: () -> Unit,
+    onLongClickLoadSave: () -> Unit,
+    onLongClickManage: () -> Unit,
+    onLongClickCreateShortcut: () -> Unit,
+    onLongClickCustomCover: () -> Unit,
     compact: Boolean
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, tween(100))
+    var showMenu by remember { mutableStateOf(false) }
 
-    Surface(
+    Box(
         modifier = modifier
             .width(if (compact) 98.dp else 108.dp)
-            .graphicsLayer(scaleX = scale, scaleY = scale)
-            .gamepadFocusableCard(shape = RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        onClick = debouncedClick
     ) {
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = debouncedClick,
+                    onLongClick = { showMenu = true }
+                )
+                .gamepadFocusableCard(shape = RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
         ) {
-            if (showCenteredTitlePlaceholder) {
-                Text(
-                    text = game.title,
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    textAlign = TextAlign.Center,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 10.dp, vertical = 12.dp)
-                        .wrapContentSize(Alignment.Center)
-                )
-            } else {
-                GameCoverArt(
-                    coverPath = game.coverArtPath,
-                    fallbackTitle = game.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            ) {
+                if (showCenteredTitlePlaceholder) {
+                    Text(
+                        text = game.title,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                        textAlign = TextAlign.Center,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 10.dp, vertical = 12.dp)
+                            .wrapContentSize(Alignment.Center)
+                    )
+                } else {
+                    GameCoverArt(
+                        coverPath = game.coverArtPath,
+                        fallbackTitle = game.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 8.dp)
+        ) {
+            GameCardContextMenu(
+                expanded = showMenu,
+                offset = DpOffset(x = 0.dp, y = 10.dp),
+                onDismiss = { showMenu = false },
+                onStart = {
+                    showMenu = false
+                    onLongClickStart()
+                },
+                onContinue = {
+                    showMenu = false
+                    onLongClickContinue()
+                },
+                onLoadSave = {
+                    showMenu = false
+                    onLongClickLoadSave()
+                },
+                onManage = {
+                    showMenu = false
+                    onLongClickManage()
+                },
+                onCreateShortcut = {
+                    showMenu = false
+                    onLongClickCreateShortcut()
+                },
+                onCustomCover = {
+                    showMenu = false
+                    onLongClickCustomCover()
+                }
+            )
         }
     }
 }
@@ -876,7 +967,8 @@ private fun GameCard(
     onLongClickContinue: () -> Unit,
     onLongClickLoadSave: () -> Unit,
     onLongClickManage: () -> Unit,
-    onLongClickCreateShortcut: () -> Unit
+    onLongClickCreateShortcut: () -> Unit,
+    onLongClickCustomCover: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -958,6 +1050,10 @@ private fun GameCard(
                 onCreateShortcut = {
                     showMenu = false
                     onLongClickCreateShortcut()
+                },
+                onCustomCover = {
+                    showMenu = false
+                    onLongClickCustomCover()
                 }
             )
         }
@@ -974,7 +1070,8 @@ private fun GameListCard(
     onLongClickContinue: () -> Unit,
     onLongClickLoadSave: () -> Unit,
     onLongClickManage: () -> Unit,
-    onLongClickCreateShortcut: () -> Unit
+    onLongClickCreateShortcut: () -> Unit,
+    onLongClickCustomCover: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -1082,6 +1179,10 @@ private fun GameListCard(
                 onCreateShortcut = {
                     showMenu = false
                     onLongClickCreateShortcut()
+                },
+                onCustomCover = {
+                    showMenu = false
+                    onLongClickCustomCover()
                 }
             )
         }
@@ -1097,7 +1198,8 @@ private fun GameCardContextMenu(
     onContinue: () -> Unit,
     onLoadSave: () -> Unit,
     onManage: () -> Unit,
-    onCreateShortcut: () -> Unit
+    onCreateShortcut: () -> Unit,
+    onCustomCover: () -> Unit
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -1123,6 +1225,10 @@ private fun GameCardContextMenu(
         DropdownMenuItem(
             text = { Text(stringResource(R.string.home_game_menu_shortcut)) },
             onClick = onCreateShortcut
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.home_game_menu_custom_cover)) },
+            onClick = onCustomCover
         )
     }
 }

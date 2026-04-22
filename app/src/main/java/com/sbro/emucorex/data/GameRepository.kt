@@ -103,6 +103,7 @@ class GameRepository {
         val children = dir.listFiles().orEmpty()
         val coverCandidates = buildLocalCoverCandidates(children)
         val coverRepository = CoverArtRepository(context)
+        val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
         children.forEach { file ->
@@ -135,7 +136,8 @@ class GameRepository {
                         fileName = file.name,
                         fileSize = file.length(),
                         lastModified = file.lastModified(),
-                        coverArtPath = coverRepository.findCachedCoverPath(metadata.serial)
+                        coverArtPath = customCoverRepository.findCustomCoverPath(file.absolutePath)
+                            ?: coverRepository.findCachedCoverPath(metadata.serial)
                             ?: cachedGame?.coverArtPath?.takeIf { File(it).exists() }
                             ?: coverCandidates[normalizeBaseName(file.nameWithoutExtension)]?.absolutePath
                             ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.absolutePath,
@@ -159,6 +161,7 @@ class GameRepository {
         val children = docFile.listFiles()
         val coverCandidates = buildDocumentCoverCandidates(children)
         val coverRepository = CoverArtRepository(context)
+        val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
         for (file in children) {
@@ -196,7 +199,8 @@ class GameRepository {
                     fileName = name,
                     fileSize = file.length(),
                     lastModified = file.lastModified(),
-                    coverArtPath = coverRepository.findCachedCoverUri(metadata.serial)
+                    coverArtPath = customCoverRepository.findCustomCoverPath(uriPath)
+                        ?: coverRepository.findCachedCoverUri(metadata.serial)
                         ?: cachedGame?.coverArtPath
                         ?: coverCandidates[normalizeBaseName(name.substringBeforeLast('.'))]?.uri?.toString()
                         ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.uri?.toString(),
@@ -215,7 +219,8 @@ class GameRepository {
         val baseName = normalizeBaseName(file.nameWithoutExtension)
         val titleKey = normalizeBaseName(cleanGameName(title ?: EmulatorBridge.getGameTitle(path)))
         val coverCandidates = buildLocalCoverCandidates(parent.listFiles().orEmpty())
-        return CoverArtRepository(context).findCachedCoverPath(serial)
+        return CustomGameCoverRepository(context).findCustomCoverPath(path)
+            ?: CoverArtRepository(context).findCachedCoverPath(serial)
             ?: coverCandidates[baseName]?.absolutePath
             ?: coverCandidates[titleKey]?.absolutePath
     }
@@ -230,7 +235,8 @@ class GameRepository {
         val baseName = normalizeBaseName(document.name.orEmpty().substringBeforeLast('.'))
         val titleKey = normalizeBaseName(cleanGameName(title ?: document.name.orEmpty().substringBeforeLast('.')))
         val coverCandidates = buildDocumentCoverCandidates(parent.listFiles())
-        return CoverArtRepository(context).findCachedCoverUri(serial)
+        return CustomGameCoverRepository(context).findCustomCoverPath(path)
+            ?: CoverArtRepository(context).findCachedCoverUri(serial)
             ?: coverCandidates[baseName]?.uri?.toString()
             ?: coverCandidates[titleKey]?.uri?.toString()
     }
