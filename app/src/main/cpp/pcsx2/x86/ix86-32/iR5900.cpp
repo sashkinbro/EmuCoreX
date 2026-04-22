@@ -1096,6 +1096,48 @@ void SetBranchImm(u32 imm)
 	iBranchTest(imm);
 }
 
+static bool IsEeBranchOpcode(u32 opcode)
+{
+	switch (opcode >> 26)
+	{
+		case 0:
+			switch (opcode & 0x3F)
+			{
+				case 8:  // JR
+				case 9:  // JALR
+					return true;
+
+				default:
+					return false;
+			}
+
+		case 1:  // REGIMM
+		case 2:  // J
+		case 3:  // JAL
+		case 4:  // BEQ
+		case 5:  // BNE
+		case 6:  // BLEZ
+		case 7:  // BGTZ
+		case 0x14: // BEQL
+		case 0x15: // BNEL
+		case 0x16: // BLEZL
+		case 0x17: // BGTZL
+			return true;
+
+		default:
+			return false;
+	}
+}
+
+bool HasBranchInDelaySlot()
+{
+	if (g_recompilingDelaySlot)
+		return false;
+
+	const u32 opcode_encoded = *(u32*)PSM(pc);
+	return IsEeBranchOpcode(opcode_encoded);
+}
+
 u8* recBeginThunk()
 {
 	// if recPtr reached the mem limit reset whole mem

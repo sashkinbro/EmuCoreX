@@ -945,4 +945,9 @@
     <string name="settings_help_enable_iop_recompiler">控制用于源自 PlayStation 1 的 I/O 处理器的 IOP 重编译器。这通常保持启用状态。仅在隔离底层 IOP 行为、音频、控制器或与 DMA 相关的兼容性问题时才将其关闭。</string>
     <string name="settings_help_enable_vu0_recompiler">控制向量单元 0 (VU0) 重编译器。VU0 用于某些游戏逻辑和数学工作负载。如果怀疑 VU0 生成的代码产生了错误的结果，请仅在进行兼容性测试时将其禁用。</string>
     <string name="settings_help_enable_vu1_recompiler">控制向量单元 1 (VU1) 重编译器。VU1 在许多游戏中驱动着大量的变换和几何工作。当您需要将 JIT 输出与解释器进行比较、调查渲染损坏或捕获 VU1 追踪以进行调试时，请将其禁用。</string>
+    <string name="settings_help_gamepad_mode">选择单个物理控制器应如何与触屏控制交互。“替换触控”会使一个手柄立即接管玩家 1，而“触控 + 手柄”则将玩家 1 保留为触屏控制，并将单个手柄分配给玩家 2。如果同时连接了两个物理控制器，它们将始终成为玩家 1 和玩家 2。</string>
+    <string name="settings_gamepad_mode">单手柄模式</string>
+    <string name="settings_gamepad_mode_desc">选择连接的一个手柄是替换触屏控制还是与触屏控制同时工作。</string>
+    <string name="settings_gamepad_mode_replace_touch">替换触控</string>
+    <string name="settings_gamepad_mode_touch_plus_gamepad">触控 + 手柄</string>
 </resources>

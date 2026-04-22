@@ -1097,15 +1097,18 @@ private fun SettingsContent(
                         )
                     }
                     SettingsSection(title = stringResource(R.string.settings_gamepad_section)) {
-                        ToggleItem(
-                            icon = Icons.Rounded.Gamepad,
-                            title = stringResource(R.string.settings_gamepad_auto),
-                            subtitle = stringResource(R.string.settings_gamepad_auto_desc),
-                            checked = uiState.enableAutoGamepad,
-                            onCheckedChange = viewModel::setEnableAutoGamepad,
-                            helpText = stringResource(R.string.settings_help_auto_gamepad),
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_gamepad_mode),
+                            options = listOf(
+                                1 to stringResource(R.string.settings_gamepad_mode_replace_touch),
+                                0 to stringResource(R.string.settings_gamepad_mode_touch_plus_gamepad)
+                            ),
+                            selectedValue = if (uiState.enableAutoGamepad) 1 else 0,
+                            onSelect = { viewModel.setEnableAutoGamepad(it == 1) },
+                            helpText = stringResource(R.string.settings_help_gamepad_mode),
                             onResetToDefault = { viewModel.setEnableAutoGamepad(defaults.enableAutoGamepad) }
                         )
+                        SettingsInlineNote(text = stringResource(R.string.settings_gamepad_mode_desc))
                         ToggleItem(
                             icon = Icons.Rounded.Visibility,
                             title = stringResource(R.string.settings_gamepad_hide_overlay),
@@ -2190,7 +2193,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
         entry(SettingsTab.Controls, R.string.settings_left_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_right_stick_sensitivity),
-        entry(SettingsTab.Controls, R.string.settings_gamepad_auto),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_mode),
         entry(SettingsTab.Controls, R.string.settings_gamepad_hide_overlay),
         entry(SettingsTab.Controls, R.string.settings_gamepad_stick_deadzone),
         entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_sensitivity),

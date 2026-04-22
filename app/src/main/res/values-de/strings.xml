@@ -945,4 +945,9 @@
     <string name="settings_help_enable_iop_recompiler">Steuert den IOP-Recompiler, der für den von der PlayStation 1 abgeleiteten I/O-Prozessor verwendet wird. Dieser bleibt normalerweise aktiviert. Schalte ihn nur aus, um Low-Level-IOP-Verhalten, Audio-, Controller- oder DMA-bezogene Kompatibilitätsprobleme zu isolieren.</string>
     <string name="settings_help_enable_vu0_recompiler">Steuert den Recompiler der Vektoreinheit 0. VU0 wird von einigen Spiellogik- und Mathematik-Workloads verwendet. Deaktiviere ihn nur für Kompatibilitätstests, wenn du vermutest, dass von VU0 generierter Code falsche Ergebnisse liefert.</string>
     <string name="settings_help_enable_vu1_recompiler">Steuert den Recompiler der Vektoreinheit 1. VU1 steuert einen großen Teil der Transformations- und Geometriearbeit in vielen Spielen. Deaktiviere ihn, wenn du die JIT-Ausgabe mit dem Interpreter vergleichen, Darstellungsfehler untersuchen oder VU1-Traces zum Debuggen erfassen musst.</string>
+    <string name="settings_help_gamepad_mode">Wähle, wie ein einzelner physischer Controller mit der Touch-Steuerung interagieren soll. \"Touch ersetzen\" weist einem Gamepad sofort Spieler 1 zu, während \"Touch + Gamepad\" die Touch-Steuerung auf Spieler 1 belässt und das einzelne Gamepad Spieler 2 zuweist. Wenn zwei physische Controller gleichzeitig verbunden sind, werden sie immer zu Spieler 1 und Spieler 2.</string>
+    <string name="settings_gamepad_mode">Modus für einzelnes Gamepad</string>
+    <string name="settings_gamepad_mode_desc">Wähle, ob ein verbundenes Gamepad die Touch-Steuerung ersetzt oder parallel dazu funktioniert.</string>
+    <string name="settings_gamepad_mode_replace_touch">Touch ersetzen</string>
+    <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
 </resources>

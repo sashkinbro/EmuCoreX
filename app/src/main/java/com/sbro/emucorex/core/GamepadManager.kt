@@ -74,6 +74,8 @@ object GamepadManager {
     private var leftStickSensitivity = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY / 100f
     @Volatile
     private var rightStickSensitivity = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY / 100f
+    @Volatile
+    private var singleGamepadReplacesTouch = true
 
     private val connectionLock = Any()
     private val deviceToPadIndex = linkedMapOf<Int, Int>()
@@ -164,6 +166,12 @@ object GamepadManager {
                 rightStickSensitivity = value.coerceIn(50, 200) / 100f
             }
         }
+        scope.launch {
+            preferences.enableAutoGamepad.collectLatest { enabled ->
+                singleGamepadReplacesTouch = enabled
+                refreshConnectedGamepads()
+            }
+        }
         refreshConnectedGamepads()
     }
 
@@ -233,6 +241,17 @@ object GamepadManager {
     }
 
     fun isGamepadConnected(): Boolean = connectedGamepads().isNotEmpty()
+
+    fun connectedGamepadCount(): Int = connectedGamepads().size
+
+    fun resolveTouchPadIndex(): Int? {
+        val connectedCount = synchronized(connectionLock) { deviceToPadIndex.size }
+        return when {
+            connectedCount <= 0 -> 0
+            connectedCount == 1 && !singleGamepadReplacesTouch -> 0
+            else -> null
+        }
+    }
 
     fun setEmulationInputEnabled(enabled: Boolean) {
         emulationInputEnabled = enabled
@@ -422,7 +441,7 @@ object GamepadManager {
     }
 
     private fun refreshConnectedGamepads(): List<ConnectedGamepad> {
-        val disconnectedAssignments = mutableListOf<Pair<Int, Int>>()
+        val releasedAssignments = mutableListOf<Pair<Int, Int>>()
         val connectedSnapshot = synchronized(connectionLock) {
             val connectedDevices = buildList<InputDevice> {
                 for (deviceId in InputDevice.getDeviceIds()) {
@@ -432,23 +451,38 @@ object GamepadManager {
                     }
                 }
             }
-            val connectedDeviceIds = connectedDevices.map { it.id }.toSet()
+            val connectedDevicesById = connectedDevices.associateBy { it.id }
+            val previousAssignments = deviceToPadIndex.toMap()
+            val orderedDeviceIds = buildList {
+                addAll(
+                    previousAssignments.entries
+                        .sortedBy { it.value }
+                        .map { it.key }
+                        .filter { it in connectedDevicesById }
+                )
+                connectedDevices.map { it.id }.forEach { deviceId ->
+                    if (deviceId !in previousAssignments) {
+                        add(deviceId)
+                    }
+                }
+            }
+            val targetPadIndices = desiredPadIndices(orderedDeviceIds.size)
+            val updatedAssignments = linkedMapOf<Int, Int>()
 
-            val staleDeviceIds = deviceToPadIndex.keys.filter { it !in connectedDeviceIds }
-            staleDeviceIds.forEach { deviceId ->
-                val padIndex = deviceToPadIndex.remove(deviceId) ?: return@forEach
-                analogStatesByDeviceId.remove(deviceId)
-                rumbleStatesByPad.remove(padIndex)
-                disconnectedAssignments += (padIndex to deviceId)
+            orderedDeviceIds.take(targetPadIndices.size).forEachIndexed { index, deviceId ->
+                updatedAssignments[deviceId] = targetPadIndices[index]
             }
 
-            val usedPadIndices = deviceToPadIndex.values.toMutableSet()
-            connectedDevices.forEach { device ->
-                if (deviceToPadIndex.containsKey(device.id)) return@forEach
-                val freePadIndex = (0 until MAX_PAD_SLOTS).firstOrNull { it !in usedPadIndices } ?: return@forEach
-                deviceToPadIndex[device.id] = freePadIndex
-                usedPadIndices += freePadIndex
+            previousAssignments.forEach { (deviceId, padIndex) ->
+                if (updatedAssignments[deviceId] != padIndex) {
+                    analogStatesByDeviceId.remove(deviceId)
+                    rumbleStatesByPad.remove(padIndex)
+                    releasedAssignments += (padIndex to deviceId)
+                }
             }
+
+            deviceToPadIndex.clear()
+            deviceToPadIndex.putAll(updatedAssignments)
 
             connectedDevices.mapNotNull { device ->
                 val padIndex = deviceToPadIndex[device.id] ?: return@mapNotNull null
@@ -460,7 +494,7 @@ object GamepadManager {
             }.sortedBy { it.padIndex }
         }
 
-        disconnectedAssignments.forEach { (padIndex, deviceId) ->
+        releasedAssignments.forEach { (padIndex, deviceId) ->
             stopGamepadVibrationForDevice(deviceId)
             if (emulationInputEnabled) {
                 EmulatorBridge.resetPadState(padIndex)
@@ -518,5 +552,14 @@ object GamepadManager {
         val vibrator = getGamepadVibrator(deviceId) ?: return
         if (!vibrator.hasVibrator()) return
         vibrator.cancel()
+    }
+
+    private fun desiredPadIndices(connectedGamepadCount: Int): List<Int> {
+        val visibleGamepadCount = connectedGamepadCount.coerceIn(0, MAX_PAD_SLOTS)
+        return when {
+            visibleGamepadCount <= 0 -> emptyList()
+            visibleGamepadCount == 1 && !singleGamepadReplacesTouch -> listOf(1)
+            else -> List(visibleGamepadCount) { it }
+        }
     }
 }

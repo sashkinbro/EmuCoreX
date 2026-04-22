@@ -51,7 +51,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.LockOpen
@@ -313,12 +312,15 @@ fun EmulationScreen(
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
     var lastTapX by remember { mutableFloatStateOf(0f) }
     var lastTapY by remember { mutableFloatStateOf(0f) }
-    val gamepadConnected = remember { mutableStateOf(GamepadManager.isGamepadConnected()) }
-    var showGamepadIndicator by remember { mutableStateOf(gamepadConnected.value) }
+    var connectedGamepadCount by remember { mutableIntStateOf(GamepadManager.connectedGamepadCount()) }
+    val gamepadConnected = connectedGamepadCount > 0
+    val touchPadIndex = GamepadManager.resolveTouchPadIndex()
+    var showGamepadIndicator by remember { mutableStateOf(gamepadConnected) }
     var showRetroAchievementsHud by remember { mutableStateOf(false) }
 
-    val shouldShowOverlay = uiState.controlsVisible &&
-            !(uiState.hideOverlayOnGamepad && gamepadConnected.value)
+    val shouldShowOverlay = uiState.controlsVisible && (
+        touchPadIndex != null || !gamepadConnected || !uiState.hideOverlayOnGamepad
+    )
 
     val toggleMenuClick = rememberDebouncedClick(onClick = { viewModel.toggleMenu() })
     val toggleControlsClick = rememberDebouncedClick(onClick = { viewModel.toggleControlsVisibility() })
@@ -423,12 +425,12 @@ fun EmulationScreen(
         viewModel.startEmulation(gamePath, saveSlot, bootToBios)
     }
 
-    LaunchedEffect(gamepadConnected.value, uiState.showMenu) {
-        if (gamepadConnected.value && !uiState.showMenu) {
+    LaunchedEffect(gamepadConnected, uiState.showMenu) {
+        if (gamepadConnected && !uiState.showMenu) {
             showGamepadIndicator = true
             delay(5000)
             showGamepadIndicator = false
-        } else if (!gamepadConnected.value || uiState.showMenu) {
+        } else {
             showGamepadIndicator = false
         }
     }
@@ -504,8 +506,8 @@ fun EmulationScreen(
 
     LaunchedEffect(Unit) {
         while (true) {
-            gamepadConnected.value = GamepadManager.isGamepadConnected()
-            delay(2000)
+            connectedGamepadCount = GamepadManager.connectedGamepadCount()
+            delay(500)
         }
     }
 
@@ -570,7 +572,7 @@ fun EmulationScreen(
             ) {
                 // Gamepad indicator
                 AnimatedVisibility(
-                    visible = gamepadConnected.value && !uiState.showMenu && showGamepadIndicator,
+                    visible = gamepadConnected && !uiState.showMenu && showGamepadIndicator,
                     enter = fadeIn(tween(300)),
                     exit = fadeOut(tween(300))
                 ) {
@@ -846,7 +848,9 @@ fun EmulationScreen(
                 controlLayouts = uiState.controlLayouts,
                 onToggleLeftInputMode = viewModel::toggleLeftInputMode,
                 onPadInput = { keyCode, range, pressed ->
-                    viewModel.onPadInput(keyCode, range, pressed)
+                    touchPadIndex?.let { padIndex ->
+                        viewModel.onPadInput(padIndex, keyCode, range, pressed)
+                    }
                 }
             )
         }
@@ -885,7 +889,7 @@ fun EmulationScreen(
 
                 EmulationSidebarMenu(
                     uiState = uiState,
-                    gamepadConnected = gamepadConnected.value,
+                    gamepadConnected = gamepadConnected,
                     currentGamePath = gamePath,
                     retroState = retroAchievementsState,
                     globalDefaults = globalDefaults,

@@ -25,9 +25,35 @@ REC_SYS_DEL(JALR, _Rd_);
 
 #else
 
+namespace Interp = R5900::Interpreter::OpcodeImpl;
+
+#define REC_JUMP_DELAY_FALLBACK(op) \
+	do \
+	{ \
+		if (HasBranchInDelaySlot()) \
+		{ \
+			recBranchCall(Interp::op); \
+			return; \
+		} \
+	} while (0)
+
+#define REC_JUMP_DELAY_FALLBACK_DEL(op, delreg) \
+	do \
+	{ \
+		if (HasBranchInDelaySlot()) \
+		{ \
+			if ((delreg) > 0) \
+				_deleteEEreg((delreg), 1); \
+			recBranchCall(Interp::op); \
+			return; \
+		} \
+	} while (0)
+
 ////////////////////////////////////////////////////
 void recJ()
 {
+	REC_JUMP_DELAY_FALLBACK(J);
+
 	EE::Profiler.EmitOp(eeOpcode::J);
 
 	// SET_FPUSTATE;
@@ -42,6 +68,8 @@ void recJ()
 ////////////////////////////////////////////////////
 void recJAL()
 {
+	REC_JUMP_DELAY_FALLBACK_DEL(JAL, 31);
+
 	EE::Profiler.EmitOp(eeOpcode::JAL);
 
 	u32 newpc = (_InstrucTarget_ << 2) + (pc & 0xf0000000);
@@ -75,6 +103,8 @@ void recJAL()
 ////////////////////////////////////////////////////
 void recJR()
 {
+	REC_JUMP_DELAY_FALLBACK(JR);
+
 	EE::Profiler.EmitOp(eeOpcode::JR);
 
 	const bool swap = EmuConfig.Gamefixes.GoemonTlbHack ? false : TrySwapDelaySlot(_Rs_, 0, 0, true);
@@ -111,6 +141,8 @@ void recJR()
 ////////////////////////////////////////////////////
 void recJALR()
 {
+	REC_JUMP_DELAY_FALLBACK_DEL(JALR, _Rd_);
+
 	EE::Profiler.EmitOp(eeOpcode::JALR);
 
 	const u32 newpc = pc + 4;

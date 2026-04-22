@@ -514,15 +514,14 @@ private fun GameSettingsEditorDialog(
                             SelectionRow(
                                 title = stringResource(R.string.settings_renderer),
                                 options = listOf(
-                                    EmulatorBridge.AUTO_RENDERER to stringResource(R.string.settings_renderer_auto),
                                     12 to stringResource(R.string.settings_renderer_opengl),
                                     14 to stringResource(R.string.settings_renderer_vulkan),
                                     13 to stringResource(R.string.settings_renderer_software)
                                 ),
-                                selectedValue = draft.renderer,
+                                selectedValue = normalizeManagerRenderer(draft.renderer),
                                 onSelected = { draft = draft.copy(renderer = it) },
                                 helpText = stringResource(R.string.settings_help_renderer),
-                                onResetToDefault = { draft = draft.copy(renderer = defaultProfile.renderer) }
+                                onResetToDefault = { draft = draft.copy(renderer = normalizeManagerRenderer(defaultProfile.renderer)) }
                             )
                             SelectionRow(
                                 title = stringResource(R.string.settings_aspect_ratio),
@@ -1116,11 +1115,17 @@ private fun anisotropicFilteringOptions(): List<Pair<Int, String>> = listOf(
     16 to "16x"
 )
 
-private fun rendererLabel(renderer: Int): Int = when (renderer) {
-    EmulatorBridge.AUTO_RENDERER -> R.string.settings_renderer_auto
+private fun rendererLabel(renderer: Int): Int = when (normalizeManagerRenderer(renderer)) {
     12 -> R.string.settings_renderer_opengl
     13 -> R.string.settings_renderer_software
     else -> R.string.settings_renderer_vulkan
+}
+
+private fun normalizeManagerRenderer(renderer: Int): Int {
+    return when (renderer) {
+        12, 13, 14 -> renderer
+        else -> EmulatorBridge.DEFAULT_RENDERER
+    }
 }
 
 private fun resolveManualTargetFps(currentTargetFps: Int, defaultTargetFps: Int): Int {

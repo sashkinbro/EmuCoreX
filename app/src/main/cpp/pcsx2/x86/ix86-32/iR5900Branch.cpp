@@ -36,6 +36,30 @@ REC_SYS_DEL(BGEZALL, 31);
 
 #else
 
+namespace Interp = R5900::Interpreter::OpcodeImpl;
+
+#define REC_BRANCH_DELAY_FALLBACK(op) \
+	do \
+	{ \
+		if (HasBranchInDelaySlot()) \
+		{ \
+			recBranchCall(Interp::op); \
+			return; \
+		} \
+	} while (0)
+
+#define REC_BRANCH_DELAY_FALLBACK_DEL(op, delreg) \
+	do \
+	{ \
+		if (HasBranchInDelaySlot()) \
+		{ \
+			if ((delreg) > 0) \
+				_deleteEEreg((delreg), 1); \
+			recBranchCall(Interp::op); \
+			return; \
+		} \
+	} while (0)
+
 static void recSetBranchEQ(int bne, int process, a64::Label *pj32Ptr)
 {
 	// TODO(Stenzek): This is suboptimal if the registers are in XMMs.
@@ -198,6 +222,8 @@ static void recBEQ_process(int process)
 
 void recBEQ()
 {
+	REC_BRANCH_DELAY_FALLBACK(BEQ);
+
 	// prefer using the host register over an immediate, it'll be smaller code.
 	if (GPR_IS_CONST2(_Rs_, _Rt_))
 		recBEQ_const();
@@ -263,6 +289,8 @@ static void recBNE_process(int process)
 
 void recBNE()
 {
+	REC_BRANCH_DELAY_FALLBACK(BNE);
+
 	if (GPR_IS_CONST2(_Rs_, _Rt_))
 		recBNE_const();
 	else if (GPR_IS_CONST1(_Rs_) && _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ) < 0)
@@ -308,6 +336,8 @@ static void recBEQL_process(int process)
 
 void recBEQL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BEQL);
+
 	if (GPR_IS_CONST2(_Rs_, _Rt_))
 		recBEQL_const();
 	else if (GPR_IS_CONST1(_Rs_) && _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ) < 0)
@@ -354,6 +384,8 @@ static void recBNEL_process(int process)
 
 void recBNEL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BNEL);
+
 	if (GPR_IS_CONST2(_Rs_, _Rt_))
 		recBNEL_const();
 	else if (GPR_IS_CONST1(_Rs_) && _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ) < 0)
@@ -384,6 +416,8 @@ void recBNEL()
 ////////////////////////////////////////////////////
 void recBLTZAL()
 {
+	REC_BRANCH_DELAY_FALLBACK_DEL(BLTZAL, 31);
+
 	EE::Profiler.EmitOp(eeOpcode::BLTZAL);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -437,6 +471,8 @@ void recBLTZAL()
 ////////////////////////////////////////////////////
 void recBGEZAL()
 {
+	REC_BRANCH_DELAY_FALLBACK_DEL(BGEZAL, 31);
+
 	EE::Profiler.EmitOp(eeOpcode::BGEZAL);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -490,6 +526,8 @@ void recBGEZAL()
 ////////////////////////////////////////////////////
 void recBLTZALL()
 {
+	REC_BRANCH_DELAY_FALLBACK_DEL(BLTZALL, 31);
+
 	EE::Profiler.EmitOp(eeOpcode::BLTZALL);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -532,6 +570,8 @@ void recBLTZALL()
 ////////////////////////////////////////////////////
 void recBGEZALL()
 {
+	REC_BRANCH_DELAY_FALLBACK_DEL(BGEZALL, 31);
+
 	EE::Profiler.EmitOp(eeOpcode::BGEZALL);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -575,6 +615,8 @@ void recBGEZALL()
 //// BLEZ
 void recBLEZ()
 {
+	REC_BRANCH_DELAY_FALLBACK(BLEZ);
+
 	EE::Profiler.EmitOp(eeOpcode::BLEZ);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -629,6 +671,8 @@ void recBLEZ()
 //// BGTZ
 void recBGTZ()
 {
+	REC_BRANCH_DELAY_FALLBACK(BGTZ);
+
 	EE::Profiler.EmitOp(eeOpcode::BGTZ);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -685,6 +729,8 @@ void recBGTZ()
 ////////////////////////////////////////////////////
 void recBLTZ()
 {
+	REC_BRANCH_DELAY_FALLBACK(BLTZ);
+
 	EE::Profiler.EmitOp(eeOpcode::BLTZ);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -730,6 +776,8 @@ void recBLTZ()
 ////////////////////////////////////////////////////
 void recBGEZ()
 {
+	REC_BRANCH_DELAY_FALLBACK(BGEZ);
+
 	EE::Profiler.EmitOp(eeOpcode::BGEZ);
 
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -775,6 +823,8 @@ void recBGEZ()
 ////////////////////////////////////////////////////
 void recBLTZL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BLTZL);
+
 	EE::Profiler.EmitOp(eeOpcode::BLTZL);
 
 	const u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -811,6 +861,8 @@ void recBLTZL()
 ////////////////////////////////////////////////////
 void recBGEZL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BGEZL);
+
 	EE::Profiler.EmitOp(eeOpcode::BGEZL);
 
 	const u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -853,6 +905,8 @@ void recBGEZL()
 ////////////////////////////////////////////////////
 void recBLEZL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BLEZL);
+
 	EE::Profiler.EmitOp(eeOpcode::BLEZL);
 
 	const u32 branchTo = ((s32)_Imm_ * 4) + pc;
@@ -899,6 +953,8 @@ void recBLEZL()
 ////////////////////////////////////////////////////
 void recBGTZL()
 {
+	REC_BRANCH_DELAY_FALLBACK(BGTZL);
+
 	EE::Profiler.EmitOp(eeOpcode::BGTZL);
 
 	const u32 branchTo = ((s32)_Imm_ * 4) + pc;

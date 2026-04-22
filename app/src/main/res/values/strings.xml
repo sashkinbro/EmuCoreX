@@ -346,6 +346,7 @@
     <string name="settings_prefer_english_game_titles">Prefer English game titles</string>
     <string name="settings_prefer_english_game_titles_desc">Use English names from the PCSX2 game database when they are available.</string>
     <string name="settings_help_content_description">Show setting details</string>
+    <string name="settings_help_gamepad_mode">Choose how a single physical controller should interact with touch controls. Replace touch makes one gamepad take Player 1 immediately, while Touch + Gamepad keeps touch on Player 1 and moves the single gamepad to Player 2. If two physical controllers are connected at the same time, they always become Player 1 and Player 2.</string>
     <string name="settings_help_auto_gamepad">Automatically switches to a connected controller when one is detected. Keep it on if you move between touch controls and a pad often; turn it off only if you want to keep the current input layout fixed.</string>
     <string name="settings_help_keep_screen_on">Prevents Android from dimming or locking the screen during play. Useful for long sessions and games with cutscenes, but it will use a little more battery if you leave the app open.</string>
     <string name="settings_help_pad_vibration">Lets supported games trigger controller rumble. It adds useful feedback in racing, combat, and impact-heavy games, but it can drain battery faster and some wireless pads may vibrate weakly or with slight delay.</string>
@@ -461,6 +462,10 @@
     <string name="settings_gamepad_stick_deadzone">Stick Deadzone</string>
     <string name="settings_gamepad_left_stick_sensitivity">Left Stick Sensitivity</string>
     <string name="settings_gamepad_right_stick_sensitivity">Right Stick Sensitivity</string>
+    <string name="settings_gamepad_mode">Single Gamepad Mode</string>
+    <string name="settings_gamepad_mode_desc">Choose whether one connected gamepad replaces touch controls or works alongside them.</string>
+    <string name="settings_gamepad_mode_replace_touch">Replace Touch</string>
+    <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
     <string name="settings_gamepad_auto">Auto-detect Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Hide Overlay on Gamepad</string>
 

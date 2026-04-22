@@ -2696,9 +2696,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         NativeApp.setCrashContextBool("emu_paused", false)
     }
 
-    fun onPadInput(keyCode: Int, range: Int = 0, pressed: Boolean) {
+    fun onPadInput(padIndex: Int, keyCode: Int, range: Int = 0, pressed: Boolean) {
         try {
-            EmulatorBridge.setPadButton(keyCode, range, pressed)
+            EmulatorBridge.setPadButton(padIndex, keyCode, range, pressed)
         } catch (_: Exception) { }
     }
 

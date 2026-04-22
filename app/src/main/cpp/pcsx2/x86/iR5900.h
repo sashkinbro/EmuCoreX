@@ -65,6 +65,7 @@ u8* recEndThunk();
 
 // used when processing branches
 bool TrySwapDelaySlot(u32 rs, u32 rt, u32 rd, bool allow_loadstore);
+bool HasBranchInDelaySlot();
 void SaveBranchState();
 void LoadBranchState();
 
