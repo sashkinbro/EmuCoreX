@@ -4,6 +4,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -77,6 +78,7 @@ import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.ScreenSettingsResetHintDialog
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import org.json.JSONObject
 import java.text.DateFormat
 import kotlinx.coroutines.launch
@@ -93,6 +95,7 @@ fun PerGameSettingsManagerScreen(
     var pendingDeleteProfile by remember { mutableStateOf<PerGameSettings?>(null) }
     var showResetAllDialog by remember { mutableStateOf(false) }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val exportSuccess = stringResource(R.string.game_settings_manager_export_success)
     val exportFailure = stringResource(R.string.game_settings_manager_export_failure)
     val importSuccess = stringResource(R.string.game_settings_manager_import_success)
@@ -134,7 +137,10 @@ fun PerGameSettingsManagerScreen(
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding),
         contentPadding = PaddingValues(
             start = 18.dp,
             end = 18.dp,

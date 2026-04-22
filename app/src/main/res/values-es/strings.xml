@@ -957,4 +957,7 @@
     <string name="settings_shadeboost_desc">Ajusta los colores de la imagen final después del renderizado.</string>
     <string name="settings_patches_section">Parches</string>
     <string name="settings_reset_to_default_toast">Valor predeterminado restaurado.</string>
+    <string name="home_game_menu_custom_cover">Elegir portada personalizada</string>
+    <string name="home_game_menu_custom_cover_applied">Portada personalizada aplicada.</string>
+    <string name="home_game_menu_custom_cover_failed">Error al aplicar la portada personalizada.</string>
 </resources>

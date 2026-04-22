@@ -103,6 +103,7 @@ import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
@@ -132,6 +133,7 @@ fun HomeScreen(
     val isWide = isTabletClass && configuration.screenWidthDp >= 900
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val horizontalInset = ScreenHorizontalPadding
     val sectionTopSpacing = 2.dp
     val sectionInnerSpacing = 4.dp
@@ -197,6 +199,7 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         if (uiState.isBootstrapping || uiState.isLoading) {
             LoadingState()

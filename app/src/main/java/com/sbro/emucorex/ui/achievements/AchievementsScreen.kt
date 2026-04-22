@@ -73,6 +73,7 @@ import com.sbro.emucorex.data.RetroAchievementGameData
 import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -111,6 +112,7 @@ fun AchievementsHubScreen(
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var username by rememberSaveable(retroState.storedUsername) { mutableStateOf(retroState.storedUsername.orEmpty()) }
     var password by rememberSaveable { mutableStateOf("") }
     val hubState by produceState(
@@ -145,6 +147,7 @@ fun AchievementsHubScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
             .verticalScroll(rememberScrollState())
             .padding(bottom = 28.dp + bottomInset),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -224,6 +227,7 @@ fun AccountUnlockedAchievementsScreen(
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val contentState by produceState(
         initialValue = AccountUnlockedContentState(),
         key1 = retroState.enabled,
@@ -261,7 +265,8 @@ fun AccountUnlockedAchievementsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         AchievementsTopBar(
@@ -314,6 +319,7 @@ fun GameAchievementsScreen(
     val repository = remember(context) { RetroAchievementsRepository(context) }
     val retroState by RetroAchievementsStateManager.state.collectAsState()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val listState = rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val showScrollToTop = listState.firstVisibleItemIndex > 2 || listState.firstVisibleItemScrollOffset > 900
@@ -355,6 +361,7 @@ fun GameAchievementsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         LazyColumn(
             state = listState,
@@ -1076,10 +1083,12 @@ private fun MiniBadge(text: String) {
 
 @Composable
 private fun AchievementsHubSkeleton(onBackClick: () -> Unit) {
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         AchievementsTopBar(
             title = androidx.compose.ui.res.stringResource(R.string.achievements_title),
@@ -1102,10 +1111,12 @@ private fun AchievementsHubSkeleton(onBackClick: () -> Unit) {
 
 @Composable
 private fun AchievementsGameSkeleton(onBackClick: () -> Unit) {
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         AchievementsTopBar(
             title = androidx.compose.ui.res.stringResource(R.string.achievements_game_title),

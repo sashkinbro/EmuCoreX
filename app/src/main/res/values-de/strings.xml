@@ -957,4 +957,7 @@
     <string name="settings_shadeboost_desc">Passe die Farben des endgültigen Bildes nach dem Rendern an.</string>
     <string name="settings_patches_section">Patches</string>
     <string name="settings_reset_to_default_toast">Standardwert wiederhergestellt.</string>
+    <string name="home_game_menu_custom_cover">Benutzerdefiniertes Cover auswählen</string>
+    <string name="home_game_menu_custom_cover_applied">Benutzerdefiniertes Cover angewendet.</string>
+    <string name="home_game_menu_custom_cover_failed">Fehler beim Anwenden des benutzerdefinierten Covers.</string>
 </resources>

@@ -128,6 +128,7 @@ import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenSettingsResetHintDialog
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.ThemeMode
@@ -157,6 +158,7 @@ fun SettingsScreen(
     LocalConfiguration.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var selectedTab by remember(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
     val cheatRepository = remember(context) { CheatRepository(context) }
     var cheatEntries by remember { mutableStateOf(cheatRepository.listImportedCheatFiles()) }
@@ -317,6 +319,7 @@ fun SettingsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         Column(
             modifier = Modifier
@@ -2905,12 +2908,14 @@ fun LanguageSettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val options = rememberLanguageOptions()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
             .verticalScroll(rememberScrollState())
     ) {
         Row(

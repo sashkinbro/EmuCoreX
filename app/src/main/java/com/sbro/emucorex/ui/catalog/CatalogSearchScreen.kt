@@ -76,6 +76,7 @@ import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
@@ -94,6 +95,7 @@ fun CatalogSearchScreen(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val gridState = rememberSaveable(saver = LazyGridState.Saver) {
         LazyGridState()
     }
@@ -133,6 +135,7 @@ fun CatalogSearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         when {
             uiState.isLoading -> {

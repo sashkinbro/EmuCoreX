@@ -957,4 +957,7 @@
     <string name="settings_shadeboost_desc">Ajustez les couleurs de l\'image finale après le rendu.</string>
     <string name="settings_patches_section">Patchs</string>
     <string name="settings_reset_to_default_toast">Valeur par défaut restaurée.</string>
+    <string name="home_game_menu_custom_cover">Choisir une jaquette personnalisée</string>
+    <string name="home_game_menu_custom_cover_applied">Jaquette personnalisée appliquée.</string>
+    <string name="home_game_menu_custom_cover_failed">Échec de l\'application de la jaquette personnalisée.</string>
 </resources>

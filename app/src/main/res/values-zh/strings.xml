@@ -957,4 +957,7 @@
     <string name="settings_shadeboost_desc">在渲染后调整最终图像的色彩。</string>
     <string name="settings_patches_section">补丁</string>
     <string name="settings_reset_to_default_toast">已恢复默认值。</string>
+    <string name="home_game_menu_custom_cover">选择自定义封面</string>
+    <string name="home_game_menu_custom_cover_applied">已应用自定义封面。</string>
+    <string name="home_game_menu_custom_cover_failed">无法应用自定义封面。</string>
 </resources>

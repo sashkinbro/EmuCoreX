@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.ImageConversionManager
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
@@ -70,6 +71,7 @@ fun SupportedFormatsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val scope = rememberCoroutineScope()
     val isConverterAvailable = ImageConversionManager.isIsoToChdAvailable()
 
@@ -145,6 +147,7 @@ fun SupportedFormatsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         Column(
             modifier = Modifier

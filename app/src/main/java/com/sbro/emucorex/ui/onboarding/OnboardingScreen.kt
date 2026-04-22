@@ -89,6 +89,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.PerformanceProfiles
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -108,6 +109,7 @@ fun OnboardingScreen(
     var isCompleting by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
     
@@ -255,6 +257,7 @@ fun OnboardingScreen(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(horizontalSystemBarPadding)
                     .graphicsLayer {
                         alpha = contentAlpha
                         translationY = contentOffset
@@ -392,6 +395,7 @@ fun OnboardingScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(horizontalSystemBarPadding)
                     .imePadding()
                     .graphicsLayer {
                         alpha = contentAlpha

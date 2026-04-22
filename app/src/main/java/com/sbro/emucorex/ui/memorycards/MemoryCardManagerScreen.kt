@@ -67,6 +67,7 @@ import com.sbro.emucorex.data.MemoryCardInfo
 import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.text.DateFormat
 import java.util.Date
@@ -84,6 +85,7 @@ fun MemoryCardManagerScreen(
     val scope = rememberCoroutineScope()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
 
     val createSuccessMessage = stringResource(R.string.memory_card_create_success)
     val createFailureMessage = stringResource(R.string.memory_card_create_failed)
@@ -296,6 +298,7 @@ fun MemoryCardManagerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

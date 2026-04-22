@@ -62,6 +62,7 @@ import com.sbro.emucorex.data.SaveStateEntryInfo
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
@@ -83,6 +84,7 @@ fun SaveManagerScreen(
     val scope = rememberCoroutineScope()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val backupSuccessMessage = stringResource(R.string.save_manager_backup_success)
     val backupFailureMessage = stringResource(R.string.save_manager_backup_failed)
     val restoreSuccessMessage = stringResource(R.string.save_manager_restore_success)
@@ -244,6 +246,7 @@ fun SaveManagerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .padding(horizontalSystemBarPadding)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
