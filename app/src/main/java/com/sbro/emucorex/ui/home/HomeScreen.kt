@@ -157,7 +157,7 @@ fun HomeScreen(
     val customCoverAppliedMessage = stringResource(R.string.home_game_menu_custom_cover_applied)
     val customCoverFailedMessage = stringResource(R.string.home_game_menu_custom_cover_failed)
     val customCoverPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         val targetGame = pendingCustomCoverGame
         pendingCustomCoverGame = null
@@ -471,7 +471,7 @@ fun HomeScreen(
                                             onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                             onLongClickCustomCover = {
                                                 pendingCustomCoverGame = game
-                                                customCoverPicker.launch(arrayOf("image/*"))
+                                                customCoverPicker.launch("image/*")
                                             },
                                             compact = isLandscape
                                         )
@@ -513,7 +513,7 @@ fun HomeScreen(
                                                     onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                     onLongClickCustomCover = {
                                                         pendingCustomCoverGame = game
-                                                        customCoverPicker.launch(arrayOf("image/*"))
+                                                        customCoverPicker.launch("image/*")
                                                     }
                                                 )
                                             } else {
@@ -529,7 +529,7 @@ fun HomeScreen(
                                                     onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                     onLongClickCustomCover = {
                                                         pendingCustomCoverGame = game
-                                                        customCoverPicker.launch(arrayOf("image/*"))
+                                                        customCoverPicker.launch("image/*")
                                                     }
                                                 )
                                             }
