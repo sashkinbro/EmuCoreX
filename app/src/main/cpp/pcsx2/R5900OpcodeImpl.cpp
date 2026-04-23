@@ -1238,7 +1238,8 @@ void MFSA() {
 }
 
 void MTSA() {
-	cpuRegs.sa = (u32)cpuRegs.GPR.r[_Rs_].UD[0];
+	// SA is a 4-bit byte shift amount on the real EE.
+	cpuRegs.sa = (u32)cpuRegs.GPR.r[_Rs_].UD[0] & 0xF;
 }
 
 // SNY supports three basic modes, two which synchronize memory accesses (related

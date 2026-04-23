@@ -173,9 +173,22 @@ void CTC2() {
 		case REG_MAC_FLAG: // read-only
 		case REG_TPC:      // read-only
 		case REG_VPU_STAT: // read-only
+		case REG_ACC_FLAG: // dummy flag, ignore writes
+		case REG_P:        // micro-only pseudo-reg
+		case REG_VF0_FLAG: // dummy flag, ignore writes
+			break;
+		case REG_STATUS_FLAG:
+			VU0.VI[REG_STATUS_FLAG].UL = cpuRegs.GPR.r[_Rt_].UL[0] & 0x0FC0;
 			break;
 		case REG_R:
 			VU0.VI[REG_R].UL = ((cpuRegs.GPR.r[_Rt_].UL[0] & 0x7FFFFF) | 0x3F800000);
+			break;
+		case REG_CLIP_FLAG:
+			VU0.clipflag = cpuRegs.GPR.r[_Rt_].UL[0] & 0x00FFFFFF;
+			VU0.VI[REG_CLIP_FLAG].UL = VU0.clipflag;
+			break;
+		case REG_CMSAR0:
+			VU0.VI[REG_CMSAR0].US[0] = cpuRegs.GPR.r[_Rt_].US[0];
 			break;
 		case REG_FBRST:
 			VU0.VI[REG_FBRST].UL = cpuRegs.GPR.r[_Rt_].UL[0] & 0x0C0C;
@@ -195,13 +208,15 @@ void CTC2() {
 			}
 			break;
 		case REG_CMSAR1: // REG_CMSAR1
+			VU0.VI[REG_CMSAR1].US[0] = cpuRegs.GPR.r[_Rt_].US[0];
 			vu1Finish(true);
-			vu1ExecMicro(cpuRegs.GPR.r[_Rt_].US[0]);	// Execute VU1 Micro SubRoutine
+			vu1ExecMicro(VU0.VI[REG_CMSAR1].US[0]);	// Execute VU1 Micro SubRoutine
 			break;
-		case REG_CLIP_FLAG:
-			VU0.clipflag = cpuRegs.GPR.r[_Rt_].UL[0];
 		default:
-			VU0.VI[_Fs_].UL = cpuRegs.GPR.r[_Rt_].UL[0];
+			if (_Fs_ < REG_STATUS_FLAG)
+				VU0.VI[_Fs_].US[0] = cpuRegs.GPR.r[_Rt_].US[0];
+			else
+				VU0.VI[_Fs_].UL = cpuRegs.GPR.r[_Rt_].UL[0];
 			break;
 	}
 }

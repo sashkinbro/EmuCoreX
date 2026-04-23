@@ -565,6 +565,9 @@ static void recCTC2()
 		case REG_MAC_FLAG:
 		case REG_TPC:
 		case REG_VPU_STAT:
+		case REG_ACC_FLAG:
+		case REG_P:
+		case REG_VF0_FLAG:
 			break; // Read Only Regs
 		case REG_R:
 			_eeMoveGPRtoR(EAX, _Rt_);
@@ -582,14 +585,11 @@ static void recCTC2()
 				_eeMoveGPRtoR(EAX, _Rt_);
 //				xAND(eax, 0xFC0);
                 armAsm->And(EAX, EAX, 0xFC0);
-//				xAND(ptr32[&vu0Regs.VI[REG_STATUS_FLAG].UL], 0x3F);
-                armAnd(PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL), 0x3F);
-//				xOR(ptr32[&vu0Regs.VI[REG_STATUS_FLAG].UL], eax);
-                armOrr(PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL), EAX);
+				armAsm->Str(a64::WRegister(EAX), PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL));
 			}
 			else {
-//                xAND(ptr32[&vu0Regs.VI[REG_STATUS_FLAG].UL], 0x3F);
-                armAnd(PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL), 0x3F);
+                armAsm->Eor(EAX, EAX, EAX);
+				armStore(PTR_CPU(vuRegs[0].VI[REG_STATUS_FLAG].UL), 0);
             }
 
 			const int xmmtemp = _allocTempXMMreg(XMMT_INT);
@@ -609,13 +609,37 @@ static void recCTC2()
 			_freeXMMreg(xmmtemp);
 			break;
 		}
+		case REG_CLIP_FLAG:
+			if (_Rt_)
+			{
+				_eeMoveGPRtoR(EAX, _Rt_);
+				armAsm->And(EAX, EAX, 0x00FFFFFF);
+				armAsm->Str(a64::WRegister(EAX), PTR_CPU(vuRegs[0].VI[REG_CLIP_FLAG].UL));
+			}
+			else
+			{
+				armStore(PTR_CPU(vuRegs[0].VI[REG_CLIP_FLAG].UL), 0);
+			}
+			break;
+		case REG_CMSAR0:
+			if (_Rt_)
+				_eeMoveGPRtoR(EAX, _Rt_);
+			else
+				armAsm->Eor(EAX, EAX, EAX);
+			armAsm->Strh(a64::WRegister(EAX), PTR_CPU(vuRegs[0].VI[REG_CMSAR0].US[0]));
+			break;
 		case REG_CMSAR1: // Execute VU1 Micro SubRoutine
+			if (_Rt_)
+				_eeMoveGPRtoR(EAX, _Rt_);
+			else
+				armAsm->Eor(EAX, EAX, EAX);
+			armAsm->Strh(a64::WRegister(EAX), PTR_CPU(vuRegs[0].VI[REG_CMSAR1].US[0]));
 			iFlushCall(FLUSH_NONE);
 //			xMOV(arg1regd, 1);
             armAsm->Mov(EAX, 1);
 //			xFastCall((void*)vu1Finish);
             armEmitCall(reinterpret_cast<const void*>(vu1Finish));
-			_eeMoveGPRtoR(EAX, _Rt_);
+			armAsm->Ldrh(EAX, PTR_CPU(vuRegs[0].VI[REG_CMSAR1].US[0]));
 			iFlushCall(FLUSH_NONE);
 //			xFastCall((void*)vu1ExecMicro);
             armEmitCall(reinterpret_cast<const void*>(vu1ExecMicro));
