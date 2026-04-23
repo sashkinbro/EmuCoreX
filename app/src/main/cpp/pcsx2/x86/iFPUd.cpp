@@ -6,7 +6,6 @@
 #include "common/emitter/x86emitter.h"
 #include "iR5900.h"
 #include "iFPU.h"
-
 /* This is a version of the FPU that emulates an exponent of 0xff and overflow/underflow flags */
 
 /* Can be made faster by not converting stuff back and forth between instructions. */
@@ -531,7 +530,7 @@ void FPU_ADD_SUB(int tempd, int tempt) //tempd and tempt are overwritten, they a
 	_freeXMMreg(xmmtemp);
 }
 
-void FPU_MUL(int info, int regd, int sreg, int treg, bool acc)
+void FPU_MUL(int info, int regd, int sreg, int treg, bool acc, bool update_flags = true)
 {
 //	u32* endMul = nullptr;
     a64::Label endMul;
@@ -576,7 +575,7 @@ void FPU_MUL(int info, int regd, int sreg, int treg, bool acc)
 	ToDouble(sreg); ToDouble(treg);
 //	xMUL.SD(xRegisterSSE(sreg), xRegisterSSE(treg));
     armAsm->Fmul(regS.V1D(), regS.V1D(), regT.V1D());
-	ToPS2FPU(sreg, true, treg, acc);
+	ToPS2FPU(sreg, update_flags, treg, acc);
 //	xMOVSS(xRegisterSSE(regd), xRegisterSSE(sreg));
     armAsm->Mov(regD.S(), 0, regS.S(), 0);
 
@@ -608,8 +607,16 @@ void recFPUOp(int info, int regd, int op, bool acc)
 	int sreg, treg;
 	ALLOC_S(sreg); ALLOC_T(treg);
 
-	if (FPU_CORRECT_ADD_SUB)
-		FPU_ADD_SUB(sreg, treg);
+	// NOTE: FPU_ADD_SUB() exists to emulate the PS2 FPU's lack of guard bits
+	// for a *single-precision* add/sub path. In this DOUBLE path the Fadd/Fsub is
+	// performed in 53-bit double precision under ChopZero, which NATURALLY produces
+	// the correct sticky behaviour (e.g. -CF_MAX + 1.0 = -CF_MAX + eps truncates
+	// toward zero to 0xC7EFFFFFDFFFFFFF, narrowing to 0xFF7FFFFE which matches
+	// the host-double interpreter). FPU_ADD_SUB was actively destroying this by
+	// collapsing the smaller operand to +-0 whenever the exponent diff exceeded 24,
+	// which is exactly the CF_MAX +/- 1.0 case. So: skip it here.
+	// if (FPU_CORRECT_ADD_SUB)
+	// 	FPU_ADD_SUB(sreg, treg);
 
 	ToDouble(sreg); ToDouble(treg);
 
@@ -899,8 +906,11 @@ void recMaddsub(int info, int regd, int op, bool acc)
 
 	GET_ACC(treg);
 
-	if (FPU_CORRECT_ADD_SUB)
-		FPU_ADD_SUB(treg, sreg); //might be problematic for something!!!!
+	// Same rationale as recFPUOp: the add/sub stage of MADD/MSUB runs in double
+	// precision under ChopZero, so the single-precision guard-bit emulation in
+	// FPU_ADD_SUB is both unnecessary and harmful (it wipes the smaller operand).
+	// if (FPU_CORRECT_ADD_SUB)
+	// 	FPU_ADD_SUB(treg, sreg); //might be problematic for something!!!!
 
 	//          TEST FOR ACC/MUL OVERFLOWS, PROPOGATE THEM IF THEY OCCUR
 
@@ -1113,7 +1123,9 @@ void recMUL_S_xmm(int info)
 	int sreg, treg;
 	ALLOC_S(sreg); ALLOC_T(treg);
 
-	FPU_MUL(info, EEREC_D, sreg, treg, false);
+	// Match interpreter-visible FCR behavior for plain MUL.S overflow:
+	// clamp the value, but do not raise O/SO in the double-path narrow helper.
+	FPU_MUL(info, EEREC_D, sreg, treg, false, false);
 	_freeXMMreg(sreg); _freeXMMreg(treg);
 }
 
@@ -1342,12 +1354,10 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
 
 //	xSQRT.SD(xRegisterSSE(regt), xRegisterSSE(regt));
     armAsm->Fsqrt(regT.V1D(), regT.V1D());
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
-	// RSQRT: keep host FPCR in Nearest for the narrowing step to match the EE
-	// interpreter, which rounds RSQRT results to nearest in C++ (vs SQRT that
-	// rounds toward zero, handled in recSQRT_S_xmm).
 	ToPS2FPU(regd, false, regt, false);
 //	x86SetJ32(pjmp32);
     armBind(&pjmp32);
@@ -1367,12 +1377,10 @@ void recRSQRThelper2(int regd, int regt) // Preforms the RSQRT function when reg
 
 //	xSQRT.SD(xRegisterSSE(regt), xRegisterSSE(regt));
     armAsm->Fsqrt(regT.V1D(), regT.V1D());
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
-	// RSQRT: keep host FPCR in Nearest for the narrowing step to match the EE
-	// interpreter, which rounds RSQRT results to nearest in C++ (vs SQRT that
-	// rounds toward zero, handled in recSQRT_S_xmm).
 	ToPS2FPU(regd, false, regt, false);
 }
 
@@ -1381,20 +1389,13 @@ void recRSQRT_S_xmm(int info)
 	EE::Profiler.EmitOp(eeOpcode::RSQRT_F);
 	int sreg, treg;
 
-	// iFPU (regular FPU) doesn't touch roundmode for rSQRT.
-	// Should this do the same?  or is changing the roundmode to nearest the better
-	// behavior for both recs? --air
-
-	bool roundmodeFlag = false;
+	// Match the interpreter split: sqrt runs in Nearest, then div/narrow run
+	// under the normal EE FP mode.
 	if (EmuConfig.Cpu.FPUFPCR.GetRoundMode() != FPRoundMode::Nearest)
 	{
-		// Set roundmode to nearest if it isn't already
-		//Console.WriteLn("sqrt to nearest");
 		roundmode_nearest = EmuConfig.Cpu.FPUFPCR;
 		roundmode_nearest.SetRoundMode(FPRoundMode::Nearest);
-//		xLDMXCSR(ptr32[&roundmode_nearest.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(armMemOperandPtr(&roundmode_nearest.bitmask)));
-		roundmodeFlag = true;
+		armAsm->Msr(a64::FPCR, armLoad64(armMemOperandPtr(&roundmode_nearest.bitmask)));
 	}
 
 	ALLOC_S(sreg); ALLOC_T(treg);
@@ -1408,11 +1409,6 @@ void recRSQRT_S_xmm(int info)
     armAsm->Mov(a64::QRegister(EEREC_D).S(), 0, a64::QRegister(sreg).S(), 0);
 
 	_freeXMMreg(treg); _freeXMMreg(sreg);
-
-	if (roundmodeFlag) {
-//        xLDMXCSR(ptr32[&EmuConfig.Cpu.FPUFPCR.bitmask]);
-        armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
-    }
 }
 
 FPURECOMPILE_CONSTCODE(RSQRT_S, XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT);
