@@ -819,6 +819,10 @@ void recADD_S_xmm(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::ADD_F);
 	//xAND(ptr32[&fpuRegs.fprc[31]], ~(FPUflagO|FPUflagU)); // Clear O and U flags
+	// Ensure EE FPU round mode (ChopZero) is live for the single-precision Fadd/Fsub
+	// emitted below. A prior DIV/SQRT may have switched FPCR to Nearest; without this
+	// MSR, CF_MAX +/- 1.0 would round to 7F7FFFFF instead of the EE-correct 7F7FFFFE.
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 	ClampValues(recCommutativeOp(info, EEREC_D, 0));
 	//REC_FPUOP(ADD_S);
 }
@@ -829,6 +833,7 @@ void recADDA_S_xmm(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::ADDA_F);
 	//xAND(ptr32[&fpuRegs.fprc[31]], ~(FPUflagO|FPUflagU)); // Clear O and U flags
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 	ClampValues(recCommutativeOp(info, EEREC_ACC, 0));
 }
 
@@ -2190,6 +2195,7 @@ void recSUBop(int info, int regd)
 void recSUB_S_xmm(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::SUB_F);
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 	recSUBop(info, EEREC_D);
 }
 
@@ -2199,6 +2205,7 @@ FPURECOMPILE_CONSTCODE(SUB_S, XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT);
 void recSUBA_S_xmm(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::SUBA_F);
+	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 	recSUBop(info, EEREC_ACC);
 }
 

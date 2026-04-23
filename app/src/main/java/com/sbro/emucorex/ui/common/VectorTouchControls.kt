@@ -1,12 +1,12 @@
 package com.sbro.emucorex.ui.common
 
+import android.view.MotionEvent
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
@@ -29,7 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
@@ -151,6 +151,7 @@ fun VectorAnalogStick(
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
     var lastSentX by remember { mutableIntStateOf(0) }
     var lastSentY by remember { mutableIntStateOf(0) }
+    var activePointerId by remember { mutableIntStateOf(MotionEvent.INVALID_POINTER_ID) }
 
     fun dispatchStickValue(x: Float, y: Float) {
         val quantizedX = (x * 255f).roundToInt()
@@ -161,50 +162,69 @@ fun VectorAnalogStick(
         onValueChange?.invoke(quantizedX / 255f, quantizedY / 255f)
     }
 
+    fun updateStickFromPosition(position: Offset) {
+        if (size.width == 0f || size.height == 0f) return
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val maxDistance = minOf(size.width, size.height) * 0.5f
+        if (maxDistance <= 0f) return
+
+        val deadZone = 0.12f
+        val raw = position - center
+        val distance = raw.getDistance()
+        val clamped = if (distance > maxDistance && distance > 0f) {
+            raw * (maxDistance / distance)
+        } else {
+            raw
+        }
+        thumbOffset = clamped
+        val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
+        val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
+        dispatchStickValue(nx, ny)
+    }
+
     fun resetStick() {
         thumbOffset = Offset.Zero
         dispatchStickValue(0f, 0f)
     }
 
     val pointerModifier = if (interactive && onValueChange != null) {
-        Modifier.pointerInput(size) {
-            detectDragGestures(
-                onDragStart = { offset ->
-                    if (size.width == 0f) return@detectDragGestures
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val maxDistance = minOf(size.width, size.height) * 0.5f
-                    val deadZone = 0.12f
-                    val raw = offset - center
-                    val distance = raw.getDistance()
-                    val clamped = if (distance > maxDistance && distance > 0f) {
-                        raw * (maxDistance / distance)
-                    } else {
-                        raw
+        Modifier.pointerInteropFilter { event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    if (activePointerId == MotionEvent.INVALID_POINTER_ID) {
+                        val index = event.actionIndex
+                        activePointerId = event.getPointerId(index)
+                        updateStickFromPosition(Offset(event.getX(index), event.getY(index)))
                     }
-                    thumbOffset = clamped
-                    val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
-                    val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
-                    dispatchStickValue(nx, ny)
-                },
-                onDragEnd = { resetStick() },
-                onDragCancel = { resetStick() }
-            ) { change, _ ->
-                change.consume()
-                if (size.width == 0f) return@detectDragGestures
-                val center = Offset(size.width / 2f, size.height / 2f)
-                val maxDistance = minOf(size.width, size.height) * 0.5f
-                val deadZone = 0.12f
-                val raw = change.position - center
-                val distance = raw.getDistance()
-                val clamped = if (distance > maxDistance && distance > 0f) {
-                    raw * (maxDistance / distance)
-                } else {
-                    raw
+                    true
                 }
-                thumbOffset = clamped
-                val nx = (clamped.x / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
-                val ny = (clamped.y / maxDistance).coerceIn(-1f, 1f).let { if (abs(it) < deadZone) 0f else it }
-                dispatchStickValue(nx, ny)
+
+                MotionEvent.ACTION_MOVE -> {
+                    val index = event.findPointerIndex(activePointerId)
+                    if (index >= 0) {
+                        updateStickFromPosition(Offset(event.getX(index), event.getY(index)))
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                    val pointerId = event.getPointerId(event.actionIndex)
+                    if (pointerId == activePointerId) {
+                        activePointerId = MotionEvent.INVALID_POINTER_ID
+                        resetStick()
+                    }
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    activePointerId = MotionEvent.INVALID_POINTER_ID
+                    resetStick()
+                    true
+                }
+
+                else -> activePointerId != MotionEvent.INVALID_POINTER_ID
             }
         }
     } else {

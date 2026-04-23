@@ -1471,6 +1471,14 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	std::string state_to_load;
 
 	s_elf_override = boot_params.elf_override;
+#ifdef __ANDROID__
+	// The Android autotest override in LoadCoreSettings() only fires when s_elf_override
+	// is non-empty. CPUThreadInitialize() already ran LoadSettings() before this point,
+	// so without a reload here the EE FPU round mode and runtime config mirror stay at
+	// their defaults and JIT-emitted MSR FPCR loads Nearest instead of ChopZero.
+	if (!s_elf_override.empty())
+		LoadSettings();
+#endif
 	if (!boot_params.save_state.empty())
 		state_to_load = boot_params.save_state;
 

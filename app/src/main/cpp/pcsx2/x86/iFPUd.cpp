@@ -616,8 +616,7 @@ void recFPUOp(int info, int regd, int op, bool acc)
 	// Ensure the PS2 EE round mode (ChopZero) is live for BOTH the double-precision
 	// add/sub AND the subsequent fcvt double->single inside ToPS2FPU. A prior DIV/SQRT
 	// may have switched FPCR to Nearest; without re-applying FPUFPCR here the narrowing
-	// step rounds to nearest and we see results one ULP above the EE-correct value
-	// (e.g. 7F7FFFFF instead of 7F7FFFFE for CF_MAX +/- 1.0).
+	// step rounds to nearest and we see results one ULP above the EE-correct value.
 	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
 
 	recFPUOpXMM_to_XMM[op](sreg, treg);

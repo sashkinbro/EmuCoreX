@@ -64,22 +64,19 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
-import com.sbro.emucorex.data.AppPreferences
-import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
 
 @Composable
 internal fun HomeShelfMode(
     games: List<GameItem>,
     recentGames: List<GameItem>,
+    isCoverArtDisabled: Boolean,
     topInset: Dp,
     bottomInset: Dp,
     horizontalInset: Dp,
@@ -156,7 +153,7 @@ internal fun HomeShelfMode(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            val activeShelfCoverPath = rememberShelfCoverPath(activeGame)
+            val activeShelfCoverPath = rememberShelfCoverPath(activeGame, isCoverArtDisabled)
             ShelfBackdrop(
                 coverPath = activeShelfCoverPath,
                 modifier = Modifier.fillMaxSize()
@@ -211,6 +208,7 @@ internal fun HomeShelfMode(
                             ShelfCoverCard(
                                 game = game,
                                 isActive = page == pagerState.currentPage,
+                                isCoverArtDisabled = isCoverArtDisabled,
                                 focusRequester = cardFocusRequesters[page],
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -417,6 +415,7 @@ private fun ShelfBackdrop(
 private fun ShelfCoverCard(
     game: GameItem,
     isActive: Boolean,
+    isCoverArtDisabled: Boolean,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -435,7 +434,7 @@ private fun ShelfCoverCard(
     val coverAspectRatio = 2f / 3f
     val horizontalCoverPadding = if (isActive) 6.dp else 8.dp
     val verticalCoverPadding = if (isActive) 6.dp else 4.dp
-    val shelfCoverPath = rememberShelfCoverPath(game)
+    val shelfCoverPath = rememberShelfCoverPath(game, isCoverArtDisabled)
     fun dismissMenu(action: () -> Unit) {
         showMenu = false
         action()
@@ -509,45 +508,16 @@ private fun ShelfCoverCard(
 }
 
 @Composable
-private fun rememberShelfCoverPath(game: GameItem): String? {
+private fun rememberShelfCoverPath(game: GameItem, isCoverArtDisabled: Boolean): String? {
     val context = LocalContext.current
-    val coverRepository = remember(context) { CoverArtRepository(context) }
     val customCoverRepository = remember(context) { CustomGameCoverRepository(context) }
     val currentCoverPath = game.coverArtPath
     val isCustomCover = remember(currentCoverPath, customCoverRepository) {
         customCoverRepository.isCustomCoverPath(currentCoverPath)
     }
-    var shelfCoverPath by remember(game.path, currentCoverPath, game.serial, isCustomCover) {
-        mutableStateOf(
-            when {
-                isCustomCover -> currentCoverPath
-                else -> coverRepository.findCachedCoverPath(
-                    serial = game.serial,
-                    styleOverride = AppPreferences.COVER_ART_STYLE_3D,
-                    ignoreDisabled = true
-                ) ?: currentCoverPath
-            }
-        )
+    return when {
+        isCustomCover -> currentCoverPath
+        isCoverArtDisabled -> null
+        else -> currentCoverPath
     }
-
-    LaunchedEffect(game.path, currentCoverPath, game.serial, isCustomCover) {
-        if (isCustomCover) {
-            shelfCoverPath = currentCoverPath
-            return@LaunchedEffect
-        }
-        val resolved3dCover = withContext(Dispatchers.IO) {
-            coverRepository.findCachedCoverPath(
-                serial = game.serial,
-                styleOverride = AppPreferences.COVER_ART_STYLE_3D,
-                ignoreDisabled = true
-            ) ?: coverRepository.downloadCover(
-                serial = game.serial,
-                styleOverride = AppPreferences.COVER_ART_STYLE_3D,
-                ignoreDisabled = true
-            )
-        }
-        shelfCoverPath = resolved3dCover ?: currentCoverPath
-    }
-
-    return shelfCoverPath
 }

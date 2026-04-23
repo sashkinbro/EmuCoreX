@@ -106,6 +106,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.data.CustomGameCoverRepository
@@ -119,6 +122,7 @@ import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
@@ -139,6 +143,7 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val customCoverRepository = remember(context) { CustomGameCoverRepository(context) }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
@@ -161,24 +166,47 @@ fun HomeScreen(
     val initialGamepadFocusRequester = remember { FocusRequester() }
     val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
 
+    fun applyShelfSystemBarsHidden() {
+        val activity = context as? android.app.Activity ?: return
+        val window = activity.window
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
     DisposableEffect(context, isShelfView) {
         val activity = context as? android.app.Activity
         val window = activity?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
 
         if (isShelfView) {
-            controller?.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller?.hide(WindowInsetsCompat.Type.systemBars())
+            applyShelfSystemBarsHidden()
         } else {
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
 
         onDispose {
-            if (isShelfView) {
-                controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    DisposableEffect(lifecycleOwner, isShelfView) {
+        if (!isShelfView) return@DisposableEffect onDispose {}
+
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {
+                applyShelfSystemBarsHidden()
             }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+    LaunchedEffect(isShelfView, context) {
+        if (!isShelfView) return@LaunchedEffect
+        applyShelfSystemBarsHidden()
+        delay(150)
+        applyShelfSystemBarsHidden()
     }
     LaunchedEffect(isShelfView) {
         onShelfModeChanged(isShelfView)
@@ -294,6 +322,7 @@ fun HomeScreen(
                     HomeShelfMode(
                         games = uiState.games,
                         recentGames = uiState.recentGames,
+                        isCoverArtDisabled = uiState.isCoverArtDisabled,
                         topInset = topInset,
                         bottomInset = bottomInset,
                         horizontalInset = horizontalInset,
@@ -1074,17 +1103,11 @@ private fun RecentGameCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             ) {
                 if (showCenteredTitlePlaceholder) {
-                    Text(
-                        text = game.title,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                        textAlign = TextAlign.Center,
-                        maxLines = if (compact) 3 else 4,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 10.dp, vertical = 12.dp)
-                            .wrapContentSize(Alignment.Center)
+                    GridCoverPlaceholder(
+                        modifier = Modifier.fillMaxSize(),
+                        title = game.title,
+                        titleMaxLines = if (compact) 3 else 4,
+                        contentScale = ContentScale.Crop
                     )
                 } else {
                     GameCoverArt(

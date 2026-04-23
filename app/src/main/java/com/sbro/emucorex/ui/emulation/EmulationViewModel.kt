@@ -233,6 +233,8 @@ private data class LiveRuntimeSnapshot(
     val shadeBoostGamma: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
+    val widescreenPatches: Boolean,
+    val noInterlacingPatches: Boolean,
     val cpuSpriteRenderSize: Int,
     val cpuSpriteRenderLevel: Int,
     val softwareClutRender: Int,
@@ -480,6 +482,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.enableHwMipmapping.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(enableHwMipmapping = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.enableWidescreenPatches.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(widescreenPatches = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.enableNoInterlacingPatches.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(noInterlacingPatches = value) }
             }
         }
         viewModelScope.launch {
@@ -875,6 +887,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     shadeBoostGamma = liveRuntime.shadeBoostGamma,
                     anisotropicFiltering = liveRuntime.anisotropicFiltering,
                     enableHwMipmapping = liveRuntime.enableHwMipmapping,
+                    widescreenPatches = liveRuntime.widescreenPatches,
+                    noInterlacingPatches = liveRuntime.noInterlacingPatches,
                     cpuSpriteRenderSize = liveRuntime.cpuSpriteRenderSize,
                     cpuSpriteRenderLevel = liveRuntime.cpuSpriteRenderLevel,
                     softwareClutRender = liveRuntime.softwareClutRender,
@@ -2227,6 +2241,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             shadeBoostGamma = preferences.shadeBoostGamma.first(),
             anisotropicFiltering = preferences.anisotropicFiltering.first(),
             enableHwMipmapping = preferences.enableHwMipmapping.first(),
+            widescreenPatches = preferences.enableWidescreenPatches.first(),
+            noInterlacingPatches = preferences.enableNoInterlacingPatches.first(),
             cpuSpriteRenderSize = preferences.cpuSpriteRenderSize.first(),
             cpuSpriteRenderLevel = preferences.cpuSpriteRenderLevel.first(),
             softwareClutRender = preferences.softwareClutRender.first(),
@@ -2357,6 +2373,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             shadeBoostGamma = pick("shadeBoostGamma", shadeBoostGamma) { shadeBoostGamma },
             anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
             enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
+            widescreenPatches = pick("enableWidescreenPatches", widescreenPatches) { enableWidescreenPatches },
+            noInterlacingPatches = pick("enableNoInterlacingPatches", noInterlacingPatches) { enableNoInterlacingPatches },
             cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize) { cpuSpriteRenderSize },
             cpuSpriteRenderLevel = pick("cpuSpriteRenderLevel", cpuSpriteRenderLevel) { cpuSpriteRenderLevel },
             softwareClutRender = pick("softwareClutRender", softwareClutRender) { softwareClutRender },
@@ -2439,8 +2457,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             shadeBoostGamma = shadeBoostGamma,
             anisotropicFiltering = anisotropicFiltering,
             enableHwMipmapping = enableHwMipmapping,
-            enableWidescreenPatches = globalWidescreenPatches,
-            enableNoInterlacingPatches = globalNoInterlacingPatches,
+            enableWidescreenPatches = widescreenPatches,
+            enableNoInterlacingPatches = noInterlacingPatches,
             cpuSpriteRenderSize = cpuSpriteRenderSize,
             cpuSpriteRenderLevel = cpuSpriteRenderLevel,
             softwareClutRender = softwareClutRender,

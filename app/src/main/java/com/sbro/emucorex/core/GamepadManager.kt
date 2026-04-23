@@ -54,6 +54,44 @@ object GamepadManager {
     private const val MAX_PAD_SLOTS = 2
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
     private const val RUMBLE_PULSE_DURATION_MS = 80L
+    private val GAMEPAD_BUTTON_KEY_CODES = intArrayOf(
+        KeyEvent.KEYCODE_BUTTON_A,
+        KeyEvent.KEYCODE_BUTTON_B,
+        KeyEvent.KEYCODE_BUTTON_X,
+        KeyEvent.KEYCODE_BUTTON_Y,
+        KeyEvent.KEYCODE_BUTTON_L1,
+        KeyEvent.KEYCODE_BUTTON_R1,
+        KeyEvent.KEYCODE_BUTTON_L2,
+        KeyEvent.KEYCODE_BUTTON_R2,
+        KeyEvent.KEYCODE_BUTTON_THUMBL,
+        KeyEvent.KEYCODE_BUTTON_THUMBR,
+        KeyEvent.KEYCODE_BUTTON_SELECT,
+        KeyEvent.KEYCODE_BUTTON_START,
+        KeyEvent.KEYCODE_BUTTON_1,
+        KeyEvent.KEYCODE_BUTTON_2,
+        KeyEvent.KEYCODE_BUTTON_3,
+        KeyEvent.KEYCODE_BUTTON_4,
+        KeyEvent.KEYCODE_BUTTON_5,
+        KeyEvent.KEYCODE_BUTTON_6,
+        KeyEvent.KEYCODE_BUTTON_7,
+        KeyEvent.KEYCODE_BUTTON_8,
+        KeyEvent.KEYCODE_BUTTON_9,
+        KeyEvent.KEYCODE_BUTTON_10,
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT
+    )
+    private val JOYSTICK_AXIS_CODES = intArrayOf(
+        MotionEvent.AXIS_X,
+        MotionEvent.AXIS_Y,
+        MotionEvent.AXIS_Z,
+        MotionEvent.AXIS_RZ,
+        MotionEvent.AXIS_LTRIGGER,
+        MotionEvent.AXIS_RTRIGGER,
+        MotionEvent.AXIS_HAT_X,
+        MotionEvent.AXIS_HAT_Y
+    )
 
     @Volatile
     private var emulationInputEnabled = false
@@ -235,9 +273,14 @@ object GamepadManager {
 
     fun isGameController(device: InputDevice?): Boolean {
         if (device == null) return false
+        if (device.isVirtual) return false
         val sources = device.sources
-        return (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+        val hasControllerSource =
+            (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
             (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+        if (!hasControllerSource) return false
+
+        return hasRecognizedGamepadButton(device) || hasRecognizedJoystickAxis(device)
     }
 
     fun isGamepadConnected(): Boolean = connectedGamepads().isNotEmpty()
@@ -434,6 +477,21 @@ object GamepadManager {
     }
 
     private fun normalizePadIndex(padIndex: Int): Int = padIndex.coerceIn(0, MAX_PAD_SLOTS - 1)
+
+    private fun hasRecognizedGamepadButton(device: InputDevice): Boolean {
+        return try {
+            device.hasKeys(*GAMEPAD_BUTTON_KEY_CODES).any { it }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun hasRecognizedJoystickAxis(device: InputDevice): Boolean {
+        return device.motionRanges.any { range ->
+            (range.source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK &&
+                range.axis in JOYSTICK_AXIS_CODES
+        }
+    }
 
     private fun resolvePadIndexForDevice(deviceId: Int): Int? {
         refreshConnectedGamepads()

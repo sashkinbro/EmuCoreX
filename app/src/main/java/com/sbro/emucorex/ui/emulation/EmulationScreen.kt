@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.emulation
 
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
+import android.graphics.PixelFormat
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -121,6 +122,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -517,6 +519,12 @@ fun EmulationScreen(
         AndroidView(
             factory = { ctx ->
                 SurfaceView(ctx).apply {
+                    isClickable = false
+                    isFocusable = false
+                    isFocusableInTouchMode = false
+                    setZOrderOnTop(false)
+                    setZOrderMediaOverlay(false)
+                    holder.setFormat(PixelFormat.OPAQUE)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
                             try { EmulatorBridge.onSurfaceCreated() } catch (_: Exception) { }
@@ -832,6 +840,7 @@ fun EmulationScreen(
             OnScreenControls(
                 modifier = Modifier
                     .fillMaxSize()
+                    .zIndex(20f)
                     .graphicsLayer(alpha = alpha),
                 scaleFactor = scaleFactor,
                 stickScaleFactor = uiState.stickScale / 100f,
