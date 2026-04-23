@@ -1473,11 +1473,14 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_elf_override = boot_params.elf_override;
 #ifdef __ANDROID__
 	// The Android autotest override in LoadCoreSettings() only fires when s_elf_override
-	// is non-empty. CPUThreadInitialize() already ran LoadSettings() before this point,
-	// so without a reload here the EE FPU round mode and runtime config mirror stay at
-	// their defaults and JIT-emitted MSR FPCR loads Nearest instead of ChopZero.
+	// is non-empty. CPUThreadInitialize() and the earlier ApplySettings() already ran
+	// with an empty override, leaving EmuConfig.Cpu.Recompiler.fpuFullMode=false and the
+	// runtime FPCR mirror in its default state. We need ApplySettings() (not LoadSettings)
+	// here so that CheckForConfigChanges fires: that is what refreshes the ARM64 backend
+	// runtime mirror, flushes the EE block cache, and clears CPU execution caches so the
+	// autotest's ChopZero / fpuFullMode takes effect on freshly emitted FPU blocks.
 	if (!s_elf_override.empty())
-		LoadSettings();
+		ApplySettings();
 #endif
 	if (!boot_params.save_state.empty())
 		state_to_load = boot_params.save_state;
