@@ -1355,6 +1355,8 @@ void recRSQRThelper1(int regd, int regt) // Preforms the RSQRT function when reg
 //	xSQRT.SD(xRegisterSSE(regt), xRegisterSSE(regt));
     armAsm->Fsqrt(regT.V1D(), regT.V1D());
 	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+	armAsm->Fcvt(regT.S(), regT.V1D());
+	armAsm->Fcvt(regT.V1D(), regT.S());
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
@@ -1378,6 +1380,8 @@ void recRSQRThelper2(int regd, int regt) // Preforms the RSQRT function when reg
 //	xSQRT.SD(xRegisterSSE(regt), xRegisterSSE(regt));
     armAsm->Fsqrt(regT.V1D(), regT.V1D());
 	armAsm->Msr(a64::FPCR, armLoad64(PTR_CONFIG(FPUFPCR.bitmask)));
+	armAsm->Fcvt(regT.S(), regT.V1D());
+	armAsm->Fcvt(regT.V1D(), regT.S());
 //	xDIV.SD(xRegisterSSE(regd), xRegisterSSE(regt));
     armAsm->Fdiv(regD.V1D(), regD.V1D(), regT.V1D());
 
