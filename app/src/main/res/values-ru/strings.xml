@@ -964,4 +964,7 @@
     <string name="home_shelf_games_counter">%1$d из %2$d</string>
     <string name="home_view_shelf">Показать полку с обложками</string>
     <string name="home_exit_shelf">Закрыть полку с обложками</string>
+    <string name="home_shelf_enable_3d_title">Использовать 3D-обложки в карусели</string>
+    <string name="home_shelf_enable_3d_desc">3D-обложки заменяют пустые карточки на полке.</string>
+    <string name="home_shelf_enable_3d_action">Включить</string>
 </resources>

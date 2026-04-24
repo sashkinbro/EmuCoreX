@@ -964,4 +964,7 @@
     <string name="home_shelf_games_counter">%1$d sur %2$d</string>
     <string name="home_view_shelf">Afficher l\'étagère de jaquettes</string>
     <string name="home_exit_shelf">Quitter l\'étagère de jaquettes</string>
+    <string name="home_shelf_enable_3d_title">Utiliser des jaquettes 3D dans le carrousel</string>
+    <string name="home_shelf_enable_3d_desc">Les jaquettes 3D remplacent les cartes vides de l\'étagère.</string>
+    <string name="home_shelf_enable_3d_action">Activer</string>
 </resources>

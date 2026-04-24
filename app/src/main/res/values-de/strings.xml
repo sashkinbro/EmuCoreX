@@ -964,4 +964,7 @@
     <string name="home_shelf_games_counter">%1$d von %2$d</string>
     <string name="home_view_shelf">Cover-Regal anzeigen</string>
     <string name="home_exit_shelf">Cover-Regal verlassen</string>
+    <string name="home_shelf_enable_3d_title">3D-Cover im Karussell verwenden</string>
+    <string name="home_shelf_enable_3d_desc">3D-Cover ersetzen leere Regal-Karten.</string>
+    <string name="home_shelf_enable_3d_action">Aktivieren</string>
 </resources>

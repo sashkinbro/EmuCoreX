@@ -964,4 +964,7 @@
     <string name="home_shelf_games_counter">%1$d de %2$d</string>
     <string name="home_view_shelf">Mostrar estante de capas</string>
     <string name="home_exit_shelf">Sair da estante de capas</string>
+    <string name="home_shelf_enable_3d_title">Usar capas 3D no carrossel</string>
+    <string name="home_shelf_enable_3d_desc">As capas 3D substituem os cartões vazios da estante.</string>
+    <string name="home_shelf_enable_3d_action">Ativar</string>
 </resources>
