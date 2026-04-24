@@ -2201,6 +2201,10 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	if (!CompileImGuiPipeline())
 		return false;
 
+#ifdef __ANDROID__
+	WarmupCommonTFXPipelines();
+#endif
+
 	InitializeState();
 	return true;
 }
@@ -5095,6 +5099,32 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 	VkPipeline pipeline = CreateTFXPipeline(p);
 	m_tfx_pipelines.emplace(p, pipeline);
 	return pipeline;
+}
+
+void GSDeviceVK::WarmupCommonTFXPipelines()
+{
+	static constexpr std::array<u8, 3> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL}};
+
+	for (const u8 tfx : tfx_modes)
+	{
+		PipelineSelector pipe = {};
+		pipe.topology = static_cast<u32>(GSHWDrawConfig::Topology::Triangle);
+		pipe.rt = true;
+		pipe.ds = false;
+		pipe.dss = GSHWDrawConfig::DepthStencilSelector::NoDepth();
+		pipe.cms = GSHWDrawConfig::ColorMaskSelector();
+		pipe.bs = GSHWDrawConfig::BlendState();
+		pipe.vs.iip = true;
+		pipe.vs.fst = true;
+		pipe.vs.tme = (tfx != TFX_NONE);
+		pipe.ps.iip = true;
+		pipe.ps.fst = true;
+		pipe.ps.tfx = tfx;
+		pipe.ps.tcc = (tfx != TFX_NONE);
+		GetTFXPipeline(pipe);
+	}
+
+	Console.WriteLn("VK: Warmed %zu common TFX pipelines.", tfx_modes.size());
 }
 
 bool GSDeviceVK::BindDrawPipeline(const PipelineSelector& p)

@@ -713,6 +713,10 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	if (!CreateTextureFX())
 		return false;
 
+#ifdef __ANDROID__
+	WarmupCommonTFXPrograms();
+#endif
+
 	// ****************************************************************
 	// Pbo Pool allocation
 	// ****************************************************************
@@ -2777,22 +2781,44 @@ __fi static void WriteToStreamBuffer(GLStreamBuffer* sb, u32 index, u32 align, c
 	glBindBufferRange(GL_UNIFORM_BUFFER, index, sb->GetGLBufferId(), res.buffer_offset, size);
 }
 
-void GSDeviceOGL::SetupPipeline(const ProgramSelector& psel)
+GLProgram& GSDeviceOGL::GetTFXProgram(const ProgramSelector& psel)
 {
 	auto it = m_programs.find(psel);
 	if (it != m_programs.end())
-	{
-		it->second.Bind();
-		return;
-	}
+		return it->second;
 
 	const std::string vs(GetVSSource(psel.vs));
 	const std::string ps(GetPSSource(psel.ps));
 
 	GLProgram prog;
 	m_shader_cache.GetProgram(&prog, vs, ps);
-	it = m_programs.emplace(psel, std::move(prog)).first;
-	it->second.Bind();
+	return m_programs.emplace(psel, std::move(prog)).first->second;
+}
+
+void GSDeviceOGL::SetupPipeline(const ProgramSelector& psel)
+{
+	GetTFXProgram(psel).Bind();
+}
+
+void GSDeviceOGL::WarmupCommonTFXPrograms()
+{
+	static constexpr std::array<u8, 3> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL}};
+
+	for (const u8 tfx : tfx_modes)
+	{
+		ProgramSelector psel = {};
+		psel.vs.iip = true;
+		psel.vs.fst = true;
+		psel.vs.tme = (tfx != TFX_NONE);
+		psel.ps.iip = true;
+		psel.ps.fst = true;
+		psel.ps.tfx = tfx;
+		psel.ps.tcc = (tfx != TFX_NONE);
+		GetTFXProgram(psel);
+	}
+
+	GLProgram::ResetLastProgram();
+	Console.WriteLn("GL: Warmed %zu common TFX shader programs.", tfx_modes.size());
 }
 
 void GSDeviceOGL::SetupSampler(PSSamplerSelector ssel)

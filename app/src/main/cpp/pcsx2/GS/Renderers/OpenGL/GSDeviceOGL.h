@@ -375,7 +375,9 @@ public:
 	GLuint CreateSampler(PSSamplerSelector sel);
 	GSDepthStencilOGL* CreateDepthStencil(OMDepthStencilSelector dssel);
 
+	GLProgram& GetTFXProgram(const ProgramSelector& psel);
 	void SetupPipeline(const ProgramSelector& psel);
+	void WarmupCommonTFXPrograms();
 	void SetupSampler(PSSamplerSelector ssel);
 	void SetupOM(OMDepthStencilSelector dssel);
 	GLuint GetSamplerID(PSSamplerSelector ssel);

@@ -489,6 +489,7 @@ private:
 	bool CompileCASPipelines();
 
 	bool CompileImGuiPipeline();
+	void WarmupCommonTFXPipelines();
 	void RenderImGui();
 	void RenderBlankFrame();
 
