@@ -975,12 +975,60 @@ static bool ApplyAndroidGsBootstrapDefaults(INISettingsInterface& si, bool only_
     set_int("filter", 2);
     set_int("TriFilter", -1);
     set_int("texture_preloading", 1);
+    set_bool("DisableShaderCache", false);
     set_int("linear_present_mode", 1);
     set_int("dithering_ps2", 2);
     set_int("MaxAnisotropy", 0);
     set_bool("fxaa", false);
     set_int("CASMode", 0);
     set_bool("hw_mipmap", false);
+
+    return changed;
+}
+
+static bool ApplyAndroidAudioBootstrapDefaults(INISettingsInterface& si, bool force_timing_defaults)
+{
+    bool changed = false;
+
+    const auto set_string = [&](const char* key, const char* value, bool force) {
+        std::string current_value;
+        const bool has_value = si.GetStringValue("SPU2/Output", key, &current_value);
+        if (!force && has_value)
+            return;
+        if (has_value && StringUtil::Strcasecmp(current_value.c_str(), value) == 0)
+            return;
+
+        si.SetStringValue("SPU2/Output", key, value);
+        changed = true;
+    };
+    const auto set_uint = [&](const char* key, u32 value, bool force) {
+        uint current_value = 0;
+        const bool has_value = si.GetUIntValue("SPU2/Output", key, &current_value);
+        if (!force && has_value)
+            return;
+        if (has_value && current_value == value)
+            return;
+
+        si.SetUIntValue("SPU2/Output", key, value);
+        changed = true;
+    };
+    const auto set_bool = [&](const char* key, bool value, bool force) {
+        bool current_value = false;
+        const bool has_value = si.GetBoolValue("SPU2/Output", key, &current_value);
+        if (!force && has_value)
+            return;
+        if (has_value && current_value == value)
+            return;
+
+        si.SetBoolValue("SPU2/Output", key, value);
+        changed = true;
+    };
+
+    set_string("Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND), false);
+    set_string("SyncMode", Pcsx2Config::SPU2Options::GetSyncModeName(Pcsx2Config::SPU2Options::DEFAULT_SYNC_MODE), force_timing_defaults);
+    set_uint("BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS, force_timing_defaults);
+    set_uint("OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS, force_timing_defaults);
+    set_bool("OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL, force_timing_defaults);
 
     return changed;
 }
@@ -1162,6 +1210,7 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
             GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
             GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0); 
             ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
+            ApplyAndroidAudioBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
             GetSettingsInterfaceStorage()->SetBoolValue("UI", "EnableFullscreenUI", false);
             GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
             GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
@@ -1190,36 +1239,7 @@ Java_com_sbro_emucorex_core_NativeApp_initialize(JNIEnv *env, jclass clazz,
                 GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
                 needs_save = true;
             }
-            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "Backend"))
-            {
-                GetSettingsInterfaceStorage()->SetStringValue(
-                    "SPU2/Output", "Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND));
-                needs_save = true;
-            }
-            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "SyncMode"))
-            {
-                GetSettingsInterfaceStorage()->SetStringValue(
-                    "SPU2/Output", "SyncMode", Pcsx2Config::SPU2Options::GetSyncModeName(Pcsx2Config::SPU2Options::DEFAULT_SYNC_MODE));
-                needs_save = true;
-            }
-            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "BufferMS"))
-            {
-                GetSettingsInterfaceStorage()->SetUIntValue(
-                    "SPU2/Output", "BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS);
-                needs_save = true;
-            }
-            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMS"))
-            {
-                GetSettingsInterfaceStorage()->SetUIntValue(
-                    "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS);
-                needs_save = true;
-            }
-            if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
-            {
-                GetSettingsInterfaceStorage()->SetBoolValue(
-                    "SPU2/Output", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL);
-                needs_save = true;
-            }
+            needs_save |= ApplyAndroidAudioBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
             if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "PreferEnglishGameTitles"))
             {
                 GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);
@@ -1305,6 +1325,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
         GetSettingsInterfaceStorage()->SetBoolValue("EmuCore/GS", "OsdShowIndicators", false);
         GetSettingsInterfaceStorage()->SetIntValue("EmuCore/GS", "OsdPerformancePos", 0);
         ApplyAndroidGsBootstrapDefaults(*GetSettingsInterfaceStorage(), false);
+        ApplyAndroidAudioBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
         GetSettingsInterfaceStorage()->SetBoolValue("UI", "EnableFullscreenUI", false);
         GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
         GetSettingsInterfaceStorage()->SetBoolValue("Achievements", "Enabled", false);
@@ -1333,36 +1354,7 @@ Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstrin
             GetSettingsInterfaceStorage()->SetBoolValue("UI", "ExpandIntoDisplayCutout", true);
             needs_save = true;
         }
-        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "Backend"))
-        {
-            GetSettingsInterfaceStorage()->SetStringValue(
-                "SPU2/Output", "Backend", AudioStream::GetBackendName(Pcsx2Config::SPU2Options::DEFAULT_BACKEND));
-            needs_save = true;
-        }
-        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "SyncMode"))
-        {
-            GetSettingsInterfaceStorage()->SetStringValue(
-                "SPU2/Output", "SyncMode", Pcsx2Config::SPU2Options::GetSyncModeName(Pcsx2Config::SPU2Options::DEFAULT_SYNC_MODE));
-            needs_save = true;
-        }
-        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "BufferMS"))
-        {
-            GetSettingsInterfaceStorage()->SetUIntValue(
-                "SPU2/Output", "BufferMS", AudioStreamParameters::DEFAULT_BUFFER_MS);
-            needs_save = true;
-        }
-        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMS"))
-        {
-            GetSettingsInterfaceStorage()->SetUIntValue(
-                "SPU2/Output", "OutputLatencyMS", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MS);
-            needs_save = true;
-        }
-        if (!GetSettingsInterfaceStorage()->ContainsValue("SPU2/Output", "OutputLatencyMinimal"))
-        {
-            GetSettingsInterfaceStorage()->SetBoolValue(
-                "SPU2/Output", "OutputLatencyMinimal", AudioStreamParameters::DEFAULT_OUTPUT_LATENCY_MINIMAL);
-            needs_save = true;
-        }
+        needs_save |= ApplyAndroidAudioBootstrapDefaults(*GetSettingsInterfaceStorage(), true);
         if (!GetSettingsInterfaceStorage()->ContainsValue("UI", "PreferEnglishGameTitles"))
         {
             GetSettingsInterfaceStorage()->SetBoolValue("UI", "PreferEnglishGameTitles", false);

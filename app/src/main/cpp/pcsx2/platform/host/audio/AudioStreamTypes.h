@@ -52,8 +52,13 @@ struct AudioStreamParameters
 	u8 expand_high_cutoff = DEFAULT_EXPAND_HIGH_CUTOFF;
 
 	static constexpr AudioExpansionMode DEFAULT_EXPANSION_MODE = AudioExpansionMode::Disabled;
+#ifdef __ANDROID__
+	static constexpr u16 DEFAULT_BUFFER_MS = 150;
+	static constexpr u16 DEFAULT_OUTPUT_LATENCY_MS = 150;
+#else
 	static constexpr u16 DEFAULT_BUFFER_MS = 50;
 	static constexpr u16 DEFAULT_OUTPUT_LATENCY_MS = 20;
+#endif
 	static constexpr bool DEFAULT_OUTPUT_LATENCY_MINIMAL = false;
 
 	static constexpr u16 DEFAULT_EXPAND_BLOCK_SIZE = 2048;

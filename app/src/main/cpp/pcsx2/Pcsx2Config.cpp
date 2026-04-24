@@ -1353,6 +1353,7 @@ bool Pcsx2Config::SPU2Options::operator==(const SPU2Options& right) const
 		   OpEqu(FastForwardVolume) &&
 		   OpEqu(OutputMuted) &&
 		   OpEqu(Backend) &&
+		   OpEqu(SyncMode) &&
 		   OpEqu(StreamParameters) &&
 		   OpEqu(DriverName) &&
 		   OpEqu(DeviceName);

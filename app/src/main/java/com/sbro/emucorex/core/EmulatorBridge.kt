@@ -369,6 +369,7 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString()))
                 add(settingOp("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString()))
                 add(settingOp("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString()))
+                add(settingOp("EmuCore/GS", "DisableShaderCache", "bool", "false"))
                 add(settingOp("EmuCore/GS", "fxaa", "bool", enableFxaa.toString()))
                 add(settingOp("EmuCore/GS", "CASMode", "int", casMode.toString()))
                 add(settingOp("EmuCore/GS", "CASSharpness", "int", casSharpness.toString()))
