@@ -25,6 +25,9 @@
     <string name="home_recent_label">Continue</string>
     <string name="home_shelf_hint">Swipe to browse. Tap the centered game to launch. Long press for more actions.</string>
     <string name="home_shelf_games_counter">%1$d of %2$d</string>
+    <string name="home_shelf_enable_3d_title">Use 3D covers in carousel</string>
+    <string name="home_shelf_enable_3d_desc">3D covers replace blank shelf cards.</string>
+    <string name="home_shelf_enable_3d_action">Enable</string>
     <string name="home_setup_title">Finish setup</string>
     <string name="home_setup_subtitle">Choose a BIOS file and your games folder to get started.</string>
     <string name="home_finish_setup">Open Setup</string>

@@ -962,6 +962,9 @@
     <string name="home_game_menu_custom_cover_failed">Не вдалося застосувати власну обкладинку.</string>
     <string name="home_shelf_hint">Гортайте для перегляду. Натисніть на гру по центру, щоб запустити. Довге натискання для додаткових дій.</string>
     <string name="home_shelf_games_counter">%1$d з %2$d</string>
+    <string name="home_shelf_enable_3d_title">3D-обкладинки для каруселі</string>
+    <string name="home_shelf_enable_3d_desc">3D-обкладинки замінять порожні картки.</string>
+    <string name="home_shelf_enable_3d_action">Увімкнути</string>
     <string name="home_view_shelf">Показати полицю з обкладинками</string>
     <string name="home_exit_shelf">Закрити полицю з обкладинками</string>
 </resources>

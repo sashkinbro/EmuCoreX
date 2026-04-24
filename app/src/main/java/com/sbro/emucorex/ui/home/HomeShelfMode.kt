@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
@@ -29,8 +30,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,7 +51,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -82,6 +85,7 @@ internal fun HomeShelfMode(
     horizontalInset: Dp,
     modifier: Modifier = Modifier,
     onExitShelfMode: () -> Unit,
+    onEnable3dCoverArt: () -> Unit,
     onGameClick: (GameItem) -> Unit,
     onLongClickStart: (GameItem) -> Unit,
     onLongClickContinue: (GameItem) -> Unit,
@@ -141,7 +145,8 @@ internal fun HomeShelfMode(
             maxWidth >= 620.dp -> 204.dp
             else -> 182.dp
         }
-        val reservedHeight = if (isLandscape) 124.dp else 164.dp
+        val coverPromptHeightAllowance = if (isCoverArtDisabled) 58.dp else 0.dp
+        val reservedHeight = (if (isLandscape) 124.dp else 164.dp) + coverPromptHeightAllowance
         val maxCardWidthFromHeight =
             ((maxHeight - topInset - bottomInset - reservedHeight).coerceAtLeast(210.dp)) * (2f / 3f)
         val cardWidth = (if (isLandscape) baseCardWidth * 0.84f else baseCardWidth)
@@ -163,10 +168,20 @@ internal fun HomeShelfMode(
                 modifier = Modifier.fillMaxSize()
             ) {
                 ShelfTopBar(
+                    title = activeGame.title,
                     topInset = topInset,
                     horizontalInset = horizontalInset,
                     onExitShelfMode = onExitShelfMode
                 )
+                if (isCoverArtDisabled) {
+                    ShelfCoverArtPrompt(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = horizontalInset)
+                            .padding(top = 2.dp, bottom = 4.dp),
+                        onEnable3dCoverArt = onEnable3dCoverArt
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -263,7 +278,7 @@ internal fun HomeShelfMode(
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .padding(horizontal = horizontalInset)
-                            .padding(bottom = bottomInset + 10.dp)
+                            .padding(bottom = bottomInset + 8.dp)
                     ) { activePath ->
                         val selectedGame = games.first { it.path == activePath }
                         Box(
@@ -272,49 +287,54 @@ internal fun HomeShelfMode(
                                 .background(
                                     Brush.verticalGradient(
                                         listOf(
-                                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                                            MaterialTheme.colorScheme.background.copy(alpha = 0.22f),
-                                            MaterialTheme.colorScheme.background.copy(alpha = 0.42f)
+                                            Color.Black.copy(alpha = 0f),
+                                            Color.Black.copy(alpha = 0.12f),
+                                            Color.Black.copy(alpha = 0.34f)
                                         )
                                     )
                                 )
-                                .padding(horizontal = 24.dp, vertical = 10.dp)
+                                .padding(horizontal = 24.dp, vertical = 12.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.Bottom
                             ) {
                                 Text(
                                     modifier = Modifier
                                         .weight(1f)
                                         .padding(end = 12.dp),
-                                    text = selectedGame.title,
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.92f),
+                                    text = selectedGame.fileName,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.72f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    color = Color.White.copy(alpha = 0.94f),
                                     textAlign = TextAlign.Start,
-                                    maxLines = 1,
+                                    maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
 
-                                Surface(
-                                    shape = RoundedCornerShape(999.dp),
-                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
-                                    tonalElevation = 0.dp,
-                                    shadowElevation = 0.dp
-                                ) {
-                                    Text(
-                                        text = androidx.compose.ui.res.stringResource(
-                                            R.string.home_shelf_games_counter,
-                                            currentPage + 1,
-                                            games.size
-                                        ),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.86f),
-                                        maxLines = 1
-                                    )
-                                }
+                                Text(
+                                    text = androidx.compose.ui.res.stringResource(
+                                        R.string.home_shelf_games_counter,
+                                        currentPage + 1,
+                                        games.size
+                                    ),
+                                    modifier = Modifier.padding(start = 12.dp),
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.72f),
+                                            blurRadius = 8f
+                                        )
+                                    ),
+                                    color = Color.White.copy(alpha = 0.88f),
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
@@ -326,6 +346,7 @@ internal fun HomeShelfMode(
 
 @Composable
 private fun ShelfTopBar(
+    title: String,
     topInset: Dp,
     horizontalInset: Dp,
     onExitShelfMode: () -> Unit
@@ -336,13 +357,22 @@ private fun ShelfTopBar(
             .padding(
                 start = horizontalInset,
                 end = horizontalInset,
-                top = topInset + 14.dp,
+                top = topInset + 30.dp,
                 bottom = 6.dp
             ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Spacer(modifier = Modifier.width(44.dp))
+        Text(
+            text = title,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White.copy(alpha = 0.94f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
 
         IconButton(onClick = onExitShelfMode) {
             Icon(
@@ -359,24 +389,44 @@ private fun ShelfBackdrop(
     coverPath: String?,
     modifier: Modifier = Modifier
 ) {
-    val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val backdropOverlay = if (isLightTheme) Color.Black else MaterialTheme.colorScheme.background
+    val baseGradient = listOf(
+        Color(0xFF11141A),
+        Color(0xFF18202A),
+        Color(0xFF101318)
+    )
+    val stageGlow = listOf(
+        Color(0xFF344153).copy(alpha = 0.42f),
+        Color(0xFF263240).copy(alpha = 0.22f),
+        Color.Transparent
+    )
+    val coverAlpha = 0.16f
+    val verticalVeil = listOf(
+        Color(0xFF0F1217).copy(alpha = 0.08f),
+        Color.Transparent,
+        Color(0xFF0F1217).copy(alpha = 0.24f)
+    )
+    val sideVeil = listOf(
+        Color.Black.copy(alpha = 0.18f),
+        Color.Transparent,
+        Color.Black.copy(alpha = 0.18f)
+    )
 
-    Box(modifier = modifier) {
-        if (coverPath.isNullOrBlank()) {
-            CoverPlaceholderArt(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { alpha = if (isLightTheme) 0.18f else 0.18f },
-                contentScale = ContentScale.Crop
-            )
-        } else {
+    Box(
+        modifier = modifier.background(Brush.verticalGradient(baseGradient))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.radialGradient(stageGlow))
+        )
+
+        if (!coverPath.isNullOrBlank()) {
             GameCoverArt(
                 coverPath = coverPath,
                 fallbackTitle = "",
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = if (isLightTheme) 0.18f else 0.18f },
+                    .graphicsLayer { alpha = coverAlpha },
                 contentScale = ContentScale.Crop
             )
         }
@@ -385,26 +435,14 @@ private fun ShelfBackdrop(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            backdropOverlay.copy(alpha = if (isLightTheme) 0.04f else 0.42f),
-                            backdropOverlay.copy(alpha = if (isLightTheme) 0.10f else 0.62f),
-                            backdropOverlay.copy(alpha = if (isLightTheme) 0.18f else 0.78f)
-                        )
-                    )
+                    Brush.verticalGradient(verticalVeil)
                 )
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            backdropOverlay.copy(alpha = if (isLightTheme) 0.05f else 0.72f),
-                            Color.Transparent.copy(alpha = if (isLightTheme) 0f else 0.14f),
-                            backdropOverlay.copy(alpha = if (isLightTheme) 0.05f else 0.72f)
-                        )
-                    )
+                    Brush.horizontalGradient(sideVeil)
                 )
         )
     }
@@ -485,11 +523,11 @@ private fun ShelfCoverCard(
                 contentScale = ContentScale.Fit
             )
         } else {
-            CoverPlaceholderArt(
+            ShelfMissingCoverCard(
+                title = game.title,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = horizontalCoverPadding, vertical = verticalCoverPadding),
-                contentScale = ContentScale.Fit
+                    .padding(horizontal = horizontalCoverPadding, vertical = verticalCoverPadding)
             )
         }
     }
@@ -519,5 +557,82 @@ private fun rememberShelfCoverPath(game: GameItem, isCoverArtDisabled: Boolean):
         isCustomCover -> currentCoverPath
         isCoverArtDisabled -> null
         else -> currentCoverPath
+    }
+}
+
+@Composable
+private fun ShelfCoverArtPrompt(
+    modifier: Modifier = Modifier,
+    onEnable3dCoverArt: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF171B24).copy(alpha = 0.88f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = androidx.compose.ui.res.stringResource(R.string.home_shelf_enable_3d_title),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White.copy(alpha = 0.94f),
+                maxLines = 2,
+                overflow = TextOverflow.Clip
+            )
+            FilledTonalButton(
+                onClick = onEnable3dCoverArt,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = Color(0xFF252C38),
+                    contentColor = Color.White.copy(alpha = 0.92f)
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ViewCarousel,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = androidx.compose.ui.res.stringResource(R.string.home_shelf_enable_3d_action),
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShelfMissingCoverCard(
+    title: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF2C333D).copy(alpha = 0.92f),
+                        Color(0xFF1C222B).copy(alpha = 0.96f)
+                    )
+                )
+            )
+            .padding(18.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White.copy(alpha = 0.86f),
+            textAlign = TextAlign.Center,
+            maxLines = 5,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

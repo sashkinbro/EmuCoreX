@@ -330,6 +330,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun enable3dCoverArt() {
+        viewModelScope.launch {
+            preferences.setCoverArtStyle(AppPreferences.COVER_ART_STYLE_3D)
+        }
+    }
+
     private fun scanGames(
         path: String,
         isInitialLoad: Boolean = false,
