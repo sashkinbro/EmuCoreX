@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -54,6 +55,14 @@ object GamepadManager {
     private const val MAX_PAD_SLOTS = 2
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
     private const val RUMBLE_PULSE_DURATION_MS = 80L
+    private val FINGERPRINT_UINPUT_DEVICE_TOKENS = setOf(
+        "uinput-fpc",
+        "uinput-goodix",
+        "uinput-synaptics",
+        "uinput-elan",
+        "uinput-vfs",
+        "uinput-atrus"
+    )
     private val GAMEPAD_BUTTON_KEY_CODES = intArrayOf(
         KeyEvent.KEYCODE_BUTTON_A,
         KeyEvent.KEYCODE_BUTTON_B,
@@ -274,6 +283,7 @@ object GamepadManager {
     fun isGameController(device: InputDevice?): Boolean {
         if (device == null) return false
         if (device.isVirtual) return false
+        if (isFingerprintUinputDevice(device)) return false
         val sources = device.sources
         val hasControllerSource =
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
@@ -477,6 +487,13 @@ object GamepadManager {
     }
 
     private fun normalizePadIndex(padIndex: Int): Int = padIndex.coerceIn(0, MAX_PAD_SLOTS - 1)
+
+    private fun isFingerprintUinputDevice(device: InputDevice): Boolean {
+        val name = device.name.lowercase(Locale.ROOT)
+        return FINGERPRINT_UINPUT_DEVICE_TOKENS.any { token ->
+            name == token || name.startsWith("$token ") || name.startsWith("$token-") || name.startsWith("${token}_")
+        }
+    }
 
     private fun hasRecognizedGamepadButton(device: InputDevice): Boolean {
         return try {
