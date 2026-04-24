@@ -249,18 +249,6 @@ static __fi u32 mVU_EFU_ESUM(u32 x, u32 y, u32 z, u32 w)
 	return mVU_EFU_ToBits(p);
 }
 
-template <typename Fn>
-static __fi void mVU_EFUArm64WritePFromCall(mV, Fn fn)
-{
-	mVUbackupRegs(mVU);
-	armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-	fn();
-	armAsm->Fmov(RQSCRATCH.S(), EAX);
-	mVUrestoreRegs(mVU);
-	armAsm->Mov(xmmPQ.S(), 0, RQSCRATCH.S(), 0);
-	armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-}
-
 mVUop(mVU_DIV)
 {
 	pass1 { mVUanalyzeFDIV(mVU, _Fs_, _Fsf_, _Ft_, _Ftf_, 7); }
@@ -404,35 +392,37 @@ mVUop(mVU_RSQRT)
 // EATAN/EEXP/ELENG/ERCPR/ERLENG/ERSADD/ERSQRT/ESADD/ESIN/ESQRT/ESUM
 //------------------------------------------------------------------
 
-#define EATANhelper(addr) \
-	{ \
-		SSE_MULSS(mVU, t2, Fs); \
-		SSE_MULSS(mVU, t2, Fs); \
-		armAsm->Mov(t1, t2);    \
-		armAsm->Fmul(t1.S(), t1.S(), armLoadPtrV(addr).S()); \
-		SSE_ADDSS(mVU, PQ, t1); \
-	}
-
-// ToDo: Can Be Optimized Further? (takes approximately (~115 cycles + mem access time) on a c2d)
 static __fi void mVU_EATAN_(mV, const xmm& PQ, const xmm& Fs, const xmm& t1, const xmm& t2)
 {
-//	xMOVSS(PQ, Fs);
-    armAsm->Mov(PQ.S(), 0, Fs.S(), 0);
-//	xMUL.SS(PQ, ptr32[mVUglob.T1]);
-    armAsm->Fmul(PQ.S(), PQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.T1)).S());
-//	xMOVAPS(t2, Fs);
-    armAsm->Mov(t2.Q(), Fs.Q());
-    EATANhelper(PTR_RUNTIME(mVUglob.T2));
-    EATANhelper(PTR_RUNTIME(mVUglob.T3));
-    EATANhelper(PTR_RUNTIME(mVUglob.T4));
-    EATANhelper(PTR_RUNTIME(mVUglob.T5));
-    EATANhelper(PTR_RUNTIME(mVUglob.T6));
-    EATANhelper(PTR_RUNTIME(mVUglob.T7));
-    EATANhelper(PTR_RUNTIME(mVUglob.T8));
-//	xADD.SS(PQ, ptr32[mVUglob.Pi4]);
-    armAsm->Fadd(PQ.S(), PQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.Pi4)).S());
-//	xPSHUF.D(PQ, PQ, mVUinfo.writeP ? 0x27 : 0xC6);
-    armPSHUFD(PQ, PQ, mVUinfo.writeP ? 0x27 : 0xC6);
+	armAsm->Fmul(PQ.S(), Fs.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.T1)).S());
+	armAsm->Fcvt(PQ.V1D(), PQ.S());
+	armAsm->Fcvt(Fs.V1D(), Fs.S());
+	armAsm->Mov(t2.V16B(), Fs.V16B());
+
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[1])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[2])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[3])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[4])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[5])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[6])).V1D(), PQ.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+	armAsm->Fmadd(PQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_ATAN_D[7])).V1D(), PQ.V1D());
+	armAsm->Fcvt(PQ.S(), PQ.V1D());
+	armAsm->Fadd(PQ.S(), PQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.Pi4)).S());
+	mVU_EFUArm64SanitizeScalar(PQ);
 }
 
 mVUop(mVU_EATAN)
@@ -448,31 +438,22 @@ mVUop(mVU_EATAN)
 	}
 	pass2
 	{
-#if defined(_M_ARM64) || defined(__aarch64__)
-		mVU_EFUArm64WritePFromCall(mVU, [&]() {
-			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
-			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATAN));
-		});
-		mVU.profiler.EmitOp(opEATAN);
-#else
-		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& src = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& Fs = mVU.regAlloc->allocReg();
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xMOVSS (xmmPQ, Fs);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-//		xSUB.SS(Fs,    ptr32[mVUglob.one]);
-    armAsm->Fsub(Fs.S(), Fs.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.one)).S());
-//		xADD.SS(xmmPQ, ptr32[mVUglob.one]);
-    armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.one)).S());
-		SSE_DIVSS(mVU, Fs, xmmPQ);
+        armAsm->Mov(Fs.S(), 0, src.S(), 0);
+		mVU_EFUArm64SanitizeScalar(Fs);
 		mVU_EATAN_(mVU, xmmPQ, Fs, t1, t2);
+//		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		mVU.regAlloc->clearNeeded(src);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATAN);
-#endif
 	}
 	pass3 { mVUlog("EATAN P"); }
 }
@@ -490,32 +471,30 @@ mVUop(mVU_EATANxy)
 	}
 	pass2
 	{
-#if defined(_M_ARM64) || defined(__aarch64__)
-		mVU_EFUArm64WritePFromCall(mVU, [&]() {
-			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
-			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[1]));
-			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATANxy));
-		});
-		mVU.profiler.EmitOp(opEATANxy);
-#else
-		const xmm& t1 = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
+		const xmm& src = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 		const xmm& Fs = mVU.regAlloc->allocReg();
+		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
-//		xPSHUF.D(Fs, t1, 0x01);
-        armPSHUFD(Fs, t1, 0x01);
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xMOVSS  (xmmPQ, Fs);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-		SSE_SUBSS (mVU, Fs, t1); // y-x, not y-1? ><
-		SSE_ADDSS (mVU, t1, xmmPQ);
+		armAsm->Eor(xmmPQ.V16B(), xmmPQ.V16B(), xmmPQ.V16B());
+		armAsm->Mov(t1.S(), 0, src.S(), 0);
+		armAsm->Ins(Fs.V4S(), 0, src.V4S(), 1);
+		mVU_EFUArm64SanitizeScalar(t1);
+		mVU_EFUArm64SanitizeScalar(Fs);
+		a64::Label end;
+		armAsm->Fcmp(t1.S(), 0.0);
+		armAsm->B(&end, a64::Condition::eq);
 		SSE_DIVSS (mVU, Fs, t1);
 		mVU_EATAN_(mVU, xmmPQ, Fs, t1, t2);
+		armBind(&end);
+//		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		mVU.regAlloc->clearNeeded(src);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATANxy);
-#endif
 	}
 	pass3 { mVUlog("EATANxy P"); }
 }
@@ -533,43 +512,33 @@ mVUop(mVU_EATANxz)
 	}
 	pass2
 	{
-#if defined(_M_ARM64) || defined(__aarch64__)
-		mVU_EFUArm64WritePFromCall(mVU, [&]() {
-			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[0]));
-			armAsm->Ldr(ECX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[2]));
-			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EATANxz));
-		});
-		mVU.profiler.EmitOp(opEATANxz);
-#else
-		const xmm& t1 = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
+		const xmm& src = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 		const xmm& Fs = mVU.regAlloc->allocReg();
+		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
-//		xPSHUF.D(Fs, t1, 0x02);
-        armPSHUFD(Fs, t1, 0x02);
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xMOVSS  (xmmPQ, Fs);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-		SSE_SUBSS (mVU, Fs, t1);
-		SSE_ADDSS (mVU, t1, xmmPQ);
+		armAsm->Eor(xmmPQ.V16B(), xmmPQ.V16B(), xmmPQ.V16B());
+		armAsm->Mov(t1.S(), 0, src.S(), 0);
+		armAsm->Ins(Fs.V4S(), 0, src.V4S(), 2);
+		mVU_EFUArm64SanitizeScalar(t1);
+		mVU_EFUArm64SanitizeScalar(Fs);
+		a64::Label end;
+		armAsm->Fcmp(t1.S(), 0.0);
+		armAsm->B(&end, a64::Condition::eq);
 		SSE_DIVSS (mVU, Fs, t1);
 		mVU_EATAN_(mVU, xmmPQ, Fs, t1, t2);
+		armBind(&end);
+//		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		mVU.regAlloc->clearNeeded(src);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEATANxz);
-#endif
 	}
 	pass3 { mVUlog("EATANxz P"); }
 }
-
-#define eexpHelper(addr) \
-	{ \
-		SSE_MULSS(mVU, t2, Fs); \
-		armAsm->Mov(t1, t2); \
-		armAsm->Fmul(t1.S(), t1.S(), armLoadPtrV(addr).S()); \
-		SSE_ADDSS(mVU, xmmPQ, t1); \
-	}
 
 mVUop(mVU_EEXP)
 {
@@ -584,41 +553,38 @@ mVUop(mVU_EEXP)
 	}
 	pass2
 	{
-#if defined(_M_ARM64) || defined(__aarch64__)
-		mVU_EFUArm64WritePFromCall(mVU, [&]() {
-			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
-			armEmitCall(reinterpret_cast<void*>(mVU_EFU_EEXP));
-		});
-		mVU.profiler.EmitOp(opEEXP);
-#else
-		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& src = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& Fs = mVU.regAlloc->allocReg();
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xMOVSS  (xmmPQ, Fs);
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-//		xMUL.SS (xmmPQ, ptr32[mVUglob.E1]);
-    armAsm->Fmul(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.E1)).S());
-//		xADD.SS (xmmPQ, ptr32[mVUglob.one]);
-    armAsm->Fadd(xmmPQ.S(), xmmPQ.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.one)).S());
-//		xMOVAPS(t1, Fs);
-        armAsm->Mov(t1.Q(), Fs.Q());
-		SSE_MULSS(mVU, t1, Fs);
-//		xMOVAPS(t2, t1);
-        armAsm->Mov(t2.Q(), t1.Q());
-//		xMUL.SS(t1, ptr32[mVUglob.E2]);
-    armAsm->Fmul(t1.S(), t1.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.E2)).S());
-		SSE_ADDSS(mVU, xmmPQ, t1);
-    eexpHelper(PTR_RUNTIME(mVUglob.E3));
-    eexpHelper(PTR_RUNTIME(mVUglob.E4));
-    eexpHelper(PTR_RUNTIME(mVUglob.E5));
-		SSE_MULSS(mVU, t2, Fs);
-//		xMUL.SS(t2, ptr32[mVUglob.E6]);
-    armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.E6)).S());
-		SSE_ADDSS(mVU, xmmPQ, t2);
-		SSE_MULSS(mVU, xmmPQ, xmmPQ);
-		SSE_MULSS(mVU, xmmPQ, xmmPQ);
+        armAsm->Mov(Fs.S(), 0, src.S(), 0);
+		mVU_EFUArm64SanitizeScalar(Fs);
+		armAsm->Ldr(t1.S(), PTR_RUNTIME(mVUglob.one));
+		armAsm->Ldr(t2.S(), PTR_RUNTIME(mVUglob.E1));
+		armAsm->Fmadd(xmmPQ.S(), Fs.S(), t2.S(), t1.S());
+		armAsm->Fcvt(xmmPQ.V1D(), xmmPQ.S());
+		armAsm->Fcvt(Fs.V1D(), Fs.S());
+		armAsm->Mov(t2.V16B(), Fs.V16B());
+
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmadd(xmmPQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_EXP_D[2])).V1D(), xmmPQ.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmadd(xmmPQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_EXP_D[3])).V1D(), xmmPQ.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmadd(xmmPQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_EXP_D[4])).V1D(), xmmPQ.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmadd(xmmPQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_EXP_D[5])).V1D(), xmmPQ.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmadd(xmmPQ.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_EXP_D[6])).V1D(), xmmPQ.V1D());
+
+		armAsm->Fcvt(xmmPQ.S(), xmmPQ.V1D());
+		armAsm->Fcvt(xmmPQ.V1D(), xmmPQ.S());
+		armAsm->Fmul(xmmPQ.V1D(), xmmPQ.V1D(), xmmPQ.V1D());
+		armAsm->Fmul(xmmPQ.V1D(), xmmPQ.V1D(), xmmPQ.V1D());
+		armAsm->Fcvt(xmmPQ.S(), xmmPQ.V1D());
+		mVU_EFUArm64SanitizeScalar(xmmPQ);
 //		xMOVSSZX(t2, ptr32[mVUglob.one]);
     armAsm->Ldr(t2.S(), PTR_RUNTIME(mVUglob.one));
 		SSE_DIVSS(mVU, t2, xmmPQ);
@@ -626,11 +592,11 @@ mVUop(mVU_EEXP)
         armAsm->Mov(xmmPQ.S(), 0, t2.S(), 0);
 //		xPSHUF.D(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		mVU.regAlloc->clearNeeded(src);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opEEXP);
-#endif
 	}
 	pass3 { mVUlog("EEXP P"); }
 }
@@ -877,55 +843,43 @@ mVUop(mVU_ESIN)
 	}
 	pass2
 	{
-#if defined(_M_ARM64) || defined(__aarch64__)
-		mVU_EFUArm64WritePFromCall(mVU, [&]() {
-			armAsm->Ldr(EAX, PTR_CPU(vuRegs[mVU.index].VF[_Fs_].UL[_Fsf_]));
-			armEmitCall(reinterpret_cast<void*>(mVU_EFU_ESIN));
-		});
-		mVU.profiler.EmitOp(opESIN);
-#else
-		const xmm& Fs = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& src = mVU.regAlloc->allocReg(_Fs_, 0, (1 << (3 - _Fsf_)));
+		const xmm& Fs = mVU.regAlloc->allocReg();
 		const xmm& t1 = mVU.regAlloc->allocReg();
 		const xmm& t2 = mVU.regAlloc->allocReg();
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip xmmPQ to get Valid P instance
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
-//		xMOVSS        (xmmPQ, Fs); // pq = X
-        armAsm->Mov(xmmPQ.S(), 0, Fs.S(), 0);
-		SSE_MULSS(mVU, Fs, Fs);    // fs = X^2
-//		xMOVAPS       (t1, Fs);    // t1 = X^2
-        armAsm->Mov(t1, Fs);
-		SSE_MULSS(mVU, Fs, xmmPQ); // fs = X^3
-//		xMOVAPS       (t2, Fs);    // t2 = X^3
-        armAsm->Mov(t2, Fs);
-//		xMUL.SS       (Fs, ptr32[mVUglob.S2]); // fs = s2 * X^3
-    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.S2)).S());
-		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3
+        armAsm->Mov(Fs.S(), 0, src.S(), 0);
+		mVU_EFUArm64SanitizeScalar(Fs);
+		armAsm->Fcvt(Fs.V1D(), Fs.S());
+		armAsm->Fmul(xmmPQ.V1D(), Fs.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_SIN_D[0])).V1D());
+		armAsm->Mov(t2.V16B(), Fs.V16B());
 
-		SSE_MULSS(mVU, t2, t1);    // t2 = X^3 * X^2
-//		xMOVAPS       (Fs, t2);    // fs = X^5
-        armAsm->Mov(Fs, t2);
-//		xMUL.SS       (Fs, ptr32[mVUglob.S3]); // ps = s3 * X^5
-    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.S3)).S());
-		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3 + s3 * X^5
-
-		SSE_MULSS(mVU, t2, t1);    // t2 = X^5 * X^2
-//		xMOVAPS       (Fs, t2);    // fs = X^7
-        armAsm->Mov(Fs, t2);
-//		xMUL.SS       (Fs, ptr32[mVUglob.S4]); // fs = s4 * X^7
-    armAsm->Fmul(Fs.S(), Fs.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.S4)).S());
-		SSE_ADDSS(mVU, xmmPQ, Fs); // pq = X + s2 * X^3 + s3 * X^5 + s4 * X^7
-
-		SSE_MULSS(mVU, t2, t1);    // t2 = X^7 * X^2
-//		xMUL.SS       (t2, ptr32[mVUglob.S5]); // t2 = s5 * X^9
-    armAsm->Fmul(t2.S(), t2.S(), armLoadPtrV(PTR_RUNTIME(mVUglob.S5)).S());
-		SSE_ADDSS(mVU, xmmPQ, t2); // pq = X + s2 * X^3 + s3 * X^5 + s4 * X^7 + s5 * X^9
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t1.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_SIN_D[1])).V1D());
+		armAsm->Fadd(xmmPQ.V1D(), xmmPQ.V1D(), t1.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t1.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_SIN_D[2])).V1D());
+		armAsm->Fadd(xmmPQ.V1D(), xmmPQ.V1D(), t1.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t1.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_SIN_D[3])).V1D());
+		armAsm->Fadd(xmmPQ.V1D(), xmmPQ.V1D(), t1.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t2.V1D(), t2.V1D(), Fs.V1D());
+		armAsm->Fmul(t1.V1D(), t2.V1D(), armLoadPtrV(PTR_RUNTIME(mVUglob.EFU_SIN_D[4])).V1D());
+		armAsm->Fadd(xmmPQ.V1D(), xmmPQ.V1D(), t1.V1D());
+		armAsm->Fcvt(xmmPQ.S(), xmmPQ.V1D());
+		mVU_EFUArm64SanitizeScalar(xmmPQ);
 //		xPSHUF.D      (xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6); // Flip back
         armPSHUFD(xmmPQ, xmmPQ, mVUinfo.writeP ? 0x27 : 0xC6);
+		mVU.regAlloc->clearNeeded(src);
 		mVU.regAlloc->clearNeeded(Fs);
 		mVU.regAlloc->clearNeeded(t1);
 		mVU.regAlloc->clearNeeded(t2);
 		mVU.profiler.EmitOp(opESIN);
-#endif
 	}
 	pass3 { mVUlog("ESIN P"); }
 }

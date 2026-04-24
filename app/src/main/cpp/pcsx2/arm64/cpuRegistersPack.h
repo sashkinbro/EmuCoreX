@@ -105,6 +105,17 @@ struct Arm64MvuGlobals
     u32 E4[4] = {0x3933e553, 0x3933e553, 0x3933e553, 0x3933e553};
     u32 E5[4] = {0x36b63510, 0x36b63510, 0x36b63510, 0x36b63510};
     u32 E6[4] = {0x353961ac, 0x353961ac, 0x353961ac, 0x353961ac};
+    u64 EFU_ATAN_D[9] = {
+            0x3feffffea0000000ULL, 0xbfd554c380000000ULL, 0x3fc98814c0000000ULL,
+            0xbfc0bfcda0000000ULL, 0x3fb8aefbe0000000ULL, 0xbfaca03880000000ULL,
+            0x3f9662ca40000000ULL, 0xbf709afce0000000ULL, 0x3fe921fb60000000ULL};
+    u64 EFU_EXP_D[7] = {
+            0x3ff0000000000000ULL, 0x3fcffff500000000ULL, 0x3fa000fe80000000ULL,
+            0x3f653a7fe0000000ULL, 0x3f267caa60000000ULL, 0x3ed6c6a200000000ULL,
+            0x3ea72c3580000000ULL};
+    u64 EFU_SIN_D[5] = {
+            0x3ff0000000000000ULL, 0xbfc5555480000000ULL, 0x3f8110e7c0000000ULL,
+            0xbf29f643e0000000ULL, 0x3ec5d38280000000ULL};
     u32 I32MAXF[4] = {0x4effffff, 0x4effffff, 0x4effffff, 0x4effffff};
     float FTOI_4[4] = {16.0f, 16.0f, 16.0f, 16.0f};
     float FTOI_12[4] = {4096.0f, 4096.0f, 4096.0f, 4096.0f};
