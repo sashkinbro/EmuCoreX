@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">在渲染后调整最终图像的色彩。</string>
     <string name="settings_patches_section">补丁</string>
     <string name="settings_reset_to_default_toast">已恢复默认值。</string>
-    <string name="home_game_menu_custom_cover">选择自定义封面</string>
+    <string name="home_game_menu_custom_cover">选择封面</string>
     <string name="home_game_menu_custom_cover_applied">已应用自定义封面。</string>
     <string name="home_game_menu_custom_cover_failed">无法应用自定义封面。</string>
     <string name="home_shelf_hint">滑动以浏览。点击居中的游戏即可启动。长按可执行更多操作。</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_title">在轮播中使用 3D 封面</string>
     <string name="home_shelf_enable_3d_desc">3D 封面将替换空白的书架卡片。</string>
     <string name="home_shelf_enable_3d_action">启用</string>
+    <string name="settings_language_italian">意大利语</string>
+    <string name="settings_language_hindi">印地语</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>

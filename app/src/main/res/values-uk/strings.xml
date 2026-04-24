@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">Налаштуйте кольори фінального зображення після рендерингу.</string>
     <string name="settings_patches_section">Патчі</string>
     <string name="settings_reset_to_default_toast">Відновлено значення за замовчуванням.</string>
-    <string name="home_game_menu_custom_cover">Вибрати власну обкладинку</string>
+    <string name="home_game_menu_custom_cover">Вибрати обкладинку</string>
     <string name="home_game_menu_custom_cover_applied">Власну обкладинку застосовано.</string>
     <string name="home_game_menu_custom_cover_failed">Не вдалося застосувати власну обкладинку.</string>
     <string name="home_shelf_hint">Гортайте для перегляду. Натисніть на гру по центру, щоб запустити. Довге натискання для додаткових дій.</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_action">Увімкнути</string>
     <string name="home_view_shelf">Показати полицю з обкладинками</string>
     <string name="home_exit_shelf">Закрити полицю з обкладинками</string>
+    <string name="settings_language_italian">Італійська</string>
+    <string name="settings_language_hindi">Гінді</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>

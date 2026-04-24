@@ -476,7 +476,7 @@ fun HomeScreen(
                                                             GameListCard(
                                                                 modifier = itemModifier,
                                                                 game = game,
-                                                                isCoverArtDisabled = showCoverPlaceholder,
+                                                                showCoverArt = !showCoverPlaceholder,
                                                                 onClick = { onGameClick(game) },
                                                                 onLongClickStart = { onGameClick(game) },
                                                                 onLongClickContinue = { onContinueGame(game) },
@@ -1258,7 +1258,7 @@ private fun GameCard(
 private fun GameListCard(
     modifier: Modifier = Modifier,
     game: GameItem,
-    isCoverArtDisabled: Boolean,
+    showCoverArt: Boolean,
     onClick: () -> Unit,
     onLongClickStart: () -> Unit,
     onLongClickContinue: () -> Unit,
@@ -1297,19 +1297,14 @@ private fun GameListCard(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Box(
-                modifier = Modifier
-                    .width(52.dp)
-                    .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            ) {
-                if (isCoverArtDisabled) {
-                    CoverPlaceholderArt(
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillHeight
-                    )
-                } else {
+            if (showCoverArt) {
+                Box(
+                    modifier = Modifier
+                        .width(52.dp)
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                ) {
                     GameCoverArt(
                         coverPath = game.coverArtPath,
                         fallbackTitle = game.title,

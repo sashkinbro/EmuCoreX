@@ -192,6 +192,8 @@
     <string name="settings_language_french">French</string>
     <string name="settings_language_german">German</string>
     <string name="settings_language_portuguese">Portuguese</string>
+    <string name="settings_language_italian">Italian</string>
+    <string name="settings_language_hindi">Hindi</string>
     <string name="settings_language_traditional_chinese">Traditional Chinese</string>
     <string name="settings_language_native_english">English</string>
     <string name="settings_language_native_ukrainian">Українська</string>
@@ -200,6 +202,8 @@
     <string name="settings_language_native_french">Français</string>
     <string name="settings_language_native_german">Deutsch</string>
     <string name="settings_language_native_portuguese">Português</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
     <string name="settings_language_native_traditional_chinese">繁體中文</string>
     <string name="settings_graphics">Video</string>
     <string name="settings_jit_section">JIT / Interpreter</string>
@@ -972,7 +976,7 @@
     <string name="home_game_menu_load_save">Load save state</string>
     <string name="home_game_menu_manager">Game manager</string>
     <string name="home_game_menu_shortcut">Create shortcut</string>
-    <string name="home_game_menu_custom_cover">Choose custom cover</string>
+    <string name="home_game_menu_custom_cover">Choose cover</string>
     <string name="home_game_menu_custom_cover_applied">Custom cover applied.</string>
     <string name="home_game_menu_custom_cover_failed">Failed to apply custom cover.</string>
     <string name="save">Save</string>

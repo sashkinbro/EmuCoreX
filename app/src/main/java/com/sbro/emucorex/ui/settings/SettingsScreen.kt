@@ -3055,6 +3055,8 @@ private fun rememberLanguageOptions(): List<LanguageUiOption> {
             LanguageUiOption("fr", "FR", R.string.settings_language_french, R.string.settings_language_native_french),
             LanguageUiOption("de", "DE", R.string.settings_language_german, R.string.settings_language_native_german),
             LanguageUiOption("pt", "PT", R.string.settings_language_portuguese, R.string.settings_language_native_portuguese),
+            LanguageUiOption("it", "IT", R.string.settings_language_italian, R.string.settings_language_native_italian),
+            LanguageUiOption("hi", "HI", R.string.settings_language_hindi, R.string.settings_language_native_hindi),
             LanguageUiOption("zh", "繁", R.string.settings_language_traditional_chinese, R.string.settings_language_native_traditional_chinese)
         )
     }
@@ -3070,6 +3072,8 @@ private fun languageLabel(tag: String?): String {
         "fr" -> stringResource(R.string.settings_language_french)
         "de" -> stringResource(R.string.settings_language_german)
         "pt" -> stringResource(R.string.settings_language_portuguese)
+        "it" -> stringResource(R.string.settings_language_italian)
+        "hi" -> stringResource(R.string.settings_language_hindi)
         "zh", "zh-TW", "zh-Hant", "zh-Hant-TW" -> stringResource(R.string.settings_language_traditional_chinese)
         else -> stringResource(R.string.settings_language_system)
     }

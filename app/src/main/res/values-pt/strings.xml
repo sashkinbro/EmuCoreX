@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">Ajuste as cores da imagem final após a renderização.</string>
     <string name="settings_patches_section">Patches</string>
     <string name="settings_reset_to_default_toast">Valor padrão restaurado.</string>
-    <string name="home_game_menu_custom_cover">Escolher capa personalizada</string>
+    <string name="home_game_menu_custom_cover">Escolher capa</string>
     <string name="home_game_menu_custom_cover_applied">Capa personalizada aplicada.</string>
     <string name="home_game_menu_custom_cover_failed">Falha ao aplicar a capa personalizada.</string>
     <string name="home_shelf_hint">Deslize para navegar. Toque no jogo centralizado para iniciar. Mantenha pressionado para mais ações.</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_title">Usar capas 3D no carrossel</string>
     <string name="home_shelf_enable_3d_desc">As capas 3D substituem os cartões vazios da estante.</string>
     <string name="home_shelf_enable_3d_action">Ativar</string>
+    <string name="settings_language_italian">Italiano</string>
+    <string name="settings_language_hindi">Hindi</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>

@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">Настройте цвета финального изображения после рендеринга.</string>
     <string name="settings_patches_section">Патчи</string>
     <string name="settings_reset_to_default_toast">Восстановлено значение по умолчанию.</string>
-    <string name="home_game_menu_custom_cover">Выбрать пользовательскую обложку</string>
+    <string name="home_game_menu_custom_cover">Выбрать обложку</string>
     <string name="home_game_menu_custom_cover_applied">Пользовательская обложка применена.</string>
     <string name="home_game_menu_custom_cover_failed">Не удалось применить пользовательскую обложку.</string>
     <string name="home_shelf_hint">Смахните для просмотра. Нажмите на игру по центру, чтобы запустить. Долгое нажатие для дополнительных действий.</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_title">Использовать 3D-обложки в карусели</string>
     <string name="home_shelf_enable_3d_desc">3D-обложки заменяют пустые карточки на полке.</string>
     <string name="home_shelf_enable_3d_action">Включить</string>
+    <string name="settings_language_italian">Итальянский</string>
+    <string name="settings_language_hindi">Хинди</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>

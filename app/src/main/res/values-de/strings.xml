@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">Passe die Farben des endgültigen Bildes nach dem Rendern an.</string>
     <string name="settings_patches_section">Patches</string>
     <string name="settings_reset_to_default_toast">Standardwert wiederhergestellt.</string>
-    <string name="home_game_menu_custom_cover">Benutzerdefiniertes Cover auswählen</string>
+    <string name="home_game_menu_custom_cover">Cover auswählen</string>
     <string name="home_game_menu_custom_cover_applied">Benutzerdefiniertes Cover angewendet.</string>
     <string name="home_game_menu_custom_cover_failed">Fehler beim Anwenden des benutzerdefinierten Covers.</string>
     <string name="home_shelf_hint">Wische zum Durchsuchen. Tippe auf das zentrierte Spiel, um es zu starten. Halte es gedrückt für weitere Aktionen.</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_title">3D-Cover im Karussell verwenden</string>
     <string name="home_shelf_enable_3d_desc">3D-Cover ersetzen leere Regal-Karten.</string>
     <string name="home_shelf_enable_3d_action">Aktivieren</string>
+    <string name="settings_language_italian">Italienisch</string>
+    <string name="settings_language_hindi">Hindi</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>

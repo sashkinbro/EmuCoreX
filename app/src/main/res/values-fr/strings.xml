@@ -957,7 +957,7 @@
     <string name="settings_shadeboost_desc">Ajustez les couleurs de l\'image finale après le rendu.</string>
     <string name="settings_patches_section">Patchs</string>
     <string name="settings_reset_to_default_toast">Valeur par défaut restaurée.</string>
-    <string name="home_game_menu_custom_cover">Choisir une jaquette personnalisée</string>
+    <string name="home_game_menu_custom_cover">Choisir une jaquette</string>
     <string name="home_game_menu_custom_cover_applied">Jaquette personnalisée appliquée.</string>
     <string name="home_game_menu_custom_cover_failed">Échec de l\'application de la jaquette personnalisée.</string>
     <string name="home_shelf_hint">Balayez pour parcourir. Appuyez sur le jeu au centre pour le lancer. Appuyez longuement pour plus d\'actions.</string>
@@ -967,4 +967,8 @@
     <string name="home_shelf_enable_3d_title">Utiliser des jaquettes 3D dans le carrousel</string>
     <string name="home_shelf_enable_3d_desc">Les jaquettes 3D remplacent les cartes vides de l\'étagère.</string>
     <string name="home_shelf_enable_3d_action">Activer</string>
+    <string name="settings_language_italian">Italien</string>
+    <string name="settings_language_hindi">Hindi</string>
+    <string name="settings_language_native_italian">Italiano</string>
+    <string name="settings_language_native_hindi">हिन्दी</string>
 </resources>
