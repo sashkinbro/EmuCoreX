@@ -871,23 +871,14 @@ static __fi void _vuOPMULA(VURegs* VU)
 static __fi void _vuOPMSUB(VURegs* VU)
 {
 	VECTOR* dst;
-	float ftx, fty, ftz;
-	float fsx, fsy, fsz;
 	if (_Fd_ == 0)
 		dst = &RDzero;
 	else
 		dst = &VU->VF[_Fd_];
 
-	ftx = vuDouble(VU->VF[_Ft_].i.x);
-	fty = vuDouble(VU->VF[_Ft_].i.y);
-	ftz = vuDouble(VU->VF[_Ft_].i.z);
-	fsx = vuDouble(VU->VF[_Fs_].i.x);
-	fsy = vuDouble(VU->VF[_Fs_].i.y);
-	fsz = vuDouble(VU->VF[_Fs_].i.z);
-
-	dst->i.x = VU_MACx_UPDATE(VU, vuDouble(VU->ACC.i.x) - fsy * ftz);
-	dst->i.y = VU_MACy_UPDATE(VU, vuDouble(VU->ACC.i.y) - fsz * ftx);
-	dst->i.z = VU_MACz_UPDATE(VU, vuDouble(VU->ACC.i.z) - fsx * fty);
+	dst->i.x = VU_MACx_UPDATE(VU, _vuOpMSUB(VU->ACC.i.x, VU->VF[_Fs_].i.y, VU->VF[_Ft_].i.z));
+	dst->i.y = VU_MACy_UPDATE(VU, _vuOpMSUB(VU->ACC.i.y, VU->VF[_Fs_].i.z, VU->VF[_Ft_].i.x));
+	dst->i.z = VU_MACz_UPDATE(VU, _vuOpMSUB(VU->ACC.i.z, VU->VF[_Fs_].i.x, VU->VF[_Ft_].i.y));
 	VU_STAT_UPDATE(VU);
 }
 

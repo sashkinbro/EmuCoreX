@@ -1171,7 +1171,7 @@ static void mVU_MADDA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lan
 			recBeginOaknutEmit();
 			const int laneIdx = (_X ? 0 : (_Y ? 1 : (_Z ? 2 : 3)));
 			oakAsm->MOV(oakQRegister(tempACC).Selem()[0], oakQRegister(ACC).Selem()[laneIdx]);
-			mVUUpperClamp2Scalar_oaknut(mVU, Fs, false);
+			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, true);
 			mVU_FMACbAddSs_oaknut(mVU, tempACC, Fs, FtL);
 			recEndOaknutEmit();
 			if (updateFlags)
@@ -1184,7 +1184,7 @@ static void mVU_MADDA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lan
 		else
 		{
 			recBeginOaknutEmit();
-			mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
+			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, false);
 			mVU_FMACbAddPs_oaknut(mVU, ACC, Fs, FtL);
 			recEndOaknutEmit();
 			if (updateFlags)
@@ -1196,7 +1196,7 @@ static void mVU_MADDA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lan
 		const int tempACC = mVU.regAlloc->allocRegId();
 		recBeginOaknutEmit();
 		oakAsm->MOV(oakQRegister(tempACC).B16(), oakQRegister(ACC).B16());
-		mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
+		mVUUpperClampAccLaneFs_oaknut(mVU, Fs, false);
 		mVU_FMACbAddPs_oaknut(mVU, tempACC, Fs, FtL);
 		mVUUpperMergeRegs_oaknut(ACC, tempACC, _X_Y_Z_W);
 		recEndOaknutEmit();
@@ -3556,7 +3556,7 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		const int flagsTemp = (useFtLane && (sFLAG.doFlag || mFLAG.doFlag)) ?
 			mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 		recBeginOaknutEmit();
-		mVUUpperClamp2Scalar_oaknut(mVU, Fs, false);
+		mVUUpperClampAccLaneFs_oaknut(mVU, Fs, true);
 		if (useFtLane)
 			mVUUpperMulSsLane_oaknut(Fs, FtRaw, lane);
 		else
@@ -3577,9 +3577,9 @@ static void mVU_MULA_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	{
 		recBeginOaknutEmit();
 		if (_XYZW_SS)
-			mVUUpperClamp2Scalar_oaknut(mVU, Fs, false);
+			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, true);
 		else
-			mVUUpperClamp2Vector_oaknut(mVU, Fs, false);
+			mVUUpperClampAccLaneFs_oaknut(mVU, Fs, false);
 		if (_XYZW_SS)
 		{
 			if (useFtLane)

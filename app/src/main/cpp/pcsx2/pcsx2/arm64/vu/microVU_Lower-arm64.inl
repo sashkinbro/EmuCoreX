@@ -840,12 +840,13 @@ static void mVU_ERLENG_direct_emit_oaknut(mP)
 	const int len = mVU.regAlloc->allocRegId();
 	const int t1 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	// Keep FsRaw intact; vector vuDouble avoids three scalar normalizations, while fused accumulation keeps ERLENG rounding stable.
+	// Keep the interpreter's x*x + y*y + z*z evaluation order. This matters
+	// under round-to-zero even when both additions are emitted as FMADDs.
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(FsRaw).B16());
 	mVU_EFUvuDoublePS_oaknut(Fs, len, t1);
-	oakAsm->MOV(oakQRegister(len).Selem()[0], oakQRegister(Fs).Selem()[1]);
+	oakAsm->MOV(oakQRegister(len).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	oakAsm->FMUL(oakSRegister(len), oakSRegister(len), oakSRegister(len));
-	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[1]);
 	oakAsm->FMADD(oakSRegister(len), OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(len));
 	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[2]);
 	oakAsm->FMADD(oakSRegister(len), OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(len));
