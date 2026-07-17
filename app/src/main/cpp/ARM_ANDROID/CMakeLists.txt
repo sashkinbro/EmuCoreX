@@ -5,6 +5,8 @@ project(EmuCoreXArmAndroid LANGUAGES C CXX)
 set(EMUCOREX_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH "EmuCoreX native source root")
 set(PCSX2_UPSTREAM_DIR "${EMUCOREX_CPP_DIR}/PCSX2" CACHE PATH "Clean PCSX2 upstream checkout")
 option(EMUCOREX_LINK_UPSTREAM_PCSX2 "Link the upstream PCSX2 core into libemucore.so" ON)
+set(EMUCOREX_ANDROID_HOST_PAGE_SIZE "0x1000" CACHE STRING "Android runtime page size expected by the PCSX2 core")
+set(EMUCOREX_NATIVE_LIBRARY_NAME "emucore_4k" CACHE STRING "Output name of the Android emulator core library")
 set(EMUCOREX_PCSX2_THIRD_PARTY_DIR "${PCSX2_UPSTREAM_DIR}/3rdparty" CACHE PATH "PCSX2 third-party dependency root")
 set(EMUCOREX_OAKNUT_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/third_party/oaknut/include" CACHE PATH "Oaknut include directory")
 
@@ -16,6 +18,14 @@ set(EMUCOREX_HAS_CAPSTONE 0)
 
 if(NOT EXISTS "${PCSX2_UPSTREAM_DIR}/pcsx2/VMManager.h")
 	message(FATAL_ERROR "PCSX2 upstream checkout is missing at ${PCSX2_UPSTREAM_DIR}")
+endif()
+
+if(NOT EMUCOREX_ANDROID_HOST_PAGE_SIZE MATCHES "^0x(1000|4000)$")
+	message(FATAL_ERROR "EMUCOREX_ANDROID_HOST_PAGE_SIZE must be 0x1000 or 0x4000")
+endif()
+
+if(NOT EMUCOREX_NATIVE_LIBRARY_NAME MATCHES "^[A-Za-z0-9_]+$")
+	message(FATAL_ERROR "EMUCOREX_NATIVE_LIBRARY_NAME contains unsupported characters")
 endif()
 
 # RetroAchievements is compiled from the tracked Android overlay below. These
@@ -54,7 +64,7 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 		__POSIX__
 		ENABLE_OPENGL
 		ENABLE_VULKAN
-		OVERRIDE_HOST_PAGE_SIZE=0x1000
+		OVERRIDE_HOST_PAGE_SIZE=${EMUCOREX_ANDROID_HOST_PAGE_SIZE}
 		OVERRIDE_HOST_CACHE_LINE_SIZE=64
 	)
 	set(PCSX2_WARNINGS -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wno-missing-field-initializers)
@@ -290,6 +300,14 @@ add_library(emucore SHARED
 	src/runtime/android_host_services.cpp
 	src/runtime/android_runtime.cpp
 	src/runtime/upstream_vm_bridge.cpp
+)
+
+set_target_properties(emucore PROPERTIES OUTPUT_NAME "${EMUCOREX_NATIVE_LIBRARY_NAME}")
+# A 16 KiB ELF alignment is valid on both 4 KiB and 16 KiB Android systems.
+# The PCSX2 fastmem page size remains a separate compile-time choice above.
+target_link_options(emucore PRIVATE
+	"LINKER:-z,max-page-size=16384"
+	"LINKER:-z,common-page-size=16384"
 )
 
 target_compile_features(emucore PRIVATE cxx_std_20)
