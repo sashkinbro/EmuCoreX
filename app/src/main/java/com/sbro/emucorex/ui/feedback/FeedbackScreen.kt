@@ -286,7 +286,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     1.dp,
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                 )
@@ -533,7 +533,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.14f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
-                border = androidx.compose.foundation.BorderStroke(
+                border = BorderStroke(
                     1.dp,
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
                 )
