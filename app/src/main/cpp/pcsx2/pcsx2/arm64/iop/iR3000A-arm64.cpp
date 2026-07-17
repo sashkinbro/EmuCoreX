@@ -1116,6 +1116,31 @@ static __fi u32 psxScaleBlockCycles()
 	return s_psxBlockCycles;
 }
 
+// AArch64 ADD/SUB immediates can only encode 12 bits, optionally shifted by 12.
+// Long IOP blocks can exceed that range, so fall back to a register operand.
+// OAK_WSCRATCH2 is safe here because all callers update OAK_EBX or OAK_WSCRATCH.
+static void iPsxAddBlockCycles(oak::WReg reg, u32 cycles)
+{
+	if (oak::AddSubImm::is_valid(cycles))
+		oakAsm->ADD(reg, reg, cycles);
+	else
+	{
+		oakAsm->MOV(OAK_WSCRATCH2, cycles);
+		oakAsm->ADD(reg, reg, OAK_WSCRATCH2);
+	}
+}
+
+static void iPsxSubBlockCyclesAndSetFlags(oak::WReg reg, u32 cycles)
+{
+	if (oak::AddSubImm::is_valid(cycles))
+		oakAsm->SUBS(reg, reg, cycles);
+	else
+	{
+		oakAsm->MOV(OAK_WSCRATCH2, cycles);
+		oakAsm->SUBS(reg, reg, OAK_WSCRATCH2);
+	}
+}
+
 static void iPsxAddEECycles_emit_oaknut(u32 blockCycles);
 
 static void iPsxAddEECycles(u32 blockCycles)
@@ -1129,7 +1154,7 @@ static void iPsxAddEECycles_emit_oaknut(u32 blockCycles)
 	{
 		oakLoad32(OAK_WSCRATCH, IOP_CPU(psxRegs.iopCycleEE));
 		if (blockCycles != 0xFFFFFFFF)
-			oakAsm->SUBS(OAK_WSCRATCH, OAK_WSCRATCH, blockCycles * 8);
+			iPsxSubBlockCyclesAndSetFlags(OAK_WSCRATCH, blockCycles * 8);
 		else
 			oakAsm->SUBS(OAK_WSCRATCH, OAK_WSCRATCH, OAK_EAX);
 		oakStore32(OAK_WSCRATCH, IOP_CPU(psxRegs.iopCycleEE));
@@ -1187,7 +1212,7 @@ static void iPsxBranchTest(u32 newpc, u32 cpuBranch)
 	else
 	{
 		oakLoad32(OAK_EBX, IOP_CPU(psxRegs.cycle));
-		oakAsm->ADD(OAK_EBX, OAK_EBX, blockCycles);
+		iPsxAddBlockCycles(OAK_EBX, blockCycles);
 		oakStore32(OAK_EBX, IOP_CPU(psxRegs.cycle));
 
 		// jump if iopCycleEE <= 0  (iop's timeslice timed out, so time to return control to the EE)
@@ -1246,7 +1271,7 @@ static void rpsxSYSCALL_emit_oaknut()
 	oakAsm->CMP(OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakAsm->B(oak::Cond::EQ, skip_cycle_update);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.cycle))});
-	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, block_cycles);
+	iPsxAddBlockCycles(OAK_WSCRATCH, block_cycles);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.cycle))});
 	iPsxAddEECycles_emit_oaknut(block_cycles);
 	oakEmitJmp(iopDispatcherReg);
@@ -1283,7 +1308,7 @@ static void rpsxBREAK_emit_oaknut()
 	oakAsm->CMP(OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakAsm->B(oak::Cond::EQ, skip_cycle_update);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.cycle))});
-	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, block_cycles);
+	iPsxAddBlockCycles(OAK_WSCRATCH, block_cycles);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.cycle))});
 	iPsxAddEECycles_emit_oaknut(block_cycles);
 	oakEmitJmp(iopDispatcherReg);
@@ -1701,7 +1726,7 @@ StartRecomp:
 		else
 		{
 			oakLoad32(OAK_WSCRATCH, IOP_CPU(psxRegs.cycle));
-			oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, psxScaleBlockCycles());
+			iPsxAddBlockCycles(OAK_WSCRATCH, psxScaleBlockCycles());
 			oakStore32(OAK_WSCRATCH, IOP_CPU(psxRegs.cycle));
 			iPsxAddEECycles(psxScaleBlockCycles());
 		}

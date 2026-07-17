@@ -5,6 +5,7 @@ import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sbro.emucorex.EmuCoreXApp
 import com.sbro.emucorex.core.AndroidGamePerformance
 import com.sbro.emucorex.core.AndroidGamePhase
 import com.sbro.emucorex.core.BiosValidator
@@ -1247,6 +1248,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun syncPendingPlayTime(forceCloud: Boolean = true) {
         cachePendingPlayTime()
         flushCachedPlayTimeIfDue(force = forceCloud)
+    }
+
+    private fun syncCachedPlayTimeInBackground(forceCloud: Boolean = true) {
+        val app = getApplication<Application>() as EmuCoreXApp
+        app.applicationScope.launch {
+            flushCachedPlayTimeIfDue(force = forceCloud)
+        }
     }
 
     private fun performAutoSave() {
@@ -4307,8 +4315,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     showActionProgress = true
                 )
             }
-            syncPendingPlayTime()
+            cachePendingPlayTime()
             performShutdown()
+            syncCachedPlayTimeInBackground()
             if (onExit != null) {
                 withContext(Dispatchers.Main) {
                     onExit.invoke()
