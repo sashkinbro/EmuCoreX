@@ -34,6 +34,9 @@ object NativeApp {
     @JvmStatic
     val loadedCoreLibraryName: String
 
+    @JvmStatic
+    val hasNativeCore: Boolean
+
     private var contextRef: WeakReference<Context>? = null
     private var dataRootOverride: String? = null
     private val soundHandler = Handler(Looper.getMainLooper())
@@ -42,13 +45,15 @@ object NativeApp {
 
     init {
         loadedCoreLibraryName = AndroidNativeCoreSelector.selectedLibraryName()
-        runCatching { System.loadLibrary(loadedCoreLibraryName) }
-            .onSuccess {
-                Log.i(TAG, "Loaded $loadedCoreLibraryName for ${AndroidNativeCoreSelector.runtimePageSizeBytes()} byte pages")
-            }
-            .onFailure { error ->
-                Log.e(TAG, "Unable to load $loadedCoreLibraryName", error)
-            }
+        hasNativeCore = try {
+            System.loadLibrary(loadedCoreLibraryName)
+            Log.i(TAG, "Loaded $loadedCoreLibraryName for ${AndroidNativeCoreSelector.runtimePageSizeBytes()} byte pages")
+            true
+        } catch (error: UnsatisfiedLinkError) {
+            Log.e(TAG, "Unable to load $loadedCoreLibraryName", error)
+            CrashLogger.logError(TAG, "$loadedCoreLibraryName load FAILED", error)
+            false
+        }
 
         hasNativeTools = try {
             System.loadLibrary("EmuCoreX_native_tools")

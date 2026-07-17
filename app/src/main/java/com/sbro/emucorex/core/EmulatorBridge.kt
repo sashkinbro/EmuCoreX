@@ -76,14 +76,11 @@ object EmulatorBridge {
     private val settingsCache = HashMap<String, String>()
 
     init {
-        try {
-            System.loadLibrary("emucore")
-            isNativeLoaded = true
-            Log.i(TAG, "libemucore loaded")
-        } catch (error: UnsatisfiedLinkError) {
-            isNativeLoaded = false
-            Log.e(TAG, "libemucore load failed", error)
-            CrashLogger.logError(TAG, "libemucore load FAILED", error)
+        isNativeLoaded = NativeApp.hasNativeCore
+        if (isNativeLoaded) {
+            Log.i(TAG, "${NativeApp.loadedCoreLibraryName} is ready")
+        } else {
+            Log.e(TAG, "${NativeApp.loadedCoreLibraryName} is unavailable")
         }
     }
 
