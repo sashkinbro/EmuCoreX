@@ -93,6 +93,10 @@ profiling-runs/
 profiler/
 /local-traces/
 
+# Local on-device VU differential conformance harness
+app/src/main/cpp/ARM_ANDROID/src/testing/vu_conformance.cpp
+app/src/main/cpp/ARM_ANDROID/include/emucorex/vu_conformance.h
+
 # Third-party and upstream docs (not needed in repo)
 **/third_party/**/docs/
 app/src/main/cpp/PCSX2/**/docs/
