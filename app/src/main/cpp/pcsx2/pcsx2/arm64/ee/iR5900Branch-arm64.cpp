@@ -475,7 +475,7 @@ void recBLTZAL()
 
 	const bool swap = TrySwapDelaySlot(_Rs_, 0, 0, true);
 
-	const RecBranchPatchpoint j32Ptr = recSetBranchSignExact_emit_oaknut<true, false>();
+	const RecBranchPatchpoint j32Ptr = recSetBranchSignExact_emit_oaknut<true>();
 
 	if (!swap)
 	{
@@ -523,7 +523,7 @@ void recBGEZAL()
 
 	const bool swap = TrySwapDelaySlot(_Rs_, 0, 0, true);
 
-	const RecBranchPatchpoint j32Ptr = recSetBranchSignExact_emit_oaknut<false, false>();
+	const RecBranchPatchpoint j32Ptr = recSetBranchSignExact_emit_oaknut<false>();
 
 	if (!swap)
 	{

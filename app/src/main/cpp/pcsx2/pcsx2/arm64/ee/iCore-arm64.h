@@ -125,6 +125,15 @@ bool mVUIsReservedCOP2(int hostreg);
 // lo and hi regs
 #define XMMGPR_LO  33
 #define XMMGPR_HI  32
+
+// HI and LO are represented as pseudo GPRs 32 and 33 by the register allocator.
+// Compute their contiguous cpuRegisters offset arithmetically instead of indexing
+// past GPR.r[32], which is undefined behavior and can fold to the wrong register.
+static constexpr s64 eeGpr128Offset(u32 reg)
+{
+	return static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[0])) +
+		static_cast<s64>(reg) * static_cast<s64>(sizeof(GPR_reg));
+}
 #define XMMFPU_ACC 32
 
 enum : int

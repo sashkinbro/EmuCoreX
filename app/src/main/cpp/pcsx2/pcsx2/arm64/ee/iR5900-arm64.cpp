@@ -1709,6 +1709,116 @@ static void recompileDelaySlotEnd_emit_oaknut()
 	recEndOaknutEmit();
 }
 
+static void recompileDelaySlotBranchBegin_emit_oaknut()
+{
+	recBeginOaknutEmit();
+	oakAsm->MOV(OAK_WSCRATCH, 1);
+	oakStore32(OAK_WSCRATCH,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.branch))});
+	recEndOaknutEmit();
+}
+
+static void recompileDelaySlotBranchEnd_emit_oaknut()
+{
+	recBeginOaknutEmit();
+	oakAsm->MOV(OAK_WSCRATCH, 0);
+	oakStore32(OAK_WSCRATCH,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.branch))});
+	recEndOaknutEmit();
+}
+
+static bool delaySlotOpcodeMayRaiseException(u32 code)
+{
+	const u32 primary = code >> 26;
+	if (primary == 8 || primary == 24) // ADDI, DADDI
+		return true;
+	if (primary == 1)
+	{
+		const u32 rt = (code >> 16) & 0x1f;
+		return rt == 8 || rt == 9 || rt == 10 || rt == 11 || rt == 12 || rt == 14;
+	}
+	if (primary != 0)
+		return false;
+
+	switch (code & 0x3f)
+	{
+		case 0x0c: // SYSCALL
+		case 0x0d: // BREAK
+		case 0x20: // ADD
+		case 0x22: // SUB
+		case 0x2c: // DADD
+		case 0x2e: // DSUB
+		case 0x30: // TGE
+		case 0x31: // TGEU
+		case 0x32: // TLT
+		case 0x33: // TLTU
+		case 0x34: // TEQ
+		case 0x36: // TNE
+			return true;
+		default:
+			return false;
+	}
+}
+
+void recEmitArithmeticOverflowException()
+{
+	// This is a cold path. Preserve the allocator's compile-time state so the
+	// non-overflow path can keep all of its cached registers, while emitting a
+	// complete architectural writeback for the exception path.
+	_x86regs saved_x86regs[iREGCNT_GPR];
+	_xmmregs saved_xmmregs[iREGCNT_XMM];
+	memcpy(saved_x86regs, x86regs, sizeof(saved_x86regs));
+	memcpy(saved_xmmregs, xmmregs, sizeof(saved_xmmregs));
+	const u32 saved_has_const = g_cpuHasConstReg;
+	const u32 saved_flushed_const = g_cpuFlushedConstReg;
+	const bool saved_flushed_pc = g_cpuFlushedPC;
+	const bool saved_flushed_code = g_cpuFlushedCode;
+
+	iFlushCall(FLUSH_INTERPRETER);
+	recFlushReccycle();
+	recBeginOaknutEmit();
+	oakLoad32(OAK_WSCRATCH,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.cycle))});
+	oakStore32(OAK_WSCRATCH,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.nextEventCycle))});
+	recEndOaknutEmit();
+	recReloadReccycle();
+
+	// Arithmetic overflow helpers use the interpreter's already-advanced PC.
+	// Trap opcodes are different: their opcode implementation subtracts four.
+	recBeginOaknutEmit();
+	if (g_recompilingDelaySlot)
+	{
+		// During delay-slot recompilation the compile cursor still points at the
+		// delay instruction, while the interpreter has already advanced past it.
+		oakLoad32(OAK_WSCRATCH,
+			{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+		oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, 4);
+		oakStore32(OAK_WSCRATCH,
+			{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+	}
+	oakAsm->MOV(OAK_WARG1, 0x30);
+	oakLoad32(OAK_WARG2,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.branch))});
+	oakEmitCall(reinterpret_cast<void*>(cpuException));
+	oakEmitJmp(DispatcherEvent);
+	recEndOaknutEmit();
+
+	memcpy(x86regs, saved_x86regs, sizeof(saved_x86regs));
+	memcpy(xmmregs, saved_xmmregs, sizeof(saved_xmmregs));
+	g_cpuHasConstReg = saved_has_const;
+	g_cpuFlushedConstReg = saved_flushed_const;
+	g_cpuFlushedPC = saved_flushed_pc;
+	g_cpuFlushedCode = saved_flushed_code;
+}
+
+void recEmitExceptionExit()
+{
+	recBeginOaknutEmit();
+	oakEmitJmp(DispatcherEvent);
+	recEndOaknutEmit();
+}
+
 static void recompileDelaySlotClearCauseBd_emit_oaknut()
 {
 	recBeginOaknutEmit();
@@ -1882,8 +1992,12 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 	// the common path without weakening the current immediate vtlb exception
 	// exit. Other exception behavior remains unchanged from this core.
 	const bool delay_slot_memory = delayslot && cpuRegs.code != 0 && (opcode.flags & IS_MEMORY);
+	const bool delay_slot_cpu_exception = delayslot && cpuRegs.code != 0 &&
+		delaySlotOpcodeMayRaiseException(cpuRegs.code);
 	if (delay_slot_memory)
 		recompileDelaySlotBegin_emit_oaknut();
+	if (delay_slot_cpu_exception)
+		recompileDelaySlotBranchBegin_emit_oaknut();
 
 	if (cpuRegs.code == 0x00000000)
 	{
@@ -1906,6 +2020,8 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 
 	if (delayslot)
 	{
+		if (delay_slot_cpu_exception)
+			recompileDelaySlotBranchEnd_emit_oaknut();
 		if (delay_slot_memory)
 			recompileDelaySlotEnd_emit_oaknut();
 		pc += 4;
