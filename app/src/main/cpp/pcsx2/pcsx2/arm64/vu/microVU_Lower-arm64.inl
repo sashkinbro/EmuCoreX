@@ -28,8 +28,12 @@ static __fi OakMemOperand mVU_ss4_oaknut(s64 offset)
 
 static __fi void mVU_storeDivFlag_oaknut(mV, u32 value)
 {
-	oakAsm->MOV(OAK_WSCRATCH, value);
-	oakStore32(OAK_WSCRATCH, mVU_divFlag_oaknut(mVU));
+	// The large-offset store may use W16/W17 to form the address. Keep its
+	// value in the reserved VU temp so callers can retain operands in both
+	// scratch registers across the flag update.
+	const oak::WReg flag = oakWRegister(VU_HOST_T1);
+	oakAsm->MOV(flag, value);
+	oakStore32(flag, mVU_divFlag_oaknut(mVU));
 }
 
 static __fi void mVU_testZero_oaknut(int xmmReg, int xmmTemp, int gprTemp)
@@ -89,13 +93,37 @@ static __fi void mVU_prepareSqrtOperand_oaknut(mV, int xmmReg)
 static __fi void mVU_prepareMacroSqrtOperand_oaknut(mV, int xmmReg)
 {
 	oak::Label non_negative;
+	oak::Label write_zero;
+	oak::Label write_abs_without_flag;
 
 	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(xmmReg));
 	oakAsm->TST(OAK_WSCRATCH, 0x80000000u);
 	oakAsm->B(oak::util::EQ, non_negative);
+	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7fffffffu);
+	// vuDouble() turns signed zero and denormals into signed zero before
+	// SQRT, so they are not invalid even when the raw sign bit is set.
+	oakAsm->CMP(OAK_WSCRATCH2, 0x00800000u);
+	oakAsm->B(oak::util::LO, write_zero);
+	if (!CHECK_VU_OVERFLOW(mVU.index))
+	{
+		// Without overflow clamping, negative NaNs remain NaNs and do not
+		// satisfy the interpreter's ft < 0 comparison.
+		oakAsm->MOV(OAK_WSCRATCH, 0x7f800000u);
+		oakAsm->CMP(OAK_WSCRATCH2, OAK_WSCRATCH);
+		oakAsm->B(oak::util::HI, write_abs_without_flag);
+	}
+	oakAsm->FMOV(oakSRegister(xmmReg), OAK_WSCRATCH2);
+	// Store the absolute operand before mVU_storeDivFlag_oaknut() reuses
+	// OAK_WSCRATCH for the flag value.
 	mVU_storeDivFlag_oaknut(mVU, divI);
-	oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, 0x7fffffffu);
-	oakAsm->FMOV(oakSRegister(xmmReg), OAK_WSCRATCH);
+	oakAsm->B(non_negative);
+
+	oakAsm->l(write_abs_without_flag);
+	oakAsm->FMOV(oakSRegister(xmmReg), OAK_WSCRATCH2);
+	oakAsm->B(non_negative);
+
+	oakAsm->l(write_zero);
+	oakAsm->EOR(oakQRegister(xmmReg).B16(), oakQRegister(xmmReg).B16(), oakQRegister(xmmReg).B16());
 	oakAsm->l(non_negative);
 
 	if (CHECK_VU_OVERFLOW(mVU.index))
@@ -175,8 +203,11 @@ static __fi void mVU_mergeDivFlagToCop2Status_oaknut(mV)
 static void mVU_SQRT_direct_emit_oaknut(mP)
 {
 	const int Ft = mVU.regAlloc->allocRegId(_Ft_, 0, (1 << (3 - _Ftf_)));
+	const bool host_denormals_enabled = !(mVU.index ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR).GetDenormalsAreZero();
 
 	recBeginOaknutEmit();
+	if (host_denormals_enabled)
+		mVUClampDenormalScalarBits_oaknut(Ft);
 	mVU_storeDivFlag_oaknut(mVU, 0);
 	// Match legacy microVU VSQRT behavior: flag negative raw inputs, abs them, then clamp before FSQRT.
 	mVU_prepareMacroSqrtOperand_oaknut(mVU, Ft);
@@ -200,8 +231,22 @@ static void mVU_RSQRT_direct_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int Ft = mVU.regAlloc->allocRegId(_Ft_, 0, (1 << (3 - _Ftf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
+	const bool host_denormals_enabled = !(mVU.index ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR).GetDenormalsAreZero();
 
 	recBeginOaknutEmit();
+	if (host_denormals_enabled)
+	{
+		mVUClampDenormalScalarBits_oaknut(Fs);
+		mVUClampDenormalScalarBits_oaknut(Ft);
+	}
+	if (CHECK_VU_OVERFLOW(mVU.index))
+	{
+		// vuDouble() converts exponent-255 operands to signed VU max before
+		// RSQRT. Do this before the sign/zero paths so NaNs and infinities
+		// follow the same arithmetic and flag behavior as the interpreter.
+		mVUClamp1ScalarBits_oaknut(Fs);
+		mVUClamp1ScalarBits_oaknut(Ft);
+	}
 	mVU_storeDivFlag_oaknut(mVU, 0);
 	mVU_makeRsqrtZeroSign_oaknut(t1, Fs, Ft);
 	mVU_prepareSqrtOperand_oaknut(mVU, Ft);
@@ -227,6 +272,8 @@ static void mVU_RSQRT_direct_emit_oaknut(mP)
 	oakAsm->l(normal_div);
 	mVU_divScalar_oaknut(mVU, Fs, Ft);
 	mVU_clamp1Scalar_oaknut(mVU, Fs, true);
+	if (host_denormals_enabled)
+		mVUClampDenormalScalarBits_oaknut(Fs);
 	oakAsm->l(done);
 	recEndOaknutEmit();
 
@@ -253,8 +300,21 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 		Ft = mVU.regAlloc->allocRegId(_Ft_);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
+	const bool host_denormals_enabled = !(mVU.index ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR).GetDenormalsAreZero();
 
 	recBeginOaknutEmit();
+	if (host_denormals_enabled)
+	{
+		mVUClampDenormalScalarBits_oaknut(Fs);
+		mVUClampDenormalScalarBits_oaknut(Ft);
+	}
+	if (CHECK_VU_OVERFLOW(mVU.index))
+	{
+		// Match vuDouble() input conversion for the accurate clamp modes.
+		// The bitwise path keeps the original sign of NaNs.
+		mVUClamp1ScalarBits_oaknut(Fs);
+		mVUClamp1ScalarBits_oaknut(Ft);
+	}
 	mVU_testZero_oaknut(Ft, t1, VU_HOST_T1);
 	oak::Label cjmp;
 	oakAsm->B(oak::util::EQ, cjmp);
@@ -281,6 +341,8 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 	mVU_storeDivFlag_oaknut(mVU, 0);
 	mVU_divScalar_oaknut(mVU, Fs, Ft);
 	mVU_clamp1Scalar_oaknut(mVU, Fs, true);
+	if (host_denormals_enabled)
+		mVUClampDenormalScalarBits_oaknut(Fs);
 	oakAsm->l(djmp);
 	recEndOaknutEmit();
 
@@ -511,16 +573,15 @@ static __fi void mVU_addGlobSS_oaknut(int reg, s64 offset)
 	oakAsm->FADD(oakSRegister(reg), oakSRegister(reg), OAK_SSCRATCH3);
 }
 
-static __fi void mVU_EATANHelper_oaknut(mV, int PQ, int Fs, int t1, int t2, s64 offset)
+static __fi void mVU_EATANHelper_oaknut(mV, int PQ, int input2, int inputpow, s64 offset)
 {
-	mVU_mulScalar_oaknut(mVU, t2, Fs);
-	mVU_mulScalar_oaknut(mVU, t2, Fs);
-	oakAsm->MOV(oakQRegister(t1).B16(), oakQRegister(t2).B16());
-	mVU_mulGlobSS_oaknut(t1, offset);
-	mVU_addScalar_oaknut(mVU, PQ, t1);
+	mVU_mulScalar_oaknut(mVU, inputpow, input2);
+	oakLoad32(OAK_WSCRATCH, mVU_glob_oaknut(offset));
+	oakAsm->FMOV(OAK_SSCRATCH3, OAK_WSCRATCH);
+	oakAsm->FMADD(oakSRegister(PQ), oakSRegister(inputpow), OAK_SSCRATCH3, oakSRegister(PQ));
 }
 
-static __fi void mVU_EATAN_oaknut(mV, int PQ, int Fs, int t1, int t2)
+static __fi void mVU_EATAN_oaknut(mV, int PQ, int Fs, int t1, int inputpow, int input2)
 {
 	oak::Label calculate;
 	oak::Label finish;
@@ -547,16 +608,21 @@ static __fi void mVU_EATAN_oaknut(mV, int PQ, int Fs, int t1, int t2)
 	oakAsm->B(finish);
 
 	oakAsm->l(calculate);
-	oakAsm->MOV(oakQRegister(PQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
-	mVU_mulGlobSS_oaknut(PQ, offsetof(mVU_Globals, T1));
-	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(Fs).B16());
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T5));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T2));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T3));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T4));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T6));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T7));
-	mVU_EATANHelper_oaknut(mVU, PQ, Fs, t1, t2, offsetof(mVU_Globals, T8));
+	oakAsm->MOV(oakQRegister(input2).B16(), oakQRegister(Fs).B16());
+	mVU_mulScalar_oaknut(mVU, input2, Fs);
+	oakAsm->MOV(oakQRegister(inputpow).B16(), oakQRegister(input2).B16());
+	mVU_mulScalar_oaknut(mVU, inputpow, Fs);
+	oakAsm->MOV(oakQRegister(t1).B16(), oakQRegister(inputpow).B16());
+	mVU_mulGlobSS_oaknut(t1, offsetof(mVU_Globals, T5));
+	oakLoad32(OAK_WSCRATCH, mVU_glob_oaknut(offsetof(mVU_Globals, T1)));
+	oakAsm->FMOV(OAK_SSCRATCH3, OAK_WSCRATCH);
+	oakAsm->FMADD(oakSRegister(PQ), oakSRegister(Fs), OAK_SSCRATCH3, oakSRegister(t1));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T2));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T3));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T4));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T6));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T7));
+	mVU_EATANHelper_oaknut(mVU, PQ, input2, inputpow, offsetof(mVU_Globals, T8));
 	mVU_addGlobSS_oaknut(PQ, offsetof(mVU_Globals, Pi4));
 	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(PQ));
 	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7fffffffu);
@@ -567,7 +633,6 @@ static __fi void mVU_EATAN_oaknut(mV, int PQ, int Fs, int t1, int t2)
 	oakAsm->FMOV(oakSRegister(PQ), OAK_WSCRATCH);
 
 	oakAsm->l(finish);
-	mVU_flipPQ_oaknut(mVU);
 }
 
 static void mVU_EATAN_direct_emit_oaknut(mP)
@@ -575,19 +640,25 @@ static void mVU_EATAN_direct_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
+	const int t3 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoubleSS_oaknut(Fs);
-	mVU_flipPQ_oaknut(mVU);
-	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_loadGlobSS_oaknut(t1, offsetof(mVU_Globals, one));
 	oakAsm->FSUB(oakSRegister(Fs), oakSRegister(Fs), oakSRegister(t1));
-	oakAsm->FADD(oakSRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ), oakSRegister(t1));
-	mVU_EFUdivScalarRaw_oaknut(Fs, VU_HOST_XMMPQ);
-	mVU_EATAN_oaknut(mVU, VU_HOST_XMMPQ, Fs, t1, t2);
+	oakAsm->FADD(oakSRegister(P), oakSRegister(P), oakSRegister(t1));
+	mVU_EFUdivScalarRaw_oaknut(Fs, P);
+	mVU_EATAN_oaknut(mVU, P, Fs, t1, t2, t3);
+	mVU_flipPQ_oaknut(mVU);
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(P).Selem()[0]);
+	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+	mVU.regAlloc->clearNeededXmmId(t3);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_EATAN_emit(mP)
@@ -614,19 +685,25 @@ static void mVU_EATANxy_direct_emit_oaknut(mP)
 	const int t1 = mVU.regAlloc->allocRegId(_Fs_, 0, 0xf);
 	const int Fs = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
+	const int t3 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoublePS_oaknut(t1, Fs, t2);
 	mVU_pshufd_oaknut(Fs, t1, 0x01);
-	mVU_flipPQ_oaknut(mVU);
-	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_subScalar_oaknut(mVU, Fs, t1);
-	mVU_addScalar_oaknut(mVU, t1, VU_HOST_XMMPQ);
+	mVU_addScalar_oaknut(mVU, t1, P);
 	mVU_EFUdivScalarRaw_oaknut(Fs, t1);
-	mVU_EATAN_oaknut(mVU, VU_HOST_XMMPQ, Fs, t1, t2);
+	mVU_EATAN_oaknut(mVU, P, Fs, t1, t2, t3);
+	mVU_flipPQ_oaknut(mVU);
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(P).Selem()[0]);
+	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+	mVU.regAlloc->clearNeededXmmId(t3);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_EATANxy_emit(mP)
@@ -653,19 +730,25 @@ static void mVU_EATANxz_direct_emit_oaknut(mP)
 	const int t1 = mVU.regAlloc->allocRegId(_Fs_, 0, 0xf);
 	const int Fs = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
+	const int t3 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoublePS_oaknut(t1, Fs, t2);
 	mVU_pshufd_oaknut(Fs, t1, 0x02);
-	mVU_flipPQ_oaknut(mVU);
-	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_subScalar_oaknut(mVU, Fs, t1);
-	mVU_addScalar_oaknut(mVU, t1, VU_HOST_XMMPQ);
+	mVU_addScalar_oaknut(mVU, t1, P);
 	mVU_EFUdivScalarRaw_oaknut(Fs, t1);
-	mVU_EATAN_oaknut(mVU, VU_HOST_XMMPQ, Fs, t1, t2);
+	mVU_EATAN_oaknut(mVU, P, Fs, t1, t2, t3);
+	mVU_flipPQ_oaknut(mVU);
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(P).Selem()[0]);
+	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+	mVU.regAlloc->clearNeededXmmId(t3);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_EATANxz_emit(mP)
@@ -687,23 +770,22 @@ static void mVU_EATANxz_emit(mP)
 }
 
 
-static __fi void mVU_eexpHelperD_oaknut(int t1, int t2, int Fs, s64 offset)
+static __fi void mVU_eexpHelperD_oaknut(int P, int t1, int t2, int Fs, s64 offset)
 {
 	oakAsm->FMUL(oakDRegister(t2), oakDRegister(t2), oakDRegister(Fs));
 	mVU_loadGlobSS_oaknut(t1, offset);
 	oakAsm->FCVT(oakDRegister(t1), oakSRegister(t1));
-	oakAsm->FMUL(oakDRegister(t1), oakDRegister(t1), oakDRegister(t2));
-	oakAsm->FADD(oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ), oakDRegister(t1));
+	oakAsm->FMADD(oakDRegister(P), oakDRegister(t1), oakDRegister(t2), oakDRegister(P));
 }
 
-static __fi void mVU_esinHelperD_oaknut(int t1, int t2, int Fs, s64 offset)
+static __fi void mVU_esinHelperD_oaknut(int P, int t1, int t2, int Fs, s64 offset)
 {
 	oakAsm->FMUL(oakDRegister(t2), oakDRegister(t2), oakDRegister(Fs));
 	oakAsm->FMUL(oakDRegister(t2), oakDRegister(t2), oakDRegister(Fs));
 	mVU_loadGlobSS_oaknut(t1, offset);
 	oakAsm->FCVT(oakDRegister(t1), oakSRegister(t1));
 	oakAsm->FMUL(oakDRegister(t1), oakDRegister(t1), oakDRegister(t2));
-	oakAsm->FADD(oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ), oakDRegister(t1));
+	oakAsm->FADD(oakDRegister(P), oakDRegister(P), oakDRegister(t1));
 }
 
 static void mVU_EEXP_direct_emit_oaknut(mP)
@@ -711,38 +793,39 @@ static void mVU_EEXP_direct_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoubleSS_oaknut(Fs);
-	mVU_flipPQ_oaknut(mVU);
-	mVU_loadGlobSS_oaknut(VU_HOST_XMMPQ, offsetof(mVU_Globals, one), true);
+	mVU_loadGlobSS_oaknut(P, offsetof(mVU_Globals, one), true);
 	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(Fs).B16());
 	mVU_loadGlobSS_oaknut(t1, offsetof(mVU_Globals, E1));
-	oakAsm->FMUL(oakSRegister(t1), oakSRegister(t1), oakSRegister(t2));
-	oakAsm->FADD(oakSRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ), oakSRegister(t1));
-	oakAsm->FCVT(oakDRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ));
+	oakAsm->FMADD(oakSRegister(P), oakSRegister(t1), oakSRegister(t2), oakSRegister(P));
+	oakAsm->FCVT(oakDRegister(P), oakSRegister(P));
 	oakAsm->FCVT(oakDRegister(Fs), oakSRegister(Fs));
 	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(Fs).B16());
-	mVU_eexpHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, E2));
-	mVU_eexpHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, E3));
-	mVU_eexpHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, E4));
-	mVU_eexpHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, E5));
-	mVU_eexpHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, E6));
-	oakAsm->FCVT(oakSRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ));
-	oakAsm->FCVT(oakDRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ));
-	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(VU_HOST_XMMPQ).B16());
-	oakAsm->FMUL(oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ));
-	oakAsm->FMUL(oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ), oakDRegister(t2));
-	oakAsm->FMUL(oakDRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ), oakDRegister(t2));
-	oakAsm->FCVT(oakSRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ));
-	mVU_EFUvuDoubleSS_oaknut(VU_HOST_XMMPQ);
+	mVU_eexpHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, E2));
+	mVU_eexpHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, E3));
+	mVU_eexpHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, E4));
+	mVU_eexpHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, E5));
+	mVU_eexpHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, E6));
+	oakAsm->FCVT(oakSRegister(P), oakDRegister(P));
+	oakAsm->FCVT(oakDRegister(P), oakSRegister(P));
+	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(P).B16());
+	oakAsm->FMUL(oakDRegister(P), oakDRegister(P), oakDRegister(P));
+	oakAsm->FMUL(oakDRegister(P), oakDRegister(P), oakDRegister(t2));
+	oakAsm->FMUL(oakDRegister(P), oakDRegister(P), oakDRegister(t2));
+	oakAsm->FCVT(oakSRegister(P), oakDRegister(P));
+	mVU_EFUvuDoubleSS_oaknut(P);
 	mVU_loadGlobSS_oaknut(Fs, offsetof(mVU_Globals, one), true);
-	mVU_EFUdivScalarRaw_oaknut(Fs, VU_HOST_XMMPQ);
+	mVU_EFUdivScalarRaw_oaknut(Fs, P);
+	mVU_flipPQ_oaknut(mVU);
 	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_EEXP_emit(mP)
@@ -770,9 +853,15 @@ static void mVU_ELENG_direct_emit_oaknut(mP)
 	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoublePS_oaknut(Fs, t1, t2);
+	oakAsm->MOV(oakQRegister(t1).Selem()[0], oakQRegister(Fs).Selem()[1]);
+	oakAsm->FMUL(oakSRegister(t1), oakSRegister(t1), oakSRegister(t1));
+	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->FMADD(oakSRegister(t1), OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(t1));
+	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[2]);
+	oakAsm->FMADD(oakSRegister(t1), OAK_SSCRATCH, OAK_SSCRATCH, oakSRegister(t1));
+	oakAsm->FSQRT(oakSRegister(t1), oakSRegister(t1));
 	mVU_flipPQ_oaknut(mVU);
-	mVU_sumXYZ_oaknut(VU_HOST_XMMPQ, Fs);
-	oakAsm->FSQRT(oakSRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ));
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(t1).Selem()[0]);
 	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
@@ -931,15 +1020,18 @@ static void mVU_ERSQRT_direct_emit_oaknut(mP)
 {
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
+	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
+	mVU_EFUvuDoubleSS_oaknut(P);
+	mVU_EFUrsqrtNonnegativeOrZeroDouble_oaknut(mVU, P, Fs, t1);
 	mVU_flipPQ_oaknut(mVU);
-	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
-	mVU_EFUvuDoubleSS_oaknut(VU_HOST_XMMPQ);
-	mVU_EFUrsqrtNonnegativeOrZeroDouble_oaknut(mVU, VU_HOST_XMMPQ, Fs, t1);
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(P).Selem()[0]);
 	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_ERSQRT_emit(mP)
@@ -1011,24 +1103,27 @@ static void mVU_ESIN_direct_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
+	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	mVU_EFUvuDoubleSS_oaknut(Fs);
-	mVU_flipPQ_oaknut(mVU);
-	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
-	oakAsm->FCVT(oakDRegister(VU_HOST_XMMPQ), oakSRegister(VU_HOST_XMMPQ));
+	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
+	oakAsm->FCVT(oakDRegister(P), oakSRegister(P));
 	oakAsm->FCVT(oakDRegister(Fs), oakSRegister(Fs));
 	oakAsm->MOV(oakQRegister(t2).B16(), oakQRegister(Fs).B16());
-	mVU_esinHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, S2));
-	mVU_esinHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, S3));
-	mVU_esinHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, S4));
-	mVU_esinHelperD_oaknut(t1, t2, Fs, offsetof(mVU_Globals, S5));
-	oakAsm->FCVT(oakSRegister(VU_HOST_XMMPQ), oakDRegister(VU_HOST_XMMPQ));
-	mVU_EFUvuDoubleSS_oaknut(VU_HOST_XMMPQ);
+	mVU_esinHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, S2));
+	mVU_esinHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, S3));
+	mVU_esinHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, S4));
+	mVU_esinHelperD_oaknut(P, t1, t2, Fs, offsetof(mVU_Globals, S5));
+	oakAsm->FCVT(oakSRegister(P), oakDRegister(P));
+	mVU_EFUvuDoubleSS_oaknut(P);
+	mVU_flipPQ_oaknut(mVU);
+	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(P).Selem()[0]);
 	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(t2);
+	mVU.regAlloc->clearNeededXmmId(P);
 }
 
 static void mVU_ESIN_emit(mP)
@@ -1075,10 +1170,10 @@ static void mVU_ESQRT_direct_emit_oaknut(mP)
 {
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
 	recBeginOaknutEmit();
+	mVU_EFUvuDoubleSS_oaknut(Fs);
+	mVU_EFUsqrtNonnegativeDouble_oaknut(Fs);
 	mVU_flipPQ_oaknut(mVU);
 	oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(Fs).Selem()[0]);
-	mVU_EFUvuDoubleSS_oaknut(VU_HOST_XMMPQ);
-	mVU_EFUsqrtNonnegativeDouble_oaknut(VU_HOST_XMMPQ);
 	mVU_flipPQ_oaknut(mVU);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
@@ -1086,7 +1181,7 @@ static void mVU_ESQRT_direct_emit_oaknut(mP)
 
 static void mVU_ESUM_direct_emit_oaknut(mP)
 {
-	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
+	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, 0xf);
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();

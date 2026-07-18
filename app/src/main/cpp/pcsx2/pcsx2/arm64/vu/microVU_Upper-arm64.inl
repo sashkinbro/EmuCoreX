@@ -2725,7 +2725,10 @@ static void mVU_SUB_direct_emit_oaknut(mP)
 	if (mVUtryEmitNoLaneFmacFlags_oaknut(mVU))
 		return;
 
-	if (_Ft_ == _Fs_)
+	// x - x is only unconditionally zero when exponent-255 inputs are clamped.
+	// In Normal mode, infinities and NaNs must still go through FSUB so their
+	// result and MAC/STATUS flags match the interpreter.
+	if (_Ft_ == _Fs_ && CHECK_VU_OVERFLOW(mVU.index))
 	{
 		const int Fs = mVU.regAlloc->allocRegId(-1, _Fd_, _X_Y_Z_W);
 		recBeginOaknutEmit();
@@ -2993,7 +2996,7 @@ static void mVU_SUBw_emit(mP)
 // SUBA Opcode
 static void mVU_SUBA_direct_emit_oaknut(mP)
 {
-	if (_Ft_ == _Fs_)
+	if (_Ft_ == _Fs_ && CHECK_VU_OVERFLOW(mVU.index))
 	{
 		const int Fs = mVU.regAlloc->allocRegId(-1, 32, _X_Y_Z_W);
 		recBeginOaknutEmit();

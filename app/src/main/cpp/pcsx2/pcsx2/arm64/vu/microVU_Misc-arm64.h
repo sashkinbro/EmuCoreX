@@ -86,7 +86,9 @@ static const char branchSTR[16][8] = {
 #define isVU0       (mVU.index == 0)
 #define getIndex    (isVU1 ? 1 : 0)
 #define getVUmem(x) (((isVU1) ? (x & 0x3ff) : ((x >= 0x400) ? (x & 0x43f) : (x & 0xff))) * 16)
-#define offsetSS    ((_X) ? (0) : ((_Y) ? (4) : ((_Z) ? 8 : 12)))
+// ILW/ILWR write the selected lanes in X->Y->Z->W order to one VI register,
+// so a multi-lane mask leaves the value from the last enabled component.
+#define offsetSS    ((_W) ? 12 : ((_Z) ? 8 : ((_Y) ? 4 : 0)))
 #define offsetReg   ((_X) ? (0) : ((_Y) ? (1) : ((_Z) ? 2 :  3)))
 
 static constexpr int VU_HOST_XMMT1 = 0;

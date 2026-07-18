@@ -876,9 +876,14 @@ static __fi void _vuOPMSUB(VURegs* VU)
 	else
 		dst = &VU->VF[_Fd_];
 
-	dst->i.x = VU_MACx_UPDATE(VU, _vuOpMSUB(VU->ACC.i.x, VU->VF[_Fs_].i.y, VU->VF[_Ft_].i.z));
-	dst->i.y = VU_MACy_UPDATE(VU, _vuOpMSUB(VU->ACC.i.y, VU->VF[_Fs_].i.z, VU->VF[_Ft_].i.x));
-	dst->i.z = VU_MACz_UPDATE(VU, _vuOpMSUB(VU->ACC.i.z, VU->VF[_Fs_].i.x, VU->VF[_Ft_].i.y));
+	// All source lanes are read before any destination lane is written. Keep
+	// snapshots so Fd overlapping Fs or Ft cannot feed an earlier result back
+	// into a later cross-product component.
+	const VECTOR fs = VU->VF[_Fs_];
+	const VECTOR ft = VU->VF[_Ft_];
+	dst->i.x = VU_MACx_UPDATE(VU, _vuOpMSUB(VU->ACC.i.x, fs.i.y, ft.i.z));
+	dst->i.y = VU_MACy_UPDATE(VU, _vuOpMSUB(VU->ACC.i.y, fs.i.z, ft.i.x));
+	dst->i.z = VU_MACz_UPDATE(VU, _vuOpMSUB(VU->ACC.i.z, fs.i.x, ft.i.y));
 	VU_STAT_UPDATE(VU);
 }
 
@@ -951,9 +956,9 @@ static __fi void _vuDIV(VURegs* VU)
 	if (ft == 0.0)
 	{
 		if (fs == 0.0)
-			VU->statusflag |= 0x10;
+			VU->statusflag |= 0x410;
 		else
-			VU->statusflag |= 0x20;
+			VU->statusflag |= 0x820;
 
 		if ((VU->VF[_Ft_].UL[_Ftf_] & 0x80000000) ^
 			(VU->VF[_Fs_].UL[_Fsf_] & 0x80000000))
@@ -975,7 +980,7 @@ static __fi void _vuSQRT(VURegs* VU)
 	VU->statusflag &= ~0x30;
 
 	if (ft < 0.0)
-		VU->statusflag |= 0x10;
+		VU->statusflag |= 0x410;
 	VU->q.F = sqrt(fabs(ft));
 	VU->q.F = vuDouble(VU->q.UL);
 }
@@ -990,7 +995,7 @@ static __fi void _vuRSQRT(VURegs* VU)
 
 	if (ft == 0.0)
 	{
-		VU->statusflag |= 0x20;
+		VU->statusflag |= 0x820;
 
 		if (fs != 0)
 		{
@@ -1008,14 +1013,14 @@ static __fi void _vuRSQRT(VURegs* VU)
 			else
 				VU->q.UL = 0;
 
-			VU->statusflag |= 0x10;
+			VU->statusflag |= 0x410;
 		}
 	}
 	else
 	{
 		if (ft < 0.0)
 		{
-			VU->statusflag |= 0x10;
+			VU->statusflag |= 0x410;
 		}
 
 		temp = sqrt(fabs(ft));
