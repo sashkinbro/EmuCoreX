@@ -2943,27 +2943,25 @@ static void rgteLoadControlHalfword_emit_oaknut(oak::WReg dst, int control_reg, 
 		oakAsm->ASR(dst, dst, shift);
 }
 
-static void rgteCCComponent_emit_oaknut(int back_color_reg, int c1_reg, u8 c1_shift, int c2_reg, u8 c2_shift, int c3_reg, u8 c3_shift, u8 rgb_shift, int mac_reg, u32 mac_high_flag, u32 mac_low_flag)
+static void rgteCCComponent_emit_oaknut(int back_color_reg, int c1_reg, u8 c1_shift, int c2_reg, u8 c2_shift, int c3_reg, u8 c3_shift, u8 rgb_shift, int mac_reg)
 {
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c1_reg, c1_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[9]))});
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, oak::util::W5);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c2_reg, c2_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[10]))});
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c3_reg, c3_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[11]))});
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
-	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[back_color_reg]))});
-	oakAsm->SXTW(oak::util::X4, oak::util::W4);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X4);
-	rgteMacOverflowFlags_emit_oaknut(OAK_XSCRATCH, mac_high_flag, mac_low_flag);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
 
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[6]))});
 	if (rgb_shift != 0)
@@ -2980,9 +2978,9 @@ static void rgteCC_emit_oaknut()
 	recBeginOaknutEmit();
 
 	oakAsm->MOV(OAK_WSCRATCH2, 0);
-	rgteCCComponent_emit_oaknut(13, 16, 0, 16, 16, 17, 0, 0, 25, 1u << 26, 1u << 29);
-	rgteCCComponent_emit_oaknut(14, 17, 16, 18, 0, 18, 16, 8, 26, 1u << 25, 1u << 28);
-	rgteCCComponent_emit_oaknut(15, 19, 0, 19, 16, 20, 0, 16, 27, 1u << 24, 1u << 27);
+	rgteCCComponent_emit_oaknut(13, 16, 0, 16, 16, 17, 0, 0, 25);
+	rgteCCComponent_emit_oaknut(14, 17, 16, 18, 0, 18, 16, 8, 26);
+	rgteCCComponent_emit_oaknut(15, 19, 0, 19, 16, 20, 0, 16, 27);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[25]))});
 	rgteSQRClampMacToIr1_emit_oaknut(OAK_WSCRATCH, 9, 1u << 24);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[26]))});
@@ -3040,38 +3038,39 @@ static void rgteNCSLightDot_emit_oaknut(oak::WReg dst, int c1_reg, u8 c1_shift, 
 {
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c1_reg, c1_shift);
 	rgteLoadDataHalfword_emit_oaknut(oak::util::W5, vx_reg, vx_shift);
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, oak::util::W5);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c2_reg, c2_shift);
 	rgteLoadDataHalfword_emit_oaknut(oak::util::W5, vy_reg, vy_shift);
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c3_reg, c3_shift);
 	rgteLoadDataHalfword_emit_oaknut(oak::util::W5, vz_reg, vz_shift);
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
-	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
+	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
+	oakAsm->SXTW(OAK_XSCRATCH, OAK_WSCRATCH);
 	rgteClampF12Unsigned_emit_oaknut(dst, flag_bit);
 }
 
 static void rgteNCSColorDot_emit_oaknut(oak::WReg ll1, oak::WReg ll2, oak::WReg ll3, int back_color_reg, int c1_reg, u8 c1_shift, int c2_reg, u8 c2_shift, int c3_reg, u8 c3_shift, int mac_reg, u32 flag_bit)
 {
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c1_reg, c1_shift);
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, ll1);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, ll1);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c2_reg, c2_shift);
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, ll2);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, ll2);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c3_reg, c3_shift);
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, ll3);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
-	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, ll3);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
+	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[back_color_reg]))});
-	oakAsm->SXTW(oak::util::X4, oak::util::W4);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X4);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
+	oakAsm->SXTW(OAK_XSCRATCH, OAK_WSCRATCH);
 	rgteClampF12Unsigned_emit_oaknut(OAK_WSCRATCH, flag_bit);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 }
@@ -3225,10 +3224,13 @@ static void rgteNCDSDepthCueComponent_emit_oaknut(u8 rgb_shift, int far_color_re
 
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
+	// The interpreter stores this intermediate in an s32 before depth cueing.
+	oakAsm->SXTW(oak::util::X5, oak::util::W5);
 
 	oakLoad32(oak::util::W6, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[far_color_reg]))});
+	// IopGte performs the shift as a 32-bit operation before widening it.
+	oakAsm->LSL(oak::util::W6, oak::util::W6, 8);
 	oakAsm->SXTW(oak::util::X6, oak::util::W6);
-	oakAsm->LSL(oak::util::X6, oak::util::X6, 8);
 	oakAsm->SUB(OAK_XSCRATCH, oak::util::X6, oak::util::X5);
 	rgteClampF12Signed_emit_oaknut(flag_bit);
 
@@ -3328,26 +3330,25 @@ static void rgteClampSigned16ToX_emit_oaknut(u32 flag_bit)
 	oakAsm->l(done);
 }
 
-static void rgteCDPComponent_emit_oaknut(u8 rgb_shift, int back_color_reg, int c1_reg, u8 c1_shift, int c2_reg, u8 c2_shift, int c3_reg, u8 c3_shift, int far_color_reg, int mac_reg, u32 mac_high_flag, u32 mac_low_flag, u32 clamp_flag)
+static void rgteCDPComponent_emit_oaknut(u8 rgb_shift, int back_color_reg, int c1_reg, u8 c1_shift, int c2_reg, u8 c2_shift, int c3_reg, u8 c3_shift, int far_color_reg, int mac_reg, u32 clamp_flag)
 {
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c1_reg, c1_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[9]))});
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, oak::util::W5);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c2_reg, c2_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[10]))});
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
 	rgteLoadControlHalfword_emit_oaknut(oak::util::W4, c3_reg, c3_shift);
 	oakLoad32(oak::util::W5, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[11]))});
-	oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W5);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+	oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W5);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[back_color_reg]))});
-	oakAsm->SXTW(oak::util::X4, oak::util::W4);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X4);
-	rgteMacOverflowFlags_emit_oaknut(OAK_XSCRATCH, mac_high_flag, mac_low_flag);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
+	oakAsm->SXTW(OAK_XSCRATCH, OAK_WSCRATCH);
 
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[6]))});
 	if (rgb_shift != 0)
@@ -3365,6 +3366,22 @@ static void rgteCDPComponent_emit_oaknut(u8 rgb_shift, int back_color_reg, int c
 	oakAsm->SXTW(oak::util::X6, oak::util::W6);
 	oakAsm->MUL(oak::util::X6, oak::util::X6, OAK_XSCRATCH);
 	oakAsm->ADD(OAK_XSCRATCH, oak::util::X5, oak::util::X6);
+	oak::Label not_low;
+	oak::Label in_range;
+	oak::Label store;
+	oakAsm->MOV(oak::util::X4, UINT64_C(0xffffffff80000000));
+	oakAsm->CMP(OAK_XSCRATCH, oak::util::X4);
+	oakAsm->B(oak::Cond::GE, not_low);
+	oakAsm->MOV(OAK_XSCRATCH, oak::util::X4);
+	oakAsm->B(store);
+	oakAsm->l(not_low);
+	oakAsm->MOV(oak::util::X4, 0x7fffffff);
+	oakAsm->CMP(OAK_XSCRATCH, oak::util::X4);
+	oakAsm->B(oak::Cond::LE, in_range);
+	oakAsm->MOV(OAK_XSCRATCH, oak::util::X4);
+	oakAsm->B(store);
+	oakAsm->l(in_range);
+	oakAsm->l(store);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 }
 
@@ -3373,9 +3390,9 @@ static void rgteCDP_emit_oaknut()
 	recBeginOaknutEmit();
 
 	oakAsm->MOV(OAK_WSCRATCH2, 0);
-	rgteCDPComponent_emit_oaknut(0, 13, 16, 0, 16, 16, 17, 0, 21, 25, 1u << 26, 1u << 29, 1u << 24);
-	rgteCDPComponent_emit_oaknut(8, 14, 17, 16, 18, 0, 18, 16, 22, 26, 1u << 25, 1u << 28, 1u << 23);
-	rgteCDPComponent_emit_oaknut(16, 15, 19, 0, 19, 16, 20, 0, 23, 27, 1u << 24, 1u << 27, 1u << 22);
+	rgteCDPComponent_emit_oaknut(0, 13, 16, 0, 16, 16, 17, 0, 21, 25, 1u << 24);
+	rgteCDPComponent_emit_oaknut(8, 14, 17, 16, 18, 0, 18, 16, 22, 26, 1u << 23);
+	rgteCDPComponent_emit_oaknut(16, 15, 19, 0, 19, 16, 20, 0, 23, 27, 1u << 22);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[25]))});
 	rgteSQRClampMacToIr1_emit_oaknut(OAK_WSCRATCH, 9, 1u << 24);
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[26]))});
@@ -3438,13 +3455,14 @@ static void rgteMVMVADot_emit_oaknut(u32 matrix_mode, int row, int add_reg, int 
 	else
 	{
 		rgteMVMVALoadMatrixComponent_emit_oaknut(oak::util::W4, matrix_mode, row, 0);
-		oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, oak::util::W10);
+		oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, oak::util::W10);
 		rgteMVMVALoadMatrixComponent_emit_oaknut(oak::util::W4, matrix_mode, row, 1);
-		oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W11);
-		oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+		oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W11);
+		oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
 		rgteMVMVALoadMatrixComponent_emit_oaknut(oak::util::W4, matrix_mode, row, 2);
-		oakAsm->SMULL(oak::util::X5, oak::util::W4, oak::util::W12);
-		oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X5);
+		oakAsm->MUL(oak::util::W5, oak::util::W4, oak::util::W12);
+		oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W5);
+		oakAsm->SXTW(OAK_XSCRATCH, OAK_WSCRATCH);
 		if (shift)
 			oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
 	}
@@ -3628,10 +3646,10 @@ static void rgteStoreDepthCue_emit_oaknut()
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, 1u << 12);
 	oakAsm->B(store);
 	oakAsm->l(not_negative);
-	oakAsm->MOV(oak::util::X5, 4095);
+	oakAsm->MOV(oak::util::X5, 65535);
 	oakAsm->CMP(oak::util::X4, oak::util::X5);
 	oakAsm->B(oak::Cond::LE, in_range);
-	oakAsm->MOV(oak::util::W4, 4095);
+	oakAsm->MOV(oak::util::W4, 65535);
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, 1u << 12);
 	oakAsm->B(store);
 	oakAsm->l(in_range);
@@ -3825,8 +3843,10 @@ static void rgteDCPLComponent_emit_oaknut(u8 rgb_shift, int ir_reg, int far_colo
 
 	oakLoad32(oak::util::W6, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[8]))});
 	oakAsm->MUL(OAK_WSCRATCH, oak::util::W6, OAK_WSCRATCH);
-	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W7);
-	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 8);
+	oakAsm->SXTW(OAK_XSCRATCH, OAK_WSCRATCH);
+	oakAsm->SXTW(oak::util::X7, oak::util::W7);
+	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X7);
+	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 8);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 }
 
@@ -3934,7 +3954,9 @@ static void rgteClampOtzFromMac0_emit_oaknut()
 
 	oakAsm->l(check_high);
 	oakAsm->l(done);
-	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[7]))});
+	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[7]))});
+	oakAsm->BFI(oak::util::W4, OAK_WSCRATCH, 0, 16);
+	oakStore32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[7]))});
 	oakStore32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[31]))});
 }
 
@@ -3953,8 +3975,8 @@ static void rgteAVSZ3_emit_oaknut()
 
 	oakLoad32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[29]))});
 	oakAsm->SXTH(OAK_WSCRATCH2, OAK_WSCRATCH2);
-	oakAsm->SMULL(OAK_XSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
-	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+	oakAsm->MUL(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
+	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[24]))});
 	rgteClampOtzFromMac0_emit_oaknut();
 
@@ -3984,8 +4006,8 @@ static void rgteAVSZ4_emit_oaknut()
 
 	oakLoad32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[30]))});
 	oakAsm->SXTH(OAK_WSCRATCH2, OAK_WSCRATCH2);
-	oakAsm->SMULL(OAK_XSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
-	oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+	oakAsm->MUL(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
+	oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[24]))});
 	rgteClampOtzFromMac0_emit_oaknut();
 
@@ -4080,29 +4102,26 @@ static void rgteStoreFlagWithSummary_emit_oaknut()
 	oakStore32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[31]))});
 }
 
-static void rgteGPFComponent_emit_oaknut(int ir_reg, int mac_reg, u32 mac_high_flag, u32 mac_low_flag, u32 ir_flag_bit, bool shift)
+static void rgteGPFComponent_emit_oaknut(int ir_reg, int mac_reg, u32 ir_flag_bit, bool shift)
 {
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[8]))});
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[ir_reg]))});
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, OAK_WSCRATCH);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, OAK_WSCRATCH);
 	if (shift)
-		oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
-	rgteMacOverflowFlags_emit_oaknut(OAK_XSCRATCH, mac_high_flag, mac_low_flag);
+		oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 	rgteClampMacToIrSigned_emit_oaknut(OAK_WSCRATCH, ir_reg, ir_flag_bit);
 }
 
-static void rgteGPLComponent_emit_oaknut(int ir_reg, int mac_reg, u32 mac_high_flag, u32 mac_low_flag, u32 ir_flag_bit, bool shift)
+static void rgteGPLComponent_emit_oaknut(int ir_reg, int mac_reg, u32 ir_flag_bit, bool shift)
 {
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[8]))});
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[ir_reg]))});
-	oakAsm->SMULL(OAK_XSCRATCH, oak::util::W4, OAK_WSCRATCH);
+	oakAsm->MUL(OAK_WSCRATCH, oak::util::W4, OAK_WSCRATCH);
 	if (shift)
-		oakAsm->ASR(OAK_XSCRATCH, OAK_XSCRATCH, 12);
+		oakAsm->ASR(OAK_WSCRATCH, OAK_WSCRATCH, 12);
 	oakLoad32(oak::util::W4, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
-	oakAsm->SXTW(oak::util::X4, oak::util::W4);
-	oakAsm->ADD(OAK_XSCRATCH, OAK_XSCRATCH, oak::util::X4);
-	rgteMacOverflowFlags_emit_oaknut(OAK_XSCRATCH, mac_high_flag, mac_low_flag);
+	oakAsm->ADD(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
 	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[mac_reg]))});
 	rgteClampMacToIrSigned_emit_oaknut(OAK_WSCRATCH, ir_reg, ir_flag_bit);
 }
@@ -4132,9 +4151,9 @@ static void rgteGPF_emit_oaknut()
 	const bool shift = (psxRegs.code & 0x80000) != 0;
 
 	oakAsm->MOV(OAK_WSCRATCH2, 0);
-	rgteGPFComponent_emit_oaknut(9, 25, 1u << 26, 1u << 29, 1u << 24, shift);
-	rgteGPFComponent_emit_oaknut(10, 26, 1u << 25, 1u << 28, 1u << 23, shift);
-	rgteGPFComponent_emit_oaknut(11, 27, 1u << 24, 1u << 27, 1u << 22, shift);
+	rgteGPFComponent_emit_oaknut(9, 25, 1u << 24, shift);
+	rgteGPFComponent_emit_oaknut(10, 26, 1u << 23, shift);
+	rgteGPFComponent_emit_oaknut(11, 27, 1u << 22, shift);
 	rgteStoreGpRgbFifo_emit_oaknut();
 	rgteStoreFlagWithSummary_emit_oaknut();
 
@@ -4153,9 +4172,9 @@ static void rgteGPL_emit_oaknut()
 	const bool shift = (psxRegs.code & 0x80000) != 0;
 
 	oakAsm->MOV(OAK_WSCRATCH2, 0);
-	rgteGPLComponent_emit_oaknut(9, 25, 1u << 26, 1u << 29, 1u << 24, shift);
-	rgteGPLComponent_emit_oaknut(10, 26, 1u << 25, 1u << 28, 1u << 23, shift);
-	rgteGPLComponent_emit_oaknut(11, 27, 1u << 24, 1u << 27, 1u << 22, shift);
+	rgteGPLComponent_emit_oaknut(9, 25, 1u << 24, shift);
+	rgteGPLComponent_emit_oaknut(10, 26, 1u << 23, shift);
+	rgteGPLComponent_emit_oaknut(11, 27, 1u << 22, shift);
 	rgteStoreGpRgbFifo_emit_oaknut();
 	rgteStoreFlagWithSummary_emit_oaknut();
 
@@ -4395,7 +4414,12 @@ extern void (*rpsxCP2BSC[32])();
 static void rpsxSPECIAL() { rpsxSPC[_Funct_](); }
 static void rpsxREGIMM() { rpsxREG[_Rt_](); }
 static void rpsxCOP0() { rpsxCP0[_Rs_](); }
-static void rpsxCOP2() { rpsxCP2[_Funct_](); }
+static void rpsxCOP2()
+{
+	if (_Rs_ == 16)
+		_psxFlushCall(0);
+	rpsxCP2[_Funct_]();
+}
 static void rpsxBASIC() { rpsxCP2BSC[_Rs_](); }
 
 static void rpsxNULL()
