@@ -52,6 +52,10 @@ static void recWritebackHILOExact(int info)
 
 	if constexpr (Upper)
 	{
+		// Upper-lane operations preserve the lower HI/LO halves. Flush and
+		// invalidate any full-width cached values before updating memory.
+		_deleteEEreg(XMMGPR_LO, 1);
+		_deleteEEreg(XMMGPR_HI, 1);
 		recBeginOaknutEmit();
 		oakAsm->SXTW(OAK_XSCRATCH, oak::util::W0);
 		oakStore64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.LO.UD[1]))});
@@ -60,6 +64,8 @@ static void recWritebackHILOExact(int info)
 		recEndOaknutEmit();
 	}
 
+	if constexpr (!Upper)
+	{
 	if (EEINST_LIVETEST(XMMGPR_LO))
 	{
 		const bool loused = EEINST_USEDTEST(XMMGPR_LO);
@@ -122,6 +128,7 @@ static void recWritebackHILOExact(int info)
 			}
 		}
 	}
+	}
 
 	// writeback lo to Rd if present
 	if constexpr (WriteD)
@@ -163,6 +170,8 @@ static void recWritebackConstHILOExact(u64 res)
 
 	if constexpr (Upper)
 	{
+		_deleteEEreg(XMMGPR_LO, 1);
+		_deleteEEreg(XMMGPR_HI, 1);
 		recBeginOaknutEmit();
 		oakAsm->MOV(OAK_XSCRATCH, static_cast<u64>(loval));
 		oakStore64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.LO.UD[1]))});
@@ -171,6 +180,8 @@ static void recWritebackConstHILOExact(u64 res)
 		recEndOaknutEmit();
 	}
 
+	if constexpr (!Upper)
+	{
 	if (EEINST_LIVETEST(XMMGPR_LO))
 	{
 		const bool lolive = EEINST_USEDTEST(XMMGPR_LO);
@@ -227,6 +238,7 @@ static void recWritebackConstHILOExact(u64 res)
 				recEndOaknutEmit();
             }
 		}
+	}
 	}
 
 	// writeback lo to Rd if present

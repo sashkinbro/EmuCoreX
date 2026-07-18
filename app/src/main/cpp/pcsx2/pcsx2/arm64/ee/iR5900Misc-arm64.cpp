@@ -123,9 +123,12 @@ static void recTrapScheduleImmediateTest_emit_oaknut()
 static void recTrapException_emit_oaknut()
 {
 	recBeginOaknutEmit();
-	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
-	oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, 4);
-	oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+	if (!g_recompilingDelaySlot)
+	{
+		oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+		oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, 4);
+		oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+	}
 	oakAsm->MOV(OAK_WARG1, 0x34);
 	oakLoad32(OAK_WARG2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.branch))});
 	oakEmitCall(reinterpret_cast<void*>(cpuException));
@@ -134,15 +137,30 @@ static void recTrapException_emit_oaknut()
 
 static void recTrapTakenPath_emit_oaknut(oak::Label& no_trap)
 {
+	_x86regs saved_x86regs[iREGCNT_GPR];
+	_xmmregs saved_xmmregs[iREGCNT_XMM];
+	memcpy(saved_x86regs, x86regs, sizeof(saved_x86regs));
+	memcpy(saved_xmmregs, xmmregs, sizeof(saved_xmmregs));
+	const u32 saved_has_const = g_cpuHasConstReg;
+	const u32 saved_flushed_const = g_cpuFlushedConstReg;
+	const bool saved_flushed_pc = g_cpuFlushedPC;
+	const bool saved_flushed_code = g_cpuFlushedCode;
+
 	iFlushCall(FLUSH_INTERPRETER);
 	recTrapScheduleImmediateTest_emit_oaknut();
 	recTrapException_emit_oaknut();
+	recEmitExceptionExit();
+
+	memcpy(x86regs, saved_x86regs, sizeof(saved_x86regs));
+	memcpy(xmmregs, saved_xmmregs, sizeof(saved_xmmregs));
+	g_cpuHasConstReg = saved_has_const;
+	g_cpuFlushedConstReg = saved_flushed_const;
+	g_cpuFlushedPC = saved_flushed_pc;
+	g_cpuFlushedCode = saved_flushed_code;
 
 	recBeginOaknutEmit();
 	oakAsm->l(no_trap);
 	recEndOaknutEmit();
-
-	g_branch = 2;
 }
 
 static void recTrapReg_emit_oaknut(oak::Cond skip_cond)
@@ -199,7 +217,7 @@ static void recMFSA_emit_oaknut()
 	const int mmreg = _allocGPRtoXMMreg(_Rd_, MODE_READ | MODE_WRITE);
 	recBeginOaknutEmit();
 	oakLoad32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.sa))});
-	oakAsm->MOV(oakQRegister(mmreg).Selem()[0], OAK_WSCRATCH);
+	oakAsm->INS(oakQRegister(mmreg).Delem()[0], OAK_XSCRATCH);
 	recEndOaknutEmit();
 }
 

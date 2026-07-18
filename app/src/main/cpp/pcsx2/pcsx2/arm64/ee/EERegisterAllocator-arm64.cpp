@@ -158,7 +158,7 @@ static void eeCoreMoveHostXmm64ToHost_emit_oaknut(int hostreg, int xmmreg)
 static void eeCoreLoadGpr64ToHost_emit_oaknut(int hostreg, int guestreg)
 {
 	recBeginOaknutEmit();
-	oakLoad64(oakXRegister(hostreg), {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[guestreg].UD[0]))});
+	oakLoad64(oakXRegister(hostreg), {oak::util::X27, eeGpr128Offset(guestreg)});
 	recEndOaknutEmit();
 }
 
@@ -186,7 +186,7 @@ static void eeCoreLoadVu0Vi16ToHost_emit_oaknut(int hostreg, int guestreg)
 static void eeCoreStoreGpr64FromHost_emit_oaknut(int guestreg, int hostreg)
 {
 	recBeginOaknutEmit();
-	oakStore64(oakXRegister(hostreg), {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[guestreg].UD[0]))});
+	oakStore64(oakXRegister(hostreg), {oak::util::X27, eeGpr128Offset(guestreg)});
 	recEndOaknutEmit();
 }
 
@@ -194,7 +194,7 @@ static void eeCoreStoreGpr64Imm_emit_oaknut(int guestreg, u64 imm)
 {
 	recBeginOaknutEmit();
 	oakAsm->MOV(OAK_XSCRATCH, imm);
-	oakStore64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[guestreg].UD[0]))});
+	oakStore64(OAK_XSCRATCH, {oak::util::X27, eeGpr128Offset(guestreg)});
 	recEndOaknutEmit();
 }
 

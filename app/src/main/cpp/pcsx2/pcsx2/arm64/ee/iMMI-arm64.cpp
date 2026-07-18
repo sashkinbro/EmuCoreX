@@ -1740,11 +1740,11 @@ static void mmi2SignedWordDiv_emit_oaknut()
 	oak::Label div_nonzero;
 	oak::Label done;
 
-	oakAsm->MOV(oak::util::W3, 0x80000000);
-	oakAsm->CMP(oak::util::W0, oak::util::W3);
+	oakAsm->MOV(oak::util::W4, 0x80000000);
+	oakAsm->CMP(oak::util::W0, oak::util::W4);
 	oakAsm->B(oak::Cond::NE, not_overflow);
-	oakAsm->MOV(oak::util::W3, 0xffffffff);
-	oakAsm->CMP(oak::util::W1, oak::util::W3);
+	oakAsm->MOV(oak::util::W4, 0xffffffff);
+	oakAsm->CMP(oak::util::W1, oak::util::W4);
 	oakAsm->B(oak::Cond::NE, not_overflow);
 	oakAsm->MOV(oak::util::W2, 0);
 	oakAsm->B(done);
@@ -1758,9 +1758,9 @@ static void mmi2SignedWordDiv_emit_oaknut()
 	oakAsm->B(done);
 
 	oakAsm->l(div_nonzero);
-	oakAsm->MOV(oak::util::W3, oak::util::W0);
-	oakAsm->SDIV(oak::util::W0, oak::util::W3, oak::util::W1);
-	oakAsm->MSUB(oak::util::W2, oak::util::W0, oak::util::W1, oak::util::W3);
+	oakAsm->MOV(oak::util::W4, oak::util::W0);
+	oakAsm->SDIV(oak::util::W0, oak::util::W4, oak::util::W1);
+	oakAsm->MSUB(oak::util::W2, oak::util::W0, oak::util::W1, oak::util::W4);
 
 	oakAsm->l(done);
 }
@@ -1770,7 +1770,7 @@ static void mmi2MulAccWordLane_emit_oaknut(int dstreg, int loreg, int hireg, int
 	mmi2LoadWordSource_emit_oaknut(oak::util::W0, sreg, ss, rs_zero);
 	mmi2LoadWordSource_emit_oaknut(oak::util::W1, treg, ss, rt_zero);
 
-	oakAsm->MOV(oak::util::W3, 0);
+	oakAsm->MOV(oak::util::W4, 0);
 	if (add && ss == 0)
 	{
 		oakAsm->MOV(OAK_WSCRATCH, 0x7fffffff);
@@ -1783,7 +1783,7 @@ static void mmi2MulAccWordLane_emit_oaknut(int dstreg, int loreg, int hireg, int
 		oakAsm->ORR(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
 		oakAsm->CMP(oak::util::W0, oak::util::W1);
 		oakAsm->CSET(OAK_WSCRATCH2, oak::Cond::NE);
-		oakAsm->AND(oak::util::W3, OAK_WSCRATCH, OAK_WSCRATCH2);
+		oakAsm->AND(oak::util::W4, OAK_WSCRATCH, OAK_WSCRATCH2);
 	}
 
 	oakAsm->SMULL(oak::util::X0, oak::util::W0, oak::util::W1);
@@ -1804,7 +1804,7 @@ static void mmi2MulAccWordLane_emit_oaknut(int dstreg, int loreg, int hireg, int
 	{
 		oakAsm->ADD(oak::util::X0, oak::util::X0, oak::util::X1);
 		oakAsm->MOV(oak::util::X2, 0x70000000);
-		oakAsm->CMP(oak::util::W3, 0);
+		oakAsm->CMP(oak::util::W4, 0);
 		oakAsm->CSEL(oak::util::X2, oak::util::X2, oak::util::XZR, oak::Cond::NE);
 		oakAsm->ADD(oak::util::X0, oak::util::X0, oak::util::X2);
 	}
@@ -1832,7 +1832,10 @@ void recPMADDW()
 {
 	EE::Profiler.EmitOp(eeOpcode::PMADDW);
 
-	int info = eeRecompileCodeXMM((((_Rs_) && (_Rt_)) ? XMMINFO_READS : 0) | (((_Rs_) && (_Rt_)) ? XMMINFO_READT : 0) | (_Rd_ ? XMMINFO_WRITED : 0) | XMMINFO_WRITELO | XMMINFO_WRITEHI | XMMINFO_READLO | XMMINFO_READHI);
+	// Even when one multiplier is zero, PMADDW's lower lane still inspects both
+	// source values for the EE multiplication-error adjustment.
+	int info = eeRecompileCodeXMM((_Rs_ ? XMMINFO_READS : 0) | (_Rt_ ? XMMINFO_READT : 0) |
+		(_Rd_ ? XMMINFO_WRITED : 0) | XMMINFO_WRITELO | XMMINFO_WRITEHI | XMMINFO_READLO | XMMINFO_READHI);
 	recPMADDW_emit_oaknut(EEREC_D, EEREC_LO, EEREC_HI, EEREC_S, EEREC_T, _Rd_ != 0, _Rs_ == 0, _Rt_ == 0);
 	_clearNeededXMMregs();
 }
@@ -1943,7 +1946,6 @@ void recPDIVW()
 {
 	EE::Profiler.EmitOp(eeOpcode::PDIVW);
 
-	_deleteEEreg(_Rd_, 0);
 	const int info = eeRecompileCodeXMM((_Rs_ ? XMMINFO_READS : 0) | (_Rt_ ? XMMINFO_READT : 0) | XMMINFO_WRITELO | XMMINFO_WRITEHI);
 	recPDIVW_emit_oaknut(EEREC_LO, EEREC_HI, EEREC_S, EEREC_T, _Rs_ == 0, _Rt_ == 0);
 	_clearNeededXMMregs();
@@ -1971,7 +1973,6 @@ void recPDIVBW()
 {
 	EE::Profiler.EmitOp(eeOpcode::PDIVBW);
 
-	_deleteEEreg(_Rd_, 0);
 	const int info = eeRecompileCodeXMM((_Rs_ ? XMMINFO_READS : 0) | (_Rt_ ? XMMINFO_READT : 0) | XMMINFO_WRITELO | XMMINFO_WRITEHI);
 	recPDIVBW_emit_oaknut(EEREC_LO, EEREC_HI, EEREC_S, EEREC_T, _Rs_ == 0, _Rt_ == 0);
 	_clearNeededXMMregs();
@@ -2412,8 +2413,8 @@ static void mmi3WriteSignedDoubleword_emit_oaknut(int hostreg, int lane, oak::WR
 static void mmi3LoadUnsignedAcc64_emit_oaknut(oak::XReg dst, int loreg, int hireg, int word)
 {
 	mmi3LoadWordSource_emit_oaknut(oak::util::W2, loreg, word, false);
-	mmi3LoadWordSource_emit_oaknut(oak::util::W3, hireg, word, false);
-	oakAsm->ORR(dst, oak::util::X2, oak::util::X3, oak::LogShift::LSL, 32);
+	mmi3LoadWordSource_emit_oaknut(oak::util::W4, hireg, word, false);
+	oakAsm->ORR(dst, oak::util::X2, oak::util::X4, oak::LogShift::LSL, 32);
 }
 
 static void mmi3WriteUnsignedProductResult_emit_oaknut(int dstreg, int loreg, int hireg, int dd, oak::XReg product, bool has_rd)
@@ -2437,9 +2438,9 @@ static void mmi3UnsignedWordDiv_emit_oaknut()
 	oakAsm->B(done);
 
 	oakAsm->l(div_nonzero);
-	oakAsm->MOV(oak::util::W3, oak::util::W0);
-	oakAsm->UDIV(oak::util::W0, oak::util::W3, oak::util::W1);
-	oakAsm->MSUB(oak::util::W2, oak::util::W0, oak::util::W1, oak::util::W3);
+	oakAsm->MOV(oak::util::W4, oak::util::W0);
+	oakAsm->UDIV(oak::util::W0, oak::util::W4, oak::util::W1);
+	oakAsm->MSUB(oak::util::W2, oak::util::W0, oak::util::W1, oak::util::W4);
 
 	oakAsm->l(done);
 }
@@ -2597,7 +2598,6 @@ void recPDIVUW()
 {
 	EE::Profiler.EmitOp(eeOpcode::PDIVUW);
 
-	_deleteEEreg(_Rd_, 0);
 	const int info = eeRecompileCodeXMM((_Rs_ ? XMMINFO_READS : 0) | (_Rt_ ? XMMINFO_READT : 0) | XMMINFO_WRITELO | XMMINFO_WRITEHI);
 	recPDIVUW_emit_oaknut(EEREC_LO, EEREC_HI, EEREC_S, EEREC_T, _Rs_ == 0, _Rt_ == 0);
 	_clearNeededXMMregs();

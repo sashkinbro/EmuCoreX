@@ -17,8 +17,6 @@ namespace R5900::Dynarec::OpcodeImpl
 * Format:  OP rd, rs, rt                                 *
 *********************************************************/
 
-// TODO: overflow checks
-
 #ifndef ARITHMETIC_RECOMPILE
 
 namespace Interp = R5900::Interpreter::OpcodeImpl;
@@ -39,6 +37,162 @@ REC_FUNC_DEL(SLT, _Rd_);
 REC_FUNC_DEL(SLTU, _Rd_);
 
 #else
+
+static void recArithmeticMoveGPRtoOakW(oak::WReg to, int fromgpr)
+{
+	if (fromgpr == 0)
+	{
+		oakAsm->MOV(to, 0);
+		return;
+	}
+	if (GPR_IS_CONST1(fromgpr))
+	{
+		oakAsm->MOV(to, g_cpuConstRegs[fromgpr].UL[0]);
+		return;
+	}
+	if (const int reg = _checkX86reg(X86TYPE_GPR, fromgpr, MODE_READ); reg >= 0)
+	{
+		oakAsm->MOV(to, oakWRegister(reg));
+		return;
+	}
+	if (const int reg = _checkXMMreg(XMMTYPE_GPRREG, fromgpr, MODE_READ); reg >= 0)
+	{
+		oakAsm->FMOV(to, oakSRegister(reg));
+		return;
+	}
+	oakLoad32(to,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[fromgpr].UL[0]))});
+}
+
+static void recArithmeticMoveGPRtoOakX(oak::XReg to, int fromgpr)
+{
+	if (fromgpr == 0)
+	{
+		oakAsm->MOV(to, 0);
+		return;
+	}
+	if (GPR_IS_CONST1(fromgpr))
+	{
+		oakAsm->MOV(to, g_cpuConstRegs[fromgpr].UD[0]);
+		return;
+	}
+	if (const int reg = _checkX86reg(X86TYPE_GPR, fromgpr, MODE_READ); reg >= 0)
+	{
+		oakAsm->MOV(to, oakXRegister(reg));
+		return;
+	}
+	if (const int reg = _checkXMMreg(XMMTYPE_GPRREG, fromgpr, MODE_READ); reg >= 0)
+	{
+		oakAsm->FMOV(to, oakDRegister(reg));
+		return;
+	}
+	oakLoad64(to,
+		{oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[fromgpr].UD[0]))});
+}
+
+static bool recAddOverflows32(u32 lhs, u32 rhs, u32 result)
+{
+	return ((~(lhs ^ rhs) & (lhs ^ result)) >> 31) != 0;
+}
+
+static bool recAddOverflows64(u64 lhs, u64 rhs, u64 result)
+{
+	return ((~(lhs ^ rhs) & (lhs ^ result)) >> 63) != 0;
+}
+
+static bool recSubOverflows32(u32 lhs, u32 rhs, u32 result)
+{
+	return (((lhs ^ rhs) & (lhs ^ result)) >> 31) != 0;
+}
+
+static bool recSubOverflows64(u64 lhs, u64 rhs, u64 result)
+{
+	return (((lhs ^ rhs) & (lhs ^ result)) >> 63) != 0;
+}
+
+template <bool Is64Bit, bool IsSubtract>
+static void recSignedArithmetic_emit_oaknut()
+{
+	oak::Label no_overflow;
+	recBeginOaknutEmit();
+	if constexpr (Is64Bit)
+	{
+		recArithmeticMoveGPRtoOakX(OAK_XSCRATCH, _Rs_);
+		recArithmeticMoveGPRtoOakX(OAK_XSCRATCH2, _Rt_);
+		if constexpr (IsSubtract)
+			oakAsm->SUBS(OAK_XSCRATCH, OAK_XSCRATCH, OAK_XSCRATCH2);
+		else
+			oakAsm->ADDS(OAK_XSCRATCH, OAK_XSCRATCH, OAK_XSCRATCH2);
+	}
+	else
+	{
+		recArithmeticMoveGPRtoOakW(OAK_WSCRATCH, _Rs_);
+		recArithmeticMoveGPRtoOakW(OAK_WSCRATCH2, _Rt_);
+		if constexpr (IsSubtract)
+			oakAsm->SUBS(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
+		else
+			oakAsm->ADDS(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2);
+	}
+	oakAsm->B(oak::Cond::VC, no_overflow);
+	recEndOaknutEmit();
+
+	recEmitArithmeticOverflowException();
+
+	recBeginOaknutEmit();
+	oakAsm->l(no_overflow);
+	recEndOaknutEmit();
+	if (_Rd_ != 0)
+	{
+		_deleteEEreg(_Rd_, 0);
+		const int regd = _allocX86reg(X86TYPE_GPR, _Rd_, MODE_WRITE);
+		recBeginOaknutEmit();
+		if constexpr (Is64Bit)
+			oakAsm->MOV(oakXRegister(regd), OAK_XSCRATCH);
+		else
+				oakAsm->SXTW(oakXRegister(regd), OAK_WSCRATCH);
+		GPR_DEL_CONST(_Rd_);
+		recEndOaknutEmit();
+	}
+}
+
+template <bool Is64Bit, bool IsSubtract>
+static void recSignedArithmetic()
+{
+	EE::Profiler.EmitOp(Is64Bit ? (IsSubtract ? eeOpcode::DSUB : eeOpcode::DADD) :
+		(IsSubtract ? eeOpcode::SUB : eeOpcode::ADD));
+
+	if (GPR_IS_CONST2(_Rs_, _Rt_))
+	{
+		const u64 lhs = g_cpuConstRegs[_Rs_].UD[0];
+		const u64 rhs = g_cpuConstRegs[_Rt_].UD[0];
+		const u64 result = IsSubtract ? lhs - rhs : lhs + rhs;
+		const bool overflow = Is64Bit ?
+			(IsSubtract ? recSubOverflows64(lhs, rhs, result) : recAddOverflows64(lhs, rhs, result)) :
+			(IsSubtract ? recSubOverflows32(static_cast<u32>(lhs), static_cast<u32>(rhs), static_cast<u32>(result)) :
+				recAddOverflows32(static_cast<u32>(lhs), static_cast<u32>(rhs), static_cast<u32>(result)));
+		if (overflow)
+		{
+			recEmitArithmeticOverflowException();
+			return;
+		}
+		if (_Rd_ != 0)
+		{
+			_deleteGPRtoX86reg(_Rd_, DELETE_REG_FREE_NO_WRITEBACK);
+			_deleteGPRtoXMMreg(_Rd_, DELETE_REG_FLUSH_AND_FREE);
+			GPR_SET_CONST(_Rd_);
+			g_cpuConstRegs[_Rd_].UD[0] = Is64Bit ? result :
+				static_cast<u64>(static_cast<s64>(static_cast<s32>(result)));
+		}
+		return;
+	}
+
+	recSignedArithmetic_emit_oaknut<Is64Bit, IsSubtract>();
+}
+
+void recADD() { recSignedArithmetic<false, false>(); }
+void recDADD() { recSignedArithmetic<true, false>(); }
+void recSUB() { recSignedArithmetic<false, true>(); }
+void recDSUB() { recSignedArithmetic<true, true>(); }
 
 //// ADD
 static void recADD_const()
@@ -136,8 +290,6 @@ static void recADD_(int info)
 {
 	recADD_emit_oaknut(info);
 }
-
-EERECOMPILE_CODERC0(ADD, XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT);
 
 //// ADDU
 void recADDU(void)
@@ -239,8 +391,6 @@ static void recDADD_(int info)
 {
 	recDADD_emit_oaknut(info);
 }
-
-EERECOMPILE_CODERC0(DADD, XMMINFO_WRITED | XMMINFO_READS | XMMINFO_READT | XMMINFO_64BITOP);
 
 //// DADDU
 void recDADDU(void)
@@ -347,8 +497,6 @@ static void recSUB_(int info)
 {
 	recSUB_emit_oaknut(info);
 }
-
-EERECOMPILE_CODERC0(SUB, XMMINFO_READS | XMMINFO_READT | XMMINFO_WRITED);
 
 //// SUBU
 void recSUBU(void)
@@ -461,8 +609,6 @@ static void recDSUB_(int info)
 {
 	recDSUB_emit_oaknut(info);
 }
-
-EERECOMPILE_CODERC0(DSUB, XMMINFO_READS | XMMINFO_READT | XMMINFO_WRITED | XMMINFO_64BITOP);
 
 //// DSUBU
 void recDSUBU(void)

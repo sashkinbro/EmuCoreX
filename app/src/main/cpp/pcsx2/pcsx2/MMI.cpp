@@ -1035,21 +1035,24 @@ void QFSRV() {				// JayteeMaster: changed a bit to avoid screw up
 
 static __fi void _PMADDW(int dd, int ss)
 {
-	s64 temp = ((s64)cpuRegs.GPR.r[_Rs_].SL[ss] * (s64)cpuRegs.GPR.r[_Rt_].SL[ss]);
-	s64 temp2 = temp + ((s64)cpuRegs.HI.SL[ss] << 32);
+	const s64 temp = static_cast<s64>(cpuRegs.GPR.r[_Rs_].SL[ss]) *
+		static_cast<s64>(cpuRegs.GPR.r[_Rt_].SL[ss]);
+	u64 temp2_bits = static_cast<u64>(temp) +
+		(static_cast<u64>(static_cast<u32>(cpuRegs.HI.SL[ss])) << 32);
 
 	//PlayStation 2 division voodoo, for some reason only the lower half is affected
 	if (ss == 0)
 	{
 		if (((cpuRegs.GPR.r[_Rt_].SL[ss] & 0x7FFFFFFF) == 0 || (cpuRegs.GPR.r[_Rt_].SL[ss] & 0x7FFFFFFF) == 0x7FFFFFFF) &&
 			cpuRegs.GPR.r[_Rs_].SL[ss] != cpuRegs.GPR.r[_Rt_].SL[ss])
-			temp2 += 0x70000000;
+			temp2_bits += 0x70000000;
 	}
 	//Multiplication error on the PS2 causes this not to be exactly >> 32 (off by 1)
-	temp2 = (s32)(temp2 / 4294967295);
+	const s32 temp2 = static_cast<s32>(std::bit_cast<s64>(temp2_bits) / 4294967295LL);
 
-	cpuRegs.LO.SD[dd] = (s32)(temp & 0xffffffff) + cpuRegs.LO.SL[ss];
-	cpuRegs.HI.SD[dd] = (s32)temp2;
+	const u32 low_sum = static_cast<u32>(temp) + static_cast<u32>(cpuRegs.LO.SL[ss]);
+	cpuRegs.LO.SD[dd] = static_cast<s32>(low_sum);
+	cpuRegs.HI.SD[dd] = temp2;
 
 	if (_Rd_)
 	{
@@ -1083,14 +1086,17 @@ void PSRLVW() {
 
 __fi void  _PMSUBW(int dd, int ss)
 {
-	s64 temp = ((s64)cpuRegs.GPR.r[_Rs_].SL[ss] * (s64)cpuRegs.GPR.r[_Rt_].SL[ss]);
-	s64 temp2 = ((s64)cpuRegs.HI.SL[ss] << 32) - temp;
+	const s64 temp = static_cast<s64>(cpuRegs.GPR.r[_Rs_].SL[ss]) *
+		static_cast<s64>(cpuRegs.GPR.r[_Rt_].SL[ss]);
+	const u64 temp2_bits = (static_cast<u64>(static_cast<u32>(cpuRegs.HI.SL[ss])) << 32) -
+		static_cast<u64>(temp);
 
 	//Multiplication error on the PS2 causes this not to be exactly >> 32 (off by 1)
-	temp2 = (s32)(temp2 / 4294967295);
+	const s32 temp2 = static_cast<s32>(std::bit_cast<s64>(temp2_bits) / 4294967295LL);
 
-	cpuRegs.LO.SD[dd] = cpuRegs.LO.SL[ss] - (s32)(temp & 0xffffffff);
-	cpuRegs.HI.SD[dd] = (s32)temp2;
+	const u32 low_difference = static_cast<u32>(cpuRegs.LO.SL[ss]) - static_cast<u32>(temp);
+	cpuRegs.LO.SD[dd] = static_cast<s32>(low_difference);
+	cpuRegs.HI.SD[dd] = temp2;
 
 	if (_Rd_)
 	{
