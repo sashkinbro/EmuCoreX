@@ -1194,6 +1194,7 @@
 
     <!-- Controls Layout Editor -->
     <string name="settings_edit_controls">ویرایش طرح‌بندی لمسی</string>
+    <string name="settings_edit_controls_action">ویرایش</string>
     <string name="settings_edit_controls_desc">دکمه‌ها را جابجا کنید و اندازه استیک آنالوگ را تغییر دهید.</string>
     <string name="controls_editor_title">ویرایش چیدمان</string>
     <string name="controls_editor_done">انجام شد</string>

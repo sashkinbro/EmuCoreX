@@ -1410,7 +1410,7 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_edit_global_controls),
                             subtitle = stringResource(R.string.settings_edit_global_controls_desc),
                             actionIcon = Icons.Rounded.Gamepad,
-                            actionLabel = stringResource(R.string.settings_edit_controls),
+                            actionLabel = stringResource(R.string.settings_edit_controls_action),
                             onClick = { onOpenControlsLayoutEditor?.invoke() },
                             enabled = onOpenControlsLayoutEditor != null
                         )

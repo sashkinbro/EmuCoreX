@@ -580,6 +580,7 @@
     <string name="formats_converter_save_failed">Le CHD converti n\'a pas pu être enregistré à l\'emplacement sélectionné.</string>
 
     <string name="settings_edit_controls">Modifier la disposition tactile</string>
+    <string name="settings_edit_controls_action">Modifier</string>
     <string name="settings_edit_controls_desc">Déplacer les boutons et modifier la taille des sticks analogiques.</string>
     <string name="controls_editor_title">Modifier la disposition</string>
     <string name="controls_editor_save">Enregistrer</string>

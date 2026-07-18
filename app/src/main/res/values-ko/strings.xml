@@ -875,6 +875,7 @@
     <string name="formats_converter_save_failed">변환된 CHD를 선택한 위치에 저장할 수 없습니다.</string>
 
     <string name="settings_edit_controls">터치 레이아웃 편집</string>
+    <string name="settings_edit_controls_action">편집</string>
     <string name="settings_edit_controls_desc">버튼을 이동하고 아날로그 스틱 크기를 변경합니다.</string>
     <string name="controls_editor_title">레이아웃 편집</string>
     <string name="controls_editor_done">완료</string>

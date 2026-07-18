@@ -789,6 +789,7 @@
     <string name="formats_converter_save_failed">कनवर्ट की गई CHD को चयनित स्थान पर सेव नहीं किया जा सका।</string>
 
     <string name="settings_edit_controls">टच लेआउट संपादित करें</string>
+    <string name="settings_edit_controls_action">संपादित करें</string>
     <string name="settings_edit_controls_desc">बटन ले जाएँ और एनालॉग स्टिक का आकार बदलें।</string>
     <string name="controls_editor_title">लेआउट संपादित करें</string>
     <string name="controls_editor_done">हो गया</string>

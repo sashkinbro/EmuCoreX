@@ -1194,6 +1194,7 @@
 
     <!-- Controls Layout Editor -->
     <string name="settings_edit_controls">Edit Tata Letak Sentuh</string>
+    <string name="settings_edit_controls_action">Edit</string>
     <string name="settings_edit_controls_desc">Pindahkan tombol dan ubah ukuran stik analog.</string>
     <string name="controls_editor_title">Edit Tata Letak</string>
     <string name="controls_editor_done">Selesai</string>

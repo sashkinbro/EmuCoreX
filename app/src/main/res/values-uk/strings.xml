@@ -604,6 +604,7 @@
     <string name="formats_converter_save_failed">Не вдалося зберегти готовий CHD у вибране місце.</string>
 
     <string name="settings_edit_controls">Редагувати керування</string>
+    <string name="settings_edit_controls_action">Змінити</string>
     <string name="settings_edit_controls_desc">Переміщення кнопок та зміна розміру стіків.</string>
     <string name="controls_editor_title">Редактор керування</string>
     <string name="controls_editor_save">Зберегти</string>

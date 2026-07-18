@@ -580,6 +580,7 @@
     <string name="formats_converter_save_failed">Não foi possível salvar o CHD convertido no local selecionado.</string>
 
     <string name="settings_edit_controls">Editar Layout de Toque</string>
+    <string name="settings_edit_controls_action">Editar</string>
     <string name="settings_edit_controls_desc">Mova os botões e altere o tamanho do controle analógico.</string>
     <string name="controls_editor_title">Editar Layout</string>
     <string name="controls_editor_save">Salvar</string>
