@@ -1417,39 +1417,6 @@ static void recCFC2_emit_oaknut()
 			mVUFinishVU0();
 	}
 
-	// VI0..VI15 and R only replace the low 32-bit word. The EE keeps the
-	// remaining 96 bits of the 128-bit GPR intact for these CFC2 forms.
-	if (_Rd_ < REG_STATUS_FLAG || _Rd_ == REG_R)
-	{
-		const int xmmregt = _allocGPRtoXMMreg(_Rt_, MODE_READ | MODE_WRITE);
-		recBeginOaknutEmit();
-		if (_Rd_ == 0)
-		{
-			oakAsm->MOV(OAK_WSCRATCH, 0);
-		}
-		else if (_Rd_ == REG_R)
-		{
-			oakLoad32(OAK_WSCRATCH, {oak::util::X27,
-				static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[0].VI[REG_R].UL))});
-			oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, 0x7fffff);
-		}
-		else
-		{
-			const int vireg = _checkX86reg(X86TYPE_VIREG, _Rd_, MODE_READ);
-			if (vireg >= 0)
-				oakAsm->UXTH(OAK_WSCRATCH, oakWRegister(vireg));
-			else
-			{
-				oakAsm->MOV(OAK_XSCRATCH, static_cast<u64>(offsetof(cpuRegistersPack, vuRegs[0].VI[_Rd_].UL)));
-				oakAsm->ADD(OAK_XSCRATCH, oak::util::X27, OAK_XSCRATCH);
-				oakAsm->LDRH(OAK_WSCRATCH, OAK_XSCRATCH);
-			}
-		}
-		oakAsm->MOV(oakQRegister(xmmregt).Selem()[0], OAK_WSCRATCH);
-		recEndOaknutEmit();
-		return;
-	}
-
 	const int regt = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_WRITE);
 	pxAssert(!GPR_IS_CONST1(_Rt_));
 
