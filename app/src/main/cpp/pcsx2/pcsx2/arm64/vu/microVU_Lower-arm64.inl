@@ -2055,12 +2055,6 @@ static void mVU_moveVIToAddressGPR_oaknut(mV, int dst, int vi)
 
 static void mVUaddrFix_oaknut(mV, int gprReg)
 {
-	constexpr s64 vu0_to_vu1_vf_qwords =
-		(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[1].VF)) -
-			static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[0].Mem))) >> 4;
-	static_assert(((static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[1].VF)) -
-		static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[0].Mem))) & 0xf) == 0);
-
 	const oak::XReg addr_x = oakXRegister(gprReg);
 	const oak::WReg addr_w = oakWRegister(gprReg);
 	recBeginOaknutEmit();
@@ -2075,17 +2069,26 @@ static void mVUaddrFix_oaknut(mV, int gprReg)
 		oakAsm->TST(addr_w, 0x400);
 		oakAsm->B(oak::Cond::NE, vu1_reg_map);
 		oakAsm->AND(addr_w, addr_w, 0xff);
+		oakAsm->LSL(addr_x, addr_x, 4);
 		oakAsm->B(done);
 
 		oakAsm->l(vu1_reg_map);
 		if (THREAD_VU1)
 			oakEmitCall(reinterpret_cast<void*>(mVU.waitMTVU));
 		oakAsm->AND(addr_w, addr_w, 0x3f);
-		oakAsm->MOV(OAK_XSCRATCH, static_cast<u64>(vu0_to_vu1_vf_qwords));
+		oakAsm->LSL(addr_x, addr_x, 4);
+		// The common memory emitters add VU0.Mem after this helper. Convert the
+		// mapped VU1 VF/VI address to an offset from that runtime pointer; using
+		// the offset of the Mem field itself is invalid because Mem is external.
+		oakAsm->MOV(OAK_XSCRATCH,
+			static_cast<u64>(offsetof(cpuRegistersPack, vuRegs[1].VF)));
+		oakAsm->ADD(addr_x, addr_x, oak::util::X27);
 		oakAsm->ADD(addr_x, addr_x, OAK_XSCRATCH);
+		oakLoad64(OAK_XSCRATCH,
+			mVUAllocOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[0].Mem))));
+		oakAsm->SUB(addr_x, addr_x, OAK_XSCRATCH);
 
 		oakAsm->l(done);
-		oakAsm->LSL(addr_x, addr_x, 4);
 	}
 	recEndOaknutEmit();
 }
@@ -2407,7 +2410,8 @@ static void mVU_makePreDecrementMemoryAddress_oaknut(mP, int addr, int vi, bool 
 		else
 		{
 			recBeginOaknutEmit();
-			oakAsm->MOV(addr_w, signext ? 0xffffffffu : 0xffffu);
+			// VI0 is immutable, so pre-decrement addressing still resolves to zero.
+			oakAsm->EOR(addr_w, addr_w, addr_w);
 			recEndOaknutEmit();
 		}
 
