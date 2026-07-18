@@ -875,6 +875,7 @@
     <string name="formats_converter_save_failed">変換されたCHDを選択した場所に保存できませんでした。</string>
 
     <string name="settings_edit_controls">タッチレイアウトを編集</string>
+    <string name="settings_edit_controls_action">編集</string>
     <string name="settings_edit_controls_desc">ボタンを移動したり、アナログスティックのサイズを変更したりします。</string>
     <string name="controls_editor_title">レイアウトを編集</string>
     <string name="controls_editor_done">完了</string>

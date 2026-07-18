@@ -580,6 +580,7 @@
     <string name="formats_converter_save_failed">Das konvertierte CHD konnte nicht am ausgewählten Speicherort gespeichert werden.</string>
 
     <string name="settings_edit_controls">Touch-Layout bearbeiten</string>
+    <string name="settings_edit_controls_action">Bearbeiten</string>
     <string name="settings_edit_controls_desc">Verschiebe Tasten und ändere die Größe der Analogsticks.</string>
     <string name="controls_editor_title">Layout bearbeiten</string>
     <string name="controls_editor_save">Speichern</string>

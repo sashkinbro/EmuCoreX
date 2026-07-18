@@ -580,6 +580,7 @@
     <string name="formats_converter_save_failed">無法將轉換後的 CHD 儲存到選取的位置。</string>
 
     <string name="settings_edit_controls">編輯觸控版面</string>
+    <string name="settings_edit_controls_action">编辑</string>
     <string name="settings_edit_controls_desc">移動按鈕並更改類比搖桿大小。</string>
     <string name="controls_editor_title">編輯版面</string>
     <string name="controls_editor_save">儲存</string>

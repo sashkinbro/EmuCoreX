@@ -789,6 +789,7 @@
     <string name="formats_converter_save_failed">Impossibile salvare il CHD convertito nella posizione selezionata.</string>
 
     <string name="settings_edit_controls">Modifica layout touch</string>
+    <string name="settings_edit_controls_action">Modifica</string>
     <string name="settings_edit_controls_desc">Sposta i pulsanti e cambia la dimensione delle levette analogiche.</string>
     <string name="controls_editor_title">Modifica layout</string>
     <string name="controls_editor_done">Fatto</string>

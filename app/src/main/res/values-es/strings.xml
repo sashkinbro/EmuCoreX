@@ -580,6 +580,7 @@
     <string name="formats_converter_save_failed">El CHD convertido no se pudo guardar en la ubicación seleccionada.</string>
 
     <string name="settings_edit_controls">Editar diseño táctil</string>
+    <string name="settings_edit_controls_action">Editar</string>
     <string name="settings_edit_controls_desc">Mueve los botones y cambia el tamaño del stick analógico.</string>
     <string name="controls_editor_title">Editar diseño</string>
     <string name="controls_editor_save">Guardar</string>

@@ -875,6 +875,7 @@
     <string name="formats_converter_save_failed">تعذر حفظ ملف CHD المحول في الموقع المحدد.</string>
 
     <string name="settings_edit_controls">تعديل تخطيط اللمس</string>
+    <string name="settings_edit_controls_action">تعديل</string>
     <string name="settings_edit_controls_desc">نقل الأزرار وتغيير حجم العصا التناظرية.</string>
     <string name="controls_editor_title">تعديل التخطيط</string>
     <string name="controls_editor_done">تم</string>

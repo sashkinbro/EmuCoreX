@@ -1252,6 +1252,7 @@
 
     <!-- Controls Layout Editor -->
     <string name="settings_edit_controls">Edit Touch Layout</string>
+    <string name="settings_edit_controls_action">Edit</string>
     <string name="settings_edit_controls_desc">Move buttons and change analog stick size.</string>
     <string name="settings_edit_global_controls">Default Touch Layout</string>
     <string name="settings_edit_global_controls_desc">Set the touch controls used by every game that does not have its own layout.</string>
