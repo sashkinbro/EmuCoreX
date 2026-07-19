@@ -393,7 +393,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setAspec
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_renderUpscalemultiplier(JNIEnv*, jclass, jfloat value) { AndroidRuntime::Instance().SetSetting("EmuCore/GS", "upscale_multiplier", "float", std::to_string(value)); }
 extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_getMaxUpscaleMultiplier(JNIEnv*, jclass, jint renderer)
 {
-	const GSRendererType resolved_renderer = renderer <= 0 ? GSRendererType::VK : static_cast<GSRendererType>(renderer);
+	const GSRendererType resolved_renderer = renderer <= 0 ? GSRendererType::OGL : static_cast<GSRendererType>(renderer);
 	const std::vector<GSAdapterInfo> adapters = GSGetAdapterInfo(resolved_renderer);
 	u32 max_multiplier = 12;
 	if (!adapters.empty())

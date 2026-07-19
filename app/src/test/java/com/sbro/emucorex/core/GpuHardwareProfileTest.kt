@@ -35,11 +35,17 @@ class GpuHardwareProfileTest {
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
         assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(999, false))
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO, false))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999, false))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO, false))
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999, true))
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO, true))
         // An explicit user selection must survive regardless of the hardware default.
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN, true))
+    }
+
+    @Test
+    fun rendererDefaultsToOpenGlForSnapdragonAndMediaTek() {
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware(false))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware(true))
     }
 }
