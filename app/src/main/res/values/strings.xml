@@ -627,6 +627,9 @@
     <string name="settings_touch_haptics_desc">Play a short haptic tick when pressing on-screen controls.</string>
     <string name="settings_gamepad_button_haptics">Gamepad button haptics</string>
     <string name="settings_gamepad_button_haptics_desc">Play a short vibration tick when pressing physical gamepad buttons.</string>
+    <string name="settings_back_button_exits_game">Use Back button to exit game</string>
+    <string name="settings_back_button_exits_game_desc">Start the exit action instead of opening the game menu when you press Back.</string>
+    <string name="settings_help_back_button_exits_game">Off by default. When enabled, the Android Back button uses the same exit action as Exit in the game menu, including the current confirmation behavior.</string>
     <string name="settings_confirm_save_load_actions">Confirm save/load actions</string>
     <string name="settings_confirm_save_load_actions_desc">Ask before quick save or quick load.</string>
     <string name="settings_auto_progressive_scan">Auto Progressive Scan</string>

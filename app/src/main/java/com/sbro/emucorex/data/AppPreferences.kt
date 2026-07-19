@@ -96,6 +96,7 @@ data class SettingsSnapshot(
     val fpsOverlayScale: Int = AppPreferences.DEFAULT_FPS_OVERLAY_SCALE,
     val fpsOverlayMetrics: Int = PerformanceOverlayMetrics.DEFAULT,
     val confirmSaveLoadActions: Boolean = true,
+    val backButtonExitsGame: Boolean = false,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
     val showRecentGames: Boolean = true,
@@ -456,6 +457,7 @@ class AppPreferences(private val context: Context) {
         private val FPS_OVERLAY_SCALE = intPreferencesKey("fps_overlay_scale")
         private val FPS_OVERLAY_METRICS = intPreferencesKey("fps_overlay_metrics")
         private val CONFIRM_SAVE_LOAD_ACTIONS = booleanPreferencesKey("confirm_save_load_actions")
+        private val BACK_BUTTON_EXITS_GAME = booleanPreferencesKey("back_button_exits_game")
         private val COMPACT_CONTROLS = booleanPreferencesKey("compact_controls")
         private val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         private val SHOW_RECENT_GAMES = booleanPreferencesKey("show_recent_games")
@@ -1353,6 +1355,7 @@ class AppPreferences(private val context: Context) {
                     prefs[FPS_OVERLAY_METRICS] ?: PerformanceOverlayMetrics.DEFAULT
                 ),
                 confirmSaveLoadActions = prefs[CONFIRM_SAVE_LOAD_ACTIONS] ?: true,
+                backButtonExitsGame = prefs[BACK_BUTTON_EXITS_GAME] ?: false,
                 compactControls = prefs[COMPACT_CONTROLS] ?: true,
                 keepScreenOn = prefs[KEEP_SCREEN_ON] ?: true,
                 showRecentGames = prefs[SHOW_RECENT_GAMES] ?: true,
@@ -1767,6 +1770,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setConfirmSaveLoadActions(enabled: Boolean) {
         context.dataStore.edit { it[CONFIRM_SAVE_LOAD_ACTIONS] = enabled }
+    }
+
+    val backButtonExitsGame: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[BACK_BUTTON_EXITS_GAME] ?: false
+    }.distinctUntilChanged()
+
+    suspend fun setBackButtonExitsGame(enabled: Boolean) {
+        context.dataStore.edit { it[BACK_BUTTON_EXITS_GAME] = enabled }
     }
 
     val compactControls: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -3078,6 +3089,7 @@ class AppPreferences(private val context: Context) {
             put("fpsOverlayScale", (prefs[FPS_OVERLAY_SCALE] ?: DEFAULT_FPS_OVERLAY_SCALE).coerceIn(MIN_FPS_OVERLAY_SCALE, MAX_FPS_OVERLAY_SCALE))
             put("fpsOverlayMetrics", PerformanceOverlayMetrics.sanitize(prefs[FPS_OVERLAY_METRICS] ?: PerformanceOverlayMetrics.DEFAULT))
             put("confirmSaveLoadActions", prefs[CONFIRM_SAVE_LOAD_ACTIONS] ?: true)
+            put("backButtonExitsGame", prefs[BACK_BUTTON_EXITS_GAME] ?: false)
             put("compactControls", prefs[COMPACT_CONTROLS] ?: true)
             put("keepScreenOn", prefs[KEEP_SCREEN_ON] ?: true)
             put("showRecentGames", prefs[SHOW_RECENT_GAMES] ?: true)
@@ -3368,6 +3380,7 @@ class AppPreferences(private val context: Context) {
                 json.optInt("fpsOverlayMetrics", PerformanceOverlayMetrics.DEFAULT)
             )
             prefs[CONFIRM_SAVE_LOAD_ACTIONS] = json.optBoolean("confirmSaveLoadActions", true)
+            prefs[BACK_BUTTON_EXITS_GAME] = json.optBoolean("backButtonExitsGame", false)
             prefs[COMPACT_CONTROLS] = json.optBoolean("compactControls", true)
             prefs[KEEP_SCREEN_ON] = json.optBoolean("keepScreenOn", true)
             prefs[SHOW_RECENT_GAMES] = json.optBoolean("showRecentGames", true)

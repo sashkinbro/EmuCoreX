@@ -104,6 +104,7 @@ data class EmulationUiState(
     val controlsVisible: Boolean = true,
     val showFps: Boolean = true,
     val confirmSaveLoadActions: Boolean = true,
+    val backButtonExitsGame: Boolean = false,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
     val fpsOverlayCorner: Int = AppPreferences.FPS_OVERLAY_CORNER_TOP_RIGHT,
@@ -359,6 +360,7 @@ private data class LiveRuntimeSnapshot(
     val showFps: Boolean,
     val fpsOverlayMode: Int,
     val confirmSaveLoadActions: Boolean,
+    val backButtonExitsGame: Boolean,
     val renderer: Int,
     val upscale: Float,
     val aspectRatio: Int,
@@ -760,6 +762,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.confirmSaveLoadActions.collect { enabled ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(confirmSaveLoadActions = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.backButtonExitsGame.collect { enabled ->
+                _uiState.value = _uiState.value.copy(backButtonExitsGame = enabled)
             }
         }
         viewModelScope.launch {
@@ -1656,6 +1663,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     showFps = liveRuntime.showFps,
                     fpsOverlayMode = liveRuntime.fpsOverlayMode,
                     confirmSaveLoadActions = liveRuntime.confirmSaveLoadActions,
+                    backButtonExitsGame = liveRuntime.backButtonExitsGame,
                     renderer = liveRuntime.renderer,
                     upscale = liveRuntime.upscale,
                     aspectRatio = liveRuntime.aspectRatio,
@@ -3546,6 +3554,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             showFps = settings.showFps,
             fpsOverlayMode = settings.fpsOverlayMode,
             confirmSaveLoadActions = settings.confirmSaveLoadActions,
+            backButtonExitsGame = settings.backButtonExitsGame,
             renderer = settings.renderer,
             upscale = settings.upscaleMultiplier,
             aspectRatio = settings.aspectRatio,

@@ -1344,6 +1344,9 @@
     <string name="settings_touch_haptics_desc">Короткочасна тактильна віддача при натисканні на екранні елементи керування.</string>
     <string name="settings_gamepad_button_haptics">Тактильна віддача кнопок геймпада</string>
     <string name="settings_gamepad_button_haptics_desc">Короткочасна вібрація при натисканні фізичних кнопок геймпада.</string>
+    <string name="settings_back_button_exits_game">Вихід із гри кнопкою «Назад»</string>
+    <string name="settings_back_button_exits_game_desc">Запускати вихід із гри замість відкриття ігрового меню після натискання кнопки «Назад».</string>
+    <string name="settings_help_back_button_exits_game">Типово вимкнено. Після ввімкнення системна кнопка «Назад» запускає ту саму дію виходу, що й пункт «Вийти» в ігровому меню, з урахуванням поточних налаштувань підтвердження.</string>
     <string name="settings_confirm_save_load_actions">Підтверджувати збереження/завантаження</string>
     <string name="settings_confirm_save_load_actions_desc">Запитувати перед швидким збереженням або швидким завантаженням.</string>
     <string name="settings_help_touch_haptics">Додає легку тактильну віддачу Android при першому натисканні екранної кнопки, напрямку хрестовини або аналогового стіка. Це впливає лише на відчуття від керування і не змінює вібрацію в грі.</string>

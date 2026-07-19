@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">تشغيل نبضة اهتزاز قصيرة عند الضغط على عناصر التحكم على الشاشة.</string>
     <string name="settings_gamepad_button_haptics">استجابة اللمس لأزرار لوحة الألعاب</string>
     <string name="settings_gamepad_button_haptics_desc">تشغيل نبضة اهتزاز قصيرة عند الضغط على أزرار لوحة الألعاب الفعلية.</string>
+    <string name="settings_back_button_exits_game">الخروج من اللعبة بزر الرجوع</string>
+    <string name="settings_back_button_exits_game_desc">بدء الخروج من اللعبة بدلاً من فتح القائمة عند الضغط على زر الرجوع.</string>
+    <string name="settings_help_back_button_exits_game">معطّل افتراضيًا. عند تفعيله، يستخدم زر الرجوع في Android إجراء الخروج نفسه الموجود في قائمة اللعبة، مع تطبيق إعداد التأكيد الحالي.</string>
     <string name="settings_confirm_save_load_actions">تأكيد إجراءات الحفظ/التحميل</string>
     <string name="settings_confirm_save_load_actions_desc">السؤال قبل الحفظ السريع أو التحميل السريع.</string>
     <string name="settings_help_touch_haptics">يضيف استجابة لمس Android خفيفة عند الضغط لأول مرة على زر على الشاشة أو اتجاه D-pad أو عصا تناظرية. هذا يؤثر على الشعور بالتحكم فقط ولا يغير اهتزاز اللعبة.</string>

@@ -1341,6 +1341,9 @@
     <string name="settings_touch_haptics_desc">Reproducir una breve vibración al presionar los controles en pantalla.</string>
     <string name="settings_gamepad_button_haptics">Respuesta háptica de botones del mando</string>
     <string name="settings_gamepad_button_haptics_desc">Reproducir una breve vibración al presionar los botones físicos del mando.</string>
+    <string name="settings_back_button_exits_game">Salir del juego con el botón Atrás</string>
+    <string name="settings_back_button_exits_game_desc">Iniciar la salida del juego en vez de abrir el menú al pulsar Atrás.</string>
+    <string name="settings_help_back_button_exits_game">Desactivado de forma predeterminada. Al activarlo, el botón Atrás de Android usa la misma acción que Salir en el menú del juego, incluida la configuración de confirmación actual.</string>
     <string name="settings_confirm_save_load_actions">Confirmar acciones de guardar/cargar</string>
     <string name="settings_confirm_save_load_actions_desc">Preguntar antes de guardar o cargar rápidamente.</string>
     <string name="settings_help_touch_haptics">Añade una ligera respuesta háptica de Android cuando se presiona por primera vez un botón en pantalla, una dirección del D-pad o un stick analógico. Esto solo afecta la sensación de control y no cambia la vibración del juego.</string>

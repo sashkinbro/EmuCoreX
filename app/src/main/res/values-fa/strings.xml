@@ -594,6 +594,9 @@
     <string name="settings_touch_haptics_desc">هنگام فشار دادن کنترل‌های روی صفحه، یک تیک لمسی کوتاه پخش کنید.</string>
     <string name="settings_gamepad_button_haptics">بازخورد لمسی دکمه‌های گیم‌پد</string>
     <string name="settings_gamepad_button_haptics_desc">هنگام فشردن دکمه‌های گیم‌پد فیزیکی، یک تیک لرزشی کوتاه پخش کنید.</string>
+    <string name="settings_back_button_exits_game">خروج از بازی با دکمه بازگشت</string>
+    <string name="settings_back_button_exits_game_desc">با فشردن دکمه بازگشت، به‌جای باز کردن منوی بازی فرایند خروج آغاز شود.</string>
+    <string name="settings_help_back_button_exits_game">به‌طور پیش‌فرض خاموش است. با فعال‌سازی، دکمه بازگشت Android همان عملکرد خروج در منوی بازی را با تنظیم تأیید فعلی اجرا می‌کند.</string>
     <string name="settings_confirm_save_load_actions">تأیید اقدامات ذخیره/بارگذاری</string>
     <string name="settings_confirm_save_load_actions_desc">قبل از ذخیره سریع یا بارگذاری سریع سؤال بپرسید.</string>
     <string name="settings_auto_progressive_scan">اسکن پیش‌رونده خودکار</string>

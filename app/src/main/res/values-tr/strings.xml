@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">Ekrandaki kontrollere basıldığında kısa bir titreşim oynatır.</string>
     <string name="settings_gamepad_button_haptics">Gamepad düğmesi titreşimi</string>
     <string name="settings_gamepad_button_haptics_desc">Fiziksel gamepad düğmelerine basıldığında kısa bir titreşim oynatır.</string>
+    <string name="settings_back_button_exits_game">Geri düğmesiyle oyundan çık</string>
+    <string name="settings_back_button_exits_game_desc">Geri düğmesine basıldığında oyun menüsünü açmak yerine çıkış işlemini başlat.</string>
+    <string name="settings_help_back_button_exits_game">Varsayılan olarak kapalıdır. Etkinleştirildiğinde Android Geri düğmesi, geçerli onay ayarıyla birlikte oyun menüsündeki Çıkış ile aynı işlemi kullanır.</string>
     <string name="settings_confirm_save_load_actions">Kaydetme/yükleme eylemlerini onayla</string>
     <string name="settings_confirm_save_load_actions_desc">Hızlı kaydetme veya hızlı yüklemeden önce sor.</string>
     <string name="settings_help_touch_haptics">Ekranda bir düğmeye, D-pad yönüne veya analog çubuğa ilk basıldığında hafif bir Android titreşim geri bildirimi ekler. Bu sadece kontrol hissini etkiler ve oyun içi titreşimi değiştirmez.</string>
