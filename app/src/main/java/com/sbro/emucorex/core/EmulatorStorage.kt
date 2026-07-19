@@ -5,6 +5,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.ConcurrentHashMap
 
+enum class EmulatorDataLocation {
+    INTERNAL,
+    SD_CARD
+}
+
 object EmulatorStorage {
     private val verifiedCustomRoots = ConcurrentHashMap.newKeySet<String>()
 
@@ -15,6 +20,11 @@ object EmulatorStorage {
         val cheats: File,
         val patches: File,
         val logs: File
+    )
+
+    data class StandardDataRoot(
+        val directory: File,
+        val preferencePath: String?
     )
 
     private val runtimeSubdirectories = listOf(
@@ -30,11 +40,53 @@ object EmulatorStorage {
         return context.getExternalFilesDir(null) ?: context.filesDir
     }
 
+    /**
+     * Returns the app-specific directory on removable/secondary storage, if Android exposes one.
+     * Index zero is the primary external storage used by [defaultRoot]; secondary entries are SD
+     * cards or other removable volumes. No broad storage permission is required for these paths.
+     */
+    fun sdCardRoot(context: Context): File? = runCatching {
+        findSecondaryExternalFilesDir(context.getExternalFilesDirs(null))
+    }.getOrNull()
+
+    fun prepareStandardDataRoot(
+        context: Context,
+        location: EmulatorDataLocation
+    ): StandardDataRoot? {
+        val directory = when (location) {
+            EmulatorDataLocation.INTERNAL -> defaultRoot(context)
+            EmulatorDataLocation.SD_CARD -> sdCardRoot(context) ?: return null
+        }
+        if (!prepareRoot(directory)) return null
+
+        return StandardDataRoot(
+            directory = directory,
+            preferencePath = if (location == EmulatorDataLocation.INTERNAL) null else directory.absolutePath
+        )
+    }
+
+    fun selectedStandardLocation(
+        preferencePath: String?,
+        sdCardPath: String?
+    ): EmulatorDataLocation? = when {
+        preferencePath.isNullOrBlank() -> EmulatorDataLocation.INTERNAL
+        !sdCardPath.isNullOrBlank() && File(preferencePath).absolutePath == File(sdCardPath).absolutePath -> {
+            EmulatorDataLocation.SD_CARD
+        }
+        else -> null
+    }
+
+    internal fun findSecondaryExternalFilesDir(directories: Array<File?>): File? =
+        directories.asSequence().drop(1).filterNotNull().firstOrNull()
+
     private fun root(context: Context, customRootPath: String? = null): File {
         val customRoot = customRootPath
             ?.takeIf { it.isNotBlank() }
             ?.let(::File)
-        if (customRoot != null && prepareRoot(customRoot)) {
+        // Selection performs the destructive write probe on Dispatchers.IO. Normal directory
+        // access must not repeat create/delete probes because repositories can resolve paths from
+        // the main thread while rendering UI.
+        if (customRoot != null && isPreparedDirectoryTree(customRoot)) {
             return customRoot
         }
 
@@ -111,6 +163,11 @@ object EmulatorStorage {
             }
             true
         }.getOrDefault(false)
+    }
+
+    private fun isPreparedDirectoryTree(root: File): Boolean {
+        if (!ensureRootDirectories(root) || !root.canWrite()) return false
+        return runtimeSubdirectories.all { File(root, it).canWrite() }
     }
 
     private fun canWriteProbe(directory: File): Boolean {

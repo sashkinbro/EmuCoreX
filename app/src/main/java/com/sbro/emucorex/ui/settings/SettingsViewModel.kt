@@ -12,6 +12,7 @@ import com.sbro.emucorex.core.AppUpdateRepository
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.EmulatorDataLocation
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.RendererDefaults
@@ -118,6 +119,7 @@ data class SettingsUiState(
     val gamePath: String? = null,
     val gamePaths: List<String> = emptyList(),
     val emulatorDataPath: String? = null,
+    val sdCardDataPath: String? = null,
     val coverDownloadBaseUrl: String? = null,
     val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DEFAULT,
     val biosValid: Boolean = false,
@@ -289,6 +291,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.value = _uiState.value.copy(biosValid = biosValid)
             }
         }
+        refreshEmulatorDataLocations()
 
                 viewModelScope.launch {
             proPurchaseManager.state.collect { proState ->
@@ -1841,36 +1844,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setEmulatorDataPath(uri: Uri) {
+    fun setEmulatorDataLocation(location: EmulatorDataLocation) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) {
-            showStoragePermissionError(application)
-            return
-        }
-
-        viewModelScope.launch {
-            val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return@launch
-            val rootPrepared = withContext(Dispatchers.IO) {
-                EmulatorStorage.prepareCustomDataRoot(resolvedPath)
-            }
-            if (!rootPrepared) {
-                android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+        viewModelScope.launch(Dispatchers.IO) {
+            val preparedRoot = EmulatorStorage.prepareStandardDataRoot(application, location)
+            if (preparedRoot == null) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        application,
+                        com.sbro.emucorex.R.string.emulator_data_location_error,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                refreshEmulatorDataLocations()
                 return@launch
             }
-            preferences.setEmulatorDataPath(resolvedPath)
+            preferences.setEmulatorDataPath(preparedRoot.preferencePath)
         }
     }
 
-    private fun showStoragePermissionError(application: Application) {
-        android.widget.Toast.makeText(
-            application,
-            com.sbro.emucorex.R.string.error_storage_permission_not_persisted,
-            android.widget.Toast.LENGTH_LONG
-        ).show()
-    }
-
-    fun clearEmulatorDataPath() {
-        viewModelScope.launch { preferences.setEmulatorDataPath(null) }
+    fun refreshEmulatorDataLocations() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val sdCardDataPath = EmulatorStorage.sdCardRoot(getApplication())?.absolutePath
+            withContext(Dispatchers.Main) {
+                _uiState.value = _uiState.value.copy(sdCardDataPath = sdCardDataPath)
+            }
+        }
     }
 
     fun setCoverDownloadBaseUrl(url: String?) {

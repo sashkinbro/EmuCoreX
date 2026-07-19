@@ -6,8 +6,8 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
-import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.EmulatorDataLocation
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.PerformanceProfiles
@@ -30,6 +30,7 @@ data class OnboardingUiState(
     val gamePath: String? = null,
     val gamePaths: List<String> = emptyList(),
     val emulatorDataPath: String? = null,
+    val sdCardDataPath: String? = null,
     val biosValid: Boolean = false,
     val gamePathValid: Boolean = false,
     val canContinue: Boolean = false,
@@ -97,6 +98,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     updateState(emulatorDataPath = path)
                 }
             }
+            refreshEmulatorDataLocations()
         }
     }
 
@@ -156,32 +158,32 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun setEmulatorDataPath(uri: Uri) {
+    fun setEmulatorDataLocation(location: EmulatorDataLocation) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) {
-            showStoragePermissionError(application)
-            return
-        }
-
-        viewModelScope.launch {
-            val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return@launch
-            val rootPrepared = withContext(Dispatchers.IO) {
-                EmulatorStorage.prepareCustomDataRoot(resolvedPath)
-            }
-            if (!rootPrepared) {
-                android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+        viewModelScope.launch(Dispatchers.IO) {
+            val preparedRoot = EmulatorStorage.prepareStandardDataRoot(application, location)
+            if (preparedRoot == null) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        application,
+                        com.sbro.emucorex.R.string.emulator_data_location_error,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                refreshEmulatorDataLocations()
                 return@launch
             }
-            preferences.setEmulatorDataPath(resolvedPath)
+            preferences.setEmulatorDataPath(preparedRoot.preferencePath)
         }
     }
 
-    private fun showStoragePermissionError(application: Application) {
-        android.widget.Toast.makeText(
-            application,
-            com.sbro.emucorex.R.string.error_storage_permission_not_persisted,
-            android.widget.Toast.LENGTH_LONG
-        ).show()
+    fun refreshEmulatorDataLocations() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val sdCardDataPath = EmulatorStorage.sdCardRoot(getApplication())?.absolutePath
+            withContext(Dispatchers.Main) {
+                updateState(sdCardDataPath = sdCardDataPath)
+            }
+        }
     }
 
     fun setPerformanceProfile(profile: Int) {
@@ -209,6 +211,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         gamePath: String? = _uiState.value.gamePath,
         gamePaths: List<String> = _uiState.value.gamePaths,
         emulatorDataPath: String? = _uiState.value.emulatorDataPath,
+        sdCardDataPath: String? = _uiState.value.sdCardDataPath,
         biosValid: Boolean = _uiState.value.biosValid,
         gamePathValid: Boolean = _uiState.value.gamePathValid,
         currentPage: Int = _uiState.value.currentPage,
@@ -225,6 +228,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             gamePath = gamePath,
             gamePaths = gamePaths,
             emulatorDataPath = emulatorDataPath,
+            sdCardDataPath = sdCardDataPath,
             biosValid = biosValid,
             gamePathValid = gamePathValid,
             canContinue = biosValid && gamePathValid,

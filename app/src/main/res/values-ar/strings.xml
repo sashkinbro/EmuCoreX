@@ -1767,4 +1767,12 @@
     <string name="feedback_discard_title">تجاهل التعليق؟</string>
     <string name="feedback_discard_message">سيتم فقد رسالتك والمرفقات المحددة.</string>
     <string name="feedback_discard_action">تجاهل</string>
+    <string name="emulator_data_location_title">موقع بيانات المحاكي</string>
+    <string name="emulator_data_location_description">اختر مجلد التطبيق الخاص القياسي. لا يلزم إذن وصول شامل إلى مساحة التخزين.</string>
+    <string name="emulator_data_location_internal">وحدة التخزين الداخلية</string>
+    <string name="emulator_data_location_internal_description">مجلد التطبيق الخاص في وحدة التخزين الأساسية للجهاز.</string>
+    <string name="emulator_data_location_sd_card">بطاقة SD</string>
+    <string name="emulator_data_location_sd_card_description">مجلد التطبيق الخاص على بطاقة SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">لم يتم العثور على بطاقة SD متاحة على هذا الجهاز.</string>
+    <string name="emulator_data_location_error">تعذر إعداد مساحة التخزين المحددة. تحقق من توفرها وحاول مرة أخرى.</string>
 </resources>

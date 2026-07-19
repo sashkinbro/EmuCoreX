@@ -1767,4 +1767,12 @@
     <string name="feedback_discard_title">Скинути відгук?</string>
     <string name="feedback_discard_message">Ваше повідомлення та вибрані вкладення будуть втрачені.</string>
     <string name="feedback_discard_action">Скинути</string>
+    <string name="emulator_data_location_title">Місце зберігання даних емулятора</string>
+    <string name="emulator_data_location_description">Оберіть стандартну приватну папку застосунку. Розширені дозволи на сховище не потрібні.</string>
+    <string name="emulator_data_location_internal">Внутрішня пам’ять</string>
+    <string name="emulator_data_location_internal_description">Приватна папка застосунку в основній пам’яті пристрою.</string>
+    <string name="emulator_data_location_sd_card">SD-картка</string>
+    <string name="emulator_data_location_sd_card_description">Приватна папка застосунку на SD-картці.</string>
+    <string name="emulator_data_location_sd_card_unavailable">На цьому пристрої не знайдено доступної SD-картки.</string>
+    <string name="emulator_data_location_error">Не вдалося підготувати вибране сховище застосунку. Перевірте його доступність і повторіть спробу.</string>
 </resources>

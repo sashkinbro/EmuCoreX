@@ -1765,4 +1765,12 @@
     <string name="feedback_discard_title">¿Descartar comentarios?</string>
     <string name="feedback_discard_message">Tu mensaje y los archivos adjuntos seleccionados se perderán.</string>
     <string name="feedback_discard_action">Descartar</string>
+    <string name="emulator_data_location_title">Ubicación de datos del emulador</string>
+    <string name="emulator_data_location_description">Elige una carpeta privada estándar de la aplicación. No se requieren permisos amplios de almacenamiento.</string>
+    <string name="emulator_data_location_internal">Almacenamiento interno</string>
+    <string name="emulator_data_location_internal_description">Carpeta privada de la aplicación en el almacenamiento principal del dispositivo.</string>
+    <string name="emulator_data_location_sd_card">Tarjeta SD</string>
+    <string name="emulator_data_location_sd_card_description">Carpeta privada de la aplicación en la tarjeta SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">No se encontró una tarjeta SD disponible en este dispositivo.</string>
+    <string name="emulator_data_location_error">No se pudo preparar el almacenamiento seleccionado. Comprueba que esté disponible e inténtalo de nuevo.</string>
 </resources>

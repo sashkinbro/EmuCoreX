@@ -1767,4 +1767,12 @@
     <string name="feedback_discard_title">Сбросить отзыв?</string>
     <string name="feedback_discard_message">Ваше сообщение и выбранные вложения будут удалены.</string>
     <string name="feedback_discard_action">Сбросить</string>
+    <string name="emulator_data_location_title">Хранилище данных эмулятора</string>
+    <string name="emulator_data_location_description">Выберите стандартную приватную папку приложения. Расширенные разрешения на хранилище не требуются.</string>
+    <string name="emulator_data_location_internal">Внутренняя память</string>
+    <string name="emulator_data_location_internal_description">Приватная папка приложения в основной памяти устройства.</string>
+    <string name="emulator_data_location_sd_card">SD-карта</string>
+    <string name="emulator_data_location_sd_card_description">Приватная папка приложения на SD-карте.</string>
+    <string name="emulator_data_location_sd_card_unavailable">На этом устройстве не найдена доступная SD-карта.</string>
+    <string name="emulator_data_location_error">Не удалось подготовить выбранное хранилище приложения. Проверьте его доступность и повторите попытку.</string>
 </resources>

@@ -1764,4 +1764,12 @@
     <string name="feedback_discard_title">放弃反馈？</string>
     <string name="feedback_discard_message">您的消息和所选的附件将丢失。</string>
     <string name="feedback_discard_action">放弃</string>
+    <string name="emulator_data_location_title">模拟器数据位置</string>
+    <string name="emulator_data_location_description">选择标准的应用专用文件夹，无需广泛的存储权限。</string>
+    <string name="emulator_data_location_internal">内部存储</string>
+    <string name="emulator_data_location_internal_description">设备主存储中的应用专用文件夹。</string>
+    <string name="emulator_data_location_sd_card">SD 卡</string>
+    <string name="emulator_data_location_sd_card_description">SD 卡上的应用专用文件夹。</string>
+    <string name="emulator_data_location_sd_card_unavailable">此设备上未找到可用的 SD 卡。</string>
+    <string name="emulator_data_location_error">无法准备所选的应用存储。请检查存储是否可用，然后重试。</string>
 </resources>

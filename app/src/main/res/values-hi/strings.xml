@@ -1763,4 +1763,12 @@
     <string name="feedback_discard_title">फीडबैक छोड़ें?</string>
     <string name="feedback_discard_message">आपका संदेश और चयनित अटैचमेंट खो जाएंगे।</string>
     <string name="feedback_discard_action">छोड़ें</string>
+    <string name="emulator_data_location_title">एमुलेटर डेटा स्थान</string>
+    <string name="emulator_data_location_description">मानक निजी ऐप फ़ोल्डर चुनें। व्यापक स्टोरेज अनुमति की आवश्यकता नहीं है।</string>
+    <string name="emulator_data_location_internal">आंतरिक स्टोरेज</string>
+    <string name="emulator_data_location_internal_description">डिवाइस के मुख्य स्टोरेज में निजी ऐप फ़ोल्डर।</string>
+    <string name="emulator_data_location_sd_card">SD कार्ड</string>
+    <string name="emulator_data_location_sd_card_description">SD कार्ड पर निजी ऐप फ़ोल्डर।</string>
+    <string name="emulator_data_location_sd_card_unavailable">इस डिवाइस पर कोई उपलब्ध SD कार्ड नहीं मिला।</string>
+    <string name="emulator_data_location_error">चुना गया ऐप स्टोरेज तैयार नहीं किया जा सका। उपलब्धता जाँचें और फिर प्रयास करें।</string>
 </resources>

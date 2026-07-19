@@ -1778,4 +1778,12 @@
     <string name="feedback_discard_title">حذف بازخورد؟</string>
     <string name="feedback_discard_message">پیام شما و پیوست‌های انتخاب شده از دست خواهند رفت.</string>
     <string name="feedback_discard_action">حذف</string>
+    <string name="emulator_data_location_title">محل داده‌های شبیه‌ساز</string>
+    <string name="emulator_data_location_description">یک پوشه خصوصی استاندارد برنامه را انتخاب کنید. مجوز گسترده ذخیره‌سازی لازم نیست.</string>
+    <string name="emulator_data_location_internal">حافظه داخلی</string>
+    <string name="emulator_data_location_internal_description">پوشه خصوصی برنامه در حافظه اصلی دستگاه.</string>
+    <string name="emulator_data_location_sd_card">کارت SD</string>
+    <string name="emulator_data_location_sd_card_description">پوشه خصوصی برنامه روی کارت SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">هیچ کارت SD در دسترسی روی این دستگاه پیدا نشد.</string>
+    <string name="emulator_data_location_error">آماده‌سازی فضای ذخیره‌سازی انتخاب‌شده ممکن نشد. در دسترس بودن آن را بررسی و دوباره تلاش کنید.</string>
 </resources>

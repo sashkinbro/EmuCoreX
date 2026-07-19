@@ -1763,4 +1763,12 @@
     <string name="feedback_discard_title">Geri bildirim atılsın mı?</string>
     <string name="feedback_discard_message">Mesajınız ve seçilen ekler kaybolacak.</string>
     <string name="feedback_discard_action">At</string>
+    <string name="emulator_data_location_title">Emülatör veri konumu</string>
+    <string name="emulator_data_location_description">Standart özel uygulama klasörünü seçin. Geniş depolama izni gerekmez.</string>
+    <string name="emulator_data_location_internal">Dahili depolama</string>
+    <string name="emulator_data_location_internal_description">Cihazın birincil depolamasındaki özel uygulama klasörü.</string>
+    <string name="emulator_data_location_sd_card">SD kart</string>
+    <string name="emulator_data_location_sd_card_description">SD karttaki özel uygulama klasörü.</string>
+    <string name="emulator_data_location_sd_card_unavailable">Bu cihazda kullanılabilir bir SD kart bulunamadı.</string>
+    <string name="emulator_data_location_error">Seçilen uygulama depolaması hazırlanamadı. Kullanılabilirliğini kontrol edip tekrar deneyin.</string>
 </resources>

@@ -1763,4 +1763,12 @@
     <string name="feedback_discard_title">Eliminare il feedback?</string>
     <string name="feedback_discard_message">Il tuo messaggio e gli allegati selezionati andranno persi.</string>
     <string name="feedback_discard_action">Elimina</string>
+    <string name="emulator_data_location_title">Posizione dati emulatore</string>
+    <string name="emulator_data_location_description">Scegli una cartella privata standard dell’app. Non sono richiesti permessi di archiviazione estesi.</string>
+    <string name="emulator_data_location_internal">Memoria interna</string>
+    <string name="emulator_data_location_internal_description">Cartella privata dell’app nella memoria principale del dispositivo.</string>
+    <string name="emulator_data_location_sd_card">Scheda SD</string>
+    <string name="emulator_data_location_sd_card_description">Cartella privata dell’app sulla scheda SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">Nessuna scheda SD disponibile trovata su questo dispositivo.</string>
+    <string name="emulator_data_location_error">Impossibile preparare l’archiviazione selezionata. Verifica che sia disponibile e riprova.</string>
 </resources>

@@ -1777,4 +1777,12 @@
     <string name="feedback_discard_title">Buang masukan?</string>
     <string name="feedback_discard_message">Pesan dan lampiran yang Anda pilih akan hilang.</string>
     <string name="feedback_discard_action">Buang</string>
+    <string name="emulator_data_location_title">Lokasi data emulator</string>
+    <string name="emulator_data_location_description">Pilih folder pribadi aplikasi standar. Izin penyimpanan luas tidak diperlukan.</string>
+    <string name="emulator_data_location_internal">Penyimpanan internal</string>
+    <string name="emulator_data_location_internal_description">Folder pribadi aplikasi di penyimpanan utama perangkat.</string>
+    <string name="emulator_data_location_sd_card">Kartu SD</string>
+    <string name="emulator_data_location_sd_card_description">Folder pribadi aplikasi di kartu SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">Tidak ada kartu SD yang tersedia di perangkat ini.</string>
+    <string name="emulator_data_location_error">Penyimpanan aplikasi yang dipilih tidak dapat disiapkan. Periksa ketersediaannya lalu coba lagi.</string>
 </resources>
