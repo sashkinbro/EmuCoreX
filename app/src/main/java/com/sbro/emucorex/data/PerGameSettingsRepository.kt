@@ -73,6 +73,8 @@ data class PerGameSettings(
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val antiBlur: Boolean = GsHackDefaults.ANTI_BLUR_DEFAULT,
+    val deinterlaceMode: Int = GsHackDefaults.DEINTERLACE_MODE_DEFAULT,
+    val dithering: Int = GsHackDefaults.DITHERING_DEFAULT,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -295,6 +297,12 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         ),
         enableHwMipmapping = optBoolean("enableHwMipmapping", GsHackDefaults.HW_MIPMAPPING_DEFAULT),
         antiBlur = optBoolean("antiBlur", GsHackDefaults.ANTI_BLUR_DEFAULT),
+        deinterlaceMode = GsHackDefaults.coerceDeinterlaceMode(
+            optInt("deinterlaceMode", GsHackDefaults.DEINTERLACE_MODE_DEFAULT)
+        ),
+        dithering = GsHackDefaults.coerceDithering(
+            optInt("dithering", GsHackDefaults.DITHERING_DEFAULT)
+        ),
         enableWidescreenPatches = optBoolean("enableWidescreenPatches", false),
         enableNoInterlacingPatches = optBoolean("enableNoInterlacingPatches", false),
         cpuSpriteRenderSize = optInt("cpuSpriteRenderSize", GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT),
@@ -408,6 +416,8 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("anisotropicFiltering")) put("anisotropicFiltering", GsHackDefaults.coerceAnisotropicFiltering(anisotropicFiltering))
         if (shouldWrite("enableHwMipmapping")) put("enableHwMipmapping", enableHwMipmapping)
         if (shouldWrite("antiBlur")) put("antiBlur", antiBlur)
+        if (shouldWrite("deinterlaceMode")) put("deinterlaceMode", GsHackDefaults.coerceDeinterlaceMode(deinterlaceMode))
+        if (shouldWrite("dithering")) put("dithering", GsHackDefaults.coerceDithering(dithering))
         if (shouldWrite("enableWidescreenPatches")) put("enableWidescreenPatches", enableWidescreenPatches)
         if (shouldWrite("enableNoInterlacingPatches")) put("enableNoInterlacingPatches", enableNoInterlacingPatches)
         if (shouldWrite("cpuSpriteRenderSize")) put("cpuSpriteRenderSize", cpuSpriteRenderSize)

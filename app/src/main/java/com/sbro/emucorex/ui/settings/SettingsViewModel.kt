@@ -170,6 +170,8 @@ data class SettingsUiState(
     val shadeBoostGamma: Int = 50,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
+    val deinterlaceMode: Int = GsHackDefaults.DEINTERLACE_MODE_DEFAULT,
+    val dithering: Int = GsHackDefaults.DITHERING_DEFAULT,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val antiBlur: Boolean = GsHackDefaults.ANTI_BLUR_DEFAULT,
@@ -414,6 +416,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             shadeBoostGamma = snapshot.shadeBoostGamma,
             enableWidescreenPatches = snapshot.enableWidescreenPatches,
             enableNoInterlacingPatches = snapshot.enableNoInterlacingPatches,
+            deinterlaceMode = snapshot.deinterlaceMode,
+            dithering = snapshot.dithering,
             anisotropicFiltering = snapshot.anisotropicFiltering,
             enableHwMipmapping = snapshot.enableHwMipmapping,
             antiBlur = snapshot.antiBlur,
@@ -1407,6 +1411,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setDeinterlaceMode(value: Int) {
+        viewModelScope.launch {
+            val normalized = GsHackDefaults.coerceDeinterlaceMode(value)
+            preferences.setDeinterlaceMode(normalized)
+            EmulatorBridge.setSetting("EmuCore/GS", "deinterlace_mode", "int", normalized.toString())
+        }
+    }
+
+    fun setDithering(value: Int) {
+        viewModelScope.launch {
+            val normalized = GsHackDefaults.coerceDithering(value)
+            preferences.setDithering(normalized)
+            EmulatorBridge.setSetting("EmuCore/GS", "dithering_ps2", "int", normalized.toString())
+        }
+    }
+
     fun setAnisotropicFiltering(value: Int) {
         viewModelScope.launch {
             markPerformancePresetCustom()
@@ -1797,6 +1817,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 casMode = _uiState.value.casMode,
                 casSharpness = _uiState.value.casSharpness,
                 tvShader = _uiState.value.tvShader,
+                deinterlaceMode = _uiState.value.deinterlaceMode,
+                dithering = _uiState.value.dithering,
                 anisotropicFiltering = _uiState.value.anisotropicFiltering,
                 enableHwMipmapping = _uiState.value.enableHwMipmapping,
                 antiBlur = _uiState.value.antiBlur,

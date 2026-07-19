@@ -1779,4 +1779,23 @@
     <string name="settings_backup_include_save_states">Incluir guardados rápidos</string>
     <string name="settings_backup_include_save_states_desc">Añade los estados de guardado rápido al archivo. Su tamaño puede aumentar considerablemente y los estados podrían no funcionar con otra versión del núcleo.</string>
     <string name="settings_backup_export_action">Exportar</string>
+    <string name="settings_image_processing">Procesamiento de imagen</string>
+    <string name="settings_deinterlacing">Desentrelazado</string>
+    <string name="settings_help_deinterlacing">Convierte la imagen entrelazada de PS2 para pantallas modernas. Se recomienda Automático. Si la imagen tiembla o muestra bordes en forma de peine, prueba Adaptativo o Bob y cambia el orden de campos si el movimiento se ve mal. Blend es más suave, pero reduce a la mitad la frecuencia efectiva.</string>
+    <string name="settings_deinterlacing_automatic">Automático (predeterminado)</string>
+    <string name="settings_deinterlacing_off">Sin desentrelazado</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (campo superior primero, dientes de sierra)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (campo inferior primero, dientes de sierra)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (campo superior primero)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (campo inferior primero)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (campo superior primero, mitad de FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (campo inferior primero, mitad de FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptativo (campo superior primero)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptativo (campo inferior primero)</string>
+    <string name="settings_dithering">Tramado</string>
+    <string name="settings_help_dithering">Controla el tramado de PS2 cuando lo solicita un juego. Sin escalar es el valor preciso predeterminado. Escalado puede hacer más visible la trama a resoluciones internas altas; Desactivado reduce la rejilla fina, pero puede crear bandas de color. Forzar 32 bits puede corregir degradados, pero también causar fallos gráficos.</string>
+    <string name="settings_dithering_off">Desactivado</string>
+    <string name="settings_dithering_scaled">Escalado</string>
+    <string name="settings_dithering_unscaled">Sin escalar (predeterminado)</string>
+    <string name="settings_dithering_force_32bit">Forzar 32 bits</string>
 </resources>

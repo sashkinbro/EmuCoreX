@@ -86,7 +86,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -182,6 +182,7 @@ import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.SettingsStyledDialog
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -634,68 +635,83 @@ fun SettingsScreen(
     }
 
     if (showBackupExportDialog) {
-        AlertDialog(
+        SettingsStyledDialog(
+            title = stringResource(R.string.settings_backup_export_title),
+            eyebrow = stringResource(R.string.settings_backup_section_title),
+            icon = Icons.Rounded.Save,
             onDismissRequest = { showBackupExportDialog = false },
-            title = {
-                Text(stringResource(R.string.settings_backup_export_title))
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_backup_export_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                includeSaveStatesInBackup = !includeSaveStatesInBackup
-                            },
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = stringResource(R.string.settings_backup_include_save_states),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = stringResource(R.string.settings_backup_include_save_states_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = includeSaveStatesInBackup,
-                                onCheckedChange = { includeSaveStatesInBackup = it }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showBackupExportDialog = false
-                        settingsBackupExporter.launch("emucorex-settings-backup.zip")
-                    }
+        ) {
+            Text(
+                text = stringResource(R.string.settings_backup_export_desc),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        includeSaveStatesInBackup = !includeSaveStatesInBackup
+                    },
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.26f),
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(stringResource(R.string.settings_backup_export_action))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBackupExportDialog = false }) {
-                    Text(stringResource(android.R.string.cancel))
+                    Icon(
+                        imageVector = Icons.Rounded.SaveAs,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_backup_include_save_states),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_backup_include_save_states_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = includeSaveStatesInBackup,
+                        onCheckedChange = { includeSaveStatesInBackup = it }
+                    )
                 }
             }
-        )
+
+            Button(
+                onClick = {
+                    showBackupExportDialog = false
+                    settingsBackupExporter.launch("emucorex-settings-backup.zip")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_backup_export_action),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
+            TextButton(
+                onClick = { showBackupExportDialog = false },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
     }
 
     if (showBiosDialog.value) {
@@ -2523,6 +2539,24 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Fixes -> {
+                    SettingsSection(title = stringResource(R.string.settings_image_processing)) {
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_deinterlacing),
+                            options = deinterlacingOptions(),
+                            selectedValue = uiState.deinterlaceMode,
+                            onSelect = viewModel::setDeinterlaceMode,
+                            helpText = stringResource(R.string.settings_help_deinterlacing),
+                            onResetToDefault = { viewModel.setDeinterlaceMode(defaults.deinterlaceMode) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_dithering),
+                            options = ditheringOptions(),
+                            selectedValue = uiState.dithering,
+                            onSelect = viewModel::setDithering,
+                            helpText = stringResource(R.string.settings_help_dithering),
+                            onResetToDefault = { viewModel.setDithering(defaults.dithering) }
+                        )
+                    }
                     SettingsSection(title = stringResource(R.string.settings_patches_section)) {
                         ToggleItem(
                             icon = Icons.Rounded.Visibility,
@@ -4581,6 +4615,8 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Audio, R.string.settings_audio_output_latency),
         entry(SettingsTab.Fixes, R.string.settings_widescreen_patches),
         entry(SettingsTab.Fixes, R.string.settings_no_interlacing_patches),
+        entry(SettingsTab.Fixes, R.string.settings_deinterlacing),
+        entry(SettingsTab.Fixes, R.string.settings_dithering),
         entry(SettingsTab.Fixes, R.string.settings_anti_blur),
         entry(SettingsTab.Controls, R.string.settings_overlay_scale),
         entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
@@ -5391,6 +5427,28 @@ private fun tvShaderOptions(): List<Pair<Int, String>> = listOf(
     5 to stringResource(R.string.settings_tv_shader_lottes_crt),
     6 to stringResource(R.string.settings_tv_shader_4x_rgss),
     7 to stringResource(R.string.settings_tv_shader_nx_agss)
+)
+
+@Composable
+private fun deinterlacingOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_deinterlacing_automatic),
+    1 to stringResource(R.string.settings_deinterlacing_off),
+    2 to stringResource(R.string.settings_deinterlacing_weave_tff),
+    3 to stringResource(R.string.settings_deinterlacing_weave_bff),
+    4 to stringResource(R.string.settings_deinterlacing_bob_tff),
+    5 to stringResource(R.string.settings_deinterlacing_bob_bff),
+    6 to stringResource(R.string.settings_deinterlacing_blend_tff),
+    7 to stringResource(R.string.settings_deinterlacing_blend_bff),
+    8 to stringResource(R.string.settings_deinterlacing_adaptive_tff),
+    9 to stringResource(R.string.settings_deinterlacing_adaptive_bff)
+)
+
+@Composable
+private fun ditheringOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_dithering_off),
+    1 to stringResource(R.string.settings_dithering_scaled),
+    2 to stringResource(R.string.settings_dithering_unscaled),
+    3 to stringResource(R.string.settings_dithering_force_32bit)
 )
 
 @Composable

@@ -153,6 +153,8 @@ data class SettingsSnapshot(
     val shadeBoostGamma: Int = 50,
     val enableWidescreenPatches: Boolean = false,
     val enableNoInterlacingPatches: Boolean = false,
+    val deinterlaceMode: Int = GsHackDefaults.DEINTERLACE_MODE_DEFAULT,
+    val dithering: Int = GsHackDefaults.DITHERING_DEFAULT,
     val antiBlur: Boolean = GsHackDefaults.ANTI_BLUR_DEFAULT,
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
@@ -519,6 +521,8 @@ class AppPreferences(private val context: Context) {
         private val SHADEBOOST_GAMMA = intPreferencesKey("shadeboost_gamma")
         private val ENABLE_WIDESCREEN_PATCHES = booleanPreferencesKey("enable_widescreen_patches")
         private val ENABLE_NO_INTERLACING_PATCHES = booleanPreferencesKey("enable_no_interlacing_patches")
+        private val DEINTERLACE_MODE = intPreferencesKey("deinterlace_mode")
+        private val DITHERING = intPreferencesKey("dithering")
         private val ANTI_BLUR = booleanPreferencesKey("anti_blur")
         private val ANISOTROPIC_FILTERING = intPreferencesKey("anisotropic_filtering")
         private val ENABLE_HW_MIPMAPPING = booleanPreferencesKey("enable_hw_mipmapping")
@@ -1432,6 +1436,12 @@ class AppPreferences(private val context: Context) {
                 shadeBoostGamma = prefs[SHADEBOOST_GAMMA] ?: 50,
                 enableWidescreenPatches = prefs[ENABLE_WIDESCREEN_PATCHES] ?: false,
                 enableNoInterlacingPatches = prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false,
+                deinterlaceMode = GsHackDefaults.coerceDeinterlaceMode(
+                    prefs[DEINTERLACE_MODE] ?: GsHackDefaults.DEINTERLACE_MODE_DEFAULT
+                ),
+                dithering = GsHackDefaults.coerceDithering(
+                    prefs[DITHERING] ?: GsHackDefaults.DITHERING_DEFAULT
+                ),
                 antiBlur = prefs[ANTI_BLUR] ?: GsHackDefaults.ANTI_BLUR_DEFAULT,
                 anisotropicFiltering = GsHackDefaults.coerceAnisotropicFiltering(
                     prefs[ANISOTROPIC_FILTERING] ?: GsHackDefaults.ANISOTROPIC_FILTERING_DEFAULT
@@ -2451,6 +2461,24 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[ENABLE_NO_INTERLACING_PATCHES] = enabled }
     }
 
+    val deinterlaceMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        GsHackDefaults.coerceDeinterlaceMode(
+            prefs[DEINTERLACE_MODE] ?: GsHackDefaults.DEINTERLACE_MODE_DEFAULT
+        )
+    }
+
+    suspend fun setDeinterlaceMode(value: Int) {
+        context.dataStore.edit { it[DEINTERLACE_MODE] = GsHackDefaults.coerceDeinterlaceMode(value) }
+    }
+
+    val dithering: Flow<Int> = context.dataStore.data.map { prefs ->
+        GsHackDefaults.coerceDithering(prefs[DITHERING] ?: GsHackDefaults.DITHERING_DEFAULT)
+    }
+
+    suspend fun setDithering(value: Int) {
+        context.dataStore.edit { it[DITHERING] = GsHackDefaults.coerceDithering(value) }
+    }
+
     val antiBlur: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[ANTI_BLUR] ?: GsHackDefaults.ANTI_BLUR_DEFAULT
     }
@@ -3171,6 +3199,12 @@ class AppPreferences(private val context: Context) {
             put("tvShader", prefs[TV_SHADER]?.let(GsHackDefaults::coerceTvShader) ?: GsHackDefaults.TV_SHADER_DEFAULT)
             put("enableWidescreenPatches", prefs[ENABLE_WIDESCREEN_PATCHES] ?: false)
             put("enableNoInterlacingPatches", prefs[ENABLE_NO_INTERLACING_PATCHES] ?: false)
+            put("deinterlaceMode", GsHackDefaults.coerceDeinterlaceMode(
+                prefs[DEINTERLACE_MODE] ?: GsHackDefaults.DEINTERLACE_MODE_DEFAULT
+            ))
+            put("dithering", GsHackDefaults.coerceDithering(
+                prefs[DITHERING] ?: GsHackDefaults.DITHERING_DEFAULT
+            ))
             put("antiBlur", prefs[ANTI_BLUR] ?: GsHackDefaults.ANTI_BLUR_DEFAULT)
             put("anisotropicFiltering", GsHackDefaults.coerceAnisotropicFiltering(
                 prefs[ANISOTROPIC_FILTERING] ?: GsHackDefaults.ANISOTROPIC_FILTERING_DEFAULT
@@ -3466,6 +3500,12 @@ class AppPreferences(private val context: Context) {
             )
             prefs[ENABLE_WIDESCREEN_PATCHES] = json.optBoolean("enableWidescreenPatches", false)
             prefs[ENABLE_NO_INTERLACING_PATCHES] = json.optBoolean("enableNoInterlacingPatches", false)
+            prefs[DEINTERLACE_MODE] = GsHackDefaults.coerceDeinterlaceMode(
+                json.optInt("deinterlaceMode", GsHackDefaults.DEINTERLACE_MODE_DEFAULT)
+            )
+            prefs[DITHERING] = GsHackDefaults.coerceDithering(
+                json.optInt("dithering", GsHackDefaults.DITHERING_DEFAULT)
+            )
             prefs[ANTI_BLUR] = json.optBoolean("antiBlur", GsHackDefaults.ANTI_BLUR_DEFAULT)
             prefs[ANISOTROPIC_FILTERING] = GsHackDefaults.coerceAnisotropicFiltering(
                 json.optInt("anisotropicFiltering", GsHackDefaults.ANISOTROPIC_FILTERING_DEFAULT)

@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.SdStorage
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,46 +36,44 @@ fun EmulatorDataLocationDialog(
     onSelect: (EmulatorDataLocation) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    SettingsStyledDialog(
+        title = stringResource(R.string.emulator_data_location_title),
+        eyebrow = stringResource(R.string.settings_emulator_data_path),
+        icon = Icons.Rounded.SdStorage,
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.emulator_data_location_title)) },
-        text = {
-            Column {
-                Text(
-                    text = stringResource(R.string.emulator_data_location_description),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                EmulatorDataLocationOption(
-                    icon = Icons.Rounded.PhoneAndroid,
-                    title = stringResource(R.string.emulator_data_location_internal),
-                    description = stringResource(R.string.emulator_data_location_internal_description),
-                    selected = selectedLocation == EmulatorDataLocation.INTERNAL,
-                    enabled = true,
-                    onClick = { onSelect(EmulatorDataLocation.INTERNAL) },
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-                EmulatorDataLocationOption(
-                    icon = Icons.Rounded.SdStorage,
-                    title = stringResource(R.string.emulator_data_location_sd_card),
-                    description = if (sdCardAvailable) {
-                        stringResource(R.string.emulator_data_location_sd_card_description)
-                    } else {
-                        stringResource(R.string.emulator_data_location_sd_card_unavailable)
-                    },
-                    selected = selectedLocation == EmulatorDataLocation.SD_CARD,
-                    enabled = sdCardAvailable,
-                    onClick = { onSelect(EmulatorDataLocation.SD_CARD) },
-                    modifier = Modifier.padding(top = 10.dp)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
+    ) {
+        Text(
+            text = stringResource(R.string.emulator_data_location_description),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge
+        )
+        EmulatorDataLocationOption(
+            icon = Icons.Rounded.PhoneAndroid,
+            title = stringResource(R.string.emulator_data_location_internal),
+            description = stringResource(R.string.emulator_data_location_internal_description),
+            selected = selectedLocation == EmulatorDataLocation.INTERNAL,
+            enabled = true,
+            onClick = { onSelect(EmulatorDataLocation.INTERNAL) }
+        )
+        EmulatorDataLocationOption(
+            icon = Icons.Rounded.SdStorage,
+            title = stringResource(R.string.emulator_data_location_sd_card),
+            description = if (sdCardAvailable) {
+                stringResource(R.string.emulator_data_location_sd_card_description)
+            } else {
+                stringResource(R.string.emulator_data_location_sd_card_unavailable)
+            },
+            selected = selectedLocation == EmulatorDataLocation.SD_CARD,
+            enabled = sdCardAvailable,
+            onClick = { onSelect(EmulatorDataLocation.SD_CARD) }
+        )
+        TextButton(
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.cancel))
         }
-    )
+    }
 }
 
 @Composable

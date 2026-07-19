@@ -1776,4 +1776,23 @@
     <string name="settings_backup_include_save_states">クイックセーブを含める</string>
     <string name="settings_backup_include_save_states_desc">クイックセーブの状態をアーカイブに追加します。サイズが大幅に増える場合があり、異なるコアバージョンでは動作しない可能性があります。</string>
     <string name="settings_backup_export_action">エクスポート</string>
+    <string name="settings_image_processing">画像処理</string>
+    <string name="settings_deinterlacing">インターレース解除</string>
+    <string name="settings_help_deinterlacing">PS2 のインターレース映像を現在の画面向けに変換します。自動を推奨します。映像が揺れる、または櫛状の輪郭が出る場合は Adaptive または Bob を試し、動きが不自然ならフィールド順を切り替えてください。Blend は滑らかですが、実効フレームレートが半分になります。</string>
+    <string name="settings_deinterlacing_automatic">自動（既定）</string>
+    <string name="settings_deinterlacing_off">インターレース解除なし</string>
+    <string name="settings_deinterlacing_weave_tff">Weave（上位フィールド優先、ギザギザ）</string>
+    <string name="settings_deinterlacing_weave_bff">Weave（下位フィールド優先、ギザギザ）</string>
+    <string name="settings_deinterlacing_bob_tff">Bob（上位フィールド優先）</string>
+    <string name="settings_deinterlacing_bob_bff">Bob（下位フィールド優先）</string>
+    <string name="settings_deinterlacing_blend_tff">Blend（上位フィールド優先、半分 FPS）</string>
+    <string name="settings_deinterlacing_blend_bff">Blend（下位フィールド優先、半分 FPS）</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive（上位フィールド優先）</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive（下位フィールド優先）</string>
+    <string name="settings_dithering">ディザリング</string>
+    <string name="settings_help_dithering">ゲームが要求したときの PS2 ディザリングを制御します。未スケーリングが正確な既定値です。スケーリングは内部解像度が高いと模様が目立つ場合があります。オフは細かな格子を減らしますが、色の階調に帯が出ることがあります。32 ビット強制は階調を改善する場合がありますが、描画を崩す可能性があります。</string>
+    <string name="settings_dithering_off">オフ</string>
+    <string name="settings_dithering_scaled">スケーリング</string>
+    <string name="settings_dithering_unscaled">未スケーリング（既定）</string>
+    <string name="settings_dithering_force_32bit">32 ビットを強制</string>
 </resources>

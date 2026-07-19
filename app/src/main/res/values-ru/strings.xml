@@ -1781,4 +1781,23 @@
     <string name="settings_backup_include_save_states">Включить быстрые сохранения</string>
     <string name="settings_backup_include_save_states_desc">Добавляет быстрые сохранения в архив. Его размер может значительно увеличиться, а сохранения могут не работать с другой версией ядра.</string>
     <string name="settings_backup_export_action">Экспортировать</string>
+    <string name="settings_image_processing">Обработка изображения</string>
+    <string name="settings_deinterlacing">Устранение чересстрочности</string>
+    <string name="settings_help_deinterlacing">Преобразует чересстрочное изображение PS2 для современных экранов. Рекомендуется автоматический режим. Если изображение дрожит или видны гребенчатые края, попробуйте Adaptive или Bob; если движение выглядит неверно, смените порядок полей. Blend делает изображение плавнее, но вдвое снижает эффективную частоту кадров.</string>
+    <string name="settings_deinterlacing_automatic">Автоматически (по умолчанию)</string>
+    <string name="settings_deinterlacing_off">Не устранять чересстрочность</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (сначала верхнее поле, зубчатые края)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (сначала нижнее поле, зубчатые края)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (сначала верхнее поле)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (сначала нижнее поле)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (сначала верхнее поле, половина FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (сначала нижнее поле, половина FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (сначала верхнее поле)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (сначала нижнее поле)</string>
+    <string name="settings_dithering">Дизеринг</string>
+    <string name="settings_help_dithering">Управляет дизерингом PS2, когда его использует игра. Режим без масштабирования является точным вариантом по умолчанию. Масштабирование может сделать сетку заметнее при высоком внутреннем разрешении; отключение убирает мелкую сетку, но может вызвать полосы на градиентах. Принудительный 32-битный режим иногда исправляет градиенты, но может нарушить рендеринг.</string>
+    <string name="settings_dithering_off">Выкл.</string>
+    <string name="settings_dithering_scaled">С масштабированием</string>
+    <string name="settings_dithering_unscaled">Без масштабирования (по умолчанию)</string>
+    <string name="settings_dithering_force_32bit">Принудительно 32-битный режим</string>
 </resources>

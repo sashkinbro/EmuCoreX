@@ -1778,4 +1778,23 @@
     <string name="settings_backup_include_save_states">包含快速存档</string>
     <string name="settings_backup_include_save_states_desc">将快速存档状态添加到归档中。归档大小可能显著增加，并且存档状态可能无法在其他核心版本中使用。</string>
     <string name="settings_backup_export_action">导出</string>
+    <string name="settings_image_processing">图像处理</string>
+    <string name="settings_deinterlacing">去隔行</string>
+    <string name="settings_help_deinterlacing">将 PS2 的隔行图像转换为适合现代屏幕的图像。建议使用自动模式。如果画面抖动或出现梳状边缘，请尝试自适应或 Bob；如果运动方向异常，请切换场序。Blend 更平滑，但有效帧率会减半。</string>
+    <string name="settings_deinterlacing_automatic">自动（默认）</string>
+    <string name="settings_deinterlacing_off">不进行去隔行</string>
+    <string name="settings_deinterlacing_weave_tff">Weave（上场优先，锯齿）</string>
+    <string name="settings_deinterlacing_weave_bff">Weave（下场优先，锯齿）</string>
+    <string name="settings_deinterlacing_bob_tff">Bob（上场优先）</string>
+    <string name="settings_deinterlacing_bob_bff">Bob（下场优先）</string>
+    <string name="settings_deinterlacing_blend_tff">Blend（上场优先，半帧率）</string>
+    <string name="settings_deinterlacing_blend_bff">Blend（下场优先，半帧率）</string>
+    <string name="settings_deinterlacing_adaptive_tff">自适应（上场优先）</string>
+    <string name="settings_deinterlacing_adaptive_bff">自适应（下场优先）</string>
+    <string name="settings_dithering">抖动</string>
+    <string name="settings_help_dithering">控制游戏请求的 PS2 抖动效果。不缩放是准确的默认值。随分辨率缩放可能让图案在较高内部分辨率下更明显；关闭可减少细密网格，但可能产生色带。强制 32 位有时能改善渐变，但也可能导致渲染错误。</string>
+    <string name="settings_dithering_off">关闭</string>
+    <string name="settings_dithering_scaled">随分辨率缩放</string>
+    <string name="settings_dithering_unscaled">不缩放（默认）</string>
+    <string name="settings_dithering_force_32bit">强制 32 位</string>
 </resources>

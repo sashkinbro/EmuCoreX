@@ -1776,4 +1776,23 @@
     <string name="settings_backup_include_save_states">빠른 저장 포함</string>
     <string name="settings_backup_include_save_states_desc">빠른 저장 상태를 보관 파일에 추가합니다. 크기가 크게 늘어날 수 있으며 다른 코어 버전에서는 상태가 작동하지 않을 수 있습니다.</string>
     <string name="settings_backup_export_action">내보내기</string>
+    <string name="settings_image_processing">이미지 처리</string>
+    <string name="settings_deinterlacing">인터레이스 제거</string>
+    <string name="settings_help_deinterlacing">PS2 인터레이스 영상을 현대 디스플레이에 맞게 변환합니다. 자동을 권장합니다. 화면이 떨리거나 빗살무늬 가장자리가 보이면 적응형 또는 Bob을 사용하고, 움직임이 이상하면 필드 순서를 바꾸세요. Blend는 더 부드럽지만 유효 프레임률이 절반으로 줄어듭니다.</string>
+    <string name="settings_deinterlacing_automatic">자동(기본값)</string>
+    <string name="settings_deinterlacing_off">인터레이스 제거 안 함</string>
+    <string name="settings_deinterlacing_weave_tff">Weave(상단 필드 우선, 톱니)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave(하단 필드 우선, 톱니)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob(상단 필드 우선)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob(하단 필드 우선)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend(상단 필드 우선, 절반 FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend(하단 필드 우선, 절반 FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">적응형(상단 필드 우선)</string>
+    <string name="settings_deinterlacing_adaptive_bff">적응형(하단 필드 우선)</string>
+    <string name="settings_dithering">디더링</string>
+    <string name="settings_help_dithering">게임이 요청할 때 PS2 디더링을 제어합니다. 비스케일이 정확한 기본값입니다. 스케일은 높은 내부 해상도에서 무늬가 더 잘 보일 수 있고, 끔은 미세 격자를 줄이지만 색상 밴딩을 만들 수 있습니다. 32비트 강제는 일부 그라데이션을 고칠 수 있지만 렌더링을 깨뜨릴 수 있습니다.</string>
+    <string name="settings_dithering_off">끔</string>
+    <string name="settings_dithering_scaled">스케일</string>
+    <string name="settings_dithering_unscaled">비스케일(기본값)</string>
+    <string name="settings_dithering_force_32bit">32비트 강제</string>
 </resources>

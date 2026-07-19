@@ -1777,4 +1777,23 @@
     <string name="settings_backup_include_save_states">त्वरित सेव शामिल करें</string>
     <string name="settings_backup_include_save_states_desc">त्वरित सेव स्थितियों को संग्रह में जोड़ता है। इसका आकार काफी बढ़ सकता है और स्थितियाँ किसी दूसरे कोर संस्करण के साथ काम नहीं कर सकतीं।</string>
     <string name="settings_backup_export_action">निर्यात करें</string>
+    <string name="settings_image_processing">चित्र प्रसंस्करण</string>
+    <string name="settings_deinterlacing">डीइंटरलेसिंग</string>
+    <string name="settings_help_deinterlacing">PS2 के इंटरलेस्ड चित्र को आधुनिक स्क्रीन के लिए बदलता है। स्वचालित मोड सुझाया जाता है। चित्र काँपे या कंघी जैसे किनारे दिखें तो अनुकूली या Bob आज़माएँ; गति गलत लगे तो फ़ील्ड क्रम बदलें। Blend अधिक सुचारु है, लेकिन प्रभावी फ़्रेम दर आधी कर देता है।</string>
+    <string name="settings_deinterlacing_automatic">स्वचालित (डिफ़ॉल्ट)</string>
+    <string name="settings_deinterlacing_off">डीइंटरलेसिंग बंद</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (ऊपरी फ़ील्ड पहले, दाँतेदार किनारे)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (निचला फ़ील्ड पहले, दाँतेदार किनारे)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (ऊपरी फ़ील्ड पहले)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (निचला फ़ील्ड पहले)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (ऊपरी फ़ील्ड पहले, आधी FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (निचला फ़ील्ड पहले, आधी FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">अनुकूली (ऊपरी फ़ील्ड पहले)</string>
+    <string name="settings_deinterlacing_adaptive_bff">अनुकूली (निचला फ़ील्ड पहले)</string>
+    <string name="settings_dithering">डिथरिंग</string>
+    <string name="settings_help_dithering">जब कोई गेम माँगता है तब PS2 डिथरिंग को नियंत्रित करता है। बिना स्केल सटीक डिफ़ॉल्ट है। स्केल किया हुआ मोड उच्च आंतरिक रिज़ॉल्यूशन पर पैटर्न को अधिक दिखा सकता है; बंद करने से महीन जाली घटती है, लेकिन रंगों में पट्टियाँ बन सकती हैं। 32-बिट बाध्य करना कुछ ग्रेडिएंट ठीक कर सकता है, पर रेंडरिंग बिगाड़ सकता है।</string>
+    <string name="settings_dithering_off">बंद</string>
+    <string name="settings_dithering_scaled">स्केल किया हुआ</string>
+    <string name="settings_dithering_unscaled">बिना स्केल (डिफ़ॉल्ट)</string>
+    <string name="settings_dithering_force_32bit">32-बिट बाध्य करें</string>
 </resources>

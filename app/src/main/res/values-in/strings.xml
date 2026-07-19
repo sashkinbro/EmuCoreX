@@ -1791,4 +1791,23 @@
     <string name="settings_backup_include_save_states">Sertakan simpan cepat</string>
     <string name="settings_backup_include_save_states_desc">Menambahkan status simpan cepat ke arsip. Ukurannya dapat bertambah besar dan status mungkin tidak berfungsi dengan versi inti yang berbeda.</string>
     <string name="settings_backup_export_action">Ekspor</string>
+    <string name="settings_image_processing">Pemrosesan gambar</string>
+    <string name="settings_deinterlacing">Deinterlacing</string>
+    <string name="settings_help_deinterlacing">Mengubah gambar interlaced PS2 untuk layar modern. Otomatis disarankan. Jika gambar bergetar atau menampilkan tepi seperti sisir, coba Adaptif atau Bob dan tukar urutan bidang bila gerakan terlihat salah. Blend lebih halus, tetapi mengurangi separuh laju bingkai efektif.</string>
+    <string name="settings_deinterlacing_automatic">Otomatis (bawaan)</string>
+    <string name="settings_deinterlacing_off">Tanpa deinterlacing</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (bidang atas lebih dulu, bergerigi)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (bidang bawah lebih dulu, bergerigi)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (bidang atas lebih dulu)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (bidang bawah lebih dulu)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (bidang atas lebih dulu, setengah FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (bidang bawah lebih dulu, setengah FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptif (bidang atas lebih dulu)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptif (bidang bawah lebih dulu)</string>
+    <string name="settings_dithering">Dithering</string>
+    <string name="settings_help_dithering">Mengontrol dithering PS2 saat diminta game. Tanpa skala adalah bawaan yang akurat. Berskala dapat membuat pola lebih terlihat pada resolusi internal tinggi; Nonaktif mengurangi kisi halus tetapi dapat menimbulkan pita warna. Paksa 32 bit dapat memperbaiki gradasi, tetapi juga dapat merusak rendering.</string>
+    <string name="settings_dithering_off">Nonaktif</string>
+    <string name="settings_dithering_scaled">Berskala</string>
+    <string name="settings_dithering_unscaled">Tanpa skala (bawaan)</string>
+    <string name="settings_dithering_force_32bit">Paksa 32 bit</string>
 </resources>

@@ -1777,4 +1777,23 @@
     <string name="settings_backup_include_save_states">Hızlı kayıtları dahil et</string>
     <string name="settings_backup_include_save_states_desc">Hızlı kayıt durumlarını arşive ekler. Arşiv boyutu önemli ölçüde büyüyebilir ve durumlar farklı bir çekirdek sürümüyle çalışmayabilir.</string>
     <string name="settings_backup_export_action">Dışa aktar</string>
+    <string name="settings_image_processing">Görüntü işleme</string>
+    <string name="settings_deinterlacing">Taramasızlaştırma</string>
+    <string name="settings_help_deinterlacing">PS2 görüntüsünü modern ekranlar için taramasız hâle getirir. Otomatik önerilir. Görüntü titriyor veya taraklı kenarlar gösteriyorsa Uyarlanır ya da Bob deneyin; hareket yanlış görünürse alan sırasını değiştirin. Blend daha yumuşaktır ancak etkin kare hızını yarıya düşürür.</string>
+    <string name="settings_deinterlacing_automatic">Otomatik (varsayılan)</string>
+    <string name="settings_deinterlacing_off">Taramasızlaştırma yok</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (üst alan önce, testere dişi)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (alt alan önce, testere dişi)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (üst alan önce)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (alt alan önce)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (üst alan önce, yarım FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (alt alan önce, yarım FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Uyarlanır (üst alan önce)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Uyarlanır (alt alan önce)</string>
+    <string name="settings_dithering">Renk titreşimi</string>
+    <string name="settings_help_dithering">Bir oyun istediğinde PS2 renk titreşimini denetler. Ölçeklendirilmemiş doğru varsayılandır. Ölçeklendirilmiş, yüksek iç çözünürlükte deseni daha görünür yapabilir; Kapalı ince ızgarayı azaltır ancak renk bantları oluşturabilir. 32 biti zorlamak bazı geçişleri düzeltebilir fakat görüntülemeyi bozabilir.</string>
+    <string name="settings_dithering_off">Kapalı</string>
+    <string name="settings_dithering_scaled">Ölçeklendirilmiş</string>
+    <string name="settings_dithering_unscaled">Ölçeklendirilmemiş (varsayılan)</string>
+    <string name="settings_dithering_force_32bit">32 biti zorla</string>
 </resources>
