@@ -107,8 +107,3 @@ app/src/main/cpp/PCSX2/bin/docs/
 CoreVixlOLD/
 OLDCORE/
 oldcore/
-
-# Tracked focused page-size documentation.
-!/docs/
-/docs/*
-!/docs/android-16kb-page-support.md
