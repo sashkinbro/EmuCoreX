@@ -1553,6 +1553,7 @@
     <string name="hang_trace_title">Hang Trace</string>
     <string name="hang_trace_desc">Records recent EE, IOP, VU0, and VU1 opcodes to data/hang_trace.txt while reproducing loading hangs.</string>
     <string name="error_otg_read_only">This folder is read-only due to Android restrictions. Please select a folder on internal storage or a supported SD card.</string>
+    <string name="error_storage_permission_not_persisted">Android did not grant permanent access to this location. Please choose it again in the system picker.</string>
     <string name="settings_touch_haptics_strength">Touch haptic strength</string>
     <string name="settings_touch_haptics_test">Test touch haptics</string>
     <string name="settings_touch_haptics_test_desc">Previews the selected press-and-release feel at the current strength.</string>

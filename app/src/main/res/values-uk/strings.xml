@@ -1336,6 +1336,7 @@
     <string name="pro_feature_support">Додайте золоту іконку лаунчера та підтримайте безперервну розробку.</string>
     <string name="onboarding_pro_subtitle">Crimson надає EmuCoreX темнішого вигляду, а версія Pro допомагає продовжувати розробку.</string>
     <string name="error_otg_read_only">Ця папка доступна лише для читання через обмеження Android. Будь ласка, оберіть папку у внутрішній пам\'яті або на підтримуваній SD-карті.</string>
+    <string name="error_storage_permission_not_persisted">Android не надав постійний доступ до цього розташування. Будь ласка, виберіть його ще раз у системному вікні.</string>
     <string name="settings_about_privacy_policy">Політика конфіденційності</string>
     <string name="settings_about_privacy_policy_desc">Відкрити політику конфіденційності EmuCoreX.</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>

@@ -596,7 +596,7 @@ fun SettingsScreen(
     }
 
     if (showBiosDialog.value) {
-        val biosDisplayName = uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
+        val biosDisplayName = uiState.biosPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
             ?: stringResource(R.string.settings_not_set)
         AlertDialog(
             onDismissRequest = { showBiosDialog.value = false },
@@ -1810,7 +1810,7 @@ private fun SettingsContent(
 
                 SettingsTab.Library -> {
                     val biosDisplayName = remember(uiState.biosPath, context, notSetLabel) {
-                        uiState.biosPath?.let { DocumentPathResolver.getDisplayName(context, it) }
+                        uiState.biosPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
                             ?: notSetLabel
                     }
                     val gameDisplayName = if (uiState.gamePaths.isEmpty()) {
@@ -1819,7 +1819,7 @@ private fun SettingsContent(
                         stringResource(R.string.settings_game_folders_count, uiState.gamePaths.size)
                     }
                     val emulatorDataDisplayName = remember(uiState.emulatorDataPath, context) {
-                        uiState.emulatorDataPath?.let { DocumentPathResolver.getDisplayName(context, it) }
+                        uiState.emulatorDataPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
                     }
                     val repository = remember(context) {
                         MemoryCardRepository(context, AppPreferences(context))
@@ -1864,7 +1864,7 @@ private fun SettingsContent(
                         uiState.gamePaths.forEach { path ->
                             SettingsItem(
                                 icon = Icons.Rounded.DeleteOutline,
-                                label = DocumentPathResolver.getDisplayName(context, path),
+                                label = DocumentPathResolver.getFallbackDisplayName(path),
                                 value = stringResource(R.string.game_folders_remove),
                                 onClick = { viewModel.removeGamePath(path) }
                             )

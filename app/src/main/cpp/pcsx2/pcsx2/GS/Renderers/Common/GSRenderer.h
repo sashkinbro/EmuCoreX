@@ -25,6 +25,8 @@ private:
 	u64 m_last_draw_n = 0;
 	u64 m_last_transfer_n = 0;
 	u64 m_fps_cap_next_present = 0;
+	u64 m_last_gpu_reset_time = 0;
+	bool m_gpu_device_failed = false;
 
 protected:
 	GSVector2i m_real_size{0, 0};

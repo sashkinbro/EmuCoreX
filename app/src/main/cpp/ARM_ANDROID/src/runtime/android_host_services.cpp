@@ -212,7 +212,7 @@ void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_
 	s_performance_gpu_timing_requested.store(request_gpu_timing, std::memory_order_relaxed);
 	if (MTGS::IsOpen())
 	{
-		MTGS::RunOnGSThread([request_gpu_timing]() {
+		Host::RunOnGSThread([request_gpu_timing]() {
 			bool timing_active = false;
 			std::string gpu_name;
 			if (g_gs_device)
@@ -616,7 +616,13 @@ void Host::RunOnGSThread(std::function<void()> function)
 		return;
 
 	Host::RunOnCPUThread([fn = std::move(function)]() mutable {
-		MTGS::RunOnGSThread(std::move(fn));
+		// MTGS has a single-producer ring buffer. Android callbacks can arrive on
+		// Binder, UI, HTTP, and VM threads, so every GS command must first be
+		// serialized through the CPU thread. The GS may have closed while this
+		// task was waiting in the CPU queue; in that case dropping the callback is
+		// safer than writing into a stopped ring buffer.
+		if (MTGS::IsOpen())
+			MTGS::RunOnGSThread(std::move(fn));
 	}, false);
 }
 

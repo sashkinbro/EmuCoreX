@@ -3,8 +3,20 @@ package com.sbro.emucorex.core
 import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 object EmulatorStorage {
+    private val verifiedCustomRoots = ConcurrentHashMap.newKeySet<String>()
+
+    data class RuntimeDirectories(
+        val saveStates: File,
+        val memoryCards: File,
+        val textures: File,
+        val cheats: File,
+        val patches: File,
+        val logs: File
+    )
+
     private val runtimeSubdirectories = listOf(
         "sstates",
         "memcards",
@@ -26,7 +38,7 @@ object EmulatorStorage {
             return customRoot
         }
 
-        return defaultRoot(context).apply { prepareRoot(this) }
+        return defaultRoot(context).apply { ensureRootDirectories(this) }
     }
 
     fun prepareCustomDataRoot(customRootPath: String?): Boolean {
@@ -55,11 +67,39 @@ object EmulatorStorage {
     fun logDir(context: Context, customRootPath: String? = null): File =
         File(root(context, customRootPath), "logs").apply { mkdirs() }
 
+    fun runtimeDirectories(context: Context, customRootPath: String? = null): RuntimeDirectories {
+        val root = root(context, customRootPath)
+        fun directory(name: String): File = File(root, name).apply { mkdirs() }
+        return RuntimeDirectories(
+            saveStates = directory("sstates"),
+            memoryCards = directory("memcards"),
+            textures = directory("textures"),
+            cheats = directory("cheats"),
+            patches = directory("patches"),
+            logs = directory("logs")
+        )
+    }
+
     fun appStateDir(context: Context): File = File(root(context), "app-state").apply { mkdirs() }
 
     fun importedCheatsDir(context: Context): File = File(appStateDir(context), "imported-cheats").apply { mkdirs() }
 
     private fun prepareRoot(root: File): Boolean {
+        val rootPath = root.absolutePath
+        if (!ensureRootDirectories(root)) {
+            verifiedCustomRoots.remove(rootPath)
+            return false
+        }
+        if (rootPath in verifiedCustomRoots) return true
+
+        val writable = canWriteProbe(root) && runtimeSubdirectories.all { subdirectory ->
+            canWriteProbe(File(root, subdirectory))
+        }
+        if (writable) verifiedCustomRoots.add(rootPath)
+        return writable
+    }
+
+    private fun ensureRootDirectories(root: File): Boolean {
         return runCatching {
             if (!root.exists() && !root.mkdirs()) return false
             if (!root.isDirectory) return false
@@ -68,11 +108,6 @@ object EmulatorStorage {
                 val dir = File(root, subdirectory)
                 if (!dir.exists() && !dir.mkdirs()) return false
                 if (!dir.isDirectory) return false
-            }
-
-            if (!canWriteProbe(root)) return false
-            runtimeSubdirectories.forEach { subdirectory ->
-                if (!canWriteProbe(File(root, subdirectory))) return false
             }
             true
         }.getOrDefault(false)

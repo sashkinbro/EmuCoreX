@@ -1437,6 +1437,7 @@
     <string name="hang_trace_title">ردیابی هنگی (Hang Trace)</string>
     <string name="hang_trace_desc">دستورالعمل‌های اخیر EE، IOP، VU0 و VU1 را در data/hang_trace.txt در هنگام بازتولید هنگی‌های بارگذاری ضبط می‌کند.</string>
     <string name="error_otg_read_only">به دلیل محدودیت‌های اندروید، این پوشه فقط خواندنی (Read-Only) است. لطفاً یک پوشه در حافظه داخلی یا یک کارت SD پشتیبانی شده انتخاب کنید.</string>
+    <string name="error_storage_permission_not_persisted">اندروید دسترسی دائمی به این مکان را نداد. لطفاً آن را دوباره در انتخاب‌گر سیستم انتخاب کنید.</string>
     <string name="settings_touch_haptics_strength">قدرت بازخورد لمسی</string>
     <string name="settings_touch_haptics_test">آزمایش بازخورد لمسی</string>
     <string name="settings_touch_haptics_test_desc">یک تیک کوتاه را با قدرت لمسی فعلی اجرا می‌کند.</string>

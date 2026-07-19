@@ -68,6 +68,9 @@ object NativeApp {
     @JvmStatic external fun reloadDataRoot(path: String)
     @JvmStatic external fun setSystemCaBundlePath(path: String)
     @JvmStatic external fun getGameTitle(path: String): String?
+    @JvmStatic external fun isBiosPath(path: String): Boolean
+    /** Takes ownership of [fd] and always closes it before returning. */
+    @JvmStatic external fun isBiosFd(fd: Int): Boolean
     @JvmStatic external fun setPadVibration(enabled: Boolean)
     @JvmStatic external fun setPerformanceMetricsEnabled(visible: Boolean, detailed: Boolean, gpuTiming: Boolean)
     @JvmStatic external fun getPerformanceMetricsSnapshot(): String?

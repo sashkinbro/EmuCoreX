@@ -454,7 +454,6 @@ fun OnboardingScreen(
                                             emulatorDataPath = uiState.emulatorDataPath,
                                             biosValid = uiState.biosValid,
                                             gamePathValid = uiState.gamePathValid,
-                                            context = context,
                                             launchBiosPicker = launchBiosPicker,
                                             launchGamePicker = launchGamePicker,
                                             onRemoveGamePath = viewModel::removeGamePath,
@@ -577,7 +576,6 @@ fun OnboardingScreen(
                                     emulatorDataPath = uiState.emulatorDataPath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
-                                    context = context,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
                                     onRemoveGamePath = viewModel::removeGamePath,
@@ -1034,7 +1032,6 @@ private fun OnboardingSetupContent(
     emulatorDataPath: String?,
     biosValid: Boolean,
     gamePathValid: Boolean,
-    context: android.content.Context,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
     onRemoveGamePath: (String) -> Unit,
@@ -1063,7 +1060,7 @@ private fun OnboardingSetupContent(
                 description = if (biosPath == null) {
                     stringResource(R.string.onboarding_bios_desc)
                 } else {
-                    DocumentPathResolver.getDisplayName(context, biosPath)
+                    DocumentPathResolver.getFallbackDisplayName(biosPath)
                 },
                 status = when {
                     biosPath == null -> stringResource(R.string.onboarding_status_required)
@@ -1112,7 +1109,7 @@ private fun OnboardingSetupContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = DocumentPathResolver.getDisplayName(context, path),
+                            text = DocumentPathResolver.getFallbackDisplayName(path),
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1132,7 +1129,7 @@ private fun OnboardingSetupContent(
             SetupCard(
                 icon = Icons.Rounded.FolderOpen,
                 title = stringResource(R.string.onboarding_emulator_folder_title),
-                description = emulatorDataPath?.let { DocumentPathResolver.getDisplayName(context, it) }
+                description = emulatorDataPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
                     ?: stringResource(R.string.onboarding_emulator_folder_desc),
                 status = if (emulatorDataPath.isNullOrBlank()) {
                     stringResource(R.string.onboarding_status_default_folder)

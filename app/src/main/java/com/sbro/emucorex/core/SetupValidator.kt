@@ -1,6 +1,8 @@
 package com.sbro.emucorex.core
 
 import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
@@ -10,12 +12,19 @@ object SetupValidator {
     private const val MAX_GAME_READ_PROBE_FILES = 24
     private const val MAX_GAME_READ_PROBE_DIRECTORIES = 96
 
+    internal enum class DocumentEntryKind {
+        DIRECTORY,
+        GAME_FILE,
+        UNKNOWN,
+        OTHER
+    }
+
     fun isGameFolderPresentForStartup(context: Context, rawPath: String?): Boolean {
         if (rawPath.isNullOrBlank()) return false
 
         return if (rawPath.startsWith("content://")) {
-            val root = DocumentFile.fromTreeUri(context, rawPath.toUri()) ?: return false
-            runCatching { root.exists() && root.isDirectory }.getOrDefault(false)
+            val uri = rawPath.toUri()
+            treeDocument(context, uri) != null && canReadTree(context, uri)
         } else {
             val dir = File(rawPath)
             if (DocumentPathResolver.findAccessibleTreeUriForRawPath(context, rawPath) != null) {
@@ -35,15 +44,14 @@ object SetupValidator {
         if (rawPath.isNullOrBlank()) return false
 
         return if (rawPath.startsWith("content://")) {
-            val root = DocumentFile.fromTreeUri(context, rawPath.toUri()) ?: return false
-            runCatching { root.isDirectory && root.exists() }.getOrDefault(false)
+            val uri = rawPath.toUri()
+            treeDocument(context, uri) != null && canReadTree(context, uri)
         } else {
             val dir = File(rawPath)
             if (DocumentPathResolver.isScopedStorageExternalPath(rawPath)) {
                 val migratedUri = DocumentPathResolver.findAccessibleTreeUriForRawPath(context, rawPath)
                 if (migratedUri != null) {
-                    val root = DocumentFile.fromTreeUri(context, migratedUri) ?: return false
-                    return runCatching { root.isDirectory && root.exists() }.getOrDefault(false)
+                    return treeDocument(context, migratedUri) != null && canReadTree(context, migratedUri)
                 }
                 return false
             }
@@ -56,7 +64,7 @@ object SetupValidator {
         rawPath ?: return false
 
         return if (rawPath.startsWith("content://")) {
-            val root = DocumentFile.fromTreeUri(context, rawPath.toUri()) ?: return false
+            val root = treeDocument(context, rawPath.toUri()) ?: return false
             findReadableDocumentGame(context, root, ProbeBudget()) != null
         } else {
             val dir = File(rawPath)
@@ -86,36 +94,70 @@ object SetupValidator {
         if (!budget.tryEnterDirectory()) return null
         val children = runCatching { root.listFiles() }.getOrDefault(emptyArray())
         for (child in children) {
-            if (child.isDirectory) {
-                findReadableDocumentGame(context, child, budget)?.let { return it }
-            } else if (child.isFile) {
-                val displayName = child.name.orEmpty().ifBlank {
-                    DocumentPathResolver.getDisplayName(context, child.uri.toString())
+            val mimeType = runCatching { child.type }.getOrNull()
+            val displayName = runCatching { child.name }.getOrNull().orEmpty().ifBlank {
+                DocumentPathResolver.getDisplayName(context, child.uri.toString())
+            }
+            when (classifyDocumentEntry(mimeType, displayName)) {
+                DocumentEntryKind.DIRECTORY,
+                DocumentEntryKind.UNKNOWN -> {
+                    // A number of cloud/USB DocumentsProviders return a null MIME type for
+                    // directories. Treat unknown entries as possible directories; listFiles()
+                    // safely returns an empty array when the entry is actually a file.
+                    findReadableDocumentGame(context, child, budget)?.let { return it }
                 }
-                val extension = displayName.substringAfterLast('.', "").lowercase()
-                if (extension !in supportedGameExtensions) continue
-                if (!budget.tryCheckFile()) return null
-                val uriPath = child.uri.toString()
-                if (isLaunchPathReadable(context, uriPath)) return uriPath
+                DocumentEntryKind.GAME_FILE -> {
+                    if (!budget.tryCheckFile()) return null
+                    val uriPath = child.uri.toString()
+                    if (isLaunchPathReadable(context, uriPath)) return uriPath
+                }
+                DocumentEntryKind.OTHER -> Unit
             }
         }
         return null
     }
 
+    internal fun classifyDocumentEntry(mimeType: String?, displayName: String?): DocumentEntryKind {
+        if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+            return DocumentEntryKind.DIRECTORY
+        }
+        val extension = displayName.orEmpty().substringAfterLast('.', "").lowercase()
+        if (extension in supportedGameExtensions) {
+            return DocumentEntryKind.GAME_FILE
+        }
+        return if (mimeType == null) DocumentEntryKind.UNKNOWN else DocumentEntryKind.OTHER
+    }
+
     private fun isLaunchPathReadable(context: Context, rawGamePath: String): Boolean {
-        val preparedPath = DocumentPathResolver.prepareGameLaunchPath(context, rawGamePath) ?: return false
-        return if (preparedPath.startsWith("content://")) {
-            runCatching {
-                context.contentResolver.openInputStream(preparedPath.toUri())?.use { stream ->
-                    stream.read(ByteArray(1))
-                    true
+        if (rawGamePath.startsWith("content://")) {
+            return runCatching {
+                context.contentResolver.openFileDescriptor(rawGamePath.toUri(), "r")?.use { descriptor ->
+                    descriptor.statSize != 0L
                 } ?: false
             }.getOrDefault(false)
-        } else {
-            val file = File(preparedPath)
-            file.isFile && file.canRead() && file.length() > 0L
         }
+
+        val preparedPath = DocumentPathResolver.prepareGameLaunchPath(context, rawGamePath) ?: return false
+        val file = File(preparedPath)
+        return file.isFile && file.canRead() && file.length() > 0L
     }
+
+    private fun treeDocument(context: Context, uri: Uri): DocumentFile? {
+        return runCatching {
+            if (DocumentsContract.isTreeUri(uri)) DocumentFile.fromTreeUri(context, uri) else null
+        }.getOrNull()
+    }
+
+    private fun canReadTree(context: Context, uri: Uri): Boolean = runCatching {
+        val root = treeDocument(context, uri) ?: return@runCatching false
+        context.contentResolver.query(
+            root.uri,
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+            null,
+            null,
+            null
+        )?.use { cursor -> cursor.moveToFirst() } ?: false
+    }.getOrDefault(false)
 
     private class ProbeBudget {
         private var checkedFiles = 0

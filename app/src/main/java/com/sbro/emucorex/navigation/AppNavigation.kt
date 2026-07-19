@@ -1,6 +1,5 @@
 package com.sbro.emucorex.navigation
 
-import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -46,6 +45,7 @@ import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.GameLaunchShortcut
 import com.sbro.emucorex.core.SetupValidator
+import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
@@ -74,9 +74,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -216,8 +218,10 @@ fun AppNavigation(
             preferences.biosPath,
             preferences.gamePaths
         ) { onboardingCompleted, biosPath, gamePaths ->
-            val hasUsableBios = BiosValidator.hasUsableBiosFiles(context, biosPath)
-            val hasGameFolder = SetupValidator.isAnyGameFolderPresentForStartup(context, gamePaths)
+            val (hasUsableBios, hasGameFolder) = withContext(Dispatchers.IO) {
+                BiosValidator.hasUsableBiosFiles(context, biosPath) to
+                    SetupValidator.isAnyGameFolderPresentForStartup(context, gamePaths)
+            }
             val shouldOpenHome = onboardingCompleted && hasUsableBios && hasGameFolder
             Log.i(
                 TAG,
@@ -274,20 +278,19 @@ fun AppNavigation(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
-        val rawPath = uri.toString()
-        val displayName = DocumentPathResolver.getDisplayName(context, rawPath)
-        if (!isSupportedGameImage(displayName)) {
-            Toast.makeText(context, unsupportedGameImageMessage, Toast.LENGTH_SHORT).show()
-            return@rememberLauncherForActivityResult
-        }
-        navController.navigate(EmulationRoute(gamePath = rawPath)) {
-            launchSingleTop = true
+        scope.launch {
+            val rawPath = uri.toString()
+            val displayName = withContext(Dispatchers.IO) {
+                StorageAccess.takePersistableReadPermission(context, uri)
+                DocumentPathResolver.getDisplayName(context, rawPath)
+            }
+            if (!isSupportedGameImage(displayName)) {
+                Toast.makeText(context, unsupportedGameImageMessage, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            navController.navigate(EmulationRoute(gamePath = rawPath)) {
+                launchSingleTop = true
+            }
         }
     }
     val startDestination = when (startupDestination) {

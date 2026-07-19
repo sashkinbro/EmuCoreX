@@ -9,6 +9,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import java.io.File
@@ -31,6 +32,8 @@ class GameRepository {
         private val SUPPORTED_EXTENSIONS = setOf("iso", "bin", "img", "mdf", "gz", "cso", "zso", "chd", "elf")
         private val COVER_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
         private val COVER_DIRECTORY_NAMES = setOf("covers", "cover", "art", "artwork", "boxart", "box art")
+        private const val MAX_DOCUMENT_SCAN_DEPTH = 32
+        private const val MAX_DOCUMENT_SCAN_ENTRIES = 20_000
 
         internal fun parentDocumentId(documentId: String): String? {
             val separatorIndex = documentId.lastIndexOf('/')
@@ -77,9 +80,23 @@ class GameRepository {
         cachedGamesByPath: Map<String, GameItem>,
         shouldAbort: () -> Boolean = { false }
     ): List<GameItem> {
-        val docFile = DocumentFile.fromTreeUri(context, uri)
-            ?: return emptyList()
-        return scanDocumentFile(docFile, context, cachedGamesByPath, shouldAbort).sortedBy { it.title.lowercase() }
+        if (!DocumentsContract.isTreeUri(uri)) {
+            return emptyList()
+        }
+        return runCatching {
+            val docFile = DocumentFile.fromTreeUri(context, uri) ?: return@runCatching emptyList()
+            scanDocumentFile(
+                docFile,
+                context,
+                cachedGamesByPath,
+                shouldAbort,
+                depth = 0,
+                budget = DocumentScanBudget()
+            )
+                .sortedBy { it.title.lowercase() }
+        }.onFailure { error ->
+            Log.w(TAG, "Unable to scan document tree: $uri", error)
+        }.getOrDefault(emptyList())
     }
 
     fun findCoverForGame(
@@ -175,64 +192,81 @@ class GameRepository {
         docFile: DocumentFile,
         context: Context,
         cachedGamesByPath: Map<String, GameItem>,
-        shouldAbort: () -> Boolean
+        shouldAbort: () -> Boolean,
+        depth: Int,
+        budget: DocumentScanBudget
     ): List<GameItem> {
+        if (depth > MAX_DOCUMENT_SCAN_DEPTH || !budget.tryEnterDirectory(docFile.uri.toString())) {
+            return emptyList()
+        }
         val items = mutableListOf<GameItem>()
-        val children = docFile.listFiles()
+        val children = runCatching { docFile.listFiles() }.getOrDefault(emptyArray())
         val coverCandidates = buildDocumentCoverCandidates(children)
         val coverRepository = CoverArtRepository(context)
         val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
         for (file in children) {
-            if (shouldAbort()) return items
-            if (file.isDirectory) {
-                val folderName = DocumentPathResolver.normalizeDisplayName(file.name.orEmpty())
-                if (normalizeBaseName(folderName) !in COVER_DIRECTORY_NAMES) {
-                    items.addAll(scanDocumentFile(file, context, cachedGamesByPath, shouldAbort))
+            if (shouldAbort() || !budget.tryVisitEntry()) return items
+            val mimeType = runCatching { file.type }.getOrNull()
+            val name = documentDisplayName(context, file)
+            when (SetupValidator.classifyDocumentEntry(mimeType, name)) {
+                SetupValidator.DocumentEntryKind.DIRECTORY,
+                SetupValidator.DocumentEntryKind.UNKNOWN -> {
+                    if (normalizeBaseName(name) !in COVER_DIRECTORY_NAMES) {
+                        items.addAll(
+                            scanDocumentFile(
+                                file,
+                                context,
+                                cachedGamesByPath,
+                                shouldAbort,
+                                depth + 1,
+                                budget
+                            )
+                        )
+                    }
                 }
-            } else if (file.isFile) {
-                val rawName = file.name ?: continue
-                val uriPath = file.uri.toString()
-                val name = DocumentPathResolver.getDisplayName(context, uriPath)
-                    .ifBlank { DocumentPathResolver.normalizeDisplayName(rawName) }
-                val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext !in SUPPORTED_EXTENSIONS) continue
+                SetupValidator.DocumentEntryKind.GAME_FILE -> {
+                    val uriPath = file.uri.toString()
+                    val fileSize = runCatching { file.length() }.getOrDefault(0L)
+                    val lastModified = runCatching { file.lastModified() }.getOrDefault(0L)
 
-                val cachedGame = cachedGamesByPath[uriPath]
-                val canReuseCachedMetadata = cachedGame != null &&
-                    cachedGame.fileSize == file.length() &&
-                    cachedGame.lastModified == file.lastModified() &&
-                    cachedGame.fileName == name &&
-                    !cachedGame.serial.isNullOrBlank()
-                val metadata = if (canReuseCachedMetadata) {
-                    com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
-                } else {
-                    EmulatorBridge.getGameMetadata(uriPath)
+                    val cachedGame = cachedGamesByPath[uriPath]
+                    val canReuseCachedMetadata = cachedGame != null &&
+                        cachedGame.fileSize == fileSize &&
+                        cachedGame.lastModified == lastModified &&
+                        cachedGame.fileName == name &&
+                        !cachedGame.serial.isNullOrBlank()
+                    val metadata = if (canReuseCachedMetadata) {
+                        com.sbro.emucorex.core.GameMetadata(cachedGame.title, cachedGame.serial)
+                    } else {
+                        EmulatorBridge.getGameMetadata(uriPath)
+                    }
+
+                    if (BiosValidator.isLikelyBiosLibraryEntry(name, metadata.title, metadata.serial, fileSize)) {
+                        continue
+                    }
+
+                    val cleanTitle = cleanScannedTitle(metadata.title, name)
+                    val compatibility = compatibilityRepository.findBest(metadata.serial, cleanTitle)
+                    val serial = metadata.serial ?: compatibility?.serial
+                    val title = compatibility?.title ?: cleanTitle
+                    items += GameItem(
+                        title = title,
+                        path = uriPath,
+                        fileName = name,
+                        fileSize = fileSize,
+                        lastModified = lastModified,
+                        coverArtPath = customCoverRepository.findCustomCoverPath(uriPath)
+                            ?: coverRepository.findCachedCoverUri(serial)
+                            ?: cachedGame?.coverArtPath
+                            ?: coverCandidates[normalizeBaseName(name.substringBeforeLast('.'))]?.uri?.toString()
+                            ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.uri?.toString(),
+                        serial = serial,
+                        pcsx2Compatibility = compatibility
+                    )
                 }
-
-                if (BiosValidator.isLikelyBiosLibraryEntry(name, metadata.title, metadata.serial, file.length())) {
-                    continue
-                }
-
-                val cleanTitle = cleanScannedTitle(metadata.title, name)
-                val compatibility = compatibilityRepository.findBest(metadata.serial, cleanTitle)
-                val serial = metadata.serial ?: compatibility?.serial
-                val title = compatibility?.title ?: cleanTitle
-                items += GameItem(
-                    title = title,
-                    path = uriPath,
-                    fileName = name,
-                    fileSize = file.length(),
-                    lastModified = file.lastModified(),
-                    coverArtPath = customCoverRepository.findCustomCoverPath(uriPath)
-                        ?: coverRepository.findCachedCoverUri(serial)
-                        ?: cachedGame?.coverArtPath
-                        ?: coverCandidates[normalizeBaseName(name.substringBeforeLast('.'))]?.uri?.toString()
-                        ?: coverCandidates[normalizeBaseName(cleanGameName(title))]?.uri?.toString(),
-                    serial = serial,
-                    pcsx2Compatibility = compatibility
-                )
+                SetupValidator.DocumentEntryKind.OTHER -> Unit
             }
         }
 
@@ -331,26 +365,48 @@ class GameRepository {
     ): Map<String, DocumentFile> {
         val directFiles = children
             .filter {
-                it.isFile &&
-                    DocumentPathResolver.normalizeDisplayName(it.name.orEmpty())
+                runCatching { it.type }.getOrNull() != DocumentsContract.Document.MIME_TYPE_DIR &&
+                    documentDisplayName(null, it)
                         .substringAfterLast('.', "")
                         .lowercase() in COVER_EXTENSIONS
             }
         val nestedCoverFiles = children
             .filter {
-                it.isDirectory &&
-                    normalizeBaseName(DocumentPathResolver.normalizeDisplayName(it.name.orEmpty())) in COVER_DIRECTORY_NAMES
+                val type = runCatching { it.type }.getOrNull()
+                (type == DocumentsContract.Document.MIME_TYPE_DIR || type == null) &&
+                    normalizeBaseName(documentDisplayName(null, it)) in COVER_DIRECTORY_NAMES
             }
-            .flatMap { it.listFiles().asIterable() }
+            .flatMap { runCatching { it.listFiles().asIterable() }.getOrDefault(emptyList()) }
             .filter {
-                it.isFile &&
-                    DocumentPathResolver.normalizeDisplayName(it.name.orEmpty())
+                runCatching { it.type }.getOrNull() != DocumentsContract.Document.MIME_TYPE_DIR &&
+                    documentDisplayName(null, it)
                         .substringAfterLast('.', "")
                         .lowercase() in COVER_EXTENSIONS
             }
 
         return (directFiles + nestedCoverFiles).associateBy {
-            normalizeBaseName(cleanGameName(DocumentPathResolver.normalizeDisplayName(it.name.orEmpty()).substringBeforeLast('.')))
+            normalizeBaseName(cleanGameName(documentDisplayName(null, it).substringBeforeLast('.')))
+        }
+    }
+
+    private fun documentDisplayName(context: Context?, document: DocumentFile): String {
+        val rawName = runCatching { document.name }.getOrNull().orEmpty()
+        if (rawName.isNotBlank()) return DocumentPathResolver.normalizeDisplayName(rawName)
+        if (context == null) return ""
+        return runCatching { DocumentPathResolver.getDisplayName(context, document.uri.toString()) }
+            .getOrDefault("")
+    }
+
+    private class DocumentScanBudget {
+        private var visitedEntries = 0
+        private val visitedDirectories = HashSet<String>()
+
+        fun tryEnterDirectory(uri: String): Boolean = visitedDirectories.add(uri)
+
+        fun tryVisitEntry(): Boolean {
+            if (visitedEntries >= MAX_DOCUMENT_SCAN_ENTRIES) return false
+            visitedEntries++
+            return true
         }
     }
 }

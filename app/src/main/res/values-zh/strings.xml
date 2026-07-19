@@ -1333,6 +1333,7 @@
     <string name="pro_feature_support">添加金色启动器图标并支持持续开发。</string>
     <string name="onboarding_pro_subtitle">Crimson 为 EmuCoreX 带来更暗的视觉效果，而 Pro 帮助推动开发的持续进行。</string>
     <string name="error_otg_read_only">由于Android的限制，此文件夹是只读的。请在内部存储或支持的SD卡上选择一个文件夹。</string>
+    <string name="error_storage_permission_not_persisted">Android 未授予对此位置的永久访问权限。请在系统选择器中重新选择。</string>
     <string name="settings_about_privacy_policy">隐私政策</string>
     <string name="settings_about_privacy_policy_desc">打开 EmuCoreX 隐私政策。</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>

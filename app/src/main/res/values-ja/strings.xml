@@ -1331,6 +1331,7 @@
     <string name="pro_feature_support">ゴールドのランチャーアイコンを追加し、継続的な開発を支援します。</string>
     <string name="onboarding_pro_subtitle">CrimsonはEmuCoreXに暗い外観を与え、Proは開発の継続を支援します。</string>
     <string name="error_otg_read_only">Androidの制限により、このフォルダーは読み取り専用です。内部ストレージまたはサポートされているSDカード上のフォルダーを選択してください。</string>
+    <string name="error_storage_permission_not_persisted">Androidからこの場所への永続的なアクセスが許可されませんでした。システムの選択画面でもう一度選択してください。</string>
     <string name="settings_about_privacy_policy">プライバシーポリシー</string>
     <string name="settings_about_privacy_policy_desc">EmuCoreXのプライバシーポリシーを開きます。</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>

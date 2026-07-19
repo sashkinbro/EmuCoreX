@@ -1333,6 +1333,7 @@
     <string name="pro_feature_support">Añade el icono dorado del lanzador y apoya el desarrollo continuo.</string>
     <string name="onboarding_pro_subtitle">Crimson le da a EmuCoreX un aspecto más oscuro, mientras que Pro ayuda a mantener en marcha el desarrollo.</string>
     <string name="error_otg_read_only">Esta carpeta es de solo lectura debido a las restricciones de Android. Seleccione una carpeta en el almacenamiento interno o en una tarjeta SD compatible.</string>
+    <string name="error_storage_permission_not_persisted">Android no concedió acceso permanente a esta ubicación. Vuelva a seleccionarla en el selector del sistema.</string>
     <string name="settings_about_privacy_policy">Política de privacidad</string>
     <string name="settings_about_privacy_policy_desc">Abre la política de privacidad de EmuCoreX.</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>
