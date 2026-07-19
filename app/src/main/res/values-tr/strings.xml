@@ -1331,6 +1331,7 @@
     <string name="pro_feature_support">Altın başlatıcı simgesini ekleyin ve sürekli geliştirmeyi destekleyin.</string>
     <string name="onboarding_pro_subtitle">Crimson, EmuCoreX\'e daha koyu bir görünüm kazandırırken Pro, geliştirmenin devam etmesine yardımcı olur.</string>
     <string name="error_otg_read_only">Android kısıtlamaları nedeniyle bu klasör salt okunurdur. Lütfen dahili depolamada veya desteklenen bir SD kartta bir klasör seçin.</string>
+    <string name="error_storage_permission_not_persisted">Android bu konuma kalıcı erişim izni vermedi. Lütfen sistem seçicisinden konumu yeniden seçin.</string>
     <string name="settings_about_privacy_policy">Gizlilik Politikası</string>
     <string name="settings_about_privacy_policy_desc">EmuCoreX gizlilik politikasını açın.</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>

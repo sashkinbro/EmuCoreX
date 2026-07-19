@@ -11,13 +11,16 @@
 #include "pcsx2/Achievements.h"
 #include "pcsx2/BuildVersion.h"
 #include "pcsx2/HangTrace.h"
+#include "pcsx2/Host.h"
 #include "pcsx2/JitProfiler.h"
+#include "pcsx2/ps2/BiosTools.h"
 
 #include <android/log.h>
 #include <android/native_window_jni.h>
 #include <jni.h>
 #include <zip.h>
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -348,6 +351,29 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_initiali
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_reloadDataRoot(JNIEnv* env, jclass, jstring path) { AndroidRuntime::Instance().ReloadDataRoot(JStringToString(env, path)); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setSystemCaBundlePath(JNIEnv* env, jclass, jstring path) { HTTPDownloaderCurl::SetCABundlePath(JStringToString(env, path)); }
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getGameTitle(JNIEnv* env, jclass, jstring path) { return StringToJString(env, AndroidRuntime::Instance().GetGameTitle(JStringToString(env, path))); }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_isBiosPath(JNIEnv* env, jclass, jstring path)
+{
+	u32 version = 0;
+	u32 region = 0;
+	std::string description;
+	std::string zone;
+	return IsBIOS(JStringToString(env, path).c_str(), version, description, region, zone) ? JNI_TRUE : JNI_FALSE;
+}
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_isBiosFd(JNIEnv*, jclass, jint fd)
+{
+	if (fd < 0)
+		return JNI_FALSE;
+
+	char path[64];
+	std::snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	u32 version = 0;
+	u32 region = 0;
+	std::string description;
+	std::string zone;
+	const bool valid = IsBIOS(path, version, description, region, zone);
+	close(fd);
+	return valid ? JNI_TRUE : JNI_FALSE;
+}
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadVibration(JNIEnv*, jclass, jboolean enabled) { AndroidRuntime::Instance().SetSetting("InputSources", "PadVibration", "bool", enabled == JNI_TRUE ? "true" : "false"); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPerformanceMetricsEnabled(JNIEnv*, jclass, jboolean visible, jboolean detailed, jboolean gpu_timing)
 {
@@ -365,7 +391,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getCo
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsDump(JNIEnv*, jclass, jint frames)
 {
 	const u32 dump_frames = frames > 0 ? static_cast<u32>(frames) : 0;
-	MTGS::RunOnGSThread([dump_frames]() {
+	Host::RunOnGSThread([dump_frames]() {
 		GSConfig.GSDumpCompression = GSDumpCompressionMethod::Uncompressed;
 		GSQueueSnapshot(std::string(), dump_frames);
 	});

@@ -170,7 +170,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             preferences.cleanupLegacyClampingPreferencesIfNeeded()
             preferences.gamePaths.distinctUntilChanged().collect { paths ->
                 val context = getApplication<Application>()
-                val effectivePaths = paths.filter { SetupValidator.hasCoreReadableGameFile(context, it) }
+                val effectivePaths = withContext(Dispatchers.IO) {
+                    paths.filter { SetupValidator.hasCoreReadableGameFile(context, it) }
+                }
                 val libraryKey = libraryKey(effectivePaths)
                 if (currentLibraryRoot != libraryKey) {
                     allGames = emptyList()
@@ -218,9 +220,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             preferences.biosPath.distinctUntilChanged().collect { path ->
+                val biosValid = withContext(Dispatchers.IO) {
+                    BiosValidator.hasUsableBiosFiles(getApplication(), path)
+                }
                 _uiState.value = _uiState.value.copy(
                     biosConfigured = path != null,
-                    biosValid = BiosValidator.hasUsableBiosFiles(getApplication(), path)
+                    biosValid = biosValid
                 )
                 biosInitialized = true
                 updateBootstrapState()
@@ -303,23 +308,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onFolderSelected(uri: Uri) {
         val context = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(context, uri)) return
-
-        val rawPath = uri.toString()
-        if (!SetupValidator.hasCoreReadableGameFile(context, rawPath)) return
-
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            StorageAccess.takePersistableReadPermission(context, uri)
+            val rawPath = uri.toString()
             preferences.addGamePath(rawPath)
         }
     }
 
     fun onBiosFolderSelected(uri: Uri) {
         val context = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(context, uri)) return
-
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val previousPath = preferences.biosPath.first()
+            StorageAccess.takePersistableReadPermission(context, uri)
             preferences.setBiosPath(uri.toString())
+            if (previousPath != uri.toString()) {
+                StorageAccess.releasePersistedPermission(context, previousPath)
+            }
         }
+    }
+
+    private fun showStoragePermissionError(application: Application) {
+        android.widget.Toast.makeText(
+            application,
+            com.sbro.emucorex.R.string.error_storage_permission_not_persisted,
+            android.widget.Toast.LENGTH_LONG
+        ).show()
     }
 
     fun refreshGames() {

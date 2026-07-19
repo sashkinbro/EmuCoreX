@@ -425,10 +425,22 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
 
 	if (update_display_window)
 	{
-		MTGS::UpdateDisplayWindow();
-		// UpdateDisplayWindow is queued. Keep the previous ANativeWindow alive until
-		// the GS thread has destroyed its EGLSurface/VkSurfaceKHR.
-		MTGS::WaitGS(false, false, false);
+		// Surface callbacks run on Android's UI/Binder threads, while the MTGS ring
+		// buffer has exactly one producer: the CPU thread. Keep the old window alive
+		// until the serialized GS update has detached from it.
+		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
+			if (value)
+				ANativeWindow_release(value);
+		});
+		Host::RunOnCPUThread([old_window_ref = std::move(old_window_ref)]() {
+			(void)old_window_ref;
+			if (MTGS::IsOpen())
+			{
+				MTGS::UpdateDisplayWindow();
+				MTGS::WaitGS(false, false, false);
+			}
+		}, false);
+		return;
 	}
 
 	if (old_window)
@@ -450,10 +462,19 @@ void AndroidRuntime::ClearSurface()
 
 	if (update_display_window)
 	{
-		// Switch the renderer to its surfaceless target before Android abandons the
-		// BufferQueue. Waiting also guarantees no later frame can target old_window.
-		MTGS::UpdateDisplayWindow();
-		MTGS::WaitGS(false, false, false);
+		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
+			if (value)
+				ANativeWindow_release(value);
+		});
+		Host::RunOnCPUThread([old_window_ref = std::move(old_window_ref)]() {
+			(void)old_window_ref;
+			if (MTGS::IsOpen())
+			{
+				MTGS::UpdateDisplayWindow();
+				MTGS::WaitGS(false, false, false);
+			}
+		}, false);
+		return;
 	}
 
 	if (old_window)

@@ -49,9 +49,6 @@ std::unique_ptr<GSRenderer> g_gs_renderer;
 // we might be switching while the other thread reads it.
 static GSVector4 s_last_draw_rect;
 
-// Last time we reset the renderer due to a GPU crash, if any.
-static Common::Timer::Value s_last_gpu_reset_time;
-
 // Screen alignment
 static GSDisplayAlignment s_display_alignment = GSDisplayAlignment::Center;
 
@@ -580,6 +577,14 @@ void GSJoinSnapshotThreads()
 
 bool GSRenderer::BeginPresentFrame(bool frame_skip)
 {
+#ifdef __ANDROID__
+	// A wedged mobile GPU must not be submitted to again while the CPU thread is
+	// shutting the VM down. Re-entering BeginPresent() can otherwise trigger the
+	// same device-lost path every frame.
+	if (m_gpu_device_failed)
+		return false;
+#endif
+
 	Host::BeginPresentFrame();
 
 	const GSDevice::PresentResult res = g_gs_device->BeginPresent(frame_skip);
@@ -600,20 +605,41 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 
 	// If we're constantly crashing on something in particular, we don't want to end up in an
 	// endless reset loop.. that'd probably end up leaking memory and/or crashing us for other
-	// reasons. So just abort in such case.
+	// reasons.
 	const Common::Timer::Value current_time = Common::Timer::GetCurrentValue();
-	if (s_last_gpu_reset_time != 0 &&
-		Common::Timer::ConvertValueToSeconds(current_time - s_last_gpu_reset_time) < 15.0f)
+	if (m_last_gpu_reset_time != 0 &&
+		Common::Timer::ConvertValueToSeconds(current_time - m_last_gpu_reset_time) < 15.0f)
 	{
+#ifdef __ANDROID__
+		// abort() turns a recoverable driver failure into a Play Console native
+		// crash. On Android, keep the process alive and stop only the current VM.
+		m_gpu_device_failed = true;
+		constexpr const char* message =
+			"Host GPU was lost repeatedly. Stopping emulation because the graphics driver is not responding.";
+		Console.Error(message);
+		Host::ReportErrorAsync("GS", message);
+		Host::RunOnCPUThread([]() { Host::RequestVMShutdown(false, false, false); });
+		return false;
+#else
 		pxFailRel("Host GPU lost too many times, device is probably completely wedged.");
+#endif
 	}
-	s_last_gpu_reset_time = current_time;
+	m_last_gpu_reset_time = current_time;
 
 	// Device lost, something went really bad.
 	// Let's just toss out everything, and try to hobble on.
 	if (!GSreopen(true, false, GSGetCurrentRenderer(), std::nullopt))
 	{
+#ifdef __ANDROID__
+		m_gpu_device_failed = true;
+		constexpr const char* message =
+			"Failed to recreate the host GPU device. Stopping emulation safely.";
+		Console.Error(message);
+		Host::ReportErrorAsync("GS", message);
+		Host::RunOnCPUThread([]() { Host::RequestVMShutdown(false, false, false); });
+#else
 		pxFailRel("Failed to recreate GS device after loss.");
+#endif
 		return false;
 	}
 

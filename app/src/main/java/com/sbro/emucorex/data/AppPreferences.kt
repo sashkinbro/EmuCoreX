@@ -11,7 +11,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GpuHardwareProfiles
@@ -1361,7 +1360,6 @@ class AppPreferences(private val context: Context) {
                 showDebugOptions = prefs[SHOW_DEBUG_OPTIONS] ?: false,
                 preferEnglishGameTitles = prefs[PREFER_ENGLISH_GAME_TITLES] ?: false,
                 biosPath = biosPath,
-                biosValid = BiosValidator.hasUsableBiosFiles(context, biosPath),
                 gamePath = readGamePaths(prefs).firstOrNull(),
                 gamePaths = readGamePaths(prefs),
                 emulatorDataPath = prefs[EMULATOR_DATA_PATH],

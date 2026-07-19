@@ -1331,6 +1331,7 @@
     <string name="pro_feature_support">गोल्ड लॉन्चर आइकन जोड़ें और निरंतर विकास का समर्थन करें।</string>
     <string name="onboarding_pro_subtitle">Crimson, EmuCoreX को एक गहरा रूप देता है, जबकि Pro विकास को गतिमान रखने में मदद करता है।</string>
     <string name="error_otg_read_only">Android प्रतिबंधों के कारण यह फ़ोल्डर केवल पढ़ने के लिए है। कृपया आंतरिक संग्रहण या समर्थित SD कार्ड पर एक फ़ोल्डर चुनें।</string>
+    <string name="error_storage_permission_not_persisted">Android ने इस स्थान के लिए स्थायी पहुँच नहीं दी। कृपया सिस्टम चयनकर्ता में इसे फिर से चुनें।</string>
     <string name="settings_about_privacy_policy">गोपनीयता नीति</string>
     <string name="settings_about_privacy_policy_desc">EmuCoreX गोपनीयता नीति खोलें।</string>
     <string name="settings_about_privacy_policy_url">https://sites.google.com/view/emucorexpolicy/%D0%B3%D0%BE%D0%BB%D0%BE%D0%B2%D0%BD%D0%B0-%D1%81%D1%82%D0%BE%D1%80%D1%96%D0%BD%D0%BA%D0%B0</string>

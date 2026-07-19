@@ -15,11 +15,14 @@ import com.sbro.emucorex.core.ProPurchaseManager
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class OnboardingUiState(
     val performanceProfile: Int = PerformanceProfiles.SAFE,
@@ -67,19 +70,25 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
             launch {
-                preferences.biosPath.collect { path ->
+                preferences.biosPath.distinctUntilChanged().collect { path ->
+                    val biosValid = withContext(Dispatchers.IO) {
+                        BiosValidator.hasUsableBiosFiles(getApplication(), path)
+                    }
                     updateState(
                         biosPath = path,
-                        biosValid = BiosValidator.hasUsableBiosFiles(getApplication(), path)
+                        biosValid = biosValid
                     )
                 }
             }
             launch {
-                preferences.gamePaths.collect { paths ->
+                preferences.gamePaths.distinctUntilChanged().collect { paths ->
+                    val gamePathValid = withContext(Dispatchers.IO) {
+                        SetupValidator.hasCoreReadableGameFile(getApplication(), paths)
+                    }
                     updateState(
                         gamePath = paths.firstOrNull(),
                         gamePaths = paths,
-                        gamePathValid = SetupValidator.hasCoreReadableGameFile(getApplication(), paths)
+                        gamePathValid = gamePathValid
                     )
                 }
             }
@@ -101,10 +110,13 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setBiosPath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(application, uri)) return
-
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val previousPath = preferences.biosPath.first()
+            StorageAccess.takePersistableReadPermission(application, uri)
             preferences.setBiosPath(uri.toString())
+            if (previousPath != uri.toString()) {
+                StorageAccess.releasePersistedPermission(application, previousPath)
+            }
             val audioSettings = preferences.settingsSnapshot.first()
             EmulatorBridge.applyRuntimeConfig(
                 biosPath = uri.toString(),
@@ -128,32 +140,48 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
 
     fun setGamePath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(application, uri)) return
-
-        val rawPath = uri.toString()
-        if (!SetupValidator.hasCoreReadableGameFile(application, rawPath)) return
-
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            StorageAccess.takePersistableReadPermission(application, uri)
+            val rawPath = uri.toString()
+            // Persist the user's valid SAF selection immediately. Game discovery runs in
+            // the gamePaths collector on Dispatchers.IO and must not make the selection vanish.
             preferences.addGamePath(rawPath)
         }
     }
 
     fun removeGamePath(path: String) {
-        viewModelScope.launch { preferences.removeGamePath(path) }
+        viewModelScope.launch(Dispatchers.IO) {
+            preferences.removeGamePath(path)
+            StorageAccess.releasePersistedPermission(getApplication(), path)
+        }
     }
 
     fun setEmulatorDataPath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) return
-
-        val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return
-        if (!EmulatorStorage.prepareCustomDataRoot(resolvedPath)) {
-            android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) {
+            showStoragePermissionError(application)
             return
         }
+
         viewModelScope.launch {
+            val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return@launch
+            val rootPrepared = withContext(Dispatchers.IO) {
+                EmulatorStorage.prepareCustomDataRoot(resolvedPath)
+            }
+            if (!rootPrepared) {
+                android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+                return@launch
+            }
             preferences.setEmulatorDataPath(resolvedPath)
         }
+    }
+
+    private fun showStoragePermissionError(application: Application) {
+        android.widget.Toast.makeText(
+            application,
+            com.sbro.emucorex.R.string.error_storage_permission_not_persisted,
+            android.widget.Toast.LENGTH_LONG
+        ).show()
     }
 
     fun setPerformanceProfile(profile: Int) {

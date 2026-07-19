@@ -411,10 +411,10 @@ object EmulatorBridge {
         dev9Dns2: String = "0.0.0.0",
         dev9LogDhcp: Boolean = false,
         dev9LogDns: Boolean = false
-    ) {
-        if (!isNativeLoaded) return
+    ) = withContext(serialDispatcher) {
+        if (!isNativeLoaded) return@withContext
 
-        val context = getContext() ?: return
+        val context = getContext() ?: return@withContext
         NetworkAdapterCollector.collectAdapters(context)
         val resolvedRenderer = normalizeRenderer(renderer)
         val preparedBios = DocumentPathResolver.prepareBiosSelection(context, biosPath)
@@ -422,12 +422,7 @@ object EmulatorBridge {
             ?: biosPath?.let(DocumentPathResolver::resolveDirectoryPath)
         val preferredBiosFile = preparedBios?.fileName
             ?: DocumentPathResolver.findPreferredBiosFileName(resolvedBiosPath)
-        val savestatesDir = EmulatorStorage.saveStatesDir(context, emulatorDataPath)
-        val memcardsDir = EmulatorStorage.memoryCardsDir(context, emulatorDataPath)
-        val texturesDir = EmulatorStorage.texturesDir(context, emulatorDataPath)
-        val cheatsDir = EmulatorStorage.cheatsDir(context, emulatorDataPath)
-        val patchesDir = EmulatorStorage.patchesDir(context, emulatorDataPath)
-        val logDir = EmulatorStorage.logDir(context, emulatorDataPath)
+        val runtimeDirectories = EmulatorStorage.runtimeDirectories(context, emulatorDataPath)
         val manualHardwareFixes = GsHackDefaults.shouldEnableManualHardwareFixes(
             cpuSpriteRenderSize = cpuSpriteRenderSize,
             cpuSpriteRenderLevel = cpuSpriteRenderLevel,
@@ -527,12 +522,12 @@ object EmulatorBridge {
                 add(settingOp("SPU2/Output", "OutputLatencyMS", "int", AudioDefaults.coerceOutputLatencyMs(audioOutputLatencyMs).toString()))
                 add(settingOp("SPU2/Output", "OutputLatencyMinimal", "bool", audioMinimalOutputLatency.toString()))
                 add(settingOp("Folders", "Bios", "string", resolvedBiosPath.orEmpty()))
-                add(settingOp("Folders", "Savestates", "string", savestatesDir.absolutePath))
-                add(settingOp("Folders", "MemoryCards", "string", memcardsDir.absolutePath))
-                add(settingOp("Folders", "Textures", "string", texturesDir.absolutePath))
-                add(settingOp("Folders", "Cheats", "string", cheatsDir.absolutePath))
-                add(settingOp("Folders", "Patches", "string", patchesDir.absolutePath))
-                add(settingOp("Folders", "Logs", "string", logDir.absolutePath))
+                add(settingOp("Folders", "Savestates", "string", runtimeDirectories.saveStates.absolutePath))
+                add(settingOp("Folders", "MemoryCards", "string", runtimeDirectories.memoryCards.absolutePath))
+                add(settingOp("Folders", "Textures", "string", runtimeDirectories.textures.absolutePath))
+                add(settingOp("Folders", "Cheats", "string", runtimeDirectories.cheats.absolutePath))
+                add(settingOp("Folders", "Patches", "string", runtimeDirectories.patches.absolutePath))
+                add(settingOp("Folders", "Logs", "string", runtimeDirectories.logs.absolutePath))
                 add(memoryCardSlotOp(1, memoryCardSlot1))
                 add(memoryCardSlotOp(2, memoryCardSlot2))
                 add(settingOp("Filenames", "BIOS", "string", preferredBiosFile.orEmpty()))

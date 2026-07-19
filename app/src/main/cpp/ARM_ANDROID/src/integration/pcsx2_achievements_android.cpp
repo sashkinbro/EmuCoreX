@@ -1171,7 +1171,7 @@ void Achievements::ClientLoadGameCallback(int result, const char* error_message,
 void Achievements::ClearGameInfo()
 {
 	if (MTGS::IsOpen())
-		MTGS::RunOnGSThread(&Achievements::ClearUIState);
+		Host::RunOnGSThread(&Achievements::ClearUIState);
 
 	if (s_load_game_request)
 	{
@@ -1778,7 +1778,7 @@ void Achievements::SetHardcoreMode(bool enabled, bool force_display_message)
 
 	// Toss away UI state, because it's invalid now
 	if (MTGS::IsOpen())
-		MTGS::RunOnGSThread(&Achievements::ClearUIState);
+		Host::RunOnGSThread(&Achievements::ClearUIState);
 
 	Host::OnAchievementsHardcoreModeChanged(enabled);
 }

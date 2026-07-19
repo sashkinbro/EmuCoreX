@@ -1437,6 +1437,7 @@
     <string name="hang_trace_title">Hang Trace (Jejak Hang)</string>
     <string name="hang_trace_desc">Merekam opcode EE, IOP, VU0, dan VU1 baru-baru ini ke data/hang_trace.txt saat mereproduksi hang pemuatan.</string>
     <string name="error_otg_read_only">Folder ini bersifat read-only (hanya-baca) karena batasan Android. Silakan pilih folder di penyimpanan internal atau kartu SD yang didukung.</string>
+    <string name="error_storage_permission_not_persisted">Android tidak memberikan akses permanen ke lokasi ini. Silakan pilih lagi melalui pemilih sistem.</string>
     <string name="settings_touch_haptics_strength">Kekuatan haptik sentuh</string>
     <string name="settings_touch_haptics_test">Uji haptik sentuh</string>
     <string name="settings_touch_haptics_test_desc">Menjalankan kedipan (tick) pendek menggunakan kekuatan haptik sentuh saat ini.</string>

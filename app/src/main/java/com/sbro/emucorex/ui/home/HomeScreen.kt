@@ -255,7 +255,7 @@ fun HomeScreen(
         uri?.let { viewModel.onFolderSelected(it) }
     }
     val biosPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { viewModel.onBiosFolderSelected(it) }
     }
@@ -333,7 +333,7 @@ fun HomeScreen(
             EmptyState(
                 biosReady = uiState.biosValid,
                 gamesReady = uiState.gameFolderSet,
-                onBiosClick = { biosPicker.launch(null) },
+                onBiosClick = { biosPicker.launch(arrayOf("*/*")) },
                 onFolderClick = { folderPicker.launch(null) },
                 topInset = topInset
             )

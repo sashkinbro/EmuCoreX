@@ -9,6 +9,7 @@ import com.sbro.emucorex.core.AndroidTouchHaptics
 import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.AppUpdateRelease
 import com.sbro.emucorex.core.AppUpdateRepository
+import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
@@ -47,6 +48,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import com.sbro.emucorex.core.GpuDriverCatalogRepository
@@ -279,6 +281,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 applySettingsSnapshot(snapshot)
             }
         }
+        viewModelScope.launch {
+            preferences.biosPath.distinctUntilChanged().collect { path ->
+                val biosValid = withContext(Dispatchers.IO) {
+                    BiosValidator.hasUsableBiosFiles(getApplication(), path)
+                }
+                _uiState.value = _uiState.value.copy(biosValid = biosValid)
+            }
+        }
 
                 viewModelScope.launch {
             proPurchaseManager.state.collect { proState ->
@@ -355,7 +365,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             emulatorDataPath = snapshot.emulatorDataPath,
             coverDownloadBaseUrl = snapshot.coverDownloadBaseUrl,
             coverArtStyle = snapshot.coverArtStyle,
-            biosValid = snapshot.biosValid,
             setupComplete = snapshot.setupComplete,
             performanceProfile = snapshot.performanceProfile,
             eeCycleRate = snapshot.eeCycleRate,
@@ -1721,9 +1730,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setBiosPath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(application, uri)) return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val previousPath = preferences.biosPath.first()
+            StorageAccess.takePersistableReadPermission(application, uri)
             preferences.setBiosPath(uri.toString())
+            if (previousPath != uri.toString()) {
+                StorageAccess.releasePersistedPermission(application, previousPath)
+            }
             EmulatorBridge.applyRuntimeConfig(
                 biosPath = uri.toString(),
                 emulatorDataPath = _uiState.value.emulatorDataPath,
@@ -1814,26 +1827,46 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setGamePath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadPermission(application, uri)) return
-        val rawPath = uri.toString()
-        if (!SetupValidator.hasCoreReadableGameFile(application, rawPath)) return
-        viewModelScope.launch { preferences.addGamePath(rawPath) }
+        viewModelScope.launch(Dispatchers.IO) {
+            StorageAccess.takePersistableReadPermission(application, uri)
+            val rawPath = uri.toString()
+            preferences.addGamePath(rawPath)
+        }
     }
 
     fun removeGamePath(path: String) {
-        viewModelScope.launch { preferences.removeGamePath(path) }
+        viewModelScope.launch(Dispatchers.IO) {
+            preferences.removeGamePath(path)
+            StorageAccess.releasePersistedPermission(getApplication(), path)
+        }
     }
 
     fun setEmulatorDataPath(uri: Uri) {
         val application = getApplication<Application>()
-        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) return
-
-        val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return
-        if (!EmulatorStorage.prepareCustomDataRoot(resolvedPath)) {
-            android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+        if (!StorageAccess.takePersistableReadWritePermission(application, uri)) {
+            showStoragePermissionError(application)
             return
         }
-        viewModelScope.launch { preferences.setEmulatorDataPath(resolvedPath) }
+
+        viewModelScope.launch {
+            val resolvedPath = DocumentPathResolver.resolveDirectoryPath(uri.toString()) ?: return@launch
+            val rootPrepared = withContext(Dispatchers.IO) {
+                EmulatorStorage.prepareCustomDataRoot(resolvedPath)
+            }
+            if (!rootPrepared) {
+                android.widget.Toast.makeText(application, com.sbro.emucorex.R.string.error_otg_read_only, android.widget.Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            preferences.setEmulatorDataPath(resolvedPath)
+        }
+    }
+
+    private fun showStoragePermissionError(application: Application) {
+        android.widget.Toast.makeText(
+            application,
+            com.sbro.emucorex.R.string.error_storage_permission_not_persisted,
+            android.widget.Toast.LENGTH_LONG
+        ).show()
     }
 
     fun clearEmulatorDataPath() {
