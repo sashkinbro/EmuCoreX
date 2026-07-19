@@ -76,6 +76,7 @@ import java.util.Date
 fun SaveManagerScreen(
     gamePath: String? = null,
     gameTitle: String? = null,
+    gameSerial: String? = null,
     onLoadClick: (String, Int) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -92,13 +93,13 @@ fun SaveManagerScreen(
     val deleteSuccessMessage = stringResource(R.string.save_manager_delete_success)
     val deleteFailureMessage = stringResource(R.string.save_manager_delete_failed)
 
-    var entries by remember(gamePath, gameTitle) { mutableStateOf<List<SaveStateEntryInfo>>(emptyList()) }
-    var previewPaths by remember(gamePath, gameTitle) { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var entries by remember(gamePath, gameTitle, gameSerial) { mutableStateOf<List<SaveStateEntryInfo>>(emptyList()) }
+    var previewPaths by remember(gamePath, gameTitle, gameSerial) { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isWorking by remember { mutableStateOf(false) }
-    var isPreparingEntries by remember(gamePath, gameTitle) { mutableStateOf(true) }
-    var isResolvingEntries by remember(gamePath, gameTitle) { mutableStateOf(false) }
+    var isPreparingEntries by remember(gamePath, gameTitle, gameSerial) { mutableStateOf(true) }
+    var isResolvingEntries by remember(gamePath, gameTitle, gameSerial) { mutableStateOf(false) }
     val pendingDelete = remember { mutableStateOf<SaveStateEntryInfo?>(null) }
-    var refreshGeneration by remember(gamePath, gameTitle) { mutableIntStateOf(0) }
+    var refreshGeneration by remember(gamePath, gameTitle, gameSerial) { mutableIntStateOf(0) }
 
     val isFiltered = !gamePath.isNullOrBlank()
     val screenSubtitle = remember(isFiltered, gameTitle, entries) {
@@ -121,7 +122,8 @@ fun SaveManagerScreen(
             val initialEntries = withContext(Dispatchers.IO) {
                 repository.listEntries(
                     filterGamePath = gamePath,
-                    filterGameTitle = gameTitle
+                    filterGameTitle = gameTitle,
+                    filterGameSerial = gameSerial
                 )
             }
             if (refreshGeneration != generation) return@launch
@@ -157,7 +159,7 @@ fun SaveManagerScreen(
         }
     }
 
-    LaunchedEffect(gamePath, gameTitle) {
+    LaunchedEffect(gamePath, gameTitle, gameSerial) {
         refresh()
     }
 

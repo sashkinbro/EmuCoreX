@@ -89,6 +89,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments("-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON")
+                }
+            }
+        }
         release {
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")

@@ -129,7 +129,11 @@ object CatalogSearchRoute
 object SupportedFormatsRoute
 
 @Serializable
-data class SaveManagerRoute(val gamePath: String? = null, val gameTitle: String? = null)
+data class SaveManagerRoute(
+    val gamePath: String? = null,
+    val gameTitle: String? = null,
+    val gameSerial: String? = null
+)
 
 @Serializable
 object MemoryCardManagerRoute
@@ -430,7 +434,7 @@ fun AppNavigation(
                             }
                         },
                         onContinueGame = { game ->
-                            val saveSlot = saveStateRepository.findLatestSlot(game.path)
+                            val saveSlot = saveStateRepository.findLatestSlot(game.path, game.serial)
                             if (saveSlot == null) {
                                 Toast.makeText(context, continueUnavailableMessage, Toast.LENGTH_SHORT).show()
                                 return@HomeScreen
@@ -440,7 +444,13 @@ fun AppNavigation(
                             }
                         },
                         onLoadSaveClick = { game ->
-                            navController.navigate(SaveManagerRoute(gamePath = game.path, gameTitle = game.title)) {
+                            navController.navigate(
+                                SaveManagerRoute(
+                                    gamePath = game.path,
+                                    gameTitle = game.title,
+                                    gameSerial = game.serial
+                                )
+                            ) {
                                 launchSingleTop = true
                             }
                         },
@@ -918,6 +928,7 @@ fun AppNavigation(
                 SaveManagerScreen(
                     gamePath = route.gamePath,
                     gameTitle = route.gameTitle,
+                    gameSerial = route.gameSerial,
                     onLoadClick = { path, slot ->
                         navController.navigate(EmulationRoute(gamePath = path, saveSlot = slot)) {
                             launchSingleTop = true
