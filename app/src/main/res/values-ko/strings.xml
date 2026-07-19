@@ -1762,4 +1762,12 @@
     <string name="feedback_discard_title">피드백을 삭제하시겠습니까?</string>
     <string name="feedback_discard_message">메시지와 선택한 첨부 파일이 손실됩니다.</string>
     <string name="feedback_discard_action">삭제</string>
+    <string name="emulator_data_location_title">에뮬레이터 데이터 위치</string>
+    <string name="emulator_data_location_description">표준 앱 전용 폴더를 선택하세요. 광범위한 저장소 권한이 필요하지 않습니다.</string>
+    <string name="emulator_data_location_internal">내부 저장소</string>
+    <string name="emulator_data_location_internal_description">기기의 기본 저장소에 있는 앱 전용 폴더입니다.</string>
+    <string name="emulator_data_location_sd_card">SD 카드</string>
+    <string name="emulator_data_location_sd_card_description">SD 카드에 있는 앱 전용 폴더입니다.</string>
+    <string name="emulator_data_location_sd_card_unavailable">이 기기에서 사용 가능한 SD 카드를 찾지 못했습니다.</string>
+    <string name="emulator_data_location_error">선택한 앱 저장소를 준비할 수 없습니다. 저장소가 사용 가능한지 확인하고 다시 시도하세요.</string>
 </resources>

@@ -143,6 +143,7 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.GpuHardwareProfiles
@@ -173,6 +174,7 @@ import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.SettingsBackupRepository
 import com.sbro.emucorex.data.SettingsSnapshot
+import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.home.calculateHomeGridColumnCount
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
@@ -224,6 +226,7 @@ fun SettingsScreen(
     val showResetAllSettingsDialog = remember { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
     val showBiosDialog = remember { mutableStateOf(false) }
+    var showEmulatorDataLocationDialog by remember { mutableStateOf(false) }
     val pendingCoverUrl = remember { mutableStateOf("") }
     var searchEnabled by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -283,10 +286,6 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let(viewModel::setGamePath) }
 
-    val emulatorDataPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? -> uri?.let(viewModel::setEmulatorDataPath) }
-
     val homeBackgroundPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::installHomeBackground) }
@@ -298,7 +297,12 @@ fun SettingsScreen(
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(arrayOf("*/*")) })
     val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog.value = true })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
-    val launchEmulatorDataPicker = rememberDebouncedClick(onClick = { emulatorDataPicker.launch(null) })
+    val openEmulatorDataLocationDialog = rememberDebouncedClick(
+        onClick = {
+            viewModel.refreshEmulatorDataLocations()
+            showEmulatorDataLocationDialog = true
+        }
+    )
     val openLanguageSheet = rememberDebouncedClick(onClick = { onOpenLanguageScreen?.invoke() })
     val refreshCheatEntries = remember {
         {
@@ -312,6 +316,21 @@ fun SettingsScreen(
         selectedTab = settingsTabs[(currentIndex + offset + settingsTabs.size) % settingsTabs.size]
         searchEnabled = false
         searchQuery = ""
+    }
+
+    if (showEmulatorDataLocationDialog) {
+        EmulatorDataLocationDialog(
+            selectedLocation = EmulatorStorage.selectedStandardLocation(
+                uiState.emulatorDataPath,
+                uiState.sdCardDataPath
+            ),
+            sdCardAvailable = uiState.sdCardDataPath != null,
+            onSelect = { location ->
+                showEmulatorDataLocationDialog = false
+                viewModel.setEmulatorDataLocation(location)
+            },
+            onDismiss = { showEmulatorDataLocationDialog = false }
+        )
     }
 
     LaunchedEffect(selectedTab, shouldRequestGamepadFocus) {
@@ -444,7 +463,7 @@ fun SettingsScreen(
                 context = context,
                 launchBiosPicker = openBiosDialog,
                 launchGamePicker = launchGamePicker,
-                launchEmulatorDataPicker = launchEmulatorDataPicker,
+                openEmulatorDataLocationDialog = openEmulatorDataLocationDialog,
                 launchHomeBackgroundPicker = {
                     homeBackgroundPicker.launch(arrayOf("image/*", "video/*"))
                 },
@@ -950,7 +969,7 @@ private fun SettingsContent(
     context: android.content.Context,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
-    launchEmulatorDataPicker: () -> Unit,
+    openEmulatorDataLocationDialog: () -> Unit,
     launchHomeBackgroundPicker: () -> Unit,
     launchCustomFontPicker: () -> Unit,
     onOpenCoverUrlEditor: () -> Unit,
@@ -1818,8 +1837,14 @@ private fun SettingsContent(
                     } else {
                         stringResource(R.string.settings_game_folders_count, uiState.gamePaths.size)
                     }
-                    val emulatorDataDisplayName = remember(uiState.emulatorDataPath, context) {
-                        uiState.emulatorDataPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
+                    val emulatorDataDisplayName = when {
+                        uiState.emulatorDataPath.isNullOrBlank() -> stringResource(
+                            R.string.emulator_data_location_internal
+                        )
+                        uiState.sdCardDataPath != null && uiState.emulatorDataPath == uiState.sdCardDataPath -> {
+                            stringResource(R.string.emulator_data_location_sd_card)
+                        }
+                        else -> DocumentPathResolver.getFallbackDisplayName(uiState.emulatorDataPath)
                     }
                     val repository = remember(context) {
                         MemoryCardRepository(context, AppPreferences(context))
@@ -1871,19 +1896,11 @@ private fun SettingsContent(
                         }
                         SettingsItem(
                             icon = Icons.Rounded.SaveAs,
-                            label = stringResource(R.string.settings_emulator_data_path),
-                            value = emulatorDataDisplayName ?: stringResource(R.string.settings_emulator_data_path_default),
-                            onClick = launchEmulatorDataPicker,
-                            helpText = stringResource(R.string.settings_help_emulator_data_path)
+                            label = stringResource(R.string.emulator_data_location_title),
+                            value = emulatorDataDisplayName,
+                            onClick = openEmulatorDataLocationDialog,
+                            helpText = stringResource(R.string.emulator_data_location_description)
                         )
-                        if (!uiState.emulatorDataPath.isNullOrBlank()) {
-                            SettingsItem(
-                                icon = Icons.Rounded.Close,
-                                label = stringResource(R.string.settings_emulator_data_path_use_default),
-                                value = stringResource(R.string.settings_emulator_data_path_use_default_desc),
-                                onClick = viewModel::clearEmulatorDataPath
-                            )
-                        }
                     }
 
                     SettingsSection(title = stringResource(R.string.settings_memory_cards_tab)) {
@@ -4501,7 +4518,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_pad_vibration_fallback),
         entry(SettingsTab.Library, R.string.settings_bios_path),
         entry(SettingsTab.Library, R.string.settings_game_path),
-        entry(SettingsTab.Library, R.string.settings_emulator_data_path),
+        entry(SettingsTab.Library, R.string.emulator_data_location_title),
         entry(SettingsTab.Library, R.string.settings_memory_cards_tab),
         entry(SettingsTab.Library, R.string.settings_cover_art_style),
         entry(SettingsTab.Library, R.string.settings_cover_download_url),

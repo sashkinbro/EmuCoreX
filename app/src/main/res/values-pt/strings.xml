@@ -1765,4 +1765,12 @@
     <string name="feedback_discard_title">Descartar feedback?</string>
     <string name="feedback_discard_message">Sua mensagem e os anexos selecionados serão perdidos.</string>
     <string name="feedback_discard_action">Descartar</string>
+    <string name="emulator_data_location_title">Local dos dados do emulador</string>
+    <string name="emulator_data_location_description">Escolha uma pasta privada padrão do aplicativo. Não é necessária permissão ampla de armazenamento.</string>
+    <string name="emulator_data_location_internal">Armazenamento interno</string>
+    <string name="emulator_data_location_internal_description">Pasta privada do aplicativo no armazenamento principal do dispositivo.</string>
+    <string name="emulator_data_location_sd_card">Cartão SD</string>
+    <string name="emulator_data_location_sd_card_description">Pasta privada do aplicativo no cartão SD.</string>
+    <string name="emulator_data_location_sd_card_unavailable">Nenhum cartão SD disponível foi encontrado neste dispositivo.</string>
+    <string name="emulator_data_location_error">Não foi possível preparar o armazenamento selecionado. Verifique se está disponível e tente novamente.</string>
 </resources>

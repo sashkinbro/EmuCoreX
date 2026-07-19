@@ -1762,4 +1762,12 @@
     <string name="feedback_discard_title">フィードバックを破棄しますか？</string>
     <string name="feedback_discard_message">メッセージと選択した添付ファイルは失われます。</string>
     <string name="feedback_discard_action">破棄</string>
+    <string name="emulator_data_location_title">エミュレーターデータの保存先</string>
+    <string name="emulator_data_location_description">標準のアプリ専用フォルダを選択します。広範なストレージ権限は不要です。</string>
+    <string name="emulator_data_location_internal">内部ストレージ</string>
+    <string name="emulator_data_location_internal_description">端末のメインストレージにあるアプリ専用フォルダ。</string>
+    <string name="emulator_data_location_sd_card">SDカード</string>
+    <string name="emulator_data_location_sd_card_description">SDカードにあるアプリ専用フォルダ。</string>
+    <string name="emulator_data_location_sd_card_unavailable">この端末で利用可能なSDカードが見つかりません。</string>
+    <string name="emulator_data_location_error">選択したストレージを準備できませんでした。利用可能か確認して、もう一度お試しください。</string>
 </resources>

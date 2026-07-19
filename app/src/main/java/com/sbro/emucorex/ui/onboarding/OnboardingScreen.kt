@@ -96,8 +96,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
+import com.sbro.emucorex.core.EmulatorStorage
 
 import com.sbro.emucorex.core.PerformanceProfiles
+import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
@@ -167,6 +169,7 @@ fun OnboardingScreen(
 
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenWidthDp >= 600
     var isCompleting by remember { mutableStateOf(false) }
+    var showEmulatorDataLocationDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
@@ -206,15 +209,29 @@ fun OnboardingScreen(
     ) { uri: Uri? ->
         uri?.let(viewModel::setGamePath)
     }
-    val emulatorDataPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let(viewModel::setEmulatorDataPath)
-    }
-
     val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(arrayOf("*/*")) })
     val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
-    val launchEmulatorDataPicker = rememberDebouncedClick(onClick = { emulatorDataPicker.launch(null) })
+    val openEmulatorDataLocationDialog = rememberDebouncedClick(
+        onClick = {
+            viewModel.refreshEmulatorDataLocations()
+            showEmulatorDataLocationDialog = true
+        }
+    )
+
+    if (showEmulatorDataLocationDialog) {
+        EmulatorDataLocationDialog(
+            selectedLocation = EmulatorStorage.selectedStandardLocation(
+                uiState.emulatorDataPath,
+                uiState.sdCardDataPath
+            ),
+            sdCardAvailable = uiState.sdCardDataPath != null,
+            onSelect = { location ->
+                showEmulatorDataLocationDialog = false
+                viewModel.setEmulatorDataLocation(location)
+            },
+            onDismiss = { showEmulatorDataLocationDialog = false }
+        )
+    }
 
     val proPurchaseMessage = uiState.proPurchaseMessageResId?.let { stringResource(it) }
     LaunchedEffect(proPurchaseMessage) {
@@ -452,12 +469,13 @@ fun OnboardingScreen(
                                             gamePath = uiState.gamePath,
                                             gamePaths = uiState.gamePaths,
                                             emulatorDataPath = uiState.emulatorDataPath,
+                                            sdCardDataPath = uiState.sdCardDataPath,
                                             biosValid = uiState.biosValid,
                                             gamePathValid = uiState.gamePathValid,
                                             launchBiosPicker = launchBiosPicker,
                                             launchGamePicker = launchGamePicker,
                                             onRemoveGamePath = viewModel::removeGamePath,
-                                            launchEmulatorDataPicker = launchEmulatorDataPicker,
+                                            openEmulatorDataLocationDialog = openEmulatorDataLocationDialog,
                                             endInset = 0.dp,
                                             bottomInset = 0.dp,
                                             reserveScrollHintSpace = true,
@@ -574,12 +592,13 @@ fun OnboardingScreen(
                                     gamePath = uiState.gamePath,
                                     gamePaths = uiState.gamePaths,
                                     emulatorDataPath = uiState.emulatorDataPath,
+                                    sdCardDataPath = uiState.sdCardDataPath,
                                     biosValid = uiState.biosValid,
                                     gamePathValid = uiState.gamePathValid,
                                     launchBiosPicker = launchBiosPicker,
                                     launchGamePicker = launchGamePicker,
                                     onRemoveGamePath = viewModel::removeGamePath,
-                                    launchEmulatorDataPicker = launchEmulatorDataPicker,
+                                    openEmulatorDataLocationDialog = openEmulatorDataLocationDialog,
                                     endInset = 0.dp,
                                     bottomInset = 0.dp
                                 )
@@ -1030,12 +1049,13 @@ private fun OnboardingSetupContent(
     gamePath: String?,
     gamePaths: List<String>,
     emulatorDataPath: String?,
+    sdCardDataPath: String?,
     biosValid: Boolean,
     gamePathValid: Boolean,
     launchBiosPicker: () -> Unit,
     launchGamePicker: () -> Unit,
     onRemoveGamePath: (String) -> Unit,
-    launchEmulatorDataPicker: () -> Unit,
+    openEmulatorDataLocationDialog: () -> Unit,
     endInset: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     bottomInset: androidx.compose.ui.unit.Dp = 0.dp,
@@ -1128,16 +1148,25 @@ private fun OnboardingSetupContent(
 
             SetupCard(
                 icon = Icons.Rounded.FolderOpen,
-                title = stringResource(R.string.onboarding_emulator_folder_title),
-                description = emulatorDataPath?.let { DocumentPathResolver.getFallbackDisplayName(it) }
-                    ?: stringResource(R.string.onboarding_emulator_folder_desc),
-                status = if (emulatorDataPath.isNullOrBlank()) {
-                    stringResource(R.string.onboarding_status_default_folder)
-                } else {
-                    stringResource(R.string.onboarding_status_custom_folder)
+                title = stringResource(R.string.emulator_data_location_title),
+                description = when {
+                    emulatorDataPath.isNullOrBlank() -> stringResource(
+                        R.string.emulator_data_location_internal_description
+                    )
+                    sdCardDataPath != null && emulatorDataPath == sdCardDataPath -> stringResource(
+                        R.string.emulator_data_location_sd_card_description
+                    )
+                    else -> DocumentPathResolver.getFallbackDisplayName(emulatorDataPath)
+                },
+                status = when {
+                    emulatorDataPath.isNullOrBlank() -> stringResource(R.string.emulator_data_location_internal)
+                    sdCardDataPath != null && emulatorDataPath == sdCardDataPath -> stringResource(
+                        R.string.emulator_data_location_sd_card
+                    )
+                    else -> stringResource(R.string.onboarding_status_custom_folder)
                 },
                 statusColor = Color(0xFF1B8A5A),
-                onClick = launchEmulatorDataPicker
+                onClick = openEmulatorDataLocationDialog
             )
 
             Spacer(modifier = Modifier.height(10.dp))

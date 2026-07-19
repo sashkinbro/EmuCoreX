@@ -1765,4 +1765,12 @@
     <string name="feedback_discard_title">Feedback verwerfen?</string>
     <string name="feedback_discard_message">Deine Nachricht und die ausgewählten Anhänge gehen verloren.</string>
     <string name="feedback_discard_action">Verwerfen</string>
+    <string name="emulator_data_location_title">Speicherort der Emulatordaten</string>
+    <string name="emulator_data_location_description">Wählen Sie einen privaten Standard-App-Ordner. Eine umfassende Speicherberechtigung ist nicht erforderlich.</string>
+    <string name="emulator_data_location_internal">Interner Speicher</string>
+    <string name="emulator_data_location_internal_description">Privater App-Ordner im primären Gerätespeicher.</string>
+    <string name="emulator_data_location_sd_card">SD-Karte</string>
+    <string name="emulator_data_location_sd_card_description">Privater App-Ordner auf der SD-Karte.</string>
+    <string name="emulator_data_location_sd_card_unavailable">Auf diesem Gerät wurde keine verfügbare SD-Karte gefunden.</string>
+    <string name="emulator_data_location_error">Der ausgewählte App-Speicher konnte nicht vorbereitet werden. Prüfen Sie die Verfügbarkeit und versuchen Sie es erneut.</string>
 </resources>

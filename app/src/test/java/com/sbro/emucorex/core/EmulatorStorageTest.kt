@@ -1,6 +1,8 @@
 package com.sbro.emucorex.core
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -27,5 +29,41 @@ class EmulatorStorageTest {
         val file = temporaryFolder.newFile("not-a-directory")
 
         assertFalse(EmulatorStorage.prepareCustomDataRoot(file.absolutePath))
+    }
+
+    @Test
+    fun secondaryStorageSkipsPrimaryAndMissingVolumes() {
+        val primary = temporaryFolder.newFolder("primary")
+        val sdCard = temporaryFolder.newFolder("sd-card")
+
+        assertEquals(
+            sdCard,
+            EmulatorStorage.findSecondaryExternalFilesDir(arrayOf(primary, null, sdCard))
+        )
+    }
+
+    @Test
+    fun secondaryStorageIsAbsentWhenAndroidOnlyReturnsPrimary() {
+        val primary = temporaryFolder.newFolder("primary-only")
+
+        assertNull(EmulatorStorage.findSecondaryExternalFilesDir(arrayOf(primary)))
+        assertNull(EmulatorStorage.findSecondaryExternalFilesDir(arrayOf(primary, null)))
+    }
+
+    @Test
+    fun standardLocationRecognizesInternalSdAndLegacyPaths() {
+        val sdCardPath = temporaryFolder.newFolder("selected-sd").absolutePath
+        val legacyPath = temporaryFolder.newFolder("legacy-custom").absolutePath
+
+        assertEquals(
+            EmulatorDataLocation.INTERNAL,
+            EmulatorStorage.selectedStandardLocation(null, sdCardPath)
+        )
+        assertEquals(
+            EmulatorDataLocation.SD_CARD,
+            EmulatorStorage.selectedStandardLocation(sdCardPath, sdCardPath)
+        )
+        assertNull(EmulatorStorage.selectedStandardLocation(legacyPath, sdCardPath))
+        assertNull(EmulatorStorage.selectedStandardLocation(sdCardPath, null))
     }
 }

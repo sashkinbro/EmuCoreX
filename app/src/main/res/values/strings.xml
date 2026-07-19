@@ -1778,4 +1778,12 @@
     <string name="feedback_discard_title">Discard feedback?</string>
     <string name="feedback_discard_message">Your message and selected attachments will be lost.</string>
     <string name="feedback_discard_action">Discard</string>
+    <string name="emulator_data_location_title">Emulator data location</string>
+    <string name="emulator_data_location_description">Choose a standard private app folder. No broad storage permission is required.</string>
+    <string name="emulator_data_location_internal">Internal storage</string>
+    <string name="emulator_data_location_internal_description">Private app folder on the device primary storage.</string>
+    <string name="emulator_data_location_sd_card">SD card</string>
+    <string name="emulator_data_location_sd_card_description">Private app folder on the SD card.</string>
+    <string name="emulator_data_location_sd_card_unavailable">No available SD card was found on this device.</string>
+    <string name="emulator_data_location_error">The selected app storage could not be prepared. Check that the storage is available and try again.</string>
 </resources>
