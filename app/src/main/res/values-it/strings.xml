@@ -1777,4 +1777,23 @@
     <string name="settings_backup_include_save_states">Includi salvataggi rapidi</string>
     <string name="settings_backup_include_save_states_desc">Aggiunge gli stati di salvataggio rapido all’archivio. Le dimensioni possono aumentare notevolmente e gli stati potrebbero non funzionare con una versione diversa del core.</string>
     <string name="settings_backup_export_action">Esporta</string>
+    <string name="settings_image_processing">Elaborazione immagine</string>
+    <string name="settings_deinterlacing">Deinterlacciamento</string>
+    <string name="settings_help_deinterlacing">Converte l’immagine interlacciata di PS2 per gli schermi moderni. È consigliato Automatico. Se l’immagine trema o mostra bordi a pettine, prova Adattivo o Bob e cambia l’ordine dei campi se il movimento è errato. Blend è più fluido, ma dimezza la frequenza effettiva.</string>
+    <string name="settings_deinterlacing_automatic">Automatico (predefinito)</string>
+    <string name="settings_deinterlacing_off">Nessun deinterlacciamento</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (campo superiore prima, dentellato)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (campo inferiore prima, dentellato)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (campo superiore prima)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (campo inferiore prima)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (campo superiore prima, metà FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (campo inferiore prima, metà FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adattivo (campo superiore prima)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adattivo (campo inferiore prima)</string>
+    <string name="settings_dithering">Dithering</string>
+    <string name="settings_help_dithering">Controlla il dithering PS2 quando un gioco lo richiede. Non ridimensionato è il valore preciso predefinito. Ridimensionato può rendere più visibile la trama ad alte risoluzioni interne; Disattivato riduce la griglia fine, ma può creare bande di colore. Forza 32 bit può correggere alcuni gradienti, ma anche causare problemi di rendering.</string>
+    <string name="settings_dithering_off">Disattivato</string>
+    <string name="settings_dithering_scaled">Ridimensionato</string>
+    <string name="settings_dithering_unscaled">Non ridimensionato (predefinito)</string>
+    <string name="settings_dithering_force_32bit">Forza 32 bit</string>
 </resources>

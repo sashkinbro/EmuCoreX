@@ -1781,4 +1781,23 @@
     <string name="settings_backup_include_save_states">Включити швидкі збереження</string>
     <string name="settings_backup_include_save_states_desc">Додає швидкі збереження до архіву. Його розмір може значно зрости, а збереження можуть не працювати з іншою версією ядра.</string>
     <string name="settings_backup_export_action">Експортувати</string>
+    <string name="settings_image_processing">Обробка зображення</string>
+    <string name="settings_deinterlacing">Деінтерлейсинг</string>
+    <string name="settings_help_deinterlacing">Перетворює черезрядкове зображення PS2 для сучасних екранів. Рекомендовано автоматичний режим. Якщо зображення тремтить або має зубчасті краї, спробуйте Adaptive чи Bob; якщо рух виглядає неправильно, змініть порядок полів. Blend дає плавніше зображення, але вдвічі зменшує ефективну частоту кадрів.</string>
+    <string name="settings_deinterlacing_automatic">Автоматично (за замовчуванням)</string>
+    <string name="settings_deinterlacing_off">Без деінтерлейсингу</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (спочатку верхнє поле, зубчасті краї)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (спочатку нижнє поле, зубчасті краї)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (спочатку верхнє поле)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (спочатку нижнє поле)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (спочатку верхнє поле, половина FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (спочатку нижнє поле, половина FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (спочатку верхнє поле)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (спочатку нижнє поле)</string>
+    <string name="settings_dithering">Дизеринг</string>
+    <string name="settings_help_dithering">Керує дизерингом PS2, коли його використовує гра. Немасштабований режим є точним стандартним варіантом. Масштабований може зробити сітку помітнішою за високої внутрішньої роздільності; вимкнення прибирає дрібну сітку, але може створити смуги на градієнтах. Примусовий 32-бітний режим іноді виправляє градієнти, але може порушити рендеринг.</string>
+    <string name="settings_dithering_off">Вимкнено</string>
+    <string name="settings_dithering_scaled">Масштабований</string>
+    <string name="settings_dithering_unscaled">Немасштабований (за замовчуванням)</string>
+    <string name="settings_dithering_force_32bit">Примусово 32-бітний режим</string>
 </resources>

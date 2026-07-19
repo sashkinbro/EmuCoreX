@@ -193,6 +193,8 @@ data class EmulationUiState(
     val anisotropicFiltering: Int = 0,
     val enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
     val antiBlur: Boolean = GsHackDefaults.ANTI_BLUR_DEFAULT,
+    val deinterlaceMode: Int = GsHackDefaults.DEINTERLACE_MODE_DEFAULT,
+    val dithering: Int = GsHackDefaults.DITHERING_DEFAULT,
     val widescreenPatches: Boolean = false,
     val noInterlacingPatches: Boolean = false,
     val cpuSpriteRenderSize: Int = GsHackDefaults.CPU_SPRITE_RENDER_SIZE_DEFAULT,
@@ -311,6 +313,8 @@ private data class EmulationLaunchConfig(
     val shadeBoostContrast: Int,
     val shadeBoostSaturation: Int,
     val shadeBoostGamma: Int,
+    val deinterlaceMode: Int,
+    val dithering: Int,
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val antiBlur: Boolean,
@@ -415,6 +419,8 @@ private data class LiveRuntimeSnapshot(
     val anisotropicFiltering: Int,
     val enableHwMipmapping: Boolean,
     val antiBlur: Boolean,
+    val deinterlaceMode: Int,
+    val dithering: Int,
     val widescreenPatches: Boolean,
     val noInterlacingPatches: Boolean,
     val cpuSpriteRenderSize: Int,
@@ -1500,6 +1506,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     shadeBoostContrast = config.shadeBoostContrast,
                     shadeBoostSaturation = config.shadeBoostSaturation,
                     shadeBoostGamma = config.shadeBoostGamma,
+                    deinterlaceMode = config.deinterlaceMode,
+                    dithering = config.dithering,
                     anisotropicFiltering = config.anisotropicFiltering,
                     enableHwMipmapping = config.enableHwMipmapping,
                     antiBlur = config.antiBlur,
@@ -1696,6 +1704,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     anisotropicFiltering = liveRuntime.anisotropicFiltering,
                     enableHwMipmapping = liveRuntime.enableHwMipmapping,
                     antiBlur = liveRuntime.antiBlur,
+                    deinterlaceMode = liveRuntime.deinterlaceMode,
+                    dithering = liveRuntime.dithering,
                     widescreenPatches = liveRuntime.widescreenPatches,
                     noInterlacingPatches = liveRuntime.noInterlacingPatches,
                     cpuSpriteRenderSize = liveRuntime.cpuSpriteRenderSize,
@@ -3501,6 +3511,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             shadeBoostContrast = settings.shadeBoostContrast,
             shadeBoostSaturation = settings.shadeBoostSaturation,
             shadeBoostGamma = settings.shadeBoostGamma,
+            deinterlaceMode = settings.deinterlaceMode,
+            dithering = settings.dithering,
             anisotropicFiltering = settings.anisotropicFiltering,
             enableHwMipmapping = settings.enableHwMipmapping,
             antiBlur = settings.antiBlur,
@@ -3609,6 +3621,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             anisotropicFiltering = settings.anisotropicFiltering,
             enableHwMipmapping = settings.enableHwMipmapping,
             antiBlur = settings.antiBlur,
+            deinterlaceMode = settings.deinterlaceMode,
+            dithering = settings.dithering,
             widescreenPatches = settings.enableWidescreenPatches,
             noInterlacingPatches = settings.enableNoInterlacingPatches,
             cpuSpriteRenderSize = settings.cpuSpriteRenderSize,
@@ -3688,6 +3702,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             shadeBoostContrast = pick("shadeBoostContrast", shadeBoostContrast) { shadeBoostContrast },
             shadeBoostSaturation = pick("shadeBoostSaturation", shadeBoostSaturation) { shadeBoostSaturation },
             shadeBoostGamma = pick("shadeBoostGamma", shadeBoostGamma) { shadeBoostGamma },
+            deinterlaceMode = pick("deinterlaceMode", deinterlaceMode) { deinterlaceMode },
+            dithering = pick("dithering", dithering) { dithering },
             anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
             enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
             antiBlur = pick("antiBlur", antiBlur) { antiBlur },
@@ -3785,6 +3801,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering) { anisotropicFiltering },
             enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping) { enableHwMipmapping },
             antiBlur = pick("antiBlur", antiBlur) { antiBlur },
+            deinterlaceMode = pick("deinterlaceMode", deinterlaceMode) { deinterlaceMode },
+            dithering = pick("dithering", dithering) { dithering },
             widescreenPatches = pick("enableWidescreenPatches", widescreenPatches) { enableWidescreenPatches },
             noInterlacingPatches = pick("enableNoInterlacingPatches", noInterlacingPatches) { enableNoInterlacingPatches },
             cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize) { cpuSpriteRenderSize },
@@ -3855,6 +3873,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val globalWidescreenPatches = preferences.enableWidescreenPatches.first()
         val globalNoInterlacingPatches = preferences.enableNoInterlacingPatches.first()
         val globalAntiBlur = preferences.antiBlur.first()
+        val globalDeinterlaceMode = preferences.deinterlaceMode.first()
+        val globalDithering = preferences.dithering.first()
 
         val profile = PerGameSettings(
             gameKey = gameKey,
@@ -3913,6 +3933,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             anisotropicFiltering = anisotropicFiltering,
             enableHwMipmapping = enableHwMipmapping,
             antiBlur = antiBlur,
+            deinterlaceMode = deinterlaceMode,
+            dithering = dithering,
             enableWidescreenPatches = widescreenPatches,
             enableNoInterlacingPatches = noInterlacingPatches,
             cpuSpriteRenderSize = cpuSpriteRenderSize,
@@ -3998,6 +4020,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (anisotropicFiltering != preferences.anisotropicFiltering.first()) add("anisotropicFiltering")
             if (enableHwMipmapping != preferences.enableHwMipmapping.first()) add("enableHwMipmapping")
             if (antiBlur != globalAntiBlur) add("antiBlur")
+            if (deinterlaceMode != globalDeinterlaceMode) add("deinterlaceMode")
+            if (dithering != globalDithering) add("dithering")
             if (profile.enableWidescreenPatches != globalWidescreenPatches) add("enableWidescreenPatches")
             if (profile.enableNoInterlacingPatches != globalNoInterlacingPatches) add("enableNoInterlacingPatches")
             if (cpuSpriteRenderSize != preferences.cpuSpriteRenderSize.first()) add("cpuSpriteRenderSize")

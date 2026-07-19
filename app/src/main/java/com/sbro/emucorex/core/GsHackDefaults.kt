@@ -1,6 +1,12 @@
 package com.sbro.emucorex.core
 
 object GsHackDefaults {
+    const val DEINTERLACE_MODE_DEFAULT = 0
+    const val DEINTERLACE_MODE_MIN = 0
+    const val DEINTERLACE_MODE_MAX = 9
+    const val DITHERING_DEFAULT = 2
+    const val DITHERING_MIN = 0
+    const val DITHERING_MAX = 3
     const val BILINEAR_FILTERING_DEFAULT = 2
     const val BILINEAR_FILTERING_MIN = 0
     const val BILINEAR_FILTERING_MAX = 3
@@ -75,6 +81,14 @@ object GsHackDefaults {
 
     fun coerceTvShader(value: Int): Int {
         return value.coerceIn(TV_SHADER_MIN, TV_SHADER_MAX)
+    }
+
+    fun coerceDeinterlaceMode(value: Int): Int {
+        return if (value in DEINTERLACE_MODE_MIN..DEINTERLACE_MODE_MAX) value else DEINTERLACE_MODE_DEFAULT
+    }
+
+    fun coerceDithering(value: Int): Int {
+        return if (value in DITHERING_MIN..DITHERING_MAX) value else DITHERING_DEFAULT
     }
 
     fun shouldEnableManualHardwareFixes(

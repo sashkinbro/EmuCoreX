@@ -365,6 +365,8 @@ object EmulatorBridge {
         shadeBoostContrast: Int = 50,
         shadeBoostSaturation: Int = 50,
         shadeBoostGamma: Int = 50,
+        deinterlaceMode: Int = GsHackDefaults.DEINTERLACE_MODE_DEFAULT,
+        dithering: Int = GsHackDefaults.DITHERING_DEFAULT,
         anisotropicFiltering: Int = 0,
         enableHwMipmapping: Boolean = GsHackDefaults.HW_MIPMAPPING_DEFAULT,
         antiBlur: Boolean = GsHackDefaults.ANTI_BLUR_DEFAULT,
@@ -555,6 +557,8 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/Speedhacks", "fastCDVD", "bool", fastCdvd.toString()))
                 add(settingOp("EmuCore", "EnableCheats", "bool", effectiveEnableCheats.toString()))
                 add(settingOp("EmuCore/GS", "HWDownloadMode", "int", hwDownloadMode.toString()))
+                add(settingOp("EmuCore/GS", "deinterlace_mode", "int", GsHackDefaults.coerceDeinterlaceMode(deinterlaceMode).toString()))
+                add(settingOp("EmuCore/GS", "dithering_ps2", "int", GsHackDefaults.coerceDithering(dithering).toString()))
                 add(settingOp("EmuCore/GS", "AndroidGpuProfileOverride", "string", gpuHardwareProfileOverride))
                 add(settingOp("EmuCore/GS", "AndroidUseAngleOpenGL", "bool", effectiveMediatekAngleOpenGl.toString()))
                 add(settingOp("EmuCore/GS", "OsdShowSpeed", "bool", "false"))

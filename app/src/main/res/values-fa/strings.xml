@@ -1792,4 +1792,23 @@
     <string name="settings_backup_include_save_states">افزودن ذخیره‌های سریع</string>
     <string name="settings_backup_include_save_states_desc">وضعیت‌های ذخیره سریع را به بایگانی اضافه می‌کند. حجم آن ممکن است بسیار افزایش یابد و این وضعیت‌ها شاید با نسخه دیگری از هسته کار نکنند.</string>
     <string name="settings_backup_export_action">برون‌بری</string>
+    <string name="settings_image_processing">پردازش تصویر</string>
+    <string name="settings_deinterlacing">حذف درهم‌تنیدگی</string>
+    <string name="settings_help_deinterlacing">تصویر درهم‌تنیدهٔ PS2 را برای نمایشگرهای امروزی تبدیل می‌کند. حالت خودکار پیشنهاد می‌شود. اگر تصویر می‌لرزد یا لبه‌های شانه‌ای دارد، Adaptive یا Bob را امتحان کنید و اگر حرکت نادرست است ترتیب فیلدها را عوض کنید. Blend نرم‌تر است، اما نرخ فریم مؤثر را نصف می‌کند.</string>
+    <string name="settings_deinterlacing_automatic">خودکار (پیش‌فرض)</string>
+    <string name="settings_deinterlacing_off">بدون حذف درهم‌تنیدگی</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (ابتدا فیلد بالا، لبه‌های دندانه‌دار)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (ابتدا فیلد پایین، لبه‌های دندانه‌دار)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (ابتدا فیلد بالا)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (ابتدا فیلد پایین)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (ابتدا فیلد بالا، نصف FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (ابتدا فیلد پایین، نصف FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (ابتدا فیلد بالا)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (ابتدا فیلد پایین)</string>
+    <string name="settings_dithering">دیترینگ</string>
+    <string name="settings_help_dithering">دیترینگ PS2 را هنگامی که بازی درخواست می‌کند کنترل می‌کند. حالت بدون مقیاس پیش‌فرض دقیق است. حالت مقیاس‌شده ممکن است الگو را در وضوح داخلی بالا نمایان‌تر کند؛ خاموش کردن شبکهٔ ریز را کم می‌کند اما ممکن است نوارهای رنگی بسازد. اجبار ۳۲ بیتی گاهی گرادیان‌ها را اصلاح می‌کند ولی ممکن است رندر را خراب کند.</string>
+    <string name="settings_dithering_off">خاموش</string>
+    <string name="settings_dithering_scaled">مقیاس‌شده</string>
+    <string name="settings_dithering_unscaled">بدون مقیاس (پیش‌فرض)</string>
+    <string name="settings_dithering_force_32bit">اجبار ۳۲ بیتی</string>
 </resources>

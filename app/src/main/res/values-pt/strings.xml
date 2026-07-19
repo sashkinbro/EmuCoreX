@@ -1779,4 +1779,23 @@
     <string name="settings_backup_include_save_states">Incluir salvamentos rápidos</string>
     <string name="settings_backup_include_save_states_desc">Adiciona os estados de salvamento rápido ao arquivo. O tamanho pode aumentar bastante e os estados podem não funcionar com outra versão do núcleo.</string>
     <string name="settings_backup_export_action">Exportar</string>
+    <string name="settings_image_processing">Processamento de imagem</string>
+    <string name="settings_deinterlacing">Desentrelaçamento</string>
+    <string name="settings_help_deinterlacing">Converte a imagem entrelaçada do PS2 para telas modernas. O modo Automático é recomendado. Se a imagem tremer ou mostrar bordas em forma de pente, tente Adaptativo ou Bob e troque a ordem dos campos se o movimento parecer incorreto. Blend é mais suave, mas reduz pela metade a taxa efetiva de quadros.</string>
+    <string name="settings_deinterlacing_automatic">Automático (padrão)</string>
+    <string name="settings_deinterlacing_off">Sem desentrelaçamento</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (campo superior primeiro, serrilhado)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (campo inferior primeiro, serrilhado)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (campo superior primeiro)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (campo inferior primeiro)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (campo superior primeiro, metade dos FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (campo inferior primeiro, metade dos FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptativo (campo superior primeiro)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptativo (campo inferior primeiro)</string>
+    <string name="settings_dithering">Dithering</string>
+    <string name="settings_help_dithering">Controla o dithering do PS2 quando um jogo o solicita. Sem escala é o padrão preciso. Escalado pode tornar o padrão mais visível em resoluções internas altas; Desligado reduz a grade fina, mas pode causar faixas de cor. Forçar 32 bits pode corrigir gradientes, mas também causar falhas de renderização.</string>
+    <string name="settings_dithering_off">Desligado</string>
+    <string name="settings_dithering_scaled">Escalado</string>
+    <string name="settings_dithering_unscaled">Sem escala (padrão)</string>
+    <string name="settings_dithering_force_32bit">Forçar 32 bits</string>
 </resources>

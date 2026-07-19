@@ -1792,4 +1792,23 @@
     <string name="settings_backup_include_save_states">Include quick saves</string>
     <string name="settings_backup_include_save_states_desc">Adds quick-save states to the archive. This can greatly increase its size, and states may not work with a different core version.</string>
     <string name="settings_backup_export_action">Export</string>
+    <string name="settings_image_processing">Image processing</string>
+    <string name="settings_deinterlacing">Deinterlacing</string>
+    <string name="settings_help_deinterlacing">Converts interlaced PS2 output for progressive displays. Automatic is recommended. If the picture shakes or has comb-like edges, try Adaptive or Bob and switch the field order if motion looks wrong. Blend is smoother but halves the effective frame rate.</string>
+    <string name="settings_deinterlacing_automatic">Automatic (default)</string>
+    <string name="settings_deinterlacing_off">No deinterlacing</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (top field first, sawtooth)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (bottom field first, sawtooth)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (top field first)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (bottom field first)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (top field first, half FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (bottom field first, half FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (top field first)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (bottom field first)</string>
+    <string name="settings_dithering">Dithering</string>
+    <string name="settings_help_dithering">Controls PS2 dithering when a game requests it. Unscaled is the accurate default. Scaled can make the pattern more visible at higher internal resolutions; Off can reduce a visible fine grid but may cause color banding. Force 32-bit may fix gradients in some games but can break rendering.</string>
+    <string name="settings_dithering_off">Off</string>
+    <string name="settings_dithering_scaled">Scaled</string>
+    <string name="settings_dithering_unscaled">Unscaled (default)</string>
+    <string name="settings_dithering_force_32bit">Force 32-bit</string>
 </resources>

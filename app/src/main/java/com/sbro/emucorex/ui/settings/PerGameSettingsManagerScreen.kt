@@ -49,7 +49,7 @@ import androidx.compose.material.icons.rounded.Save
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.RendererDefaults
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.AlertDialog
+import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -1292,6 +1292,24 @@ private fun GameSettingsTabContent(
                 }
             }
             GameSettingsManagerTab.Fixes -> {
+                EditorSection(title = stringResource(R.string.settings_image_processing)) {
+                    SelectionRow(
+                        title = stringResource(R.string.settings_deinterlacing),
+                        options = deinterlacingOptions(),
+                        selectedValue = draft.deinterlaceMode,
+                        onSelected = { onDraftChange(draft.copy(deinterlaceMode = it)) },
+                        helpText = stringResource(R.string.settings_help_deinterlacing),
+                        onResetToDefault = { onDraftChange(draft.copy(deinterlaceMode = defaultProfile.deinterlaceMode)) }
+                    )
+                    SelectionRow(
+                        title = stringResource(R.string.settings_dithering),
+                        options = ditheringOptions(),
+                        selectedValue = draft.dithering,
+                        onSelected = { onDraftChange(draft.copy(dithering = it)) },
+                        helpText = stringResource(R.string.settings_help_dithering),
+                        onResetToDefault = { onDraftChange(draft.copy(dithering = defaultProfile.dithering)) }
+                    )
+                }
                 EditorSection(title = stringResource(R.string.settings_patches_section)) {
                     ToggleRow(
                         title = stringResource(R.string.settings_widescreen_patches),
@@ -2095,6 +2113,24 @@ private fun GameSettingsEditorDialog(
                                         shadeBoostGamma = defaultProfile.shadeBoostGamma
                                     )
                                 }
+                            )
+                        }
+                        EditorSection(title = stringResource(R.string.settings_image_processing)) {
+                            SelectionRow(
+                                title = stringResource(R.string.settings_deinterlacing),
+                                options = deinterlacingOptions(),
+                                selectedValue = draft.deinterlaceMode,
+                                onSelected = { draft = draft.copy(deinterlaceMode = it) },
+                                helpText = stringResource(R.string.settings_help_deinterlacing),
+                                onResetToDefault = { draft = draft.copy(deinterlaceMode = defaultProfile.deinterlaceMode) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_dithering),
+                                options = ditheringOptions(),
+                                selectedValue = draft.dithering,
+                                onSelected = { draft = draft.copy(dithering = it) },
+                                helpText = stringResource(R.string.settings_help_dithering),
+                                onResetToDefault = { draft = draft.copy(dithering = defaultProfile.dithering) }
                             )
                         }
                         EditorSection(title = stringResource(R.string.settings_patches_section)) {
@@ -3282,6 +3318,28 @@ private fun tvShaderOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
+private fun deinterlacingOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_deinterlacing_automatic),
+    1 to stringResource(R.string.settings_deinterlacing_off),
+    2 to stringResource(R.string.settings_deinterlacing_weave_tff),
+    3 to stringResource(R.string.settings_deinterlacing_weave_bff),
+    4 to stringResource(R.string.settings_deinterlacing_bob_tff),
+    5 to stringResource(R.string.settings_deinterlacing_bob_bff),
+    6 to stringResource(R.string.settings_deinterlacing_blend_tff),
+    7 to stringResource(R.string.settings_deinterlacing_blend_bff),
+    8 to stringResource(R.string.settings_deinterlacing_adaptive_tff),
+    9 to stringResource(R.string.settings_deinterlacing_adaptive_bff)
+)
+
+@Composable
+private fun ditheringOptions(): List<Pair<Int, String>> = listOf(
+    0 to stringResource(R.string.settings_dithering_off),
+    1 to stringResource(R.string.settings_dithering_scaled),
+    2 to stringResource(R.string.settings_dithering_unscaled),
+    3 to stringResource(R.string.settings_dithering_force_32bit)
+)
+
+@Composable
 private fun cpuSpriteRenderSizeOptions(): List<Pair<Int, String>> = (0..10).map { value ->
     value to if (value == 0) stringResource(R.string.settings_disabled_short) else value.toString()
 }
@@ -3511,6 +3569,8 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         anisotropicFiltering = anisotropicFiltering,
         enableHwMipmapping = enableHwMipmapping,
         antiBlur = antiBlur,
+        deinterlaceMode = deinterlaceMode,
+        dithering = dithering,
         enableWidescreenPatches = enableWidescreenPatches,
         enableNoInterlacingPatches = enableNoInterlacingPatches,
         cpuSpriteRenderSize = cpuSpriteRenderSize,
@@ -3608,6 +3668,8 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         anisotropicFiltering = pick("anisotropicFiltering", anisotropicFiltering, defaultProfile.anisotropicFiltering),
         enableHwMipmapping = pick("enableHwMipmapping", enableHwMipmapping, defaultProfile.enableHwMipmapping),
         antiBlur = pick("antiBlur", antiBlur, defaultProfile.antiBlur),
+        deinterlaceMode = pick("deinterlaceMode", deinterlaceMode, defaultProfile.deinterlaceMode),
+        dithering = pick("dithering", dithering, defaultProfile.dithering),
         enableWidescreenPatches = pick("enableWidescreenPatches", enableWidescreenPatches, defaultProfile.enableWidescreenPatches),
         enableNoInterlacingPatches = pick("enableNoInterlacingPatches", enableNoInterlacingPatches, defaultProfile.enableNoInterlacingPatches),
         cpuSpriteRenderSize = pick("cpuSpriteRenderSize", cpuSpriteRenderSize, defaultProfile.cpuSpriteRenderSize),

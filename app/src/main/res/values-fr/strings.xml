@@ -1779,4 +1779,23 @@
     <string name="settings_backup_include_save_states">Inclure les sauvegardes rapides</string>
     <string name="settings_backup_include_save_states_desc">Ajoute les états de sauvegarde rapide à l’archive. Sa taille peut augmenter fortement et les états peuvent ne pas fonctionner avec une autre version du cœur.</string>
     <string name="settings_backup_export_action">Exporter</string>
+    <string name="settings_image_processing">Traitement de l’image</string>
+    <string name="settings_deinterlacing">Désentrelacement</string>
+    <string name="settings_help_deinterlacing">Convertit la sortie entrelacée de la PS2 pour les écrans modernes. Le mode Automatique est recommandé. Si l’image tremble ou présente des bords en peigne, essayez Adaptatif ou Bob et inversez l’ordre des trames si le mouvement paraît incorrect. Blend est plus fluide, mais divise la fréquence effective par deux.</string>
+    <string name="settings_deinterlacing_automatic">Automatique (par défaut)</string>
+    <string name="settings_deinterlacing_off">Sans désentrelacement</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (trame du haut d’abord, dents de scie)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (trame du bas d’abord, dents de scie)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (trame du haut d’abord)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (trame du bas d’abord)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (trame du haut d’abord, moitié des IPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (trame du bas d’abord, moitié des IPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptatif (trame du haut d’abord)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptatif (trame du bas d’abord)</string>
+    <string name="settings_dithering">Tramage</string>
+    <string name="settings_help_dithering">Contrôle le tramage PS2 lorsqu’un jeu le demande. Sans mise à l’échelle est la valeur précise par défaut. Mis à l’échelle peut rendre la trame plus visible en haute résolution interne ; Désactivé réduit la fine grille, mais peut créer des bandes de couleur. Forcer 32 bits peut corriger certains dégradés, mais aussi perturber le rendu.</string>
+    <string name="settings_dithering_off">Désactivé</string>
+    <string name="settings_dithering_scaled">Mis à l’échelle</string>
+    <string name="settings_dithering_unscaled">Sans mise à l’échelle (par défaut)</string>
+    <string name="settings_dithering_force_32bit">Forcer 32 bits</string>
 </resources>

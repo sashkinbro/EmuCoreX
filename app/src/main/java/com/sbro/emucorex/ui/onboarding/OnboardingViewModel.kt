@@ -133,6 +133,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 audioBufferMs = audioSettings.audioBufferMs,
                 audioOutputLatencyMs = audioSettings.audioOutputLatencyMs,
                 audioMinimalOutputLatency = audioSettings.audioMinimalOutputLatency,
+                deinterlaceMode = audioSettings.deinterlaceMode,
+                dithering = audioSettings.dithering,
                 upscaleMultiplier = EmulatorBridge.getSetting("EmuCoreX", "UpscaleMultiplier", "float")?.toFloatOrNull()
                     ?: EmulatorBridge.getSetting("EmuCoreX", "UpscaleMultiplier", "int")?.toIntOrNull()?.toFloat()
                     ?: 1f

@@ -1779,4 +1779,23 @@
     <string name="settings_backup_include_save_states">Schnellspeicherstände einschließen</string>
     <string name="settings_backup_include_save_states_desc">Fügt Schnellspeicherstände zum Archiv hinzu. Dadurch kann es deutlich größer werden, und die Speicherstände funktionieren möglicherweise nicht mit einer anderen Core-Version.</string>
     <string name="settings_backup_export_action">Exportieren</string>
+    <string name="settings_image_processing">Bildverarbeitung</string>
+    <string name="settings_deinterlacing">Deinterlacing</string>
+    <string name="settings_help_deinterlacing">Wandelt das Zeilensprungbild der PS2 für moderne Bildschirme um. Automatisch wird empfohlen. Wenn das Bild zittert oder Kammkanten zeigt, Adaptive oder Bob testen und bei falscher Bewegung die Feldreihenfolge wechseln. Blend wirkt ruhiger, halbiert jedoch die effektive Bildrate.</string>
+    <string name="settings_deinterlacing_automatic">Automatisch (Standard)</string>
+    <string name="settings_deinterlacing_off">Kein Deinterlacing</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (oberes Feld zuerst, Sägezahn)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (unteres Feld zuerst, Sägezahn)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (oberes Feld zuerst)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (unteres Feld zuerst)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (oberes Feld zuerst, halbe FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (unteres Feld zuerst, halbe FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (oberes Feld zuerst)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (unteres Feld zuerst)</string>
+    <string name="settings_dithering">Dithering</string>
+    <string name="settings_help_dithering">Steuert PS2-Dithering, wenn ein Spiel es verwendet. Unskaliert ist der genaue Standard. Skaliert kann das Muster bei hoher interner Auflösung sichtbarer machen; Aus reduziert ein feines Raster, kann aber Farbstufen verursachen. 32 Bit erzwingen kann Farbverläufe korrigieren, aber die Darstellung beeinträchtigen.</string>
+    <string name="settings_dithering_off">Aus</string>
+    <string name="settings_dithering_scaled">Skaliert</string>
+    <string name="settings_dithering_unscaled">Unskaliert (Standard)</string>
+    <string name="settings_dithering_force_32bit">32 Bit erzwingen</string>
 </resources>

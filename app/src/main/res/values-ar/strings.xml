@@ -1781,4 +1781,23 @@
     <string name="settings_backup_include_save_states">تضمين حالات الحفظ السريع</string>
     <string name="settings_backup_include_save_states_desc">يضيف حالات الحفظ السريع إلى الأرشيف. قد يزداد حجمه كثيرًا، وقد لا تعمل الحالات مع إصدار مختلف من النواة.</string>
     <string name="settings_backup_export_action">تصدير</string>
+    <string name="settings_image_processing">معالجة الصورة</string>
+    <string name="settings_deinterlacing">إزالة التشابك</string>
+    <string name="settings_help_deinterlacing">يحوّل صورة PS2 المتشابكة لتناسب الشاشات الحديثة. يوصى بالوضع التلقائي. إذا اهتزت الصورة أو ظهرت حواف مشطية، فجرّب Adaptive أو Bob وبدّل ترتيب الحقول إذا بدت الحركة غير صحيحة. يمنح Blend حركة أنعم لكنه يخفض معدل الإطارات الفعلي إلى النصف.</string>
+    <string name="settings_deinterlacing_automatic">تلقائي (الافتراضي)</string>
+    <string name="settings_deinterlacing_off">بدون إزالة التشابك</string>
+    <string name="settings_deinterlacing_weave_tff">Weave (الحقل العلوي أولاً، حواف مسننة)</string>
+    <string name="settings_deinterlacing_weave_bff">Weave (الحقل السفلي أولاً، حواف مسننة)</string>
+    <string name="settings_deinterlacing_bob_tff">Bob (الحقل العلوي أولاً)</string>
+    <string name="settings_deinterlacing_bob_bff">Bob (الحقل السفلي أولاً)</string>
+    <string name="settings_deinterlacing_blend_tff">Blend (الحقل العلوي أولاً، نصف FPS)</string>
+    <string name="settings_deinterlacing_blend_bff">Blend (الحقل السفلي أولاً، نصف FPS)</string>
+    <string name="settings_deinterlacing_adaptive_tff">Adaptive (الحقل العلوي أولاً)</string>
+    <string name="settings_deinterlacing_adaptive_bff">Adaptive (الحقل السفلي أولاً)</string>
+    <string name="settings_dithering">التدرج المنقّط</string>
+    <string name="settings_help_dithering">يتحكم في تدرج PS2 المنقّط عندما تطلبه اللعبة. الوضع غير المحجّم هو الافتراضي الدقيق. قد يجعل الوضع المحجّم النمط أوضح عند الدقة الداخلية العالية؛ الإيقاف يقلل الشبكة الدقيقة لكنه قد يسبب شرائط لونية. قد يصلح فرض 32 بت بعض التدرجات لكنه قد يسبب أخطاء في العرض.</string>
+    <string name="settings_dithering_off">إيقاف</string>
+    <string name="settings_dithering_scaled">محجّم</string>
+    <string name="settings_dithering_unscaled">غير محجّم (الافتراضي)</string>
+    <string name="settings_dithering_force_32bit">فرض 32 بت</string>
 </resources>
