@@ -555,7 +555,10 @@ fun EmulationScreen(
         pendingGamepadActionId != null
 
     BackHandler(enabled = true) {
-        toggleMenuClick()
+        when (resolveEmulationBackAction(uiState.backButtonExitsGame)) {
+            EmulationBackAction.OpenGameMenu -> toggleMenuClick()
+            EmulationBackAction.RequestExit -> requestExitClick()
+        }
     }
 
     ProvideGamepadMenuAction(onMenu = toggleMenuClick)

@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">画面上のコントロールを押したときに短いハプティクス振動を再生します。</string>
     <string name="settings_gamepad_button_haptics">ゲームパッドボタンのハプティクス</string>
     <string name="settings_gamepad_button_haptics_desc">物理的なゲームパッドのボタンを押したときに短い振動を再生します。</string>
+    <string name="settings_back_button_exits_game">戻るボタンでゲームを終了</string>
+    <string name="settings_back_button_exits_game_desc">戻るボタンを押したとき、ゲームメニューを開かずに終了操作を開始します。</string>
+    <string name="settings_help_back_button_exits_game">初期設定ではオフです。有効にすると、Android の戻るボタンはゲームメニューの「終了」と同じ終了操作を使用し、現在の確認設定も引き継ぎます。</string>
     <string name="settings_confirm_save_load_actions">セーブ/ロード操作の確認</string>
     <string name="settings_confirm_save_load_actions_desc">クイックセーブまたはクイックロードの前に確認します。</string>
     <string name="settings_help_touch_haptics">画面上のボタン、十字キーの方向、またはアナログスティックを最初に押したときに、軽いAndroidハプティクスフィードバックを追加します。これは操作感にのみ影響し、ゲーム内の振動は変更しません。</string>

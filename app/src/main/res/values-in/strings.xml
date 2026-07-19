@@ -594,6 +594,9 @@
     <string name="settings_touch_haptics_desc">Mainkan getaran pendek saat menekan kontrol di layar.</string>
     <string name="settings_gamepad_button_haptics">Haptik tombol Gamepad</string>
     <string name="settings_gamepad_button_haptics_desc">Mainkan getaran pendek saat menekan tombol fisik gamepad.</string>
+    <string name="settings_back_button_exits_game">Keluar dari game dengan tombol Kembali</string>
+    <string name="settings_back_button_exits_game_desc">Mulai keluar dari game alih-alih membuka menu saat tombol Kembali ditekan.</string>
+    <string name="settings_help_back_button_exits_game">Nonaktif secara default. Jika diaktifkan, tombol Kembali Android menggunakan tindakan yang sama dengan Keluar di menu game, termasuk pengaturan konfirmasi saat ini.</string>
     <string name="settings_confirm_save_load_actions">Konfirmasi tindakan simpan/muat</string>
     <string name="settings_confirm_save_load_actions_desc">Tanyakan sebelum simpan cepat atau muat cepat.</string>
     <string name="settings_auto_progressive_scan">Pindai Progresif Otomatis</string>

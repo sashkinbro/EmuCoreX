@@ -109,6 +109,7 @@ data class SettingsUiState(
     val fpsOverlayScale: Int = AppPreferences.DEFAULT_FPS_OVERLAY_SCALE,
     val fpsOverlayMetrics: Int = PerformanceOverlayMetrics.DEFAULT,
     val confirmSaveLoadActions: Boolean = true,
+    val backButtonExitsGame: Boolean = false,
     val compactControls: Boolean = true,
     val keepScreenOn: Boolean = true,
     val showRecentGames: Boolean = true,
@@ -356,6 +357,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             fpsOverlayScale = snapshot.fpsOverlayScale,
             fpsOverlayMetrics = snapshot.fpsOverlayMetrics,
             confirmSaveLoadActions = snapshot.confirmSaveLoadActions,
+            backButtonExitsGame = snapshot.backButtonExitsGame,
             compactControls = snapshot.compactControls,
             keepScreenOn = snapshot.keepScreenOn,
             showRecentGames = snapshot.showRecentGames,
@@ -918,6 +920,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setFpsOverlayScale(scale: Int) { viewModelScope.launch { preferences.setFpsOverlayScale(scale) } }
     fun setFpsOverlayMetrics(metrics: Int) { viewModelScope.launch { preferences.setFpsOverlayMetrics(metrics) } }
     fun setConfirmSaveLoadActions(enabled: Boolean) { viewModelScope.launch { preferences.setConfirmSaveLoadActions(enabled) } }
+    fun setBackButtonExitsGame(enabled: Boolean) { viewModelScope.launch { preferences.setBackButtonExitsGame(enabled) } }
     fun setKeepScreenOn(enabled: Boolean) { viewModelScope.launch { preferences.setKeepScreenOn(enabled) } }
     fun setRacingMode(enabled: Boolean) { viewModelScope.launch { preferences.setRacingMode(enabled) } }
     fun setTouchHaptics(enabled: Boolean) { viewModelScope.launch { preferences.setTouchHaptics(enabled) } }

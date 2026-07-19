@@ -1341,6 +1341,9 @@
     <string name="settings_touch_haptics_desc">Émettre un bref retour haptique lors d\'une pression sur les commandes à l\'écran.</string>
     <string name="settings_gamepad_button_haptics">Retour haptique des boutons de la manette</string>
     <string name="settings_gamepad_button_haptics_desc">Émettre une brève vibration lors d\'une pression sur les boutons physiques de la manette.</string>
+    <string name="settings_back_button_exits_game">Quitter le jeu avec le bouton Retour</string>
+    <string name="settings_back_button_exits_game_desc">Lancer la sortie du jeu au lieu d’ouvrir le menu en appuyant sur Retour.</string>
+    <string name="settings_help_back_button_exits_game">Désactivé par défaut. Une fois activé, le bouton Retour d’Android utilise la même action que Quitter dans le menu du jeu, avec le réglage de confirmation actuel.</string>
     <string name="settings_confirm_save_load_actions">Confirmer les actions de sauvegarde/chargement</string>
     <string name="settings_confirm_save_load_actions_desc">Demander avant une sauvegarde rapide ou un chargement rapide.</string>
     <string name="settings_help_touch_haptics">Ajoute un léger retour haptique Android lorsqu\'un bouton à l\'écran, une direction de la croix directionnelle ou un stick analogique est pressé pour la première fois. Cela affecte uniquement la sensation de contrôle et ne modifie pas les vibrations du jeu.</string>

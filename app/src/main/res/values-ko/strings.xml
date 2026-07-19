@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">화면의 컨트롤을 누를 때 짧은 햅틱 반응을 재생합니다.</string>
     <string name="settings_gamepad_button_haptics">게임패드 버튼 햅틱</string>
     <string name="settings_gamepad_button_haptics_desc">물리적 게임패드 버튼을 누를 때 짧은 진동 반응을 재생합니다.</string>
+    <string name="settings_back_button_exits_game">뒤로 버튼으로 게임 종료</string>
+    <string name="settings_back_button_exits_game_desc">뒤로 버튼을 누를 때 게임 메뉴를 열지 않고 종료 동작을 시작합니다.</string>
+    <string name="settings_help_back_button_exits_game">기본적으로 꺼져 있습니다. 활성화하면 Android 뒤로 버튼이 게임 메뉴의 종료와 동일한 동작을 사용하며 현재 확인 설정도 그대로 적용됩니다.</string>
     <string name="settings_confirm_save_load_actions">저장/불러오기 작업 확인</string>
     <string name="settings_confirm_save_load_actions_desc">빠른 저장 또는 빠른 불러오기 전에 묻습니다.</string>
     <string name="settings_help_touch_haptics">화면 버튼, 방향패드 방향 또는 아날로그 스틱을 처음 누를 때 가벼운 Android 햅틱 피드백을 추가합니다. 이는 조작감에만 영향을 미치며 게임 내 진동은 변경하지 않습니다.</string>

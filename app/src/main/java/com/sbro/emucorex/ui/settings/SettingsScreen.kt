@@ -44,6 +44,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
@@ -1116,6 +1117,15 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setKeepScreenOn,
                             helpText = stringResource(R.string.settings_help_keep_screen_on),
                             onResetToDefault = { viewModel.setKeepScreenOn(defaults.keepScreenOn) }
+                        )
+                        ToggleItem(
+                            icon = Icons.AutoMirrored.Rounded.ExitToApp,
+                            title = stringResource(R.string.settings_back_button_exits_game),
+                            subtitle = stringResource(R.string.settings_back_button_exits_game_desc),
+                            checked = uiState.backButtonExitsGame,
+                            onCheckedChange = viewModel::setBackButtonExitsGame,
+                            helpText = stringResource(R.string.settings_help_back_button_exits_game),
+                            onResetToDefault = { viewModel.setBackButtonExitsGame(defaults.backButtonExitsGame) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Save,
@@ -4536,6 +4546,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.GameMenu, R.string.settings_game_menu_session_sections),
         entry(SettingsTab.Pro, R.string.settings_pro_title),
         entry(SettingsTab.General, R.string.settings_keep_screen_on),
+        entry(SettingsTab.General, R.string.settings_back_button_exits_game),
         entry(SettingsTab.General, R.string.settings_confirm_save_load_actions),
         entry(SettingsTab.General, R.string.settings_show_recent_games),
         entry(SettingsTab.General, R.string.settings_show_home_search),

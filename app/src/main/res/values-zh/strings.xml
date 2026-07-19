@@ -1341,6 +1341,9 @@
     <string name="settings_touch_haptics_desc">按下屏幕控件时播放短促的触觉反馈。</string>
     <string name="settings_gamepad_button_haptics">游戏手柄按钮震动反馈</string>
     <string name="settings_gamepad_button_haptics_desc">按下实体游戏手柄按钮时播放短促的震动反馈。</string>
+    <string name="settings_back_button_exits_game">使用返回键退出游戏</string>
+    <string name="settings_back_button_exits_game_desc">按下返回键时启动退出操作，而不是打开游戏菜单。</string>
+    <string name="settings_help_back_button_exits_game">默认关闭。启用后，Android 返回键将使用与游戏菜单中“退出”相同的操作，并沿用当前的确认设置。</string>
     <string name="settings_confirm_save_load_actions">确认保存/加载操作</string>
     <string name="settings_confirm_save_load_actions_desc">在快速保存或快速加载前询问。</string>
     <string name="settings_help_touch_haptics">首次按下屏幕按钮、十字键方向或模拟摇杆时添加轻微的 Android 触觉反馈。这仅影响控制手感，不会改变游戏内的震动。</string>

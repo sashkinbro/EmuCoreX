@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">ऑन-स्क्रीन नियंत्रण दबाते समय एक छोटी हैप्टिक टिक प्ले करें।</string>
     <string name="settings_gamepad_button_haptics">गेमपैड बटन हैप्टिक्स</string>
     <string name="settings_gamepad_button_haptics_desc">भौतिक गेमपैड बटन दबाते समय एक छोटी कंपन टिक प्ले करें।</string>
+    <string name="settings_back_button_exits_game">वापस बटन से गेम से बाहर निकलें</string>
+    <string name="settings_back_button_exits_game_desc">वापस दबाने पर गेम मेनू खोलने के बजाय बाहर निकलने की कार्रवाई शुरू करें।</string>
+    <string name="settings_help_back_button_exits_game">डिफ़ॉल्ट रूप से बंद। चालू होने पर Android का वापस बटन गेम मेनू के बाहर निकलें विकल्प वाली ही कार्रवाई और वर्तमान पुष्टि सेटिंग का उपयोग करता है।</string>
     <string name="settings_confirm_save_load_actions">सहेजें/लोड क्रियाओं की पुष्टि करें</string>
     <string name="settings_confirm_save_load_actions_desc">त्वरित सहेजने या त्वरित लोड करने से पहले पूछें।</string>
     <string name="settings_help_touch_haptics">जब कोई ऑन-स्क्रीन बटन, डी-पैड दिशा, या एनालॉग स्टिक पहली बार दबाया जाता है, तो हल्का Android हैप्टिक फीडबैक जोड़ता है। यह केवल नियंत्रण महसूस को प्रभावित करता है और इन-गेम रंबल को नहीं बदलता है。</string>

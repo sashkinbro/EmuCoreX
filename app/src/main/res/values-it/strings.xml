@@ -1339,6 +1339,9 @@
     <string name="settings_touch_haptics_desc">Riproduce un breve feedback aptico quando si premono i controlli sullo schermo.</string>
     <string name="settings_gamepad_button_haptics">Feedback aptico per pulsanti del gamepad</string>
     <string name="settings_gamepad_button_haptics_desc">Riproduce una breve vibrazione quando si premono i pulsanti fisici del gamepad.</string>
+    <string name="settings_back_button_exits_game">Esci dal gioco con il pulsante Indietro</string>
+    <string name="settings_back_button_exits_game_desc">Avvia l’uscita dal gioco invece di aprire il menu quando premi Indietro.</string>
+    <string name="settings_help_back_button_exits_game">Disattivato per impostazione predefinita. Se attivato, il pulsante Indietro di Android usa la stessa azione di Esci nel menu di gioco, inclusa l’impostazione di conferma corrente.</string>
     <string name="settings_confirm_save_load_actions">Conferma azioni di salvataggio/caricamento</string>
     <string name="settings_confirm_save_load_actions_desc">Chiedi prima del salvataggio o caricamento rapido.</string>
     <string name="settings_help_touch_haptics">Aggiunge un leggero feedback aptico di Android quando viene premuto per la prima volta un pulsante sullo schermo, una direzione del D-pad o uno stick analogico. Questo influenza solo la sensazione dei controlli e non modifica la vibrazione del gioco.</string>

@@ -1341,6 +1341,9 @@
     <string name="settings_touch_haptics_desc">Reproduzir uma curta vibração ao pressionar os controles na tela.</string>
     <string name="settings_gamepad_button_haptics">Resposta tátil para botões do controle</string>
     <string name="settings_gamepad_button_haptics_desc">Reproduzir uma curta vibração ao pressionar os botões físicos do controle.</string>
+    <string name="settings_back_button_exits_game">Sair do jogo com o botão Voltar</string>
+    <string name="settings_back_button_exits_game_desc">Iniciar a saída do jogo em vez de abrir o menu ao pressionar Voltar.</string>
+    <string name="settings_help_back_button_exits_game">Desativado por padrão. Quando ativado, o botão Voltar do Android usa a mesma ação que Sair no menu do jogo, incluindo a configuração de confirmação atual.</string>
     <string name="settings_confirm_save_load_actions">Confirmar ações de salvar/carregar</string>
     <string name="settings_confirm_save_load_actions_desc">Perguntar antes de salvar ou carregar rapidamente.</string>
     <string name="settings_help_touch_haptics">Adiciona um leve feedback tátil do Android quando um botão na tela, direção do D-pad ou direcional analógico é pressionado pela primeira vez. Isso afeta apenas a sensação de controle e não altera a vibração do jogo.</string>
