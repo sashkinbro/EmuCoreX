@@ -109,9 +109,9 @@ fun TextureManagerScreen(
         refreshGeneration = generation
         scope.launch {
             isLoading = true
-            val loaded = withContext(Dispatchers.IO) { repository.listPacks() }
+            val loaded = withContext(Dispatchers.IO) { runCatching { repository.listPacks() }.getOrNull() }
             if (refreshGeneration != generation) return@launch
-            summary = loaded
+            if (loaded != null) summary = loaded
             isLoading = false
         }
     }
@@ -126,14 +126,20 @@ fun TextureManagerScreen(
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             isWorking = true
-            val result = withContext(Dispatchers.IO) { repository.importPackZip(uri) }
-            isWorking = false
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    runCatching { repository.importPackZip(uri) }
+                        .getOrElse { com.sbro.emucorex.data.TextureImportResult(success = false) }
+                }
+            } finally {
+                isWorking = false
+            }
             Toast.makeText(
                 context,
                 if (result.success) {
                     importSuccessMessage.format(result.importedFiles)
                 } else {
-                    result.message ?: importFailureMessage
+                    importFailureMessage
                 },
                 Toast.LENGTH_LONG
             ).show()
@@ -262,8 +268,13 @@ fun TextureManagerScreen(
                         pendingDelete.value = null
                         scope.launch {
                             isWorking = true
-                            val success = withContext(Dispatchers.IO) { repository.deletePack(pack.serial) }
-                            isWorking = false
+                            val success = try {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { repository.deletePack(pack.serial) }.getOrDefault(false)
+                                }
+                            } finally {
+                                isWorking = false
+                            }
                             Toast.makeText(
                                 context,
                                 if (success) deleteSuccessMessage else deleteFailureMessage,
@@ -295,8 +306,13 @@ fun TextureManagerScreen(
                         pendingClearDumps.value = null
                         scope.launch {
                             isWorking = true
-                            val success = withContext(Dispatchers.IO) { repository.clearDumps(pack.serial) }
-                            isWorking = false
+                            val success = try {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { repository.clearDumps(pack.serial) }.getOrDefault(false)
+                                }
+                            } finally {
+                                isWorking = false
+                            }
                             Toast.makeText(
                                 context,
                                 if (success) clearDumpsSuccessMessage else clearDumpsFailureMessage,

@@ -546,12 +546,16 @@ fun SettingsScreen(
             },
             onSave = {
                 cheatEditorGameKey.value?.let { gameKey ->
-                    cheatRepository.updateImportedCheatText(gameKey, cheatEditorText.value)
-                    refreshCheatEntries()
-                    Toast.makeText(context, cheatsSavedMessage, Toast.LENGTH_SHORT).show()
-                    cheatEditorGameKey.value = null
-                    cheatEditorFileName.value = null
-                    cheatEditorText.value = ""
+                    val updatedBlocks = cheatRepository.updateImportedCheatText(gameKey, cheatEditorText.value)
+                    if (updatedBlocks > 0) {
+                        refreshCheatEntries()
+                        Toast.makeText(context, cheatsSavedMessage, Toast.LENGTH_SHORT).show()
+                        cheatEditorGameKey.value = null
+                        cheatEditorFileName.value = null
+                        cheatEditorText.value = ""
+                    } else {
+                        Toast.makeText(context, cheatsImportFailureMessage, Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             onDelete = {
