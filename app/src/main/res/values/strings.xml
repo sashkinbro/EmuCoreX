@@ -1786,4 +1786,7 @@
     <string name="emulator_data_location_sd_card_description">Private app folder on the SD card.</string>
     <string name="emulator_data_location_sd_card_unavailable">No available SD card was found on this device.</string>
     <string name="emulator_data_location_error">The selected app storage could not be prepared. Check that the storage is available and try again.</string>
+    <string name="settings_backup_include_save_states">Include quick saves</string>
+    <string name="settings_backup_include_save_states_desc">Adds quick-save states to the archive. This can greatly increase its size, and states may not work with a different core version.</string>
+    <string name="settings_backup_export_action">Export</string>
 </resources>

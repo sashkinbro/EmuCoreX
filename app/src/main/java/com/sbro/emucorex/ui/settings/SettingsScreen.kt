@@ -191,6 +191,8 @@ import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class SettingsTab {
@@ -224,6 +226,8 @@ fun SettingsScreen(
     var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     var showTopBarMenu by remember { mutableStateOf(false) }
     val showResetAllSettingsDialog = remember { mutableStateOf(false) }
+    var showBackupExportDialog by rememberSaveable { mutableStateOf(false) }
+    var includeSaveStatesInBackup by rememberSaveable { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
     val showBiosDialog = remember { mutableStateOf(false) }
     var showEmulatorDataLocationDialog by remember { mutableStateOf(false) }
@@ -362,7 +366,12 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val success = backupRepository.backup(uri)
+            val success = withContext(Dispatchers.IO) {
+                backupRepository.backup(
+                    destination = uri,
+                    includeSaveStates = includeSaveStatesInBackup
+                )
+            }
             Toast.makeText(
                 context,
                 if (success) backupExportSuccessMessage else backupExportFailureMessage,
@@ -375,7 +384,9 @@ fun SettingsScreen(
     ) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
-            val success = backupRepository.restore(uri)
+            val success = withContext(Dispatchers.IO) {
+                backupRepository.restore(uri)
+            }
             Toast.makeText(
                 context,
                 if (success) backupRestoreSuccessMessage else backupRestoreFailureMessage,
@@ -483,7 +494,10 @@ fun SettingsScreen(
                     pendingCoverUrl.value = uiState.coverDownloadBaseUrl.orEmpty()
                     showCoverUrlDialog.value = true
                 },
-                launchSettingsBackupExport = { settingsBackupExporter.launch("emucorex-settings-backup.zip") },
+                launchSettingsBackupExport = {
+                    includeSaveStatesInBackup = false
+                    showBackupExportDialog = true
+                },
                 launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
                 launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
                 openLanguageSheet = openLanguageSheet,
@@ -608,6 +622,71 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetAllSettingsDialog.value = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showBackupExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackupExportDialog = false },
+            title = {
+                Text(stringResource(R.string.settings_backup_export_title))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_backup_export_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                includeSaveStatesInBackup = !includeSaveStatesInBackup
+                            },
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.settings_backup_include_save_states),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_backup_include_save_states_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = includeSaveStatesInBackup,
+                                onCheckedChange = { includeSaveStatesInBackup = it }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBackupExportDialog = false
+                        settingsBackupExporter.launch("emucorex-settings-backup.zip")
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_backup_export_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackupExportDialog = false }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             }

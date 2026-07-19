@@ -1775,4 +1775,7 @@
     <string name="emulator_data_location_sd_card_description">Приватная папка приложения на SD-карте.</string>
     <string name="emulator_data_location_sd_card_unavailable">На этом устройстве не найдена доступная SD-карта.</string>
     <string name="emulator_data_location_error">Не удалось подготовить выбранное хранилище приложения. Проверьте его доступность и повторите попытку.</string>
+    <string name="settings_backup_include_save_states">Включить быстрые сохранения</string>
+    <string name="settings_backup_include_save_states_desc">Добавляет быстрые сохранения в архив. Его размер может значительно увеличиться, а сохранения могут не работать с другой версией ядра.</string>
+    <string name="settings_backup_export_action">Экспортировать</string>
 </resources>

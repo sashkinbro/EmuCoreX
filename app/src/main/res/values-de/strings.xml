@@ -1773,4 +1773,7 @@
     <string name="emulator_data_location_sd_card_description">Privater App-Ordner auf der SD-Karte.</string>
     <string name="emulator_data_location_sd_card_unavailable">Auf diesem Gerät wurde keine verfügbare SD-Karte gefunden.</string>
     <string name="emulator_data_location_error">Der ausgewählte App-Speicher konnte nicht vorbereitet werden. Prüfen Sie die Verfügbarkeit und versuchen Sie es erneut.</string>
+    <string name="settings_backup_include_save_states">Schnellspeicherstände einschließen</string>
+    <string name="settings_backup_include_save_states_desc">Fügt Schnellspeicherstände zum Archiv hinzu. Dadurch kann es deutlich größer werden, und die Speicherstände funktionieren möglicherweise nicht mit einer anderen Core-Version.</string>
+    <string name="settings_backup_export_action">Exportieren</string>
 </resources>

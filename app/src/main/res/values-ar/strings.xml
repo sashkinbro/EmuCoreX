@@ -1775,4 +1775,7 @@
     <string name="emulator_data_location_sd_card_description">مجلد التطبيق الخاص على بطاقة SD.</string>
     <string name="emulator_data_location_sd_card_unavailable">لم يتم العثور على بطاقة SD متاحة على هذا الجهاز.</string>
     <string name="emulator_data_location_error">تعذر إعداد مساحة التخزين المحددة. تحقق من توفرها وحاول مرة أخرى.</string>
+    <string name="settings_backup_include_save_states">تضمين حالات الحفظ السريع</string>
+    <string name="settings_backup_include_save_states_desc">يضيف حالات الحفظ السريع إلى الأرشيف. قد يزداد حجمه كثيرًا، وقد لا تعمل الحالات مع إصدار مختلف من النواة.</string>
+    <string name="settings_backup_export_action">تصدير</string>
 </resources>

@@ -1786,4 +1786,7 @@
     <string name="emulator_data_location_sd_card_description">پوشه خصوصی برنامه روی کارت SD.</string>
     <string name="emulator_data_location_sd_card_unavailable">هیچ کارت SD در دسترسی روی این دستگاه پیدا نشد.</string>
     <string name="emulator_data_location_error">آماده‌سازی فضای ذخیره‌سازی انتخاب‌شده ممکن نشد. در دسترس بودن آن را بررسی و دوباره تلاش کنید.</string>
+    <string name="settings_backup_include_save_states">افزودن ذخیره‌های سریع</string>
+    <string name="settings_backup_include_save_states_desc">وضعیت‌های ذخیره سریع را به بایگانی اضافه می‌کند. حجم آن ممکن است بسیار افزایش یابد و این وضعیت‌ها شاید با نسخه دیگری از هسته کار نکنند.</string>
+    <string name="settings_backup_export_action">برون‌بری</string>
 </resources>

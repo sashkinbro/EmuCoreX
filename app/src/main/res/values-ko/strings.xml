@@ -1770,4 +1770,7 @@
     <string name="emulator_data_location_sd_card_description">SD 카드에 있는 앱 전용 폴더입니다.</string>
     <string name="emulator_data_location_sd_card_unavailable">이 기기에서 사용 가능한 SD 카드를 찾지 못했습니다.</string>
     <string name="emulator_data_location_error">선택한 앱 저장소를 준비할 수 없습니다. 저장소가 사용 가능한지 확인하고 다시 시도하세요.</string>
+    <string name="settings_backup_include_save_states">빠른 저장 포함</string>
+    <string name="settings_backup_include_save_states_desc">빠른 저장 상태를 보관 파일에 추가합니다. 크기가 크게 늘어날 수 있으며 다른 코어 버전에서는 상태가 작동하지 않을 수 있습니다.</string>
+    <string name="settings_backup_export_action">내보내기</string>
 </resources>
