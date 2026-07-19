@@ -32,15 +32,17 @@ class CheatRepository(private val context: Context) {
     private val preferences = AppPreferences(context)
     private val importedDir = EmulatorStorage.importedCheatsDir(context)
     private val stateFile = File(EmulatorStorage.appStateDir(context), "cheat-state.json")
+    private val activeTargetsFile = File(EmulatorStorage.appStateDir(context), "cheat-active-targets.json")
 
     fun getGameConfig(gameKey: String, serial: String, crc: String?): CheatGameConfig? {
-        val sourceFile = importedFile(gameKey)
+        val sourceFile = resolveImportedFile(gameKey)
         if (!sourceFile.exists()) return null
-        val raw = sourceFile.readText()
-        val enabledIds = loadEnabledIds().optJSONArray(gameKey)?.toStringSet().orEmpty()
+        val normalizedGameKey = sourceFile.nameWithoutExtension
+        val raw = runCatching { sourceFile.readText() }.getOrNull() ?: return null
+        val enabledIds = storedValues(loadEnabledIds(), normalizedGameKey, gameKey)
         val blocks = parseCheatBlocks(raw).map { it.copy(enabled = enabledIds.contains(it.id)) }
         return CheatGameConfig(
-            gameKey = gameKey,
+            gameKey = normalizedGameKey,
             serial = serial,
             crc = crc,
             sourceFileName = sourceFile.name,
@@ -70,13 +72,13 @@ class CheatRepository(private val context: Context) {
     }
 
     fun getImportedCheatText(gameKey: String): String? {
-        val file = importedFile(gameKey)
+        val file = resolveImportedFile(gameKey)
         if (!file.exists()) return null
-        return file.readText()
+        return runCatching { file.readText() }.getOrNull()
     }
 
-    fun updateImportedCheatText(gameKey: String, contents: String) {
-        importCheatFile(gameKey = gameKey, contents = contents)
+    fun updateImportedCheatText(gameKey: String, contents: String): Int {
+        return importCheatFile(gameKey = gameKey, contents = contents)
     }
 
     fun importCheatFile(
@@ -84,36 +86,63 @@ class CheatRepository(private val context: Context) {
         contents: String,
         enableAllByDefault: Boolean = false
     ): Int {
+        val normalizedGameKey = normalizeGameKey(gameKey)
         val blocks = parseCheatBlocks(contents)
         if (blocks.isEmpty()) return 0
-        val target = importedFile(gameKey)
+        val target = importedFile(normalizedGameKey)
+        val state = loadEnabledIds()
+        val old = storedValues(state, normalizedGameKey, gameKey)
+        val oldEnabledSignatures = if (target.exists()) {
+            runCatching { parseCheatBlocks(target.readText()) }
+                .getOrDefault(emptyList())
+                .filter { old.contains(it.id) }
+                .map(::cheatBlockSignature)
+                .toSet()
+        } else {
+            emptySet()
+        }
         target.parentFile?.mkdirs()
         target.writeText(contents)
-        val parsedIds = blocks.map { it.id }.toSet()
-        val state = loadEnabledIds()
-        val old = state.optJSONArray(gameKey)?.toStringSet().orEmpty()
-        val enabledIds = if (enableAllByDefault) parsedIds else old.filter(parsedIds::contains)
-        state.put(gameKey, JSONArray(enabledIds))
+        val enabledIds = if (enableAllByDefault) {
+            blocks.map { it.id }
+        } else {
+            blocks.filter { old.contains(it.id) || cheatBlockSignature(it) in oldEnabledSignatures }
+                .map { it.id }
+        }
+        state.put(normalizedGameKey, JSONArray(enabledIds))
+        if (normalizedGameKey != gameKey) state.remove(gameKey)
         writeEnabledIds(state)
         return blocks.size
     }
 
     fun setEnabledBlocks(gameKey: String, enabledIds: Set<String>) {
+        val normalizedGameKey = normalizeGameKey(gameKey)
         val state = loadEnabledIds()
-        state.put(gameKey, JSONArray(enabledIds.toList()))
+        state.put(normalizedGameKey, JSONArray(enabledIds.toList()))
+        if (normalizedGameKey != gameKey) state.remove(gameKey)
         writeEnabledIds(state)
     }
 
     fun syncActiveCheats(gameKey: String, serial: String?, crc: String?) {
+        val source = resolveImportedFile(gameKey)
+        val normalizedGameKey = source.nameWithoutExtension
         val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: return
-        val normalizedSerial = serial?.trim()?.takeIf { it.isNotBlank() }
-        val source = importedFile(gameKey)
-        if (!source.exists()) return
-        val enabledIds = loadEnabledIds().optJSONArray(gameKey)?.toStringSet().orEmpty()
-        val blocks = parseCheatBlocks(source.readText()).filter { enabledIds.contains(it.id) }
-        val targets = activeCheatFiles(normalizedSerial, normalizedCrc)
+        val normalizedSerial = serial?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+        if (!source.exists()) {
+            recordedActiveCheatFiles(normalizedGameKey).forEach { if (it.exists()) it.delete() }
+            clearRecordedActiveCheatFiles(normalizedGameKey)
+            return
+        }
+        val enabledIds = storedValues(loadEnabledIds(), normalizedGameKey, gameKey)
+        val blocks = runCatching { parseCheatBlocks(source.readText()) }
+            .getOrDefault(emptyList())
+            .filter { enabledIds.contains(it.id) }
+        val candidates = activeCheatFileCandidates(normalizedSerial, normalizedCrc)
+        val target = canonicalActiveCheatFile(normalizedSerial, normalizedCrc)
         if (blocks.isEmpty()) {
-            targets.forEach { if (it.exists()) it.delete() }
+            (candidates + recordedActiveCheatFiles(normalizedGameKey)).distinctBy(File::getAbsolutePath)
+                .forEach { if (it.exists()) it.delete() }
+            clearRecordedActiveCheatFiles(normalizedGameKey)
             return
         }
         activeDir().mkdirs()
@@ -124,15 +153,26 @@ class CheatRepository(private val context: Context) {
                 append('\n')
             }
         }.trim() + "\n"
-        targets.forEach { it.writeText(contents) }
+        candidates.filterNot { it == target }.forEach { if (it.exists()) it.delete() }
+        recordedActiveCheatFiles(normalizedGameKey).filterNot { it == target }.forEach { if (it.exists()) it.delete() }
+        target.writeText(contents)
+        recordActiveCheatFile(normalizedGameKey, target)
     }
 
     fun deleteImportedCheats(gameKey: String, serial: String?, crc: String?) {
-        importedFile(gameKey).delete()
-        setEnabledBlocks(gameKey, emptySet())
-        val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: return
-        val normalizedSerial = serial?.trim()?.takeIf { it.isNotBlank() }
-        activeCheatFiles(normalizedSerial, normalizedCrc).forEach { if (it.exists()) it.delete() }
+        val source = resolveImportedFile(gameKey)
+        val normalizedGameKey = source.nameWithoutExtension
+        source.delete()
+        setEnabledBlocks(normalizedGameKey, emptySet())
+        recordedActiveCheatFiles(normalizedGameKey).forEach { if (it.exists()) it.delete() }
+        clearRecordedActiveCheatFiles(normalizedGameKey)
+        val inferred = inferSerialAndCrc(normalizedGameKey)
+        val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+            ?: inferred?.second
+            ?: return
+        val normalizedSerial = serial?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
+            ?: inferred?.first
+        activeCheatFileCandidates(normalizedSerial, normalizedCrc).forEach { if (it.exists()) it.delete() }
     }
 
     fun exportJson(): JSONObject {
@@ -144,6 +184,17 @@ class CheatRepository(private val context: Context) {
     }
 
     private fun importedFile(gameKey: String): File = File(importedDir, "${sanitizeFileName(gameKey)}.pnach")
+
+    private fun resolveImportedFile(gameKey: String): File {
+        val exact = importedFile(normalizeGameKey(gameKey))
+        val candidates = importedDir.listFiles { file ->
+            file.isFile && file.extension.equals("pnach", ignoreCase = true) &&
+                file.nameWithoutExtension.equals(exact.nameWithoutExtension, ignoreCase = true)
+        }.orEmpty()
+        return candidates.firstOrNull { it.name == exact.name }
+            ?: candidates.firstOrNull()
+            ?: exact
+    }
 
     private fun loadEnabledIds(): JSONObject {
         if (!stateFile.exists()) return JSONObject()
@@ -159,11 +210,76 @@ class CheatRepository(private val context: Context) {
         return value.replace(Regex("[^a-zA-Z0-9._-]"), "_")
     }
 
-    private fun activeCheatFiles(serial: String?, crc: String): List<File> {
+    private fun normalizeGameKey(gameKey: String): String = sanitizeFileName(gameKey).ifBlank { "cheat" }
+
+    private fun inferSerialAndCrc(gameKey: String): Pair<String?, String>? {
+        val serialAndCrc = Regex("^([A-Z]{4}[-_]?\\d{5})[_-]([0-9A-F]{8})$", RegexOption.IGNORE_CASE)
+            .matchEntire(gameKey)
+        if (serialAndCrc != null) {
+            return serialAndCrc.groupValues[1].uppercase().replace('_', '-') to
+                serialAndCrc.groupValues[2].uppercase()
+        }
+        val crcOnly = gameKey.uppercase().takeIf { it.matches(Regex("[0-9A-F]{8}")) }
+        return crcOnly?.let { null to it }
+    }
+
+    private fun storedValues(state: JSONObject, normalizedKey: String, legacyKey: String): Set<String> {
+        val caseInsensitiveKey = state.keys().asSequence().firstOrNull { key ->
+            key.equals(normalizedKey, ignoreCase = true) || key.equals(legacyKey, ignoreCase = true)
+        }
+        return (state.optJSONArray(normalizedKey)
+            ?: state.optJSONArray(legacyKey)
+            ?: caseInsensitiveKey?.let(state::optJSONArray))
+            ?.toStringSet()
+            .orEmpty()
+    }
+
+    private fun activeCheatFileCandidates(serial: String?, crc: String): List<File> {
         val names = linkedSetOf<String>()
         if (!serial.isNullOrBlank()) names += "${sanitizeFileName(serial)}_$crc.pnach"
         names += "$crc.pnach"
-        return names.map { File(activeDir(), it) }
+        val root = activeDir().canonicalFile
+        return names.map { File(root, it) }
+    }
+
+    private fun canonicalActiveCheatFile(serial: String?, crc: String): File {
+        val name = if (serial.isNullOrBlank()) {
+            "$crc.pnach"
+        } else {
+            "${sanitizeFileName(serial)}_$crc.pnach"
+        }
+        return File(activeDir().canonicalFile, name)
+    }
+
+    private fun recordedActiveCheatFiles(gameKey: String): List<File> {
+        val names = loadActiveTargets().optJSONArray(gameKey)?.toStringSet().orEmpty()
+        val root = activeDir().canonicalFile
+        return names.mapNotNull { name ->
+            if (name != File(name).name || !name.endsWith(".pnach", ignoreCase = true)) return@mapNotNull null
+            File(root, name).canonicalFile.takeIf { it.parentFile == root }
+        }
+    }
+
+    private fun recordActiveCheatFile(gameKey: String, target: File) {
+        val state = loadActiveTargets()
+        state.put(gameKey, JSONArray(listOf(target.name)))
+        writeActiveTargets(state)
+    }
+
+    private fun clearRecordedActiveCheatFiles(gameKey: String) {
+        val state = loadActiveTargets()
+        state.remove(gameKey)
+        writeActiveTargets(state)
+    }
+
+    private fun loadActiveTargets(): JSONObject {
+        if (!activeTargetsFile.exists()) return JSONObject()
+        return runCatching { JSONObject(activeTargetsFile.readText()) }.getOrDefault(JSONObject())
+    }
+
+    private fun writeActiveTargets(json: JSONObject) {
+        activeTargetsFile.parentFile?.mkdirs()
+        activeTargetsFile.writeText(json.toString())
     }
 
     private fun activeDir(): File {
@@ -238,6 +354,10 @@ class CheatRepository(private val context: Context) {
                     )
                 }
         }
+    }
+
+    private fun cheatBlockSignature(block: CheatBlock): String {
+        return block.title.trim().lowercase() + "\u0000" + block.lines.joinToString("\n")
     }
 }
 

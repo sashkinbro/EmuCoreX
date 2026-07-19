@@ -91,6 +91,56 @@ class SettingsBackupRepositoryInstrumentedTest {
         }
     }
 
+    @Test
+    fun importedCheatFileRoundTripsWithBackup() = runBlocking {
+        val cheatRepository = CheatRepository(context)
+        val gameKey = "BACKUP-CHEAT-${System.nanoTime()}"
+        val archive = backupFile()
+        try {
+            assertTrue(
+                cheatRepository.importCheatFile(
+                    gameKey,
+                    "// Test\npatch=1,EE,00100000,word,00000001\n",
+                    enableAllByDefault = true
+                ) > 0
+            )
+            archive.outputStream().use { repository.writeBackup(it) }
+            assertTrue("cheat-files/$gameKey.pnach" in zipEntries(archive))
+
+            cheatRepository.deleteImportedCheats(gameKey, null, null)
+            assertFalse(cheatRepository.listImportedCheatFiles().any { it.gameKey == gameKey })
+
+            archive.inputStream().use { repository.restoreBackup(it) }
+            assertTrue(cheatRepository.listImportedCheatFiles().any { it.gameKey == gameKey })
+            assertTrue(requireNotNull(cheatRepository.getGameConfig(gameKey, "TEST-00000", "12345678"))
+                .blocks.single().enabled)
+        } finally {
+            cheatRepository.deleteImportedCheats(gameKey, null, null)
+            archive.delete()
+        }
+    }
+
+    @Test
+    fun restoreRejectsCheatPathTraversal() = runBlocking {
+        val archive = backupFile()
+        val importedRoot = EmulatorStorage.importedCheatsDir(context)
+        val escaped = File(importedRoot.parentFile, "escaped-cheat-test.pnach")
+        try {
+            ZipOutputStream(archive.outputStream()).use { zip ->
+                zip.putNextEntry(ZipEntry("cheat-files/../${escaped.name}"))
+                zip.write("patch=1,EE,00100000,word,00000001".toByteArray())
+                zip.closeEntry()
+            }
+
+            val result = runCatching { archive.inputStream().use { repository.restoreBackup(it) } }
+            assertTrue(result.isFailure)
+            assertFalse(escaped.exists())
+        } finally {
+            escaped.delete()
+            archive.delete()
+        }
+    }
+
     private fun uniqueStateFile(suffix: String): File {
         val directory = EmulatorStorage.saveStatesDir(
             context,

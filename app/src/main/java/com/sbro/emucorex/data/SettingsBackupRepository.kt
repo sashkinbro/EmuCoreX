@@ -47,6 +47,11 @@ class SettingsBackupRepository(
             zip.writeJsonEntry("settings.json", preferences.exportJson())
             zip.writeJsonEntry("per-game-settings.json", perGameSettingsRepository.exportJson())
             zip.writeJsonEntry("cheats.json", cheatRepository.exportJson())
+            zip.writeFlatDirectory(
+                "cheat-files",
+                EmulatorStorage.importedCheatsDir(context),
+                ::isCheatFile
+            )
             zip.writeDirectory("memory-cards", memoryCardsDir())
             if (includeSaveStates) {
                 zip.writeFlatDirectory("save-states", saveStatesDir(), ::isQuickSaveState)
@@ -97,6 +102,16 @@ class SettingsBackupRepository(
                             require(target.parentFile == root) {
                                 "Invalid save-state backup path"
                             }
+                            root.mkdirs()
+                            target.outputStream().use { output -> zip.copyTo(output) }
+                        } else if (entry.name.startsWith("cheat-files/") && !entry.isDirectory) {
+                            val relative = entry.name.removePrefix("cheat-files/")
+                            require(relative == File(relative).name && isCheatFile(File(relative))) {
+                                "Invalid cheat backup path"
+                            }
+                            val root = EmulatorStorage.importedCheatsDir(context).canonicalFile
+                            val target = File(root, relative).canonicalFile
+                            require(target.parentFile == root) { "Invalid cheat backup path" }
                             root.mkdirs()
                             target.outputStream().use { output -> zip.copyTo(output) }
                         }
@@ -151,6 +166,10 @@ private fun ZipOutputStream.writeJsonEntry(name: String, json: JSONObject) {
 private fun isQuickSaveState(file: File): Boolean {
     return file.name.endsWith(".p2s", ignoreCase = true) &&
         !file.name.contains(".resume.", ignoreCase = true)
+}
+
+private fun isCheatFile(file: File): Boolean {
+    return file.extension.equals("pnach", ignoreCase = true)
 }
 
 private fun ZipOutputStream.writeDirectory(
