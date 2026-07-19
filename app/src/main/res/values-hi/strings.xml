@@ -1771,4 +1771,7 @@
     <string name="emulator_data_location_sd_card_description">SD कार्ड पर निजी ऐप फ़ोल्डर।</string>
     <string name="emulator_data_location_sd_card_unavailable">इस डिवाइस पर कोई उपलब्ध SD कार्ड नहीं मिला।</string>
     <string name="emulator_data_location_error">चुना गया ऐप स्टोरेज तैयार नहीं किया जा सका। उपलब्धता जाँचें और फिर प्रयास करें।</string>
+    <string name="settings_backup_include_save_states">त्वरित सेव शामिल करें</string>
+    <string name="settings_backup_include_save_states_desc">त्वरित सेव स्थितियों को संग्रह में जोड़ता है। इसका आकार काफी बढ़ सकता है और स्थितियाँ किसी दूसरे कोर संस्करण के साथ काम नहीं कर सकतीं।</string>
+    <string name="settings_backup_export_action">निर्यात करें</string>
 </resources>

@@ -1785,4 +1785,7 @@
     <string name="emulator_data_location_sd_card_description">Folder pribadi aplikasi di kartu SD.</string>
     <string name="emulator_data_location_sd_card_unavailable">Tidak ada kartu SD yang tersedia di perangkat ini.</string>
     <string name="emulator_data_location_error">Penyimpanan aplikasi yang dipilih tidak dapat disiapkan. Periksa ketersediaannya lalu coba lagi.</string>
+    <string name="settings_backup_include_save_states">Sertakan simpan cepat</string>
+    <string name="settings_backup_include_save_states_desc">Menambahkan status simpan cepat ke arsip. Ukurannya dapat bertambah besar dan status mungkin tidak berfungsi dengan versi inti yang berbeda.</string>
+    <string name="settings_backup_export_action">Ekspor</string>
 </resources>

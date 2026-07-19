@@ -1771,4 +1771,7 @@
     <string name="emulator_data_location_sd_card_description">Cartella privata dell’app sulla scheda SD.</string>
     <string name="emulator_data_location_sd_card_unavailable">Nessuna scheda SD disponibile trovata su questo dispositivo.</string>
     <string name="emulator_data_location_error">Impossibile preparare l’archiviazione selezionata. Verifica che sia disponibile e riprova.</string>
+    <string name="settings_backup_include_save_states">Includi salvataggi rapidi</string>
+    <string name="settings_backup_include_save_states_desc">Aggiunge gli stati di salvataggio rapido all’archivio. Le dimensioni possono aumentare notevolmente e gli stati potrebbero non funzionare con una versione diversa del core.</string>
+    <string name="settings_backup_export_action">Esporta</string>
 </resources>

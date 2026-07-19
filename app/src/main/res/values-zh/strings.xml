@@ -1772,4 +1772,7 @@
     <string name="emulator_data_location_sd_card_description">SD 卡上的应用专用文件夹。</string>
     <string name="emulator_data_location_sd_card_unavailable">此设备上未找到可用的 SD 卡。</string>
     <string name="emulator_data_location_error">无法准备所选的应用存储。请检查存储是否可用，然后重试。</string>
+    <string name="settings_backup_include_save_states">包含快速存档</string>
+    <string name="settings_backup_include_save_states_desc">将快速存档状态添加到归档中。归档大小可能显著增加，并且存档状态可能无法在其他核心版本中使用。</string>
+    <string name="settings_backup_export_action">导出</string>
 </resources>

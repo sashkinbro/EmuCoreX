@@ -1773,4 +1773,7 @@
     <string name="emulator_data_location_sd_card_description">Dossier privé de l’application sur la carte SD.</string>
     <string name="emulator_data_location_sd_card_unavailable">Aucune carte SD disponible n’a été trouvée sur cet appareil.</string>
     <string name="emulator_data_location_error">Le stockage sélectionné n’a pas pu être préparé. Vérifiez sa disponibilité et réessayez.</string>
+    <string name="settings_backup_include_save_states">Inclure les sauvegardes rapides</string>
+    <string name="settings_backup_include_save_states_desc">Ajoute les états de sauvegarde rapide à l’archive. Sa taille peut augmenter fortement et les états peuvent ne pas fonctionner avec une autre version du cœur.</string>
+    <string name="settings_backup_export_action">Exporter</string>
 </resources>
