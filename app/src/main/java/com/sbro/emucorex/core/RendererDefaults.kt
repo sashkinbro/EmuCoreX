@@ -5,11 +5,12 @@ object RendererDefaults {
     const val OPENGL = 12
     const val SOFTWARE = 13
     const val VULKAN = 14
-    const val DEFAULT = VULKAN
+    const val DEFAULT = OPENGL
 
-    fun defaultForHardware(isMediaTekHardware: Boolean = GpuHardwareProfiles.isMediaTekHardware()): Int {
-        return if (isMediaTekHardware) OPENGL else VULKAN
-    }
+    fun defaultForHardware(
+        @Suppress("UNUSED_PARAMETER")
+        isMediaTekHardware: Boolean = GpuHardwareProfiles.isMediaTekHardware()
+    ): Int = DEFAULT
 
     fun normalizeAndroidRenderer(
         value: Int,

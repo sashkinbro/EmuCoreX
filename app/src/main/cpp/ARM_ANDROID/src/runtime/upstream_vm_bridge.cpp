@@ -102,7 +102,7 @@ bool FileExists(const std::string& path)
 void ApplyAngleOpenGLLibraryHints(const VmLaunchConfig& config)
 {
 	const bool requested = GetBoolSetting(config.settings, "EmuCore/GS", "AndroidUseAngleOpenGL", false);
-	const int renderer = GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::VK));
+	const int renderer = GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL));
 	const bool eligible = requested && renderer == static_cast<s32>(GSRendererType::OGL);
 
 	const std::string egl_path = Path::Combine(config.paths.native_library_dir, "libEGL_angle.so");
@@ -211,7 +211,7 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	si.SetBoolValue("Logging", "EnableEEConsole", autotest_mode);
 	si.SetBoolValue("Logging", "EnableIOPConsole", autotest_mode);
 	si.SetIntValue("EmuCore/GS", "Renderer",
-		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::VK)));
+		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
 	si.SetBoolValue("EmuCore/GS", "VsyncEnable",
 		GetBoolSetting(config.settings, "EmuCore/GS", "VsyncEnable", false));
 	si.SetStringValue("SPU2/Output", "Backend", "SDL");

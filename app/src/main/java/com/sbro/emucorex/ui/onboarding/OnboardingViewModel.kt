@@ -109,7 +109,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             EmulatorBridge.applyRuntimeConfig(
                 biosPath = uri.toString(),
                 emulatorDataPath = _uiState.value.emulatorDataPath,
-                renderer = EmulatorBridge.getSetting("EmuCoreX", "Renderer", "int")?.toIntOrNull() ?: 0,
+                renderer = audioSettings.renderer,
                 gpuHardwareProfile = GpuHardwareProfiles.detectHardwareProfile(),
                 audioVolume = audioSettings.audioVolume,
                 audioFastForwardVolume = audioSettings.audioFastForwardVolume,

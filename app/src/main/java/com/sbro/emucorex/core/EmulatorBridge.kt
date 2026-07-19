@@ -244,8 +244,8 @@ object EmulatorBridge {
     }
 
     private fun rendererName(renderer: Int): String = when (renderer) {
-        AUTO_RENDERER -> "Vulkan"
-        0 -> "Vulkan"
+        AUTO_RENDERER -> "OpenGL"
+        0 -> "OpenGL"
         OPENGL_RENDERER -> "OpenGL"
         13 -> "Software"
         VULKAN_RENDERER -> "Vulkan"
