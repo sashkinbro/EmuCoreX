@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
+#include "Config.h"
 
 #include <cmath>
 
@@ -259,7 +260,10 @@ void CVT_W() {
 
 void DIV_S() {
 	if (checkDivideByZero( _FdValUl_, _FtValUl_, _FsValUl_, FPUflagD | FPUflagSD, FPUflagI | FPUflagSI)) return;
-	_FdValf_ = fpuDouble( _FsValUl_ ) / fpuDouble( _FtValUl_ );
+	{
+		const FPControlRegisterBackup fpcr_backup(EmuConfig.Cpu.FPUDivFPCR);
+		_FdValf_ = fpuDouble( _FsValUl_ ) / fpuDouble( _FtValUl_ );
+	}
 	if (checkOverflow( _FdValUl_, 0)) return;
 	checkUnderflow( _FdValUl_, 0);
 }

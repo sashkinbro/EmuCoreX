@@ -5,6 +5,7 @@ project(EmuCoreXArmAndroid LANGUAGES C CXX)
 set(EMUCOREX_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH "EmuCoreX native source root")
 set(PCSX2_UPSTREAM_DIR "${EMUCOREX_CPP_DIR}/PCSX2" CACHE PATH "Clean PCSX2 upstream checkout")
 option(EMUCOREX_LINK_UPSTREAM_PCSX2 "Link the upstream PCSX2 core into libemucore.so" ON)
+option(EMUCOREX_ENABLE_NATIVE_SELF_TESTS "Enable debug-only native core self-tests" OFF)
 set(EMUCOREX_ANDROID_HOST_PAGE_SIZE "0x1000" CACHE STRING "Android runtime page size expected by the PCSX2 core")
 set(EMUCOREX_NATIVE_LIBRARY_NAME "emucore_4k" CACHE STRING "Output name of the Android emulator core library")
 set(EMUCOREX_PCSX2_THIRD_PARTY_DIR "${PCSX2_UPSTREAM_DIR}/3rdparty" CACHE PATH "PCSX2 third-party dependency root")
@@ -334,6 +335,9 @@ target_compile_definitions(emucore
 		EMUCOREX_HAS_OAKNUT=${EMUCOREX_HAS_OAKNUT}
 		EMUCOREX_HAS_CAPSTONE=${EMUCOREX_HAS_CAPSTONE}
 )
+if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	target_compile_definitions(emucore PRIVATE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
+endif()
 target_link_libraries(emucore PRIVATE aaudio android EGL GLESv3 log)
 if(EMUCOREX_HAS_CAPSTONE)
 	target_link_libraries(emucore PRIVATE capstone_static)

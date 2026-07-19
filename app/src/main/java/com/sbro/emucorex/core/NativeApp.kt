@@ -105,6 +105,7 @@ object NativeApp {
     @JvmStatic external fun runVMThread(path: String): Boolean
     @JvmStatic external fun runBootSmokeProbe(path: String, steps: Int): Int
     @JvmStatic external fun runJitExecutableMemorySmokeTest(): Boolean
+    @JvmStatic external fun runEeFpuDivRoundingSelfTest(): String
     @JvmStatic external fun bootElf(path: String): Boolean
     @JvmStatic external fun bootIrx(path: String): Boolean
     @JvmStatic external fun pause()

@@ -1063,6 +1063,13 @@ static void recFpuSetFpcr_emit_oaknut(u64 fpcr)
 	oakAsm->ISB();
 }
 
+static void recFpuLoadConfiguredFpcr_emit_oaknut(s64 offset)
+{
+	oakLoad64(OAK_XSCRATCH, {oak::util::X27, offset});
+	oakAsm->MSR(oak::SystemReg::FPCR, OAK_XSCRATCH);
+	oakAsm->ISB();
+}
+
 static void recDIV_S_emit_oaknut(int info)
 {
 	EE::Profiler.EmitOp(eeOpcode::DIV_F);
@@ -1113,8 +1120,14 @@ static void recDIV_S_emit_oaknut(int info)
 		oakAsm->l(nonzero_divisor);
 		recFpuDoubleClampOperand_emit_oaknut(sreg);
 		recFpuDoubleClampOperand_emit_oaknut(treg);
+		if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+			recFpuLoadConfiguredFpcr_emit_oaknut(
+				static_cast<s64>(offsetof(cpuRegistersPack, Cpu.FPUDivFPCR.bitmask)));
 		oakAsm->FDIV(oakSRegister(EEREC_D), oakSRegister(sreg), oakSRegister(treg));
 		recFpuClampExactInfinity_emit_oaknut(EEREC_D);
+		if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+			recFpuLoadConfiguredFpcr_emit_oaknut(
+				static_cast<s64>(offsetof(cpuRegistersPack, Cpu.FPUFPCR.bitmask)));
 		oakAsm->l(precise_done);
 		recEndOaknutEmit();
 
@@ -1170,8 +1183,14 @@ static void recDIV_S_emit_oaknut(int info)
 	oakAsm->l(normal_div);
 	recFpuDoubleClampOperand_emit_oaknut(sreg);
 	recFpuDoubleClampOperand_emit_oaknut(treg);
+	if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+		recFpuLoadConfiguredFpcr_emit_oaknut(
+			static_cast<s64>(offsetof(cpuRegistersPack, Cpu.FPUDivFPCR.bitmask)));
 	oakAsm->FDIV(oakSRegister(EEREC_D), oakSRegister(sreg), oakSRegister(treg));
 	recFpuFinishInterpreterResult_emit_oaknut(EEREC_D);
+	if (EmuConfig.Cpu.FPUFPCR.bitmask != EmuConfig.Cpu.FPUDivFPCR.bitmask)
+		recFpuLoadConfiguredFpcr_emit_oaknut(
+			static_cast<s64>(offsetof(cpuRegistersPack, Cpu.FPUFPCR.bitmask)));
 
 	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(trawreg));
 	oakAsm->FMOV(OAK_WSCRATCH2, oakSRegister(srawreg));

@@ -15,11 +15,19 @@
 #include "pcsx2/JitProfiler.h"
 #include "pcsx2/ps2/BiosTools.h"
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "common/FPControl.h"
+#include "pcsx2/Common.h"
+#include "pcsx2/Config.h"
+#include "pcsx2/R5900OpcodeTables.h"
+#endif
+
 #include <android/log.h>
 #include <android/native_window_jni.h>
 #include <jni.h>
 #include <zip.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -447,6 +455,70 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNative
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, 0) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_runBootSmokeProbe(JNIEnv* env, jclass, jstring path, jint steps) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, steps) ? 1 : 0; }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runJitExecutableMemorySmokeTest(JNIEnv*, jclass) { return RunExecutableMemorySmokeTest() ? JNI_TRUE : JNI_FALSE; }
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_runEeFpuDivRoundingSelfTest(JNIEnv* env, jclass)
+{
+	struct TestCase
+	{
+		s32 input;
+		u32 expected;
+	};
+	static constexpr std::array<TestCase, 10> CASES = {{{1, 0x3b808081u}, {2, 0x3c008081u},
+		{3, 0x3c40c0c1u}, {64, 0x3e808081u}, {92, 0x3eb8b8b9u}, {127, 0x3efefeffu},
+		{128, 0x3f008081u}, {160, 0x3f20a0a1u}, {182, 0x3f36b6b7u}, {254, 0x3f7efeffu}}};
+
+	const cpuRegisters saved_cpu = cpuRegs;
+	const fpuRegisters saved_fpu = fpuRegs;
+	const FPControlRegister saved_fpu_fpcr = EmuConfig.Cpu.FPUFPCR;
+	const FPControlRegister saved_div_fpcr = EmuConfig.Cpu.FPUDivFPCR;
+	const FPControlRegister saved_host_fpcr = FPControlRegister::GetCurrent();
+	auto restore = [&]() {
+		cpuRegs = saved_cpu;
+		fpuRegs = saved_fpu;
+		EmuConfig.Cpu.FPUFPCR = saved_fpu_fpcr;
+		EmuConfig.Cpu.FPUDivFPCR = saved_div_fpcr;
+		FPControlRegister::SetCurrent(saved_host_fpcr);
+	};
+
+	FPControlRegister ee_fpcr = FPControlRegister::GetDefault();
+	ee_fpcr.DisableExceptions();
+	ee_fpcr = ee_fpcr.SetDenormalsAreZero(true);
+	ee_fpcr = ee_fpcr.SetFlushToZero(true);
+	ee_fpcr.SetRoundMode(FPRoundMode::ChopZero);
+	EmuConfig.Cpu.FPUFPCR = ee_fpcr;
+	EmuConfig.Cpu.FPUDivFPCR = FPControlRegister(ee_fpcr).SetRoundMode(FPRoundMode::Nearest);
+	FPControlRegister::SetCurrent(ee_fpcr);
+
+	constexpr u32 FS = 1;
+	constexpr u32 FT = 2;
+	constexpr u32 FD = 3;
+	cpuRegs.code = (FT << 16) | (FS << 11) | (FD << 6) | 0x03u;
+	fpuRegs.fpr[FT].UL = 0x437f0000u;
+	for (const TestCase& test : CASES)
+	{
+		fpuRegs.fpr[FS].SL = test.input;
+		R5900::Interpreter::OpcodeImpl::COP1::CVT_S();
+		fpuRegs.fpr[FS].UL = fpuRegs.fpr[FD].UL;
+		R5900::Interpreter::OpcodeImpl::COP1::DIV_S();
+		const u32 actual = fpuRegs.fpr[FD].UL;
+		if (actual != test.expected)
+		{
+			char message[96];
+			std::snprintf(message, sizeof(message), "input=%d expected=%08x actual=%08x",
+				test.input, test.expected, actual);
+			restore();
+			return StringToJString(env, message);
+		}
+		if (FPControlRegister::GetCurrent() != ee_fpcr)
+		{
+			restore();
+			return StringToJString(env, "DIV.S did not restore the EE FPCR");
+		}
+	}
+	restore();
+	return StringToJString(env, "ok");
+}
+#endif
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_bootElf(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), true, 0) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_bootIrx(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, 0, true) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_pause(JNIEnv*, jclass) { AndroidRuntime::Instance().Pause(); }

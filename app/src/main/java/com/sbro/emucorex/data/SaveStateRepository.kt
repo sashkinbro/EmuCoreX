@@ -19,10 +19,44 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 private const val AUTO_SAVE_SLOT = 0
+private val SAVE_STATE_SLOTS = 0..10
+private val SAVE_STATE_FILE_REGEX = Regex("""^(.+?) \(([0-9A-Fa-f]{8})\)\.(\d{2})\.p2s$""")
+
+internal fun findFallbackSaveStateFile(
+    files: Array<out File>,
+    gameSerial: String?,
+    slot: Int
+): File? {
+    val normalizedSerial = gameSerial.normalizeSaveStateSerialKey() ?: return null
+    return files.asSequence()
+        .filter(File::isFile)
+        .mapNotNull { file ->
+            val match = SAVE_STATE_FILE_REGEX.matchEntire(file.name) ?: return@mapNotNull null
+            val serial = match.groupValues[1].normalizeSaveStateSerialKey() ?: return@mapNotNull null
+            val fileSlot = match.groupValues[3].toIntOrNull() ?: return@mapNotNull null
+            file.takeIf { serial == normalizedSerial && fileSlot == slot }
+        }
+        .maxByOrNull(File::lastModified)
+}
+
+private fun String?.normalizeSaveStateSerialKey(): String? {
+    if (this.isNullOrBlank()) return null
+    val cleanSerial = trim().uppercase(Locale.ROOT)
+    val regex = Regex("([A-Z]{4})[^A-Z0-9]*([0-9]{3})[^A-Z0-9]*([0-9]{2})")
+    val altRegex = Regex("([A-Z]{4})[^A-Z0-9]*([0-9]{5})")
+    regex.find(cleanSerial)?.let { match ->
+        return "${match.groupValues[1]}-${match.groupValues[2]}${match.groupValues[3]}"
+    }
+    altRegex.find(cleanSerial)?.let { match ->
+        return "${match.groupValues[1]}-${match.groupValues[2]}"
+    }
+    return cleanSerial.replace(Regex("[^A-Z0-9_-]"), "").takeIf { it.isNotBlank() }
+}
 
 data class SaveStateSlotInfo(
     val slot: Int,
     val exists: Boolean,
+    val absolutePath: String?,
     val fileName: String?,
     val sizeBytes: Long,
     val lastModified: Long,
@@ -53,13 +87,20 @@ class SaveStateRepository(private val context: Context) {
     private val preferences = AppPreferences(context)
     private val compatibilityRepository = Pcsx2CompatibilityRepository(context)
 
-    fun listSlots(gamePath: String): List<SaveStateSlotInfo> {
+    fun listSlots(gamePath: String, gameSerial: String? = null): List<SaveStateSlotInfo> {
+        val saveStateFiles = saveStatesDir().listFiles().orEmpty()
         return SAVE_STATE_SLOTS.map { slot ->
             val path = runCatching { NativeApp.getSaveStatePathForFile(gamePath, slot) }.getOrNull()
-            val file = path?.let(::File)
+            val file = resolveSaveStateFile(
+                nativePath = path,
+                saveStateFiles = saveStateFiles,
+                gameSerial = gameSerial,
+                slot = slot
+            )
             SaveStateSlotInfo(
                 slot = slot,
                 exists = file?.exists() == true,
+                absolutePath = file?.absolutePath,
                 fileName = file?.name,
                 sizeBytes = file?.takeIf(File::exists)?.length() ?: 0L,
                 lastModified = file?.takeIf(File::exists)?.lastModified() ?: 0L
@@ -67,18 +108,34 @@ class SaveStateRepository(private val context: Context) {
         }
     }
 
-    fun findLatestSlot(gamePath: String): Int? {
-        return listSlots(gamePath)
+    private fun resolveSaveStateFile(
+        nativePath: String?,
+        saveStateFiles: Array<out File>,
+        gameSerial: String?,
+        slot: Int
+    ): File? {
+        nativePath?.let(::File)?.takeIf(File::exists)?.let { return it }
+        // GameList can still be warming up after a cold launch. The library already knows the
+        // serial, so use it to locate the slot without waiting for native metadata discovery.
+        return findFallbackSaveStateFile(saveStateFiles, gameSerial, slot)
+    }
+
+    fun findLatestSlot(gamePath: String, gameSerial: String? = null): Int? {
+        return listSlots(gamePath, gameSerial)
             .filter { it.exists }
             .maxByOrNull { it.lastModified }
             ?.slot
     }
 
-    fun listEntries(filterGamePath: String? = null, filterGameTitle: String? = null): List<SaveStateEntryInfo> {
+    fun listEntries(
+        filterGamePath: String? = null,
+        filterGameTitle: String? = null,
+        filterGameSerial: String? = null
+    ): List<SaveStateEntryInfo> {
         return if (filterGamePath.isNullOrBlank()) {
             listAllEntriesFast()
         } else {
-            listEntriesForGame(filterGamePath, filterGameTitle)
+            listEntriesForGame(filterGamePath, filterGameTitle, filterGameSerial)
         }
     }
 
@@ -195,16 +252,19 @@ class SaveStateRepository(private val context: Context) {
         return EmulatorStorage.saveStatesDir(context, preferences.getEmulatorDataPathSync())
     }
 
-    private fun listEntriesForGame(gamePath: String, gameTitle: String?): List<SaveStateEntryInfo> {
-        val fallbackInfo = resolveFallbackGameInfo(gamePath, gameTitle)
+    private fun listEntriesForGame(
+        gamePath: String,
+        gameTitle: String?,
+        gameSerial: String?
+    ): List<SaveStateEntryInfo> {
+        val fallbackInfo = resolveFallbackGameInfo(gamePath, gameTitle, gameSerial)
         val targetSerial = fallbackInfo.serial
 
-        return listSlots(gamePath)
+        return listSlots(gamePath, targetSerial)
             .filter { it.exists }
             .mapNotNull { slot ->
-                val absolutePath = NativeApp.getSaveStatePathForFile(gamePath, slot.slot) ?: return@mapNotNull null
-                val file = File(absolutePath)
-                if (!file.exists()) return@mapNotNull null
+                val file = slot.absolutePath?.let(::File)?.takeIf(File::exists) ?: return@mapNotNull null
+                val absolutePath = file.absolutePath
 
                 val parsed = parseSaveStateName(file.name)
                 val serialKey = parsed?.serial ?: targetSerial ?: return@mapNotNull null
@@ -268,10 +328,14 @@ class SaveStateRepository(private val context: Context) {
         )
     }
 
-    private fun resolveFallbackGameInfo(gamePath: String, gameTitle: String?): FallbackGameInfo {
+    private fun resolveFallbackGameInfo(
+        gamePath: String,
+        gameTitle: String?,
+        gameSerial: String? = null
+    ): FallbackGameInfo {
         val resolvedPath = DocumentPathResolver.resolveFilePath(context, gamePath) ?: gamePath
         val metadata = runCatching { EmulatorBridge.getGameMetadata(resolvedPath) }.getOrNull()
-        val normalizedSerial = metadata?.serial.normalizeSerialKey()
+        val normalizedSerial = gameSerial.normalizeSerialKey() ?: metadata?.serial.normalizeSerialKey()
         val cleanPassedTitle = gameTitle.takeIf(::isUsableTitle)
         val cleanMetadataTitle = metadata?.title?.takeIf(::isUsableTitle)
         val title = when {
@@ -329,17 +393,7 @@ class SaveStateRepository(private val context: Context) {
     }
 
     private fun String?.normalizeSerialKey(): String? {
-        if (this.isNullOrBlank()) return null
-        val cleanSerial = this.trim().uppercase(Locale.ROOT)
-        val regex = Regex("([A-Z]{4})[^A-Z0-9]*([0-9]{3})[^A-Z0-9]*([0-9]{2})")
-        val altRegex = Regex("([A-Z]{4})[^A-Z0-9]*([0-9]{5})")
-        regex.find(cleanSerial)?.let { match ->
-            return "${match.groupValues[1]}-${match.groupValues[2]}${match.groupValues[3]}"
-        }
-        altRegex.find(cleanSerial)?.let { match ->
-            return "${match.groupValues[1]}-${match.groupValues[2]}"
-        }
-        return cleanSerial.replace(Regex("[^A-Z0-9_-]"), "").takeIf { it.isNotBlank() }
+        return normalizeSaveStateSerialKey()
     }
 
     private fun normalizeTitleKey(value: String?): String? {
@@ -390,10 +444,6 @@ class SaveStateRepository(private val context: Context) {
         }
     }
 
-    private companion object {
-        private val SAVE_STATE_SLOTS = 0..10
-        private val SAVE_STATE_FILE_REGEX = Regex("""^(.+?) \(([0-9A-Fa-f]{8})\)\.(\d{2})\.p2s$""")
-    }
 }
 
 private fun String.sha1(): String {
