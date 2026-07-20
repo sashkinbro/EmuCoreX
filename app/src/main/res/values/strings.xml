@@ -775,6 +775,7 @@
     <string name="settings_fps_metric_speed">Speed</string>
     <string name="settings_fps_metric_target">Target</string>
     <string name="settings_fps_metric_renderer">Renderer</string>
+    <string name="settings_fps_metric_audio">Audio</string>
     <string name="settings_fps_metric_vram">VRAM</string>
     <string name="settings_fps_metric_frame_time">Frame time</string>
     <string name="settings_fps_metric_queue">GS queue</string>
@@ -1588,6 +1589,10 @@
     <string name="settings_audio_interpolation_linear">Linear</string>
     <string name="settings_audio_interpolation_gaussian">Gaussian (Accurate)</string>
     <string name="settings_audio_interpolation_cubic">Cubic</string>
+    <string name="settings_audio_backend">Audio backend</string>
+    <string name="settings_audio_backend_aaudio">AAudio (Recommended)</string>
+    <string name="settings_audio_backend_opensles">OpenSL ES (Compatible)</string>
+    <string name="settings_help_audio_backend">AAudio provides low latency but may stutter on slower or heavily loaded devices. OpenSL ES uses a simpler buffer queue and is more stable on weaker hardware, at the cost of slightly higher latency. Changing this setting requires restarting the game.</string>
     <string name="settings_audio_sync_mode">Synchronization mode</string>
     <string name="settings_audio_sync_time_stretch">TimeStretch (Recommended)</string>
     <string name="settings_audio_sync_disabled">Disabled (Noisy)</string>
@@ -1811,4 +1816,13 @@
     <string name="settings_dithering_scaled">Scaled</string>
     <string name="settings_dithering_unscaled">Unscaled (default)</string>
     <string name="settings_dithering_force_32bit">Force 32-bit</string>
+    <string name="settings_gpu_driver_detected_device">Detected: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Compatible drivers are shown first. Tap a driver card to see supported Snapdragon chips.</string>
+    <string name="settings_gpu_driver_compatibility">Snapdragon compatibility</string>
+    <string name="settings_gpu_driver_best_match">Best match</string>
+    <string name="settings_gpu_driver_compatible">Compatible</string>
+    <string name="settings_gpu_driver_other_family">Different Adreno family</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 and many Snapdragon 6/7 series</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, recent Snapdragon 7 series, and 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4, and 6 Gen 4</string>
 </resources>

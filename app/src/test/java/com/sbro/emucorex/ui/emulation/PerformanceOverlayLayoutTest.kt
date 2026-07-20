@@ -21,6 +21,7 @@ class PerformanceOverlayLayoutTest {
         GS: 57.7% (11.53 ms)
         VU: 57.4% (11.49 ms)
         SW-0: 20.0% (4.00 ms)
+        Audio:OpenSL ES
     """.trimIndent()
 
     @Test
@@ -38,6 +39,7 @@ class PerformanceOverlayLayoutTest {
         assertTrue(layout.mainLines.any { it.startsWith("GPU:") })
         assertTrue(layout.mainLines.any { it.startsWith("EE:") })
         assertTrue(layout.mainLines.any { it.startsWith("SW-0:") })
+        assertFalse(layout.mainLines.any { it.startsWith("Audio:") })
         assertEquals("Vulkan HW|VRAM:24MB|TGT:8MB|SRC:4MB", layout.bottomLines[0])
         assertFalse(layout.bottomLines.any { it.startsWith("GS Queue:") })
     }
@@ -69,6 +71,16 @@ class PerformanceOverlayLayoutTest {
     }
 
     @Test
+    fun audioBackendIsOptIn() {
+        val hidden = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.DEFAULT)
+        val visible = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.AUDIO)
+
+        assertFalse(hidden.mainLines.any { it.startsWith("Audio:") })
+        assertEquals(listOf("Audio:OpenSL ES"), visible.mainLines)
+        assertEquals(0, PerformanceOverlayMetrics.DEFAULT and PerformanceOverlayMetrics.AUDIO)
+    }
+
+    @Test
     fun hostHardwareMetricsAreOptInAndHeaderCannotBeMaskedOut() {
         val layout = buildPerformanceOverlayLayout(
             fullSnapshot,
@@ -95,6 +107,7 @@ class PerformanceOverlayLayoutTest {
         assertEquals(vuIndex + 1, layout.mainLines.indexOfFirst { it.startsWith("CPU:") })
         assertEquals(vuIndex + 2, layout.mainLines.indexOfFirst { it.startsWith("GPU:") })
         assertEquals(vuIndex + 3, layout.mainLines.indexOfFirst { it.startsWith("SW-0:") })
+        assertEquals(vuIndex + 4, layout.mainLines.indexOfFirst { it.startsWith("Audio:") })
     }
 
     @Test

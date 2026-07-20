@@ -1686,6 +1686,7 @@
     <string name="settings_fps_metric_speed">Hız</string>
     <string name="settings_fps_metric_target">Hedef</string>
     <string name="settings_fps_metric_renderer">Oluşturucu</string>
+    <string name="settings_fps_metric_audio">Ses</string>
     <string name="settings_fps_metric_vram">VRAM</string>
     <string name="settings_fps_metric_frame_time">Kare süresi</string>
     <string name="settings_fps_metric_queue">GS kuyruğu</string>
@@ -1796,4 +1797,17 @@
     <string name="settings_dithering_scaled">Ölçeklendirilmiş</string>
     <string name="settings_dithering_unscaled">Ölçeklendirilmemiş (varsayılan)</string>
     <string name="settings_dithering_force_32bit">32 biti zorla</string>
+    <string name="settings_audio_backend">Ses arka ucu</string>
+    <string name="settings_audio_backend_aaudio">AAudio (Önerilen)</string>
+    <string name="settings_audio_backend_opensles">OpenSL ES (Uyumlu)</string>
+    <string name="settings_help_audio_backend">AAudio düşük gecikme sağlar ancak daha yavaş veya ağır yüklü cihazlarda seste takılmalar olabilir. OpenSL ES daha basit bir arabellek kuyruğu kullanır ve biraz daha yüksek gecikme pahasına zayıf donanımlarda daha kararlıdır. Bu ayarı değiştirmek oyunun yeniden başlatılmasını gerektirir.</string>
+    <string name="settings_gpu_driver_detected_device">Algılandı: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Uyumlu sürücüler önce gösterilir. Desteklenen Snapdragon çiplerini görmek için sürücü kartına dokunun.</string>
+    <string name="settings_gpu_driver_compatibility">Snapdragon uyumluluğu</string>
+    <string name="settings_gpu_driver_best_match">En iyi eşleşme</string>
+    <string name="settings_gpu_driver_compatible">Uyumlu</string>
+    <string name="settings_gpu_driver_other_family">Farklı Adreno ailesi</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 ve birçok Snapdragon 6/7 serisi modeli</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, güncel Snapdragon 7 serisi ve 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 ve 6 Gen 4</string>
 </resources>

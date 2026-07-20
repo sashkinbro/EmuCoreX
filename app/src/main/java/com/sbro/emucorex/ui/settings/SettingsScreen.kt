@@ -1470,6 +1470,14 @@ private fun SettingsContent(
 
                     SettingsSection(title = stringResource(R.string.settings_audio_processing)) {
                         ChoiceSection(
+                            title = stringResource(R.string.settings_audio_backend),
+                            options = audioBackendOptions(),
+                            selectedValue = uiState.audioBackend,
+                            onSelect = viewModel::setAudioBackend,
+                            helpText = stringResource(R.string.settings_help_audio_backend),
+                            onResetToDefault = { viewModel.setAudioBackend(defaults.audioBackend) }
+                        )
+                        ChoiceSection(
                             title = stringResource(R.string.settings_audio_interpolation),
                             options = audioInterpolationOptions(),
                             selectedValue = uiState.audioInterpolation,
@@ -5310,6 +5318,12 @@ private fun gyroModeOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
+private fun audioBackendOptions(): List<Pair<Int, String>> = listOf(
+    AudioDefaults.BACKEND_AAUDIO to stringResource(R.string.settings_audio_backend_aaudio),
+    AudioDefaults.BACKEND_OPENSLES to stringResource(R.string.settings_audio_backend_opensles)
+)
+
+@Composable
 private fun audioInterpolationOptions(): List<Pair<Int, String>> = listOf(
     AudioDefaults.INTERPOLATION_NEAREST to stringResource(R.string.settings_audio_interpolation_nearest),
     AudioDefaults.INTERPOLATION_LINEAR to stringResource(R.string.settings_audio_interpolation_linear),
@@ -5525,6 +5539,7 @@ private fun fpsOverlayMetricOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.SPEED to stringResource(R.string.settings_fps_metric_speed),
     PerformanceOverlayMetrics.TARGET to stringResource(R.string.settings_fps_metric_target),
     PerformanceOverlayMetrics.RENDERER to stringResource(R.string.settings_fps_metric_renderer),
+    PerformanceOverlayMetrics.AUDIO to stringResource(R.string.settings_fps_metric_audio),
     PerformanceOverlayMetrics.VRAM to stringResource(R.string.settings_fps_metric_vram),
     PerformanceOverlayMetrics.FRAME_TIME to stringResource(R.string.settings_fps_metric_frame_time),
     PerformanceOverlayMetrics.QUEUE to stringResource(R.string.settings_fps_metric_queue),

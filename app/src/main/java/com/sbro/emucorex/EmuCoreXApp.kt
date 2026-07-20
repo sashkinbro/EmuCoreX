@@ -1,6 +1,7 @@
 package com.sbro.emucorex
 
 import android.app.Application
+import com.sbro.emucorex.core.AppAnalytics
 import com.sbro.emucorex.core.AppIconManager
 import com.sbro.emucorex.core.CrashLogger
 import com.sbro.emucorex.core.EmulatorBridge
@@ -17,6 +18,7 @@ class EmuCoreXApp : Application() {
         super.onCreate()
         // CrashLogger must be the very first thing — it catches crashes in all subsequent init steps
         CrashLogger.init(this)
+        AppAnalytics.initialize(this)
         AppIconManager.applyProIcon(this, AppPreferences(this).getProUnlockedSync())
         EmulatorBridge.initializeOnce(this)
         RetroAchievementsStateManager.initialize()

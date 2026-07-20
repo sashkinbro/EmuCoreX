@@ -5,6 +5,7 @@
 
 #include "SaveState.h"
 #include "IopCounters.h"
+#include "Host/AudioStreamTypes.h"
 
 #include <memory>
 
@@ -32,6 +33,9 @@ void CheckForConfigChanges(const Pcsx2Config& old_config);
 
 /// Returns the current output volume, irrespective of the configuration.
 u32 GetOutputVolume();
+
+/// Returns the backend of the stream that was actually created (Null after fallback).
+AudioBackend GetOutputBackend();
 
 /// Directly updates the output volume without going through the configuration.
 void SetOutputVolume(u32 volume);

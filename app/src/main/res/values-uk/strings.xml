@@ -1690,6 +1690,7 @@
     <string name="settings_fps_metric_speed">Швидкість</string>
     <string name="settings_fps_metric_target">Ціль</string>
     <string name="settings_fps_metric_renderer">Рендерер</string>
+    <string name="settings_fps_metric_audio">Аудіо</string>
     <string name="settings_fps_metric_vram">VRAM</string>
     <string name="settings_fps_metric_frame_time">Час кадру</string>
     <string name="settings_fps_metric_queue">Черга GS</string>
@@ -1800,4 +1801,17 @@
     <string name="settings_dithering_scaled">Масштабований</string>
     <string name="settings_dithering_unscaled">Немасштабований (за замовчуванням)</string>
     <string name="settings_dithering_force_32bit">Примусово 32-бітний режим</string>
+    <string name="settings_audio_backend">Аудіо бекенд</string>
+    <string name="settings_audio_backend_aaudio">AAudio (Рекомендовано)</string>
+    <string name="settings_audio_backend_opensles">OpenSL ES (Сумісний)</string>
+    <string name="settings_help_audio_backend">AAudio забезпечує низьку затримку, але звук може заїкатися на повільних або сильно завантажених пристроях. OpenSL ES використовує простішу чергу буферизації та працює стабільніше на слабкому обладнанні ціною трохи вищої затримки. Зміна цього налаштування вимагає перезапуску гри.</string>
+    <string name="settings_gpu_driver_detected_device">Виявлено: %1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">Сумісні драйвери показано першими. Натисніть картку драйвера, щоб переглянути підтримувані чипи Snapdragon.</string>
+    <string name="settings_gpu_driver_compatibility">Сумісність зі Snapdragon</string>
+    <string name="settings_gpu_driver_best_match">Найкращий вибір</string>
+    <string name="settings_gpu_driver_compatible">Сумісний</string>
+    <string name="settings_gpu_driver_other_family">Інше покоління Adreno</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 і багато моделей серій Snapdragon 6/7</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, нові моделі серії Snapdragon 7 та 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 та 6 Gen 4</string>
 </resources>

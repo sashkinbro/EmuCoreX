@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.EmuCoreXApp
 import com.sbro.emucorex.core.AndroidGamePerformance
 import com.sbro.emucorex.core.AndroidGamePhase
+import com.sbro.emucorex.core.AppAnalytics
+import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
@@ -248,6 +250,7 @@ data class EmulationUiState(
 )
 
 private data class EmulationLaunchConfig(
+    val performanceProfile: Int,
     val biosPath: String?,
     val emulatorDataPath: String?,
     val memoryCardSlot1: String?,
@@ -264,6 +267,7 @@ private data class EmulationLaunchConfig(
     val audioMuted: Boolean,
     val audioInterpolation: Int,
     val audioSyncMode: Int,
+    val audioBackend: Int,
     val audioBufferMs: Int,
     val audioOutputLatencyMs: Int,
     val audioMinimalOutputLatency: Boolean,
@@ -489,6 +493,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var currentGameTitle: String = ""
     @Volatile
     private var currentGamePath: String? = null
+    private var currentAnalyticsAudioBackend: Int = AudioDefaults.BACKEND_DEFAULT
     @Volatile
     private var currentGameSerial: String = ""
     @Volatile
@@ -1315,6 +1320,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (success) {
             refreshSaveStateMetadata()
         }
+        AppAnalytics.logSaveStateAction(action = "save", automatic = true, success = success)
         return success
     }
 
@@ -1352,6 +1358,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         gsDumpFrames: Int? = null,
         gsDumpDelayMs: Int? = null
     ) {
+        val analyticsLaunchType = when {
+            bootSmokeProbe -> "smoke_test"
+            autotestMode -> "autotest"
+            bootToBios -> "bios"
+            else -> "game"
+        }
         Log.i(
             TAG,
             "startEmulation requested path=$path bootBios=$bootToBios bootSmoke=$bootSmokeProbe autotest=$autotestMode"
@@ -1362,6 +1374,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         val normalizedSlotToLoad = slotToLoad?.let { normalizeSaveSlot(it) }
         val hasPendingStateLoad = !bootToBios && !bootSmokeProbe && normalizedSlotToLoad != null
+        var analyticsPerformanceProfile = PerformanceProfiles.SAFE
         cancelPendingStart = false
         pausedForBackground = false
         if (pendingPlayTimeSyncMs > 0L) {
@@ -1405,6 +1418,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 )
 
                 val config = loadLaunchConfig()
+                analyticsPerformanceProfile = config.performanceProfile
+                currentAnalyticsAudioBackend = config.audioBackend
                 val renderer = rendererOverride ?: config.renderer
                 Log.i(
                     TAG,
@@ -1423,6 +1438,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     val biosDirExists = !resolvedBiosPath.isNullOrBlank() && File(resolvedBiosPath).exists()
                     val biosLooksUsable = BiosValidator.hasUsableBiosFiles(getApplication(), config.biosPath)
                     if (!biosDirExists || !biosLooksUsable) {
+                        AppAnalytics.logEmulationStartFailed(analyticsLaunchType, "bios_missing")
                         _uiState.value = _uiState.value.copy(
                             isStarting = false,
                             statusMessage = null,
@@ -1456,6 +1472,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     audioMuted = config.audioMuted,
                     audioInterpolation = config.audioInterpolation,
                     audioSyncMode = config.audioSyncMode,
+                    audioBackend = config.audioBackend,
                     audioBufferMs = config.audioBufferMs,
                     audioOutputLatencyMs = config.audioOutputLatencyMs,
                     audioMinimalOutputLatency = config.audioMinimalOutputLatency,
@@ -1569,6 +1586,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 if (!bootToBios && launchPath.isNullOrBlank()) {
+                    AppAnalytics.logEmulationStartFailed(analyticsLaunchType, "path_unavailable")
                     _uiState.value = _uiState.value.copy(
                         isStarting = false,
                         statusMessage = null,
@@ -1799,6 +1817,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     } else {
                         EmulatorBridge.loadState(normalizedSlotToLoad)
                     }
+                    AppAnalytics.logSaveStateAction(
+                        action = "load",
+                        automatic = false,
+                        success = loaded
+                    )
                     _uiState.value = _uiState.value.copy(
                         isRunning = true,
                         isPaused = false,
@@ -1872,6 +1895,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 false
             }
             Log.i(TAG, "EmulatorBridge.startEmulation returned $started path=$pathToLaunch")
+            val analyticsState = _uiState.value
+            if (started) {
+                AppAnalytics.logEmulationStarted(
+                    launchType = analyticsLaunchType,
+                    renderer = analyticsState.renderer,
+                    audioBackend = currentAnalyticsAudioBackend,
+                    upscaleMultiplier = analyticsState.upscale,
+                    performanceProfile = analyticsPerformanceProfile,
+                    saveStateLoad = hasPendingStateLoad
+                )
+            } else {
+                AppAnalytics.logEmulationStartFailed(analyticsLaunchType, "native_start")
+            }
             if (started && gsDumpFrames != null && gsDumpFrames > 0) {
                 val delayMs = gsDumpDelayMs?.coerceAtLeast(0) ?: 0
                 viewModelScope.launch(Dispatchers.IO) {
@@ -3446,6 +3482,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             preferences.setCustomDriverPath(resolvedCustomDriverPath)
         }
         return EmulationLaunchConfig(
+            performanceProfile = settings.performanceProfile,
             biosPath = settings.biosPath,
             emulatorDataPath = settings.emulatorDataPath,
             memoryCardSlot1 = ensuredAssignments.slot1,
@@ -3462,6 +3499,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             audioMuted = settings.audioMuted,
             audioInterpolation = settings.audioInterpolation,
             audioSyncMode = settings.audioSyncMode,
+            audioBackend = settings.audioBackend,
             audioBufferMs = settings.audioBufferMs,
             audioOutputLatencyMs = settings.audioOutputLatencyMs,
             audioMinimalOutputLatency = settings.audioMinimalOutputLatency,
@@ -4228,6 +4266,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (success) {
                 refreshSaveStateMetadata()
             }
+            AppAnalytics.logSaveStateAction(action = "save", automatic = false, success = success)
             delay(2000.milliseconds)
             _uiState.value = _uiState.value.copy(toastMessage = null)
         }
@@ -4254,6 +4293,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     } catch (_: Exception) { false }
                 }
             }
+            AppAnalytics.logSaveStateAction(action = "load", automatic = false, success = success)
             _uiState.value = _uiState.value.copy(
                 isActionInProgress = false,
                 actionLabel = null,
@@ -4284,6 +4324,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     } catch (_: Exception) { false }
                 }
             }
+            AppAnalytics.logSaveStateAction(action = "load", automatic = true, success = success)
             _uiState.value = _uiState.value.copy(
                 isActionInProgress = false,
                 actionLabel = null,
@@ -4320,6 +4361,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             }
         }
+        AppAnalytics.logSaveStateAction(action = "load", automatic = true, success = success)
         _uiState.value = _uiState.value.copy(
             isActionInProgress = false,
             actionLabel = null,
@@ -4404,6 +4446,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         lifecycleMutex.withLock {
             if (!_uiState.value.isRunning && !_uiState.value.isStarting) return
             if (isShuttingDown) return
+            val analyticsState = _uiState.value
+            val completedRunningSession = analyticsState.isRunning
             isShuttingDown = true
             pausedForBackground = false
             fastForwardRequested = false
@@ -4445,6 +4489,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 )
                 syncNativePerformanceOverlayState(_uiState.value)
                 clearCrashContext()
+                if (completedRunningSession) {
+                    AppAnalytics.logEmulationEnded(
+                        activePlayTimeMs = analyticsState.activePlayTimeMs,
+                        renderer = analyticsState.renderer,
+                        audioBackend = currentAnalyticsAudioBackend
+                    )
+                }
             } finally {
                 isShuttingDown = false
             }

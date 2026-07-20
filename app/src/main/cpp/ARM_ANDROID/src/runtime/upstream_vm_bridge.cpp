@@ -22,6 +22,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
+#include <string_view>
 #include <thread>
 
 namespace emucorex::android
@@ -214,7 +215,12 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
 	si.SetBoolValue("EmuCore/GS", "VsyncEnable",
 		GetBoolSetting(config.settings, "EmuCore/GS", "VsyncEnable", false));
-	si.SetStringValue("SPU2/Output", "Backend", "SDL");
+	const auto audio_backend_setting = config.settings.find("SPU2/Output\nBackend");
+	const std::string_view requested_audio_backend =
+		(audio_backend_setting != config.settings.end()) ? std::string_view(audio_backend_setting->second) : std::string_view("SDL");
+	const char* const audio_backend = (requested_audio_backend == "OpenSLES") ? "OpenSLES" : "SDL";
+	si.SetStringValue("SPU2/Output", "Backend", audio_backend);
+	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Effective audio backend=%s", audio_backend);
 	si.SetStringValue("SPU2/Output", "DriverName", "");
 	si.SetStringValue("SPU2/Output", "DeviceName", "");
 	si.SetIntValue("SPU2/Output", "BufferMS",

@@ -13,6 +13,9 @@
 #include "VMManager.h"
 
 #include "common/Error.h"
+#include "common/Console.h"
+
+#include <atomic>
 
 const StereoOut32 StereoOut32::Empty(0, 0);
 
@@ -31,6 +34,7 @@ static bool s_psxmode = false;
 static bool s_output_muted = false;
 
 static std::unique_ptr<AudioStream> s_output_stream;
+static std::atomic<AudioBackend> s_output_backend{AudioBackend::Null};
 static std::array<float, AudioStream::CHUNK_SIZE * 2> s_current_chunk;
 static u32 s_current_chunk_pos;
 static u32 s_standard_volume = 0;
@@ -115,10 +119,32 @@ void SPU2::CreateOutputStream()
 
 	const u32 sample_rate = GetConsoleSampleRate();
 	s_output_stream.reset();
+	s_output_backend.store(AudioBackend::Null, std::memory_order_release);
 
 	Error error;
-	s_output_stream = AudioStream::CreateStream(EmuConfig.SPU2.Backend, sample_rate, EmuConfig.SPU2.StreamParameters,
+	AudioBackend active_backend = EmuConfig.SPU2.Backend;
+	s_output_stream = AudioStream::CreateStream(active_backend, sample_rate, EmuConfig.SPU2.StreamParameters,
 		EmuConfig.SPU2.DriverName.c_str(), EmuConfig.SPU2.DeviceName.c_str(), EmuConfig.SPU2.IsTimeStretchEnabled(), &error);
+#ifdef __ANDROID__
+	if (!s_output_stream && active_backend == AudioBackend::OpenSLES)
+	{
+		const std::string opensles_error(error.GetDescription());
+		Error fallback_error;
+		active_backend = AudioBackend::SDL;
+		s_output_stream = AudioStream::CreateStream(active_backend, sample_rate, EmuConfig.SPU2.StreamParameters,
+			EmuConfig.SPU2.DriverName.c_str(), EmuConfig.SPU2.DeviceName.c_str(), EmuConfig.SPU2.IsTimeStretchEnabled(),
+			&fallback_error);
+		if (s_output_stream)
+		{
+			WARNING_LOG("OpenSL ES initialization failed ({}); using AAudio fallback.", opensles_error);
+		}
+		else
+		{
+			Error::SetStringFmt(&error, "OpenSL ES failed: {}; AAudio fallback failed: {}", opensles_error,
+				fallback_error.GetDescription());
+		}
+	}
+#endif
 	if (!s_output_stream)
 	{
 		Host::ReportErrorAsync("Error",
@@ -126,6 +152,10 @@ void SPU2::CreateOutputStream()
 				error.GetDescription()));
 
 		s_output_stream = AudioStream::CreateNullStream(sample_rate, EmuConfig.SPU2.StreamParameters.buffer_ms);
+	}
+	else
+	{
+		s_output_backend.store(active_backend, std::memory_order_release);
 	}
 
 	SPU2::UpdateOutputVolume();
@@ -151,6 +181,11 @@ void SPU2::UpdateSampleRate()
 u32 SPU2::GetOutputVolume()
 {
 	return s_output_stream->GetOutputVolume();
+}
+
+AudioBackend SPU2::GetOutputBackend()
+{
+	return s_output_backend.load(std::memory_order_acquire);
 }
 
 void SPU2::SetOutputVolume(u32 volume)
@@ -309,6 +344,7 @@ void SPU2::Close()
 	FileLog("[%10d] SPU2 Close\n", Cycles);
 
 	s_output_stream.reset();
+	s_output_backend.store(AudioBackend::Null, std::memory_order_release);
 
 #ifdef PCSX2_DEVBUILD
 	WaveDump::Close();

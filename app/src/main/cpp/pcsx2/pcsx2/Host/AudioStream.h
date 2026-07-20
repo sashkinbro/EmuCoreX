@@ -147,6 +147,11 @@ private:
 	static std::unique_ptr<AudioStream> CreateSDLAudioStream(u32 sample_rate, const AudioStreamParameters& parameters,
 		bool stretch_enabled, Error* error);
 
+#ifdef __ANDROID__
+	static std::unique_ptr<AudioStream> CreateOpenSLESAudioStream(u32 sample_rate, const AudioStreamParameters& parameters,
+		bool stretch_enabled, Error* error);
+#endif
+
 	void AllocateBuffer();
 	void DestroyBuffer();
 

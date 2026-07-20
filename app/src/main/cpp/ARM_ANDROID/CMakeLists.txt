@@ -244,6 +244,7 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	target_sources(PCSX2 PRIVATE
 		"${CMAKE_CURRENT_LIST_DIR}/src/integration/pcsx2_achievements_android.cpp"
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_aaudio_stream.cpp"
+		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_opensles_stream.cpp"
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_network_adapters.cpp"
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_posix_compat.cpp"
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_pcap_unavailable.cpp"
@@ -338,7 +339,7 @@ target_compile_definitions(emucore
 if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	target_compile_definitions(emucore PRIVATE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
 endif()
-target_link_libraries(emucore PRIVATE aaudio android EGL GLESv3 log)
+target_link_libraries(emucore PRIVATE aaudio OpenSLES android EGL GLESv3 log)
 if(EMUCOREX_HAS_CAPSTONE)
 	target_link_libraries(emucore PRIVATE capstone_static)
 endif()

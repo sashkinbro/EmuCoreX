@@ -315,6 +315,7 @@ object EmulatorBridge {
         audioMuted: Boolean = false,
         audioInterpolation: Int = AudioDefaults.INTERPOLATION_DEFAULT,
         audioSyncMode: Int = AudioDefaults.SYNC_DEFAULT,
+        audioBackend: Int = AudioDefaults.BACKEND_DEFAULT,
         audioBufferMs: Int = AudioDefaults.BUFFER_MS_DEFAULT,
         audioOutputLatencyMs: Int = AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT,
         audioMinimalOutputLatency: Boolean = AudioDefaults.MINIMAL_OUTPUT_LATENCY_DEFAULT,
@@ -520,6 +521,7 @@ object EmulatorBridge {
                 add(settingOp("SPU2/Output", "OutputMuted", "bool", audioMuted.toString()))
                 add(settingOp("SPU2/Output", "InterpolationMode", "string", AudioDefaults.interpolationCoreName(audioInterpolation)))
                 add(settingOp("SPU2/Output", "SyncMode", "string", AudioDefaults.syncModeCoreName(audioSyncMode)))
+                add(settingOp("SPU2/Output", "Backend", "string", AudioDefaults.backendCoreName(audioBackend)))
                 add(settingOp("SPU2/Output", "BufferMS", "int", AudioDefaults.coerceBufferMs(audioBufferMs).toString()))
                 add(settingOp("SPU2/Output", "OutputLatencyMS", "int", AudioDefaults.coerceOutputLatencyMs(audioOutputLatencyMs).toString()))
                 add(settingOp("SPU2/Output", "OutputLatencyMinimal", "bool", audioMinimalOutputLatency.toString()))

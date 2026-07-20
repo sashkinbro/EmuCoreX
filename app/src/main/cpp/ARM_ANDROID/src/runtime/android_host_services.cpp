@@ -12,6 +12,7 @@
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
 #include "pcsx2/PerformanceMetrics.h"
+#include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
 
 #include "common/ProgressCallback.h"
@@ -539,6 +540,25 @@ void Host::OnPerformanceMetricsUpdated()
 			AppendProcessorStat(line, "", PerformanceMetrics::GetGSSWThreadUsage(thread), PerformanceMetrics::GetGSSWThreadAverageTime(thread));
 			AppendLine(overlay, line);
 		}
+
+		line.clear();
+		line.append("Audio:");
+		switch (SPU2::GetOutputBackend())
+		{
+			case AudioBackend::SDL:
+				line.append("AAudio");
+				break;
+			case AudioBackend::OpenSLES:
+				line.append("OpenSL ES");
+				break;
+			case AudioBackend::Null:
+				line.append("Null");
+				break;
+			default:
+				line.append("Unknown");
+				break;
+		}
+		AppendLine(overlay, line);
 	}
 
 	std::string snapshot;

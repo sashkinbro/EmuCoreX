@@ -195,7 +195,8 @@ fun AppAlertDialog(
     properties: DialogProperties = DialogProperties(
         usePlatformDefaultWidth = false,
         decorFitsSystemWindows = false
-    )
+    ),
+    compact: Boolean = false
 ) {
     StyledDialogScaffold(
         onDismissRequest = onDismissRequest,
@@ -213,7 +214,8 @@ fun AppAlertDialog(
         },
         shape = shape,
         containerColor = containerColor,
-        properties = properties
+        properties = properties,
+        compact = compact
     ) {
         if (text != null) {
             CompositionLocalProvider(
@@ -236,6 +238,38 @@ fun AppAlertDialog(
     }
 }
 
+/** Compact adaptive variant for short confirmations, with the same branded dialog styling. */
+@Composable
+fun CompactAppAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+    shape: Shape = RoundedCornerShape(30.dp),
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    properties: DialogProperties = DialogProperties(
+        usePlatformDefaultWidth = false,
+        decorFitsSystemWindows = false
+    )
+) {
+    AppAlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = confirmButton,
+        modifier = modifier,
+        dismissButton = dismissButton,
+        icon = icon,
+        title = title,
+        text = text,
+        shape = shape,
+        containerColor = containerColor,
+        properties = properties,
+        compact = true
+    )
+}
+
 @Composable
 private fun StyledDialogScaffold(
     onDismissRequest: () -> Unit,
@@ -249,6 +283,7 @@ private fun StyledDialogScaffold(
         usePlatformDefaultWidth = false,
         decorFitsSystemWindows = false
     ),
+    compact: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val containerSize = LocalWindowInfo.current.containerSize
@@ -261,14 +296,54 @@ private fun StyledDialogScaffold(
     } else {
         (windowHeight - 64.dp).coerceAtLeast(540.dp)
     }
-    val dialogWidthFraction = if (isLandscape) 0.98f else 0.94f
-    val dialogMaxWidth = if (isLandscape) 1600.dp else 720.dp
-    val contentHorizontalPadding = if (isLandscape) 20.dp else 22.dp
-    val contentTopPadding = if (isLandscape) 18.dp else 22.dp
-    val contentBottomPadding = if (isLandscape) 24.dp else 28.dp
-    val contentSpacing = if (isLandscape) 14.dp else 18.dp
-    val iconTileSize = if (isLandscape) 52.dp else 58.dp
-    val iconSize = if (isLandscape) 28.dp else 30.dp
+    val dialogWidthFraction = when {
+        compact && isLandscape -> 0.78f
+        compact -> 0.90f
+        isLandscape -> 0.98f
+        else -> 0.94f
+    }
+    val dialogMaxWidth = when {
+        compact && isLandscape -> 600.dp
+        compact -> 520.dp
+        isLandscape -> 1600.dp
+        else -> 720.dp
+    }
+    val contentHorizontalPadding = when {
+        compact && isLandscape -> 18.dp
+        compact -> 20.dp
+        isLandscape -> 20.dp
+        else -> 22.dp
+    }
+    val contentTopPadding = when {
+        compact && isLandscape -> 14.dp
+        compact -> 18.dp
+        isLandscape -> 18.dp
+        else -> 22.dp
+    }
+    val contentBottomPadding = when {
+        compact && isLandscape -> 16.dp
+        compact -> 20.dp
+        isLandscape -> 24.dp
+        else -> 28.dp
+    }
+    val contentSpacing = when {
+        compact && isLandscape -> 10.dp
+        compact -> 14.dp
+        isLandscape -> 14.dp
+        else -> 18.dp
+    }
+    val iconTileSize = when {
+        compact && isLandscape -> 48.dp
+        compact -> 52.dp
+        isLandscape -> 52.dp
+        else -> 58.dp
+    }
+    val iconSize = when {
+        compact && isLandscape -> 26.dp
+        compact -> 28.dp
+        isLandscape -> 28.dp
+        else -> 30.dp
+    }
 
     Dialog(
         onDismissRequest = onDismissRequest,

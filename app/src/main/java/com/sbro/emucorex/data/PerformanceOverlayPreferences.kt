@@ -16,11 +16,12 @@ object PerformanceOverlayMetrics {
     const val SOFTWARE_THREADS = 1 shl 12
     const val HOST_CPU = 1 shl 13
     const val HOST_GPU = 1 shl 14
+    const val AUDIO = 1 shl 15
 
     const val ALL = FPS or VPS or SPEED or TARGET or RENDERER or VRAM or FRAME_TIME or QUEUE or
-        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU
+        RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU or AUDIO
 
-    // Show device hardware metrics by default while keeping every metric user-configurable.
+    // Audio remains opt-in; all other useful hardware metrics are visible by default.
     const val DEFAULT = FPS or VPS or SPEED or TARGET or RENDERER or VRAM or FRAME_TIME or
         RESOLUTION or EE or GS or VU or SOFTWARE_THREADS or HOST_CPU or HOST_GPU
 
