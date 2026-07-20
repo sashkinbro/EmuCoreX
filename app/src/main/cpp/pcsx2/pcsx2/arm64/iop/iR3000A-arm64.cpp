@@ -35,8 +35,6 @@ using namespace x86Emitter;
 #endif
 
 extern void psxBREAK();
-extern u8* recBeginOaknutEmit();
-extern void recEndOaknutEmit();
 
 u32 g_psxMaxRecMem = 0;
 
