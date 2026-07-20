@@ -1309,6 +1309,8 @@
     <string name="settings_help_mediatek_angle_opengl">Leitet den MediaTek OpenGL-Renderer durch gebündelte ANGLE-Bibliotheken. Aufgrund des Übersetzungsaufwands kann dies je nach Spiel die Leistung erhöhen oder verringern. Verfügbar für Mali- und PowerVR-Profile und standardmäßig deaktiviert.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE für OpenGL</string>
     <string name="settings_mediatek_angle_opengl_desc">Gebündelte ANGLE-Bibliotheken für den MediaTek OpenGL-Pfad verwenden.</string>
+    <string name="settings_mediatek_notice_title">MediaTek-Kompatibilität</string>
+    <string name="settings_mediatek_notice_message">Die MediaTek-Unterstützung ist noch experimentell. Während wir Kompatibilität und Leistung weiter verbessern, können Abstürze, Grafikfehler und instabiles Verhalten auftreten.\n\nBei Grafikproblemen probiere OpenGL mit aktiviertem ANGLE aus. Falls die Probleme bestehen bleiben, verwende den Software-Renderer.</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Schalte Crimson, das goldene App-Symbol, Pro-Profile, erweiterte Statistiken und Spielerkarten frei.</string>
     <string name="settings_pro_not_active">Nicht aktiv</string>

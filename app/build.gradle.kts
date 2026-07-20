@@ -100,6 +100,11 @@ android {
             if (releaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            ndk {
+                // Keep full native symbols in release bundles so Google Play can
+                // report source files and line numbers for production NDK crashes.
+                debugSymbolLevel = "FULL"
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

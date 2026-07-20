@@ -1174,6 +1174,8 @@
     <string name="gpu_powervr_desc">Uses the PowerVR branch for Imagination GPU devices.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE for OpenGL</string>
     <string name="settings_mediatek_angle_opengl_desc">Use bundled ANGLE libraries for the MediaTek OpenGL path.</string>
+    <string name="settings_mediatek_notice_title">MediaTek compatibility</string>
+    <string name="settings_mediatek_notice_message">MediaTek support is still experimental. Crashes, visual artifacts, and unstable behavior may occur while we continue improving compatibility and performance.\n\nIf you experience graphics issues, try OpenGL with ANGLE enabled. If the issues persist, use the Software renderer.</string>
     <string name="onboarding_title">Get ready to play</string>
     <string name="onboarding_subtitle">Add a BIOS file, choose your game folders, and grant file access.</string>
     <string name="onboarding_bios_title">Choose BIOS File</string>

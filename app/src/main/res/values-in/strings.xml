@@ -1116,6 +1116,8 @@
     <string name="gpu_powervr_desc">Menggunakan cabang rute grafis PowerVR untuk perangkat dengan unit GPU dari Imagination.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE untuk OpenGL</string>
     <string name="settings_mediatek_angle_opengl_desc">Gunakan bundel pustaka ANGLE (ANGLE libraries) pada rute perenderan MediaTek OpenGL.</string>
+    <string name="settings_mediatek_notice_title">Kompatibilitas MediaTek</string>
+    <string name="settings_mediatek_notice_message">Dukungan MediaTek masih bersifat eksperimental. Crash, artefak grafis, dan perilaku tidak stabil dapat terjadi sementara kami terus meningkatkan kompatibilitas dan performa.\n\nJika mengalami masalah grafis, coba OpenGL dengan ANGLE diaktifkan. Jika masalah berlanjut, gunakan perender Perangkat Lunak.</string>
     <string name="onboarding_title">Bersiaplah untuk bermain</string>
     <string name="onboarding_subtitle">Tambahkan file BIOS, pilih folder game Anda, dan berikan akses file penuh.</string>
     <string name="onboarding_bios_title">Pilih File BIOS</string>

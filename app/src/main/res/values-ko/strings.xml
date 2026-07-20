@@ -1307,6 +1307,8 @@
     <string name="settings_help_mediatek_angle_opengl">MediaTek OpenGL 렌더러를 번들로 제공되는 ANGLE 라이브러리를 통해 라우팅합니다. 변환 오버헤드로 인해 게임에 따라 성능이 향상되거나 저하될 수 있습니다. Mali 및 PowerVR 프로필에서 사용할 수 있으며 기본적으로 꺼져 있습니다.</string>
     <string name="settings_mediatek_angle_opengl">OpenGL용 ANGLE</string>
     <string name="settings_mediatek_angle_opengl_desc">MediaTek OpenGL 경로에 번들로 제공되는 ANGLE 라이브러리를 사용합니다.</string>
+    <string name="settings_mediatek_notice_title">MediaTek 호환성</string>
+    <string name="settings_mediatek_notice_message">MediaTek 지원은 아직 실험 단계입니다. 호환성과 성능을 개선하는 동안 충돌, 그래픽 깨짐 및 불안정한 동작이 발생할 수 있습니다.\n\n그래픽 문제가 발생하면 ANGLE을 활성화한 OpenGL을 사용해 보세요. 문제가 계속되면 소프트웨어 렌더러를 사용하세요.</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Crimson 테마, 골드 앱 아이콘, Pro 프로필, 고급 통계 및 플레이어 카드를 잠금 해제합니다.</string>
     <string name="settings_pro_not_active">비활성</string>

@@ -422,6 +422,8 @@ class AppPreferences(private val context: Context) {
         private val HIDDEN_GAME_MENU_SECTIONS = stringPreferencesKey("hidden_game_menu_sections")
         private val PRO_UNLOCKED = booleanPreferencesKey("pro_unlocked")
         private val WELCOME_DIALOG_SHOWN = booleanPreferencesKey("welcome_dialog_shown")
+        private val MEDIATEK_SETTINGS_NOTICE_SHOWN =
+            booleanPreferencesKey("mediatek_settings_notice_shown")
         private val IN_APP_REVIEW_QUALIFYING_SESSION_COUNT =
             intPreferencesKey("in_app_review_qualifying_session_count")
         private val IN_APP_REVIEW_TOTAL_ACTIVE_PLAY_TIME_MS =
@@ -838,6 +840,10 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> prefs[WELCOME_DIALOG_SHOWN] ?: false }
         .distinctUntilChanged()
 
+    val mediatekSettingsNoticeShown: Flow<Boolean> = context.dataStore.data
+        .map { prefs -> prefs[MEDIATEK_SETTINGS_NOTICE_SHOWN] ?: false }
+        .distinctUntilChanged()
+
     suspend fun setProUnlocked(unlocked: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[PRO_UNLOCKED] = unlocked
@@ -849,6 +855,10 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setWelcomeDialogShown(shown: Boolean) {
         context.dataStore.edit { prefs -> prefs[WELCOME_DIALOG_SHOWN] = shown }
+    }
+
+    suspend fun markMediatekSettingsNoticeShown() {
+        context.dataStore.edit { prefs -> prefs[MEDIATEK_SETTINGS_NOTICE_SHOWN] = true }
     }
 
     suspend fun recordInAppReviewSession(activePlayTimeMs: Long) {
@@ -1110,7 +1120,15 @@ class AppPreferences(private val context: Context) {
     }
 
     suspend fun resetAllSettings() {
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit { prefs ->
+            // Acknowledged compatibility notices are not user settings. Preserve them so a
+            // settings reset does not make a one-time notice appear again.
+            val mediatekNoticeWasShown = prefs[MEDIATEK_SETTINGS_NOTICE_SHOWN] == true
+            prefs.clear()
+            if (mediatekNoticeWasShown) {
+                prefs[MEDIATEK_SETTINGS_NOTICE_SHOWN] = true
+            }
+        }
         localePrefs.edit().remove("language_tag").apply()
     }
 

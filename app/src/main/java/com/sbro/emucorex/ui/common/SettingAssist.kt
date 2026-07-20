@@ -186,6 +186,8 @@ fun AppAlertDialog(
     onDismissRequest: () -> Unit,
     confirmButton: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    showEyebrow: Boolean = true,
+    showIconContainer: Boolean = true,
     dismissButton: (@Composable () -> Unit)? = null,
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
@@ -202,6 +204,8 @@ fun AppAlertDialog(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         eyebrow = stringResource(R.string.app_name),
+        showEyebrow = showEyebrow,
+        showIconContainer = showIconContainer,
         icon = icon ?: {
             Icon(
                 imageVector = Icons.Rounded.Info,
@@ -277,6 +281,8 @@ private fun StyledDialogScaffold(
     icon: @Composable () -> Unit,
     title: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    showEyebrow: Boolean = true,
+    showIconContainer: Boolean = true,
     shape: Shape = RoundedCornerShape(30.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     properties: DialogProperties = DialogProperties(
@@ -384,15 +390,27 @@ private fun StyledDialogScaffold(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Surface(
-                            modifier = Modifier.size(iconTileSize),
-                            shape = RoundedCornerShape(18.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Box(modifier = Modifier.size(iconSize), contentAlignment = Alignment.Center) {
-                                    icon()
+                        if (showIconContainer) {
+                            Surface(
+                                modifier = Modifier.size(iconTileSize),
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier.size(iconSize),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        icon()
+                                    }
                                 }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier.size(iconTileSize),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                icon()
                             }
                         }
                         Spacer(modifier = Modifier.width(14.dp))
@@ -400,12 +418,14 @@ private fun StyledDialogScaffold(
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Text(
-                                text = eyebrow,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            if (showEyebrow) {
+                                Text(
+                                    text = eyebrow,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                             CompositionLocalProvider(
                                 androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface
                             ) {

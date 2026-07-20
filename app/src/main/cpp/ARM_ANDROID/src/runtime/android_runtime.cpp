@@ -34,7 +34,10 @@ namespace emucorex::android
 namespace
 {
 constexpr const char* LOG_TAG = "EmuCoreX";
-std::mutex s_game_metadata_mutex;
+// PCSX2 game metadata probing and VM lifecycle operations share the global CDVD/ISO
+// reader. Keep them mutually exclusive so a library scan cannot close or replace the
+// reader while another thread is detecting a disc or while the VM is starting/stopping.
+std::mutex s_disc_access_mutex;
 
 std::string SettingKey(const std::string& section, const std::string& key)
 {
@@ -495,6 +498,8 @@ bool AndroidRuntime::GetNativeSurface(void** window, int* width, int* height) co
 
 bool AndroidRuntime::StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx)
 {
+	std::lock_guard disc_access_lock(s_disc_access_mutex);
+
 	std::thread finished_thread;
 	{
 		std::lock_guard lock(mutex_);
@@ -594,6 +599,8 @@ void AndroidRuntime::Resume()
 
 void AndroidRuntime::Shutdown()
 {
+	std::lock_guard disc_access_lock(s_disc_access_mutex);
+
 	std::thread thread_to_join;
 	{
 		std::lock_guard lock(mutex_);
@@ -632,6 +639,8 @@ std::string AndroidRuntime::GetGameTitle(const std::string& path) const
 	if (path.empty())
 		return {};
 
+	std::lock_guard disc_access_lock(s_disc_access_mutex);
+
 	std::string data_root;
 	{
 		std::lock_guard lock(mutex_);
@@ -639,8 +648,6 @@ std::string AndroidRuntime::GetGameTitle(const std::string& path) const
 			return BasenameWithoutExtension(path);
 		data_root = paths_.data_root;
 	}
-
-	std::lock_guard metadata_lock(s_game_metadata_mutex);
 
 	if (!data_root.empty())
 	{
@@ -667,6 +674,8 @@ std::string AndroidRuntime::GetGameSerial() const
 
 std::string AndroidRuntime::GetSaveStatePathForFile(const std::string& path, int slot) const
 {
+	std::lock_guard disc_access_lock(s_disc_access_mutex);
+
 	std::string data_root;
 	bool vm_active = false;
 	{
