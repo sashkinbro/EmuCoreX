@@ -1580,6 +1580,9 @@
     <string name="settings_audio_tab">Audio</string>
     <string name="settings_audio_control">Audio control</string>
     <string name="settings_audio_processing">Audio processing</string>
+    <string name="settings_audio_lightweight_spu2">Lightweight SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">Linear interpolation, no Time Stretch, and simplified effects</string>
+    <string name="settings_help_audio_lightweight_spu2">Off by default. Reduces audio CPU usage by using Linear interpolation, disabling Time Stretch, and bypassing SPU2 reverb. Audio may sound flatter or crackle if the game cannot maintain full speed. Your manual processing settings are restored when this mode is turned off.</string>
     <string name="settings_audio_volume">Volume</string>
     <string name="settings_audio_fast_forward_volume">Fast-forward volume</string>
     <string name="settings_audio_mute">Mute all sound</string>

@@ -1363,6 +1363,9 @@
     <string name="settings_audio_tab">ऑडियो</string>
     <string name="settings_audio_control">ऑडियो नियंत्रण</string>
     <string name="settings_audio_processing">ऑडियो प्रोसेसिंग</string>
+    <string name="settings_audio_lightweight_spu2">हल्का SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">रैखिक इंटरपोलेशन, Time Stretch बंद और सरल इफ़ेक्ट</string>
+    <string name="settings_help_audio_lightweight_spu2">डिफ़ॉल्ट रूप से बंद। रैखिक इंटरपोलेशन का उपयोग करके, Time Stretch बंद करके और SPU2 रीवर्ब को बायपास करके ऑडियो CPU उपयोग घटाता है। यदि गेम पूरी गति बनाए नहीं रखता तो आवाज़ कम गहरी या कर्कश हो सकती है। यह मोड बंद करने पर आपकी मैन्युअल प्रोसेसिंग सेटिंग वापस लागू हो जाती हैं।</string>
     <string name="settings_audio_volume">वॉल्यूम</string>
     <string name="settings_audio_fast_forward_volume">फ़ास्ट-फ़ॉरवर्ड वॉल्यूम</string>
     <string name="settings_audio_mute">सभी ध्वनियां म्यूट करें</string>

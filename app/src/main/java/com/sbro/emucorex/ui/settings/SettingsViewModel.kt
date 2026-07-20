@@ -96,6 +96,7 @@ data class SettingsUiState(
     val audioMuted: Boolean = false,
     val audioInterpolation: Int = AudioDefaults.INTERPOLATION_DEFAULT,
     val audioSyncMode: Int = AudioDefaults.SYNC_DEFAULT,
+    val audioLightweightSpu2: Boolean = AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT,
     val audioBackend: Int = AudioDefaults.BACKEND_DEFAULT,
     val audioBufferMs: Int = AudioDefaults.BUFFER_MS_DEFAULT,
     val audioOutputLatencyMs: Int = AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT,
@@ -347,6 +348,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             audioMuted = snapshot.audioMuted,
             audioInterpolation = snapshot.audioInterpolation,
             audioSyncMode = snapshot.audioSyncMode,
+            audioLightweightSpu2 = snapshot.audioLightweightSpu2,
             audioBackend = snapshot.audioBackend,
             audioBufferMs = snapshot.audioBufferMs,
             audioOutputLatencyMs = snapshot.audioOutputLatencyMs,
@@ -880,7 +882,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 "SPU2/Output",
                 "InterpolationMode",
                 "string",
-                AudioDefaults.interpolationCoreName(normalized)
+                AudioDefaults.interpolationCoreName(
+                    AudioDefaults.effectiveInterpolation(normalized, _uiState.value.audioLightweightSpu2)
+                )
             )
         }
     }
@@ -893,7 +897,34 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 "SPU2/Output",
                 "SyncMode",
                 "string",
-                AudioDefaults.syncModeCoreName(normalized)
+                AudioDefaults.syncModeCoreName(
+                    AudioDefaults.effectiveSyncMode(normalized, _uiState.value.audioLightweightSpu2)
+                )
+            )
+        }
+    }
+
+    fun setAudioLightweightSpu2(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setAudioLightweightSpu2(enabled)
+            val state = _uiState.value
+            _uiState.value = state.copy(audioLightweightSpu2 = enabled)
+            EmulatorBridge.setSetting("SPU2/Output", "LightweightMode", "bool", enabled.toString())
+            EmulatorBridge.setSetting(
+                "SPU2/Output",
+                "InterpolationMode",
+                "string",
+                AudioDefaults.interpolationCoreName(
+                    AudioDefaults.effectiveInterpolation(state.audioInterpolation, enabled)
+                )
+            )
+            EmulatorBridge.setSetting(
+                "SPU2/Output",
+                "SyncMode",
+                "string",
+                AudioDefaults.syncModeCoreName(
+                    AudioDefaults.effectiveSyncMode(state.audioSyncMode, enabled)
+                )
             )
         }
     }
@@ -1791,6 +1822,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 audioMuted = _uiState.value.audioMuted,
                 audioInterpolation = _uiState.value.audioInterpolation,
                 audioSyncMode = _uiState.value.audioSyncMode,
+                audioLightweightSpu2 = _uiState.value.audioLightweightSpu2,
                 audioBackend = _uiState.value.audioBackend,
                 audioBufferMs = _uiState.value.audioBufferMs,
                 audioOutputLatencyMs = _uiState.value.audioOutputLatencyMs,

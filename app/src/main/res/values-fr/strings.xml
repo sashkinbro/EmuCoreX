@@ -1365,6 +1365,9 @@
     <string name="settings_audio_tab">Audio</string>
     <string name="settings_audio_control">Contrôle audio</string>
     <string name="settings_audio_processing">Traitement audio</string>
+    <string name="settings_audio_lightweight_spu2">SPU2 allégé</string>
+    <string name="settings_audio_lightweight_spu2_desc">Interpolation linéaire, sans Time Stretch et effets simplifiés</string>
+    <string name="settings_help_audio_lightweight_spu2">Désactivé par défaut. Réduit la charge processeur audio avec une interpolation linéaire, sans Time Stretch et en contournant la réverbération SPU2. Le son peut paraître plus plat ou grésiller si le jeu ne maintient pas sa vitesse maximale. Vos réglages manuels sont restaurés lorsque ce mode est désactivé.</string>
     <string name="settings_audio_volume">Volume</string>
     <string name="settings_audio_fast_forward_volume">Volume en avance rapide</string>
     <string name="settings_audio_mute">Couper tout le son</string>

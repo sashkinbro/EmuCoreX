@@ -1316,6 +1316,7 @@ void Pcsx2Config::SPU2Options::LoadSave(SettingsWrapper& wrap)
 		SettingsWrapEntry(StandardVolume);
 		SettingsWrapEntry(FastForwardVolume);
 		SettingsWrapEntry(OutputMuted);
+		SettingsWrapEntry(LightweightMode);
 		SettingsWrapParsedEnum(Backend, "Backend", &AudioStream::ParseBackendName, &AudioStream::GetBackendName);
 		SettingsWrapParsedEnum(InterpolationMode, "InterpolationMode", &ParseInterpolationMode, &GetInterpolationModeName);
 		SettingsWrapParsedEnum(SyncMode, "SyncMode", &ParseSyncMode, &GetSyncModeName);
@@ -1336,6 +1337,7 @@ bool Pcsx2Config::SPU2Options::operator==(const SPU2Options& right) const
 		   OpEqu(StandardVolume) &&
 		   OpEqu(FastForwardVolume) &&
 		   OpEqu(OutputMuted) &&
+		   OpEqu(LightweightMode) &&
 		   OpEqu(Backend) &&
 		   OpEqu(InterpolationMode) &&
 		   OpEqu(SyncMode) &&

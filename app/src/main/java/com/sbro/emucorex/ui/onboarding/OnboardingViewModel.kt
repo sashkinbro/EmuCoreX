@@ -131,6 +131,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 audioMuted = audioSettings.audioMuted,
                 audioInterpolation = audioSettings.audioInterpolation,
                 audioSyncMode = audioSettings.audioSyncMode,
+                audioLightweightSpu2 = audioSettings.audioLightweightSpu2,
                 audioBackend = audioSettings.audioBackend,
                 audioBufferMs = audioSettings.audioBufferMs,
                 audioOutputLatencyMs = audioSettings.audioOutputLatencyMs,

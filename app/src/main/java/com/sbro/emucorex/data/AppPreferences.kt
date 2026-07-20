@@ -83,6 +83,7 @@ data class SettingsSnapshot(
     val audioMuted: Boolean = false,
     val audioInterpolation: Int = AudioDefaults.INTERPOLATION_DEFAULT,
     val audioSyncMode: Int = AudioDefaults.SYNC_DEFAULT,
+    val audioLightweightSpu2: Boolean = AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT,
     val audioBackend: Int = AudioDefaults.BACKEND_DEFAULT,
     val audioBufferMs: Int = AudioDefaults.BUFFER_MS_DEFAULT,
     val audioOutputLatencyMs: Int = AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT,
@@ -447,6 +448,7 @@ class AppPreferences(private val context: Context) {
         private val AUDIO_MUTED = booleanPreferencesKey("audio_muted")
         private val AUDIO_INTERPOLATION = intPreferencesKey("audio_interpolation")
         private val AUDIO_SYNC_MODE = intPreferencesKey("audio_sync_mode")
+        private val AUDIO_LIGHTWEIGHT_SPU2 = booleanPreferencesKey("audio_lightweight_spu2")
         private val AUDIO_BACKEND = intPreferencesKey("audio_backend")
         private val AUDIO_BUFFER_MS = intPreferencesKey("audio_buffer_ms")
         private val AUDIO_OUTPUT_LATENCY_MS = intPreferencesKey("audio_output_latency_ms")
@@ -995,6 +997,14 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[AUDIO_SYNC_MODE] = AudioDefaults.coerceSyncMode(value) }
     }
 
+    val audioLightweightSpu2: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[AUDIO_LIGHTWEIGHT_SPU2] ?: AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT
+    }
+
+    suspend fun setAudioLightweightSpu2(enabled: Boolean) {
+        context.dataStore.edit { it[AUDIO_LIGHTWEIGHT_SPU2] = enabled }
+    }
+
     val audioBackend: Flow<Int> = context.dataStore.data.map { prefs ->
         AudioDefaults.coerceBackend(prefs[AUDIO_BACKEND] ?: AudioDefaults.BACKEND_DEFAULT)
     }
@@ -1340,6 +1350,8 @@ class AppPreferences(private val context: Context) {
                 audioSyncMode = AudioDefaults.coerceSyncMode(
                     prefs[AUDIO_SYNC_MODE] ?: AudioDefaults.SYNC_DEFAULT
                 ),
+                audioLightweightSpu2 = prefs[AUDIO_LIGHTWEIGHT_SPU2]
+                    ?: AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT,
                 audioBackend = AudioDefaults.coerceBackend(
                     prefs[AUDIO_BACKEND] ?: AudioDefaults.BACKEND_DEFAULT
                 ),
@@ -3117,6 +3129,7 @@ class AppPreferences(private val context: Context) {
             put("audioMuted", prefs[AUDIO_MUTED] ?: false)
             put("audioInterpolation", AudioDefaults.coerceInterpolation(prefs[AUDIO_INTERPOLATION] ?: AudioDefaults.INTERPOLATION_DEFAULT))
             put("audioSyncMode", AudioDefaults.coerceSyncMode(prefs[AUDIO_SYNC_MODE] ?: AudioDefaults.SYNC_DEFAULT))
+            put("audioLightweightSpu2", prefs[AUDIO_LIGHTWEIGHT_SPU2] ?: AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT)
             put("audioBackend", AudioDefaults.coerceBackend(prefs[AUDIO_BACKEND] ?: AudioDefaults.BACKEND_DEFAULT))
             put("audioBufferMs", AudioDefaults.coerceBufferMs(prefs[AUDIO_BUFFER_MS] ?: AudioDefaults.BUFFER_MS_DEFAULT))
             put("audioOutputLatencyMs", AudioDefaults.coerceOutputLatencyMs(prefs[AUDIO_OUTPUT_LATENCY_MS] ?: AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT))
@@ -3399,6 +3412,10 @@ class AppPreferences(private val context: Context) {
             )
             prefs[AUDIO_SYNC_MODE] = AudioDefaults.coerceSyncMode(
                 json.optInt("audioSyncMode", AudioDefaults.SYNC_DEFAULT)
+            )
+            prefs[AUDIO_LIGHTWEIGHT_SPU2] = json.optBoolean(
+                "audioLightweightSpu2",
+                AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT
             )
             prefs[AUDIO_BACKEND] = AudioDefaults.coerceBackend(
                 json.optInt("audioBackend", AudioDefaults.BACKEND_DEFAULT)

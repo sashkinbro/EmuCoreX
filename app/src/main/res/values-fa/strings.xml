@@ -1449,6 +1449,9 @@
     <string name="settings_audio_tab">صدا</string>
     <string name="settings_audio_control">کنترل صدا</string>
     <string name="settings_audio_processing">پردازش صدا</string>
+    <string name="settings_audio_lightweight_spu2">SPU2 سبک</string>
+    <string name="settings_audio_lightweight_spu2_desc">درون‌یابی خطی، بدون Time Stretch و جلوه‌های ساده‌شده</string>
+    <string name="settings_help_audio_lightweight_spu2">به‌طور پیش‌فرض خاموش است. با استفاده از درون‌یابی خطی، غیرفعال کردن Time Stretch و عبور از بازآوایی SPU2، مصرف پردازندهٔ صدا را کاهش می‌دهد. اگر بازی سرعت کامل را حفظ نکند، ممکن است صدا تخت‌تر یا همراه با خش شنیده شود. با خاموش کردن این حالت، تنظیمات دستی پردازش بازیابی می‌شوند.</string>
     <string name="settings_audio_volume">حجم صدا</string>
     <string name="settings_audio_fast_forward_volume">حجم صدای Fast-forward</string>
     <string name="settings_audio_mute">بی‌صدا کردن همه</string>

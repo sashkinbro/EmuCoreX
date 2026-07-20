@@ -11,6 +11,7 @@ class AudioDefaultsTest {
         assertEquals(50, AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT)
         assertEquals(AudioDefaults.INTERPOLATION_GAUSSIAN, AudioDefaults.INTERPOLATION_DEFAULT)
         assertEquals(AudioDefaults.SYNC_TIME_STRETCH, AudioDefaults.SYNC_DEFAULT)
+        assertEquals(false, AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT)
         assertEquals(AudioDefaults.BACKEND_AAUDIO, AudioDefaults.BACKEND_DEFAULT)
     }
 
@@ -35,5 +36,25 @@ class AudioDefaultsTest {
         assertEquals(AudioDefaults.BACKEND_DEFAULT, AudioDefaults.coerceBackend(99))
         assertEquals(10, AudioDefaults.coerceBufferMs(0))
         assertEquals(500, AudioDefaults.coerceOutputLatencyMs(999))
+    }
+
+    @Test
+    fun lightweightSpu2OverridesProcessingWithoutReplacingManualValues() {
+        assertEquals(
+            AudioDefaults.INTERPOLATION_LINEAR,
+            AudioDefaults.effectiveInterpolation(AudioDefaults.INTERPOLATION_CUBIC, true)
+        )
+        assertEquals(
+            AudioDefaults.SYNC_DISABLED,
+            AudioDefaults.effectiveSyncMode(AudioDefaults.SYNC_TIME_STRETCH, true)
+        )
+        assertEquals(
+            AudioDefaults.INTERPOLATION_CUBIC,
+            AudioDefaults.effectiveInterpolation(AudioDefaults.INTERPOLATION_CUBIC, false)
+        )
+        assertEquals(
+            AudioDefaults.SYNC_TIME_STRETCH,
+            AudioDefaults.effectiveSyncMode(AudioDefaults.SYNC_TIME_STRETCH, false)
+        )
     }
 }

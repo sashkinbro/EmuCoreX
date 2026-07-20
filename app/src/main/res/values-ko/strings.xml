@@ -1363,6 +1363,9 @@
     <string name="settings_audio_tab">오디오</string>
     <string name="settings_audio_control">오디오 제어</string>
     <string name="settings_audio_processing">오디오 처리</string>
+    <string name="settings_audio_lightweight_spu2">경량 SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">선형 보간, Time Stretch 끄기 및 간소화된 효과</string>
+    <string name="settings_help_audio_lightweight_spu2">기본적으로 꺼져 있습니다. 선형 보간을 사용하고 Time Stretch를 비활성화하며 SPU2 리버브를 우회해 오디오 CPU 사용량을 줄입니다. 게임이 최대 속도를 유지하지 못하면 소리가 밋밋하거나 끊길 수 있습니다. 이 모드를 끄면 수동 처리 설정이 복원됩니다.</string>
     <string name="settings_audio_volume">음량</string>
     <string name="settings_audio_fast_forward_volume">빨리 감기 음량</string>
     <string name="settings_audio_mute">모든 소리 음소거</string>

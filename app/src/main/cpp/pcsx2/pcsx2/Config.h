@@ -1022,6 +1022,7 @@ struct Pcsx2Config
 		u32 StandardVolume = 100;
 		u32 FastForwardVolume = 100;
 		bool OutputMuted = false;
+		bool LightweightMode = false;
 
 		AudioBackend Backend = DEFAULT_BACKEND;
 		SPU2InterpolationMode InterpolationMode = DEFAULT_INTERPOLATION_MODE;

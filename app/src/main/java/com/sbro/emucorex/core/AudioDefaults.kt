@@ -16,6 +16,8 @@ object AudioDefaults {
     const val SYNC_TIME_STRETCH = 1
     const val SYNC_DEFAULT = SYNC_TIME_STRETCH
 
+    const val LIGHTWEIGHT_SPU2_DEFAULT = false
+
     // Audio backend selection (Android-specific)
     // BACKEND_AAUDIO  → maps to AudioBackend::SDL in core (android_aaudio_stream.cpp)
     // BACKEND_OPENSLES → maps to AudioBackend::OpenSLES (android_opensles_stream.cpp)
@@ -60,6 +62,12 @@ object AudioDefaults {
         SYNC_DISABLED -> "Disabled"
         else -> "TimeStretch"
     }
+
+    fun effectiveInterpolation(value: Int, lightweightSpu2: Boolean): Int =
+        if (lightweightSpu2) INTERPOLATION_LINEAR else coerceInterpolation(value)
+
+    fun effectiveSyncMode(value: Int, lightweightSpu2: Boolean): Int =
+        if (lightweightSpu2) SYNC_DISABLED else coerceSyncMode(value)
 
     fun coerceBackend(value: Int): Int = when (value) {
         BACKEND_AAUDIO, BACKEND_OPENSLES -> value

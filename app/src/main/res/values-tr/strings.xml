@@ -1363,6 +1363,9 @@
     <string name="settings_audio_tab">Ses</string>
     <string name="settings_audio_control">Ses kontrolü</string>
     <string name="settings_audio_processing">Ses işleme</string>
+    <string name="settings_audio_lightweight_spu2">Hafif SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">Doğrusal interpolasyon, Time Stretch kapalı ve basitleştirilmiş efektler</string>
+    <string name="settings_help_audio_lightweight_spu2">Varsayılan olarak kapalıdır. Doğrusal interpolasyon kullanarak, Time Stretch özelliğini kapatarak ve SPU2 yankısını atlayarak sesin CPU kullanımını azaltır. Oyun tam hızı koruyamazsa ses daha düz gelebilir veya çatırdayabilir. Bu mod kapatıldığında elle seçtiğiniz işleme ayarları geri yüklenir.</string>
     <string name="settings_audio_volume">Ses Seviyesi</string>
     <string name="settings_audio_fast_forward_volume">Hızlı ileri sarma sesi</string>
     <string name="settings_audio_mute">Tüm sesleri kapat</string>
