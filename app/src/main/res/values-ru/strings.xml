@@ -1309,6 +1309,8 @@
     <string name="settings_help_mediatek_angle_opengl">Маршрутизирует рендерер MediaTek OpenGL через встроенные библиотеки ANGLE. Из-за накладных расходов на трансляцию это может как увеличить, так и уменьшить производительность в зависимости от игры. Доступно только для Mali и PowerVR и по умолчанию отключено.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE для OpenGL</string>
     <string name="settings_mediatek_angle_opengl_desc">Использовать встроенные библиотеки ANGLE для пути MediaTek OpenGL.</string>
+    <string name="settings_mediatek_notice_title">Совместимость с MediaTek</string>
+    <string name="settings_mediatek_notice_message">Поддержка MediaTek пока экспериментальная. Возможны вылеты, графические артефакты и нестабильная работа, пока мы продолжаем улучшать совместимость и производительность.\n\nПри проблемах с графикой попробуйте OpenGL с включённым ANGLE. Если проблемы сохраняются, используйте программный рендерер Software.</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Разблокируйте тему Crimson, золотую иконку приложения, Pro-профили, расширенную статистику и карточки игрока.</string>
     <string name="settings_pro_not_active">Неактивно</string>

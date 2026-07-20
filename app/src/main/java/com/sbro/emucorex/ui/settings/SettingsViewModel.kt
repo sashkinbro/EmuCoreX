@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 
 data class SettingsUiState(
     val isLoaded: Boolean = false,
+    val showMediatekCompatibilityNotice: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val appFontChoice: AppFontChoice = AppFontChoice.SYSTEM,
     val appFontScale: Float = AppPreferences.DEFAULT_APP_FONT_SCALE,
@@ -279,6 +280,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    private var mediatekCompatibilityNoticeChecked = false
 
     init {
         refreshInstalledGpuDrivers()
@@ -501,6 +503,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             ntscFramerate = snapshot.ntscFramerate,
             palFramerate = snapshot.palFramerate
         )
+    }
+
+    fun checkMediatekCompatibilityNotice() {
+        if (mediatekCompatibilityNoticeChecked) return
+        mediatekCompatibilityNoticeChecked = true
+        if (!GpuHardwareProfiles.isMediaTekHardware()) return
+
+        viewModelScope.launch {
+            if (!preferences.mediatekSettingsNoticeShown.first()) {
+                _uiState.value = _uiState.value.copy(showMediatekCompatibilityNotice = true)
+            }
+        }
+    }
+
+    fun dismissMediatekCompatibilityNotice() {
+        _uiState.value = _uiState.value.copy(showMediatekCompatibilityNotice = false)
+        viewModelScope.launch {
+            preferences.markMediatekSettingsNoticeShown()
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { preferences.setThemeMode(mode) } }

@@ -87,6 +87,7 @@ import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material.icons.rounded.WarningAmber
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -283,6 +284,10 @@ fun SettingsScreen(
             CircularProgressIndicator()
         }
         return
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.checkMediatekCompatibilityNotice()
     }
 
     val biosPicker = rememberLauncherForActivityResult(
@@ -568,6 +573,30 @@ fun SettingsScreen(
                     cheatEditorGameKey.value = null
                     cheatEditorFileName.value = null
                     cheatEditorText.value = ""
+                }
+            }
+        )
+    }
+
+    if (uiState.showMediatekCompatibilityNotice) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissMediatekCompatibilityNotice,
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.WarningAmber,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+            },
+            title = {
+                Text(stringResource(R.string.settings_mediatek_notice_title))
+            },
+            text = {
+                Text(stringResource(R.string.settings_mediatek_notice_message))
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissMediatekCompatibilityNotice) {
+                    Text(stringResource(android.R.string.ok))
                 }
             }
         )

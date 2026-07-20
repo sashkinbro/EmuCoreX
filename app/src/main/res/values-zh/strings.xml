@@ -1309,6 +1309,8 @@
     <string name="settings_help_mediatek_angle_opengl">通过捆绑的 ANGLE 库路由 MediaTek OpenGL 渲染器。由于转换开销，根据游戏的不同，这可能会提高或降低性能。适用于 Mali 和 PowerVR 配置文件，默认关闭。</string>
     <string name="settings_mediatek_angle_opengl">适用于 OpenGL 的 ANGLE</string>
     <string name="settings_mediatek_angle_opengl_desc">对 MediaTek OpenGL 路径使用捆绑的 ANGLE 库。</string>
+    <string name="settings_mediatek_notice_title">MediaTek 兼容性</string>
+    <string name="settings_mediatek_notice_message">MediaTek 支持目前仍处于实验阶段。在我们继续改进兼容性和性能期间，可能会出现崩溃、图形异常和运行不稳定。\n\n如果遇到图形问题，请尝试启用 ANGLE 的 OpenGL。若问题仍然存在，请使用软件渲染器。</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">解锁 Crimson 主题、金色应用图标、Pro 个人资料、高级统计和玩家卡片。</string>
     <string name="settings_pro_not_active">未激活</string>

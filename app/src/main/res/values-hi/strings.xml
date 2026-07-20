@@ -1307,6 +1307,8 @@
     <string name="settings_help_mediatek_angle_opengl">MediaTek OpenGL रेंडरर को बंडल की गई ANGLE लाइब्रेरी के माध्यम से रूट करता है। अनुवाद ओवरहेड के कारण, यह गेम के आधार पर प्रदर्शन को बढ़ा या घटा सकता है। Mali और PowerVR प्रोफाइल के लिए उपलब्ध है और डिफ़ॉल्ट रूप से बंद रहता है।</string>
     <string name="settings_mediatek_angle_opengl">OpenGL के लिए ANGLE</string>
     <string name="settings_mediatek_angle_opengl_desc">MediaTek OpenGL पथ के लिए बंडल की गई ANGLE लाइब्रेरी का उपयोग करें।</string>
+    <string name="settings_mediatek_notice_title">MediaTek संगतता</string>
+    <string name="settings_mediatek_notice_message">MediaTek समर्थन अभी प्रयोगात्मक है। संगतता और प्रदर्शन में सुधार के दौरान क्रैश, ग्राफ़िक्स आर्टिफ़ैक्ट और अस्थिर व्यवहार हो सकते हैं।\n\nग्राफ़िक्स समस्या होने पर ANGLE चालू करके OpenGL आज़माएँ। समस्या बनी रहे तो सॉफ़्टवेयर रेंडरर का उपयोग करें।</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Crimson, गोल्ड ऐप आइकन, Pro प्रोफ़ाइल, उन्नत आँकड़े और प्लेयर कार्ड अनलॉक करें।</string>
     <string name="settings_pro_not_active">सक्रिय नहीं</string>

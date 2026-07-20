@@ -68,7 +68,6 @@ import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SportsEsports
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewCarousel
@@ -647,11 +646,16 @@ private fun WelcomeProDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        showEyebrow = false,
+        showIconContainer = false,
         icon = {
-            Icon(
-                imageVector = Icons.Rounded.Star,
+            Image(
+                painter = painterResource(
+                    if (isProUnlocked) R.drawable.ic_drawer_app_pro else R.drawable.ic_drawer_app
+                ),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
             )
         },
         title = { Text(text = stringResource(R.string.welcome_title)) },

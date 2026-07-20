@@ -1307,6 +1307,8 @@
     <string name="settings_help_mediatek_angle_opengl">MediaTek OpenGL oluşturucusunu paketlenmiş ANGLE kitaplıkları üzerinden yönlendirir. Çeviri ek yükü nedeniyle, oyuna bağlı olarak performansı artırabilir veya azaltabilir. Mali ve PowerVR profilleri için mevcuttur ve varsayılan olarak kapalıdır.</string>
     <string name="settings_mediatek_angle_opengl">OpenGL için ANGLE</string>
     <string name="settings_mediatek_angle_opengl_desc">MediaTek OpenGL yolu için paketlenmiş ANGLE kitaplıklarını kullanın.</string>
+    <string name="settings_mediatek_notice_title">MediaTek uyumluluğu</string>
+    <string name="settings_mediatek_notice_message">MediaTek desteği hâlâ deneyseldir. Uyumluluğu ve performansı geliştirmeye devam ederken çökmeler, grafik bozulmaları ve kararsız çalışma görülebilir.\n\nGrafik sorunları yaşarsanız ANGLE etkinleştirilmiş OpenGL’yi deneyin. Sorunlar devam ederse Yazılım işleyicisini kullanın.</string>
     <string name="settings_pro_tab">Pro</string>
     <string name="settings_pro_desc">Crimson temasını, altın uygulama simgesini, Pro profilleri, gelişmiş istatistikleri ve Oyuncu Kartlarını açın.</string>
     <string name="settings_pro_not_active">Aktif değil</string>
