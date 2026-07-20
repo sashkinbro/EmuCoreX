@@ -70,6 +70,7 @@ internal fun buildPerformanceOverlayLayout(
             line.startsWith("SW-") -> PerformanceOverlayMetrics.SOFTWARE_THREADS
             line.startsWith("CPU:") -> PerformanceOverlayMetrics.HOST_CPU
             line.startsWith("GPU:") -> PerformanceOverlayMetrics.HOST_GPU
+            line.startsWith("Audio:") -> PerformanceOverlayMetrics.AUDIO
             else -> 0
         }
         if (metric != 0 && !PerformanceOverlayMetrics.isEnabled(metricsMask, metric)) return null
@@ -96,6 +97,7 @@ internal fun buildPerformanceOverlayLayout(
     val hardwareLines = filtered.filter { line ->
         line.startsWith("CPU:") || line.startsWith("GPU:")
     }
+    val audioLines = filtered.filter { line -> line.startsWith("Audio:") }
     val softwareThreadLines = filtered.filter { line -> line.startsWith("SW-") }
     val rendererLine = filtered.firstOrNull(::isRendererLine)
     val vramLine = filtered.firstOrNull { it.startsWith("VRAM:") }
@@ -109,7 +111,7 @@ internal fun buildPerformanceOverlayLayout(
             line.startsWith("Frame:") || line.startsWith("GS Queue:") || line.startsWith("Res:")
         })
     }
-    val knownLines = (topLines + processorLines + hardwareLines + softwareThreadLines + bottomLines).toSet()
+    val knownLines = (topLines + processorLines + hardwareLines + audioLines + softwareThreadLines + bottomLines).toSet()
     val unknownLines = filtered.filterNot { line ->
         line in knownLines || line == rendererLine || line == vramLine
     }
@@ -117,7 +119,7 @@ internal fun buildPerformanceOverlayLayout(
     return PerformanceOverlayLayout(
         mainLines = (
             listOf(fixedHeaderLine).filter(String::isNotBlank) +
-                topLines + processorLines + hardwareLines + softwareThreadLines + unknownLines
+                topLines + processorLines + hardwareLines + softwareThreadLines + audioLines + unknownLines
             ).map(::compactPerformanceOverlayLine),
         bottomLines = bottomLines.map(::compactPerformanceOverlayLine)
     )

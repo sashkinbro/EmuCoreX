@@ -73,6 +73,7 @@ import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
+import com.sbro.emucorex.ui.common.CompactAppAlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -288,6 +289,7 @@ private fun fpsOverlayMetricLiveOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.SPEED to stringResource(R.string.settings_fps_metric_speed),
     PerformanceOverlayMetrics.TARGET to stringResource(R.string.settings_fps_metric_target),
     PerformanceOverlayMetrics.RENDERER to stringResource(R.string.settings_fps_metric_renderer),
+    PerformanceOverlayMetrics.AUDIO to stringResource(R.string.settings_fps_metric_audio),
     PerformanceOverlayMetrics.VRAM to stringResource(R.string.settings_fps_metric_vram),
     PerformanceOverlayMetrics.FRAME_TIME to stringResource(R.string.settings_fps_metric_frame_time),
     PerformanceOverlayMetrics.QUEUE to stringResource(R.string.settings_fps_metric_queue),
@@ -1359,7 +1361,7 @@ fun EmulationScreen(
     }
 
     if (showExitDialog) {
-        AlertDialog(
+        CompactAppAlertDialog(
             onDismissRequest = dismissExitClick,
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(24.dp),
@@ -5500,7 +5502,7 @@ private fun buildPerformanceAnnotatedText(text: String, speedPercent: Float): An
             listOf(
                 "EmuCoreX", "FPS:", "VPS:", "Speed:", "Target:",
                 "Frame:", "GS Queue:", "Res:", "CPU:", "GPU:",
-                "EE:", "GS:", "VU:", "SW-", "VRAM:"
+                "Audio:", "EE:", "GS:", "VU:", "SW-", "VRAM:"
             ),
             SpanStyle(color = Color(0xFF9DD7FF))
         )

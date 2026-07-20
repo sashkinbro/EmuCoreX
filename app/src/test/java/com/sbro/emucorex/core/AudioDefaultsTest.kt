@@ -11,6 +11,7 @@ class AudioDefaultsTest {
         assertEquals(50, AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT)
         assertEquals(AudioDefaults.INTERPOLATION_GAUSSIAN, AudioDefaults.INTERPOLATION_DEFAULT)
         assertEquals(AudioDefaults.SYNC_TIME_STRETCH, AudioDefaults.SYNC_DEFAULT)
+        assertEquals(AudioDefaults.BACKEND_AAUDIO, AudioDefaults.BACKEND_DEFAULT)
     }
 
     @Test
@@ -21,6 +22,8 @@ class AudioDefaultsTest {
         assertEquals("Cubic", AudioDefaults.interpolationCoreName(AudioDefaults.INTERPOLATION_CUBIC))
         assertEquals("Disabled", AudioDefaults.syncModeCoreName(AudioDefaults.SYNC_DISABLED))
         assertEquals("TimeStretch", AudioDefaults.syncModeCoreName(AudioDefaults.SYNC_TIME_STRETCH))
+        assertEquals("SDL", AudioDefaults.backendCoreName(AudioDefaults.BACKEND_AAUDIO))
+        assertEquals("OpenSLES", AudioDefaults.backendCoreName(AudioDefaults.BACKEND_OPENSLES))
     }
 
     @Test
@@ -29,6 +32,7 @@ class AudioDefaultsTest {
         assertEquals(100, AudioDefaults.coerceVolume(150))
         assertEquals(AudioDefaults.INTERPOLATION_DEFAULT, AudioDefaults.coerceInterpolation(99))
         assertEquals(AudioDefaults.SYNC_DEFAULT, AudioDefaults.coerceSyncMode(99))
+        assertEquals(AudioDefaults.BACKEND_DEFAULT, AudioDefaults.coerceBackend(99))
         assertEquals(10, AudioDefaults.coerceBufferMs(0))
         assertEquals(500, AudioDefaults.coerceOutputLatencyMs(999))
     }

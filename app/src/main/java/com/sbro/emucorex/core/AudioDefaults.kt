@@ -16,6 +16,13 @@ object AudioDefaults {
     const val SYNC_TIME_STRETCH = 1
     const val SYNC_DEFAULT = SYNC_TIME_STRETCH
 
+    // Audio backend selection (Android-specific)
+    // BACKEND_AAUDIO  → maps to AudioBackend::SDL in core (android_aaudio_stream.cpp)
+    // BACKEND_OPENSLES → maps to AudioBackend::OpenSLES (android_opensles_stream.cpp)
+    const val BACKEND_AAUDIO = 0
+    const val BACKEND_OPENSLES = 1
+    const val BACKEND_DEFAULT = BACKEND_AAUDIO
+
     const val BUFFER_MS_DEFAULT = 100
     const val BUFFER_MS_MIN = 10
     const val BUFFER_MS_MAX = 500
@@ -52,6 +59,17 @@ object AudioDefaults {
     fun syncModeCoreName(value: Int): String = when (coerceSyncMode(value)) {
         SYNC_DISABLED -> "Disabled"
         else -> "TimeStretch"
+    }
+
+    fun coerceBackend(value: Int): Int = when (value) {
+        BACKEND_AAUDIO, BACKEND_OPENSLES -> value
+        else -> BACKEND_DEFAULT
+    }
+
+    /** Returns the core AudioBackend enum string name for the given frontend backend index. */
+    fun backendCoreName(value: Int): String = when (coerceBackend(value)) {
+        BACKEND_OPENSLES -> "OpenSLES"
+        else -> "SDL" // SDL on Android = AAudio via android_aaudio_stream.cpp
     }
 
     fun coerceBufferMs(value: Int): Int = value.coerceIn(BUFFER_MS_MIN, BUFFER_MS_MAX)

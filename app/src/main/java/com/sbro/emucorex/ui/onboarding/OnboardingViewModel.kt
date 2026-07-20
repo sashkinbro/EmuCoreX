@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
+import com.sbro.emucorex.core.AppAnalytics
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorDataLocation
 import com.sbro.emucorex.core.EmulatorStorage
@@ -130,6 +131,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                 audioMuted = audioSettings.audioMuted,
                 audioInterpolation = audioSettings.audioInterpolation,
                 audioSyncMode = audioSettings.audioSyncMode,
+                audioBackend = audioSettings.audioBackend,
                 audioBufferMs = audioSettings.audioBufferMs,
                 audioOutputLatencyMs = audioSettings.audioOutputLatencyMs,
                 audioMinimalOutputLatency = audioSettings.audioMinimalOutputLatency,
@@ -203,6 +205,7 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         if (!_uiState.value.canContinue) return
         viewModelScope.launch {
             preferences.setOnboardingCompleted(true)
+            AppAnalytics.logOnboardingCompleted(_uiState.value.performanceProfile)
             onFinished()
         }
     }

@@ -96,6 +96,7 @@ data class SettingsUiState(
     val audioMuted: Boolean = false,
     val audioInterpolation: Int = AudioDefaults.INTERPOLATION_DEFAULT,
     val audioSyncMode: Int = AudioDefaults.SYNC_DEFAULT,
+    val audioBackend: Int = AudioDefaults.BACKEND_DEFAULT,
     val audioBufferMs: Int = AudioDefaults.BUFFER_MS_DEFAULT,
     val audioOutputLatencyMs: Int = AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT,
     val audioMinimalOutputLatency: Boolean = AudioDefaults.MINIMAL_OUTPUT_LATENCY_DEFAULT,
@@ -346,6 +347,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             audioMuted = snapshot.audioMuted,
             audioInterpolation = snapshot.audioInterpolation,
             audioSyncMode = snapshot.audioSyncMode,
+            audioBackend = snapshot.audioBackend,
             audioBufferMs = snapshot.audioBufferMs,
             audioOutputLatencyMs = snapshot.audioOutputLatencyMs,
             audioMinimalOutputLatency = snapshot.audioMinimalOutputLatency,
@@ -893,6 +895,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 "string",
                 AudioDefaults.syncModeCoreName(normalized)
             )
+        }
+    }
+
+    fun setAudioBackend(value: Int) {
+        viewModelScope.launch {
+            val normalized = AudioDefaults.coerceBackend(value)
+            preferences.setAudioBackend(normalized)
+            _uiState.value = _uiState.value.copy(audioBackend = normalized)
+            // A backend change is applied the next time the game starts.
         }
     }
 
@@ -1780,6 +1791,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 audioMuted = _uiState.value.audioMuted,
                 audioInterpolation = _uiState.value.audioInterpolation,
                 audioSyncMode = _uiState.value.audioSyncMode,
+                audioBackend = _uiState.value.audioBackend,
                 audioBufferMs = _uiState.value.audioBufferMs,
                 audioOutputLatencyMs = _uiState.value.audioOutputLatencyMs,
                 audioMinimalOutputLatency = _uiState.value.audioMinimalOutputLatency,

@@ -119,6 +119,11 @@ std::unique_ptr<AudioStream> AudioStream::CreateStream(AudioBackend backend, u32
 		case AudioBackend::SDL:
 			return CreateSDLAudioStream(sample_rate, parameters, stretch_enabled, error);
 
+#ifdef __ANDROID__
+		case AudioBackend::OpenSLES:
+			return CreateOpenSLESAudioStream(sample_rate, parameters, stretch_enabled, error);
+#endif
+
 		case AudioBackend::Null:
 			return CreateNullStream(sample_rate, parameters.buffer_ms);
 
@@ -149,11 +154,19 @@ static constexpr const std::array s_backend_names = {
 	"Null",
 	"Cubeb",
 	"SDL",
+#ifdef __ANDROID__
+	"OpenSLES",
+#endif
 };
 static constexpr const std::array s_backend_display_names = {
 	TRANSLATE_NOOP("AudioStream", "Null (No Output)"),
 	TRANSLATE_NOOP("AudioStream", "Cubeb"),
+#ifdef __ANDROID__
+	TRANSLATE_NOOP("AudioStream", "AAudio"),
+	TRANSLATE_NOOP("AudioStream", "OpenSL ES (Compatible)"),
+#else
 	TRANSLATE_NOOP("AudioStream", "SDL"),
+#endif
 };
 
 std::optional<AudioBackend> AudioStream::ParseBackendName(const char* str)

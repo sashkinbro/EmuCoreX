@@ -1687,6 +1687,7 @@
     <string name="settings_fps_metric_speed">速度</string>
     <string name="settings_fps_metric_target">目标</string>
     <string name="settings_fps_metric_renderer">渲染器</string>
+    <string name="settings_fps_metric_audio">音频</string>
     <string name="settings_fps_metric_vram">VRAM</string>
     <string name="settings_fps_metric_frame_time">帧时间</string>
     <string name="settings_fps_metric_queue">GS 队列</string>
@@ -1797,4 +1798,17 @@
     <string name="settings_dithering_scaled">随分辨率缩放</string>
     <string name="settings_dithering_unscaled">不缩放（默认）</string>
     <string name="settings_dithering_force_32bit">强制 32 位</string>
+    <string name="settings_audio_backend">音频后端</string>
+    <string name="settings_audio_backend_aaudio">AAudio (推荐)</string>
+    <string name="settings_audio_backend_opensles">OpenSL ES (兼容)</string>
+    <string name="settings_help_audio_backend">AAudio 提供低延迟，但在较慢或高负载的设备上声音可能会出现卡顿。OpenSL ES 使用更简单的缓冲队列，在性能较弱的硬件上更稳定，代价是延迟略高。更改此设置需要重新启动游戏。</string>
+    <string name="settings_gpu_driver_detected_device">检测到：%1$s · %2$s</string>
+    <string name="settings_gpu_driver_device_hint">兼容的驱动会优先显示。点按驱动卡片可查看支持的 Snapdragon 芯片。</string>
+    <string name="settings_gpu_driver_compatibility">Snapdragon 兼容性</string>
+    <string name="settings_gpu_driver_best_match">最佳匹配</string>
+    <string name="settings_gpu_driver_compatible">兼容</string>
+    <string name="settings_gpu_driver_other_family">其他 Adreno 系列</string>
+    <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx：Snapdragon 845/855/865/888 及众多 Snapdragon 6/7 系列型号</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx：Snapdragon 8 Gen 1/2/3、8s Gen 3、较新的 Snapdragon 7 系列和 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx：Snapdragon 8 Elite Gen 5、8 Gen 5、8 Elite、8s Gen 4 和 6 Gen 4</string>
 </resources>
