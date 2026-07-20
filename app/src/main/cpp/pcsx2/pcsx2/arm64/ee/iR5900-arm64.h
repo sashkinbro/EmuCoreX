@@ -66,10 +66,6 @@ extern bool g_cpuFlushedPC, g_cpuFlushedCode;
 u8* recBeginThunk();
 u8* recEndThunk();
 
-// Used while migrating one EE opcode body at a time to Oaknut.
-u8* recBeginOaknutEmit();
-void recEndOaknutEmit();
-
 // used when processing branches
 bool TrySwapDelaySlot(u32 rs, u32 rt, u32 rd, bool allow_loadstore);
 void SaveBranchState();

@@ -16,8 +16,6 @@ using namespace x86Emitter;
 
 extern int g_psxWriteOk;
 extern u32 g_psxMaxRecMem;
-extern u8* recBeginOaknutEmit();
-extern void recEndOaknutEmit();
 
 static constexpr int IOP_HOST_W0 = 0;
 static constexpr int IOP_HOST_W1 = 1;

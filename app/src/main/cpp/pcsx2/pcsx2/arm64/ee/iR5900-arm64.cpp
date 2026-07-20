@@ -793,22 +793,6 @@ u8* recEndThunk()
 	return block_end;
 }
 
-u8* recBeginOaknutEmit()
-{
-	pxAssert(oakHasBlock());
-
-	u8* oak_start = oakGetCurrentCodePointer();
-	pxAssert(oak_start < recPtrEnd);
-	return oak_start;
-}
-
-void recEndOaknutEmit()
-{
-	pxAssert(oakHasBlock());
-
-	pxAssert(oakGetCurrentCodePointer() < recPtrEnd);
-}
-
 bool TrySwapDelaySlot(u32 rs, u32 rt, u32 rd, bool allow_loadstore)
 {
 #if 1

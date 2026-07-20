@@ -104,3 +104,14 @@ void oakStore128(oak::QReg src, OakMemOperand mem);
 
 void oakEmitSmokeReturn42();
 void oakEmitSmokeFpAddReturn();
+
+// Assertion-only wrappers around Oaknut code generation blocks.
+// Force-inlined to eliminate function call overhead across hundreds of
+// call sites per block. Used by EE, IOP and VU recompilers.
+static __fi u8* recBeginOaknutEmit()
+{
+	return oakGetCurrentCodePointer();
+}
+static __fi void recEndOaknutEmit()
+{
+}
