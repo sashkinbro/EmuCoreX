@@ -1363,6 +1363,9 @@
     <string name="settings_audio_tab">الصوت</string>
     <string name="settings_audio_control">التحكم في الصوت</string>
     <string name="settings_audio_processing">معالجة الصوت</string>
+    <string name="settings_audio_lightweight_spu2">SPU2 خفيف</string>
+    <string name="settings_audio_lightweight_spu2_desc">استيفاء خطي، بدون Time Stretch، وتأثيرات مبسطة</string>
+    <string name="settings_help_audio_lightweight_spu2">معطّل افتراضيًا. يقلّل استخدام المعالج للصوت عبر الاستيفاء الخطي وتعطيل Time Stretch وتجاوز صدى SPU2. قد يبدو الصوت أقل عمقًا أو يحدث تقطّع إذا لم تحافظ اللعبة على السرعة الكاملة. تُستعاد إعدادات المعالجة اليدوية عند إيقاف هذا الوضع.</string>
     <string name="settings_audio_volume">مستوى الصوت</string>
     <string name="settings_audio_fast_forward_volume">مستوى الصوت عند التقديم السريع</string>
     <string name="settings_audio_mute">كتم كل الأصوات</string>

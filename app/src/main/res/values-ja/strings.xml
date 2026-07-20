@@ -1363,6 +1363,9 @@
     <string name="settings_audio_tab">オーディオ</string>
     <string name="settings_audio_control">オーディオ制御</string>
     <string name="settings_audio_processing">オーディオ処理</string>
+    <string name="settings_audio_lightweight_spu2">軽量 SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">リニア補間、Time Stretch なし、簡略化されたエフェクト</string>
+    <string name="settings_help_audio_lightweight_spu2">初期設定ではオフです。リニア補間を使用し、Time Stretch を無効化して SPU2 リバーブを迂回することで、オーディオの CPU 使用量を減らします。ゲームがフルスピードを維持できない場合、音が平坦になったり途切れたりすることがあります。このモードをオフにすると、手動の処理設定が復元されます。</string>
     <string name="settings_audio_volume">音量</string>
     <string name="settings_audio_fast_forward_volume">早送り時の音量</string>
     <string name="settings_audio_mute">すべての音をミュート</string>

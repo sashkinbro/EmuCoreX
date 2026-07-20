@@ -1365,6 +1365,9 @@
     <string name="settings_audio_tab">Аудіо</string>
     <string name="settings_audio_control">Керування звуком</string>
     <string name="settings_audio_processing">Обробка звуку</string>
+    <string name="settings_audio_lightweight_spu2">Полегшений SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">Лінійна інтерполяція, без Time Stretch і зі спрощеними ефектами</string>
+    <string name="settings_help_audio_lightweight_spu2">За замовчуванням вимкнено. Зменшує навантаження звуку на процесор завдяки лінійній інтерполяції, вимкненню Time Stretch та обходу реверберації SPU2. Звук може стати менш об’ємним або потріскувати, якщо гра не підтримує повну швидкість. Після вимкнення режиму вибрані вручну налаштування обробки відновлюються.</string>
     <string name="settings_audio_volume">Гучність</string>
     <string name="settings_audio_fast_forward_volume">Гучність при прискоренні</string>
     <string name="settings_audio_mute">Вимкнути весь звук</string>

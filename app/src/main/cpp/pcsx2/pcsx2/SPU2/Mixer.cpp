@@ -536,6 +536,11 @@ static __forceinline StereoOut32 MixCore(const uint coreidx, const VoiceMixSet& 
 	TW.Left += Ext.Left & thiscore.WetGate.ExtL;
 	TW.Right += Ext.Right & thiscore.WetGate.ExtR;
 
+	// The lightweight Android mode keeps wet-only voices audible, but routes them
+	// directly instead of running the considerably heavier SPU2 reverb pipeline.
+	if (EmuConfig.SPU2.LightweightMode)
+		return TD + TW;
+
 #ifdef PCSX2_DEVBUILD
 	WaveDump::WriteCore(thiscore.Index, CoreSrc_PreReverb, TW);
 #endif

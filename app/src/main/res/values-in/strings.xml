@@ -1449,6 +1449,9 @@
     <string name="settings_audio_tab">Audio</string>
     <string name="settings_audio_control">Kontrol audio</string>
     <string name="settings_audio_processing">Pemrosesan audio</string>
+    <string name="settings_audio_lightweight_spu2">SPU2 ringan</string>
+    <string name="settings_audio_lightweight_spu2_desc">Interpolasi linear, tanpa Time Stretch, dan efek sederhana</string>
+    <string name="settings_help_audio_lightweight_spu2">Nonaktif secara default. Mengurangi penggunaan CPU audio dengan interpolasi linear, menonaktifkan Time Stretch, dan melewati reverb SPU2. Audio dapat terdengar lebih datar atau berderak jika game tidak dapat mempertahankan kecepatan penuh. Pengaturan pemrosesan manual dipulihkan saat mode ini dimatikan.</string>
     <string name="settings_audio_volume">Volume</string>
     <string name="settings_audio_fast_forward_volume">Volume maju cepat</string>
     <string name="settings_audio_mute">Bisukan semua suara</string>

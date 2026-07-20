@@ -1365,6 +1365,9 @@
     <string name="settings_audio_tab">音频</string>
     <string name="settings_audio_control">音频控制</string>
     <string name="settings_audio_processing">音频处理</string>
+    <string name="settings_audio_lightweight_spu2">轻量 SPU2</string>
+    <string name="settings_audio_lightweight_spu2_desc">线性插值、关闭 Time Stretch 并简化效果处理</string>
+    <string name="settings_help_audio_lightweight_spu2">默认关闭。通过使用线性插值、关闭 Time Stretch 并绕过 SPU2 混响来降低音频 CPU 占用。如果游戏无法保持全速，声音可能会显得较单薄或出现爆音。关闭此模式后会恢复您手动选择的处理设置。</string>
     <string name="settings_audio_volume">音量</string>
     <string name="settings_audio_fast_forward_volume">快进音量</string>
     <string name="settings_audio_mute">静音所有声音</string>

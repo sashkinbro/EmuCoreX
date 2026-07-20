@@ -315,6 +315,7 @@ object EmulatorBridge {
         audioMuted: Boolean = false,
         audioInterpolation: Int = AudioDefaults.INTERPOLATION_DEFAULT,
         audioSyncMode: Int = AudioDefaults.SYNC_DEFAULT,
+        audioLightweightSpu2: Boolean = AudioDefaults.LIGHTWEIGHT_SPU2_DEFAULT,
         audioBackend: Int = AudioDefaults.BACKEND_DEFAULT,
         audioBufferMs: Int = AudioDefaults.BUFFER_MS_DEFAULT,
         audioOutputLatencyMs: Int = AudioDefaults.OUTPUT_LATENCY_MS_DEFAULT,
@@ -519,8 +520,13 @@ object EmulatorBridge {
                 add(settingOp("SPU2/Output", "StandardVolume", "int", AudioDefaults.coerceVolume(audioVolume).toString()))
                 add(settingOp("SPU2/Output", "FastForwardVolume", "int", AudioDefaults.coerceVolume(audioFastForwardVolume).toString()))
                 add(settingOp("SPU2/Output", "OutputMuted", "bool", audioMuted.toString()))
-                add(settingOp("SPU2/Output", "InterpolationMode", "string", AudioDefaults.interpolationCoreName(audioInterpolation)))
-                add(settingOp("SPU2/Output", "SyncMode", "string", AudioDefaults.syncModeCoreName(audioSyncMode)))
+                add(settingOp("SPU2/Output", "LightweightMode", "bool", audioLightweightSpu2.toString()))
+                add(settingOp("SPU2/Output", "InterpolationMode", "string", AudioDefaults.interpolationCoreName(
+                    AudioDefaults.effectiveInterpolation(audioInterpolation, audioLightweightSpu2)
+                )))
+                add(settingOp("SPU2/Output", "SyncMode", "string", AudioDefaults.syncModeCoreName(
+                    AudioDefaults.effectiveSyncMode(audioSyncMode, audioLightweightSpu2)
+                )))
                 add(settingOp("SPU2/Output", "Backend", "string", AudioDefaults.backendCoreName(audioBackend)))
                 add(settingOp("SPU2/Output", "BufferMS", "int", AudioDefaults.coerceBufferMs(audioBufferMs).toString()))
                 add(settingOp("SPU2/Output", "OutputLatencyMS", "int", AudioDefaults.coerceOutputLatencyMs(audioOutputLatencyMs).toString()))

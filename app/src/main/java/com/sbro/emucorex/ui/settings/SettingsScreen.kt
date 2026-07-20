@@ -47,6 +47,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -1477,22 +1478,35 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_audio_backend),
                             onResetToDefault = { viewModel.setAudioBackend(defaults.audioBackend) }
                         )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_audio_interpolation),
-                            options = audioInterpolationOptions(),
-                            selectedValue = uiState.audioInterpolation,
-                            onSelect = viewModel::setAudioInterpolation,
-                            helpText = stringResource(R.string.settings_help_audio_interpolation),
-                            onResetToDefault = { viewModel.setAudioInterpolation(defaults.audioInterpolation) }
+                        ToggleItem(
+                            icon = Icons.Rounded.Bolt,
+                            title = stringResource(R.string.settings_audio_lightweight_spu2),
+                            subtitle = stringResource(R.string.settings_audio_lightweight_spu2_desc),
+                            checked = uiState.audioLightweightSpu2,
+                            onCheckedChange = viewModel::setAudioLightweightSpu2,
+                            helpText = stringResource(R.string.settings_help_audio_lightweight_spu2),
+                            onResetToDefault = {
+                                viewModel.setAudioLightweightSpu2(defaults.audioLightweightSpu2)
+                            }
                         )
-                        ChoiceSection(
-                            title = stringResource(R.string.settings_audio_sync_mode),
-                            options = audioSyncModeOptions(),
-                            selectedValue = uiState.audioSyncMode,
-                            onSelect = viewModel::setAudioSyncMode,
-                            helpText = stringResource(R.string.settings_help_audio_sync_mode),
-                            onResetToDefault = { viewModel.setAudioSyncMode(defaults.audioSyncMode) }
-                        )
+                        if (!uiState.audioLightweightSpu2) {
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_audio_interpolation),
+                                options = audioInterpolationOptions(),
+                                selectedValue = uiState.audioInterpolation,
+                                onSelect = viewModel::setAudioInterpolation,
+                                helpText = stringResource(R.string.settings_help_audio_interpolation),
+                                onResetToDefault = { viewModel.setAudioInterpolation(defaults.audioInterpolation) }
+                            )
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_audio_sync_mode),
+                                options = audioSyncModeOptions(),
+                                selectedValue = uiState.audioSyncMode,
+                                onSelect = viewModel::setAudioSyncMode,
+                                helpText = stringResource(R.string.settings_help_audio_sync_mode),
+                                onResetToDefault = { viewModel.setAudioSyncMode(defaults.audioSyncMode) }
+                            )
+                        }
                         SliderItem(
                             icon = Icons.Rounded.GraphicEq,
                             title = stringResource(R.string.settings_audio_buffer_size),
