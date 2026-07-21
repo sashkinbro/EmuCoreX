@@ -10,7 +10,7 @@ class GsHackDefaultsTest {
         assertEquals(-1, GsHackDefaults.TRILINEAR_FILTERING_DEFAULT)
         assertEquals(1, GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
         assertEquals(2, GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
-        assertEquals(4, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT) // Disabled for Android
+        assertEquals(3, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT) // Unsynchronized for Android
         assertEquals(0, GsHackDefaults.ANISOTROPIC_FILTERING_DEFAULT)
     }
 
