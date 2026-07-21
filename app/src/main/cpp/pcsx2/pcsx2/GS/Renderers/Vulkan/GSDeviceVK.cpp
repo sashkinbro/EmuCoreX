@@ -480,8 +480,12 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		SupportsExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
 		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
+	// Disable feedback loop layout for Mali (older drivers have issues) and PowerVR.
+	// Only enable for non-mobile vendors or when explicitly supported.
+	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
-		(m_device_properties.vendorID != 0x13B5u) && SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
+		(!(m_device_properties.vendorID == 0x13B5u || is_powervr)) &&
+		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_push_descriptor =
 		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
@@ -857,7 +861,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
 
 	// Mali (ARM, vendorID 0x13B5) advertises VK_KHR_push_descriptor but its driver
-	// null-derefs inside vkCmdPushDescriptorSetKHR, so never use it there even when present.
+	// null-derefs inside vkCmdPushDescriptorSetKHR. Also disable for PowerVR.
 	m_use_push_descriptors = m_optional_extensions.vk_khr_push_descriptor;
 	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
 	{
@@ -865,7 +869,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 			push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
 		m_use_push_descriptors = false;
 	}
-	if (m_use_push_descriptors && properties2.properties.vendorID == 0x13B5u)
+	if (m_use_push_descriptors && (properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
 		m_use_push_descriptors = false;
 	if (!m_use_push_descriptors)
 		Console.Warning("VK: Using non-push-descriptor texture binding fallback.");
@@ -2850,6 +2854,7 @@ bool GSDeviceVK::CheckFeatures()
 	// capability-gated, and handle missing dual-source blending independently in GSRendererHW.
 	// Adreno/other mobile implementations remain opt-in because support varies by driver stack.
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
+	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	// MediaTek's Mali Vulkan stacks across multiple GPU generations have been observed returning
 	// zero/stale destination color through ROAA (black or intermittently missing textures). Keep
 	// other Mali vendors on the tile-local fast path. G57 remains a model fallback for firmware
@@ -2858,16 +2863,16 @@ bool GSDeviceVK::CheckFeatures()
 		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
 			 GetMobileGPUIdentity().model_number == 57) ||
 			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
-	const bool is_mediatek_mali_vk = is_mali_vk && IsMediaTekSoC();
-	const bool unreliable_mali_fbfetch = is_mediatek_mali_vk || is_mali_g57;
+	// All Mali and PowerVR GPUs have unreliable ROAA (framebuffer fetch).
+	// This causes black/stale textures. Disable fbfetch for all mobile GPUs except Adreno.
+	const bool unreliable_mali_fbfetch = is_mali_vk || is_powervr;
 	const bool vendor_allows_fbfetch =
 		!unreliable_mali_fbfetch && (is_mali_vk || GSConfig.EnableAdrenoFramebufferFetch);
 	bool framebuffer_fetch = vendor_allows_fbfetch &&
 		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
 	if (unreliable_mali_fbfetch && has_framebuffer_fetch_extension)
 	{
-		Console.Warning("VK: Disabled unreliable %s Mali framebuffer fetch; using texture-barrier feedback.",
-			is_mediatek_mali_vk ? "MediaTek" : "G57");
+		Console.Warning("VK: Disabled unreliable Mali framebuffer fetch; using texture-barrier feedback.");
 	}
 
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
