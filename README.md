@@ -57,9 +57,9 @@ This repository contains the Android app, UI, settings, bridge code, and bundled
 EmuCoreX currently targets Android with:
 
 - `minSdk 29`
-- `targetSdk 36`
+- `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.2.8`
+- version `0.2.9`
 
 ## Building Locally
 
