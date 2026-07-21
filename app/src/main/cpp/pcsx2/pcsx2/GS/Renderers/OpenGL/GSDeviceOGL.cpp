@@ -2488,6 +2488,17 @@ void GSDeviceOGL::PSSetShaderResource(int i, GSTexture* sr)
 {
 	pxAssert(i < static_cast<int>(std::size(GLState::tex_unit)));
 
+	if (!sr)
+	{
+		// Defensive: unbind if null texture passed (matches Vulkan null_texture fallback)
+		if (GLState::tex_unit[i] != 0)
+		{
+			GLState::tex_unit[i] = 0;
+			glBindTextureUnit(i, 0);
+		}
+		return;
+	}
+
 	const GLuint id = static_cast<GSTextureOGL*>(sr)->GetID();
 	if (GLState::tex_unit[i] != id)
 	{
