@@ -61,6 +61,10 @@ static const char* GetVulkanVendorHint(u32 vendor_id)
 			return "Qualcomm Adreno";
 		case 0x1010u:
 			return "Imagination PowerVR";
+		case 0x144Du:
+			return "Samsung Xclipse";
+		case 0x18D1u:
+			return "Google Tensor";
 		default:
 			return "";
 	}
@@ -1074,14 +1078,14 @@ bool GSDeviceVK::CreateGlobalDescriptorPool()
 {
 #ifdef __ANDROID__
 	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
-		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 18},
-		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 18},
-		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8192},
-		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096},
-		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2048},
-		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 128},
+		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 32},
+		{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 32},
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 16384},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 8192},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4096},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 256},
 	};
-	u32 max_sets = 16384;
+	u32 max_sets = 32768;
 #else
 	static constexpr const VkDescriptorPoolSize pool_sizes[] = {
 		{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 130},

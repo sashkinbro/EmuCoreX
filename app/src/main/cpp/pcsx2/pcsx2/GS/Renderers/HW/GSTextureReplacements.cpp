@@ -10,6 +10,8 @@
 #include "common/ScopedGuard.h"
 #include "common/TextureDecompress.h"
 
+#include <atomic>
+
 #include "Config.h"
 #include "platform/host/Host.h"
 #include "IconsFontAwesome.h"
@@ -148,7 +150,7 @@ namespace GSTextureReplacements
 	static std::mutex s_worker_thread_mutex;
 	static std::condition_variable s_worker_thread_cv;
 	static std::deque<std::pair<std::function<void()>, bool>> s_worker_thread_queue;
-	static bool s_worker_thread_running = false;
+	static std::atomic<bool> s_worker_thread_running{false};
 }; // namespace GSTextureReplacements
 
 TextureName GSTextureReplacements::CreateTextureName(const GSTextureCache::HashCacheKey& hash, u32 miplevel)

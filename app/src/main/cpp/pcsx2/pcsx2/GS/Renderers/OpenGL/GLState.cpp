@@ -71,7 +71,7 @@ namespace GLState
 
 		depth = false;
 		depth_func = GL_LESS;
-		depth_mask = false;
+		depth_mask = true; // OpenGL default is GL_TRUE
 
 		stencil = false;
 		stencil_func = GL_ALWAYS;

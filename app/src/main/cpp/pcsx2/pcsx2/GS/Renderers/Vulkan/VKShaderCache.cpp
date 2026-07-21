@@ -28,12 +28,13 @@
 
 #include <cstring>
 #include <memory>
+#include <mutex>
 
 // TODO: store the driver version and stuff in the shader header
 
 std::unique_ptr<VKShaderCache> g_vulkan_shader_cache;
 
-static u32 s_next_bad_shader_id = 0;
+static std::atomic<u32> s_next_bad_shader_id{0};
 #ifndef __ANDROID__
 static bool s_glslang_initialized = false;
 static bool s_shaderc_fallback_warning_emitted = false;
@@ -126,7 +127,6 @@ static void FillPipelineCacheHeader(VK_PIPELINE_CACHE_HEADER* header)
 	X(shaderc_result_get_error_message) \
 	X(shaderc_result_get_compilation_status)
 
-// TODO: NOT thread safe, yet.
 namespace dyn_shaderc
 {
 	static bool Open();
@@ -135,6 +135,7 @@ namespace dyn_shaderc
 	static DynamicLibrary s_library;
 	static shaderc_compiler_t s_compiler = nullptr;
 	static bool s_open_failed = false;
+	static std::mutex s_mutex;
 
 #define ADD_FUNC(F) static decltype(&::F) F;
 	SHADERC_FUNCTIONS(ADD_FUNC)
@@ -144,6 +145,8 @@ namespace dyn_shaderc
 
 bool dyn_shaderc::Open()
 {
+	std::lock_guard<std::mutex> lock(s_mutex);
+
 	if (s_compiler)
 		return true;
 

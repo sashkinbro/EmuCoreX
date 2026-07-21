@@ -25,7 +25,7 @@ constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age, bool prefe
 
 // Renderer names are stable (for example "Adreno (TM) 740"), while Snapdragon product names are not.
 // Keep one entry per shipping renderer model so adjacent parts are not silently treated as equivalent.
-static constexpr std::array<AdrenoSpec, 52> s_adreno_specs = {{
+static constexpr std::array<AdrenoSpec, 62> s_adreno_specs = {{
 	{200, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
 	{203, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
 	{205, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
@@ -43,8 +43,10 @@ static constexpr std::array<AdrenoSpec, 52> s_adreno_specs = {{
 	{418, 0, MobileGpuArchitecture::Adreno4xx, T(68, 5, 5)},
 	{420, 0, MobileGpuArchitecture::Adreno4xx, T(72, 6, 5)},
 	{430, 0, MobileGpuArchitecture::Adreno4xx, T(80, 6, 5)},
+	{504, 0, MobileGpuArchitecture::Adreno5xx, T(64, 5, 5)},
 	{505, 0, MobileGpuArchitecture::Adreno5xx, T(68, 5, 5)},
 	{506, 0, MobileGpuArchitecture::Adreno5xx, T(72, 6, 5)},
+	{507, 0, MobileGpuArchitecture::Adreno5xx, T(72, 6, 5)},
 	{508, 0, MobileGpuArchitecture::Adreno5xx, T(76, 6, 5)},
 	{509, 0, MobileGpuArchitecture::Adreno5xx, T(80, 6, 5)},
 	{510, 0, MobileGpuArchitecture::Adreno5xx, T(84, 6, 6)},
@@ -53,13 +55,15 @@ static constexpr std::array<AdrenoSpec, 52> s_adreno_specs = {{
 	{540, 0, MobileGpuArchitecture::Adreno5xx, T(112, 8, 7)},
 	{605, 0, MobileGpuArchitecture::Adreno6xx, T(72, 6, 5)},
 	{608, 0, MobileGpuArchitecture::Adreno6xx, T(76, 6, 5)},
+	{609, 0, MobileGpuArchitecture::Adreno6xx, T(78, 6, 5)},
 	{610, 0, MobileGpuArchitecture::Adreno6xx, T(80, 6, 5)},
+	{610, 'l', MobileGpuArchitecture::Adreno6xx, T(72, 6, 5)},
 	{612, 0, MobileGpuArchitecture::Adreno6xx, T(84, 7, 5)},
 	{613, 0, MobileGpuArchitecture::Adreno6xx, T(88, 7, 6)},
 	{615, 0, MobileGpuArchitecture::Adreno6xx, T(92, 7, 6)},
 	{616, 0, MobileGpuArchitecture::Adreno6xx, T(96, 8, 6)},
 	{618, 0, MobileGpuArchitecture::Adreno6xx, T(100, 8, 6)},
-	{619, 'l', MobileGpuArchitecture::Adreno6xx, T(88, 7, 6)},
+	{619, 'l', MobileGpuArchitecture::Adreno6xx, T(84, 7, 5)},
 	{619, 0, MobileGpuArchitecture::Adreno6xx, T(96, 8, 6)},
 	{620, 0, MobileGpuArchitecture::Adreno6xx, T(112, 8, 7)},
 	{630, 0, MobileGpuArchitecture::Adreno6xx, T(128, 9, 7, true)},
@@ -70,6 +74,7 @@ static constexpr std::array<AdrenoSpec, 52> s_adreno_specs = {{
 	{644, 0, MobileGpuArchitecture::Adreno6xx, T(132, 9, 7, true)},
 	{650, 0, MobileGpuArchitecture::Adreno6xx, T(144, 10, 8, true)},
 	{660, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8, true)},
+	{663, 0, MobileGpuArchitecture::Adreno6xx, T(100, 8, 6)},
 	{675, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8, true)},
 	{680, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8, true)},
 	{685, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8, true)},
@@ -82,17 +87,27 @@ static constexpr std::array<AdrenoSpec, 52> s_adreno_specs = {{
 
 // Later 7xx/8xx models are kept separate because they use materially different renderer generations,
 // even though their current GS pool ceiling is the same.
-static constexpr std::array<AdrenoSpec, 10> s_recent_adreno_specs = {{
+static constexpr std::array<AdrenoSpec, 20> s_recent_adreno_specs = {{
+	{722, 0, MobileGpuArchitecture::Adreno7xx, T(128, 9, 7, true)},
 	{725, 0, MobileGpuArchitecture::Adreno7xx, T(140, 10, 8, true)},
 	{730, 0, MobileGpuArchitecture::Adreno7xx, T(144, 10, 8, true)},
+	{732, 0, MobileGpuArchitecture::Adreno7xx, T(148, 10, 8, true)},
 	{735, 0, MobileGpuArchitecture::Adreno7xx, T(152, 11, 8, true)},
 	{740, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
 	{750, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
+	{760, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
+	{765, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
+	{775, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
 	{810, 0, MobileGpuArchitecture::Adreno8xx, T(128, 9, 7, true)},
+	{820, 0, MobileGpuArchitecture::Adreno8xx, T(140, 10, 8, true)},
 	{825, 0, MobileGpuArchitecture::Adreno8xx, T(148, 10, 8, true)},
 	{829, 0, MobileGpuArchitecture::Adreno8xx, T(156, 11, 8, true)},
 	{830, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
 	{840, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
+	{845, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
+	{850, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
+	{860, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
+	{870, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
 }};
 
 static bool ParseAdrenoModel(std::string_view hints, u16* model, char* suffix)

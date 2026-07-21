@@ -37,8 +37,8 @@ GSTextureOGL::GSTextureOGL(Type type, int width, int height, int levels, Format 
 	{
 		// 1 Channel integer
 		case Format::PrimID:
-			gl_fmt = GL_R32F;
-			m_int_format = GL_RED;
+			gl_fmt = GL_R32I;
+			m_int_format = GL_RED_INTEGER;
 			m_int_type = GL_INT;
 			m_int_shift = 2;
 			break;
@@ -235,6 +235,9 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
 		sb->Unbind();
+
+		// Ensure PBO data is visible to the texture unit before sampling.
+		glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 	}
 
 	m_needs_mipmaps_generated = true;
@@ -305,6 +308,9 @@ void GSTextureOGL::Unmap()
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
 		sb->Unbind();
+
+		// Ensure PBO data is visible to the texture unit before sampling.
+		glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 
 		m_needs_mipmaps_generated = true;
 
@@ -438,7 +444,11 @@ void GSDownloadTextureOGL::CopyFromTexture(
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
 	}
 
-	glReadPixels(src.left, src.top, src.width(), src.height(), glTex->GetIntFormat(), glTex->GetIntType(), m_cpu_buffer + copy_offset);
+	// On GLES, glReadPixels uses bottom-left origin. Flip Y for top-down GS coordinates.
+	const bool is_gles = GSDeviceOGL::GetInstance()->IsGLESDevice();
+	const u32 read_x = src.left;
+	const u32 read_y = is_gles ? (glTex->GetHeight() - src.top - src.height()) : src.top;
+	glReadPixels(read_x, read_y, src.width(), src.height(), glTex->GetIntFormat(), glTex->GetIntType(), m_cpu_buffer + copy_offset);
 
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 
@@ -460,6 +470,7 @@ void GSDownloadTextureOGL::CopyFromTexture(
 	}
 
 	glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 }
 
 bool GSDownloadTextureOGL::Map(const GSVector4i& read_rc)

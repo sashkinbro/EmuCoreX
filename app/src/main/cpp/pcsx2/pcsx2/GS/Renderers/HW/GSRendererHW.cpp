@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/HW/GSRendererHW.h"
+#include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "GS/GSGL.h"
 #include "GS/GSPerfMon.h"
@@ -158,6 +159,7 @@ void GSRendererHW::Reset(bool hardware_reset)
 		g_texture_cache->ReadbackAll();
 
 	g_texture_cache->RemoveAll(true, true, true);
+	GSHwHack::ResetState();
 
 	GSRenderer::Reset(hardware_reset);
 }
@@ -1142,7 +1144,7 @@ void GSRendererHW::MergeSprite(GSTextureCache::Source* tex)
 					{
 						bool unique_found = false;
 
-						for (u32 j = i & 1; j < unique_verts; i += 2)
+						for (u32 j = i & 1; j < unique_verts; j += 2)
 						{
 							if (s[i].XYZ.X != s[j].XYZ.X)
 							{
@@ -1163,8 +1165,6 @@ void GSRendererHW::MergeSprite(GSTextureCache::Source* tex)
 
 							s[unique_verts - 2].V = static_cast<u16>(16.0f * m_vt.m_min.t.y);
 							s[unique_verts - 1].V = static_cast<u16>(16.0f * m_vt.m_max.t.y);
-
-							i |= 1;
 						}
 					}
 				}
@@ -1183,7 +1183,7 @@ void GSRendererHW::MergeSprite(GSTextureCache::Source* tex)
 					{
 						bool unique_found = false;
 
-						for (u32 j = i & 1; j < unique_verts; i+=2)
+						for (u32 j = i & 1; j < unique_verts; j += 2)
 						{
 							if (s[i].XYZ.Y != s[j].XYZ.Y)
 							{
@@ -1204,8 +1204,6 @@ void GSRendererHW::MergeSprite(GSTextureCache::Source* tex)
 
 							s[unique_verts - 2].U = static_cast<u16>(16.0f * m_vt.m_min.t.x);
 							s[unique_verts - 1].U = static_cast<u16>(16.0f * m_vt.m_max.t.x);
-
-							i |= 1;
 						}
 					}
 				}

@@ -170,11 +170,11 @@ static MobileGpuArchitecture ArchitectureForUnknownMali(char series, u16 model)
 			MobileGpuArchitecture::MaliValhall1 : MobileGpuArchitecture::MaliBifrost;
 	if (model < 600)
 		return MobileGpuArchitecture::MaliValhall2;
-	if (model == 615 || model == 715)
-		return MobileGpuArchitecture::MaliValhall3;
-	if (model >= 620)
+	if (model < 620)
+		return (model == 615) ? MobileGpuArchitecture::MaliValhall3 : MobileGpuArchitecture::MaliValhall2;
+	if (model >= 900)
 		return MobileGpuArchitecture::MaliFifthGen;
-	return MobileGpuArchitecture::Unknown;
+	return MobileGpuArchitecture::MaliFifthGen;
 }
 
 static MobileGsTuning FallbackTuningForMali(MobileGpuArchitecture architecture)

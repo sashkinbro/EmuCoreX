@@ -816,11 +816,11 @@ void GSDevice::DrawMultiStretchRects(
 	for (u32 i = 0; i < num_rects; i++)
 	{
 		const MultiStretchRect& sr = rects[i];
-		pxAssert(HasVariableWriteMask(shader) || rects[0].wmask.wrgba == 0xf);
-		if (rects[0].wmask.wrgba != 0xf)
+		pxAssert(HasVariableWriteMask(shader) || sr.wmask.wrgba == 0xf);
+		if (sr.wmask.wrgba != 0xf)
 		{
-			g_gs_device->StretchRect(sr.src, sr.src_rect, dTex, sr.dst_rect, rects[0].wmask.wr,
-				rects[0].wmask.wg, rects[0].wmask.wb, rects[0].wmask.wa, shader);
+			g_gs_device->StretchRect(sr.src, sr.src_rect, dTex, sr.dst_rect, sr.wmask.wr,
+				sr.wmask.wg, sr.wmask.wb, sr.wmask.wa, shader);
 		}
 		else
 		{
@@ -833,7 +833,9 @@ void GSDevice::SortMultiStretchRects(MultiStretchRect* rects, u32 num_rects)
 {
 	// Depending on num_rects, insertion sort may be better here.
 	std::sort(rects, rects + num_rects, [](const MultiStretchRect& lhs, const MultiStretchRect& rhs) {
-		return lhs.src < rhs.src || lhs.linear < rhs.linear;
+		if (lhs.src != rhs.src)
+			return lhs.src < rhs.src;
+		return lhs.linear < rhs.linear;
 	});
 }
 

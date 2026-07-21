@@ -19,6 +19,7 @@
 #include "pcsx2/GS.h"
 #include "GS/Renderers/Null/GSRendererNull.h"
 #include "GS/Renderers/HW/GSRendererHW.h"
+#include "GS/Renderers/HW/GSHwHack.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 #include "VMManager.h"
 
@@ -599,7 +600,10 @@ void GSThrottlePresentation()
 void GSGameChanged()
 {
 	if (GSIsHardwareRenderer())
+	{
+		GSHwHack::ResetState();
 		GSTextureReplacements::GameChanged();
+	}
 
 	if (!VMManager::HasValidVM() && GSCapture::IsCapturing())
 		GSCapture::EndCapture();
