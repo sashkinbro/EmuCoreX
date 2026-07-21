@@ -1371,7 +1371,7 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	}
 	else
 	{
-		resources.spin_id = -1;
+		spin_cycles = 0;
 	}
 	m_command_buffer_render_passes = 0;
 
@@ -2871,6 +2871,17 @@ bool GSDeviceVK::CheckFeatures()
 	}
 
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
+
+	// On MediaTek SoCs (Mali or PowerVR), framebuffer fetch is unreliable.
+	// If fbfetch is disabled, force texture_barrier ON to ensure we have at least
+	// one feedback mechanism. Without this, games requiring accurate blending
+	// will crash or render incorrectly.
+	if (IsMediaTekSoC() && !framebuffer_fetch && !texture_barrier)
+	{
+		texture_barrier = true;
+		Console.Warning("VK: MediaTek SoC detected without fbfetch — forcing texture_barrier ON for feedback support.");
+	}
+
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
 
@@ -5585,6 +5596,8 @@ void GSDeviceVK::PSSetShaderResource(int i, GSTexture* sr, bool check_state)
 	else
 	{
 		vkTex = m_null_texture.get();
+		if (!vkTex)
+			return; // Null texture creation failed — skip binding to avoid crash
 	}
 
 	if (m_tfx_textures[i] == vkTex)

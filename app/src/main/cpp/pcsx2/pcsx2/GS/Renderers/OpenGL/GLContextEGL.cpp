@@ -464,7 +464,7 @@ bool GLContextEGL::CreateContext(const Version& version, EGLContext share_contex
 		EGL_SURFACE_TYPE,
 		(m_wi.type != WindowInfo::Type::Surfaceless) ? EGL_WINDOW_BIT : 0,
 		EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
-		EGL_BLUE_SIZE, 8, EGL_NONE, 0};
+		EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE, 0};
 
 	EGLint num_configs;
 	if (!eglChooseConfig(m_display, surface_attribs, nullptr, 0, &num_configs) || num_configs == 0)
