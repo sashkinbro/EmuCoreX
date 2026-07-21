@@ -1239,6 +1239,7 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Graphics -> {
+                    val mediatekAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
                     SettingsSection(title = stringResource(R.string.settings_graphics)) {
                         ChoiceSection(
                             title = stringResource(R.string.settings_renderer),
@@ -1261,6 +1262,17 @@ private fun SettingsContent(
                                 label = stringResource(R.string.settings_gpu_driver_manager_title),
                                 value = activeDriverName ?: stringResource(R.string.settings_gpu_driver_system),
                                 onClick = onOpenGpuDriverManager ?: {}
+                            )
+                        }
+                        if (GpuHardwareProfiles.isMediaTekHardware() && mediatekAngleAvailable) {
+                            ToggleItem(
+                                icon = Icons.Rounded.SettingsSuggest,
+                                title = stringResource(R.string.settings_mediatek_angle_opengl),
+                                subtitle = stringResource(R.string.settings_mediatek_angle_opengl_desc),
+                                checked = uiState.mediatekAngleOpenGl,
+                                onCheckedChange = viewModel::setMediatekAngleOpenGl,
+                                helpText = stringResource(R.string.settings_help_mediatek_angle_opengl),
+                                onResetToDefault = { viewModel.setMediatekAngleOpenGl(false) }
                             )
                         }
                         val maxUpscaleMultiplier = remember(uiState.renderer) {
@@ -2313,17 +2325,6 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.onboarding_profile_subtitle),
                             onResetToDefault = { viewModel.setPerformanceProfile(defaults.performanceProfile) }
                         )
-                        if (GpuHardwareProfiles.isMediaTekHardware() && mediatekAngleAvailable) {
-                            ToggleItem(
-                                icon = Icons.Rounded.SettingsSuggest,
-                                title = stringResource(R.string.settings_mediatek_angle_opengl),
-                                subtitle = stringResource(R.string.settings_mediatek_angle_opengl_desc),
-                                checked = uiState.mediatekAngleOpenGl,
-                                onCheckedChange = viewModel::setMediatekAngleOpenGl,
-                                helpText = stringResource(R.string.settings_help_mediatek_angle_opengl),
-                                onResetToDefault = { viewModel.setMediatekAngleOpenGl(false) }
-                            )
-                        }
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_frame_limiter),
