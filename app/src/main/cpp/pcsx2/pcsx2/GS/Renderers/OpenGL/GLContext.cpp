@@ -42,10 +42,31 @@ static void DisableBrokenExtensions(const char* gl_vendor, const char* gl_render
 {
 	if (std::strstr(gl_vendor, "ARM") || std::strstr(gl_renderer, "Mali"))
 	{
-		// GL_{EXT,OES}_copy_image appears to fall back to CPU paths on Mali.
-		Console.Warning("Mali driver detected, disabling GL_{EXT,OES}_copy_image");
-		GLAD_GL_EXT_copy_image = 0;
-		GLAD_GL_OES_copy_image = 0;
+		// GL_{EXT,OES}_copy_image falls back to CPU paths on old Mali (Bifrost and older).
+		// Newer Valhall+ (G57+) handle it correctly. Detect from renderer string.
+		const char* g_pos = std::strstr(gl_renderer, "Mali-G");
+		bool is_old_mali = true; // default to safe (disable)
+		if (g_pos)
+		{
+			const int model = std::atoi(g_pos + 6); // parse number after "Mali-G"
+			// G57+ = Valhall, G310+ = Valhall 2nd gen, G620+ = 5th gen — all modern
+			if (model >= 57)
+				is_old_mali = false;
+		}
+		// Also check for "Mali-T" (Midgard) and "Mali-" without G (Utgard) — always old
+		if (std::strstr(gl_renderer, "Mali-T") || std::strstr(gl_renderer, "Mali-4") || std::strstr(gl_renderer, "Mali-3"))
+			is_old_mali = true;
+
+		if (is_old_mali)
+		{
+			Console.Warning("Old Mali driver detected, disabling GL_{EXT,OES}_copy_image");
+			GLAD_GL_EXT_copy_image = 0;
+			GLAD_GL_OES_copy_image = 0;
+		}
+		else
+		{
+			Console.Warning("Modern Mali detected (%s), keeping GL_{EXT,OES}_copy_image enabled.", gl_renderer);
+		}
 	}
 }
 
