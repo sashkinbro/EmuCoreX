@@ -235,9 +235,6 @@ bool GSTextureOGL::Update(const GSVector4i& r, const void* data, int pitch, int 
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
 		sb->Unbind();
-
-		// Ensure PBO data is visible to the texture unit before sampling.
-		glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 	}
 
 	m_needs_mipmaps_generated = true;
@@ -308,9 +305,6 @@ void GSTextureOGL::Unmap()
 		glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
 		sb->Unbind();
-
-		// Ensure PBO data is visible to the texture unit before sampling.
-		glMemoryBarrier(GL_TEXTURE_UPDATE_BARRIER_BIT);
 
 		m_needs_mipmaps_generated = true;
 
