@@ -47,7 +47,7 @@ data class PerGameSettings(
     val eeFpuClampingMode: Int = AppPreferences.DEFAULT_EE_FPU_CLAMPING_MODE,
     val vu0ClampingMode: Int = AppPreferences.DEFAULT_VU0_CLAMPING_MODE,
     val vu1ClampingMode: Int = AppPreferences.DEFAULT_VU1_CLAMPING_MODE,
-    val hwDownloadMode: Int = 0,
+    val hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
     val eeCycleRate: Int = 0,
     val eeCycleSkip: Int = 0,
     val frameSkip: Int = 0,
