@@ -224,8 +224,13 @@ std::optional<VkSurfaceFormatKHR> VKSwapChain::SelectSurfaceFormat(VkSurfaceKHR 
 		// Some drivers seem to return a SRGB format here (Intel Mesa).
 		// This results in gamma correction when presenting to the screen, which we don't want.
 		// Use a linear format instead, if this is the case.
-		return VkSurfaceFormatKHR{GetLinearFormat(surface_format.format), VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+		const VkFormat linear = GetLinearFormat(surface_format.format);
+		if (linear == VK_FORMAT_R8G8B8A8_UNORM || linear == VK_FORMAT_B8G8R8A8_UNORM)
+			return VkSurfaceFormatKHR{linear, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 	}
+
+	// Fallback: use the first available format with linear conversion.
+	return VkSurfaceFormatKHR{GetLinearFormat(surface_formats[0].format), VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 
 	Console.Error("Failed to find a suitable format for swap chain buffers.");
 	return std::nullopt;

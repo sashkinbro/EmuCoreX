@@ -500,7 +500,10 @@ void GSTextureVK::GenerateMipmap()
 {
 	const VkCommandBuffer cmdbuf = GetCommandBufferForUpdate();
 
-	if (m_layout == Layout::Undefined)
+	const Layout original_layout = m_layout;
+	const Layout restore_layout = (original_layout == Layout::Undefined) ? Layout::ShaderReadOnly : original_layout;
+
+	if (original_layout == Layout::Undefined)
 		TransitionToLayout(cmdbuf, Layout::TransferSrc);
 
 	for (int dst_level = 1; dst_level < m_mipmap_levels; dst_level++)
@@ -524,8 +527,8 @@ void GSTextureVK::GenerateMipmap()
 		vkCmdBlitImage(cmdbuf, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_image,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
-		TransitionSubresourcesToLayout(cmdbuf, src_level, 1, Layout::TransferSrc, m_layout);
-		TransitionSubresourcesToLayout(cmdbuf, dst_level, 1, Layout::TransferDst, m_layout);
+		TransitionSubresourcesToLayout(cmdbuf, src_level, 1, Layout::TransferSrc, restore_layout);
+		TransitionSubresourcesToLayout(cmdbuf, dst_level, 1, Layout::TransferDst, restore_layout);
 	}
 }
 
@@ -692,7 +695,8 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 
 		case Layout::General:
 		default:
-			srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
 	}
 
@@ -765,7 +769,8 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 
 		case Layout::General:
 		default:
-			dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+			dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 			break;
 	}
 	vkCmdPipelineBarrier(command_buffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1, &barrier);
@@ -911,7 +916,7 @@ void GSDownloadTextureVK::CopyFromTexture(
 		copy_size // VkDeviceSize       size
 	};
 	vkCmdPipelineBarrier(
-		cmdbuf, VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 1, &buffer_info, 0, nullptr);
+		cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 0, nullptr, 1, &buffer_info, 0, nullptr);
 
 	if (old_layout != GSTextureVK::Layout::TransferSrc && old_layout != GSTextureVK::Layout::Undefined)
 		vkTex->TransitionSubresourcesToLayout(cmdbuf, src_level, 1, GSTextureVK::Layout::TransferSrc, old_layout);

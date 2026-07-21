@@ -139,7 +139,11 @@ ProcessedVertex load_vertex(uint index)
 	uint z = min(i_z, MaxDepth);
 	vtx.p.xy = vec2(i_p) - vec2(0.05f, 0.05f);
 	vtx.p.xy = vtx.p.xy * VertexScale - VertexOffset;
+#if HAS_CLIP_CONTROL
 	vtx.p.z = float(z) * exp_min32;
+#else
+	vtx.p.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
+#endif
 	vtx.p.w = 1.0f;
 
 	vec2 uv = vec2(i_uv) - TextureOffset;

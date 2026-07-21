@@ -13,11 +13,12 @@ object GpuHardwareProfiles {
     fun normalize(profile: Int): Int = when (profile) {
         MALI -> MALI
         POWERVR -> POWERVR
-        else -> ADRENO
+        ADRENO -> ADRENO
+        else -> MALI
     }
 
     fun isMediatekProfile(profile: Int): Boolean {
-        return normalize(profile) != ADRENO
+        return normalize(profile) == MALI || normalize(profile) == POWERVR
     }
 
     // Pass only the SoC-vendor hint. "mediatek" intentionally parses as an automatic GPU override:
@@ -69,7 +70,9 @@ object GpuHardwareProfiles {
             listOf("powervr", "imgtec", "imagination technologies").any(hints::contains) -> POWERVR
             listOf("qualcomm", "qcom", "snapdragon", "adreno").any(hints::contains) -> ADRENO
             hasMediaTekSocHints(hints) -> MALI
-            else -> ADRENO
+            listOf("samsung", "exynos", "xclipse").any(hints::contains) -> MALI
+            listOf("mali", "immortalis", "arm").any(hints::contains) -> MALI
+            else -> MALI
         }
     }
 }

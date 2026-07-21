@@ -1216,8 +1216,8 @@ void GSDeviceOGL::DestroyResources()
 	m_vertex_uniform_stream_buffer.reset();
 
 	glBindVertexArray(0);
-	if (m_expand_ibo != 0)
-		glDeleteVertexArrays(1, &m_expand_ibo);
+	if (m_expand_vao != 0)
+		glDeleteVertexArrays(1, &m_expand_vao);
 	if (m_vao != 0)
 		glDeleteVertexArrays(1, &m_vao);
 
@@ -1326,6 +1326,9 @@ void GSDeviceOGL::EndPresent()
 
 	if (m_gpu_timing_enabled)
 		PopTimestampQuery();
+
+	// Ensure all rendering commands are submitted before swap to prevent stale frames on Android.
+	glFlush();
 
 	m_gl_context->SwapBuffers();
 
@@ -1475,7 +1478,7 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 
 	if (T->GetState() == GSTexture::State::Invalidated)
 	{
-		if (GLAD_GL_VERSION_4_3)
+		if (GLAD_GL_VERSION_4_3 || GLAD_GL_ES_VERSION_3_0)
 		{
 			if (T->GetType() == GSTexture::Type::DepthStencil)
 			{
@@ -1502,8 +1505,10 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 			}
 			else
 			{
+				GLState::depth_mask = true;
 				glDepthMask(true);
 				glClearBufferfv(GL_DEPTH, 0, &d);
+				GLState::depth_mask = false;
 				glDepthMask(false);
 			}
 		}
@@ -2587,6 +2592,7 @@ bool GSDeviceOGL::DoCAS(GSTexture* sTex, GSTexture* dTex, bool sharpen_only, con
 	const int dispatchX = (dTex->GetWidth() + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
 	const int dispatchY = (dTex->GetHeight() + (threadGroupWorkRegionDim - 1)) / threadGroupWorkRegionDim;
 	glDispatchCompute(dispatchX, dispatchY, 1);
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
 	return true;
 }
