@@ -1359,7 +1359,7 @@ void GSHWDrawConfig::DumpPSSelector(std::ostream& out, const PSSelector& ps, con
 	out << indent << "fst: " << static_cast<u32>(ps.fst) << std::endl;
 	out << indent << "tfx: " << static_cast<u32>(ps.tfx) << std::endl;
 	out << indent << "tcc: " << GSUtil::GetTCCName(static_cast<u32>(ps.tcc)) << std::endl;
-	out << indent << "wms: " << static_cast<u32>(ps.tcc) << " # " << static_cast<u32>(ps.wms) << std::endl;
+	out << indent << "wms: " << static_cast<u32>(ps.wms) << " # " << static_cast<u32>(ps.wms) << std::endl;
 	out << indent << "wmt: " << static_cast<u32>(ps.wmt) << std::endl;
 	out << indent << "adjs: " << static_cast<u32>(ps.adjs) << std::endl;
 	out << indent << "adjt: " << static_cast<u32>(ps.adjt) << std::endl;
