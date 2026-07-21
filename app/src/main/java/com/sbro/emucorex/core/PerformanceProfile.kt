@@ -17,7 +17,7 @@ object PerformanceProfiles {
         id = SAFE,
         eeCycleRate = 0,
         eeCycleSkip = 0,
-        hwDownloadMode = 0,
+        hwDownloadMode = 4, // Disabled — GPU readbacks are slow/buggy on Android
         fpuCorrectAddSub = true
     )
 
@@ -25,7 +25,7 @@ object PerformanceProfiles {
         id = FAST,
         eeCycleRate = -1,
         eeCycleSkip = 2,
-        hwDownloadMode = 2,
+        hwDownloadMode = 4, // Disabled
         fpuCorrectAddSub = false
     )
 

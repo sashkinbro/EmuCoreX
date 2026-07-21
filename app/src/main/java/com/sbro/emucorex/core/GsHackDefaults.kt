@@ -25,7 +25,7 @@ object GsHackDefaults {
     const val ANISOTROPIC_FILTERING_DEFAULT = 0
     const val HW_MIPMAPPING_DEFAULT = true
     const val ANTI_BLUR_DEFAULT = true
-    const val HW_DOWNLOAD_MODE_DEFAULT = 0
+    const val HW_DOWNLOAD_MODE_DEFAULT = 4 // Disabled — GPU readbacks are slow/buggy on Android mobile GPUs
     const val HW_DOWNLOAD_MODE_MIN = 0
     const val HW_DOWNLOAD_MODE_MAX = 4
     const val FRAME_SKIP_DEFAULT = 0

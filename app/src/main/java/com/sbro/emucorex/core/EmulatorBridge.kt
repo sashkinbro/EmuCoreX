@@ -342,7 +342,7 @@ object EmulatorBridge {
         enableFastBoot: Boolean = true,
         fastCdvd: Boolean = false,
         enableCheats: Boolean = false,
-        hwDownloadMode: Int = 0,
+        hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
         eeCycleRate: Int = 0,
         eeCycleSkip: Int = 0,
         frameSkip: Int = 0,
