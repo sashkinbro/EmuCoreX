@@ -25,7 +25,7 @@ object GsHackDefaults {
     const val ANISOTROPIC_FILTERING_DEFAULT = 0
     const val HW_MIPMAPPING_DEFAULT = true
     const val ANTI_BLUR_DEFAULT = true
-    const val HW_DOWNLOAD_MODE_DEFAULT = 3 // Unsynchronized — no GPU stall, reads from CPU-side GS memory
+    const val HW_DOWNLOAD_MODE_DEFAULT = 4 // Disabled — maximum performance and stability for Android
     const val HW_DOWNLOAD_MODE_MIN = 0
     const val HW_DOWNLOAD_MODE_MAX = 4
     const val FRAME_SKIP_DEFAULT = 0
