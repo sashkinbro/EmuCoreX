@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,8 +55,10 @@ import com.sbro.emucorex.data.InstalledRemoteTexture
 import com.sbro.emucorex.data.RemoteContentCatalogRepository
 import com.sbro.emucorex.data.RemoteContentInstallState
 import com.sbro.emucorex.data.RemoteTexturePack
+import com.sbro.emucorex.data.SelectedGameIdentity
 import com.sbro.emucorex.data.TexturePackRepository
 import com.sbro.emucorex.ui.common.LibraryGamePicker
+import com.sbro.emucorex.ui.common.contentCatalogTitleKey
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,6 +78,9 @@ internal fun TextureOnlineCatalogSection(
     val installState = remember(context) { RemoteContentInstallState(context) }
     var games by remember { mutableStateOf<List<GameItem>>(emptyList()) }
     var selectedPath by remember { mutableStateOf<String?>(null) }
+    var identity by remember { mutableStateOf<SelectedGameIdentity?>(null) }
+    var identityPath by remember { mutableStateOf<String?>(null) }
+    var resolvingIdentity by remember { mutableStateOf(false) }
     var packs by remember { mutableStateOf<List<RemoteTexturePack>>(emptyList()) }
     var installed by remember { mutableStateOf<Map<String, InstalledRemoteTexture>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
@@ -99,22 +105,63 @@ internal fun TextureOnlineCatalogSection(
         installed = loaded.third
         selectedPath = selectedPath ?: games.firstOrNull()?.path
         loading = false
+        if (loaded.second.cacheHit) {
+            val refreshed = withContext(Dispatchers.IO) {
+                catalogRepository.loadTextureCatalog(forceRefresh = true)
+            }
+            if (refreshed.entries.isNotEmpty()) {
+                packs = refreshed.entries
+                cached = refreshed.fromCache
+                loadFailed = false
+            }
+        }
     }
 
     val selectedGame = games.firstOrNull { it.path == selectedPath }
-    val selectedSerial = selectedGame?.serial?.uppercase(Locale.US)
-    val available = remember(packs, selectedSerial) {
+    LaunchedEffect(selectedPath) {
+        val game = selectedGame
+        if (game == null) {
+            identity = null
+            identityPath = null
+            resolvingIdentity = false
+            return@LaunchedEffect
+        }
+        identity = null
+        identityPath = null
+        resolvingIdentity = true
+        val resolved = withContext(Dispatchers.IO) { libraryRepository.resolveIdentity(game) }
+        if (selectedPath == game.path) {
+            identity = resolved
+            identityPath = game.path
+        }
+        resolvingIdentity = false
+    }
+    val selectedSerial = identity?.serial
+        ?.takeIf { identityPath == selectedPath }
+        ?.uppercase(Locale.US)
+    val selectedTitleKey = selectedGame?.title.orEmpty().contentCatalogTitleKey()
+    val compatiblePacks = remember(packs, selectedSerial) {
         if (selectedSerial == null) emptyList()
         else packs.filter { pack -> pack.serials.any { it.equals(selectedSerial, ignoreCase = true) } }
+            .sortedBy(RemoteTexturePack::name)
+    }
+    val otherVersionPacks = remember(packs, compatiblePacks, selectedTitleKey) {
+        if (selectedTitleKey.isEmpty()) emptyList()
+        else packs.filter { pack ->
+            pack !in compatiblePacks && pack.gameTitle.contentCatalogTitleKey() == selectedTitleKey
+        }.sortedBy(RemoteTexturePack::name)
     }
     val onlineContentState = TextureOnlineContentState(
         phase = when {
-            loading -> TextureOnlinePhase.LOADING
+            loading || resolvingIdentity || (selectedGame != null && identityPath != selectedPath) ->
+                TextureOnlinePhase.LOADING
             loadFailed -> TextureOnlinePhase.ERROR
-            selectedGame != null && available.isEmpty() -> TextureOnlinePhase.EMPTY
+            selectedGame != null && compatiblePacks.isEmpty() && otherVersionPacks.isEmpty() ->
+                TextureOnlinePhase.EMPTY
             else -> TextureOnlinePhase.CONTENT
         },
-        packs = available
+        compatiblePacks = compatiblePacks,
+        otherVersionPacks = otherVersionPacks
     )
 
     Surface(
@@ -138,7 +185,14 @@ internal fun TextureOnlineCatalogSection(
             LibraryGamePicker(
                 games = games,
                 selectedPath = selectedPath,
-                onSelected = { selectedPath = it.path },
+                onSelected = { game ->
+                    if (game.path != selectedPath) {
+                        identity = null
+                        identityPath = null
+                        resolvingIdentity = true
+                        selectedPath = game.path
+                    }
+                },
                 horizontalContentPadding = 16.dp,
                 fullBleedPadding = 16.dp
             )
@@ -165,57 +219,82 @@ internal fun TextureOnlineCatalogSection(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         TextureOnlinePhase.EMPTY -> TextureCatalogEmptyState()
-                        TextureOnlinePhase.CONTENT -> state.packs.forEach { pack ->
-                            val installedPack = installed[pack.id]
-                            val upToDate = installedPack?.version == pack.version &&
-                                installedPack.serial.equals(selectedSerial, ignoreCase = true)
-                            TextureCatalogCard(
-                                pack = pack,
-                                installed = upToDate,
-                                updateAvailable = installedPack != null && !upToDate,
-                                working = workingPackId == pack.id,
-                                progress = downloadProgress,
-                                onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
-                                onInstall = {
-                                    val serial = selectedSerial ?: return@TextureCatalogCard
-                                    if (workingPackId != null) return@TextureCatalogCard
-                                    scope.launch {
-                                        workingPackId = pack.id
-                                        downloadProgress = 0f
-                                        val success = withContext(Dispatchers.IO) {
-                                            var archive: java.io.File? = null
-                                            try {
-                                                archive = catalogRepository.downloadTexturePack(pack) { progress ->
-                                                    downloadProgress = progress
+                        TextureOnlinePhase.CONTENT -> {
+                            if (state.compatiblePacks.isNotEmpty()) {
+                                TextureCatalogSectionTitle(
+                                    text = stringResource(R.string.content_compatible_game_version_section)
+                                )
+                                state.compatiblePacks.forEach { pack ->
+                                    val installedPack = installed[pack.id]
+                                    val upToDate = installedPack?.version == pack.version &&
+                                        installedPack.serial.equals(selectedSerial, ignoreCase = true)
+                                    TextureCatalogCard(
+                                        pack = pack,
+                                        compatible = true,
+                                        installed = upToDate,
+                                        updateAvailable = installedPack != null && !upToDate,
+                                        working = workingPackId == pack.id,
+                                        progress = downloadProgress,
+                                        onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
+                                        onInstall = {
+                                            val serial = selectedSerial ?: return@TextureCatalogCard
+                                            if (workingPackId != null) return@TextureCatalogCard
+                                            scope.launch {
+                                                workingPackId = pack.id
+                                                downloadProgress = 0f
+                                                val success = withContext(Dispatchers.IO) {
+                                                    var archive: java.io.File? = null
+                                                    try {
+                                                        archive = catalogRepository.downloadTexturePack(pack) { progress ->
+                                                            downloadProgress = progress
+                                                        }
+                                                        val result = textureRepository.installRemotePack(archive, serial)
+                                                        if (!result.success) return@withContext false
+                                                        installState.removeTexturesForSerial(serial)
+                                                        installState.recordTexture(pack, serial)
+                                                        true
+                                                    } catch (_: Throwable) {
+                                                        false
+                                                    } finally {
+                                                        catalogRepository.discardDownload(archive)
+                                                    }
                                                 }
-                                                val result = textureRepository.installRemotePack(archive, serial)
-                                                if (!result.success) return@withContext false
-                                                installState.removeTexturesForSerial(serial)
-                                                installState.recordTexture(pack, serial)
-                                                true
-                                            } catch (_: Throwable) {
-                                                false
-                                            } finally {
-                                                catalogRepository.discardDownload(archive)
+                                                if (success) {
+                                                    preferences.setTextureReplacementsEnabled(true)
+                                                    installed = withContext(Dispatchers.IO) {
+                                                        installState.installedTextures()
+                                                    }
+                                                    onInstalled()
+                                                }
+                                                Toast.makeText(
+                                                    context,
+                                                    if (success) installSuccess else installFailure,
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                workingPackId = null
+                                                downloadProgress = 0f
                                             }
                                         }
-                                        if (success) {
-                                            preferences.setTextureReplacementsEnabled(true)
-                                            installed = withContext(Dispatchers.IO) {
-                                                installState.installedTextures()
-                                            }
-                                            onInstalled()
-                                        }
-                                        Toast.makeText(
-                                            context,
-                                            if (success) installSuccess else installFailure,
-                                            Toast.LENGTH_LONG
-                                        ).show()
-                                        workingPackId = null
-                                        downloadProgress = 0f
-                                    }
+                                    )
                                 }
-                            )
+                            }
+                            if (state.otherVersionPacks.isNotEmpty()) {
+                                TextureCatalogSectionTitle(
+                                    text = stringResource(R.string.content_other_game_versions_section)
+                                )
+                                state.otherVersionPacks.forEach { pack ->
+                                    TextureCatalogCard(
+                                        pack = pack,
+                                        compatible = false,
+                                        installed = false,
+                                        updateAvailable = false,
+                                        working = false,
+                                        progress = 0f,
+                                        onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
+                                        onInstall = {}
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -269,6 +348,7 @@ private fun TextureCatalogEmptyState() {
 @Composable
 private fun TextureCatalogCard(
     pack: RemoteTexturePack,
+    compatible: Boolean,
     installed: Boolean,
     updateAvailable: Boolean,
     working: Boolean,
@@ -310,6 +390,17 @@ private fun TextureCatalogCard(
                     )
                 }
             }
+            TextureCompatibilityBadge(compatible = compatible)
+            if (!compatible) {
+                Text(
+                    text = stringResource(
+                        R.string.content_supported_serials,
+                        pack.serials.joinToString()
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             if (pack.description.isNotBlank()) {
                 Text(
                     text = pack.description,
@@ -335,24 +426,26 @@ private fun TextureCatalogCard(
                 )
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onInstall,
-                    enabled = !working,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Rounded.CloudDownload, contentDescription = null)
-                    Spacer(Modifier.width(7.dp))
-                    Text(
-                        text = stringResource(
-                            when {
-                                installed -> R.string.content_reinstall
-                                updateAvailable -> R.string.content_update
-                                else -> R.string.content_download_install
-                            }
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                if (compatible) {
+                    Button(
+                        onClick = onInstall,
+                        enabled = !working,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.CloudDownload, contentDescription = null)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            text = stringResource(
+                                when {
+                                    installed -> R.string.content_reinstall
+                                    updateAvailable -> R.string.content_update
+                                    else -> R.string.content_download_install
+                                }
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 OutlinedButton(
                     onClick = onSource,
@@ -369,6 +462,44 @@ private fun TextureCatalogCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TextureCatalogSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun TextureCompatibilityBadge(compatible: Boolean) {
+    val background = if (compatible) {
+        Color(0xFF1B6B3A)
+    } else {
+        MaterialTheme.colorScheme.errorContainer
+    }
+    val foreground = if (compatible) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.onErrorContainer
+    }
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = background,
+        contentColor = foreground
+    ) {
+        Text(
+            text = stringResource(
+                if (compatible) R.string.content_compatible
+                else R.string.content_not_compatible
+            ),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -390,5 +521,6 @@ private enum class TextureOnlinePhase {
 
 private data class TextureOnlineContentState(
     val phase: TextureOnlinePhase,
-    val packs: List<RemoteTexturePack>
+    val compatiblePacks: List<RemoteTexturePack>,
+    val otherVersionPacks: List<RemoteTexturePack>
 )

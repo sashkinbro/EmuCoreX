@@ -1840,6 +1840,11 @@
     <string name="texture_catalog_install_success">텍스처 팩을 설치하고 텍스처 교체를 활성화했습니다.</string>
     <string name="texture_catalog_install_failed">텍스처 팩을 안전하게 다운로드하거나 설치하지 못했습니다.</string>
     <string name="texture_catalog_pack_meta">버전 %1$s • %2$s • 파일 %3$d개</string>
+    <string name="content_compatible_game_version_section">이 게임 버전과 호환</string>
+    <string name="content_other_game_versions_section">다른 게임 버전용</string>
+    <string name="content_compatible">호환됨</string>
+    <string name="content_not_compatible">호환되지 않음</string>
+    <string name="content_supported_serials">호환 시리얼: %1$s</string>
     <string name="cheat_manager_title">치트 관리자</string>
     <string name="cheat_manager_enable">치트 활성화</string>
     <string name="cheat_manager_enable_desc">게임 시작 시 활성화된 PNACH 블록을 적용합니다.</string>

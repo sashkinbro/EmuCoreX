@@ -1841,6 +1841,11 @@
     <string name="texture_catalog_install_success">Doku paketi yüklendi. Doku değiştirme etkinleştirildi.</string>
     <string name="texture_catalog_install_failed">Doku paketi güvenli biçimde indirilemedi veya yüklenemedi.</string>
     <string name="texture_catalog_pack_meta">Sürüm %1$s • %2$s • %3$d dosya</string>
+    <string name="content_compatible_game_version_section">Bu oyun sürümüyle uyumlu</string>
+    <string name="content_other_game_versions_section">Diğer oyun sürümleri için mevcut</string>
+    <string name="content_compatible">Uyumlu</string>
+    <string name="content_not_compatible">Uyumlu değil</string>
+    <string name="content_supported_serials">Uyumlu seri numaraları: %1$s</string>
     <string name="cheat_manager_title">Hile yöneticisi</string>
     <string name="cheat_manager_enable">Hileleri etkinleştir</string>
     <string name="cheat_manager_enable_desc">Etkin PNACH bloklarının oyun başlarken uygulanmasını sağlar.</string>

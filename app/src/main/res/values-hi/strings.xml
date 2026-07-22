@@ -1841,6 +1841,11 @@
     <string name="texture_catalog_install_success">टेक्सचर पैक इंस्टॉल हुआ। टेक्सचर प्रतिस्थापन चालू कर दिया गया है।</string>
     <string name="texture_catalog_install_failed">टेक्सचर पैक सुरक्षित रूप से डाउनलोड या इंस्टॉल नहीं हो सका।</string>
     <string name="texture_catalog_pack_meta">संस्करण %1$s • %2$s • %3$d फ़ाइलें</string>
+    <string name="content_compatible_game_version_section">इस गेम संस्करण के संगत</string>
+    <string name="content_other_game_versions_section">अन्य गेम संस्करणों के लिए उपलब्ध</string>
+    <string name="content_compatible">संगत</string>
+    <string name="content_not_compatible">संगत नहीं</string>
+    <string name="content_supported_serials">संगत सीरियल: %1$s</string>
     <string name="cheat_manager_title">चीट प्रबंधक</string>
     <string name="cheat_manager_enable">चीट चालू करें</string>
     <string name="cheat_manager_enable_desc">गेम शुरू होने पर चालू PNACH ब्लॉक लागू करता है।</string>

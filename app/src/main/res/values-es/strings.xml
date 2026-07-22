@@ -1843,6 +1843,11 @@
     <string name="texture_catalog_install_success">Paquete de texturas instalado. Se activó la sustitución de texturas.</string>
     <string name="texture_catalog_install_failed">No se pudo descargar o instalar el paquete de texturas de forma segura.</string>
     <string name="texture_catalog_pack_meta">Versión %1$s • %2$s • %3$d archivos</string>
+    <string name="content_compatible_game_version_section">Compatibles con esta versión del juego</string>
+    <string name="content_other_game_versions_section">Disponibles para otras versiones del juego</string>
+    <string name="content_compatible">Compatible</string>
+    <string name="content_not_compatible">No compatible</string>
+    <string name="content_supported_serials">Números de serie compatibles: %1$s</string>
     <string name="cheat_manager_title">Gestor de trucos</string>
     <string name="cheat_manager_enable">Activar trucos</string>
     <string name="cheat_manager_enable_desc">Permite aplicar los bloques PNACH activados al iniciar un juego.</string>

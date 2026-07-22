@@ -1845,6 +1845,11 @@
     <string name="texture_catalog_install_success">Текстурний пак встановлено. Заміни текстур увімкнено.</string>
     <string name="texture_catalog_install_failed">Не вдалося безпечно завантажити або встановити текстурний пак.</string>
     <string name="texture_catalog_pack_meta">Версія %1$s • %2$s • файлів: %3$d</string>
+    <string name="content_compatible_game_version_section">Сумісні з цією версією гри</string>
+    <string name="content_other_game_versions_section">Доступні для інших версій гри</string>
+    <string name="content_compatible">Сумісний</string>
+    <string name="content_not_compatible">Несумісний</string>
+    <string name="content_supported_serials">Сумісні серійники: %1$s</string>
     <string name="cheat_manager_title">Менеджер чітів</string>
     <string name="cheat_manager_enable">Увімкнути чіти</string>
     <string name="cheat_manager_enable_desc">Дозволяє застосовувати ввімкнені блоки PNACH під час запуску гри.</string>

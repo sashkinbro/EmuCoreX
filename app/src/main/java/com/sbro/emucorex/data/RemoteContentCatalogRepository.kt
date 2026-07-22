@@ -50,7 +50,8 @@ data class RemoteCheatPack(
 data class RemoteCatalogResult<T>(
     val entries: List<T>,
     val fromCache: Boolean,
-    val error: Throwable? = null
+    val error: Throwable? = null,
+    val cacheHit: Boolean = false
 )
 
 class RemoteContentCatalogRepository(context: Context) {
@@ -59,16 +60,18 @@ class RemoteContentCatalogRepository(context: Context) {
     private val cacheDir = File(appContext.filesDir, "remote-content").apply { mkdirs() }
     private val downloadDir = File(appContext.cacheDir, "remote-content-downloads").apply { mkdirs() }
 
-    fun loadTextureCatalog(): RemoteCatalogResult<RemoteTexturePack> = loadCatalog(
+    fun loadTextureCatalog(forceRefresh: Boolean = false): RemoteCatalogResult<RemoteTexturePack> = loadCatalog(
         urls = TEXTURE_CATALOG_URLS,
         cacheFile = File(cacheDir, "textures-v1.json"),
-        parser = ::parseTextureCatalog
+        parser = ::parseTextureCatalog,
+        forceRefresh = forceRefresh
     )
 
-    fun loadCheatCatalog(): RemoteCatalogResult<RemoteCheatPack> = loadCatalog(
+    fun loadCheatCatalog(forceRefresh: Boolean = false): RemoteCatalogResult<RemoteCheatPack> = loadCatalog(
         urls = CHEAT_CATALOG_URLS,
         cacheFile = File(cacheDir, "cheats-v1.json"),
-        parser = ::parseCheatCatalog
+        parser = ::parseCheatCatalog,
+        forceRefresh = forceRefresh
     )
 
     fun downloadTexturePack(
@@ -111,9 +114,10 @@ class RemoteContentCatalogRepository(context: Context) {
     private fun <T> loadCatalog(
         urls: List<String>,
         cacheFile: File,
-        parser: (String) -> List<T>
+        parser: (String) -> List<T>,
+        forceRefresh: Boolean
     ): RemoteCatalogResult<T> {
-        if (cacheFile.isFile) {
+        if (!forceRefresh && cacheFile.isFile) {
             val cacheAge = (System.currentTimeMillis() - cacheFile.lastModified()).coerceAtLeast(0L)
             if (cacheAge <= CATALOG_CACHE_TTL_MS) {
                 runCatching { parser(cacheFile.readText()) }
@@ -121,7 +125,7 @@ class RemoteContentCatalogRepository(context: Context) {
                     ?.takeIf { it.isNotEmpty() }
                     ?.let { entries ->
                         // A fresh cache is the normal fast path, not an offline fallback warning.
-                        return RemoteCatalogResult(entries, fromCache = false)
+                        return RemoteCatalogResult(entries, fromCache = false, cacheHit = true)
                     }
             }
         }
@@ -141,7 +145,7 @@ class RemoteContentCatalogRepository(context: Context) {
             runCatching { parser(cacheFile.readText()) }
                 .getOrNull()
                 ?.takeIf { it.isNotEmpty() }
-                ?.let { return RemoteCatalogResult(it, fromCache = true, error = lastError) }
+                ?.let { return RemoteCatalogResult(it, fromCache = true, error = lastError, cacheHit = true) }
         }
         return RemoteCatalogResult(emptyList(), fromCache = false, error = lastError)
     }

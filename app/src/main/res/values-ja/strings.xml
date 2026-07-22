@@ -1840,6 +1840,11 @@
     <string name="texture_catalog_install_success">テクスチャパックをインストールし、テクスチャ置換を有効にしました。</string>
     <string name="texture_catalog_install_failed">テクスチャパックを安全にダウンロードまたはインストールできませんでした。</string>
     <string name="texture_catalog_pack_meta">バージョン %1$s • %2$s • %3$d ファイル</string>
+    <string name="content_compatible_game_version_section">このゲームバージョンに対応</string>
+    <string name="content_other_game_versions_section">ほかのゲームバージョン向け</string>
+    <string name="content_compatible">対応</string>
+    <string name="content_not_compatible">非対応</string>
+    <string name="content_supported_serials">対応シリアル: %1$s</string>
     <string name="cheat_manager_title">チートマネージャー</string>
     <string name="cheat_manager_enable">チートを有効化</string>
     <string name="cheat_manager_enable_desc">ゲーム開始時に有効な PNACH ブロックを適用します。</string>

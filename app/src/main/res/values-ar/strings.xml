@@ -1845,6 +1845,11 @@
     <string name="texture_catalog_install_success">تم تثبيت حزمة الأنسجة وتفعيل استبدال الأنسجة.</string>
     <string name="texture_catalog_install_failed">تعذر تنزيل حزمة الأنسجة أو تثبيتها بأمان.</string>
     <string name="texture_catalog_pack_meta">الإصدار %1$s • %2$s • %3$d ملف</string>
+    <string name="content_compatible_game_version_section">متوافقة مع إصدار اللعبة هذا</string>
+    <string name="content_other_game_versions_section">متاحة لإصدارات أخرى من اللعبة</string>
+    <string name="content_compatible">متوافق</string>
+    <string name="content_not_compatible">غير متوافق</string>
+    <string name="content_supported_serials">الأرقام التسلسلية المتوافقة: %1$s</string>
     <string name="cheat_manager_title">مدير الغش</string>
     <string name="cheat_manager_enable">تفعيل الغش</string>
     <string name="cheat_manager_enable_desc">يسمح بتطبيق كتل PNACH المفعلة عند تشغيل اللعبة.</string>

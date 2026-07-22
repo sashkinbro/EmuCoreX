@@ -1843,6 +1843,11 @@
     <string name="texture_catalog_install_success">Texturpaket installiert. Texturersetzungen wurden aktiviert.</string>
     <string name="texture_catalog_install_failed">Das Texturpaket konnte nicht sicher heruntergeladen oder installiert werden.</string>
     <string name="texture_catalog_pack_meta">Version %1$s • %2$s • %3$d Dateien</string>
+    <string name="content_compatible_game_version_section">Mit dieser Spielversion kompatibel</string>
+    <string name="content_other_game_versions_section">Für andere Spielversionen verfügbar</string>
+    <string name="content_compatible">Kompatibel</string>
+    <string name="content_not_compatible">Nicht kompatibel</string>
+    <string name="content_supported_serials">Kompatible Seriennummern: %1$s</string>
     <string name="cheat_manager_title">Cheat-Verwaltung</string>
     <string name="cheat_manager_enable">Cheats aktivieren</string>
     <string name="cheat_manager_enable_desc">Aktivierte PNACH-Blöcke beim Spielstart anwenden.</string>

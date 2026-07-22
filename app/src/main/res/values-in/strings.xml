@@ -1855,6 +1855,11 @@
     <string name="texture_catalog_install_success">Paket tekstur terpasang. Penggantian tekstur telah diaktifkan.</string>
     <string name="texture_catalog_install_failed">Paket tekstur tidak dapat diunduh atau dipasang dengan aman.</string>
     <string name="texture_catalog_pack_meta">Versi %1$s • %2$s • %3$d file</string>
+    <string name="content_compatible_game_version_section">Kompatibel dengan versi game ini</string>
+    <string name="content_other_game_versions_section">Tersedia untuk versi game lain</string>
+    <string name="content_compatible">Kompatibel</string>
+    <string name="content_not_compatible">Tidak kompatibel</string>
+    <string name="content_supported_serials">Serial yang kompatibel: %1$s</string>
     <string name="cheat_manager_title">Pengelola cheat</string>
     <string name="cheat_manager_enable">Aktifkan cheat</string>
     <string name="cheat_manager_enable_desc">Menerapkan blok PNACH yang diaktifkan saat game dimulai.</string>

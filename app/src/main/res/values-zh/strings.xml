@@ -1842,6 +1842,11 @@
     <string name="texture_catalog_install_success">纹理包已安装，并已启用纹理替换。</string>
     <string name="texture_catalog_install_failed">无法安全下载或安装纹理包。</string>
     <string name="texture_catalog_pack_meta">版本 %1$s • %2$s • %3$d 个文件</string>
+    <string name="content_compatible_game_version_section">与此游戏版本兼容</string>
+    <string name="content_other_game_versions_section">适用于其他游戏版本</string>
+    <string name="content_compatible">兼容</string>
+    <string name="content_not_compatible">不兼容</string>
+    <string name="content_supported_serials">兼容序列号：%1$s</string>
     <string name="cheat_manager_title">作弊管理器</string>
     <string name="cheat_manager_enable">启用作弊码</string>
     <string name="cheat_manager_enable_desc">在游戏启动时应用已启用的 PNACH 代码块。</string>

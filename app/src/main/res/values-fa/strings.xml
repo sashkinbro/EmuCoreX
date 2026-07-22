@@ -1856,6 +1856,11 @@
     <string name="texture_catalog_install_success">بسته بافت نصب و جایگزینی بافت فعال شد.</string>
     <string name="texture_catalog_install_failed">بسته بافت با اطمینان بارگیری یا نصب نشد.</string>
     <string name="texture_catalog_pack_meta">نسخه %1$s • %2$s • %3$d فایل</string>
+    <string name="content_compatible_game_version_section">سازگار با این نسخه بازی</string>
+    <string name="content_other_game_versions_section">موجود برای نسخه‌های دیگر بازی</string>
+    <string name="content_compatible">سازگار</string>
+    <string name="content_not_compatible">ناسازگار</string>
+    <string name="content_supported_serials">شماره‌های سریال سازگار: %1$s</string>
     <string name="cheat_manager_title">مدیریت تقلب‌ها</string>
     <string name="cheat_manager_enable">فعال‌سازی تقلب‌ها</string>
     <string name="cheat_manager_enable_desc">بلوک‌های فعال PNACH را هنگام اجرای بازی اعمال می‌کند.</string>
