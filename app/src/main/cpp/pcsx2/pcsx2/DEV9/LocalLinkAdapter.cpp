@@ -629,7 +629,16 @@ void LocalLinkAdapter::PurgeExpiredState()
 	}
 
 	if (!m_host)
+	{
+		for (auto it = m_remote_peers.begin(); it != m_remote_peers.end();)
+		{
+			if (now - it->second.last_seen > std::chrono::seconds(10))
+				it = m_remote_peers.erase(it);
+			else
+				++it;
+		}
 		return;
+	}
 	std::lock_guard lock(m_peer_mutex);
 	m_peers.erase(std::remove_if(m_peers.begin(), m_peers.end(), [&](const Peer& peer) {
 		return now - peer.last_seen > std::chrono::seconds(10);

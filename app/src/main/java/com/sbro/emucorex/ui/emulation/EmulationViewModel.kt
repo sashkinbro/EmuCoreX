@@ -577,7 +577,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun syncGamepadRuntimeSettings(state: EmulationUiState) {
         syncGamepadRightStickTriggerMapping(state)
-        GamepadManager.setButtonHapticsEnabled(state.gamepadButtonHaptics)
+        GamepadManager.setButtonHapticsEnabled(
+            enabled = state.gamepadButtonHaptics,
+            strengthPercent = state.touchHapticsStrength,
+            preset = state.touchHapticsPreset
+        )
         NativeApp.setPadPressureModifierAmount(state.pressureModifierAmount.coerceIn(1, 100))
     }
 
@@ -1685,7 +1689,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         launchPath?.startsWith("/") == true -> "file"
                         else -> "unknown"
                     }
-                    refreshCurrentGameCheats(metadata)
+                    refreshCurrentGameCheats(metadata, config.enableCheats)
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
@@ -4174,7 +4178,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         return profile.copy(providedKeys = providedKeys)
     }
 
-    private fun refreshCurrentGameCheats(metadata: com.sbro.emucorex.core.GameMetadata) {
+    private fun refreshCurrentGameCheats(
+        metadata: com.sbro.emucorex.core.GameMetadata,
+        cheatsEnabled: Boolean = _uiState.value.enableCheats
+    ) {
         val serial = metadata.serial.orEmpty()
         val crc = metadata.serialWithCrc.extractCrc()
         val config = cheatRepository.getGameConfig(
@@ -4186,7 +4193,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             cheatsGameKey = config?.gameKey,
             availableCheats = config?.blocks.orEmpty()
         )
-        if (config != null && _uiState.value.enableCheats) {
+        if (config != null && cheatsEnabled) {
             cheatRepository.syncActiveCheats(config.gameKey, serial, crc)
         }
     }

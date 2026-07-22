@@ -45,6 +45,9 @@ bool SDLInputSource::ReloadDevices()
 
 void SDLInputSource::Shutdown()
 {
+	m_android_motor_state = {};
+	emucorex::android::DispatchPadVibration(0, 0.0f, 0.0f);
+	emucorex::android::DispatchPadVibration(1, 0.0f, 0.0f);
 	m_sdl_subsystem_initialized = false;
 }
 

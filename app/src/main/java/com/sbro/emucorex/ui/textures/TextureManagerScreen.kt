@@ -136,6 +136,9 @@ fun TextureManagerScreen(
             } finally {
                 isWorking = false
             }
+            if (result.success) {
+                preferences.setTextureReplacementsEnabled(true)
+            }
             Toast.makeText(
                 context,
                 if (result.success) {
@@ -197,7 +200,10 @@ fun TextureManagerScreen(
 
             item {
                 TextureOnlineCatalogSection(
-                    onInstalled = { refresh() }
+                    onInstalled = {
+                        scope.launch { preferences.setTextureReplacementsEnabled(true) }
+                        refresh()
+                    }
                 )
             }
 

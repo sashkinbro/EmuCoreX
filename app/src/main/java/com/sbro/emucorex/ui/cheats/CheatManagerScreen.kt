@@ -86,6 +86,8 @@ import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -98,6 +100,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
     val cheatRepository = remember(context) { CheatRepository(context) }
     val catalogRepository = remember(context) { RemoteContentCatalogRepository(context) }
     val libraryRepository = remember(context) { ContentLibraryRepository(context) }
+    val cheatWriteMutex = remember { Mutex() }
     val cheatsEnabled by preferences.enableCheats.collectAsState(initial = false)
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -460,12 +463,14 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                                         onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
                                         onDownload = {
                                             if (workingId == null) {
+                                                val capturedIdentity = identity
+                                                val capturedPath = selectedPath
                                                 scope.launch {
                                                     workingId = pack.id
                                                     val installedConfig = withContext(Dispatchers.IO) {
                                                         runCatching {
                                                             val text = catalogRepository.downloadCheatText(pack)
-                                                            val serial = identity?.serial
+                                                            val serial = capturedIdentity?.serial
                                                             val gameKey = if (!serial.isNullOrBlank()) {
                                                                 "${serial}_${pack.crc}"
                                                             } else {
@@ -487,6 +492,8 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                                                     }
                                                     if (installedConfig != null) {
                                                         preferences.setEnableCheats(true)
+                                                    }
+                                                    if (installedConfig != null && selectedPath == capturedPath) {
                                                         config = installedConfig
                                                     }
                                                     Toast.makeText(
@@ -628,21 +635,24 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                             CheatToggleCard(
                                 block = block,
                                 onEnabledChange = { enabled ->
-                                    val enabledIds = current.blocks
+                                    val latest = config ?: current
+                                    val enabledIds = latest.blocks
                                         .filter { it.enabled }
                                         .mapTo(mutableSetOf()) { it.id }
                                         .apply { if (enabled) add(block.id) else remove(block.id) }
-                                    val updatedBlocks = current.blocks.map { item ->
+                                    val updatedBlocks = latest.blocks.map { item ->
                                         if (item.id == block.id) item.copy(enabled = enabled) else item
                                     }
-                                    config = current.copy(blocks = updatedBlocks)
+                                    config = latest.copy(blocks = updatedBlocks)
                                     categoryGroups = categoryGroups.map { (category, blocks) ->
                                         category to blocks.map { item ->
                                             if (item.id == block.id) item.copy(enabled = enabled) else item
                                         }
                                     }
                                     scope.launch(Dispatchers.IO) {
-                                        cheatRepository.setEnabledBlocks(current.gameKey, enabledIds)
+                                        cheatWriteMutex.withLock {
+                                            cheatRepository.setEnabledBlocks(latest.gameKey, enabledIds)
+                                        }
                                     }
                                 }
                             )

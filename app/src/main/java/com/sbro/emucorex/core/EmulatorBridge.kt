@@ -503,11 +503,13 @@ object EmulatorBridge {
         val textureReplacementsAsync = prefs.textureReplacementsAsync.first()
         val textureReplacementsPrecache = prefs.textureReplacementsPrecache.first()
         val textureDumpingEnabled = prefs.textureDumpingEnabled.first()
+        val effectiveDev9EthernetEnabled = dev9EthernetEnabled ||
+            dev9LocalLinkMode != AppPreferences.DEV9_LOCAL_LINK_OFF
 
         performRuntimeOps(
             buildList {
                 add(settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString()))
-                add(settingOp("DEV9/Eth", "EthEnable", "bool", dev9EthernetEnabled.toString()))
+                add(settingOp("DEV9/Eth", "EthEnable", "bool", effectiveDev9EthernetEnabled.toString()))
                 add(settingOp("DEV9/Eth", "EthApi", "string", if (dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) "Sockets" else "Local Link"))
                 add(settingOp("DEV9/Eth", "EthDevice", "string", dev9EthernetDevice.ifBlank { "Auto" }))
                 add(settingOp("DEV9/Eth", "InterceptDHCP", "bool", dev9InterceptDhcp.toString()))
@@ -1217,7 +1219,6 @@ object EmulatorBridge {
 
     suspend fun setPadVibration(enabled: Boolean) {
         setSetting("InputSources", "PadVibration", "bool", enabled.toString())
-        runCatching { NativeApp.setPadVibration(enabled) }
     }
 
     fun onSurfaceCreated() {

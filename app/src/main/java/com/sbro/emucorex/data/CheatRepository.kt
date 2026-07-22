@@ -1,6 +1,7 @@
 package com.sbro.emucorex.data
 
 import android.content.Context
+import android.util.AtomicFile
 import com.sbro.emucorex.core.EmulatorStorage
 import org.json.JSONArray
 import org.json.JSONObject
@@ -87,7 +88,7 @@ class CheatRepository(private val context: Context) {
         contents: String,
         enableAllByDefault: Boolean = false,
         mergeWithExisting: Boolean = false
-    ): Int {
+    ): Int = synchronized(CHEAT_IO_LOCK) {
         val normalizedGameKey = normalizeGameKey(gameKey)
         val target = importedFile(normalizedGameKey)
         val state = loadEnabledIds()
@@ -102,7 +103,7 @@ class CheatRepository(private val context: Context) {
                 .map(::cheatBlockSignature)
                 .toSet()
         val importedBlocks = parseCheatBlocks(contents)
-        if (importedBlocks.isEmpty()) return 0
+        if (importedBlocks.isEmpty()) return@synchronized 0
         val blocks = if (mergeWithExisting) {
             mergeCheatBlocks(existingBlocks, importedBlocks)
         } else {
@@ -110,7 +111,7 @@ class CheatRepository(private val context: Context) {
         }
         val storedContents = if (mergeWithExisting) serializeCheatBlocks(blocks) else contents
         target.parentFile?.mkdirs()
-        target.writeText(storedContents)
+        writeTextAtomically(target, storedContents)
         val enabledIds = if (enableAllByDefault) {
             blocks.map { it.id }
         } else {
@@ -120,7 +121,7 @@ class CheatRepository(private val context: Context) {
         state.put(normalizedGameKey, JSONArray(enabledIds))
         if (normalizedGameKey != gameKey) state.remove(gameKey)
         writeEnabledIds(state)
-        return blocks.size
+        blocks.size
     }
 
     private fun mergeCheatBlocks(
@@ -148,7 +149,7 @@ class CheatRepository(private val context: Context) {
         }
     }
 
-    fun setEnabledBlocks(gameKey: String, enabledIds: Set<String>) {
+    fun setEnabledBlocks(gameKey: String, enabledIds: Set<String>) = synchronized(CHEAT_IO_LOCK) {
         val normalizedGameKey = normalizeGameKey(gameKey)
         val state = loadEnabledIds()
         state.put(normalizedGameKey, JSONArray(enabledIds.toList()))
@@ -156,15 +157,15 @@ class CheatRepository(private val context: Context) {
         writeEnabledIds(state)
     }
 
-    fun syncActiveCheats(gameKey: String, serial: String?, crc: String?) {
+    fun syncActiveCheats(gameKey: String, serial: String?, crc: String?) = synchronized(CHEAT_IO_LOCK) {
         val source = resolveImportedFile(gameKey)
         val normalizedGameKey = source.nameWithoutExtension
-        val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: return
+        val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() } ?: return@synchronized
         val normalizedSerial = serial?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
         if (!source.exists()) {
             recordedActiveCheatFiles(normalizedGameKey).forEach { if (it.exists()) it.delete() }
             clearRecordedActiveCheatFiles(normalizedGameKey)
-            return
+            return@synchronized
         }
         val enabledIds = storedValues(loadEnabledIds(), normalizedGameKey, gameKey)
         val blocks = runCatching { parseCheatBlocks(source.readText()) }
@@ -176,7 +177,7 @@ class CheatRepository(private val context: Context) {
             (candidates + recordedActiveCheatFiles(normalizedGameKey)).distinctBy(File::getAbsolutePath)
                 .forEach { if (it.exists()) it.delete() }
             clearRecordedActiveCheatFiles(normalizedGameKey)
-            return
+            return@synchronized
         }
         activeDir().mkdirs()
         val contents = buildString {
@@ -188,11 +189,11 @@ class CheatRepository(private val context: Context) {
         }.trim() + "\n"
         candidates.filterNot { it == target }.forEach { if (it.exists()) it.delete() }
         recordedActiveCheatFiles(normalizedGameKey).filterNot { it == target }.forEach { if (it.exists()) it.delete() }
-        target.writeText(contents)
+        writeTextAtomically(target, contents)
         recordActiveCheatFile(normalizedGameKey, target)
     }
 
-    fun deleteImportedCheats(gameKey: String, serial: String?, crc: String?) {
+    fun deleteImportedCheats(gameKey: String, serial: String?, crc: String?) = synchronized(CHEAT_IO_LOCK) {
         val source = resolveImportedFile(gameKey)
         val normalizedGameKey = source.nameWithoutExtension
         source.delete()
@@ -202,7 +203,7 @@ class CheatRepository(private val context: Context) {
         val inferred = inferSerialAndCrc(normalizedGameKey)
         val normalizedCrc = crc?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
             ?: inferred?.second
-            ?: return
+            ?: return@synchronized
         val normalizedSerial = serial?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
             ?: inferred?.first
         activeCheatFileCandidates(normalizedSerial, normalizedCrc).forEach { if (it.exists()) it.delete() }
@@ -235,8 +236,7 @@ class CheatRepository(private val context: Context) {
     }
 
     private fun writeEnabledIds(json: JSONObject) {
-        stateFile.parentFile?.mkdirs()
-        stateFile.writeText(json.toString())
+        writeTextAtomically(stateFile, json.toString())
     }
 
     private fun sanitizeFileName(value: String): String {
@@ -311,12 +311,28 @@ class CheatRepository(private val context: Context) {
     }
 
     private fun writeActiveTargets(json: JSONObject) {
-        activeTargetsFile.parentFile?.mkdirs()
-        activeTargetsFile.writeText(json.toString())
+        writeTextAtomically(activeTargetsFile, json.toString())
+    }
+
+    private fun writeTextAtomically(file: File, contents: String) {
+        file.parentFile?.mkdirs()
+        val atomicFile = AtomicFile(file)
+        val output = atomicFile.startWrite()
+        try {
+            output.write(contents.toByteArray(Charsets.UTF_8))
+            atomicFile.finishWrite(output)
+        } catch (error: Throwable) {
+            atomicFile.failWrite(output)
+            throw error
+        }
     }
 
     private fun activeDir(): File {
         return EmulatorStorage.cheatsDir(context, preferences.getEmulatorDataPathSync())
+    }
+
+    private companion object {
+        val CHEAT_IO_LOCK = Any()
     }
 
     private fun parseCheatBlocks(raw: String): List<CheatBlock> {

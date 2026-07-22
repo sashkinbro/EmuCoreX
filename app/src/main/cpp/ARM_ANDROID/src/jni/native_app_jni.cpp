@@ -28,6 +28,8 @@
 #include <zip.h>
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <mutex>
@@ -47,6 +49,20 @@ constexpr const char* LOG_TAG = "EmuCoreX";
 std::mutex s_callback_mutex;
 JavaVM* s_java_vm = nullptr;
 jclass s_native_app_class = nullptr;
+jmethodID s_pad_vibration_method = nullptr;
+
+struct PadVibrationDispatchState
+{
+	float large_motor = 0.0f;
+	float small_motor = 0.0f;
+	std::chrono::steady_clock::time_point last_dispatch{};
+	bool dispatched = false;
+};
+
+std::array<PadVibrationDispatchState, 2> s_pad_vibration_dispatch_states{};
+
+constexpr auto PAD_VIBRATION_REFRESH_INTERVAL = std::chrono::milliseconds(40);
+constexpr float PAD_VIBRATION_CHANGE_EPSILON = 0.002f;
 
 void LogUnsupported(const char* feature)
 {
@@ -169,6 +185,11 @@ void ConfigureNativeAppCallbacks(JNIEnv* env, jclass native_app_class)
 	if (s_native_app_class)
 		env->DeleteGlobalRef(s_native_app_class);
 	s_native_app_class = static_cast<jclass>(env->NewGlobalRef(native_app_class));
+	s_pad_vibration_method = s_native_app_class ?
+		env->GetStaticMethodID(s_native_app_class, "onPadVibration", "(IFF)V") : nullptr;
+	s_pad_vibration_dispatch_states = {};
+	if (env->ExceptionCheck())
+		env->ExceptionClear();
 }
 
 JavaVM* GetJavaVM()
@@ -179,15 +200,33 @@ JavaVM* GetJavaVM()
 
 void DispatchPadVibration(int pad_index, float large_motor, float small_motor)
 {
+	if (pad_index < 0 || pad_index >= static_cast<int>(s_pad_vibration_dispatch_states.size()))
+		return;
+
+	large_motor = std::clamp(large_motor, 0.0f, 1.0f);
+	small_motor = std::clamp(small_motor, 0.0f, 1.0f);
+	const auto now = std::chrono::steady_clock::now();
 	JavaVM* java_vm = nullptr;
-	jclass native_app_class = nullptr;
 	{
 		std::lock_guard lock(s_callback_mutex);
+		PadVibrationDispatchState& state = s_pad_vibration_dispatch_states[pad_index];
+		const bool stopped = large_motor == 0.0f && small_motor == 0.0f;
+		const bool transitioned_to_stop = stopped &&
+			(state.large_motor != 0.0f || state.small_motor != 0.0f);
+		const bool changed = !state.dispatched || transitioned_to_stop ||
+			std::abs(state.large_motor - large_motor) > PAD_VIBRATION_CHANGE_EPSILON ||
+			std::abs(state.small_motor - small_motor) > PAD_VIBRATION_CHANGE_EPSILON;
+		if (!changed && (stopped || (now - state.last_dispatch) < PAD_VIBRATION_REFRESH_INTERVAL))
+			return;
+
+		state.large_motor = large_motor;
+		state.small_motor = small_motor;
+		state.last_dispatch = now;
+		state.dispatched = true;
 		java_vm = s_java_vm;
-		native_app_class = s_native_app_class;
 	}
 
-	if (!java_vm || !native_app_class)
+	if (!java_vm)
 		return;
 
 	JNIEnv* env = nullptr;
@@ -199,10 +238,23 @@ void DispatchPadVibration(int pad_index, float large_motor, float small_motor)
 		did_attach = true;
 	}
 
-	jmethodID method = env->GetStaticMethodID(native_app_class, "onPadVibration", "(IFF)V");
-	if (method)
-		env->CallStaticVoidMethod(native_app_class, method, static_cast<jint>(pad_index),
+	jclass native_app_class = nullptr;
+	jmethodID pad_vibration_method = nullptr;
+	{
+		std::lock_guard lock(s_callback_mutex);
+		if (s_native_app_class && s_pad_vibration_method)
+		{
+			native_app_class = static_cast<jclass>(env->NewLocalRef(s_native_app_class));
+			pad_vibration_method = s_pad_vibration_method;
+		}
+	}
+
+	if (native_app_class && pad_vibration_method)
+	{
+		env->CallStaticVoidMethod(native_app_class, pad_vibration_method, static_cast<jint>(pad_index),
 			static_cast<jfloat>(large_motor), static_cast<jfloat>(small_motor));
+		env->DeleteLocalRef(native_app_class);
+	}
 
 	if (env->ExceptionCheck())
 		env->ExceptionClear();
@@ -382,7 +434,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_isBi
 	close(fd);
 	return valid ? JNI_TRUE : JNI_FALSE;
 }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadVibration(JNIEnv*, jclass, jboolean enabled) { AndroidRuntime::Instance().SetSetting("InputSources", "PadVibration", "bool", enabled == JNI_TRUE ? "true" : "false"); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPerformanceMetricsEnabled(JNIEnv*, jclass, jboolean visible, jboolean detailed, jboolean gpu_timing)
 {
 	emucorex::android::SetPerformanceMetricsCallbackEnabled(

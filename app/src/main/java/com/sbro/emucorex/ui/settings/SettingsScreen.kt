@@ -3899,14 +3899,19 @@ private fun NetworkSettingsTab(
 
     SettingsSection(title = stringResource(R.string.settings_network_tab)) {
         SettingsInlineNote(stringResource(R.string.settings_network_summary))
+        val localLinkActive = uiState.dev9LocalLinkMode != AppPreferences.DEV9_LOCAL_LINK_OFF
         ToggleItem(
             icon = Icons.Rounded.Link,
             title = stringResource(R.string.settings_network_enable),
             subtitle = stringResource(R.string.settings_network_enable_desc),
-            checked = uiState.dev9EthernetEnabled,
-            onCheckedChange = viewModel::setDev9EthernetEnabled,
+            checked = uiState.dev9EthernetEnabled || localLinkActive,
+            onCheckedChange = { enabled ->
+                viewModel.setDev9EthernetEnabled(enabled || localLinkActive)
+            },
             helpText = stringResource(R.string.settings_network_enable_help),
-            onResetToDefault = { viewModel.setDev9EthernetEnabled(defaults.dev9EthernetEnabled) }
+            onResetToDefault = {
+                viewModel.setDev9EthernetEnabled(defaults.dev9EthernetEnabled || localLinkActive)
+            }
         )
         ChoiceSection(
             title = stringResource(R.string.settings_network_mode),
