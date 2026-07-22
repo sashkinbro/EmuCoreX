@@ -59,7 +59,7 @@ EmuCoreX currently targets Android with:
 - `minSdk 29`
 - `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.2.9`
+- version `0.3.0`
 
 ## Building Locally
 
