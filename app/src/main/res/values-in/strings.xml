@@ -906,6 +906,7 @@
     <string name="settings_hw_download_mode_no_readbacks">Tidak Ada Readback</string>
     <string name="settings_hw_download_mode_unsynchronized">Tidak Disinkronkan</string>
     <string name="settings_hw_download_mode_disabled">Dinonaktifkan</string>
+    <string name="settings_hw_download_mode_asynchronous">Asinkron (Eksperimental)</string>
     <string name="settings_frame_control">Kontrol Frame</string>
     <string name="settings_frame_skip_off">Mati</string>
     <string name="settings_frame_limiter">Pembatas frame</string>

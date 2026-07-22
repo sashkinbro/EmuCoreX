@@ -906,6 +906,7 @@
     <string name="settings_hw_download_mode_no_readbacks">بدون بازخوانی</string>
     <string name="settings_hw_download_mode_unsynchronized">هماهنگ نشده</string>
     <string name="settings_hw_download_mode_disabled">غیرفعال</string>
+    <string name="settings_hw_download_mode_asynchronous">ناهمگام (آزمایشی)</string>
     <string name="settings_frame_control">کنترل فریم</string>
     <string name="settings_frame_skip_off">خاموش</string>
     <string name="settings_frame_limiter">محدودکننده فریم</string>

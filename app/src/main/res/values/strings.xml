@@ -955,12 +955,13 @@
     <string name="settings_intc_stat_speedhack_desc">Optimizes interrupt status polling</string>
     <string name="settings_vu_flag_hack_desc">Uses faster VU flag timing</string>
     <string name="settings_instant_vu1_desc">Runs VU1 work with looser timing</string>
-    <string name="settings_hw_download_mode_desc">Changes synchronization behavior for hardware GS downloads. Accurate is the safest option.</string>
+    <string name="settings_hw_download_mode_desc">Changes synchronization behavior for hardware GS downloads. No Readbacks is the balanced Android default; Asynchronous is experimental and returns the latest completed GPU data.</string>
     <string name="settings_hw_download_mode_accurate">Accurate</string>
     <string name="settings_hw_download_mode_force_full">Accurate (Force Full Readbacks)</string>
     <string name="settings_hw_download_mode_no_readbacks">No Readbacks</string>
     <string name="settings_hw_download_mode_unsynchronized">Unsynchronized</string>
     <string name="settings_hw_download_mode_disabled">Disabled</string>
+    <string name="settings_hw_download_mode_asynchronous">Asynchronous (Experimental)</string>
     <string name="settings_frame_control">Frame Control</string>
     <string name="settings_frame_skip_off">Off</string>
     <string name="settings_frame_limiter">Frame limiter</string>

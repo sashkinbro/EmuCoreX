@@ -154,7 +154,7 @@ data class SettingsUiState(
     val enableFastBoot: Boolean = true,
     val enableFastCdvd: Boolean = false,
     val enableCheats: Boolean = false,
-    val hwDownloadMode: Int = 3, // Unsynchronized default for Android
+    val hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = true,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,

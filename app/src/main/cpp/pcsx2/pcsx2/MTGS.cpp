@@ -272,6 +272,16 @@ void MTGS::PostVsyncStart(bool registers_written)
 
 void MTGS::InitAndReadFIFO(u8* mem, u32 qwc)
 {
+	if (EmuConfig.GS.HWDownloadMode == GSHardwareDownloadMode::Asynchronous && GSIsHardwareRenderer())
+	{
+		// Return the latest CPU-side GS memory immediately. The ordered GS-thread command below
+		// schedules a real GPU download which refreshes that shadow without stalling the EE thread.
+		GSReadLocalMemoryUnsync(mem, qwc, vif1.BITBLTBUF._u64, vif1.TRXPOS._u64, vif1.TRXREG._u64);
+		SendSimplePacket(Command::AsyncReadFIFO, qwc, 0, 0);
+		SetEvent();
+		return;
+	}
+
 	if (EmuConfig.GS.HWDownloadMode >= GSHardwareDownloadMode::Unsynchronized && GSIsHardwareRenderer())
 	{
 		if (EmuConfig.GS.HWDownloadMode == GSHardwareDownloadMode::Unsynchronized)
@@ -584,6 +594,15 @@ void MTGS::MainLoop()
 						case Command::InitAndReadFIFO:
 							GSInitAndReadFIFO((u8*)tag.pointer, tag.data[0]);
 							break;
+
+						case Command::AsyncReadFIFO:
+						{
+							// Some GS formats can write one quadword past the requested transfer size.
+							static thread_local std::vector<u8> async_fifo_buffer;
+							async_fifo_buffer.resize((static_cast<size_t>(tag.data[0]) + 1) * 16);
+							GSInitAndReadFIFO(async_fifo_buffer.data(), tag.data[0]);
+						}
+						break;
 
 #ifdef PCSX2_DEVBUILD
 						default:

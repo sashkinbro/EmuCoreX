@@ -631,6 +631,7 @@
     <string name="settings_hw_download_mode_no_readbacks">リードバックなし</string>
     <string name="settings_hw_download_mode_unsynchronized">非同期</string>
     <string name="settings_hw_download_mode_disabled">無効</string>
+    <string name="settings_hw_download_mode_asynchronous">非同期（試験的）</string>
     <string name="settings_frame_control">フレーム制御</string>
     <string name="settings_frame_skip_off">オフ</string>
     <string name="settings_frame_limiter">フレームリミッター</string>

@@ -969,6 +969,18 @@ void GSDownloadTextureVK::Flush()
 	}
 }
 
+bool GSDownloadTextureVK::Poll()
+{
+	if (!m_needs_flush)
+		return true;
+
+	if (GSDeviceVK::GetInstance()->GetCompletedFenceCounter() < m_copy_fence_counter)
+		return false;
+
+	m_needs_flush = false;
+	return true;
+}
+
 #ifdef PCSX2_DEVBUILD
 
 void GSDownloadTextureVK::SetDebugName(std::string_view name)

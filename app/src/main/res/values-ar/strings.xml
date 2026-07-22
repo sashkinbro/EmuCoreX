@@ -631,6 +631,7 @@
     <string name="settings_hw_download_mode_no_readbacks">بدون قراءات (No Readbacks)</string>
     <string name="settings_hw_download_mode_unsynchronized">غير متزامن (Unsynchronized)</string>
     <string name="settings_hw_download_mode_disabled">معطل</string>
+    <string name="settings_hw_download_mode_asynchronous">غير متزامن مؤجل (تجريبي)</string>
     <string name="settings_frame_control">التحكم في الإطارات</string>
     <string name="settings_frame_skip_off">إيقاف</string>
     <string name="settings_frame_limiter">محدد الإطارات (Frame limiter)</string>

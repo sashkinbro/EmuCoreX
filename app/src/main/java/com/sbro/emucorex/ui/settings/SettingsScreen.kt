@@ -5343,7 +5343,8 @@ private fun hwDownloadModeOptions(): List<Pair<Int, String>> = listOf(
     1 to stringResource(R.string.settings_hw_download_mode_force_full),
     2 to stringResource(R.string.settings_hw_download_mode_no_readbacks),
     3 to stringResource(R.string.settings_hw_download_mode_unsynchronized),
-    4 to stringResource(R.string.settings_hw_download_mode_disabled)
+    4 to stringResource(R.string.settings_hw_download_mode_disabled),
+    5 to stringResource(R.string.settings_hw_download_mode_asynchronous)
 )
 
 @Composable

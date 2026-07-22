@@ -241,6 +241,8 @@ void GSTextureCache::ReadbackAll()
 void GSTextureCache::RemoveAll(bool sources, bool targets, bool hash_cache)
 {
 	InvalidateTemporaryZ();
+	if (targets)
+		DiscardPendingDownloads();
 
 	if (sources || targets)
 	{
@@ -4441,6 +4443,97 @@ bool GSTextureCache::PrepareDownloadTexture(u32 width, u32 height, GSTexture::Fo
 	return true;
 }
 
+void GSTextureCache::ApplyPendingDownload(PendingDownload& download)
+{
+	if (!download.texture->Map(download.read_rect))
+		return;
+
+	const GIFRegTEX0& TEX0 = download.tex0;
+	u8* bits = const_cast<u8*>(download.texture->GetMapPointer());
+	const u32 pitch = download.texture->GetMapPitch();
+
+	const auto write_download = [&](GSLocalMemory& local_mem)
+	{
+		const GSOffset off = local_mem.GetOffset(TEX0.TBP0, TEX0.TBW, TEX0.PSM);
+		switch (TEX0.PSM)
+		{
+			case PSMCT32:
+			case PSMZ32:
+			case PSMCT24:
+			case PSMZ24:
+				local_mem.WritePixel32(bits, pitch, off, download.target_rect, download.write_mask);
+				break;
+			case PSMCT16:
+			case PSMCT16S:
+			case PSMZ16:
+			case PSMZ16S:
+				local_mem.WritePixel16(bits, pitch, off, download.target_rect);
+				break;
+			default:
+				Console.Error("Unknown PSM %u on asynchronous readback", TEX0.PSM);
+				break;
+		}
+	};
+
+	// Publish a complete result atomically to the EE-facing shadow. This is a CPU-only
+	// lock around the swizzle/copy and never turns into a GPU wait.
+	{
+		const std::lock_guard lock(g_gs_renderer->GetAsyncReadbackMutex());
+		write_download(g_gs_renderer->GetAsyncReadbackMemory());
+	}
+
+	download.texture->Unmap();
+}
+
+void GSTextureCache::ProcessPendingDownloads()
+{
+	// Publish only on VSync. If several snapshots of the same range completed during one
+	// frame, skip intermediate versions and expose only the newest one to the EE cache.
+	// Tiny visibility queries use a fixed three-frame pipeline so varying mobile GPU fence
+	// latency cannot turn a steady effect into an on/off feedback loop.
+	static constexpr u64 VISIBILITY_QUERY_LATENCY_FRAMES = 3;
+	const u64 current_frame = static_cast<u64>(g_perfmon.GetFrame());
+	size_t ready_count = 0;
+	for (const PendingDownload& download : m_pending_downloads)
+	{
+		const bool visibility_query = download.target_rect.width() == 1 && download.target_rect.height() == 1;
+		const u64 age = current_frame >= download.queued_frame ? current_frame - download.queued_frame : 0;
+		if (visibility_query && age < VISIBILITY_QUERY_LATENCY_FRAMES)
+			break;
+
+		if (!download.texture->Poll())
+			break;
+		ready_count++;
+	}
+
+	while (ready_count > 0)
+	{
+		PendingDownload& download = m_pending_downloads.front();
+		const bool has_newer_snapshot = std::any_of(
+			std::next(m_pending_downloads.begin()),
+			std::next(m_pending_downloads.begin(), static_cast<ptrdiff_t>(ready_count)),
+			[&download](const PendingDownload& newer)
+			{
+				return newer.tex0.U64 == download.tex0.U64 && newer.target_rect.eq(download.target_rect);
+			});
+
+		if (!has_newer_snapshot)
+			ApplyPendingDownload(download);
+
+		std::unique_ptr<GSDownloadTexture> completed_texture = std::move(download.texture);
+		m_pending_downloads.pop_front();
+		if (m_async_download_texture_pool.size() < MAX_PENDING_DOWNLOADS)
+			m_async_download_texture_pool.push_back(std::move(completed_texture));
+		ready_count--;
+	}
+}
+
+void GSTextureCache::DiscardPendingDownloads()
+{
+	m_pending_downloads.clear();
+	m_async_download_texture_pool.clear();
+}
+
 /*void GSTextureCache::InvalidateContainedTargets(u32 start_bp, u32 end_bp, u32 write_psm, u32 write_bw)
 {
 	const bool preserve_alpha = (GSLocalMemory::m_psm[write_psm].trbpp == 24);
@@ -4913,7 +5006,7 @@ void GSTextureCache::InvalidateLocalMem(const GSOffset& off, const GSVector4i& r
 	// Could be reading Z24/32 back as CT32 (Gundam Battle Assault 3)
 	if (GSLocalMemory::m_psm[psm].bpp >= 16)
 	{
-		if (GSConfig.HWDownloadMode != GSHardwareDownloadMode::Enabled)
+		if (!IsHardwareDownloadReadbackEnabled(GSConfig.HWDownloadMode))
 		{
 			DevCon.Error("TC: Skipping depth readback of %ux%u @ %u,%u", r.width(), r.height(), r.left, r.top);
 			return;
@@ -4946,7 +5039,7 @@ void GSTextureCache::InvalidateLocalMem(const GSOffset& off, const GSVector4i& r
 				const bool swizzle_match = GSLocalMemory::m_psm[psm].depth == GSLocalMemory::m_psm[t->m_TEX0.PSM].depth;
 				// Calculate the rect offset if the BP doesn't match.
 				GSVector4i targetr = {};
-				if (full_flush || t->readbacks_since_draw > 1)
+				if (full_flush || GSConfig.HWDownloadMode == GSHardwareDownloadMode::EnabledForceFull || t->readbacks_since_draw > 1)
 				{
 					targetr = t->m_drawn_since_read;
 				}
@@ -5080,7 +5173,7 @@ void GSTextureCache::InvalidateLocalMem(const GSOffset& off, const GSVector4i& r
 			const bool swizzle_match = GSLocalMemory::m_psm[psm].depth == GSLocalMemory::m_psm[t->m_TEX0.PSM].depth;
 			// Calculate the rect offset if the BP doesn't match.
 			GSVector4i targetr = {};
-			if (full_flush || t->readbacks_since_draw > 1)
+			if (full_flush || GSConfig.HWDownloadMode == GSHardwareDownloadMode::EnabledForceFull || t->readbacks_since_draw > 1)
 			{
 				targetr = t->m_drawn_since_read;
 			}
@@ -5183,7 +5276,7 @@ void GSTextureCache::InvalidateLocalMem(const GSOffset& off, const GSVector4i& r
 					}
 				}
 
-				if (GSConfig.HWDownloadMode != GSHardwareDownloadMode::Enabled)
+				if (!IsHardwareDownloadReadbackEnabled(GSConfig.HWDownloadMode))
 				{
 					DevCon.Error("TC: Skipping depth readback of %ux%u @ %u,%u", targetr.width(), targetr.height(), targetr.left, targetr.top);
 					continue;
@@ -7325,6 +7418,17 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r)
 	const GSVector4 src(GSVector4(r) * GSVector4(t->m_scale) / GSVector4(t->m_texture->GetSize()).xyxy());
 	const GSVector4i drc(0, 0, r.width(), r.height());
 	const bool direct_read = t->m_type == RenderTarget && t->m_scale == 1.0f && ps_shader == ShaderConvert::COPY;
+	const bool asynchronous = GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous;
+	std::unique_ptr<GSDownloadTexture> asynchronous_dltex;
+	if (asynchronous)
+	{
+		if (!m_async_download_texture_pool.empty())
+		{
+			asynchronous_dltex = std::move(m_async_download_texture_pool.back());
+			m_async_download_texture_pool.pop_back();
+		}
+		dltex = &asynchronous_dltex;
+	}
 
 	if (!PrepareDownloadTexture(drc.z, drc.w, fmt, dltex))
 		return;
@@ -7347,6 +7451,20 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r)
 			Console.Error("Failed to allocate temporary %dx%d target for read.", drc.z, drc.w);
 			return;
 		}
+	}
+
+	if (asynchronous)
+	{
+		if (m_pending_downloads.size() >= MAX_PENDING_DOWNLOADS)
+		{
+			// Never turn the experimental mode back into a blocking readback when the GPU falls
+			// behind. Prefer the newest shadow update and retire the oldest staging allocation.
+			m_pending_downloads.pop_front();
+		}
+
+		m_pending_downloads.push_back(
+			{std::move(asynchronous_dltex), TEX0, drc, r, write_mask, static_cast<u64>(g_perfmon.GetFrame())});
+		return;
 	}
 
 	dltex->get()->Flush();

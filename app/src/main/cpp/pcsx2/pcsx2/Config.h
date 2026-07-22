@@ -403,8 +403,16 @@ enum class GSHardwareDownloadMode : u8
 	EnabledForceFull,
 	NoReadbacks,
 	Unsynchronized,
-	Disabled
+	Disabled,
+	Asynchronous
 };
+
+constexpr bool IsHardwareDownloadReadbackEnabled(GSHardwareDownloadMode mode)
+{
+	return mode == GSHardwareDownloadMode::Enabled ||
+		mode == GSHardwareDownloadMode::EnabledForceFull ||
+		mode == GSHardwareDownloadMode::Asynchronous;
+}
 
 enum class GSCASMode : u8
 {
@@ -878,7 +886,7 @@ struct Pcsx2Config
 		BiFiltering TextureFiltering = DEFAULT_TEXTURE_FILTERING_MODE;
 		TexturePreloadingLevel TexturePreloading = TexturePreloadingLevel::Full;
 		GSDumpCompressionMethod GSDumpCompression = GSDumpCompressionMethod::Zstandard;
-		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::Enabled;
+		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::NoReadbacks;
 		GSCASMode CASMode = DEFAULT_CAS_MODE;
 		GSSGSRMode SGSRMode = DEFAULT_SGSR_MODE;
 		u8 Dithering = 2;

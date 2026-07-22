@@ -352,6 +352,7 @@
     <string name="settings_hw_download_mode_no_readbacks">Pas de relectures</string>
     <string name="settings_hw_download_mode_unsynchronized">Désynchronisé</string>
     <string name="settings_hw_download_mode_disabled">Désactivé</string>
+    <string name="settings_hw_download_mode_asynchronous">Asynchrone (expérimental)</string>
     <string name="settings_frame_control">Contrôle de la fréquence d\'images</string>
     <string name="settings_frame_skip_off">Désactivé</string>
     <string name="settings_frame_limiter">Limiteur de fréquence d\'images</string>

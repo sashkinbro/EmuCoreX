@@ -17,7 +17,7 @@ object PerformanceProfiles {
         id = SAFE,
         eeCycleRate = 0,
         eeCycleSkip = 0,
-        hwDownloadMode = 4, // Disabled — maximum performance and stability
+        hwDownloadMode = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
         fpuCorrectAddSub = true
     )
 
@@ -25,7 +25,7 @@ object PerformanceProfiles {
         id = FAST,
         eeCycleRate = -1,
         eeCycleSkip = 2,
-        hwDownloadMode = 4, // Disabled
+        hwDownloadMode = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
         fpuCorrectAddSub = false
     )
 

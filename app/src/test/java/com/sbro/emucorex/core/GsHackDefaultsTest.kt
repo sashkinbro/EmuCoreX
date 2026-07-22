@@ -10,7 +10,9 @@ class GsHackDefaultsTest {
         assertEquals(-1, GsHackDefaults.TRILINEAR_FILTERING_DEFAULT)
         assertEquals(1, GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
         assertEquals(2, GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
-        assertEquals(4, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT) // Disabled for Android
+        assertEquals(2, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT)
+        assertEquals(GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT, PerformanceProfiles.safeConfig.hwDownloadMode)
+        assertEquals(GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT, PerformanceProfiles.fastConfig.hwDownloadMode)
         assertEquals(0, GsHackDefaults.ANISOTROPIC_FILTERING_DEFAULT)
     }
 
@@ -21,7 +23,8 @@ class GsHackDefaultsTest {
         assertEquals(2, GsHackDefaults.coerceHardwareDownloadMode(2))
         assertEquals(3, GsHackDefaults.coerceHardwareDownloadMode(3))
         assertEquals(4, GsHackDefaults.coerceHardwareDownloadMode(4))
-        assertEquals(4, GsHackDefaults.coerceHardwareDownloadMode(5))
+        assertEquals(5, GsHackDefaults.coerceHardwareDownloadMode(5))
+        assertEquals(5, GsHackDefaults.coerceHardwareDownloadMode(6))
         assertEquals(0, GsHackDefaults.coerceFrameSkip(-1))
         assertEquals(4, GsHackDefaults.coerceFrameSkip(5))
     }

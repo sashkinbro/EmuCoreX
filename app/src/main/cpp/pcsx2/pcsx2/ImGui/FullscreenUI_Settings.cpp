@@ -2862,9 +2862,11 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 	};
 	static constexpr const char* s_hw_download[] = {
 		FSUI_NSTR("Accurate (Recommended)"),
+		FSUI_NSTR("Accurate (Force Full Readbacks)"),
 		FSUI_NSTR("Disable Readbacks (Synchronize GS Thread)"),
 		FSUI_NSTR("Unsynchronized (Non-Deterministic)"),
 		FSUI_NSTR("Disabled (Ignore Transfers)"),
+		FSUI_NSTR("Asynchronous (Experimental)"),
 	};
 	static constexpr const char* s_screenshot_sizes[] = {
 		FSUI_NSTR("Display Resolution (Aspect Corrected)"),
@@ -3297,7 +3299,7 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		if (IsEditingGameSettings(bsi))
 		{
 			DrawIntListSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "Hardware Download Mode"), FSUI_CSTR("Changes synchronization behavior for GS downloads."),
-				"EmuCore/GS", "HWDownloadMode", static_cast<int>(GSHardwareDownloadMode::Enabled), s_hw_download, std::size(s_hw_download),
+				"EmuCore/GS", "HWDownloadMode", static_cast<int>(GSHardwareDownloadMode::NoReadbacks), s_hw_download, std::size(s_hw_download),
 				true);
 		}
 		DrawIntListSetting(bsi, FSUI_ICONSTR(ICON_FA_EXPAND, "Allow Exclusive Fullscreen"),
@@ -5646,9 +5648,11 @@ TRANSLATE_NOOP("FullscreenUI", "Full (Hash Cache)");
 TRANSLATE_NOOP("FullscreenUI", "Force Disabled");
 TRANSLATE_NOOP("FullscreenUI", "Force Enabled");
 TRANSLATE_NOOP("FullscreenUI", "Accurate (Recommended)");
+TRANSLATE_NOOP("FullscreenUI", "Accurate (Force Full Readbacks)");
 TRANSLATE_NOOP("FullscreenUI", "Disable Readbacks (Synchronize GS Thread)");
 TRANSLATE_NOOP("FullscreenUI", "Unsynchronized (Non-Deterministic)");
 TRANSLATE_NOOP("FullscreenUI", "Disabled (Ignore Transfers)");
+TRANSLATE_NOOP("FullscreenUI", "Asynchronous (Experimental)");
 TRANSLATE_NOOP("FullscreenUI", "Display Resolution (Aspect Corrected)");
 TRANSLATE_NOOP("FullscreenUI", "Internal Resolution (Aspect Corrected)");
 TRANSLATE_NOOP("FullscreenUI", "Internal Resolution (No Aspect Correction)");

@@ -631,6 +631,7 @@
     <string name="settings_hw_download_mode_no_readbacks">Geri Okuma Yok (No Readbacks)</string>
     <string name="settings_hw_download_mode_unsynchronized">Senkronize Edilmemiş</string>
     <string name="settings_hw_download_mode_disabled">Devre Dışı</string>
+    <string name="settings_hw_download_mode_asynchronous">Eşzamansız (Deneysel)</string>
     <string name="settings_frame_control">Kare Kontrolü</string>
     <string name="settings_frame_skip_off">Kapalı</string>
     <string name="settings_frame_limiter">Kare sınırlayıcı</string>

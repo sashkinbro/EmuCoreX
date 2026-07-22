@@ -352,6 +352,7 @@
     <string name="settings_hw_download_mode_no_readbacks">無回讀 (No Readbacks)</string>
     <string name="settings_hw_download_mode_unsynchronized">未同步 (Unsynchronized)</string>
     <string name="settings_hw_download_mode_disabled">停用</string>
+    <string name="settings_hw_download_mode_asynchronous">异步（实验性）</string>
     <string name="settings_frame_control">幀數控制</string>
     <string name="settings_frame_skip_off">關閉</string>
     <string name="settings_frame_limiter">幀數限制器</string>

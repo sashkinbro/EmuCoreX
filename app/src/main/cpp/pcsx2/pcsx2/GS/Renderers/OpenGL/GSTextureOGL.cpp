@@ -491,6 +491,21 @@ void GSDownloadTextureOGL::Flush()
 	m_sync = {};
 }
 
+bool GSDownloadTextureOGL::Poll()
+{
+	if (!m_needs_flush || !m_sync)
+		return true;
+
+	const GLenum result = glClientWaitSync(m_sync, GL_SYNC_FLUSH_COMMANDS_BIT, 0);
+	if (result != GL_ALREADY_SIGNALED && result != GL_CONDITION_SATISFIED)
+		return false;
+
+	m_needs_flush = false;
+	glDeleteSync(m_sync);
+	m_sync = {};
+	return true;
+}
+
 #ifdef PCSX2_DEVBUILD
 
 void GSDownloadTextureOGL::SetDebugName(std::string_view name)

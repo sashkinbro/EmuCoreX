@@ -166,6 +166,12 @@ void GSRendererHW::Reset(bool hardware_reset)
 
 void GSRendererHW::UpdateSettings(const Pcsx2Config::GSOptions& old_config)
 {
+	if (old_config.HWDownloadMode == GSHardwareDownloadMode::Asynchronous &&
+		GSConfig.HWDownloadMode != GSHardwareDownloadMode::Asynchronous)
+	{
+		g_texture_cache->DiscardPendingDownloads();
+	}
+
 	GSRenderer::UpdateSettings(old_config);
 	m_mipmap = GSConfig.HWMipmap;
 	SetTCOffset();
@@ -173,6 +179,8 @@ void GSRendererHW::UpdateSettings(const Pcsx2Config::GSOptions& old_config)
 
 void GSRendererHW::VSync(u32 field, bool registers_written, bool idle_frame)
 {
+	g_texture_cache->ProcessPendingDownloads();
+
 	if (GSConfig.LoadTextureReplacements)
 		GSTextureReplacements::ProcessAsyncLoadedTextures();
 

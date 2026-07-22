@@ -173,7 +173,7 @@ data class EmulationUiState(
     val enableFastCdvd: Boolean = false,
     val enableFastBoot: Boolean = true,
     val enableCheats: Boolean = false,
-    val hwDownloadMode: Int = 4, // Disabled default for Android
+    val hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
     val eeCycleRate: Int = PerformanceProfiles.safeConfig.eeCycleRate,
     val eeCycleSkip: Int = PerformanceProfiles.safeConfig.eeCycleSkip,
     val frameSkip: Int = 0,

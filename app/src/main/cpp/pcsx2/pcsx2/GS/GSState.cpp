@@ -109,6 +109,7 @@ GSState::GSState()
 	memset(&m_vertex, 0, sizeof(m_vertex));
 	memset(&m_index, 0, sizeof(m_index));
 	memset(m_mem.m_vm8, 0, m_mem.m_vmsize);
+	SyncAsyncReadbackMemory();
 
 	m_v.RGBAQ.Q = 1.0f;
 
@@ -323,6 +324,12 @@ void GSState::ResetPCRTC()
 void GSState::UpdateSettings(const Pcsx2Config::GSOptions& old_config)
 {
 	m_mipmap = GSConfig.Mipmap;
+
+	if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous &&
+		old_config.HWDownloadMode != GSHardwareDownloadMode::Asynchronous)
+	{
+		SyncAsyncReadbackMemory();
+	}
 
 	if (
 		GSConfig.AutoFlushSW != old_config.AutoFlushSW ||
@@ -2773,35 +2780,53 @@ void GSState::ReadLocalMemoryUnsync(u8* mem, int qwc, GIFRegBITBLTBUF BITBLTBUF,
 
 	const u16 bpp = GSLocalMemory::m_psm[BITBLTBUF.SPSM].trbpp;
 
-	GSTransferBuffer tb;
-
-	if(m_tr.end >= m_tr.total || m_tr.write == true)
+	// This runs on the EE thread. Keep a separate transfer cursor so an asynchronous read
+	// never races with or advances the renderer's GS-thread transfer state.
+	static thread_local GSTransferBuffer tb;
+	if (tb.end >= tb.total || tb.write || tb.m_blit.U64 != BITBLTBUF.U64 ||
+		tb.m_pos.U64 != TRXPOS.U64 || tb.m_reg.U64 != TRXREG.U64)
 		tb.Init(TRXPOS, TRXREG, BITBLTBUF, false);
 
 	int len = qwc * 16;
 	if (!tb.Update(w, h, bpp, len))
 		return;
 
-	if (m_tr.start == 0)
+	if (tb.start == 0)
 	{
-		m_mem.ReadImageX(tb.x, tb.y, m_tr.buff, m_tr.total, BITBLTBUF, TRXPOS, TRXREG);
-		m_tr.start += m_tr.total;
+		if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous)
+		{
+			// Only hold the CPU mutex while taking a coherent snapshot. GPU completion is
+			// polled before publishing, so this never waits for a fence or stalls the GPU.
+			const std::lock_guard lock(m_async_readback_mutex);
+			m_async_readback_mem.ReadImageX(tb.x, tb.y, tb.buff, tb.total, BITBLTBUF, TRXPOS, TRXREG);
+		}
+		else
+		{
+			m_mem.ReadImageX(tb.x, tb.y, tb.buff, tb.total, BITBLTBUF, TRXPOS, TRXREG);
+		}
+		tb.start = tb.total;
 	}
 
-	if ((m_tr.end + len) > m_mem.m_vmsize)
+	if ((tb.end + len) > m_mem.m_vmsize)
 	{
-		const int masked_end = m_tr.end & 0x3FFFFF; // 4mb.
+		const int masked_end = tb.end & 0x3FFFFF; // 4mb.
 		const int first_transfer = m_mem.m_vmsize - masked_end;
 		const int second_transfer = len - first_transfer;
-		memcpy(mem, &m_tr.buff[masked_end], first_transfer);
-		memcpy(&mem[first_transfer], &m_tr.buff, second_transfer);
-		m_tr.end += len;
+		memcpy(mem, &tb.buff[masked_end], first_transfer);
+		memcpy(&mem[first_transfer], &tb.buff, second_transfer);
+		tb.end += len;
 	}
 	else
 	{
-		memcpy(mem, &m_tr.buff[m_tr.end], len);
-		m_tr.end += len;
+		memcpy(mem, &tb.buff[tb.end], len);
+		tb.end += len;
 	}
+}
+
+void GSState::SyncAsyncReadbackMemory()
+{
+	const std::lock_guard lock(m_async_readback_mutex);
+	std::memcpy(m_async_readback_mem.m_vm8, m_mem.m_vm8, m_mem.m_vmsize);
 }
 
 void GSState::PurgeTextureCache(bool sources, bool targets, bool hash_cache)
@@ -3221,6 +3246,7 @@ int GSState::Defrost(const freezeData* fd)
 	}
 
 	ReadState(m_mem.m_vm8, data, m_mem.m_vmsize);
+	SyncAsyncReadbackMemory();
 
 	for (GIFPath& path : m_path)
 	{

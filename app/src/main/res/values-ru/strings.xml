@@ -358,6 +358,7 @@
     <string name="settings_hw_download_mode_no_readbacks">Без readback</string>
     <string name="settings_hw_download_mode_unsynchronized">Без синхронизации</string>
     <string name="settings_hw_download_mode_disabled">Отключено</string>
+    <string name="settings_hw_download_mode_asynchronous">Асинхронный (экспериментальный)</string>
     <string name="settings_frame_control">Контроль кадров</string>
     <string name="settings_frame_skip_off">Выкл.</string>
     <string name="settings_frame_limiter">Лимитер кадров</string>

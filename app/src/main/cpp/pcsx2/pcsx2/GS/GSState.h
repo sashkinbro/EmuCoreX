@@ -14,6 +14,8 @@
 #include "GS/GSVector.h"
 #include "GSAlignedClass.h"
 
+#include <mutex>
+
 class GSDumpBase;
 
 class GSState : public GSAlignedClass<32>
@@ -124,6 +126,12 @@ private:
 		bool Update(int tw, int th, int bpp, int& len);
 
 	} m_tr;
+
+	// Async downloads are published here instead of directly becoming the EE thread's
+	// view of live GS memory. This prevents a completed frame-old download from racing
+	// with the next frame's writes and exposing a half-old/half-new result.
+	GSLocalMemory m_async_readback_mem;
+	std::mutex m_async_readback_mutex;
 
 protected:
 	static constexpr int INVALID_ALPHA_MINMAX = 500;
@@ -480,6 +488,9 @@ public:
 	void WriteCSR(u32 csr) { m_regs->CSR.U32[1] = csr; }
 	void ReadFIFO(u8* mem, int size);
 	void ReadLocalMemoryUnsync(u8* mem, int qwc, GIFRegBITBLTBUF BITBLTBUF, GIFRegTRXPOS TRXPOS, GIFRegTRXREG TRXREG);
+	GSLocalMemory& GetAsyncReadbackMemory() { return m_async_readback_mem; }
+	std::mutex& GetAsyncReadbackMutex() { return m_async_readback_mutex; }
+	void SyncAsyncReadbackMemory();
 	template<int index> void Transfer(const u8* mem, u32 size);
 	int Freeze(freezeData* fd, bool sizeonly);
 	int Defrost(const freezeData* fd);

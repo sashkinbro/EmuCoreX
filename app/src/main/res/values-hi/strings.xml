@@ -545,6 +545,7 @@
     <string name="settings_hw_download_mode_no_readbacks">कोई रीडबैक नहीं</string>
     <string name="settings_hw_download_mode_unsynchronized">असमन्वित (Unsynchronized)</string>
     <string name="settings_hw_download_mode_disabled">अक्षम</string>
+    <string name="settings_hw_download_mode_asynchronous">असिंक्रोनस (प्रायोगिक)</string>
     <string name="settings_frame_control">फ्रेम कंट्रोल</string>
     <string name="settings_frame_skip_off">बंद</string>
     <string name="settings_frame_limiter">फ्रेम लिमिटर</string>

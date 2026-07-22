@@ -352,6 +352,7 @@
     <string name="settings_hw_download_mode_no_readbacks">Sin relecturas</string>
     <string name="settings_hw_download_mode_unsynchronized">No sincronizado</string>
     <string name="settings_hw_download_mode_disabled">Deshabilitado</string>
+    <string name="settings_hw_download_mode_asynchronous">Asíncrono (experimental)</string>
     <string name="settings_frame_control">Control de fotogramas</string>
     <string name="settings_frame_skip_off">Desactivado</string>
     <string name="settings_frame_limiter">Limitador de fotogramas</string>

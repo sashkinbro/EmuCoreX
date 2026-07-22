@@ -3542,7 +3542,8 @@ private fun EmulationSidebarMenu(
                                 LiveSelectionOption(1, stringResource(R.string.settings_hw_download_mode_force_full)),
                                 LiveSelectionOption(2, stringResource(R.string.settings_hw_download_mode_no_readbacks)),
                                 LiveSelectionOption(3, stringResource(R.string.settings_hw_download_mode_unsynchronized)),
-                                LiveSelectionOption(4, stringResource(R.string.settings_hw_download_mode_disabled))
+                                LiveSelectionOption(4, stringResource(R.string.settings_hw_download_mode_disabled)),
+                                LiveSelectionOption(5, stringResource(R.string.settings_hw_download_mode_asynchronous))
                             ),
                             currentValue = uiState.hwDownloadMode,
                             onValueChange = onSetHwDownloadMode,

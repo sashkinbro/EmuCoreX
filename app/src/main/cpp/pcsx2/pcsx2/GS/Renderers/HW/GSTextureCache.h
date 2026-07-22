@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <utility>
 #include <limits>
+#include <deque>
 
 class GSHwHack;
 
@@ -455,6 +456,20 @@ protected:
 	std::unique_ptr<GSDownloadTexture> m_uint16_download_texture;
 	std::unique_ptr<GSDownloadTexture> m_uint32_download_texture;
 
+	struct PendingDownload
+	{
+		std::unique_ptr<GSDownloadTexture> texture;
+		GIFRegTEX0 tex0 = {};
+		GSVector4i read_rect = {};
+		GSVector4i target_rect = {};
+		u32 write_mask = 0;
+		u64 queued_frame = 0;
+	};
+
+	static constexpr size_t MAX_PENDING_DOWNLOADS = 8;
+	std::deque<PendingDownload> m_pending_downloads;
+	std::vector<std::unique_ptr<GSDownloadTexture>> m_async_download_texture_pool;
+
 	Source* CreateSource(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, const GIFRegCLAMP& CLAMP, Target* t, int x_offset, int y_offset, const GSVector2i* lod, const GSVector4i* src_range, GSTexture* gpu_clut, SourceRegion region, bool force_temporary = false);
 	bool HasExpectedStripedMove(u32 sbp, u32 dbp) const;
 	void ClearExpectedStripedMove();
@@ -473,6 +488,7 @@ protected:
 
 	/// Resizes the download texture if needed.
 	bool PrepareDownloadTexture(u32 width, u32 height, GSTexture::Format format, std::unique_ptr<GSDownloadTexture>* tex);
+	void ApplyPendingDownload(PendingDownload& download);
 
 	HashCacheEntry* LookupHashCache(const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA, bool& paltex, const u32* clut, const GSVector2i* lod, SourceRegion region);
 	HashCacheMap::iterator RemoveFromHashCache(HashCacheMap::iterator it);
@@ -498,6 +514,8 @@ public:
 
 	void Read(Target* t, const GSVector4i& r);
 	void Read(Source* t, const GSVector4i& r);
+	void ProcessPendingDownloads();
+	void DiscardPendingDownloads();
 	void RemoveAll(bool sources, bool targets, bool hash_cache);
 	void ReadbackAll();
 	static void AddDirtyRectTarget(Target* target, GSVector4i rect, u32 psm, u32 bw, RGBAMask rgba, bool req_linear = false);

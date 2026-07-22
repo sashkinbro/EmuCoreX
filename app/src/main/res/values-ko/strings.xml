@@ -631,6 +631,7 @@
     <string name="settings_hw_download_mode_no_readbacks">읽기백 없음 (No Readbacks)</string>
     <string name="settings_hw_download_mode_unsynchronized">비동기화 (Unsynchronized)</string>
     <string name="settings_hw_download_mode_disabled">비활성화됨</string>
+    <string name="settings_hw_download_mode_asynchronous">비동기 (실험적)</string>
     <string name="settings_frame_control">프레임 제어</string>
     <string name="settings_frame_skip_off">끄기</string>
     <string name="settings_frame_limiter">프레임 리미터</string>
