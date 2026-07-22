@@ -512,7 +512,7 @@
 
     <string name="onboarding_badge">Configuración rápida</string>
     <string name="onboarding_page_1_title">Bienvenido a EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">Tu biblioteca y lanzador de PlayStation 2 diseñado para una configuración rápida, navegación limpia y una experiencia optimizada para dispositivos portátiles.</string>
+    <string name="onboarding_page_1_subtitle">Tu biblioteca y lanzador de PlayStation 2, diseñados para una configuración rápida, una navegación clara y una experiencia fluida en cualquier pantalla.</string>
     <string name="onboarding_page_2_title">Emulación potente</string>
     <string name="onboarding_page_2_subtitle">Experimenta tus juegos favoritos de PS2 con opciones gráficas avanzadas, controles personalizables y optimizaciones de rendimiento.</string>
     <string name="onboarding_page_3_title">Tu biblioteca de juegos</string>

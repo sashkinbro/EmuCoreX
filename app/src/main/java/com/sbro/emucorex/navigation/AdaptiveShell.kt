@@ -225,10 +225,10 @@ fun AdaptiveShell(
                         }
                     )
                     .padding(
-                        start = if (tvUiEnabled) 0.dp else 12.dp,
+                        start = 12.dp,
                         end = if (tvUiEnabled) 16.dp else 0.dp,
-                        top = if (tvUiEnabled) 0.dp else 12.dp,
-                        bottom = if (tvUiEnabled) 0.dp else 12.dp
+                        top = if (tvUiEnabled) 6.dp else 12.dp,
+                        bottom = 12.dp
                     )
             ) {
                 navContent()

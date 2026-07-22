@@ -800,7 +800,7 @@
 
     <string name="onboarding_badge">クイックセットアップ</string>
     <string name="onboarding_page_1_title">EmuCoreX へようこそ</string>
-    <string name="onboarding_page_1_subtitle">迅速なセットアップ、クリーンなナビゲーション、合理化されたハンドヘルドフレンドリーな体験のために設計された、あなたのPlayStation 2ライブラリおよびランチャーです。</string>
+    <string name="onboarding_page_1_subtitle">PlayStation 2ライブラリとランチャー。すばやいセットアップ、分かりやすいナビゲーション、あらゆる画面での快適な操作のために設計されています。</string>
     <string name="onboarding_page_2_title">強力なエミュレーション</string>
     <string name="onboarding_page_2_subtitle">高度なグラフィックスオプション、カスタマイズ可能なコントロール、およびパフォーマンスの最適化により、お気に入りのPS2ゲームを体験してください。</string>
     <string name="onboarding_page_3_title">あなたのゲームライブラリ</string>

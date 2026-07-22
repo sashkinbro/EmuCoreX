@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.common
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,9 +69,19 @@ fun EmulatorDataLocationDialog(
             enabled = sdCardAvailable,
             onClick = { onSelect(EmulatorDataLocation.SD_CARD) }
         )
+        val cancelInteractionSource = remember { MutableInteractionSource() }
+        val cancelShape = RoundedCornerShape(18.dp)
         TextButton(
             onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvGamepadFocusableCard(
+                    shape = cancelShape,
+                    interactionSource = cancelInteractionSource,
+                    addFocusTarget = false
+                ),
+            interactionSource = cancelInteractionSource,
+            shape = cancelShape
         ) {
             Text(stringResource(R.string.cancel))
         }
@@ -86,6 +98,8 @@ private fun EmulatorDataLocationOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -96,8 +110,18 @@ private fun EmulatorDataLocationOption(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
+            .tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
+        shape = shape,
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
         } else {

@@ -36,7 +36,7 @@ class HomeGridLayoutTest {
             contentReservedWidthDp = TvUiMetrics.contentReservedWidthDp(widthDp)
         )
 
-        assertEquals(5, columns)
+        assertEquals(6, columns)
     }
 
     @Test

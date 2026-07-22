@@ -1147,7 +1147,7 @@
     <!-- Onboarding -->
     <string name="onboarding_badge">Quick setup</string>
     <string name="onboarding_page_1_title">Welcome to EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">Your PlayStation 2 library and launcher designed for quick setup, clean navigation, and a streamlined handheld-friendly experience.</string>
+    <string name="onboarding_page_1_subtitle">Your PlayStation 2 library and launcher, designed for quick setup, clear navigation, and a streamlined experience on any screen.</string>
     <string name="onboarding_page_2_title">Powerful Emulation</string>
     <string name="onboarding_page_2_subtitle">Experience your favorite PS2 games with advanced graphics options, customizable controls, and performance optimizations.</string>
     <string name="onboarding_page_3_title">Your Games Library</string>

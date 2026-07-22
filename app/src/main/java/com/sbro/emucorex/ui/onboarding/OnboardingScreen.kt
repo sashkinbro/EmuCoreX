@@ -20,6 +20,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,6 +89,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -104,8 +111,10 @@ import com.sbro.emucorex.core.TvUiMetrics
 
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
+import com.sbro.emucorex.ui.common.GamepadFocusHighlightMode
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
+import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
@@ -202,6 +211,9 @@ fun OnboardingScreen(
     }
     
     val pagerState = rememberPagerState(pageCount = { uiState.totalPages })
+    val pageContentFocusRequesters = remember(uiState.totalPages) {
+        List(uiState.totalPages) { FocusRequester() }
+    }
     
     LaunchedEffect(pagerState.currentPage) {
         if (pagerState.currentPage != uiState.currentPage) {
@@ -476,6 +488,8 @@ fun OnboardingScreen(
                                     OnboardingPerformanceProfileContent(
                                         selectedProfile = uiState.performanceProfile,
                                         onSelectProfile = viewModel::setPerformanceProfile,
+                                        requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                        contentFocusRequester = pageContentFocusRequesters[page],
                                         modifier = Modifier.padding(horizontal = 32.dp)
                                     )
                                 }
@@ -486,6 +500,8 @@ fun OnboardingScreen(
                                     isProductLoading = uiState.isProProductLoading,
                                     isPurchaseInProgress = uiState.isProPurchaseInProgress,
                                     onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                    contentFocusRequester = pageContentFocusRequesters[page],
                                     modifier = Modifier.padding(horizontal = 32.dp)
                                 )
                             } else {
@@ -514,7 +530,13 @@ fun OnboardingScreen(
                                             endInset = 0.dp,
                                             bottomInset = 0.dp,
                                             reserveScrollHintSpace = true,
-                                            modifier = Modifier.padding(horizontal = 32.dp)
+                                            requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                            contentFocusRequester = pageContentFocusRequesters[page],
+                                            modifier = if (tvUiEnabled) {
+                                                Modifier.padding(start = 8.dp, end = 20.dp)
+                                            } else {
+                                                Modifier.padding(horizontal = 32.dp)
+                                            }
                                         )
                                         
                                         Spacer(modifier = Modifier.height(24.dp))
@@ -562,6 +584,9 @@ fun OnboardingScreen(
                             onNext = nextClick,
                             onPrevious = previousClick,
                             onContinue = continueClick,
+                            contentFocusRequester = pageContentFocusRequesters
+                                .getOrNull(pagerState.currentPage)
+                                ?.takeIf { pagerState.currentPage >= 3 },
                             modifier = Modifier
                                 .widthIn(max = 420.dp)
                                 .padding(horizontal = 32.dp)
@@ -606,7 +631,9 @@ fun OnboardingScreen(
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingPerformanceProfileContent(
                                     selectedProfile = uiState.performanceProfile,
-                                    onSelectProfile = viewModel::setPerformanceProfile
+                                    onSelectProfile = viewModel::setPerformanceProfile,
+                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                    contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
                             4 -> {
@@ -617,7 +644,9 @@ fun OnboardingScreen(
                                     proPrice = uiState.proPrice,
                                     isProductLoading = uiState.isProProductLoading,
                                     isPurchaseInProgress = uiState.isProPurchaseInProgress,
-                                    onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) }
+                                    onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                    contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
                             5 -> {
@@ -636,7 +665,9 @@ fun OnboardingScreen(
                                     onRemoveGamePath = viewModel::removeGamePath,
                                     openEmulatorDataLocationDialog = openEmulatorDataLocationDialog,
                                     endInset = 0.dp,
-                                    bottomInset = 0.dp
+                                    bottomInset = 0.dp,
+                                    requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
+                                    contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
                         }
@@ -662,7 +693,10 @@ fun OnboardingScreen(
                         canContinue = uiState.canContinue,
                         onNext = nextClick,
                         onPrevious = previousClick,
-                        onContinue = continueClick
+                        onContinue = continueClick,
+                        contentFocusRequester = pageContentFocusRequesters
+                            .getOrNull(pagerState.currentPage)
+                            ?.takeIf { pagerState.currentPage >= 3 }
                     )
                 }
             }
@@ -881,8 +915,20 @@ private fun OnboardingProContent(
     isProductLoading: Boolean,
     isPurchaseInProgress: Boolean,
     onPurchase: () -> Unit,
+    requestInitialFocus: Boolean = false,
+    contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val fallbackFocusRequester = remember { FocusRequester() }
+    val purchaseFocusRequester = contentFocusRequester ?: fallbackFocusRequester
+    val purchaseInteractionSource = remember { MutableInteractionSource() }
+    LaunchedEffect(requestInitialFocus, isProUnlocked, isPurchaseInProgress, isProductLoading) {
+        if (requestInitialFocus && !isProUnlocked && !isPurchaseInProgress && !isProductLoading) {
+            delay(100.milliseconds)
+            runCatching { purchaseFocusRequester.requestFocus() }
+        }
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -924,7 +970,17 @@ private fun OnboardingProContent(
                 Button(
                     onClick = onPurchase,
                     enabled = !isPurchaseInProgress && !isProductLoading,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(purchaseFocusRequester)
+                        .gamepadFocusableCard(
+                            enabled = tvUiEnabled && !isPurchaseInProgress && !isProductLoading,
+                            shape = RoundedCornerShape(16.dp),
+                            interactionSource = purchaseInteractionSource,
+                            addFocusTarget = false,
+                            focusHighlightMode = GamepadFocusHighlightMode.Always
+                        ),
+                    interactionSource = purchaseInteractionSource
                 ) {
                     Text(
                         text = if (isPurchaseInProgress) {
@@ -983,13 +1039,19 @@ private fun OnboardingNavigation(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onContinue: () -> Unit,
+    contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val actionShape = RoundedCornerShape(12.dp)
+    val backActionFocusRequester = remember { FocusRequester() }
     val primaryActionFocusRequester = remember { FocusRequester() }
+    val backActionInteractionSource = remember { MutableInteractionSource() }
+    val primaryActionInteractionSource = remember { MutableInteractionSource() }
     LaunchedEffect(tvUiEnabled, currentPage, totalPages, canContinue) {
         val primaryActionEnabled = currentPage < totalPages - 1 || canContinue
-        if (tvUiEnabled && primaryActionEnabled) {
+        val introductionPage = currentPage < 3
+        if (tvUiEnabled && introductionPage && primaryActionEnabled) {
             delay(80.milliseconds)
             runCatching { primaryActionFocusRequester.requestFocus() }
         }
@@ -997,7 +1059,41 @@ private fun OnboardingNavigation(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 8.dp)
+            .then(if (tvUiEnabled) Modifier.focusGroup() else Modifier)
+            .onPreviewKeyEvent { event ->
+                if (!tvUiEnabled || event.type != KeyEventType.KeyDown) {
+                    return@onPreviewKeyEvent false
+                }
+                when (event.key) {
+                    Key.DirectionLeft -> {
+                        if (currentPage > 0) {
+                            runCatching { backActionFocusRequester.requestFocus() }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.DirectionRight -> {
+                        val primaryActionEnabled = currentPage < totalPages - 1 || canContinue
+                        if (primaryActionEnabled) {
+                            runCatching { primaryActionFocusRequester.requestFocus() }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Key.DirectionUp -> {
+                        if (contentFocusRequester != null) {
+                            runCatching { contentFocusRequester.requestFocus() }
+                                .getOrDefault(false)
+                        } else {
+                            false
+                        }
+                    }
+                    else -> false
+                }
+            },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1005,8 +1101,18 @@ private fun OnboardingNavigation(
             if (currentPage > 0) {
                 OutlinedButton(
                     onClick = onPrevious,
-                    modifier = Modifier.height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .height(44.dp)
+                        .focusRequester(backActionFocusRequester)
+                        .gamepadFocusableCard(
+                            enabled = tvUiEnabled,
+                            shape = actionShape,
+                            interactionSource = backActionInteractionSource,
+                            addFocusTarget = false,
+                            focusHighlightMode = GamepadFocusHighlightMode.Always
+                        ),
+                    shape = actionShape,
+                    interactionSource = backActionInteractionSource,
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp, 
                         MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
@@ -1038,8 +1144,16 @@ private fun OnboardingNavigation(
                     onClick = onNext,
                     modifier = Modifier
                         .height(52.dp)
-                        .focusRequester(primaryActionFocusRequester),
-                    shape = RoundedCornerShape(12.dp),
+                        .focusRequester(primaryActionFocusRequester)
+                        .gamepadFocusableCard(
+                            enabled = tvUiEnabled,
+                            shape = actionShape,
+                            interactionSource = primaryActionInteractionSource,
+                            addFocusTarget = false,
+                            focusHighlightMode = GamepadFocusHighlightMode.Always
+                        ),
+                    shape = actionShape,
+                    interactionSource = primaryActionInteractionSource,
                     elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(
                         defaultElevation = 0.dp
                     ),
@@ -1065,8 +1179,16 @@ private fun OnboardingNavigation(
                     enabled = canContinue,
                     modifier = Modifier
                         .height(52.dp)
-                        .focusRequester(primaryActionFocusRequester),
-                    shape = RoundedCornerShape(12.dp),
+                        .focusRequester(primaryActionFocusRequester)
+                        .gamepadFocusableCard(
+                            enabled = tvUiEnabled && canContinue,
+                            shape = actionShape,
+                            interactionSource = primaryActionInteractionSource,
+                            addFocusTarget = false,
+                            focusHighlightMode = GamepadFocusHighlightMode.Always
+                        ),
+                    shape = actionShape,
+                    interactionSource = primaryActionInteractionSource,
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -1109,7 +1231,17 @@ private fun OnboardingSetupContent(
     modifier: Modifier = Modifier,
     bottomInset: androidx.compose.ui.unit.Dp = 0.dp,
     reserveScrollHintSpace: Boolean = false,
+    requestInitialFocus: Boolean = false,
+    contentFocusRequester: FocusRequester? = null,
 ) {
+    val fallbackFocusRequester = remember { FocusRequester() }
+    val firstSetupFocusRequester = contentFocusRequester ?: fallbackFocusRequester
+    LaunchedEffect(requestInitialFocus) {
+        if (requestInitialFocus) {
+            delay(100.milliseconds)
+            runCatching { firstSetupFocusRequester.requestFocus() }
+        }
+    }
     val completionProgress = listOf(biosValid, gamePathValid).count { it }
     Row(
         modifier = modifier.padding(end = endInset),
@@ -1141,7 +1273,8 @@ private fun OnboardingSetupContent(
                     biosValid -> Color(0xFF1B8A5A)
                     else -> MaterialTheme.colorScheme.error
                 },
-                onClick = launchBiosPicker
+                onClick = launchBiosPicker,
+                modifier = Modifier.focusRequester(firstSetupFocusRequester)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -1322,8 +1455,18 @@ private fun OnboardingSetupScrollHint(
 private fun OnboardingPerformanceProfileContent(
     selectedProfile: Int,
     onSelectProfile: (Int) -> Unit,
+    requestInitialFocus: Boolean = false,
+    contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
 ) {
+    val fallbackFocusRequester = remember { FocusRequester() }
+    val firstProfileFocusRequester = contentFocusRequester ?: fallbackFocusRequester
+    LaunchedEffect(requestInitialFocus) {
+        if (requestInitialFocus) {
+            delay(100.milliseconds)
+            runCatching { firstProfileFocusRequester.requestFocus() }
+        }
+    }
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -1332,7 +1475,8 @@ private fun OnboardingPerformanceProfileContent(
             title = stringResource(R.string.onboarding_profile_safe_title),
             description = stringResource(R.string.onboarding_profile_safe_desc),
             selected = selectedProfile == PerformanceProfiles.SAFE,
-            onClick = { onSelectProfile(PerformanceProfiles.SAFE) }
+            onClick = { onSelectProfile(PerformanceProfiles.SAFE) },
+            modifier = Modifier.focusRequester(firstProfileFocusRequester)
         )
         Spacer(modifier = Modifier.height(12.dp))
         ProfileCard(
@@ -1483,10 +1627,19 @@ private fun ProfileCard(
     title: String,
     description: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .gamepadFocusableCard(
+                shape = RoundedCornerShape(32.dp),
+                interactionSource = interactionSource,
+                addFocusTarget = false,
+                focusHighlightMode = GamepadFocusHighlightMode.Always
+            ),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         tonalElevation = if (selected) 6.dp else 2.dp,
@@ -1495,6 +1648,7 @@ private fun ProfileCard(
             if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
             else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Row(
@@ -1532,16 +1686,25 @@ private fun SetupCard(
     description: String,
     status: String,
     statusColor: Color,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+            .gamepadFocusableCard(
+                shape = RoundedCornerShape(32.dp),
+                interactionSource = interactionSource,
+                addFocusTarget = false,
+                focusHighlightMode = GamepadFocusHighlightMode.Always
+            ),
         shape = RoundedCornerShape(32.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         tonalElevation = 2.dp,
         onClick = onClick,
+        interactionSource = interactionSource,
         border = androidx.compose.foundation.BorderStroke(
             1.dp, 
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)

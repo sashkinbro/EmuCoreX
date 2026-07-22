@@ -800,7 +800,7 @@
 
     <string name="onboarding_badge">빠른 설정</string>
     <string name="onboarding_page_1_title">EmuCoreX에 오신 것을 환영합니다</string>
-    <string name="onboarding_page_1_subtitle">빠른 설정, 깔끔한 내비게이션 및 능률적인 핸드헬드 친화적 환경을 위해 설계된 PlayStation 2 라이브러리 및 런처입니다.</string>
+    <string name="onboarding_page_1_subtitle">빠른 설정, 명확한 탐색, 모든 화면에서의 매끄러운 사용 경험을 위해 설계된 PlayStation 2 라이브러리 및 런처입니다.</string>
     <string name="onboarding_page_2_title">강력한 에뮬레이션</string>
     <string name="onboarding_page_2_subtitle">고급 그래픽 옵션, 사용자 지정 가능한 컨트롤, 성능 최적화로 좋아하는 PS2 게임을 경험하세요.</string>
     <string name="onboarding_page_3_title">나만의 게임 라이브러리</string>

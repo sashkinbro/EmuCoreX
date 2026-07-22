@@ -98,6 +98,7 @@ object GamepadManager {
     private const val MAX_PAD_SLOTS = 2
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
     private const val RUMBLE_PULSE_DURATION_MS = 80L
+    private const val PHONE_SMALL_MOTOR_WEIGHT = 0.35f
     private const val TEST_RUMBLE_DURATION_MS = 260L
     private const val MISSING_VIBRATOR_LOG_INTERVAL_MS = 1500L
     const val ACTION_QUICK_SAVE = "quick_save"
@@ -676,10 +677,9 @@ object GamepadManager {
             return
         }
 
-        val intensity = maxOf(largeMotor.coerceIn(0f, 1f), smallMotor.coerceIn(0f, 1f)) *
-            (strengthOverride ?: vibrationStrength).coerceIn(0f, 1.5f)
-        val amplitude = (intensity * 255f).roundToInt().coerceIn(0, 255)
-        if (amplitude <= 0) {
+        val largeIntensity = largeMotor.coerceIn(0f, 1f)
+        val smallIntensity = smallMotor.coerceIn(0f, 1f)
+        if (largeIntensity <= 0f && smallIntensity <= 0f) {
             stopPadVibration(normalizedPadIndex)
             return
         }
@@ -689,6 +689,18 @@ object GamepadManager {
         if (resolvedTarget == null) {
             stopPadVibration(normalizedPadIndex)
             logMissingVibrationTarget(normalizedPadIndex)
+            return
+        }
+
+        val intensity = resolveRumbleIntensity(
+            largeMotor = largeIntensity,
+            smallMotor = smallIntensity,
+            strength = (strengthOverride ?: vibrationStrength).coerceIn(0f, 1.5f),
+            systemFallback = resolvedTarget.isSystemFallback
+        )
+        val amplitude = (intensity * 255f).roundToInt().coerceIn(0, 255)
+        if (amplitude <= 0) {
+            stopPadVibration(normalizedPadIndex)
             return
         }
 
@@ -1122,6 +1134,28 @@ object GamepadManager {
         }
         lastMissingVibratorLogElapsedMs = now
         Log.w(TAG, "No vibration target available for pad $padIndex")
+    }
+
+    /**
+     * A phone has one low-frequency actuator, while a DualShock 2 has separate large and small
+     * motors. Mapping the binary small motor at full strength turns sustained road/engine effects
+     * into an unnecessarily harsh continuous buzz. Physical controllers retain the original
+     * two-motor intensity; only the phone fallback attenuates the small motor.
+     */
+    internal fun resolveRumbleIntensity(
+        largeMotor: Float,
+        smallMotor: Float,
+        strength: Float,
+        systemFallback: Boolean
+    ): Float {
+        val large = largeMotor.coerceIn(0f, 1f)
+        val small = smallMotor.coerceIn(0f, 1f)
+        val mixed = if (systemFallback) {
+            maxOf(large, small * PHONE_SMALL_MOTOR_WEIGHT)
+        } else {
+            maxOf(large, small)
+        }
+        return (mixed * strength.coerceIn(0f, 1.5f)).coerceIn(0f, 1.5f)
     }
 
     internal fun assignConnectedGamepadSlots(

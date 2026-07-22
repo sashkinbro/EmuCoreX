@@ -185,6 +185,7 @@ import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.buildOverlayCanvasLayout
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.settings.ControlsEditorScreen
 import com.sbro.emucorex.ui.settings.toControlsEditorState
 import com.sbro.emucorex.ui.theme.GradientEnd
@@ -4504,7 +4505,9 @@ private fun GameMenuHorizontalNavigation(
             verticalAlignment = Alignment.CenterVertically
         ) {
             LazyRow(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .tvFocusGroup(),
                 contentPadding = PaddingValues(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -4535,7 +4538,9 @@ private fun GameMenuHorizontalNavigation(
     }
 
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvFocusGroup(),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically

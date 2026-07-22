@@ -116,4 +116,32 @@ class GamepadManagerTest {
 
         assertEquals("square", GamepadManager.resolveMappedActionIdForTriggerAxis("r2", bindings))
     }
+
+    @Test
+    fun phoneFallbackAttenuatesDualShockSmallMotor() {
+        assertEquals(
+            0.35f,
+            GamepadManager.resolveRumbleIntensity(
+                largeMotor = 0f,
+                smallMotor = 1f,
+                strength = 1f,
+                systemFallback = true
+            ),
+            0.001f
+        )
+    }
+
+    @Test
+    fun physicalControllerKeepsOriginalMotorIntensity() {
+        assertEquals(
+            1f,
+            GamepadManager.resolveRumbleIntensity(
+                largeMotor = 0f,
+                smallMotor = 1f,
+                strength = 1f,
+                systemFallback = false
+            ),
+            0.001f
+        )
+    }
 }

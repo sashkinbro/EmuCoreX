@@ -512,7 +512,7 @@
 
     <string name="onboarding_badge">快速設定</string>
     <string name="onboarding_page_1_title">歡迎使用 EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">您的 PlayStation 2 遊戲庫與啟動器，專為快速設定、簡潔導覽以及流暢的掌機體驗而設計。</string>
+    <string name="onboarding_page_1_subtitle">您的 PlayStation 2 遊戲庫與啟動器，專為快速設定、清楚導覽，以及在任何螢幕上都能流暢使用而設計。</string>
     <string name="onboarding_page_2_title">強大的模擬功能</string>
     <string name="onboarding_page_2_subtitle">透過進階圖形選項、可自訂的控制項和效能最佳化，體驗您最喜愛的 PS2 遊戲。</string>
     <string name="onboarding_page_3_title">您的遊戲庫</string>

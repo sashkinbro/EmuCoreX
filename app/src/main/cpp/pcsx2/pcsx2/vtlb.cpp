@@ -29,7 +29,6 @@
 
 #include "fmt/format.h"
 
-#include <algorithm>
 #include <bit>
 #include <map>
 #include <unordered_set>
@@ -1150,21 +1149,6 @@ void vtlb_ClearLoadStoreInfo()
 	s_fastmem_faulting_pcs.clear();
 }
 
-void vtlb_RemoveLoadStoreInfo(const std::vector<std::pair<uptr, uptr>>& code_ranges)
-{
-	for (auto it = s_fastmem_backpatch_info.begin(); it != s_fastmem_backpatch_info.end();)
-	{
-		const auto upper = std::upper_bound(code_ranges.begin(), code_ranges.end(), it->first,
-			[](uptr address, const auto& range) { return address < range.first; });
-		const bool removed = upper != code_ranges.begin() && it->first < std::prev(upper)->second;
-
-		if (removed)
-			it = s_fastmem_backpatch_info.erase(it);
-		else
-			++it;
-	}
-}
-
 void vtlb_AddLoadStoreInfo(uptr code_address, u32 code_size, u32 guest_pc, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr)
 {
 	pxAssert(code_size < std::numeric_limits<u8>::max());
@@ -1188,18 +1172,22 @@ bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address)
 	if (iter == s_fastmem_backpatch_info.end())
 		return false;
 
-	const LoadstoreBackpatchInfo& info = iter->second;
+	// Consume this patch point before invalidating the guest block. Invalidated
+	// host code can finish its current execution, so metadata for its other patch
+	// points deliberately remains alive until it is consumed or the JIT resets.
+	const LoadstoreBackpatchInfo info = iter->second;
+	s_fastmem_backpatch_info.erase(iter);
 	const u32 guest_addr = static_cast<u32>(fault_address - fastmem_start);
 	vtlb_DynBackpatchLoadStore(code_address, info.code_size, info.guest_pc, guest_addr,
 		info.gpr_bitmask, info.fpr_bitmask, info.address_register, info.data_register,
 		info.size_in_bits, info.is_signed, info.is_load, info.is_fpr);
 
-	// queue block for recompilation later
-	Cpu->Clear(info.guest_pc, 1);
-
-	// and store the pc in the faulting list, so that we don't emit another fastmem loadstore
+	// Mark it before clearing the block so a subsequent compilation cannot emit
+	// the same faulting fastmem load/store again.
 	s_fastmem_faulting_pcs.insert(info.guest_pc);
-	s_fastmem_backpatch_info.erase(iter);
+
+	// Queue the block for recompilation after the faulting PC has been recorded.
+	Cpu->Clear(info.guest_pc, 1);
 	return true;
 }
 

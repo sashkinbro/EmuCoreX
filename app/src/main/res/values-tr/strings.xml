@@ -800,7 +800,7 @@
 
     <string name="onboarding_badge">Hızlı kurulum</string>
     <string name="onboarding_page_1_title">EmuCoreX\'e Hoş Geldiniz</string>
-    <string name="onboarding_page_1_subtitle">Hızlı kurulum, temiz gezinme ve düzenli bir el konsolu dostu deneyim için tasarlanmış PlayStation 2 kütüphaneniz ve başlatıcınız.</string>
+    <string name="onboarding_page_1_subtitle">Hızlı kurulum, anlaşılır gezinme ve her ekranda akıcı bir deneyim için tasarlanmış PlayStation 2 kütüphaneniz ve başlatıcınız.</string>
     <string name="onboarding_page_2_title">Güçlü Emülasyon</string>
     <string name="onboarding_page_2_subtitle">Gelişmiş grafik seçenekleri, özelleştirilebilir kontroller ve performans optimizasyonlarıyla favori PS2 oyunlarınızı deneyimleyin.</string>
     <string name="onboarding_page_3_title">Oyun Kütüphaneniz</string>

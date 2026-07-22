@@ -125,6 +125,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -162,6 +163,7 @@ import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
+import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
@@ -193,6 +195,7 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.SettingsStyledDialog
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
@@ -994,7 +997,8 @@ private fun SettingsTabRow(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .padding(vertical = 6.dp)
+                .tvFocusGroup(),
             contentPadding = PaddingValues(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding
@@ -1004,11 +1008,15 @@ private fun SettingsTabRow(
             items(items = tabs, key = { it.name }) { tab ->
                 val interactionSource = remember { MutableInteractionSource() }
                 FilterChip(
-                    modifier = if (tab == selectedTab) {
+                    modifier = (if (tab == selectedTab) {
                         Modifier.focusRequester(selectedTabFocusRequester)
                     } else {
                         Modifier
-                    },
+                    }).tvGamepadFocusableCard(
+                        shape = RoundedCornerShape(16.dp),
+                        interactionSource = interactionSource,
+                        addFocusTarget = false
+                    ),
                     selected = selectedTab == tab,
                     onClick = { onSelected(tab) },
                     interactionSource = interactionSource,
@@ -1942,14 +1950,22 @@ private fun SettingsContent(
                         LazyRow(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
+                                .padding(horizontal = 16.dp)
+                                .tvFocusGroup(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(end = 4.dp)
                         ) {
                             items(listOf(0, 1)) { padIndex ->
+                                val interactionSource = remember { MutableInteractionSource() }
                                 FilterChip(
+                                    modifier = Modifier.tvGamepadFocusableCard(
+                                        shape = RoundedCornerShape(16.dp),
+                                        interactionSource = interactionSource,
+                                        addFocusTarget = false
+                                    ),
                                     selected = selectedGamepadPadIndex == padIndex,
                                     onClick = { selectedGamepadPadIndex = padIndex },
+                                    interactionSource = interactionSource,
                                     label = { Text(gamepadPlayerLabel(padIndex)) }
                                 )
                             }
@@ -3426,7 +3442,9 @@ private fun GameMenuLayoutStylePicker(
         color = MaterialTheme.colorScheme.primary
     )
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvFocusGroup(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -3455,7 +3473,9 @@ private fun DrawerVisualStylePicker(
         color = MaterialTheme.colorScheme.primary
     )
     LazyRow(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvFocusGroup(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -3478,12 +3498,22 @@ private fun VisualStylePreviewCard(
     onClick: () -> Unit,
     preview: @Composable () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .width(176.dp)
             .height(132.dp)
-            .clickable(onClick = onClick),
+            .tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         shape = shape,
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
@@ -4615,13 +4645,32 @@ private fun SettingsItem(
     helpText: String? = null
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
+    val interactionSource = remember { MutableInteractionSource() }
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val itemFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .then(
+                if (tvUiEnabled && helpText != null) {
+                    Modifier
+                        .focusRequester(itemFocusRequester)
+                        .focusProperties { right = helpFocusRequester }
+                } else {
+                    Modifier
+                }
+            )
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        interactionSource = interactionSource,
         onClick = debouncedClick
     ) {
         Row(
@@ -4656,7 +4705,12 @@ private fun SettingsItem(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     helpText?.let {
-                        SettingHelpButton(title = label, description = it)
+                        SettingHelpButton(
+                            title = label,
+                            description = it,
+                            focusRequester = helpFocusRequester,
+                            returnFocusRequester = itemFocusRequester
+                        )
                     }
                 }
                 Text(
@@ -4676,17 +4730,22 @@ private fun CoverUrlExampleRow(
     onLongClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(14.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .gamepadFocusableCard(shape = RoundedCornerShape(14.dp))
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(14.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Text(
@@ -4895,13 +4954,20 @@ private fun GamepadBindingRow(
     onBindClick: () -> Unit,
     onClearClick: (() -> Unit)?
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        interactionSource = interactionSource,
         onClick = onBindClick
     ) {
         Row(
@@ -4971,12 +5037,24 @@ private fun ToggleItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val itemFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .then(
+                if (tvUiEnabled && helpText != null) {
+                    Modifier
+                        .focusRequester(itemFocusRequester)
+                        .focusProperties { right = helpFocusRequester }
+                } else {
+                    Modifier
+                }
+            )
             .gamepadFocusableCard(
                 enabled = enabled,
                 shape = shape,
@@ -5036,7 +5114,12 @@ private fun ToggleItem(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     helpText?.let {
-                        SettingHelpButton(title = title, description = it)
+                        SettingHelpButton(
+                            title = title,
+                            description = it,
+                            focusRequester = helpFocusRequester,
+                            returnFocusRequester = itemFocusRequester
+                        )
                     }
                 }
                 Text(
@@ -5067,18 +5150,36 @@ private fun ActionItem(
     enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val itemFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp))
+            .then(
+                if (tvUiEnabled && helpText != null) {
+                    Modifier
+                        .focusRequester(itemFocusRequester)
+                        .focusProperties { right = helpFocusRequester }
+                } else {
+                    Modifier
+                }
+            )
+            .gamepadFocusableCard(
+                enabled = enabled,
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled,
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
     ) {
         Row(
@@ -5118,7 +5219,12 @@ private fun ActionItem(
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     helpText?.let {
-                        SettingHelpButton(title = title, description = it)
+                        SettingHelpButton(
+                            title = title,
+                            description = it,
+                            focusRequester = helpFocusRequester,
+                            returnFocusRequester = itemFocusRequester
+                        )
                     }
                 }
                 Text(
@@ -5161,6 +5267,9 @@ private fun SliderItem(
     var sliderValue by remember { mutableFloatStateOf(value) }
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val itemFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
 
     LaunchedEffect(value) {
@@ -5171,6 +5280,15 @@ private fun SliderItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .then(
+                if (tvUiEnabled && helpText != null) {
+                    Modifier
+                        .focusRequester(itemFocusRequester)
+                        .focusProperties { right = helpFocusRequester }
+                } else {
+                    Modifier
+                }
+            )
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -5216,9 +5334,14 @@ private fun SliderItem(
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        helpText?.let {
-                            SettingHelpButton(title = title, description = it)
-                        }
+                    helpText?.let {
+                        SettingHelpButton(
+                            title = title,
+                            description = it,
+                            focusRequester = helpFocusRequester,
+                            returnFocusRequester = itemFocusRequester
+                        )
+                    }
                     }
                     Text(
                         text = valueLabel?.invoke(sliderValue) ?: subtitle,
@@ -5261,11 +5384,23 @@ private fun ChoiceSection(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val titleFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp)
+                .then(
+                    if (tvUiEnabled && helpText != null) {
+                        Modifier
+                            .focusRequester(titleFocusRequester)
+                            .focusProperties { right = helpFocusRequester }
+                    } else {
+                        Modifier
+                    }
+                )
                 .combinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -5287,18 +5422,32 @@ private fun ChoiceSection(
                 modifier = Modifier.weight(1f)
             )
             helpText?.let {
-                SettingHelpButton(title = title, description = it)
+                SettingHelpButton(
+                    title = title,
+                    description = it,
+                    focusRequester = helpFocusRequester,
+                    returnFocusRequester = titleFocusRequester
+                )
             }
         }
         LazyRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvFocusGroup(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(options) { (value, label) ->
+                val optionInteractionSource = remember { MutableInteractionSource() }
                 FilterChip(
+                    modifier = Modifier.tvGamepadFocusableCard(
+                        shape = RoundedCornerShape(16.dp),
+                        interactionSource = optionInteractionSource,
+                        addFocusTarget = false
+                    ),
                     selected = selectedValue == value,
                     onClick = { onSelect(value) },
+                    interactionSource = optionInteractionSource,
                     colors = premiumFilterChipColors(),
                     label = { Text(text = label) }
                 )
@@ -5318,11 +5467,23 @@ private fun BitmaskChoiceSection(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val titleFocusRequester = remember { FocusRequester() }
+    val helpFocusRequester = remember { FocusRequester() }
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier
                 .padding(horizontal = 16.dp)
+                .then(
+                    if (tvUiEnabled && helpText != null) {
+                        Modifier
+                            .focusRequester(titleFocusRequester)
+                            .focusProperties { right = helpFocusRequester }
+                    } else {
+                        Modifier
+                    }
+                )
                 .combinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -5344,18 +5505,32 @@ private fun BitmaskChoiceSection(
                 modifier = Modifier.weight(1f)
             )
             helpText?.let {
-                SettingHelpButton(title = title, description = it)
+                SettingHelpButton(
+                    title = title,
+                    description = it,
+                    focusRequester = helpFocusRequester,
+                    returnFocusRequester = titleFocusRequester
+                )
             }
         }
         LazyRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvFocusGroup(),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(options) { (metric, label) ->
+                val optionInteractionSource = remember { MutableInteractionSource() }
                 FilterChip(
+                    modifier = Modifier.tvGamepadFocusableCard(
+                        shape = RoundedCornerShape(16.dp),
+                        interactionSource = optionInteractionSource,
+                        addFocusTarget = false
+                    ),
                     selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
                     onClick = { onToggle(metric) },
+                    interactionSource = optionInteractionSource,
                     colors = premiumFilterChipColors(),
                     label = { Text(text = label) }
                 )
@@ -5759,16 +5934,23 @@ private fun LanguageOptionCard(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(20.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .gamepadFocusableCard(shape = RoundedCornerShape(20.dp)),
-        shape = RoundedCornerShape(20.dp),
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = if (selected) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         } else {
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
         },
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Row(

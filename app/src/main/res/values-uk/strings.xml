@@ -529,7 +529,7 @@
 
     <string name="onboarding_badge">Швидке налаштування</string>
     <string name="onboarding_page_1_title">Ласкаво просимо до EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">Ваша бібліотека та лаунчер PlayStation 2, розроблені для швидкого налаштування, зручної навігації та оптимізованого для портативних пристроїв досвіду.</string>
+    <string name="onboarding_page_1_subtitle">Ваша бібліотека та лаунчер PlayStation 2, створені для швидкого налаштування, зрозумілої навігації та зручної роботи на будь-якому екрані.</string>
     <string name="onboarding_page_2_title">Потужна емуляція</string>
     <string name="onboarding_page_2_subtitle">Грайте в улюблені ігри PS2 з розширеними графічними опціями, налаштовуваним керуванням та оптимізацією продуктивності.</string>
     <string name="onboarding_page_3_title">Ваша бібліотека ігор</string>

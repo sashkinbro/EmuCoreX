@@ -6,9 +6,6 @@
 #include "vtlbDef.h"
 #include "common/HostSys.h"
 
-#include <utility>
-#include <vector>
-
 static const uptr VTLB_AllocUpperBounds = _1gb * 2;
 
 extern bool vtlb_Core_Alloc();
@@ -49,7 +46,6 @@ extern void vtlb_UpdateFastmemProtection(u32 paddr, u32 size, PageProtectionMode
 extern bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address);
 
 extern void vtlb_ClearLoadStoreInfo();
-extern void vtlb_RemoveLoadStoreInfo(const std::vector<std::pair<uptr, uptr>>& code_ranges);
 extern void vtlb_AddLoadStoreInfo(uptr code_address, u32 code_size, u32 guest_pc, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr);
 extern void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, u32 guest_addr, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr);
 extern bool vtlb_IsFaultingPC(u32 guest_pc);

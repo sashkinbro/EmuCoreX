@@ -2,6 +2,7 @@ package com.sbro.emucorex.ui.common
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -76,18 +78,29 @@ fun LibraryGamePicker(
             return
         }
         LazyRow(
+            modifier = Modifier.tvFocusGroup(),
             contentPadding = PaddingValues(horizontal = horizontalContentPadding),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             items(games, key = GameItem::path) { game ->
                 val selected = game.path == selectedPath
+                val interactionSource = remember { MutableInteractionSource() }
+                val shape = RoundedCornerShape(18.dp)
                 Surface(
                     modifier = Modifier
                         .width(236.dp)
                         .height(106.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .clickable { onSelected(game) },
-                    shape = RoundedCornerShape(18.dp),
+                        .tvGamepadFocusableCard(
+                            shape = shape,
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { onSelected(game) }
+                        ),
+                    shape = shape,
                     color = if (selected) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
                     } else {

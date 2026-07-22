@@ -36,6 +36,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
@@ -47,19 +50,40 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 
 @Composable
 fun SettingHelpButton(
     title: String,
     description: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    returnFocusRequester: FocusRequester? = null
 ) {
     val showDialog = remember(title, description) { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val focusShape = RoundedCornerShape(999.dp)
 
     Box(
         modifier = modifier
-            .size(18.dp)
+            .then(
+                if (tvUiEnabled && focusRequester != null) {
+                    Modifier
+                        .focusRequester(focusRequester)
+                        .focusProperties {
+                            returnFocusRequester?.let { left = it }
+                        }
+                } else {
+                    Modifier
+                }
+            )
+            .size(if (tvUiEnabled) 32.dp else 18.dp)
+            .tvGamepadFocusableCard(
+                shape = focusShape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -71,7 +95,7 @@ fun SettingHelpButton(
             imageVector = Icons.Rounded.Info,
             contentDescription = stringResource(R.string.settings_help_content_description),
             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(if (tvUiEnabled) 18.dp else 14.dp)
         )
     }
 

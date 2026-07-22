@@ -77,6 +77,8 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
+import com.sbro.emucorex.ui.common.tvFocusGroup
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -161,13 +163,21 @@ fun GameDbBrowserScreen(
                     shape = RoundedCornerShape(18.dp)
                 )
                 FlowRow(
+                    modifier = Modifier.tvFocusGroup(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     GameDbFilter.entries.forEach { filter ->
+                        val interactionSource = remember { MutableInteractionSource() }
                         FilterChip(
+                            modifier = Modifier.tvGamepadFocusableCard(
+                                shape = RoundedCornerShape(16.dp),
+                                interactionSource = interactionSource,
+                                addFocusTarget = false
+                            ),
                             selected = uiState.filter == filter,
                             onClick = { viewModel.setFilter(filter) },
+                            interactionSource = interactionSource,
                             label = { Text(filter.label()) },
                             leadingIcon = if (uiState.filter == filter) {
                                 { Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(16.dp)) }
@@ -218,7 +228,8 @@ fun GameDbBrowserScreen(
 @Composable
 private fun GameDbEntryCard(entry: GameDbCatalogEntry, loadCover: Boolean) {
     var expanded by rememberSaveable(entry.serial) { mutableStateOf(false) }
-    val detailsInteractionSource = remember { MutableInteractionSource() }
+    val cardInteractionSource = remember { MutableInteractionSource() }
+    val cardShape = RoundedCornerShape(24.dp)
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(stiffness = 500f),
@@ -227,9 +238,18 @@ private fun GameDbEntryCard(entry: GameDbCatalogEntry, loadCover: Boolean) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .gamepadFocusableCard(shape = RoundedCornerShape(24.dp))
+            .gamepadFocusableCard(
+                shape = cardShape,
+                interactionSource = cardInteractionSource,
+                addFocusTarget = false
+            )
+            .clickable(
+                interactionSource = cardInteractionSource,
+                indication = null,
+                onClick = { expanded = !expanded }
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f)),
-        shape = RoundedCornerShape(24.dp),
+        shape = cardShape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         shadowElevation = 2.dp,
@@ -281,12 +301,7 @@ private fun GameDbEntryCard(entry: GameDbCatalogEntry, loadCover: Boolean) {
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable(
-                            interactionSource = detailsInteractionSource,
-                            indication = null,
-                            onClick = { expanded = !expanded }
-                        )
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = stringResource(

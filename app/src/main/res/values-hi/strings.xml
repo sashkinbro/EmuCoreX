@@ -714,7 +714,7 @@
 
     <string name="onboarding_badge">त्वरित सेटअप</string>
     <string name="onboarding_page_1_title">EmuCoreX में आपका स्वागत है</string>
-    <string name="onboarding_page_1_subtitle">आपकी PlayStation 2 लाइब्रेरी और लॉन्चर त्वरित सेटअप, स्वच्छ नेविगेशन और एक सुव्यवस्थित हैंडहेल्ड-अनुकूल अनुभव के लिए डिज़ाइन किया गया है।</string>
+    <string name="onboarding_page_1_subtitle">आपकी PlayStation 2 लाइब्रेरी और लॉन्चर, तेज़ सेटअप, स्पष्ट नेविगेशन और हर स्क्रीन पर सहज अनुभव के लिए डिज़ाइन किए गए हैं।</string>
     <string name="onboarding_page_2_title">शक्तिशाली एमुलेशन</string>
     <string name="onboarding_page_2_subtitle">उन्नत ग्राफिक्स विकल्पों, अनुकूलन योग्य कंट्रोल्स और प्रदर्शन अनुकूलन (optimizations) के साथ अपने पसंदीदा PS2 गेम्स का अनुभव करें।</string>
     <string name="onboarding_page_3_title">आपकी गेम्स लाइब्रेरी</string>

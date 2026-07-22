@@ -24,20 +24,20 @@ class TvUiPolicyTest {
     }
 
     @Test
-    fun tvSafeAreaScalesFor720pAnd1080pLayouts() {
-        assertEquals(32, TvUiMetrics.safeHorizontalDp(640))
-        assertEquals(20, TvUiMetrics.safeVerticalDp(360))
-        assertEquals(48, TvUiMetrics.safeHorizontalDp(960))
-        assertEquals(27, TvUiMetrics.safeVerticalDp(540))
-        assertEquals(96, TvUiMetrics.safeHorizontalDp(1920))
-        assertEquals(54, TvUiMetrics.safeVerticalDp(1080))
+    fun tvShellUsesScreenSpecificPaddingInsteadOfGlobalOverscan() {
+        assertEquals(0, TvUiMetrics.safeHorizontalDp(640))
+        assertEquals(0, TvUiMetrics.safeVerticalDp(360))
+        assertEquals(0, TvUiMetrics.safeHorizontalDp(960))
+        assertEquals(0, TvUiMetrics.safeVerticalDp(540))
+        assertEquals(0, TvUiMetrics.safeHorizontalDp(1920))
+        assertEquals(0, TvUiMetrics.safeVerticalDp(1080))
     }
 
     @Test
     fun tvNavigationAndContentReservationStayBounded() {
         assertEquals(248, TvUiMetrics.navigationWidthDp(640))
         assertEquals(288, TvUiMetrics.navigationWidthDp(960))
-        assertEquals(384, TvUiMetrics.contentReservedWidthDp(960))
+        assertEquals(288, TvUiMetrics.contentReservedWidthDp(960))
         assertEquals(360, TvUiMetrics.navigationWidthDp(1920))
     }
 }

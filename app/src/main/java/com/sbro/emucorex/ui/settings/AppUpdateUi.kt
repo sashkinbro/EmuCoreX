@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -54,6 +55,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.AppUpdateRelease
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.time.Instant
 import java.time.ZoneId
@@ -112,16 +114,25 @@ private fun ReleaseHistoryCard(
     var expanded by rememberSaveable { mutableStateOf(false) }
     val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
     val cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+    val expandInteractionSource = remember { MutableInteractionSource() }
+    val expandShape = RoundedCornerShape(18.dp)
     UpdateSectionCard(
         title = stringResource(R.string.settings_updates_history_title),
         contentPadding = PaddingValues(16.dp)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tvGamepadFocusableCard(
+                        shape = expandShape,
+                        interactionSource = expandInteractionSource,
+                        addFocusTarget = false
+                    ),
+                shape = expandShape,
                 color = cardColor,
                 border = cardBorder,
+                interactionSource = expandInteractionSource,
                 onClick = { expanded = !expanded }
             ) {
                 Row(
@@ -230,11 +241,20 @@ private fun ReleaseHistoryRow(
     release: AppUpdateRelease,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Row(

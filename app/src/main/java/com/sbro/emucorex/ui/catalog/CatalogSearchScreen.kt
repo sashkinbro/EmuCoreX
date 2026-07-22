@@ -80,6 +80,8 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
+import com.sbro.emucorex.ui.common.tvFocusGroup
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -196,10 +198,17 @@ fun CatalogSearchScreen(
                             },
                             trailingIcon = {
                                 if (uiState.query.isNotBlank()) {
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val shape = RoundedCornerShape(999.dp)
                                     Surface(
-                                        modifier = Modifier.gamepadFocusableCard(shape = RoundedCornerShape(999.dp)),
-                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.tvGamepadFocusableCard(
+                                            shape = shape,
+                                            interactionSource = interactionSource,
+                                            addFocusTarget = false
+                                        ),
+                                        shape = shape,
                                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                        interactionSource = interactionSource,
                                         onClick = { viewModel.updateQuery("") }
                                     ) {
                                         Box(
@@ -238,6 +247,7 @@ fun CatalogSearchScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             FlowRow(
+                                modifier = Modifier.tvFocusGroup(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
@@ -396,7 +406,11 @@ private fun ScrollToTopButton(
 
         Box(
             modifier = Modifier
-                .gamepadFocusableCard(shape = shape)
+                .gamepadFocusableCard(
+                    shape = shape,
+                    interactionSource = interactionSource,
+                    addFocusTarget = false
+                )
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f), shape)
                 .clickable(
                     interactionSource = interactionSource,
@@ -425,13 +439,20 @@ private fun FilterMenuChip(
     onExpandedChange: (Boolean) -> Unit,
     content: @Composable () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(999.dp)
     Box {
         Surface(
-            modifier = modifier.focusable(),
-            shape = RoundedCornerShape(999.dp),
+            modifier = modifier.tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+            shape = shape,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
             shadowElevation = 0.dp,
+            interactionSource = interactionSource,
             onClick = { onExpandedChange(true) }
         ) {
             Row(
@@ -466,12 +487,19 @@ private fun CatalogGameCard(
     onClick: () -> Unit,
     compact: Boolean
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
-        modifier = modifier.gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.gamepadFocusableCard(
+            shape = shape,
+            interactionSource = interactionSource,
+            addFocusTarget = false
+        ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Column {

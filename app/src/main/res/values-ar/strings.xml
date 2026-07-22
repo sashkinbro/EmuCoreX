@@ -800,7 +800,7 @@
 
     <string name="onboarding_badge">إعداد سريع</string>
     <string name="onboarding_page_1_title">مرحبًا بك في EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">مكتبة ومشغل PlayStation 2 الخاص بك المصمم لإعداد سريع، وتنقل نظيف، وتجربة مبسطة للأجهزة المحمولة.</string>
+    <string name="onboarding_page_1_subtitle">مكتبة ومشغّل PlayStation 2، مصممان للإعداد السريع والتنقل الواضح وتجربة سلسة على أي شاشة.</string>
     <string name="onboarding_page_2_title">محاكاة قوية</string>
     <string name="onboarding_page_2_subtitle">جرب ألعاب PS2 المفضلة لديك مع خيارات رسومات متقدمة، وعناصر تحكم قابلة للتخصيص، وتحسينات في الأداء.</string>
     <string name="onboarding_page_3_title">مكتبة ألعابك</string>

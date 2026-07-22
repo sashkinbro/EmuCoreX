@@ -61,13 +61,15 @@ object TvUiPolicy {
     }
 }
 
-/** Layout dimensions which keep interactive TV content inside the common 5% safe area. */
+/** TV layout dimensions. Screens provide their own content padding; no global overscan crop. */
 object TvUiMetrics {
+    @Suppress("UNUSED_PARAMETER")
     fun safeHorizontalDp(screenWidthDp: Int): Int =
-        (screenWidthDp.coerceAtLeast(1) * 0.05f).roundToInt().coerceIn(32, 96)
+        0
 
+    @Suppress("UNUSED_PARAMETER")
     fun safeVerticalDp(screenHeightDp: Int): Int =
-        (screenHeightDp.coerceAtLeast(1) * 0.05f).roundToInt().coerceIn(20, 54)
+        0
 
     fun navigationWidthDp(screenWidthDp: Int): Int =
         (screenWidthDp.coerceAtLeast(1) * 0.30f).roundToInt().coerceIn(248, 360)

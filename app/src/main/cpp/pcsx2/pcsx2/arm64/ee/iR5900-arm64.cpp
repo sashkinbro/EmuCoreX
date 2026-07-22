@@ -687,24 +687,6 @@ void R5900::Dynarec::OpcodeImpl::recBREAK()
 }
 
 // Size is in dwords (4 bytes)
-static void recRemoveBlocks(int first, int last)
-{
-	std::vector<std::pair<uptr, uptr>> host_ranges;
-	host_ranges.reserve(last - first + 1);
-	for (int index = first; index <= last; index++)
-	{
-		const BASEBLOCKEX* block = recBlocks[index];
-		if (block && block->x86size > 0)
-			host_ranges.emplace_back(block->fnptr, block->fnptr + block->x86size);
-	}
-	std::sort(host_ranges.begin(), host_ranges.end());
-
-	// Fastmem patch points are keyed by host code address. Purge entries owned
-	// by dead blocks before their code can be recycled or fault metadata grows.
-	vtlb_RemoveLoadStoreInfo(host_ranges);
-	recBlocks.Remove(first, last);
-}
-
 void recClear(u32 addr, u32 size)
 {
 	if ((addr) >= maxrecmem || !(recLUT[(addr) >> 16] + (addr & ~0xFFFFUL)))
@@ -737,7 +719,7 @@ void recClear(u32 addr, u32 size)
 		{
 			if (toRemoveLast != blockidx)
 			{
-				recRemoveBlocks((blockidx + 1), toRemoveLast);
+				recBlocks.Remove((blockidx + 1), toRemoveLast);
 			}
 			toRemoveLast = --blockidx;
 			continue;
@@ -758,7 +740,7 @@ void recClear(u32 addr, u32 size)
 
 	if (toRemoveLast != blockidx)
 	{
-		recRemoveBlocks((blockidx + 1), toRemoveLast);
+		recBlocks.Remove((blockidx + 1), toRemoveLast);
 	}
 
 	upperextent = std::min(upperextent, ceiling);

@@ -16,6 +16,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.automirrored.rounded.Login
@@ -114,6 +115,7 @@ import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.shimmer
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -401,12 +403,19 @@ private fun ProfileBottomNav(
         ) {
             tabs.forEachIndexed { index, tab ->
                 val selected = selectedIndex == index
+                val interactionSource = remember(tab) { MutableInteractionSource() }
                 Surface(
                     onClick = { onSelect(index) },
                     modifier = Modifier
                         .weight(1f)
-                        .height(56.dp),
+                        .height(56.dp)
+                        .tvGamepadFocusableCard(
+                            shape = RoundedCornerShape(22.dp),
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        ),
                     shape = RoundedCornerShape(22.dp),
+                    interactionSource = interactionSource,
                     color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
                 ) {
                     Column(

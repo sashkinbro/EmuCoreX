@@ -16,6 +16,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
@@ -118,6 +120,7 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.shimmer
+import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -324,6 +327,7 @@ fun GameDetailScreen(
                         )
                     }
                     LazyRow(
+                        modifier = Modifier.tvFocusGroup(),
                         contentPadding = PaddingValues(horizontal = horizontalInset),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -350,6 +354,7 @@ fun GameDetailScreen(
                         )
                     }
                     LazyRow(
+                        modifier = Modifier.tvFocusGroup(),
                         contentPadding = PaddingValues(horizontal = horizontalInset),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
@@ -1032,17 +1037,36 @@ private fun ExpandableInfoSection(
         expanded || !canExpand -> trimmedValue
         else -> trimmedValue.take(collapsedMaxChars).trimEnd() + "..."
     }
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(16.dp)
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (canExpand) {
+                    Modifier
+                        .gamepadFocusableCard(
+                            shape = shape,
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { expanded = !expanded }
+                        )
+                } else {
+                    Modifier
+                }
+            )
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioNoBouncy,
                     stiffness = Spring.StiffnessLow
                 )
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = shape,
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
     ) {
@@ -1061,17 +1085,14 @@ private fun ExpandableInfoSection(
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (canExpand) {
-                TextButton(
-                    onClick = { expanded = !expanded },
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (expanded) R.string.detail_show_less
-                            else R.string.detail_show_more
-                        )
-                    )
-                }
+                Text(
+                    text = stringResource(
+                        if (expanded) R.string.detail_show_less
+                        else R.string.detail_show_more
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -1127,12 +1148,19 @@ private fun ScreenshotCard(
     title: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .width(220.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Box(
@@ -1157,12 +1185,19 @@ private fun VideoCard(
     title: String,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(18.dp)
     Surface(
         modifier = Modifier
             .width(232.dp)
-            .gamepadFocusableCard(shape = RoundedCornerShape(18.dp)),
-        shape = RoundedCornerShape(18.dp),
+            .gamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+        interactionSource = interactionSource,
         onClick = onClick
     ) {
         Box(

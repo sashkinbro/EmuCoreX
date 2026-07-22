@@ -1089,7 +1089,7 @@
     <!-- Onboarding -->
     <string name="onboarding_badge">Penyiapan cepat</string>
     <string name="onboarding_page_1_title">Selamat datang di EmuCoreX</string>
-    <string name="onboarding_page_1_subtitle">Pustaka dan peluncur PlayStation 2 Anda dirancang untuk penyiapan cepat, navigasi bersih, dan pengalaman ramah perangkat seluler yang efisien.</string>
+    <string name="onboarding_page_1_subtitle">Pustaka dan peluncur PlayStation 2 Anda, dirancang untuk penyiapan cepat, navigasi yang jelas, dan pengalaman mulus di layar apa pun.</string>
     <string name="onboarding_page_2_title">Emulasi Kuat</string>
     <string name="onboarding_page_2_subtitle">Rasakan pengalaman game PS2 favorit Anda dengan opsi grafis canggih, kontrol yang dapat disesuaikan, dan pengoptimalan performa.</string>
     <string name="onboarding_page_3_title">Pustaka Game Anda</string>
