@@ -246,6 +246,16 @@
     <string name="pro_message_purchase_failed">Pembelian Pro tidak dapat diselesaikan.</string>
     <string name="pro_message_pending_confirmation">Pembelian Pro menunggu konfirmasi.</string>
     <string name="settings_language">Bahasa</string>
+    <string name="settings_tv_interface">Antarmuka TV</string>
+    <string name="settings_tv_interface_auto">Otomatis</string>
+    <string name="settings_tv_interface_standard">Standar</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">Otomatis mengaktifkan tata letak TV hanya saat Android mendeteksi TV atau perangkat Leanback. Gunakan TV untuk TV box yang tidak tersertifikasi, atau Standar untuk menonaktifkannya.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV terdeteksi. Otomatis menggunakan antarmuka TV.</string>
+    <string name="settings_tv_interface_detected_standard">Perangkat Android standar terdeteksi. Otomatis mempertahankan antarmuka sentuh.</string>
+    <string name="tv_storage_source_title">Pilih penyimpanan</string>
+    <string name="tv_storage_all_locations">Semua lokasi</string>
+    <string name="tv_storage_picker_unavailable">Tidak ada pemilih file sistem yang kompatibel terpasang di perangkat TV ini.</string>
     <string name="settings_language_system">Default sistem</string>
     <string name="settings_language_sheet_subtitle">Pilih bahasa aplikasi.</string>
     <string name="settings_language_screen_subtitle">Pilih bahasa antarmuka untuk EmuCoreX.</string>
@@ -1926,4 +1936,7 @@
     <string name="settings_network_local_room_code_desc">Gunakan kode 4–12 huruf atau angka yang sama pada Wi‑Fi atau hotspot tepercaya.</string>
     <string name="settings_network_local_peer_id">ID peserta lokal: %1$d</string>
     <string name="settings_network_local_compatibility_note">Hanya berfungsi pada game yang mendukung DEV9 LAN atau System Link. Game khusus online dan i.Link tidak diubah menjadi LAN.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">Menggunakan akses memori virtual langsung untuk JIT EE. Nonaktifkan hanya untuk mendiagnosis crash atau masalah rekompiler.</string>
+    <string name="settings_help_enable_fastmem">Memetakan alamat PS2 ke rentang sistem yang dicadangkan agar operasi memori hasil rekompilasi melewati penangan yang lebih lambat. Biarkan aktif untuk bermain normal. Menonaktifkannya sangat mengurangi performa, tetapi dapat membantu mengisolasi kesalahan Fastmem atau masalah pemetaan memori khusus perangkat. Mulai ulang game untuk menerapkan.</string>
 </resources>

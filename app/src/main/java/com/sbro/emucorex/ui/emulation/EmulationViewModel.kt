@@ -54,6 +54,7 @@ import com.sbro.emucorex.data.PlayerPlayTimeDelta
 import com.sbro.emucorex.data.PlayerProfileRepository
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -284,6 +285,7 @@ private data class EmulationLaunchConfig(
     val enableIopRecompiler: Boolean,
     val enableVu0Recompiler: Boolean,
     val enableVu1Recompiler: Boolean,
+    val enableFastmem: Boolean,
     val eeFpuRoundMode: Int,
     val vu0RoundMode: Int,
     val vu1RoundMode: Int,
@@ -521,6 +523,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var currentTouchControlsLayoutProfile: TouchControlsLayoutProfile? = null
     private var lastAutoSavePlayTimeMs: Long = 0L
     private var pendingPlayTimeSyncMs: Long = 0L
+    private var playTimeSyncJob: Job? = null
     private var lastCloudPlayTimeSyncAtMs: Long = 0L
     private var shouldCountCurrentProfileSession = false
     // Autotest and boot-smoke VMs may run for minutes, but must never enter persistent player stats.
@@ -1217,10 +1220,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (shouldTrackCurrentProfilePlayTime) {
             pendingPlayTimeSyncMs += 1_000L
             if (pendingPlayTimeSyncMs >= PLAY_TIME_LOCAL_CACHE_INTERVAL_MS) {
-                viewModelScope.launch(Dispatchers.IO) {
-                    cachePendingPlayTime()
-                    flushCachedPlayTimeIfDue(force = false)
-                }
+                schedulePlayTimeSync()
             }
         }
 
@@ -1235,6 +1235,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
         lastAutoSavePlayTimeMs = nextPlayTimeMs
         performAutoSave()
+    }
+
+    private fun schedulePlayTimeSync() {
+        if (playTimeSyncJob?.isActive == true) return
+        playTimeSyncJob = viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    cachePendingPlayTime()
+                    flushCachedPlayTimeIfDue(force = false)
+                }
+            } finally {
+                playTimeSyncJob = null
+            }
+        }
     }
 
     private suspend fun cachePendingPlayTime() {
@@ -1459,7 +1473,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val enableIopRecompiler = enableIopRecompilerOverride ?: config.enableIopRecompiler
                 val enableVu0Recompiler = enableVu0RecompilerOverride ?: config.enableVu0Recompiler
                 val enableVu1Recompiler = enableVu1RecompilerOverride ?: config.enableVu1Recompiler
-                val enableFastmem = enableFastmemOverride ?: true
+                val enableFastmem = enableFastmemOverride ?: config.enableFastmem
                 val enableMtvu = enableMtvuOverride ?: config.mtvu
 
                 if (!autotestMode) {
@@ -3559,6 +3573,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             enableIopRecompiler = settings.enableIopRecompiler,
             enableVu0Recompiler = settings.enableVu0Recompiler,
             enableVu1Recompiler = settings.enableVu1Recompiler,
+            enableFastmem = settings.enableFastmem,
             eeFpuRoundMode = settings.eeFpuRoundMode,
             vu0RoundMode = settings.vu0RoundMode,
             vu1RoundMode = settings.vu1RoundMode,

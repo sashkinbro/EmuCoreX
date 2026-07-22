@@ -129,6 +129,16 @@
     <string name="settings_theme_light">淺色</string>
     <string name="settings_theme_dark">深色</string>
     <string name="settings_language">語言</string>
+    <string name="settings_tv_interface">電視介面</string>
+    <string name="settings_tv_interface_auto">自動</string>
+    <string name="settings_tv_interface_standard">標準</string>
+    <string name="settings_tv_interface_tv">電視</string>
+    <string name="settings_help_tv_interface">自動模式只會在 Android 識別為電視或 Leanback 裝置時啟用電視版面。未認證的電視盒請選擇「電視」，若要停用則選擇「標準」。</string>
+    <string name="settings_tv_interface_detected_tv">已偵測到 Android TV / Google TV。自動模式會使用電視介面。</string>
+    <string name="settings_tv_interface_detected_standard">已偵測到標準 Android 裝置。自動模式會保留觸控介面。</string>
+    <string name="tv_storage_source_title">選擇儲存空間</string>
+    <string name="tv_storage_all_locations">所有位置</string>
+    <string name="tv_storage_picker_unavailable">此電視裝置未安裝相容的系統檔案選擇器。</string>
     <string name="settings_language_system">系統預設</string>
     <string name="settings_language_sheet_subtitle">選擇應用程式語言。</string>
     <string name="settings_language_screen_subtitle">選擇 EmuCoreX 的介面語言。</string>
@@ -1913,4 +1923,7 @@
     <string name="settings_network_local_room_code_desc">请在可信 Wi‑Fi 或热点中使用相同的 4–12 位字母或数字代码。</string>
     <string name="settings_network_local_peer_id">本地玩家 ID：%1$d</string>
     <string name="settings_network_local_compatibility_note">仅适用于支持 DEV9 LAN 或 System Link 的游戏。纯在线游戏和 i.Link 游戏不会转换为局域网游戏。</string>
+    <string name="settings_enable_fastmem">快速内存（Fastmem）</string>
+    <string name="settings_enable_fastmem_desc">为 EE JIT 使用直接虚拟内存访问。仅在诊断崩溃或重编译器问题时关闭。</string>
+    <string name="settings_help_enable_fastmem">将 PS2 地址映射到预留的主机地址范围，使重编译后的内存操作绕过较慢的处理程序。正常游玩时请保持启用。关闭后性能会显著下降，但有助于排查 Fastmem 故障或特定设备的内存映射问题。重启游戏后生效。</string>
 </resources>

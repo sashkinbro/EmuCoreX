@@ -176,6 +176,16 @@
     <string name="settings_theme_light">Chiaro</string>
     <string name="settings_theme_dark">Scuro</string>
     <string name="settings_language">Lingua</string>
+    <string name="settings_tv_interface">Interfaccia TV</string>
+    <string name="settings_tv_interface_auto">Automatico</string>
+    <string name="settings_tv_interface_standard">Standard</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">Automatico attiva il layout TV solo quando Android rileva un televisore o un dispositivo Leanback. Usa TV per i TV box non certificati oppure Standard per disattivarlo.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV rilevato. Automatico usa l’interfaccia TV.</string>
+    <string name="settings_tv_interface_detected_standard">Rilevato dispositivo Android standard. Automatico mantiene l’interfaccia touch.</string>
+    <string name="tv_storage_source_title">Scegli archivio</string>
+    <string name="tv_storage_all_locations">Tutte le posizioni</string>
+    <string name="tv_storage_picker_unavailable">Su questo dispositivo TV non è installato un selettore file di sistema compatibile.</string>
     <string name="settings_language_system">Predefinita di sistema</string>
     <string name="settings_language_sheet_subtitle">Scegli la lingua dell\'app.</string>
     <string name="settings_language_screen_subtitle">Scegli la lingua dell\'interfaccia per EmuCoreX.</string>
@@ -1912,4 +1922,7 @@
     <string name="settings_network_local_room_code_desc">Usa lo stesso codice di 4–12 lettere o cifre su un Wi‑Fi o hotspot affidabile.</string>
     <string name="settings_network_local_peer_id">ID partecipante locale: %1$d</string>
     <string name="settings_network_local_compatibility_note">Funziona solo con giochi che supportano DEV9 LAN o System Link. I giochi solo online e i.Link non vengono convertiti in LAN.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">Usa l\'accesso diretto alla memoria virtuale per il JIT EE. Disattivalo solo per diagnosticare arresti o problemi del ricompilatore.</string>
+    <string name="settings_help_enable_fastmem">Mappa gli indirizzi PS2 in un intervallo riservato del sistema, così le operazioni ricompilate evitano gestori più lenti. Lascialo attivo durante il gioco normale. Disattivarlo riduce molto le prestazioni, ma può aiutare a isolare errori Fastmem o problemi di mappatura specifici del dispositivo. Riavvia il gioco per applicare la modifica.</string>
 </resources>

@@ -53,6 +53,7 @@ void mVUreset(microVU& mVU, bool resetReserve)
 		}
 		VU0.VI[REG_VPU_STAT].UL &= ~0x100;
 	}
+	u8* const old_high_water = mVU.prog.x86ptr;
 
     oakSetAsmPtr(mVU.cache, mVU.index ? HostMemoryMap::mVU1recSize : HostMemoryMap::mVU0recSize);
     oakStartBlock();
@@ -78,6 +79,7 @@ void mVUreset(microVU& mVU, bool resetReserve)
 	// Setup Dynarec Cache Limits for Each Program
 //	mVU.prog.x86start = xGetAlignedCallTarget();
 	mVU.prog.x86ptr   = mVU.prog.x86start;
+	SysMemory::DiscardCodeCachePages(mVU.prog.x86ptr, old_high_water);
 
 	// Program objects have one owner regardless of how many start-PC lists
 	// reference them. Drifted programs are no longer hash-addressable, but stay
@@ -238,12 +240,23 @@ __ri microProgram* mVUcreateProg(microVU& mVU, int startPC, const MvuContentKey&
 	return prog;
 }
 
-static __fi void mVUcontentMapEvict(microVU& mVU, microProgram& prog)
+static __fi void mVUcontentMapRefreshOrEvict(microVU& mVU, microProgram& prog, const MvuContentKey& liveKey)
 {
 	auto it = mVU.contentPrograms.find(prog.contentKey);
 	if (it != mVU.contentPrograms.end() && it->second == &prog)
 	{
 		mVU.contentPrograms.erase(it);
+
+		const bool inserted = mVU.contentPrograms.emplace(liveKey, &prog).second;
+		if (inserted)
+		{
+			prog.contentKey = liveKey;
+			prog.contentWriteGeneration = mVU.microMemWriteGeneration;
+			return;
+		}
+
+		// Another program already owns this exact full-memory image. Existing
+		// per-PC lists may still reference this range-specialized variant.
 		mVU.orphanedPrograms.push_back(&prog);
 	}
 	else
@@ -277,7 +290,7 @@ __ri void mVUcacheProg(microVU& mVU, microProgram& prog)
 	{
 		const MvuContentKey liveKey = mVUcomputeContentKey(mVU);
 		if (!(liveKey == prog.contentKey))
-			mVUcontentMapEvict(mVU, prog);
+			mVUcontentMapRefreshOrEvict(mVU, prog, liveKey);
 		else
 			prog.contentWriteGeneration = mVU.microMemWriteGeneration;
 	}
@@ -375,6 +388,24 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 
 	if (!quick.prog) // If null, we need to search for new program
 	{
+		// An exact full-memory hit is O(1) and always safe. Check it before the
+		// historical per-PC list, which can contain many partial-range variants.
+		const MvuContentKey liveKey = mVUcomputeContentKey(mVU);
+		auto contentIt = mVU.contentPrograms.find(liveKey);
+		if (contentIt != mVU.contentPrograms.end())
+		{
+			microProgram* shared = contentIt->second;
+			mVUlistPushUnique(list, shared);
+			mVU.prog.cleared = 0;
+			mVU.prog.isSame = 1;
+			mVU.prog.cur = shared;
+			quick.prog = shared;
+			quick.block = shared->block[start_pc_8];
+			if (quick.block == nullptr)
+				return mVUblockFetch(mVU, startPC, pState);
+			return mVUentryGet(mVU, quick.block, startPC, pState);
+		}
+
 		auto it(list->begin());
 		for (; it != list->end(); ++it)
 		{
@@ -400,22 +431,6 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 		// Hash only after the per-PC MRU list misses completely. Identical full
 		// micro-memory images reached through another start PC can share the same
 		// program and compile only the missing entry block.
-		const MvuContentKey liveKey = mVUcomputeContentKey(mVU);
-		auto contentIt = mVU.contentPrograms.find(liveKey);
-		if (contentIt != mVU.contentPrograms.end())
-		{
-			microProgram* shared = contentIt->second;
-			mVUlistPushUnique(list, shared);
-			mVU.prog.cleared = 0;
-			mVU.prog.isSame = 1;
-			mVU.prog.cur = shared;
-			quick.prog = shared;
-			quick.block = shared->block[start_pc_8];
-			if (quick.block == nullptr)
-				return mVUblockFetch(mVU, startPC, pState);
-			return mVUentryGet(mVU, quick.block, startPC, pState);
-		}
-
 		// If cleared and program not found, make a new program instance
 		mVU.prog.cleared = 0;
 		mVU.prog.isSame  = 1;

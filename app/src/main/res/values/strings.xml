@@ -252,6 +252,16 @@
     <string name="pro_message_purchase_failed">Pro purchase could not be completed.</string>
     <string name="pro_message_pending_confirmation">Pro purchase is pending confirmation.</string>
     <string name="settings_language">Language</string>
+    <string name="settings_tv_interface">TV interface</string>
+    <string name="settings_tv_interface_auto">Automatic</string>
+    <string name="settings_tv_interface_standard">Standard</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">Automatic enables the TV layout only when Android reports a TV or Leanback device. Use TV for uncertified TV boxes, or Standard to disable it.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV detected. Automatic uses the TV interface.</string>
+    <string name="settings_tv_interface_detected_standard">Standard Android device detected. Automatic keeps the touch interface.</string>
+    <string name="tv_storage_source_title">Choose storage</string>
+    <string name="tv_storage_all_locations">All locations</string>
+    <string name="tv_storage_picker_unavailable">No compatible system file picker is installed on this TV device.</string>
     <string name="settings_language_system">System default</string>
     <string name="settings_language_sheet_subtitle">Choose the app language.</string>
     <string name="settings_language_screen_subtitle">Choose the interface language for EmuCoreX.</string>
@@ -1927,4 +1937,7 @@
     <string name="settings_network_local_room_code_desc">Use the same 4–12 letter or digit code on trusted Wi-Fi or a hotspot.</string>
     <string name="settings_network_local_peer_id">Local peer ID: %1$d</string>
     <string name="settings_network_local_compatibility_note">Works only with games that support DEV9 LAN or System Link. Online-only and i.Link games are not converted to LAN.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">Uses direct virtual memory for EE JIT access. Disable only to diagnose crashes or recompiler issues.</string>
+    <string name="settings_help_enable_fastmem">Maps PS2 addresses into a reserved host range so recompiled memory operations avoid slower handlers. Keep it enabled for normal play. Disabling it greatly reduces performance, but can help isolate Fastmem faults or device-specific memory-mapping problems. Restart the game to apply.</string>
 </resources>

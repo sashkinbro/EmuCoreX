@@ -129,6 +129,16 @@
     <string name="settings_theme_light">Світла</string>
     <string name="settings_theme_dark">Темна</string>
     <string name="settings_language">Мова</string>
+    <string name="settings_tv_interface">Інтерфейс для ТВ</string>
+    <string name="settings_tv_interface_auto">Автоматично</string>
+    <string name="settings_tv_interface_standard">Стандартний</string>
+    <string name="settings_tv_interface_tv">ТВ</string>
+    <string name="settings_help_tv_interface">Автоматичний режим вмикає ТВ-інтерфейс лише тоді, коли Android визначає телевізор або пристрій Leanback. Для несертифікованих ТВ-приставок виберіть «ТВ», а щоб вимкнути — «Стандартний».</string>
+    <string name="settings_tv_interface_detected_tv">Виявлено Android TV / Google TV. Автоматичний режим використовує ТВ-інтерфейс.</string>
+    <string name="settings_tv_interface_detected_standard">Виявлено стандартний Android-пристрій. Автоматичний режим залишає сенсорний інтерфейс.</string>
+    <string name="tv_storage_source_title">Виберіть накопичувач</string>
+    <string name="tv_storage_all_locations">Усі розташування</string>
+    <string name="tv_storage_picker_unavailable">На цьому ТВ-пристрої не встановлено сумісний системний засіб вибору файлів.</string>
     <string name="settings_language_system">За замовчуванням</string>
     <string name="settings_language_sheet_subtitle">Виберіть мову додатка.</string>
     <string name="settings_language_screen_subtitle">Виберіть мову інтерфейсу для EmuCoreX.</string>
@@ -1916,4 +1926,7 @@
     <string name="settings_network_local_room_code_desc">Введіть однаковий код із 4–12 літер або цифр у довіреній мережі Wi‑Fi чи точці доступу.</string>
     <string name="settings_network_local_peer_id">Локальний ID учасника: %1$d</string>
     <string name="settings_network_local_compatibility_note">Працює лише в іграх із підтримкою DEV9 LAN або System Link. Ігри лише з онлайном та i.Link не перетворюються на LAN.</string>
+    <string name="settings_enable_fastmem">Швидка памʼять (Fastmem)</string>
+    <string name="settings_enable_fastmem_desc">Використовує прямий доступ до віртуальної памʼяті для EE JIT. Вимикайте лише для діагностики збоїв або рекомпілятора.</string>
+    <string name="settings_help_enable_fastmem">Відображає адреси PS2 у зарезервований діапазон памʼяті пристрою, щоб рекомпільовані операції не проходили через повільніші обробники. Для звичайної гри залишайте увімкненим. Вимкнення суттєво знижує продуктивність, але допомагає виявити помилки Fastmem або проблеми відображення памʼяті на окремих пристроях. Для застосування перезапустіть гру.</string>
 </resources>

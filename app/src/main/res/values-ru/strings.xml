@@ -129,6 +129,16 @@
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Темная</string>
     <string name="settings_language">Язык</string>
+    <string name="settings_tv_interface">Интерфейс для ТВ</string>
+    <string name="settings_tv_interface_auto">Автоматически</string>
+    <string name="settings_tv_interface_standard">Стандартный</string>
+    <string name="settings_tv_interface_tv">ТВ</string>
+    <string name="settings_help_tv_interface">Автоматический режим включает ТВ-интерфейс, только если Android определяет телевизор или устройство Leanback. Для несертифицированных ТВ-приставок выберите «ТВ», а для отключения — «Стандартный».</string>
+    <string name="settings_tv_interface_detected_tv">Обнаружен Android TV / Google TV. Автоматический режим использует ТВ-интерфейс.</string>
+    <string name="settings_tv_interface_detected_standard">Обнаружено стандартное Android-устройство. Автоматический режим сохраняет сенсорный интерфейс.</string>
+    <string name="tv_storage_source_title">Выберите накопитель</string>
+    <string name="tv_storage_all_locations">Все расположения</string>
+    <string name="tv_storage_picker_unavailable">На этом ТВ-устройстве не установлен совместимый системный выбор файлов.</string>
     <string name="settings_language_system">По умолчанию</string>
     <string name="settings_language_sheet_subtitle">Выберите язык приложения.</string>
     <string name="settings_language_screen_subtitle">Выберите язык интерфейса для EmuCoreX.</string>
@@ -1916,4 +1926,7 @@
     <string name="settings_network_local_room_code_desc">Используйте одинаковый код из 4–12 букв или цифр в доверенной сети Wi‑Fi или точке доступа.</string>
     <string name="settings_network_local_peer_id">Локальный ID участника: %1$d</string>
     <string name="settings_network_local_compatibility_note">Работает только в играх с поддержкой DEV9 LAN или System Link. Игры только с онлайном и i.Link не преобразуются в LAN.</string>
+    <string name="settings_enable_fastmem">Быстрая память (Fastmem)</string>
+    <string name="settings_enable_fastmem_desc">Использует прямой доступ к виртуальной памяти для EE JIT. Отключайте только для диагностики сбоев или рекомпилятора.</string>
+    <string name="settings_help_enable_fastmem">Отображает адреса PS2 в зарезервированный диапазон памяти устройства, чтобы рекомпилированные операции обходили более медленные обработчики. Для обычной игры оставляйте включённым. Отключение заметно снижает производительность, но помогает выявить ошибки Fastmem или проблемы отображения памяти на отдельных устройствах. Для применения перезапустите игру.</string>
 </resources>

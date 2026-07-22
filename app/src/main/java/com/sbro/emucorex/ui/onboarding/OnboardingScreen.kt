@@ -82,6 +82,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -97,9 +99,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorStorage
+import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.TvUiMetrics
 
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
+import com.sbro.emucorex.ui.common.TvStoragePickerHost
+import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
@@ -166,6 +172,7 @@ fun OnboardingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
 
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp && configuration.screenWidthDp >= 600
     var isCompleting by remember { mutableStateOf(false) }
@@ -173,6 +180,16 @@ fun OnboardingScreen(
     val scope = rememberCoroutineScope()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
+    val tvSafeHorizontal = if (tvUiEnabled) {
+        TvUiMetrics.safeHorizontalDp(configuration.screenWidthDp).dp
+    } else {
+        0.dp
+    }
+    val tvSafeVertical = if (tvUiEnabled) {
+        TvUiMetrics.safeVerticalDp(configuration.screenHeightDp).dp
+    } else {
+        0.dp
+    }
     val landscapeSetupScrollState = rememberScrollState()
     val landscapeSetupScrollProgress by remember(landscapeSetupScrollState) {
         derivedStateOf {
@@ -209,8 +226,25 @@ fun OnboardingScreen(
     ) { uri: Uri? ->
         uri?.let(viewModel::setGamePath)
     }
-    val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(arrayOf("*/*")) })
-    val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
+    var tvStorageRequest by remember { mutableStateOf<TvStorageRequest?>(null) }
+    TvStoragePickerHost(
+        request = tvStorageRequest,
+        onDismiss = { tvStorageRequest = null },
+        onBiosSelected = viewModel::setBiosPath,
+        onGameFolderSelected = viewModel::setGamePath
+    )
+    val launchBiosPicker = rememberDebouncedClick(
+        onClick = {
+            if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
+            else biosPicker.launch(arrayOf("*/*"))
+        }
+    )
+    val launchGamePicker = rememberDebouncedClick(
+        onClick = {
+            if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
+            else gamePicker.launch(null)
+        }
+    )
     val openEmulatorDataLocationDialog = rememberDebouncedClick(
         onClick = {
             viewModel.refreshEmulatorDataLocations()
@@ -358,6 +392,7 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontalSystemBarPadding)
+                    .padding(horizontal = tvSafeHorizontal, vertical = tvSafeVertical)
                     .graphicsLayer {
                         alpha = contentAlpha
                         translationY = contentOffset
@@ -539,6 +574,7 @@ fun OnboardingScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontalSystemBarPadding)
+                    .padding(horizontal = tvSafeHorizontal, vertical = tvSafeVertical)
                     .imePadding()
                     .graphicsLayer {
                         alpha = contentAlpha
@@ -949,6 +985,15 @@ private fun OnboardingNavigation(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val primaryActionFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(tvUiEnabled, currentPage, totalPages, canContinue) {
+        val primaryActionEnabled = currentPage < totalPages - 1 || canContinue
+        if (tvUiEnabled && primaryActionEnabled) {
+            delay(80.milliseconds)
+            runCatching { primaryActionFocusRequester.requestFocus() }
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -991,7 +1036,9 @@ private fun OnboardingNavigation(
             if (currentPage < totalPages - 1) {
                 Button(
                     onClick = onNext,
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier
+                        .height(52.dp)
+                        .focusRequester(primaryActionFocusRequester),
                     shape = RoundedCornerShape(12.dp),
                     elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(
                         defaultElevation = 0.dp
@@ -1016,7 +1063,9 @@ private fun OnboardingNavigation(
                 Button(
                     onClick = onContinue,
                     enabled = canContinue,
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier
+                        .height(52.dp)
+                        .focusRequester(primaryActionFocusRequester),
                     shape = RoundedCornerShape(12.dp),
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,

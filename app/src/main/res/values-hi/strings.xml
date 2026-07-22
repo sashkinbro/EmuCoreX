@@ -176,6 +176,16 @@
     <string name="settings_theme_light">लाइट</string>
     <string name="settings_theme_dark">डार्क</string>
     <string name="settings_language">भाषा</string>
+    <string name="settings_tv_interface">टीवी इंटरफ़ेस</string>
+    <string name="settings_tv_interface_auto">स्वचालित</string>
+    <string name="settings_tv_interface_standard">मानक</string>
+    <string name="settings_tv_interface_tv">टीवी</string>
+    <string name="settings_help_tv_interface">स्वचालित मोड टीवी लेआउट केवल तब चालू करता है जब Android किसी टीवी या Leanback डिवाइस को पहचानता है। अप्रमाणित टीवी बॉक्स के लिए टीवी और इसे बंद करने के लिए मानक चुनें।</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV मिला। स्वचालित मोड टीवी इंटरफ़ेस का उपयोग करता है।</string>
+    <string name="settings_tv_interface_detected_standard">मानक Android डिवाइस मिला। स्वचालित मोड टच इंटरफ़ेस बनाए रखता है।</string>
+    <string name="tv_storage_source_title">स्टोरेज चुनें</string>
+    <string name="tv_storage_all_locations">सभी स्थान</string>
+    <string name="tv_storage_picker_unavailable">इस टीवी डिवाइस पर कोई संगत सिस्टम फ़ाइल पिकर इंस्टॉल नहीं है।</string>
     <string name="settings_language_system">सिस्टम डिफ़ॉल्ट</string>
     <string name="settings_language_sheet_subtitle">ऐप की भाषा चुनें।</string>
     <string name="settings_language_screen_subtitle">EmuCoreX के लिए इंटरफ़ेस भाषा चुनें।</string>
@@ -1912,4 +1922,7 @@
     <string name="settings_network_local_room_code_desc">भरोसेमंद Wi‑Fi या हॉटस्पॉट पर वही 4–12 अक्षर या अंक वाला कोड उपयोग करें।</string>
     <string name="settings_network_local_peer_id">लोकल खिलाड़ी ID: %1$d</string>
     <string name="settings_network_local_compatibility_note">केवल DEV9 LAN या System Link समर्थित गेम में काम करता है। केवल ऑनलाइन और i.Link गेम LAN में नहीं बदलते।</string>
+    <string name="settings_enable_fastmem">तेज़ मेमोरी (Fastmem)</string>
+    <string name="settings_enable_fastmem_desc">EE JIT के लिए सीधे वर्चुअल मेमोरी एक्सेस का उपयोग करता है। केवल क्रैश या रीकंपाइलर समस्या की जाँच के लिए बंद करें।</string>
+    <string name="settings_help_enable_fastmem">PS2 पतों को होस्ट मेमोरी की आरक्षित सीमा में मैप करता है, ताकि रीकंपाइल किए गए मेमोरी ऑपरेशन धीमे हैंडलरों से बच सकें। सामान्य खेल में इसे चालू रखें। इसे बंद करने से प्रदर्शन बहुत घटता है, लेकिन Fastmem त्रुटि या किसी डिवाइस की मेमोरी मैपिंग समस्या अलग करने में मदद मिल सकती है। लागू करने के लिए गेम दोबारा शुरू करें।</string>
 </resources>

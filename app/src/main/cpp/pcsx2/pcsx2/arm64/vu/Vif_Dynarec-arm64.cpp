@@ -192,12 +192,14 @@ static void maskedVecWrite(oak::QReg reg, OakMemOperand addr, int xyzw)
 
 void dVifReset(int idx)
 {
+	u8* const old_high_water = nVif[idx].recWritePtr;
 	nVif[idx].vifBlocks.reset();
 
 	const size_t offset = idx ? HostMemoryMap::VIF1recOffset : HostMemoryMap::VIF0recOffset;
 	const size_t size = idx ? HostMemoryMap::VIF1recSize : HostMemoryMap::VIF0recSize;
 	nVif[idx].recWritePtr = SysMemory::GetCodePtr(offset);
 	nVif[idx].recEndPtr = nVif[idx].recWritePtr + (size - _256kb);
+	SysMemory::DiscardCodeCachePages(nVif[idx].recWritePtr, old_high_water);
 }
 
 void dVifRelease(int idx)

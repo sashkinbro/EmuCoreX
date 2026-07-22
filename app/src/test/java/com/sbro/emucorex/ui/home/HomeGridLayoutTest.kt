@@ -1,5 +1,6 @@
 package com.sbro.emucorex.ui.home
 
+import com.sbro.emucorex.core.TvUiMetrics
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -22,6 +23,20 @@ class HomeGridLayoutTest {
         val columns = calculateHomeGridColumnCount(1200, 800, 800, 1.00f)
 
         assertEquals(8, columns)
+    }
+
+    @Test
+    fun tvGridUsesActualSafeContentWidth() {
+        val widthDp = 960
+        val columns = calculateHomeGridColumnCount(
+            screenWidthDp = widthDp,
+            screenHeightDp = 540,
+            smallestScreenWidthDp = 540,
+            gridScale = 1f,
+            contentReservedWidthDp = TvUiMetrics.contentReservedWidthDp(widthDp)
+        )
+
+        assertEquals(5, columns)
     }
 
     @Test

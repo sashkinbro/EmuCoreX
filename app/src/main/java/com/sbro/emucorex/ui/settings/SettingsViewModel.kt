@@ -24,6 +24,7 @@ import com.sbro.emucorex.core.ProPurchaseManager
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
+import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
@@ -89,6 +90,7 @@ data class SettingsUiState(
     val isProPurchaseInProgress: Boolean = false,
     val proPurchaseMessageResId: Int? = null,
     val languageTag: String? = null,
+    val tvInterfaceMode: TvInterfaceMode = TvInterfaceMode.AUTO,
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
@@ -137,6 +139,7 @@ data class SettingsUiState(
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
     val enableVu1Recompiler: Boolean = true,
+    val enableFastmem: Boolean = true,
     val eeFpuRoundMode: Int = AppPreferences.DEFAULT_EE_FPU_ROUND_MODE,
     val vu0RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
     val vu1RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
@@ -349,6 +352,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             hiddenGameMenuSections = snapshot.hiddenGameMenuSections,
             isProUnlocked = snapshot.proUnlocked,
             languageTag = snapshot.languageTag,
+            tvInterfaceMode = snapshot.tvInterfaceMode,
             renderer = snapshot.renderer,
             upscaleMultiplier = snapshot.upscaleMultiplier,
             aspectRatio = snapshot.aspectRatio,
@@ -393,6 +397,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableIopRecompiler = snapshot.enableIopRecompiler,
             enableVu0Recompiler = snapshot.enableVu0Recompiler,
             enableVu1Recompiler = snapshot.enableVu1Recompiler,
+            enableFastmem = snapshot.enableFastmem,
             eeFpuRoundMode = snapshot.eeFpuRoundMode,
             vu0RoundMode = snapshot.vu0RoundMode,
             vu1RoundMode = snapshot.vu1RoundMode,
@@ -1020,6 +1025,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setConfirmSaveLoadActions(enabled: Boolean) { viewModelScope.launch { preferences.setConfirmSaveLoadActions(enabled) } }
     fun setBackButtonExitsGame(enabled: Boolean) { viewModelScope.launch { preferences.setBackButtonExitsGame(enabled) } }
     fun setKeepScreenOn(enabled: Boolean) { viewModelScope.launch { preferences.setKeepScreenOn(enabled) } }
+    fun setTvInterfaceMode(mode: TvInterfaceMode) {
+        viewModelScope.launch { preferences.setTvInterfaceMode(mode) }
+    }
     fun setRacingMode(enabled: Boolean) { viewModelScope.launch { preferences.setRacingMode(enabled) } }
     fun setTouchHaptics(enabled: Boolean) { viewModelScope.launch { preferences.setTouchHaptics(enabled) } }
     fun setTouchscreenRightStick(enabled: Boolean) { viewModelScope.launch { preferences.setTouchscreenRightStick(enabled) } }
@@ -1113,6 +1121,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 preferences.setEnableMtvu(false)
                 EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", "false")
             }
+        }
+    }
+
+    fun setEnableFastmem(enabled: Boolean) {
+        viewModelScope.launch {
+            markPerformancePresetCustom()
+            preferences.setEnableFastmem(enabled)
+            EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableFastmem", "bool", enabled.toString())
         }
     }
 
@@ -1887,6 +1903,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 enableIopRecompiler = _uiState.value.enableIopRecompiler,
                 enableVu0Recompiler = _uiState.value.enableVu0Recompiler,
                 enableVu1Recompiler = _uiState.value.enableVu1Recompiler,
+                enableFastmem = _uiState.value.enableFastmem,
                 eeFpuRoundMode = _uiState.value.eeFpuRoundMode,
                 vu0RoundMode = _uiState.value.vu0RoundMode,
                 vu1RoundMode = _uiState.value.vu1RoundMode,

@@ -108,6 +108,10 @@ namespace SysMemory
 	/// Returns memory used for the recompilers.
 	u8* GetCodePtr(size_t offset);
 
+	/// Releases fully unused physical pages from a reset JIT cache while keeping
+	/// its virtual address range reserved and executable.
+	void DiscardCodeCachePages(u8* live_end, u8* old_high_water);
+
 	/// Returns the file mapping which backs the data memory.
 	void* GetDataFileHandle();
 

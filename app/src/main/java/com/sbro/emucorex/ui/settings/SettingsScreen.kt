@@ -154,9 +154,14 @@ import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.PerformanceProfiles
+import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.TvInterfaceMode
+import com.sbro.emucorex.core.TvUiPolicy
 import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
+import com.sbro.emucorex.ui.common.TvStoragePickerHost
+import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
@@ -219,6 +224,7 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
@@ -236,7 +242,7 @@ fun SettingsScreen(
     var searchEnabled by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val selectedTabFocusRequester = remember { FocusRequester() }
-    val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+    val shouldRequestGamepadFocus = tvUiEnabled || remember { GamepadManager.isGamepadConnected() }
     val scope = rememberCoroutineScope()
     val backupRepository = remember(context) {
         SettingsBackupRepository(
@@ -299,9 +305,26 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::installCustomFont) }
 
-    val launchBiosPicker = rememberDebouncedClick(onClick = { biosPicker.launch(arrayOf("*/*")) })
+    var tvStorageRequest by remember { mutableStateOf<TvStorageRequest?>(null) }
+    TvStoragePickerHost(
+        request = tvStorageRequest,
+        onDismiss = { tvStorageRequest = null },
+        onBiosSelected = viewModel::setBiosPath,
+        onGameFolderSelected = viewModel::setGamePath
+    )
+    val launchBiosPicker = rememberDebouncedClick(
+        onClick = {
+            if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
+            else biosPicker.launch(arrayOf("*/*"))
+        }
+    )
     val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog.value = true })
-    val launchGamePicker = rememberDebouncedClick(onClick = { gamePicker.launch(null) })
+    val launchGamePicker = rememberDebouncedClick(
+        onClick = {
+            if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
+            else gamePicker.launch(null)
+        }
+    )
     val openEmulatorDataLocationDialog = rememberDebouncedClick(
         onClick = {
             viewModel.refreshEmulatorDataLocations()
@@ -1060,6 +1083,32 @@ private fun SettingsContent(
                             label = stringResource(R.string.settings_language),
                             value = languageLabel(uiState.languageTag),
                             onClick = openLanguageSheet
+                        )
+                        val systemTelevision = remember(context) {
+                            TvUiPolicy.isSystemTelevision(context)
+                        }
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_tv_interface),
+                            options = listOf(
+                                TvInterfaceMode.AUTO.preferenceValue to stringResource(R.string.settings_tv_interface_auto),
+                                TvInterfaceMode.STANDARD.preferenceValue to stringResource(R.string.settings_tv_interface_standard),
+                                TvInterfaceMode.TV.preferenceValue to stringResource(R.string.settings_tv_interface_tv)
+                            ),
+                            selectedValue = uiState.tvInterfaceMode.preferenceValue,
+                            onSelect = { value ->
+                                viewModel.setTvInterfaceMode(TvInterfaceMode.fromPreference(value))
+                            },
+                            helpText = stringResource(R.string.settings_help_tv_interface),
+                            onResetToDefault = { viewModel.setTvInterfaceMode(TvInterfaceMode.AUTO) }
+                        )
+                        SettingsInlineNote(
+                            stringResource(
+                                if (systemTelevision) {
+                                    R.string.settings_tv_interface_detected_tv
+                                } else {
+                                    R.string.settings_tv_interface_detected_standard
+                                }
+                            )
                         )
                         ThemeSelector(
                             selected = uiState.themeMode,
@@ -2169,6 +2218,15 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setEnableVu1Recompiler,
                             helpText = stringResource(R.string.settings_help_enable_vu1_recompiler),
                             onResetToDefault = { viewModel.setEnableVu1Recompiler(defaults.enableVu1Recompiler) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Bolt,
+                            title = stringResource(R.string.settings_enable_fastmem),
+                            subtitle = stringResource(R.string.settings_enable_fastmem_desc),
+                            checked = uiState.enableFastmem,
+                            onCheckedChange = viewModel::setEnableFastmem,
+                            helpText = stringResource(R.string.settings_help_enable_fastmem),
+                            onResetToDefault = { viewModel.setEnableFastmem(defaults.enableFastmem) }
                         )
                         SettingsInlineNote(
                             text = stringResource(R.string.settings_jit_section_note)
@@ -4654,6 +4712,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
     }
     return listOfNotNull(
         entry(SettingsTab.General, R.string.settings_language),
+        entry(SettingsTab.General, R.string.settings_tv_interface),
         entry(SettingsTab.General, R.string.settings_theme),
         entry(SettingsTab.Customization, R.string.settings_customization_background),
         entry(SettingsTab.Customization, R.string.settings_customization_grid_size),
@@ -4748,6 +4807,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Emulation, R.string.settings_enable_iop_recompiler),
         entry(SettingsTab.Emulation, R.string.settings_enable_vu0_recompiler),
         entry(SettingsTab.Emulation, R.string.settings_enable_vu1_recompiler),
+        entry(SettingsTab.Emulation, R.string.settings_enable_fastmem),
         entry(SettingsTab.Emulation, R.string.settings_game_fixes),
         entry(SettingsTab.Emulation, R.string.settings_ee_timing_hack),
         entry(SettingsTab.Emulation, R.string.settings_ee_fpu_round_mode),

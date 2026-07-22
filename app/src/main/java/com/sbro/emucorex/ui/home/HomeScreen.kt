@@ -126,6 +126,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.TvUiMetrics
 import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.HomeBackgroundRepository
@@ -133,6 +135,8 @@ import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
+import com.sbro.emucorex.ui.common.TvStoragePickerHost
+import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -173,6 +177,7 @@ fun HomeScreen(
         measuredHeightDp = with(density) { windowSize.height.toDp().value.roundToInt() }
     )
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val lifecycleOwner = LocalLifecycleOwner.current
     val customCoverRepository = remember(context) { CustomGameCoverRepository(context) }
     val homeBackgroundRepository = remember(context) { HomeBackgroundRepository(context) }
@@ -192,7 +197,12 @@ fun HomeScreen(
         screenWidthDp = windowMetrics.widthDp,
         screenHeightDp = windowMetrics.heightDp,
         smallestScreenWidthDp = configuration.smallestScreenWidthDp,
-        gridScale = uiState.homeGridScale
+        gridScale = uiState.homeGridScale,
+        contentReservedWidthDp = if (tvUiEnabled) {
+            TvUiMetrics.contentReservedWidthDp(windowMetrics.widthDp)
+        } else {
+            null
+        }
     )
     val isListView = uiState.libraryViewMode == HomeLibraryViewMode.LIST
     val standardViewMode = if (isShelfView) uiState.lastStandardLibraryViewMode else uiState.libraryViewMode
@@ -200,7 +210,7 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val showScrollToTop = gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900
     val initialGamepadFocusRequester = remember { FocusRequester() }
-    val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+    val shouldRequestGamepadFocus = tvUiEnabled || remember { GamepadManager.isGamepadConnected() }
 
     fun applyShelfSystemBarsHidden() {
         val activity = context as? Activity ?: return
@@ -258,6 +268,13 @@ fun HomeScreen(
     ) { uri: Uri? ->
         uri?.let { viewModel.onBiosFolderSelected(it) }
     }
+    var tvStorageRequest by remember { mutableStateOf<TvStorageRequest?>(null) }
+    TvStoragePickerHost(
+        request = tvStorageRequest,
+        onDismiss = { tvStorageRequest = null },
+        onBiosSelected = viewModel::onBiosFolderSelected,
+        onGameFolderSelected = viewModel::onFolderSelected
+    )
     var pendingCustomCoverGame by remember { mutableStateOf<GameItem?>(null) }
     var gameAwaitingPickerLaunch by remember { mutableStateOf<GameItem?>(null) }
     val customCoverAppliedMessage = stringResource(R.string.home_game_menu_custom_cover_applied)
@@ -332,8 +349,14 @@ fun HomeScreen(
             EmptyState(
                 biosReady = uiState.biosValid,
                 gamesReady = uiState.gameFolderSet,
-                onBiosClick = { biosPicker.launch(arrayOf("*/*")) },
-                onFolderClick = { folderPicker.launch(null) },
+                onBiosClick = {
+                    if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
+                    else biosPicker.launch(arrayOf("*/*"))
+                },
+                onFolderClick = {
+                    if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
+                    else folderPicker.launch(null)
+                },
                 topInset = topInset
             )
         } else {

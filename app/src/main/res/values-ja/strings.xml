@@ -184,6 +184,16 @@
     <string name="settings_theme_light">ライト</string>
     <string name="settings_theme_dark">ダーク</string>
     <string name="settings_language">言語</string>
+    <string name="settings_tv_interface">テレビ用インターフェース</string>
+    <string name="settings_tv_interface_auto">自動</string>
+    <string name="settings_tv_interface_standard">標準</string>
+    <string name="settings_tv_interface_tv">テレビ</string>
+    <string name="settings_help_tv_interface">自動では、Android がテレビまたは Leanback デバイスとして認識した場合のみテレビ用レイアウトを有効にします。未認証の TV ボックスでは「テレビ」、無効にする場合は「標準」を選択してください。</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV を検出しました。自動ではテレビ用インターフェースを使用します。</string>
+    <string name="settings_tv_interface_detected_standard">標準の Android デバイスを検出しました。自動ではタッチ用インターフェースを維持します。</string>
+    <string name="tv_storage_source_title">ストレージを選択</string>
+    <string name="tv_storage_all_locations">すべての場所</string>
+    <string name="tv_storage_picker_unavailable">このテレビ端末には互換性のあるシステムファイル選択機能がインストールされていません。</string>
     <string name="settings_language_system">システムデフォルト</string>
     <string name="settings_language_sheet_subtitle">アプリの言語を選択してください。</string>
     <string name="settings_language_screen_subtitle">EmuCoreXのインターフェース言語を選択してください。</string>
@@ -1911,4 +1921,7 @@
     <string name="settings_network_local_room_code_desc">信頼できる Wi‑Fi またはテザリングで、同じ4～12文字の英数字コードを使用してください。</string>
     <string name="settings_network_local_peer_id">ローカル参加者 ID：%1$d</string>
     <string name="settings_network_local_compatibility_note">DEV9 LAN または System Link 対応ゲームでのみ動作します。オンライン専用ゲームや i.Link ゲームを LAN 対応に変換するものではありません。</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">EE JITのメモリアクセスに直接仮想メモリを使用します。クラッシュやリコンパイラの診断時のみ無効にしてください。</string>
+    <string name="settings_help_enable_fastmem">PS2アドレスを予約済みのホスト領域に割り当て、再コンパイルされたメモリ操作が低速なハンドラを回避できるようにします。通常のプレイでは有効のままにしてください。無効にすると性能が大幅に低下しますが、Fastmemの障害や端末固有のメモリマッピング問題の切り分けに役立ちます。適用するにはゲームを再起動してください。</string>
 </resources>

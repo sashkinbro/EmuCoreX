@@ -478,12 +478,16 @@ static void recReserve()
 		pxFailRel("Failed to allocate R5900 InstCache array");
 }
 
-alignas(16) static u16 manual_page[Ps2MemSize::TotalRam >> 12];
-alignas(16) static u8 manual_counter[Ps2MemSize::TotalRam >> 12];
+// Manual protection follows the host page size. This matters on Android devices
+// with 16 KiB pages, where protecting one host page covers four PS2 4 KiB pages.
+alignas(16) static u16 manual_page[Ps2MemSize::TotalRam >> __pageshift];
+alignas(16) static u32 manual_slow_page[Ps2MemSize::TotalRam >> __pageshift];
+alignas(16) static u8 manual_counter[Ps2MemSize::TotalRam >> __pageshift];
 
 ////////////////////////////////////////////////////
 static void recResetRaw()
 {
+	u8* const old_high_water = recPtr;
 	if (CHECK_EXTRAMEM != extraRam)
 	{
 		recReserveRAM();
@@ -501,6 +505,7 @@ static void recResetRaw()
 
     // recVTLB => iR5900LoadStore
     recPtr = vtlb_DynGenDispatchers(recPtr);
+	SysMemory::DiscardCodeCachePages(recPtr, old_high_water);
 
 	ClearRecLUT(reinterpret_cast<BASEBLOCK*>(recLutReserve_RAM.data()), recLutSize);
 	recRAMCopy.fill(0);
@@ -516,6 +521,7 @@ static void recResetRaw()
 	g_branch = 0;
 
 	memset(manual_page, 0, sizeof(manual_page));
+	memset(manual_slow_page, 0, sizeof(manual_slow_page));
 	memset(manual_counter, 0, sizeof(manual_counter));
 }
 
@@ -681,6 +687,24 @@ void R5900::Dynarec::OpcodeImpl::recBREAK()
 }
 
 // Size is in dwords (4 bytes)
+static void recRemoveBlocks(int first, int last)
+{
+	std::vector<std::pair<uptr, uptr>> host_ranges;
+	host_ranges.reserve(last - first + 1);
+	for (int index = first; index <= last; index++)
+	{
+		const BASEBLOCKEX* block = recBlocks[index];
+		if (block && block->x86size > 0)
+			host_ranges.emplace_back(block->fnptr, block->fnptr + block->x86size);
+	}
+	std::sort(host_ranges.begin(), host_ranges.end());
+
+	// Fastmem patch points are keyed by host code address. Purge entries owned
+	// by dead blocks before their code can be recycled or fault metadata grows.
+	vtlb_RemoveLoadStoreInfo(host_ranges);
+	recBlocks.Remove(first, last);
+}
+
 void recClear(u32 addr, u32 size)
 {
 	if ((addr) >= maxrecmem || !(recLUT[(addr) >> 16] + (addr & ~0xFFFFUL)))
@@ -713,7 +737,7 @@ void recClear(u32 addr, u32 size)
 		{
 			if (toRemoveLast != blockidx)
 			{
-				recBlocks.Remove((blockidx + 1), toRemoveLast);
+				recRemoveBlocks((blockidx + 1), toRemoveLast);
 			}
 			toRemoveLast = --blockidx;
 			continue;
@@ -734,7 +758,7 @@ void recClear(u32 addr, u32 size)
 
 	if (toRemoveLast != blockidx)
 	{
-		recBlocks.Remove((blockidx + 1), toRemoveLast);
+		recRemoveBlocks((blockidx + 1), toRemoveLast);
 	}
 
 	upperextent = std::min(upperextent, ceiling);
@@ -1591,8 +1615,23 @@ static void recManualPageAddAndResetOnCarry_emit_oaknut(u16* counter, u32 size)
 	oakMoveAddressToReg(oak::util::X16, counter);
 	oakAsm->LDRH(oak::util::W4, oak::util::X16);
 	oakAsm->MOV(OAK_WSCRATCH2, size);
-	oakAsm->ADDS(oak::util::W4, oak::util::W4, OAK_WSCRATCH2);
+	oakAsm->ADD(oak::util::W4, oak::util::W4, OAK_WSCRATCH2);
 	oakAsm->STRH(oak::util::W4, oak::util::X16);
+	// LDRH widens the value, so a 32-bit ADDS carry does not describe a
+	// 16-bit overflow. Compare the widened sum with 0x10000 explicitly.
+	oakAsm->CMP(oak::util::W4, 0x10000);
+	oakEmitCondBranch(oak::Cond::CS, DispatchPageReset);
+	recEndOaknutEmit();
+}
+
+static void recManualPageAddAndResetOnCarrySlow_emit_oaknut(u32* counter, u32 size)
+{
+	recBeginOaknutEmit();
+	oakMoveAddressToReg(oak::util::X16, counter);
+	oakAsm->LDR(oak::util::W4, oak::util::X16);
+	oakAsm->MOV(OAK_WSCRATCH2, size);
+	oakAsm->ADDS(oak::util::W4, oak::util::W4, OAK_WSCRATCH2);
+	oakAsm->STR(oak::util::W4, oak::util::X16);
 	oakEmitCondBranch(oak::Cond::CS, DispatchPageReset);
 	recEndOaknutEmit();
 }
@@ -2045,8 +2084,17 @@ void dyna_block_discard(u32 start, u32 sz)
 // and the block is re-assigned for write protection.
 void dyna_page_reset(u32 start, u32 sz)
 {
-	recClear(start & ~0xfffUL, 0x400);
-	manual_counter[start >> 12]++;
+	const u32 page_start = start & ~static_cast<u32>(__pagemask);
+	const u32 page_index = page_start >> __pageshift;
+	recClear(page_start, __pagesize / sizeof(u32));
+	manual_page[page_index] = 0;
+	manual_slow_page[page_index] = 0;
+
+	// A busy mixed code/data page gets a long probation interval instead of
+	// becoming permanently slow. After that interval, retry normal protection.
+	if (manual_counter[page_index] > 3)
+		manual_counter[page_index] = 0;
+	manual_counter[page_index]++;
 	mmap_MarkCountedRamPage(start);
 }
 
@@ -2054,11 +2102,16 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 {
 	u32 inpage_ptr = HWADDR(startpc);
 	const u32 inpage_sz = size << 2; // size * 4
+	const u32 host_page_index = inpage_ptr >> __pageshift;
 
 	// The kernel context register is stored @ 0x800010C0-0x80001300
 	// The EENULL thread context register is stored @ 0x81000-....
-    u32 startpc_lsr_12 = (startpc >> 12);
-	const bool contains_thread_stack = (startpc_lsr_12 == 0x81) || (startpc_lsr_12 == 0x80001);
+	// Compare at host-page granularity: on 16 KiB Android systems, neighbouring
+	// PS2 4 KiB pages share the same mprotect unit and must remain manual too.
+	const u32 startpc_host_page = startpc & ~static_cast<u32>(__pagemask);
+	const bool contains_thread_stack =
+		startpc_host_page == (0x00081000u & ~static_cast<u32>(__pagemask)) ||
+		startpc_host_page == (0x800010c0u & ~static_cast<u32>(__pagemask));
 
 	// note: blocks are guaranteed to reside within the confines of a single page.
 	const vtlb_ProtectionMode PageType = contains_thread_stack ? ProtMode_Manual : mmap_GetRamPageInfo(inpage_ptr);
@@ -2071,7 +2124,8 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 		case ProtMode_None:
 		case ProtMode_Write:
 			mmap_MarkCountedRamPage(inpage_ptr);
-			manual_page[inpage_ptr >> 12] = 0;
+			manual_page[host_page_index] = 0;
+			manual_slow_page[host_page_index] = 0;
 			break;
 
 		case ProtMode_Manual:
@@ -2100,7 +2154,7 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 
 			// (ideally, perhaps, manual_counter should be reset to 0 every few minutes?)
 
-			if (!contains_thread_stack && manual_counter[inpage_ptr >> 12] <= 3)
+			if (!contains_thread_stack && manual_counter[host_page_index] <= 3)
 			{
 				// Counted blocks add a weighted (by block size) value into manual_page each time they're
 				// run.  If the block gets run a lot, it resets and re-protects itself in the hope
@@ -2118,21 +2172,27 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 				// not worth the effort (tests show that we have lots of recompiler memory to spare, and
 				// that the current amount of recompilation is fairly cheap).
 
-				recManualPageAddAndResetOnCarry_emit_oaknut(&manual_page[inpage_ptr >> 12], size);
+				recManualPageAddAndResetOnCarry_emit_oaknut(&manual_page[host_page_index], size);
 
 #ifdef PCSX2_DEVBUILD
 				// note: clearcnt is measured per-page, not per-block!
 				eeRecPerfLog.Write("Manual block @ %08X : size =%3d  page/offs = 0x%05X/0x%03X  inpgsz = %d  clearcnt = %d",
-					startpc, size, inpage_ptr >> 12, inpage_ptr & 0xfff, inpage_sz, manual_counter[inpage_ptr >> 12]);
+					startpc, size, host_page_index, inpage_ptr & __pagemask, inpage_sz, manual_counter[host_page_index]);
 #endif
 			}
-#ifdef PCSX2_DEVBUILD
 			else
 			{
+				if (!contains_thread_stack)
+				{
+					// Do not leave pages in per-execution memcmp mode forever. A 32-bit
+					// weighted counter makes the retry rare for genuinely busy pages.
+					recManualPageAddAndResetOnCarrySlow_emit_oaknut(&manual_slow_page[host_page_index], size);
+				}
+#ifdef PCSX2_DEVBUILD
 				eeRecPerfLog.Write("Uncounted Manual block @ 0x%08X : size =%3d page/offs = 0x%05X/0x%03X  inpgsz = %d",
-					startpc, size, inpage_ptr >> 12, inpage_ptr & 0xfff, inpage_sz);
-			}
+					startpc, size, host_page_index, inpage_ptr & __pagemask, inpage_sz);
 #endif
+			}
 			break;
 	}
 }

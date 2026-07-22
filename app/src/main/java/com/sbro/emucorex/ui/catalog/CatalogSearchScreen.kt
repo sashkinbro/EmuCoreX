@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
 import com.sbro.emucorex.data.ps2.Ps2CatalogSummary
 import com.sbro.emucorex.ui.common.GameCoverArt
@@ -109,7 +110,8 @@ fun CatalogSearchScreen(
     val hasActiveFilters = uiState.selectedGenre != null || uiState.selectedYear != null || uiState.minRating != null
     val backFocusRequester = remember { FocusRequester() }
     val firstResultFocusRequester = remember { FocusRequester() }
-    val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+    val shouldRequestGamepadFocus =
+        LocalTvUiEnvironment.current.enabled || remember { GamepadManager.isGamepadConnected() }
 
     DisposableEffect(viewModel) {
         viewModel.onScreenStart()

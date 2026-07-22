@@ -29,6 +29,7 @@
 
 #include "fmt/format.h"
 
+#include <algorithm>
 #include <bit>
 #include <map>
 #include <unordered_set>
@@ -993,6 +994,7 @@ static void vtlb_CreateFastmemMapping(u32 vaddr, u32 mainmem_offset, const PageP
 	if (s_fastmem_virtual_mapping[page] != NO_FASTMEM_MAPPING)
 	{
 		// current mapping needs to be removed
+		const u32 old_mainmem_offset = s_fastmem_virtual_mapping[page];
 		const bool was_coalesced = vtlb_IsHostCoalesced(page);
 
 		s_fastmem_virtual_mapping[page] = NO_FASTMEM_MAPPING;
@@ -1000,7 +1002,7 @@ static void vtlb_CreateFastmemMapping(u32 vaddr, u32 mainmem_offset, const PageP
 			Console.Error("Failed to unmap vaddr %08X", vaddr);
 
 		// remove reverse mapping
-		auto range = s_fastmem_physical_mapping.equal_range(mainmem_offset);
+		auto range = s_fastmem_physical_mapping.equal_range(old_mainmem_offset);
 		for (auto it = range.first; it != range.second;)
 		{
 			auto this_it = it++;
@@ -1146,6 +1148,21 @@ void vtlb_ClearLoadStoreInfo()
 {
 	s_fastmem_backpatch_info.clear();
 	s_fastmem_faulting_pcs.clear();
+}
+
+void vtlb_RemoveLoadStoreInfo(const std::vector<std::pair<uptr, uptr>>& code_ranges)
+{
+	for (auto it = s_fastmem_backpatch_info.begin(); it != s_fastmem_backpatch_info.end();)
+	{
+		const auto upper = std::upper_bound(code_ranges.begin(), code_ranges.end(), it->first,
+			[](uptr address, const auto& range) { return address < range.first; });
+		const bool removed = upper != code_ranges.begin() && it->first < std::prev(upper)->second;
+
+		if (removed)
+			it = s_fastmem_backpatch_info.erase(it);
+		else
+			++it;
+	}
 }
 
 void vtlb_AddLoadStoreInfo(uptr code_address, u32 code_size, u32 guest_pc, u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register, u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr)
@@ -1453,10 +1470,9 @@ void vtlb_Core_Free()
 // incur a permanent performance penalty.
 //
 // Page Granularity:
-// Fortunately for us MIPS and x86 use the same page granularity for TLB and memory
-// protection, so we can use a 1:1 correspondence when protecting pages.  Page granularity
-// is 4096 (4k), which is why you'll see a lot of 0xfff's, >><< 12's, and 0x1000's in the
-// code below.
+// Guest TLB mappings are 4 KiB, but host memory protection must use the runtime host
+// page size. Android ARM64 can use 16 KiB pages, so tracking and protection below are
+// intentionally indexed with __pageshift/__pagesize instead of assuming a 1:1 mapping.
 //
 
 struct vtlb_PageProtectionInfo
@@ -1482,7 +1498,7 @@ vtlb_ProtectionMode mmap_GetRamPageInfo(u32 paddr)
 {
 	pxAssert(eeMem);
 
-	paddr &= ~0xfff;
+	paddr &= ~static_cast<u32>(__pagemask);
 
 	uptr ptr = (uptr)PSM(paddr);
 	uptr rampage = ptr - (uptr)eeMem->Main;
@@ -1542,7 +1558,8 @@ static __fi void mmap_ClearCpuBlock(uint offset)
 	HostSys::MemProtect(&eeMem->Main[rampage << __pageshift], __pagesize, PageAccess_ReadWrite());
 	vtlb_UpdateFastmemProtection(rampage << __pageshift, __pagesize, PageAccess_ReadWrite());
 	m_PageProtectInfo[rampage].Mode = ProtMode_Manual;
-	Cpu->Clear(m_PageProtectInfo[rampage].ReverseRamMap, __pagesize);
+	// CPU clear callbacks take an instruction count (DWORDs), not bytes.
+	Cpu->Clear(m_PageProtectInfo[rampage].ReverseRamMap, __pagesize / sizeof(u32));
 }
 
 PageFaultHandler::HandlerResult PageFaultHandler::HandlePageFault(void* exception_pc, void* fault_address, bool is_write)

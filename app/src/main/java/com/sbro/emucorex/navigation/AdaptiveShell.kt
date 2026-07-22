@@ -84,10 +84,13 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.TvUiMetrics
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.DrawerItemId
 import com.sbro.emucorex.data.DrawerVisualStyle
@@ -148,9 +151,17 @@ fun AdaptiveShell(
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
     val context = LocalContext.current
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val preferences = remember(context) { AppPreferences(context) }
     val hiddenDrawerItems by preferences.hiddenDrawerItems.collectAsState(initial = emptySet())
     val drawerVisualStyle by preferences.drawerVisualStyle.collectAsState(initial = DrawerVisualStyle.CLASSIC)
+    val tvNavigationFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(tvUiEnabled, selected) {
+        if (tvUiEnabled) {
+            withFrameNanos { }
+            runCatching { tvNavigationFocusRequester.requestFocus() }
+        }
+    }
     val navContent: @Composable () -> Unit = {
         SideNavigation(
             selected = selected,
@@ -173,30 +184,52 @@ fun AdaptiveShell(
             onNavigateCheatManager = onNavigateCheatManager,
             onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
+            selectedItemFocusRequester = if (tvUiEnabled) tvNavigationFocusRequester else null,
+            topInset = if (tvUiEnabled) 0.dp else WindowInsets.statusBarsIgnoringVisibility
+                .asPaddingValues()
+                .calculateTopPadding(),
             onCloseDrawer = { }
         )
     }
     val configuration = LocalConfiguration.current
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
-    val isWide = isTabletClass && configuration.screenWidthDp >= 900
+    val isWide = tvUiEnabled || (isTabletClass && configuration.screenWidthDp >= 900)
+    val tvSafeHorizontal = TvUiMetrics.safeHorizontalDp(configuration.screenWidthDp).dp
+    val tvSafeVertical = TvUiMetrics.safeVerticalDp(configuration.screenHeightDp).dp
+    val tvNavigationWidth = TvUiMetrics.navigationWidthDp(configuration.screenWidthDp).dp
 
     if (isWide) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .then(
+                    if (tvUiEnabled) {
+                        Modifier.padding(horizontal = tvSafeHorizontal, vertical = tvSafeVertical)
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(
-                        when (drawerVisualStyle) {
+                        when {
+                            tvUiEnabled -> tvNavigationWidth
+                            else -> when (drawerVisualStyle) {
                             DrawerVisualStyle.COMPACT -> 272.dp
                             DrawerVisualStyle.CONSOLE -> 348.dp
                             else -> 320.dp
                         }
+                        }
                     )
-                    .padding(start = 12.dp, top = 12.dp, bottom = 12.dp)
+                    .padding(
+                        start = if (tvUiEnabled) 0.dp else 12.dp,
+                        end = if (tvUiEnabled) 16.dp else 0.dp,
+                        top = if (tvUiEnabled) 0.dp else 12.dp,
+                        bottom = if (tvUiEnabled) 0.dp else 12.dp
+                    )
             ) {
                 navContent()
             }
@@ -608,7 +641,11 @@ private fun SideNavigation(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 14.dp)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 14.dp)
                 )
             }
             Text(
@@ -937,7 +974,11 @@ private fun ShellAction(
                     MaterialTheme.typography.labelLarge
                 },
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 12.dp)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
             )
         }
     }
@@ -1013,7 +1054,11 @@ private fun ShellItem(
                     else -> MaterialTheme.typography.titleMedium
                 },
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 12.dp)
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
             )
         }
     }

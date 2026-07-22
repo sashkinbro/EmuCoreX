@@ -1,5 +1,8 @@
 package com.sbro.emucorex.ui.common
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 
 @Composable
 fun NavigationBackButton(
@@ -37,12 +43,21 @@ fun NavigationBackButton(
     tonalElevation: Dp = 3.dp,
     shadowElevation: Dp = 5.dp
 ) {
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
     Surface(
-        modifier = modifier.size(40.dp),
+        modifier = modifier.size(if (tvUiEnabled) 52.dp else 40.dp),
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,
         shadowElevation = shadowElevation,
+        border = if (tvUiEnabled && isFocused) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
+        interactionSource = interactionSource,
         onClick = rememberDebouncedClick(onClick = onClick)
     ) {
         Box(
@@ -53,7 +68,7 @@ fun NavigationBackButton(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = stringResource(R.string.back),
                 tint = contentColor,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(if (tvUiEnabled) 22.dp else 18.dp)
             )
         }
     }

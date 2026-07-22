@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 
 enum class GamepadFocusHighlightMode {
     ConnectedGamepadOnly,
@@ -41,8 +42,11 @@ fun Modifier.gamepadFocusableCard(
     val focusInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
     val isFocused by focusInteractionSource.collectIsFocusedAsState()
     val connectedGamepadCount by GamepadManager.connectedGamepadCountState.collectAsState()
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val shouldShowFocusHighlight = isFocused && enabled && (
-        focusHighlightMode == GamepadFocusHighlightMode.Always || connectedGamepadCount > 0
+        focusHighlightMode == GamepadFocusHighlightMode.Always ||
+            connectedGamepadCount > 0 ||
+            tvUiEnabled
     )
     val scale by animateFloatAsState(
         targetValue = if (shouldShowFocusHighlight) 1.02f else 1f,

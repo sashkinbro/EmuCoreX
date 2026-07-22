@@ -3,8 +3,10 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstring>
 #include <map>
+#include <vector>
 
 #include "arm64/OaknutHelpers-arm64.h"
 #include "common/Assertions.h"
@@ -48,7 +50,7 @@ class BaseBlockArray
 		auto* newMem = new BASEBLOCKEX[size];
 		if (blocks)
 		{
-			memcpy(newMem, blocks, mReserved * sizeof(BASEBLOCKEX));
+			memcpy(newMem, blocks, mSize * sizeof(BASEBLOCKEX));
 			delete[] blocks;
             blocks = nullptr;
 		}
@@ -171,12 +173,15 @@ public:
 
 	[[nodiscard]] __fi int Index(u32 startpc) const
 	{
-		int idx = LastIndex(startpc);
-        u32 block_startpc = blocks[idx].startpc;
-        u32 block_size = (blocks[idx].size);
+		const int idx = LastIndex(startpc);
+		if (idx < 0)
+			return -1;
 
-		if ((idx == -1) || (startpc < block_startpc) ||
-			(block_size && (startpc >= block_startpc + block_size << 2))) // blocks[idx].size * 4
+		const u32 block_startpc = blocks[idx].startpc;
+		const u32 block_size = blocks[idx].size;
+
+		if ((startpc < block_startpc) ||
+			(block_size && (startpc >= block_startpc + (block_size << 2))))
 			return -1;
 		else
 			return idx;
@@ -227,7 +232,30 @@ public:
 			}
 		} while (idx++ < last);
 
-		// TODO: remove links from this block?
+		// Link values are patch addresses inside the source block's generated code. Remove
+		// outgoing records owned by invalidated blocks so later relinks never walk or patch
+		// dead JIT code and the multimap cannot grow for the whole session.
+		std::vector<std::pair<uptr, uptr>> removed_host_ranges;
+		removed_host_ranges.reserve(last - first + 1);
+		for (int block_index = first; block_index <= last; block_index++)
+		{
+			const uptr source_begin = blocks[block_index].fnptr;
+			removed_host_ranges.emplace_back(source_begin, source_begin + blocks[block_index].x86size);
+		}
+		std::sort(removed_host_ranges.begin(), removed_host_ranges.end());
+
+		for (auto link = links.begin(); link != links.end();)
+		{
+			const auto upper = std::upper_bound(removed_host_ranges.begin(), removed_host_ranges.end(), link->second,
+				[](uptr address, const auto& range) { return address < range.first; });
+			const bool source_was_removed = upper != removed_host_ranges.begin() &&
+				link->second < std::prev(upper)->second;
+
+			if (source_was_removed)
+				link = links.erase(link);
+			else
+				++link;
+		}
 		blocks.erase(first, last + 1);
 	}
 

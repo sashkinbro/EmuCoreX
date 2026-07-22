@@ -184,6 +184,16 @@
     <string name="settings_theme_light">Açık</string>
     <string name="settings_theme_dark">Koyu</string>
     <string name="settings_language">Dil</string>
+    <string name="settings_tv_interface">TV arayüzü</string>
+    <string name="settings_tv_interface_auto">Otomatik</string>
+    <string name="settings_tv_interface_standard">Standart</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">Otomatik, TV düzenini yalnızca Android bir TV veya Leanback cihazı algıladığında açar. Sertifikasız TV kutuları için TV’yi, kapatmak için Standart’ı seçin.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV algılandı. Otomatik, TV arayüzünü kullanır.</string>
+    <string name="settings_tv_interface_detected_standard">Standart Android cihazı algılandı. Otomatik, dokunmatik arayüzü korur.</string>
+    <string name="tv_storage_source_title">Depolama alanı seç</string>
+    <string name="tv_storage_all_locations">Tüm konumlar</string>
+    <string name="tv_storage_picker_unavailable">Bu TV cihazında uyumlu bir sistem dosya seçicisi yüklü değil.</string>
     <string name="settings_language_system">Sistem varsayılanı</string>
     <string name="settings_language_sheet_subtitle">Uygulama dilini seçin.</string>
     <string name="settings_language_screen_subtitle">EmuCoreX için arayüz dilini seçin.</string>
@@ -1912,4 +1922,7 @@
     <string name="settings_network_local_room_code_desc">Güvenilir Wi‑Fi veya erişim noktasında aynı 4–12 harf ya da rakamdan oluşan kodu kullanın.</string>
     <string name="settings_network_local_peer_id">Yerel katılımcı kimliği: %1$d</string>
     <string name="settings_network_local_compatibility_note">Yalnızca DEV9 LAN veya System Link destekleyen oyunlarda çalışır. Sadece çevrimiçi ve i.Link oyunları LAN oyununa dönüşmez.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">EE JIT için doğrudan sanal bellek erişimi kullanır. Yalnızca çökmeleri veya yeniden derleyici sorunlarını tanılamak için kapatın.</string>
+    <string name="settings_help_enable_fastmem">Yeniden derlenmiş bellek işlemlerinin daha yavaş işleyicileri atlaması için PS2 adreslerini ayrılmış bir sistem aralığına eşler. Normal oyun için açık bırakın. Kapatmak performansı ciddi ölçüde düşürür; ancak Fastmem hatalarını veya cihaza özgü bellek eşleme sorunlarını ayırmaya yardımcı olabilir. Uygulamak için oyunu yeniden başlatın.</string>
 </resources>

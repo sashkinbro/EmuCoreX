@@ -19,6 +19,7 @@ import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.RendererDefaults
+import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import com.sbro.emucorex.ui.theme.ThemeMode
@@ -75,6 +76,7 @@ data class SettingsSnapshot(
     val hiddenGameMenuSections: Set<GameMenuSectionId> = emptySet(),
     val proUnlocked: Boolean = false,
     val languageTag: String? = null,
+    val tvInterfaceMode: TvInterfaceMode = TvInterfaceMode.AUTO,
     val performanceProfile: Int = PerformanceProfiles.SAFE,
     val gpuHardwareProfile: Int = GpuHardwareProfiles.ADRENO,
     val renderer: Int = RendererDefaults.defaultForHardware(),
@@ -122,6 +124,7 @@ data class SettingsSnapshot(
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
     val enableVu1Recompiler: Boolean = true,
+    val enableFastmem: Boolean = true,
     val eeFpuRoundMode: Int = AppPreferences.DEFAULT_EE_FPU_ROUND_MODE,
     val vu0RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
     val vu1RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
@@ -423,6 +426,7 @@ class AppPreferences(private val context: Context) {
         )
 
         private val THEME_MODE = intPreferencesKey("theme_mode")
+        private val TV_INTERFACE_MODE = intPreferencesKey("tv_interface_mode")
         private val APP_FONT_CHOICE = intPreferencesKey("app_font_choice")
         private val APP_FONT_SCALE = floatPreferencesKey("app_font_scale")
         private val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
@@ -510,6 +514,7 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_IOP_RECOMPILER = booleanPreferencesKey("enable_iop_recompiler")
         private val ENABLE_VU0_RECOMPILER = booleanPreferencesKey("enable_vu0_recompiler")
         private val ENABLE_VU1_RECOMPILER = booleanPreferencesKey("enable_vu1_recompiler")
+        private val ENABLE_FASTMEM = booleanPreferencesKey("enable_fastmem")
         private val EE_FPU_ROUND_MODE = intPreferencesKey("ee_fpu_round_mode")
         private val VU0_ROUND_MODE = intPreferencesKey("vu0_round_mode")
         private val VU1_ROUND_MODE = intPreferencesKey("vu1_round_mode")
@@ -683,6 +688,10 @@ class AppPreferences(private val context: Context) {
     // Theme
     val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs -> readThemeMode(prefs) }
 
+    val tvInterfaceMode: Flow<TvInterfaceMode> = context.dataStore.data
+        .map { prefs -> TvInterfaceMode.fromPreference(prefs[TV_INTERFACE_MODE]) }
+        .distinctUntilChanged()
+
     val appFontChoice: Flow<AppFontChoice> = context.dataStore.data
         .map { prefs -> AppFontChoice.fromPreference(prefs[APP_FONT_CHOICE]) }
         .distinctUntilChanged()
@@ -761,6 +770,10 @@ class AppPreferences(private val context: Context) {
                 ThemeMode.PRO -> 3
             }
         }
+    }
+
+    suspend fun setTvInterfaceMode(mode: TvInterfaceMode) {
+        context.dataStore.edit { prefs -> prefs[TV_INTERFACE_MODE] = mode.preferenceValue }
     }
 
     suspend fun setAppFontChoice(choice: AppFontChoice) {
@@ -1377,6 +1390,7 @@ class AppPreferences(private val context: Context) {
                 hiddenGameMenuSections = sanitizeHiddenGameMenuSections(prefs[HIDDEN_GAME_MENU_SECTIONS]),
                 proUnlocked = prefs[PRO_UNLOCKED] ?: false,
                 languageTag = prefs[LANGUAGE_TAG],
+                tvInterfaceMode = TvInterfaceMode.fromPreference(prefs[TV_INTERFACE_MODE]),
                 performanceProfile = performanceProfile,
                 gpuHardwareProfile = gpuHardwareProfile,
                 renderer = normalizeRendererPreference(prefs[RENDERER]),
@@ -1454,6 +1468,7 @@ class AppPreferences(private val context: Context) {
                 enableIopRecompiler = prefs[ENABLE_IOP_RECOMPILER] ?: true,
                 enableVu0Recompiler = prefs[ENABLE_VU0_RECOMPILER] ?: true,
                 enableVu1Recompiler = prefs[ENABLE_VU1_RECOMPILER] ?: true,
+                enableFastmem = prefs[ENABLE_FASTMEM] ?: true,
                 eeFpuRoundMode = sanitizeFloatRoundMode(prefs[EE_FPU_ROUND_MODE], DEFAULT_EE_FPU_ROUND_MODE),
                 vu0RoundMode = sanitizeFloatRoundMode(prefs[VU0_ROUND_MODE], DEFAULT_VU_ROUND_MODE),
                 vu1RoundMode = sanitizeFloatRoundMode(prefs[VU1_ROUND_MODE], DEFAULT_VU_ROUND_MODE),
@@ -2270,6 +2285,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setEnableVu1Recompiler(enabled: Boolean) {
         context.dataStore.edit { it[ENABLE_VU1_RECOMPILER] = enabled }
+    }
+
+    val enableFastmem: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[ENABLE_FASTMEM] ?: true
+    }
+
+    suspend fun setEnableFastmem(enabled: Boolean) {
+        context.dataStore.edit { it[ENABLE_FASTMEM] = enabled }
     }
 
     val eeFpuRoundMode: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -3217,6 +3240,7 @@ class AppPreferences(private val context: Context) {
         val gpuHardwareProfile = resolveGpuHardwareProfile()
         return JSONObject().apply {
             put("themeMode", prefs[THEME_MODE] ?: 0)
+            put("tvInterfaceMode", TvInterfaceMode.fromPreference(prefs[TV_INTERFACE_MODE]).preferenceValue)
             put("appFontChoice", prefs[APP_FONT_CHOICE] ?: AppFontChoice.SYSTEM.preferenceValue)
             put("appFontScale", (prefs[APP_FONT_SCALE] ?: DEFAULT_APP_FONT_SCALE).toDouble())
             put("customFontName", prefs[CUSTOM_FONT_NAME])
@@ -3317,6 +3341,7 @@ class AppPreferences(private val context: Context) {
             put("enableIopRecompiler", prefs[ENABLE_IOP_RECOMPILER] ?: true)
             put("enableVu0Recompiler", prefs[ENABLE_VU0_RECOMPILER] ?: true)
             put("enableVu1Recompiler", prefs[ENABLE_VU1_RECOMPILER] ?: true)
+            put("enableFastmem", prefs[ENABLE_FASTMEM] ?: true)
             put("eeFpuRoundMode", sanitizeFloatRoundMode(prefs[EE_FPU_ROUND_MODE], DEFAULT_EE_FPU_ROUND_MODE))
             put("vu0RoundMode", sanitizeFloatRoundMode(prefs[VU0_ROUND_MODE], DEFAULT_VU_ROUND_MODE))
             put("vu1RoundMode", sanitizeFloatRoundMode(prefs[VU1_ROUND_MODE], DEFAULT_VU_ROUND_MODE))
@@ -3463,6 +3488,9 @@ class AppPreferences(private val context: Context) {
         localePrefs.edit().putString("language_tag", languageTag).apply()
         context.dataStore.edit { prefs ->
             prefs[THEME_MODE] = json.optInt("themeMode", 0)
+            prefs[TV_INTERFACE_MODE] = TvInterfaceMode.fromPreference(
+                json.optInt("tvInterfaceMode", TvInterfaceMode.AUTO.preferenceValue)
+            ).preferenceValue
             prefs[APP_FONT_CHOICE] = AppFontChoice.fromPreference(
                 json.optInt("appFontChoice", AppFontChoice.SYSTEM.preferenceValue)
             ).preferenceValue
@@ -3638,6 +3666,7 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_IOP_RECOMPILER] = json.optBoolean("enableIopRecompiler", true)
             prefs[ENABLE_VU0_RECOMPILER] = json.optBoolean("enableVu0Recompiler", true)
             prefs[ENABLE_VU1_RECOMPILER] = json.optBoolean("enableVu1Recompiler", true)
+            prefs[ENABLE_FASTMEM] = json.optBoolean("enableFastmem", true)
             prefs[EE_FPU_ROUND_MODE] = sanitizeFloatRoundMode(json.optInt("eeFpuRoundMode", DEFAULT_EE_FPU_ROUND_MODE), DEFAULT_EE_FPU_ROUND_MODE)
             prefs[VU0_ROUND_MODE] = sanitizeFloatRoundMode(json.optInt("vu0RoundMode", DEFAULT_VU_ROUND_MODE), DEFAULT_VU_ROUND_MODE)
             prefs[VU1_ROUND_MODE] = sanitizeFloatRoundMode(json.optInt("vu1RoundMode", DEFAULT_VU_ROUND_MODE), DEFAULT_VU_ROUND_MODE)

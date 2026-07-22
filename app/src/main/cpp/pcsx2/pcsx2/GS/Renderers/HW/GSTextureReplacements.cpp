@@ -25,6 +25,7 @@
 #include <cstring>
 #include <deque>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
@@ -114,6 +115,9 @@ namespace GSTextureReplacements
 	static void QueueAsyncReplacementTextureLoad(const TextureName& name, const std::string& filename, bool mipmap, bool cache_only);
 	static void PrecacheReplacementTextures();
 	static void ClearReplacementTextures();
+	static size_t GetReplacementTextureMemoryUsage(const ReplacementTexture& texture);
+	static void TouchReplacementTexture(const TextureName& name);
+	static void TrimReplacementTextureCache(const TextureName* protected_name = nullptr);
 
 	static void StartWorkerThread();
 	static void StopWorkerThread();
@@ -136,6 +140,9 @@ namespace GSTextureReplacements
 
 	/// Lookup map of texture names to replacement data which has been cached.
 	static std::unordered_map<TextureName, ReplacementTexture> s_replacement_texture_cache;
+	static std::unordered_map<TextureName, u64> s_replacement_texture_last_used;
+	static size_t s_replacement_texture_cache_bytes = 0;
+	static u64 s_replacement_texture_access_counter = 0;
 	static std::mutex s_replacement_texture_cache_mutex;
 
 	/// List of textures that are pending asynchronous load. Second element is whether we're only precaching.
@@ -151,7 +158,64 @@ namespace GSTextureReplacements
 	static std::condition_variable s_worker_thread_cv;
 	static std::deque<std::pair<std::function<void()>, bool>> s_worker_thread_queue;
 	static std::atomic<bool> s_worker_thread_running{false};
+
+#if defined(__ANDROID__)
+	// Decoded PNGs can be many times larger than their archive. Keep enough recently-used data to
+	// avoid I/O churn without allowing large community packs to consume the whole Android process.
+	static constexpr size_t REPLACEMENT_TEXTURE_CACHE_BUDGET = 192u * 1024u * 1024u;
+	static constexpr size_t MAX_ANDROID_PRECACHE_REQUESTS = 64;
+#else
+	static constexpr size_t REPLACEMENT_TEXTURE_CACHE_BUDGET = std::numeric_limits<size_t>::max();
+#endif
 }; // namespace GSTextureReplacements
+
+size_t GSTextureReplacements::GetReplacementTextureMemoryUsage(const ReplacementTexture& texture)
+{
+	size_t bytes = texture.data.size();
+	for (const ReplacementTexture::MipData& mip : texture.mips)
+		bytes += mip.data.size();
+	return bytes;
+}
+
+void GSTextureReplacements::TouchReplacementTexture(const TextureName& name)
+{
+	s_replacement_texture_last_used.insert_or_assign(name, ++s_replacement_texture_access_counter);
+}
+
+void GSTextureReplacements::TrimReplacementTextureCache(const TextureName* protected_name)
+{
+	while (s_replacement_texture_cache_bytes > REPLACEMENT_TEXTURE_CACHE_BUDGET &&
+		!s_replacement_texture_cache.empty())
+	{
+		auto victim = s_replacement_texture_cache.end();
+		u64 oldest_access = std::numeric_limits<u64>::max();
+		for (auto it = s_replacement_texture_cache.begin(); it != s_replacement_texture_cache.end(); ++it)
+		{
+			if ((protected_name && it->first == *protected_name) ||
+				s_pending_async_load_textures.find(it->first) != s_pending_async_load_textures.end())
+			{
+				continue;
+			}
+
+			const auto access_it = s_replacement_texture_last_used.find(it->first);
+			const u64 access = (access_it != s_replacement_texture_last_used.end()) ? access_it->second : 0;
+			if (access < oldest_access)
+			{
+				oldest_access = access;
+				victim = it;
+			}
+		}
+
+		if (victim == s_replacement_texture_cache.end())
+			break;
+
+		const TextureName victim_name = victim->first;
+		const size_t victim_bytes = GetReplacementTextureMemoryUsage(victim->second);
+		s_replacement_texture_cache.erase(victim);
+		s_replacement_texture_last_used.erase(victim_name);
+		s_replacement_texture_cache_bytes -= std::min(s_replacement_texture_cache_bytes, victim_bytes);
+	}
+}
 
 TextureName GSTextureReplacements::CreateTextureName(const GSTextureCache::HashCacheKey& hash, u32 miplevel)
 {
@@ -386,6 +450,9 @@ void GSTextureReplacements::ReloadReplacementMap()
 
 		std::unique_lock<std::mutex> lock(s_replacement_texture_cache_mutex);
 		s_replacement_texture_cache.clear();
+		s_replacement_texture_last_used.clear();
+		s_replacement_texture_cache_bytes = 0;
+		s_replacement_texture_access_counter = 0;
 		s_pending_async_load_textures.clear();
 		s_async_loaded_textures.clear();
 	}
@@ -521,6 +588,7 @@ GSTexture* GSTextureReplacements::LookupReplacementTexture(const GSTextureCache:
 		auto it = s_replacement_texture_cache.find(name);
 		if (it != s_replacement_texture_cache.end())
 		{
+			TouchReplacementTexture(name);
 			// replacement is cached, can immediately upload to host GPU
 			*alpha_minmax = it->second.alpha_minmax;
 			return CreateReplacementTexture(it->second, mipmap);
@@ -546,7 +614,12 @@ GSTexture* GSTextureReplacements::LookupReplacementTexture(const GSTextureCache:
 
 		// insert into cache
 		std::unique_lock<std::mutex> lock(s_replacement_texture_cache_mutex);
-		const ReplacementTexture& rtex = s_replacement_texture_cache.emplace(name, std::move(replacement.value())).first->second;
+		auto [cache_it, inserted] = s_replacement_texture_cache.emplace(name, std::move(replacement.value()));
+		if (inserted)
+			s_replacement_texture_cache_bytes += GetReplacementTextureMemoryUsage(cache_it->second);
+		TouchReplacementTexture(name);
+		TrimReplacementTextureCache(&name);
+		const ReplacementTexture& rtex = cache_it->second;
 
 		// and upload to gpu
 		*alpha_minmax = rtex.alpha_minmax;
@@ -688,7 +761,11 @@ void GSTextureReplacements::QueueAsyncReplacementTextureLoad(const TextureName& 
 		// insert into the cache and queue for later injection
 		if (replacement.has_value())
 		{
-			s_replacement_texture_cache.emplace(name, std::move(replacement.value()));
+			auto [cache_it, inserted] = s_replacement_texture_cache.emplace(name, std::move(replacement.value()));
+			if (inserted)
+				s_replacement_texture_cache_bytes += GetReplacementTextureMemoryUsage(cache_it->second);
+			TouchReplacementTexture(name);
+			TrimReplacementTextureCache(&name);
 			s_async_loaded_textures.emplace_back(name, mipmap);
 		}
 		else
@@ -713,6 +790,13 @@ void GSTextureReplacements::PrecacheReplacementTextures()
 		if (s_replacement_texture_cache.find(it.first) != s_replacement_texture_cache.end())
 			continue;
 
+#if defined(__ANDROID__)
+		// Full-pack precaching is counterproductive on memory-constrained devices. The normal
+		// asynchronous lookup path will load remaining textures on demand.
+		if (s_pending_async_load_textures.size() >= MAX_ANDROID_PRECACHE_REQUESTS)
+			break;
+#endif
+
 		// precaching always goes async.. for now
 		QueueAsyncReplacementTextureLoad(it.first, it.second, mipmap, true);
 	}
@@ -725,6 +809,9 @@ void GSTextureReplacements::ClearReplacementTextures()
 
 	std::unique_lock<std::mutex> lock(s_replacement_texture_cache_mutex);
 	s_replacement_texture_cache.clear();
+	s_replacement_texture_last_used.clear();
+	s_replacement_texture_cache_bytes = 0;
+	s_replacement_texture_access_counter = 0;
 	s_pending_async_load_textures.clear();
 	s_async_loaded_textures.clear();
 }
@@ -794,10 +881,12 @@ void GSTextureReplacements::ProcessAsyncLoadedTextures()
 
 		// upload and inject into TC
 		GSTexture* tex = CreateReplacementTexture(it->second, mipmap);
+		TouchReplacementTexture(name);
 		if (tex)
 			g_texture_cache->InjectHashCacheTexture(HashCacheKeyFromTextureName(name), tex, it->second.alpha_minmax);
 	}
 	s_async_loaded_textures.clear();
+	TrimReplacementTextureCache();
 }
 
 void GSTextureReplacements::DumpTexture(const GSTextureCache::HashCacheKey& hash, const GIFRegTEX0& TEX0,

@@ -825,7 +825,7 @@ void GSgetMemoryStats(SmallStringBase& info)
 
 	if (GSConfig.TexturePreloading == TexturePreloadingLevel::Full)
 	{
-		const double hashcache_MB = get_MB(static_cast<double>(g_texture_cache->GetHashCacheMemoryUsage()));
+		const double hashcache_MB = get_MB(static_cast<double>(g_texture_cache->GetTotalHashCacheMemoryUsage()));
 		const double total_MB = targets_MB + sources_MB + hashcache_MB + pool_MB;
 		info.format("VRAM: {} MB | TGT: {} MB | SRC: {} MB | HC: {} MB | PL: {} MB",
 			format_precision(total_MB),

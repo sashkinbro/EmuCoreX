@@ -39,7 +39,13 @@ class AndroidGyroscopeInput(
     private var lastSentX = 0f
     private var lastSentY = 0f
     private var wasActive = false
-    private var steeringCenter: Float? = null
+    private var steeringCenter = 0f
+    private var hasSteeringCenter = false
+    private var sampleX = 0f
+    private var sampleY = 0f
+    private val rotationMatrix = FloatArray(9)
+    private val remappedRotationMatrix = FloatArray(9)
+    private val orientationValues = FloatArray(3)
 
     fun start(mode: Int, sensitivityPercent: Int, smoothingPercent: Int, invertX: Boolean, invertY: Boolean): Boolean {
         stop()
@@ -53,7 +59,7 @@ class AndroidGyroscopeInput(
         lastSentX = 0f
         lastSentY = 0f
         wasActive = false
-        steeringCenter = null
+        hasSteeringCenter = false
         activeSensor = when (mode) {
             1 -> sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
             2 -> sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
@@ -66,7 +72,7 @@ class AndroidGyroscopeInput(
     fun stop() {
         activeSensor?.let { sensorManager.unregisterListener(this, it) }
         activeSensor = null
-        steeringCenter = null
+        hasSteeringCenter = false
         filteredX = 0f
         filteredY = 0f
         wasActive = false
@@ -74,13 +80,14 @@ class AndroidGyroscopeInput(
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        val raw = when (mode) {
-            1 -> aimValues(event)
-            2 -> steeringValues(event)
-            else -> return
+        val validSample = when (mode) {
+            1 -> readAimValues(event)
+            2 -> readSteeringValues(event)
+            else -> false
         }
-        var x = applyDeadzone(raw.first.coerceIn(-1f, 1f))
-        var y = applyDeadzone(raw.second.coerceIn(-1f, 1f))
+        if (!validSample) return
+        var x = applyDeadzone(sampleX.coerceIn(-1f, 1f))
+        var y = applyDeadzone(sampleY.coerceIn(-1f, 1f))
         if (invertX) x = -x
         if (invertY) y = -y
         val alpha = (1f - smoothing * 0.86f).coerceIn(0.16f, 1f)
@@ -99,40 +106,71 @@ class AndroidGyroscopeInput(
         onAnalog(mode, sentX, sentY)
     }
 
-    private fun aimValues(event: SensorEvent): Pair<Float, Float> {
-        if (event.sensor.type != Sensor.TYPE_GYROSCOPE) return 0f to 0f
+    private fun readAimValues(event: SensorEvent): Boolean {
+        if (event.sensor.type != Sensor.TYPE_GYROSCOPE) return false
         val rotation = @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
         val gx = event.values[0]
         val gy = event.values[1]
-        val axes = when (rotation) {
-            Surface.ROTATION_90 -> gx to gy
-            Surface.ROTATION_270 -> -gx to -gy
-            Surface.ROTATION_180 -> gy to -gx
-            else -> -gy to -gx
+        when (rotation) {
+            Surface.ROTATION_90 -> {
+                sampleX = gx
+                sampleY = gy
+            }
+            Surface.ROTATION_270 -> {
+                sampleX = -gx
+                sampleY = -gy
+            }
+            Surface.ROTATION_180 -> {
+                sampleX = gy
+                sampleY = -gx
+            }
+            else -> {
+                sampleX = -gy
+                sampleY = -gx
+            }
         }
-        return (axes.first * 0.72f * sensitivity) to (axes.second * 0.72f * sensitivity)
+        sampleX *= 0.72f * sensitivity
+        sampleY *= 0.72f * sensitivity
+        return true
     }
 
-    private fun steeringValues(event: SensorEvent): Pair<Float, Float> {
-        if (event.sensor.type != Sensor.TYPE_GAME_ROTATION_VECTOR) return 0f to 0f
-        val matrix = FloatArray(9)
-        val remapped = FloatArray(9)
-        SensorManager.getRotationMatrixFromVector(matrix, event.values)
+    private fun readSteeringValues(event: SensorEvent): Boolean {
+        if (event.sensor.type != Sensor.TYPE_GAME_ROTATION_VECTOR) return false
+        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
         val rotation = @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
-        val (axisX, axisY) = when (rotation) {
-            Surface.ROTATION_90 -> SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
-            Surface.ROTATION_180 -> SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
-            Surface.ROTATION_270 -> SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
-            else -> SensorManager.AXIS_X to SensorManager.AXIS_Y
+        val axisX: Int
+        val axisY: Int
+        when (rotation) {
+            Surface.ROTATION_90 -> {
+                axisX = SensorManager.AXIS_Y
+                axisY = SensorManager.AXIS_MINUS_X
+            }
+            Surface.ROTATION_180 -> {
+                axisX = SensorManager.AXIS_MINUS_X
+                axisY = SensorManager.AXIS_MINUS_Y
+            }
+            Surface.ROTATION_270 -> {
+                axisX = SensorManager.AXIS_MINUS_Y
+                axisY = SensorManager.AXIS_X
+            }
+            else -> {
+                axisX = SensorManager.AXIS_X
+                axisY = SensorManager.AXIS_Y
+            }
         }
-        SensorManager.remapCoordinateSystem(matrix, axisX, axisY, remapped)
-        val roll = SensorManager.getOrientation(remapped, FloatArray(3))[2]
-        val center = steeringCenter ?: roll.also { steeringCenter = it }
-        var delta = roll - center
+        SensorManager.remapCoordinateSystem(rotationMatrix, axisX, axisY, remappedRotationMatrix)
+        val roll = SensorManager.getOrientation(remappedRotationMatrix, orientationValues)[2]
+        if (!hasSteeringCenter) {
+            steeringCenter = roll
+            hasSteeringCenter = true
+        }
+        var delta = roll - steeringCenter
         while (delta > PI) delta -= (2 * PI).toFloat()
         while (delta < -PI) delta += (2 * PI).toFloat()
         val steeringRange = Math.toRadians(32.0).toFloat()
-        return (delta / steeringRange * sensitivity).coerceIn(-1f, 1f) to 0f
+        sampleX = (delta / steeringRange * sensitivity).coerceIn(-1f, 1f)
+        sampleY = 0f
+        return true
     }
 
     private fun applyDeadzone(value: Float): Float {

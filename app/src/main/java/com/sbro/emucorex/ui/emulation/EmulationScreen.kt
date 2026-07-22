@@ -152,6 +152,7 @@ import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
@@ -490,7 +491,8 @@ fun EmulationScreen(
     }
     var showGamepadIndicator by remember { mutableStateOf(gamepadConnected) }
 
-    val shouldShowOverlay = uiState.controlsVisible && (
+    val tvUiEnabled = LocalTvUiEnvironment.current.enabled
+    val shouldShowOverlay = !tvUiEnabled && uiState.controlsVisible && (
         touchPadIndex != null || !gamepadConnected || !uiState.hideOverlayOnGamepad
     )
 

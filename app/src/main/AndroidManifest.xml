@@ -10,10 +10,22 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="com.android.vending.BILLING" />
 
+    <!-- Keep touch devices supported while making the same APK eligible for Android TV. -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.faketouch"
+        android:required="false" />
+
     <application
         android:name=".EmuCoreXApp"
         android:allowBackup="true"
         android:appCategory="game"
+        android:banner="@drawable/tv_banner"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
@@ -44,6 +56,19 @@
                 <data
                     android:scheme="emucorex"
                     android:host="launch" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".TvActivity"
+            android:banner="@drawable/tv_banner"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.EmuCoreX.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
 

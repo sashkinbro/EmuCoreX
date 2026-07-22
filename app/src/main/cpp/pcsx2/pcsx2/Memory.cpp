@@ -38,6 +38,10 @@ BIOS
 #include "common/AlignedMalloc.h"
 #include "common/Error.h"
 
+#ifdef __ANDROID__
+#include <sys/mman.h>
+#endif
+
 #ifdef ENABLECACHE
 #include "Cache.h"
 #endif
@@ -224,6 +228,28 @@ u8* SysMemory::GetCodePtr(size_t offset)
 {
 	pxAssert(offset <= HostMemoryMap::CodeSize);
 	return s_code_memory + offset;
+}
+
+void SysMemory::DiscardCodeCachePages(u8* live_end, u8* old_high_water)
+{
+#ifdef __ANDROID__
+	if (!live_end || !old_high_water || old_high_water <= live_end)
+		return;
+
+	const size_t page_size = HostSys::GetRuntimePageSize();
+	const uptr page_mask = static_cast<uptr>(page_size - 1);
+	const uptr discard_begin = (reinterpret_cast<uptr>(live_end) + page_mask) & ~page_mask;
+	const uptr discard_end = reinterpret_cast<uptr>(old_high_water) & ~page_mask;
+	if (discard_end > discard_begin)
+	{
+		// MADV_DONTNEED drops resident anonymous pages but preserves the JIT
+		// reservation and permissions; subsequent compilation faults in zero pages.
+		(void)madvise(reinterpret_cast<void*>(discard_begin), discard_end - discard_begin, MADV_DONTNEED);
+	}
+#else
+	(void)live_end;
+	(void)old_high_water;
+#endif
 }
 
 void* SysMemory::GetDataFileHandle()

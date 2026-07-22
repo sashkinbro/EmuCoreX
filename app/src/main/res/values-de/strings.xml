@@ -129,6 +129,16 @@
     <string name="settings_theme_light">Hell</string>
     <string name="settings_theme_dark">Dunkel</string>
     <string name="settings_language">Sprache</string>
+    <string name="settings_tv_interface">TV-Oberfläche</string>
+    <string name="settings_tv_interface_auto">Automatisch</string>
+    <string name="settings_tv_interface_standard">Standard</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">Automatisch aktiviert das TV-Layout nur, wenn Android ein TV- oder Leanback-Gerät erkennt. Verwende TV für nicht zertifizierte TV-Boxen oder Standard zum Deaktivieren.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV erkannt. Automatisch verwendet die TV-Oberfläche.</string>
+    <string name="settings_tv_interface_detected_standard">Standard-Android-Gerät erkannt. Automatisch behält die Touch-Oberfläche bei.</string>
+    <string name="tv_storage_source_title">Speicher auswählen</string>
+    <string name="tv_storage_all_locations">Alle Speicherorte</string>
+    <string name="tv_storage_picker_unavailable">Auf diesem TV-Gerät ist keine kompatible System-Dateiauswahl installiert.</string>
     <string name="settings_language_system">Systemstandard</string>
     <string name="settings_language_sheet_subtitle">Wähle die App-Sprache.</string>
     <string name="settings_language_screen_subtitle">Wähle die Oberflächensprache für EmuCoreX.</string>
@@ -1914,4 +1924,7 @@
     <string name="settings_network_local_room_code_desc">Im vertrauenswürdigen WLAN oder Hotspot denselben Code aus 4–12 Buchstaben oder Ziffern verwenden.</string>
     <string name="settings_network_local_peer_id">Lokale Teilnehmer-ID: %1$d</string>
     <string name="settings_network_local_compatibility_note">Funktioniert nur mit Spielen, die DEV9-LAN oder System Link unterstützen. Reine Online- und i.Link-Spiele werden nicht zu LAN-Spielen.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">Verwendet direkten virtuellen Speicherzugriff für den EE-JIT. Nur zur Diagnose von Abstürzen oder Recompiler-Problemen deaktivieren.</string>
+    <string name="settings_help_enable_fastmem">Bildet PS2-Adressen in einem reservierten Hostbereich ab, damit rekompilierte Speicherzugriffe langsamere Handler umgehen. Für normales Spielen aktiviert lassen. Das Deaktivieren verringert die Leistung deutlich, kann aber Fastmem-Fehler oder gerätespezifische Probleme bei der Speicherabbildung eingrenzen. Zum Anwenden das Spiel neu starten.</string>
 </resources>

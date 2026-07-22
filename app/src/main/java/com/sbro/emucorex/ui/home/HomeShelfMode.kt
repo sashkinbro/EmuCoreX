@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.ui.common.GameCoverArt
@@ -110,7 +111,8 @@ internal fun HomeShelfMode(
         pageCount = { games.size }
     )
     val scope = rememberCoroutineScope()
-    val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+    val shouldRequestGamepadFocus =
+        LocalTvUiEnvironment.current.enabled || remember { GamepadManager.isGamepadConnected() }
     val cardFocusRequesters = remember(games) { List(games.size) { FocusRequester() } }
     val currentPage = pagerState.currentPage.coerceIn(0, games.lastIndex)
     val activeGame = games[currentPage]

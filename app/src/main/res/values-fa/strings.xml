@@ -246,6 +246,16 @@
     <string name="pro_message_purchase_failed">خرید Pro تکمیل نشد.</string>
     <string name="pro_message_pending_confirmation">خرید Pro در انتظار تأیید است.</string>
     <string name="settings_language">زبان</string>
+    <string name="settings_tv_interface">رابط تلویزیون</string>
+    <string name="settings_tv_interface_auto">خودکار</string>
+    <string name="settings_tv_interface_standard">استاندارد</string>
+    <string name="settings_tv_interface_tv">تلویزیون</string>
+    <string name="settings_help_tv_interface">حالت خودکار فقط وقتی Android دستگاه تلویزیون یا Leanback را تشخیص دهد چیدمان تلویزیون را فعال می‌کند. برای تی‌وی‌باکس‌های تأییدنشده «تلویزیون» و برای غیرفعال‌کردن آن «استاندارد» را انتخاب کنید.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV شناسایی شد. حالت خودکار از رابط تلویزیون استفاده می‌کند.</string>
+    <string name="settings_tv_interface_detected_standard">دستگاه استاندارد Android شناسایی شد. حالت خودکار رابط لمسی را حفظ می‌کند.</string>
+    <string name="tv_storage_source_title">انتخاب فضای ذخیره‌سازی</string>
+    <string name="tv_storage_all_locations">همه مکان‌ها</string>
+    <string name="tv_storage_picker_unavailable">هیچ انتخابگر فایل سیستمی سازگاری روی این دستگاه تلویزیون نصب نیست.</string>
     <string name="settings_language_system">پیش‌فرض سیستم</string>
     <string name="settings_language_sheet_subtitle">زبان برنامه را انتخاب کنید.</string>
     <string name="settings_language_screen_subtitle">زبان رابط کاربری EmuCoreX را انتخاب کنید.</string>
@@ -1927,4 +1937,7 @@
     <string name="settings_network_local_room_code_desc">در Wi‑Fi یا نقطهٔ اتصال مطمئن، همان کد ۴ تا ۱۲ حرفی یا عددی را استفاده کنید.</string>
     <string name="settings_network_local_peer_id">شناسهٔ محلی شرکت‌کننده: %1$d</string>
     <string name="settings_network_local_compatibility_note">فقط با بازی‌های دارای پشتیبانی DEV9 LAN یا System Link کار می‌کند. بازی‌های صرفاً آنلاین و i.Link به LAN تبدیل نمی‌شوند.</string>
+    <string name="settings_enable_fastmem">حافظه سریع (Fastmem)</string>
+    <string name="settings_enable_fastmem_desc">برای JIT پردازنده EE از دسترسی مستقیم به حافظه مجازی استفاده می‌کند. فقط برای بررسی خرابی یا مشکل کامپایلر مجدد غیرفعال کنید.</string>
+    <string name="settings_help_enable_fastmem">نشانی‌های PS2 را به یک محدوده رزروشده در حافظه دستگاه نگاشت می‌کند تا عملیات بازکامپایل‌شده از پردازشگرهای کندتر عبور نکنند. برای بازی عادی روشن بماند. خاموش کردن آن کارایی را بسیار کاهش می‌دهد، اما به تشخیص خطاهای Fastmem یا مشکلات نگاشت حافظه در دستگاه‌های خاص کمک می‌کند. برای اعمال، بازی را دوباره اجرا کنید.</string>
 </resources>

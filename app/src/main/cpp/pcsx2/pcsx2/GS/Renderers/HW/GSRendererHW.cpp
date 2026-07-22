@@ -213,11 +213,17 @@ void GSRendererHW::VSync(u32 field, bool registers_written, bool idle_frame)
 		GL_INS("HW: No draws or transfers, not aging TC");
 	}
 
-	if (g_texture_cache->GetHashCacheMemoryUsage() > 1024 * 1024 * 1024)
+#if defined(__ANDROID__)
+	static constexpr u64 HASH_CACHE_MEMORY_LIMIT = 384u * 1024u * 1024u;
+#else
+	static constexpr u64 HASH_CACHE_MEMORY_LIMIT = 1024u * 1024u * 1024u;
+#endif
+	const u64 total_hash_cache_memory = g_texture_cache->GetTotalHashCacheMemoryUsage();
+	if (total_hash_cache_memory > HASH_CACHE_MEMORY_LIMIT)
 	{
 		Host::AddKeyedOSDMessage("HashCacheOverflow",
 			fmt::format(TRANSLATE_FS("GS", "Hash cache has used {:.2f} MB of VRAM, disabling."),
-				static_cast<float>(g_texture_cache->GetHashCacheMemoryUsage()) / 1048576.0f),
+				static_cast<float>(total_hash_cache_memory) / 1048576.0f),
 			Host::OSD_ERROR_DURATION);
 		g_texture_cache->RemoveAll(true, false, true);
 		g_gs_device->PurgePool();

@@ -165,6 +165,12 @@ public:
 
 	void Clear()
 	{
+		// The active map also owns pointers to generated functions. Keeping it
+		// across a code-cache reset can execute overwritten or discarded code.
+		for (auto& entry : this->m_map_active)
+			delete entry.second;
+		this->m_map_active.clear();
+		this->m_active = nullptr;
 		m_cgmap.clear();
 	}
 
@@ -180,9 +186,12 @@ public:
 		}
 		else
 		{
+			u8* code_ptr = GSCodeReserve::ReserveMemory(MAX_SIZE);
+			if (!code_ptr)
+				return nullptr;
+
 			HostSys::BeginCodeWrite();
 
-			u8* code_ptr = GSCodeReserve::ReserveMemory(MAX_SIZE);
 			CG cg(key, code_ptr, MAX_SIZE);
 			cg.Generate();
 			pxAssert(cg.GetSize() < MAX_SIZE);

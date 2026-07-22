@@ -184,6 +184,16 @@
     <string name="settings_theme_light">라이트</string>
     <string name="settings_theme_dark">다크</string>
     <string name="settings_language">언어</string>
+    <string name="settings_tv_interface">TV 인터페이스</string>
+    <string name="settings_tv_interface_auto">자동</string>
+    <string name="settings_tv_interface_standard">표준</string>
+    <string name="settings_tv_interface_tv">TV</string>
+    <string name="settings_help_tv_interface">자동은 Android가 TV 또는 Leanback 기기로 인식할 때만 TV 레이아웃을 켭니다. 인증되지 않은 TV 박스에서는 TV를, 끄려면 표준을 선택하세요.</string>
+    <string name="settings_tv_interface_detected_tv">Android TV / Google TV가 감지되었습니다. 자동은 TV 인터페이스를 사용합니다.</string>
+    <string name="settings_tv_interface_detected_standard">표준 Android 기기가 감지되었습니다. 자동은 터치 인터페이스를 유지합니다.</string>
+    <string name="tv_storage_source_title">저장소 선택</string>
+    <string name="tv_storage_all_locations">모든 위치</string>
+    <string name="tv_storage_picker_unavailable">이 TV 기기에 호환되는 시스템 파일 선택기가 설치되어 있지 않습니다.</string>
     <string name="settings_language_system">시스템 기본값</string>
     <string name="settings_language_sheet_subtitle">앱 언어를 선택하세요.</string>
     <string name="settings_language_screen_subtitle">EmuCoreX의 인터페이스 언어를 선택하세요.</string>
@@ -1911,4 +1921,7 @@
     <string name="settings_network_local_room_code_desc">신뢰할 수 있는 Wi‑Fi 또는 핫스팟에서 동일한 4–12자리 영문자 또는 숫자 코드를 사용하세요.</string>
     <string name="settings_network_local_peer_id">로컬 참가자 ID: %1$d</string>
     <string name="settings_network_local_compatibility_note">DEV9 LAN 또는 System Link를 지원하는 게임에서만 작동합니다. 온라인 전용 및 i.Link 게임을 LAN 게임으로 바꾸지는 않습니다.</string>
+    <string name="settings_enable_fastmem">Fastmem</string>
+    <string name="settings_enable_fastmem_desc">EE JIT 메모리 접근에 직접 가상 메모리를 사용합니다. 충돌이나 리컴파일러 문제를 진단할 때만 끄세요.</string>
+    <string name="settings_help_enable_fastmem">PS2 주소를 예약된 호스트 영역에 매핑하여 재컴파일된 메모리 작업이 느린 처리기를 거치지 않도록 합니다. 일반 플레이에서는 활성화해 두세요. 비활성화하면 성능이 크게 저하되지만 Fastmem 오류나 기기별 메모리 매핑 문제를 구분하는 데 도움이 됩니다. 적용하려면 게임을 다시 시작하세요.</string>
 </resources>

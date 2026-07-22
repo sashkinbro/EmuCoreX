@@ -13,9 +13,11 @@ namespace GSCodeReserve
 
 void GSCodeReserve::ResetMemory()
 {
+	u8* const old_high_water = s_memory_ptr;
 	s_memory_base = SysMemory::GetSWRec();
 	s_memory_end = SysMemory::GetSWRecEnd();
 	s_memory_ptr = s_memory_base;
+	SysMemory::DiscardCodeCachePages(s_memory_ptr, old_high_water);
 }
 
 size_t GSCodeReserve::GetMemoryUsed()
@@ -25,7 +27,8 @@ size_t GSCodeReserve::GetMemoryUsed()
 
 u8* GSCodeReserve::ReserveMemory(size_t size)
 {
-	pxAssert((s_memory_ptr + size) <= s_memory_end);
+	if (size > static_cast<size_t>(s_memory_end - s_memory_ptr))
+		return nullptr;
 	return s_memory_ptr;
 }
 

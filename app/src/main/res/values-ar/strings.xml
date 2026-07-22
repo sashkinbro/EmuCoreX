@@ -184,6 +184,16 @@
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
     <string name="settings_language">اللغة</string>
+    <string name="settings_tv_interface">واجهة التلفاز</string>
+    <string name="settings_tv_interface_auto">تلقائي</string>
+    <string name="settings_tv_interface_standard">قياسي</string>
+    <string name="settings_tv_interface_tv">تلفاز</string>
+    <string name="settings_help_tv_interface">يفعّل الوضع التلقائي تخطيط التلفاز فقط عندما يتعرّف Android على جهاز تلفاز أو Leanback. استخدم «تلفاز» للأجهزة غير المعتمدة، أو «قياسي» لتعطيله.</string>
+    <string name="settings_tv_interface_detected_tv">تم اكتشاف Android TV / Google TV. يستخدم الوضع التلقائي واجهة التلفاز.</string>
+    <string name="settings_tv_interface_detected_standard">تم اكتشاف جهاز Android قياسي. يحافظ الوضع التلقائي على واجهة اللمس.</string>
+    <string name="tv_storage_source_title">اختر وحدة التخزين</string>
+    <string name="tv_storage_all_locations">كل المواقع</string>
+    <string name="tv_storage_picker_unavailable">لا يوجد منتقي ملفات نظام متوافق مثبت على جهاز التلفاز هذا.</string>
     <string name="settings_language_system">الافتراضي للنظام</string>
     <string name="settings_language_sheet_subtitle">اختر لغة التطبيق.</string>
     <string name="settings_language_screen_subtitle">اختر لغة واجهة EmuCoreX.</string>
@@ -1916,4 +1926,7 @@
     <string name="settings_network_local_room_code_desc">استخدم الرمز نفسه المكوّن من 4–12 حرفاً أو رقماً على شبكة Wi‑Fi أو نقطة اتصال موثوقة.</string>
     <string name="settings_network_local_peer_id">معرّف المشارك المحلي: %1$d</string>
     <string name="settings_network_local_compatibility_note">يعمل فقط مع الألعاب التي تدعم DEV9 LAN أو System Link. لا تتحول ألعاب الإنترنت فقط وألعاب i.Link إلى LAN.</string>
+    <string name="settings_enable_fastmem">الذاكرة السريعة (Fastmem)</string>
+    <string name="settings_enable_fastmem_desc">يستخدم وصولاً مباشراً إلى الذاكرة الافتراضية لمترجم EE الفوري. عطّله فقط لتشخيص الأعطال أو مشكلات إعادة الترجمة.</string>
+    <string name="settings_help_enable_fastmem">يربط عناوين PS2 بنطاق محجوز في ذاكرة الجهاز كي تتجاوز عمليات الذاكرة المعاد ترجمتها المعالجات الأبطأ. اتركه مفعّلاً للعب العادي. يؤدي تعطيله إلى خفض الأداء كثيراً، لكنه قد يساعد في عزل أخطاء Fastmem أو مشكلات ربط الذاكرة الخاصة بالجهاز. أعد تشغيل اللعبة لتطبيق التغيير.</string>
 </resources>

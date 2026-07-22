@@ -62,6 +62,8 @@ public:
 	__fi nVifBlock* find(const nVifBlock& dataPtr)
 	{
 		nVifBlock* chainpos = m_bucket[dataPtr.hash_key];
+		if (!chainpos)
+			return nullptr;
 
 		while (true)
 		{
@@ -83,10 +85,13 @@ public:
 
 		// Warning there is an extra +1 due to the empty cell
 		// Performance note: 64B align to reduce cache miss penalty in `find`
-		if ((m_bucket[b] = (nVifBlock*)pcsx2_aligned_realloc(m_bucket[b], sizeof(nVifBlock) * (size + 2), 64, sizeof(nVifBlock) * (size + 1))) == NULL)
+		nVifBlock* const resized = static_cast<nVifBlock*>(pcsx2_aligned_realloc(
+			m_bucket[b], sizeof(nVifBlock) * (size + 2), 64, sizeof(nVifBlock) * (size + 1)));
+		if (resized == nullptr)
 		{
 			pxFailRel("Failed to allocate HashBucket Chain");
 		}
+		m_bucket[b] = resized;
 
 		// Replace the empty cell by the new block and create a new empty cell
 		memcpy(&m_bucket[b][size++], &dataPtr, sizeof(nVifBlock));
@@ -99,6 +104,8 @@ public:
 	u32 bucket_size(const nVifBlock& dataPtr)
 	{
 		nVifBlock* chainpos = m_bucket[dataPtr.hash_key];
+		if (!chainpos)
+			return 0;
 
 		u32 size = 0;
 
@@ -120,16 +127,8 @@ public:
 	void reset()
 	{
 		clear();
-
-		// Allocate an empty cell for all buckets
-		for (auto& bucket : m_bucket)
-		{
-			if ((bucket = (nVifBlock*)_aligned_malloc(sizeof(nVifBlock), 16)) == nullptr)
-			{
-				pxFailRel("Failed to allocate HashBucket Chain on reset");
-			}
-
-			memset(bucket, 0, sizeof(nVifBlock));
-		}
+		// Empty buckets stay null and allocate their entry+sentinel pair lazily
+		// on first use. The old eager path performed 65,536 tiny allocations on
+		// every VIF JIT cache reset, causing allocator stalls and fragmentation.
 	}
 };

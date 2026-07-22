@@ -883,12 +883,14 @@ static void recReserve()
 
 void recResetIOP()
 {
+	u8* const old_high_water = recPtr;
 	oakSetAsmPtr(SysMemory::GetIOPRec(), _4kb);
 	oakStartBlock();
 
 	_DynGen_Dispatchers();
 
 	recPtr = oakEndBlock();
+	SysMemory::DiscardCodeCachePages(recPtr, old_high_water);
 
 	iopClearRecLUT((BASEBLOCK*)m_recBlockAlloc,
 		(((Ps2MemSize::IopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4)));

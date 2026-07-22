@@ -106,6 +106,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.data.GameComment
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityEntry
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityStatus
@@ -148,7 +149,8 @@ fun GameDetailScreen(
     val contentMaxWidth = if (isLandscape) 760.dp else Dp.Unspecified
     val heroMaxWidth = if (isLandscape) 240.dp else Dp.Unspecified
     val backFocusRequester = remember { FocusRequester() }
-    val shouldRequestGamepadFocus = remember { GamepadManager.isGamepadConnected() }
+    val shouldRequestGamepadFocus =
+        LocalTvUiEnvironment.current.enabled || remember { GamepadManager.isGamepadConnected() }
 
     LaunchedEffect(catalogGameId) {
         viewModel.loadGame(catalogGameId)

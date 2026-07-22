@@ -15,6 +15,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,6 +27,9 @@ import com.sbro.emucorex.core.AppLocaleManager
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.PlayInAppReviewManager
+import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.core.TvInterfaceMode
+import com.sbro.emucorex.core.TvUiPolicy
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.CustomFontRepository
@@ -47,7 +51,8 @@ private const val LIGHT_NAVIGATION_BAR_SCRIM = 0x04000000
 private const val DARK_NAVIGATION_BAR_SCRIM = 0x0A000000
 private const val IN_APP_REVIEW_HOME_SETTLE_DELAY_MS = 750L
 
-class MainActivity : ComponentActivity() {
+open class MainActivity : ComponentActivity() {
+    protected open val launchedFromTv: Boolean = false
     private var appliedLanguageTag: String? = null
     @Volatile
     private var keepSplashVisible = true
@@ -91,6 +96,14 @@ class MainActivity : ComponentActivity() {
             val fontChoice by preferences.appFontChoice.collectAsState(initial = AppFontChoice.SYSTEM)
             val appFontScale by preferences.appFontScale.collectAsState(initial = 1f)
             val customFontRevision by preferences.customFontRevision.collectAsState(initial = 0)
+            val tvInterfaceMode by preferences.tvInterfaceMode.collectAsState(initial = TvInterfaceMode.AUTO)
+            val tvUiEnvironment = remember(tvInterfaceMode, launchedFromTv) {
+                TvUiPolicy.resolve(
+                    context = applicationContext,
+                    mode = tvInterfaceMode,
+                    launchedFromTv = launchedFromTv
+                )
+            }
             val systemDarkTheme = isSystemInDarkTheme()
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> systemDarkTheme
@@ -103,23 +116,25 @@ class MainActivity : ComponentActivity() {
                 applySystemBarTheme(darkTheme)
             }
 
-            EmuCoreXTheme(
-                themeMode = themeMode,
-                fontChoice = fontChoice,
-                fontScale = appFontScale,
-                customFontFile = customFontRepository.installedFile(),
-                customFontRevision = customFontRevision
-            ) {
-                AppNavigation(
-                    launchIntentVersion = launchIntentVersion,
-                    restoredFromSavedState = restoredFromSavedState,
-                    onStartupReady = {
-                        keepSplashVisible = false
-                    },
-                    onEmulationSessionCompleted = { activePlayTimeMs ->
-                        recordCompletedEmulationSession(preferences, activePlayTimeMs)
-                    }
-                )
+            CompositionLocalProvider(LocalTvUiEnvironment provides tvUiEnvironment) {
+                EmuCoreXTheme(
+                    themeMode = themeMode,
+                    fontChoice = fontChoice,
+                    fontScale = appFontScale,
+                    customFontFile = customFontRepository.installedFile(),
+                    customFontRevision = customFontRevision
+                ) {
+                    AppNavigation(
+                        launchIntentVersion = launchIntentVersion,
+                        restoredFromSavedState = restoredFromSavedState,
+                        onStartupReady = {
+                            keepSplashVisible = false
+                        },
+                        onEmulationSessionCompleted = { activePlayTimeMs ->
+                            recordCompletedEmulationSession(preferences, activePlayTimeMs)
+                        }
+                    )
+                }
             }
         }
     }
