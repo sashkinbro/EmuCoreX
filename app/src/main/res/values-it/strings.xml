@@ -1894,4 +1894,22 @@
     <string name="cheat_manager_category_hotkeys">Combinazioni di tasti</string>
     <string name="cheat_manager_category_other">Altro</string>
     <string name="content_select_game_named">Gioco selezionato: %1$s</string>
+    <string name="settings_network_mode">Modalità di rete</string>
+    <string name="settings_network_mode_online">Online (Sockets)</string>
+    <string name="settings_network_mode_local_host">Ospita partita locale</string>
+    <string name="settings_network_mode_local_join">Unisciti a partita locale</string>
+    <string name="settings_network_mode_help">La modalità online si collega ai server Internet. Local Link crea una LAN PS2 privata tramite lo stesso Wi‑Fi o hotspot del telefono.</string>
+    <string name="settings_network_local_summary">Collega tutti i dispositivi allo stesso Wi‑Fi o hotspot. L’host avvia prima il gioco; gli ospiti inseriscono il suo indirizzo IPv4 e lo stesso codice stanza.</string>
+    <string name="settings_network_open_wifi_settings">Impostazioni Wi‑Fi e hotspot</string>
+    <string name="settings_network_open_wifi_settings_desc">Collega i dispositivi prima di avviare il gioco</string>
+    <string name="settings_network_local_host_addresses">Indirizzo host: %1$s</string>
+    <string name="settings_network_local_no_address">Nessun indirizzo IPv4 rilevato</string>
+    <string name="settings_network_local_host_address">Indirizzo IPv4 dell’host</string>
+    <string name="settings_network_local_host_address_desc">Inserisci l’indirizzo mostrato sul dispositivo host.</string>
+    <string name="settings_network_local_port">Porta Local Link</string>
+    <string name="settings_network_local_port_desc">Usa la stessa porta su tutti i dispositivi (1024–65535).</string>
+    <string name="settings_network_local_room_code">Codice stanza</string>
+    <string name="settings_network_local_room_code_desc">Usa lo stesso codice di 4–12 lettere o cifre su un Wi‑Fi o hotspot affidabile.</string>
+    <string name="settings_network_local_peer_id">ID partecipante locale: %1$d</string>
+    <string name="settings_network_local_compatibility_note">Funziona solo con giochi che supportano DEV9 LAN o System Link. I giochi solo online e i.Link non vengono convertiti in LAN.</string>
 </resources>

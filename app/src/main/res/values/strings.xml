@@ -1909,4 +1909,22 @@
     <string name="cheat_manager_category_hotkeys">Button combinations</string>
     <string name="cheat_manager_category_other">Other</string>
     <string name="content_select_game_named">Selected game: %1$s</string>
+    <string name="settings_network_mode">Network mode</string>
+    <string name="settings_network_mode_online">Online (Sockets)</string>
+    <string name="settings_network_mode_local_host">Host local game</string>
+    <string name="settings_network_mode_local_join">Join local game</string>
+    <string name="settings_network_mode_help">Online connects to internet servers. Local Link creates a private PS2 LAN over the same Wi-Fi or phone hotspot.</string>
+    <string name="settings_network_local_summary">Connect all devices to the same Wi-Fi or hotspot. The host starts the game first; guests enter the host IPv4 address and the same room code.</string>
+    <string name="settings_network_open_wifi_settings">Wi-Fi and hotspot settings</string>
+    <string name="settings_network_open_wifi_settings_desc">Connect the devices before starting the game</string>
+    <string name="settings_network_local_host_addresses">Host address: %1$s</string>
+    <string name="settings_network_local_no_address">No IPv4 address detected</string>
+    <string name="settings_network_local_host_address">Host IPv4 address</string>
+    <string name="settings_network_local_host_address_desc">Enter the address shown on the host device.</string>
+    <string name="settings_network_local_port">Local Link port</string>
+    <string name="settings_network_local_port_desc">Use the same port on every device (1024–65535).</string>
+    <string name="settings_network_local_room_code">Room code</string>
+    <string name="settings_network_local_room_code_desc">Use the same 4–12 letter or digit code on trusted Wi-Fi or a hotspot.</string>
+    <string name="settings_network_local_peer_id">Local peer ID: %1$d</string>
+    <string name="settings_network_local_compatibility_note">Works only with games that support DEV9 LAN or System Link. Online-only and i.Link games are not converted to LAN.</string>
 </resources>

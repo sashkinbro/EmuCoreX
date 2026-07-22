@@ -370,7 +370,12 @@ private data class EmulationLaunchConfig(
     val dev9Dns2Mode: String,
     val dev9Dns2: String,
     val dev9LogDhcp: Boolean,
-    val dev9LogDns: Boolean
+    val dev9LogDns: Boolean,
+    val dev9LocalLinkMode: Int,
+    val dev9LocalLinkAddress: String,
+    val dev9LocalLinkPort: Int,
+    val dev9LocalLinkPeerId: Int,
+    val dev9LocalLinkRoomCode: String
 )
 
 private data class LiveRuntimeSnapshot(
@@ -1590,7 +1595,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     dev9Dns2Mode = config.dev9Dns2Mode,
                     dev9Dns2 = config.dev9Dns2,
                     dev9LogDhcp = config.dev9LogDhcp,
-                    dev9LogDns = config.dev9LogDns
+                    dev9LogDns = config.dev9LogDns,
+                    dev9LocalLinkMode = config.dev9LocalLinkMode,
+                    dev9LocalLinkAddress = config.dev9LocalLinkAddress,
+                    dev9LocalLinkPort = config.dev9LocalLinkPort,
+                    dev9LocalLinkPeerId = config.dev9LocalLinkPeerId,
+                    dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode
                 )
 
                 _uiState.value = _uiState.value.copy(
@@ -3631,7 +3641,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             dev9Dns2Mode = settings.dev9Dns2Mode,
             dev9Dns2 = settings.dev9Dns2,
             dev9LogDhcp = settings.dev9LogDhcp,
-            dev9LogDns = settings.dev9LogDns
+            dev9LogDns = settings.dev9LogDns,
+            dev9LocalLinkMode = settings.dev9LocalLinkMode,
+            dev9LocalLinkAddress = settings.dev9LocalLinkAddress,
+            dev9LocalLinkPort = settings.dev9LocalLinkPort,
+            dev9LocalLinkPeerId = settings.dev9LocalLinkPeerId,
+            dev9LocalLinkRoomCode = settings.dev9LocalLinkRoomCode
         ).applyProfile(profile)
         val mergedDriverPath = if (mergedConfig.gpuDriverType == 1) {
             GpuDriverManager(getApplication()).resolveUsableDriverPath(mergedConfig.customDriverPath)

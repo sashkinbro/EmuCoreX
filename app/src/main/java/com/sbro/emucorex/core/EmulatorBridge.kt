@@ -414,7 +414,12 @@ object EmulatorBridge {
         dev9Dns2Mode: String = "Auto",
         dev9Dns2: String = "0.0.0.0",
         dev9LogDhcp: Boolean = false,
-        dev9LogDns: Boolean = false
+        dev9LogDns: Boolean = false,
+        dev9LocalLinkMode: Int = AppPreferences.DEV9_LOCAL_LINK_OFF,
+        dev9LocalLinkAddress: String = "192.168.43.1",
+        dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
+        dev9LocalLinkPeerId: Int = 2,
+        dev9LocalLinkRoomCode: String = ""
     ) = withContext(serialDispatcher) {
         if (!isNativeLoaded) return@withContext
 
@@ -503,7 +508,7 @@ object EmulatorBridge {
             buildList {
                 add(settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString()))
                 add(settingOp("DEV9/Eth", "EthEnable", "bool", dev9EthernetEnabled.toString()))
-                add(settingOp("DEV9/Eth", "EthApi", "string", "Sockets"))
+                add(settingOp("DEV9/Eth", "EthApi", "string", if (dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) "Sockets" else "Local Link"))
                 add(settingOp("DEV9/Eth", "EthDevice", "string", dev9EthernetDevice.ifBlank { "Auto" }))
                 add(settingOp("DEV9/Eth", "InterceptDHCP", "bool", dev9InterceptDhcp.toString()))
                 add(settingOp("DEV9/Eth", "ModeDNS1", "string", dev9Dns1Mode))
@@ -512,6 +517,11 @@ object EmulatorBridge {
                 add(settingOp("DEV9/Eth", "DNS2", "string", dev9Dns2))
                 add(settingOp("DEV9/Eth", "EthLogDHCP", "bool", dev9LogDhcp.toString()))
                 add(settingOp("DEV9/Eth", "EthLogDNS", "bool", dev9LogDns.toString()))
+                add(settingOp("DEV9/Eth", "LocalLinkHost", "bool", (dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_HOST).toString()))
+                add(settingOp("DEV9/Eth", "LocalLinkAddress", "string", dev9LocalLinkAddress))
+                add(settingOp("DEV9/Eth", "LocalLinkPort", "int", dev9LocalLinkPort.coerceIn(1024, 65535).toString()))
+                add(settingOp("DEV9/Eth", "LocalLinkPeerId", "int", dev9LocalLinkPeerId.coerceIn(2, 65533).toString()))
+                add(settingOp("DEV9/Eth", "LocalLinkRoomCode", "string", dev9LocalLinkRoomCode.filter(Char::isLetterOrDigit).take(12).uppercase()))
                 val pressureAmount = pressureModifierAmount.coerceIn(1, 100) / 100.0f
                 add(settingOp("Pad1", "PressureModifier", "float", pressureAmount.toString()))
                 add(settingOp("Pad2", "PressureModifier", "float", pressureAmount.toString()))

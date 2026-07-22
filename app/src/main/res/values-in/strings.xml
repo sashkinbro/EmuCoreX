@@ -1908,4 +1908,22 @@
     <string name="cheat_manager_category_hotkeys">Kombinasi tombol</string>
     <string name="cheat_manager_category_other">Lainnya</string>
     <string name="content_select_game_named">Game terpilih: %1$s</string>
+    <string name="settings_network_mode">Mode jaringan</string>
+    <string name="settings_network_mode_online">Online (Sockets)</string>
+    <string name="settings_network_mode_local_host">Host game lokal</string>
+    <string name="settings_network_mode_local_join">Gabung game lokal</string>
+    <string name="settings_network_mode_help">Mode online terhubung ke server internet. Local Link membuat LAN PS2 privat melalui Wi‑Fi atau hotspot ponsel yang sama.</string>
+    <string name="settings_network_local_summary">Hubungkan semua perangkat ke Wi‑Fi atau hotspot yang sama. Host memulai game lebih dulu; tamu memasukkan alamat IPv4 host dan kode ruang yang sama.</string>
+    <string name="settings_network_open_wifi_settings">Setelan Wi‑Fi dan hotspot</string>
+    <string name="settings_network_open_wifi_settings_desc">Hubungkan perangkat sebelum memulai game</string>
+    <string name="settings_network_local_host_addresses">Alamat host: %1$s</string>
+    <string name="settings_network_local_no_address">Alamat IPv4 tidak terdeteksi</string>
+    <string name="settings_network_local_host_address">Alamat IPv4 host</string>
+    <string name="settings_network_local_host_address_desc">Masukkan alamat yang ditampilkan di perangkat host.</string>
+    <string name="settings_network_local_port">Port Local Link</string>
+    <string name="settings_network_local_port_desc">Gunakan port yang sama di semua perangkat (1024–65535).</string>
+    <string name="settings_network_local_room_code">Kode ruang</string>
+    <string name="settings_network_local_room_code_desc">Gunakan kode 4–12 huruf atau angka yang sama pada Wi‑Fi atau hotspot tepercaya.</string>
+    <string name="settings_network_local_peer_id">ID peserta lokal: %1$d</string>
+    <string name="settings_network_local_compatibility_note">Hanya berfungsi pada game yang mendukung DEV9 LAN atau System Link. Game khusus online dan i.Link tidak diubah menjadi LAN.</string>
 </resources>

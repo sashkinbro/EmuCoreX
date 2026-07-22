@@ -1909,4 +1909,22 @@
     <string name="cheat_manager_category_hotkeys">ترکیب دکمه‌ها</string>
     <string name="cheat_manager_category_other">سایر</string>
     <string name="content_select_game_named">بازی انتخاب‌شده: %1$s</string>
+    <string name="settings_network_mode">حالت شبکه</string>
+    <string name="settings_network_mode_online">آنلاین (Sockets)</string>
+    <string name="settings_network_mode_local_host">میزبانی بازی محلی</string>
+    <string name="settings_network_mode_local_join">پیوستن به بازی محلی</string>
+    <string name="settings_network_mode_help">حالت آنلاین به سرورهای اینترنتی متصل می‌شود. Local Link یک شبکهٔ خصوصی PS2 را روی همان Wi‑Fi یا نقطهٔ اتصال تلفن ایجاد می‌کند.</string>
+    <string name="settings_network_local_summary">همهٔ دستگاه‌ها را به یک Wi‑Fi یا نقطهٔ اتصال وصل کنید. میزبان ابتدا بازی را اجرا می‌کند؛ مهمان‌ها نشانی IPv4 میزبان و همان کد اتاق را وارد می‌کنند.</string>
+    <string name="settings_network_open_wifi_settings">تنظیمات Wi‑Fi و نقطهٔ اتصال</string>
+    <string name="settings_network_open_wifi_settings_desc">پیش از اجرای بازی دستگاه‌ها را متصل کنید</string>
+    <string name="settings_network_local_host_addresses">نشانی میزبان: %1$s</string>
+    <string name="settings_network_local_no_address">هیچ نشانی IPv4 پیدا نشد</string>
+    <string name="settings_network_local_host_address">نشانی IPv4 میزبان</string>
+    <string name="settings_network_local_host_address_desc">نشانی نمایش‌داده‌شده در دستگاه میزبان را وارد کنید.</string>
+    <string name="settings_network_local_port">درگاه Local Link</string>
+    <string name="settings_network_local_port_desc">در همهٔ دستگاه‌ها از یک درگاه استفاده کنید (1024–65535).</string>
+    <string name="settings_network_local_room_code">کد اتاق</string>
+    <string name="settings_network_local_room_code_desc">در Wi‑Fi یا نقطهٔ اتصال مطمئن، همان کد ۴ تا ۱۲ حرفی یا عددی را استفاده کنید.</string>
+    <string name="settings_network_local_peer_id">شناسهٔ محلی شرکت‌کننده: %1$d</string>
+    <string name="settings_network_local_compatibility_note">فقط با بازی‌های دارای پشتیبانی DEV9 LAN یا System Link کار می‌کند. بازی‌های صرفاً آنلاین و i.Link به LAN تبدیل نمی‌شوند.</string>
 </resources>

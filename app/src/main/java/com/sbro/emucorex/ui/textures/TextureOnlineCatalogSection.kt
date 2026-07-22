@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -438,64 +439,71 @@ private fun TextureCatalogCard(
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (compatible) {
-                    when (download?.status) {
-                        TextureDownloadStatus.QUEUED,
-                        TextureDownloadStatus.DOWNLOADING,
-                        TextureDownloadStatus.WAITING_NETWORK -> DownloadActionButton(
-                            text = stringResource(R.string.emulation_pause),
-                            icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
-                            onClick = onPause
-                        )
-                        TextureDownloadStatus.PAUSED -> {
-                            DownloadActionButton(
-                                text = stringResource(R.string.detail_resume),
-                                icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
-                                onClick = onResume
+                    Crossfade(
+                        targetState = download?.status.toDownloadControlState(),
+                        modifier = Modifier.fillMaxWidth(),
+                        animationSpec = tween(durationMillis = DOWNLOAD_CONTROL_ANIMATION_MS),
+                        label = "texturePackDownloadControls"
+                    ) { controlState ->
+                        when (controlState) {
+                            DownloadControlState.PAUSE -> DownloadActionButton(
+                                text = stringResource(R.string.emulation_pause),
+                                icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
+                                onClick = onPause
                             )
-                            DownloadSecondaryAction(
-                                text = stringResource(R.string.cancel),
-                                icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
-                                onClick = onCancel
-                            )
-                        }
-                        TextureDownloadStatus.FAILED -> {
-                            DownloadActionButton(
-                                text = stringResource(R.string.texture_download_retry),
-                                icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
-                                onClick = onResume
-                            )
-                            DownloadSecondaryAction(
-                                text = stringResource(R.string.settings_gpu_driver_remove_short),
-                                icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                                onClick = onRemove
-                            )
-                        }
-                        TextureDownloadStatus.CANCELLED -> DownloadActionButton(
-                            text = stringResource(R.string.content_download_install),
-                            icon = { Icon(Icons.Rounded.CloudDownload, contentDescription = null) },
-                            onClick = onInstall
-                        )
-                        TextureDownloadStatus.VERIFYING,
-                        TextureDownloadStatus.INSTALLING -> Unit
-                        else -> {
-                            Button(
-                                onClick = onInstall,
-                                modifier = Modifier.fillMaxWidth()
+                            DownloadControlState.RESUME_CANCEL -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Rounded.CloudDownload, contentDescription = null)
-                                Spacer(Modifier.width(7.dp))
-                                Text(
-                                    text = stringResource(
-                                        when {
-                                            installed -> R.string.content_reinstall
-                                            updateAvailable -> R.string.content_update
-                                            else -> R.string.content_download_install
-                                        }
-                                    ),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+                                DownloadActionButton(
+                                    text = stringResource(R.string.detail_resume),
+                                    icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                                    onClick = onResume,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DownloadSecondaryAction(
+                                    text = stringResource(R.string.cancel),
+                                    icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
+                                    onClick = onCancel,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
+                            DownloadControlState.RETRY_REMOVE -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                DownloadActionButton(
+                                    text = stringResource(R.string.texture_download_retry),
+                                    icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                    onClick = onResume,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DownloadSecondaryAction(
+                                    text = stringResource(R.string.settings_gpu_driver_remove_short),
+                                    icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                    onClick = onRemove,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            DownloadControlState.INSTALL -> {
+                                Button(
+                                    onClick = onInstall,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Rounded.CloudDownload, contentDescription = null)
+                                    Spacer(Modifier.width(7.dp))
+                                    Text(
+                                        text = stringResource(
+                                            when {
+                                                installed -> R.string.content_reinstall
+                                                updateAvailable -> R.string.content_update
+                                                else -> R.string.content_download_install
+                                            }
+                                        ),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            DownloadControlState.HIDDEN -> Spacer(Modifier.height(0.dp))
                         }
                     }
                 }
@@ -541,43 +549,53 @@ private fun TextureDownloadQueue(
                 Text(task.packName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(task.serial, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextureDownloadProgress(task)
-                when (task.status) {
-                    TextureDownloadStatus.QUEUED,
-                    TextureDownloadStatus.DOWNLOADING,
-                    TextureDownloadStatus.WAITING_NETWORK -> DownloadActionButton(
-                        text = stringResource(R.string.emulation_pause),
-                        icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
-                        onClick = { onPause(task.key) }
-                    )
-                    TextureDownloadStatus.PAUSED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DownloadActionButton(
-                            text = stringResource(R.string.detail_resume),
-                            icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
-                            onClick = { onResume(task.key) },
-                            modifier = Modifier.weight(1f)
+                Crossfade(
+                    targetState = task.status.toDownloadControlState(),
+                    modifier = Modifier.fillMaxWidth(),
+                    animationSpec = tween(durationMillis = DOWNLOAD_CONTROL_ANIMATION_MS),
+                    label = "textureQueueDownloadControls"
+                ) { controlState ->
+                    when (controlState) {
+                        DownloadControlState.PAUSE -> DownloadActionButton(
+                            text = stringResource(R.string.emulation_pause),
+                            icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
+                            onClick = { onPause(task.key) }
                         )
-                        DownloadSecondaryAction(
-                            text = stringResource(R.string.cancel),
-                            icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
-                            onClick = { onCancel(task.key) },
-                            modifier = Modifier.weight(1f)
-                        )
+                        DownloadControlState.RESUME_CANCEL -> Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DownloadActionButton(
+                                text = stringResource(R.string.detail_resume),
+                                icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                                onClick = { onResume(task.key) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DownloadSecondaryAction(
+                                text = stringResource(R.string.cancel),
+                                icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
+                                onClick = { onCancel(task.key) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        DownloadControlState.RETRY_REMOVE -> Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DownloadActionButton(
+                                text = stringResource(R.string.texture_download_retry),
+                                icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                onClick = { onResume(task.key) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DownloadSecondaryAction(
+                                text = stringResource(R.string.settings_gpu_driver_remove_short),
+                                icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                onClick = { onRemove(task.key) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        DownloadControlState.INSTALL,
+                        DownloadControlState.HIDDEN -> Spacer(Modifier.height(0.dp))
                     }
-                    TextureDownloadStatus.FAILED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DownloadActionButton(
-                            text = stringResource(R.string.texture_download_retry),
-                            icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
-                            onClick = { onResume(task.key) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        DownloadSecondaryAction(
-                            text = stringResource(R.string.settings_gpu_driver_remove_short),
-                            icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
-                            onClick = { onRemove(task.key) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    else -> Unit
                 }
             }
         }
@@ -639,6 +657,29 @@ private fun textureDownloadStatusText(status: TextureDownloadStatus): String = s
         TextureDownloadStatus.CANCELLED -> R.string.texture_download_status_cancelled
     }
 )
+
+private enum class DownloadControlState {
+    INSTALL,
+    PAUSE,
+    RESUME_CANCEL,
+    RETRY_REMOVE,
+    HIDDEN
+}
+
+private fun TextureDownloadStatus?.toDownloadControlState(): DownloadControlState = when (this) {
+    TextureDownloadStatus.QUEUED,
+    TextureDownloadStatus.DOWNLOADING,
+    TextureDownloadStatus.WAITING_NETWORK -> DownloadControlState.PAUSE
+    TextureDownloadStatus.PAUSED -> DownloadControlState.RESUME_CANCEL
+    TextureDownloadStatus.FAILED -> DownloadControlState.RETRY_REMOVE
+    TextureDownloadStatus.VERIFYING,
+    TextureDownloadStatus.INSTALLING -> DownloadControlState.HIDDEN
+    TextureDownloadStatus.COMPLETED,
+    TextureDownloadStatus.CANCELLED,
+    null -> DownloadControlState.INSTALL
+}
+
+private const val DOWNLOAD_CONTROL_ANIMATION_MS = 180
 
 @Composable
 private fun DownloadActionButton(

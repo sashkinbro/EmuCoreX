@@ -1893,4 +1893,22 @@
     <string name="cheat_manager_category_hotkeys">버튼 조합</string>
     <string name="cheat_manager_category_other">기타</string>
     <string name="content_select_game_named">선택한 게임: %1$s</string>
+    <string name="settings_network_mode">네트워크 모드</string>
+    <string name="settings_network_mode_online">온라인(Sockets)</string>
+    <string name="settings_network_mode_local_host">로컬 게임 만들기</string>
+    <string name="settings_network_mode_local_join">로컬 게임 참가</string>
+    <string name="settings_network_mode_help">온라인 모드는 인터넷 서버에 연결합니다. Local Link는 동일한 Wi‑Fi 또는 휴대전화 핫스팟에서 비공개 PS2 LAN을 만듭니다.</string>
+    <string name="settings_network_local_summary">모든 기기를 같은 Wi‑Fi 또는 핫스팟에 연결하세요. 호스트가 게임을 먼저 시작하고 참가자는 호스트의 IPv4 주소와 동일한 방 코드를 입력합니다.</string>
+    <string name="settings_network_open_wifi_settings">Wi‑Fi 및 핫스팟 설정</string>
+    <string name="settings_network_open_wifi_settings_desc">게임을 시작하기 전에 기기를 연결하세요</string>
+    <string name="settings_network_local_host_addresses">호스트 주소: %1$s</string>
+    <string name="settings_network_local_no_address">IPv4 주소를 찾지 못했습니다</string>
+    <string name="settings_network_local_host_address">호스트 IPv4 주소</string>
+    <string name="settings_network_local_host_address_desc">호스트 기기에 표시된 주소를 입력하세요.</string>
+    <string name="settings_network_local_port">Local Link 포트</string>
+    <string name="settings_network_local_port_desc">모든 기기에서 같은 포트를 사용하세요(1024–65535).</string>
+    <string name="settings_network_local_room_code">방 코드</string>
+    <string name="settings_network_local_room_code_desc">신뢰할 수 있는 Wi‑Fi 또는 핫스팟에서 동일한 4–12자리 영문자 또는 숫자 코드를 사용하세요.</string>
+    <string name="settings_network_local_peer_id">로컬 참가자 ID: %1$d</string>
+    <string name="settings_network_local_compatibility_note">DEV9 LAN 또는 System Link를 지원하는 게임에서만 작동합니다. 온라인 전용 및 i.Link 게임을 LAN 게임으로 바꾸지는 않습니다.</string>
 </resources>

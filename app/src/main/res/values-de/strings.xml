@@ -1896,4 +1896,22 @@
     <string name="cheat_manager_category_hotkeys">Tastenkombinationen</string>
     <string name="cheat_manager_category_other">Sonstiges</string>
     <string name="content_select_game_named">Ausgewähltes Spiel: %1$s</string>
+    <string name="settings_network_mode">Netzwerkmodus</string>
+    <string name="settings_network_mode_online">Online (Sockets)</string>
+    <string name="settings_network_mode_local_host">Lokales Spiel hosten</string>
+    <string name="settings_network_mode_local_join">Lokalem Spiel beitreten</string>
+    <string name="settings_network_mode_help">Online verbindet sich mit Internetservern. Local Link erstellt ein privates PS2-LAN über dasselbe WLAN oder den Handy-Hotspot.</string>
+    <string name="settings_network_local_summary">Verbinde alle Geräte mit demselben WLAN oder Hotspot. Der Host startet das Spiel zuerst; Gäste geben seine IPv4-Adresse und denselben Raumcode ein.</string>
+    <string name="settings_network_open_wifi_settings">WLAN- und Hotspot-Einstellungen</string>
+    <string name="settings_network_open_wifi_settings_desc">Geräte vor dem Spielstart verbinden</string>
+    <string name="settings_network_local_host_addresses">Host-Adresse: %1$s</string>
+    <string name="settings_network_local_no_address">Keine IPv4-Adresse erkannt</string>
+    <string name="settings_network_local_host_address">IPv4-Adresse des Hosts</string>
+    <string name="settings_network_local_host_address_desc">Gib die auf dem Host-Gerät angezeigte Adresse ein.</string>
+    <string name="settings_network_local_port">Local-Link-Port</string>
+    <string name="settings_network_local_port_desc">Auf allen Geräten denselben Port verwenden (1024–65535).</string>
+    <string name="settings_network_local_room_code">Raumcode</string>
+    <string name="settings_network_local_room_code_desc">Im vertrauenswürdigen WLAN oder Hotspot denselben Code aus 4–12 Buchstaben oder Ziffern verwenden.</string>
+    <string name="settings_network_local_peer_id">Lokale Teilnehmer-ID: %1$d</string>
+    <string name="settings_network_local_compatibility_note">Funktioniert nur mit Spielen, die DEV9-LAN oder System Link unterstützen. Reine Online- und i.Link-Spiele werden nicht zu LAN-Spielen.</string>
 </resources>

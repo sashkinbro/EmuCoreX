@@ -15,6 +15,7 @@
 #endif
 #include "pcap_io.h"
 #include "sockets.h"
+#include "LocalLinkAdapter.h"
 
 #include "PacketReader/EthernetFrame.h"
 #include "PacketReader/IP/IP_Packet.h"
@@ -78,6 +79,9 @@ NetAdapter* GetNetAdapter()
 		case Pcsx2Config::DEV9Options::NetApi::Sockets:
 			na = static_cast<NetAdapter*>(new SocketAdapter());
 			break;
+		case Pcsx2Config::DEV9Options::NetApi::LocalLink:
+			na = static_cast<NetAdapter*>(new LocalLinkAdapter());
+			break;
 		default:
 			return 0;
 	}
@@ -128,7 +132,12 @@ void ReconfigureLiveNet(const Pcsx2Config& old_config)
 		{
 			//Reload Net if adapter changed
 			if (EmuConfig.DEV9.EthDevice != old_config.DEV9.EthDevice ||
-				EmuConfig.DEV9.EthApi != old_config.DEV9.EthApi)
+				EmuConfig.DEV9.EthApi != old_config.DEV9.EthApi ||
+				EmuConfig.DEV9.LocalLinkHost != old_config.DEV9.LocalLinkHost ||
+				EmuConfig.DEV9.LocalLinkAddress != old_config.DEV9.LocalLinkAddress ||
+				EmuConfig.DEV9.LocalLinkPort != old_config.DEV9.LocalLinkPort ||
+				EmuConfig.DEV9.LocalLinkPeerId != old_config.DEV9.LocalLinkPeerId ||
+				EmuConfig.DEV9.LocalLinkRoomCode != old_config.DEV9.LocalLinkRoomCode)
 			{
 				TermNet();
 				InitNet();

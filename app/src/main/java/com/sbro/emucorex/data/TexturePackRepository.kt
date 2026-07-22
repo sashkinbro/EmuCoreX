@@ -120,6 +120,10 @@ class TexturePackRepository(
                         val stagedRoot = File(canonicalStagingRoot, serial)
                         val stagedTarget = safeChild(stagedRoot, relativeParts)
                             ?: error("Invalid texture archive path")
+                        val announcedSize = entry.size.coerceAtLeast(0L).coerceAtMost(MAX_TEXTURE_FILE_BYTES)
+                        require(stagingRoot.usableSpace >= announcedSize + MIN_FREE_SPACE_BYTES) {
+                            "Not enough free space to import texture archive"
+                        }
                         stagedTarget.parentFile?.mkdirs()
                         stagedTarget.outputStream().use { output ->
                             val copied = zip.copyToWithLimit(output, MAX_TEXTURE_FILE_BYTES)
@@ -184,16 +188,18 @@ class TexturePackRepository(
                 require(target.renameTo(backup)) { "Could not prepare texture update" }
                 oldMoved = true
             }
-            target.mkdirs()
-            stagedSerialRoot.walkTopDown()
-                .filter(File::isFile)
-                .forEach { source ->
-                    val relative = source.relativeTo(stagedSerialRoot).invariantSeparatorsPath
-                    val destination = safeChild(target, relative.split('/'))
-                        ?: error("Invalid staged texture path")
-                    destination.parentFile?.mkdirs()
-                    source.copyTo(destination, overwrite = true)
-                }
+            if (!stagedSerialRoot.renameTo(target)) {
+                target.mkdirs()
+                stagedSerialRoot.walkTopDown()
+                    .filter(File::isFile)
+                    .forEach { source ->
+                        val relative = source.relativeTo(stagedSerialRoot).invariantSeparatorsPath
+                        val destination = safeChild(target, relative.split('/'))
+                            ?: error("Invalid staged texture path")
+                        destination.parentFile?.mkdirs()
+                        source.copyTo(destination, overwrite = true)
+                    }
+            }
             if (backup.exists()) backup.deleteRecursively()
         } catch (error: Throwable) {
             if (target.exists()) target.deleteRecursively()
@@ -347,9 +353,10 @@ class TexturePackRepository(
     }
 
     private companion object {
-        const val MAX_ARCHIVE_ENTRIES = 20_000
+        const val MAX_ARCHIVE_ENTRIES = 50_000
         const val MAX_TEXTURE_FILE_BYTES = 512L * 1024L * 1024L
-        const val MAX_ARCHIVE_BYTES = 4L * 1024L * 1024L * 1024L
+        const val MAX_ARCHIVE_BYTES = 8L * 1024L * 1024L * 1024L
+        const val MIN_FREE_SPACE_BYTES = 512L * 1024L * 1024L
         val githubCodeloadRootPattern = Regex(".+-[0-9a-fA-F]{40}")
     }
 }

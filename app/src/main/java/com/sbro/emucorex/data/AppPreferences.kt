@@ -1,6 +1,7 @@
 package com.sbro.emucorex.data
 
 import android.content.Context
+import android.provider.Settings
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.UUID
 
 data class RecentGameEntry(
     val path: String,
@@ -231,6 +233,11 @@ data class SettingsSnapshot(
     val dev9Dns2: String = "0.0.0.0",
     val dev9LogDhcp: Boolean = false,
     val dev9LogDns: Boolean = false,
+    val dev9LocalLinkMode: Int = AppPreferences.DEV9_LOCAL_LINK_OFF,
+    val dev9LocalLinkAddress: String = "192.168.43.1",
+    val dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
+    val dev9LocalLinkPeerId: Int = 2,
+    val dev9LocalLinkRoomCode: String = "",
     val frameLimitEnabled: Boolean = true,
     val vSyncEnabled: Boolean = false,
     val fastForwardSpeed: Float = AppPreferences.DEFAULT_FAST_FORWARD_SPEED,
@@ -297,6 +304,10 @@ class AppPreferences(private val context: Context) {
         const val DEV9_DNS_MODE_MANUAL = "Manual"
         const val DEV9_DNS_MODE_AUTO = "Auto"
         const val DEV9_DNS_MODE_INTERNAL = "Internal"
+        const val DEV9_LOCAL_LINK_OFF = 0
+        const val DEV9_LOCAL_LINK_HOST = 1
+        const val DEV9_LOCAL_LINK_JOIN = 2
+        const val DEFAULT_LOCAL_LINK_PORT = 19072
         private const val CURRENT_OVERLAY_LAYOUT_VERSION = 16
         const val DEFAULT_NTSC_FRAMERATE = 59.94f
         const val DEFAULT_THREAD_PINNING = true
@@ -601,6 +612,11 @@ class AppPreferences(private val context: Context) {
         private val DEV9_DNS2 = stringPreferencesKey("dev9_dns2")
         private val DEV9_LOG_DHCP = booleanPreferencesKey("dev9_log_dhcp")
         private val DEV9_LOG_DNS = booleanPreferencesKey("dev9_log_dns")
+        private val DEV9_LOCAL_LINK_MODE = intPreferencesKey("dev9_local_link_mode")
+        private val DEV9_LOCAL_LINK_ADDRESS = stringPreferencesKey("dev9_local_link_address")
+        private val DEV9_LOCAL_LINK_PORT = intPreferencesKey("dev9_local_link_port")
+        private val DEV9_LOCAL_LINK_PEER_ID = intPreferencesKey("dev9_local_link_peer_id")
+        private val DEV9_LOCAL_LINK_ROOM_CODE = stringPreferencesKey("dev9_local_link_room_code")
         private val FRAME_LIMIT_ENABLED = booleanPreferencesKey("frame_limit_enabled")
         private val VSYNC_ENABLED = booleanPreferencesKey("vsync_enabled")
         private val FAST_FORWARD_SPEED = floatPreferencesKey("fast_forward_speed")
@@ -1579,6 +1595,11 @@ class AppPreferences(private val context: Context) {
                 dev9Dns2 = sanitizeIpv4(prefs[DEV9_DNS2]),
                 dev9LogDhcp = prefs[DEV9_LOG_DHCP] ?: false,
                 dev9LogDns = prefs[DEV9_LOG_DNS] ?: false,
+                dev9LocalLinkMode = sanitizeLocalLinkMode(prefs[DEV9_LOCAL_LINK_MODE]),
+                dev9LocalLinkAddress = sanitizeIpv4(prefs[DEV9_LOCAL_LINK_ADDRESS], "192.168.43.1"),
+                dev9LocalLinkPort = (prefs[DEV9_LOCAL_LINK_PORT] ?: DEFAULT_LOCAL_LINK_PORT).coerceIn(1024, 65535),
+                dev9LocalLinkPeerId = (prefs[DEV9_LOCAL_LINK_PEER_ID] ?: defaultLocalLinkPeerId()).coerceIn(2, 65533),
+                dev9LocalLinkRoomCode = sanitizeLocalLinkRoomCode(prefs[DEV9_LOCAL_LINK_ROOM_CODE]),
                 frameLimitEnabled = prefs[FRAME_LIMIT_ENABLED] ?: true,
                 vSyncEnabled = prefs[VSYNC_ENABLED] ?: false,
                 fastForwardSpeed = sanitizeFastForwardSpeed(prefs[FAST_FORWARD_SPEED]),
@@ -1611,15 +1632,50 @@ class AppPreferences(private val context: Context) {
     suspend fun setDev9Dns2(address: String) = context.dataStore.edit { it[DEV9_DNS2] = sanitizeIpv4(address) }
     suspend fun setDev9LogDhcp(enabled: Boolean) = context.dataStore.edit { it[DEV9_LOG_DHCP] = enabled }
     suspend fun setDev9LogDns(enabled: Boolean) = context.dataStore.edit { it[DEV9_LOG_DNS] = enabled }
+    suspend fun setDev9LocalLinkMode(mode: Int) = context.dataStore.edit { prefs ->
+        prefs[DEV9_LOCAL_LINK_MODE] = sanitizeLocalLinkMode(mode)
+        if (mode != DEV9_LOCAL_LINK_OFF && sanitizeLocalLinkRoomCode(prefs[DEV9_LOCAL_LINK_ROOM_CODE]).isBlank()) {
+            prefs[DEV9_LOCAL_LINK_ROOM_CODE] = UUID.randomUUID().toString()
+                .filter(Char::isLetterOrDigit)
+                .take(12)
+                .uppercase()
+        }
+        if (!prefs.contains(DEV9_LOCAL_LINK_PEER_ID)) prefs[DEV9_LOCAL_LINK_PEER_ID] = defaultLocalLinkPeerId()
+    }
+    suspend fun setDev9LocalLinkAddress(address: String) = context.dataStore.edit {
+        it[DEV9_LOCAL_LINK_ADDRESS] = sanitizeIpv4(address, "192.168.43.1")
+    }
+    suspend fun setDev9LocalLinkPort(port: Int) = context.dataStore.edit {
+        it[DEV9_LOCAL_LINK_PORT] = port.coerceIn(1024, 65535)
+    }
+    suspend fun setDev9LocalLinkRoomCode(code: String) = context.dataStore.edit {
+        val sanitized = sanitizeLocalLinkRoomCode(code)
+        if (sanitized.length in 4..12) it[DEV9_LOCAL_LINK_ROOM_CODE] = sanitized
+    }
 
     private fun sanitizeDev9DnsMode(mode: String?): String = when (mode) {
         DEV9_DNS_MODE_MANUAL, DEV9_DNS_MODE_INTERNAL -> mode
         else -> DEV9_DNS_MODE_AUTO
     }
 
-    private fun sanitizeIpv4(address: String?): String {
+    private fun sanitizeLocalLinkMode(mode: Int?): Int = when (mode) {
+        DEV9_LOCAL_LINK_HOST, DEV9_LOCAL_LINK_JOIN -> mode
+        else -> DEV9_LOCAL_LINK_OFF
+    }
+
+    private fun sanitizeLocalLinkRoomCode(code: String?): String = code.orEmpty()
+        .filter(Char::isLetterOrDigit)
+        .take(12)
+        .uppercase()
+
+    private fun defaultLocalLinkPeerId(): Int {
+        val androidId = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID).orEmpty()
+        return 2 + ((androidId.hashCode().toLong() and 0x7fffffffL) % 65532L).toInt()
+    }
+
+    private fun sanitizeIpv4(address: String?, fallback: String = "0.0.0.0"): String {
         val parts = address.orEmpty().trim().split('.')
-        if (parts.size != 4 || parts.any { it.toIntOrNull() !in 0..255 }) return "0.0.0.0"
+        if (parts.size != 4 || parts.any { it.toIntOrNull() !in 0..255 }) return fallback
         return parts.joinToString(".") { it.toInt().toString() }
     }
 
@@ -3363,6 +3419,11 @@ class AppPreferences(private val context: Context) {
             put("dev9Dns2", sanitizeIpv4(prefs[DEV9_DNS2]))
             put("dev9LogDhcp", prefs[DEV9_LOG_DHCP] ?: false)
             put("dev9LogDns", prefs[DEV9_LOG_DNS] ?: false)
+            put("dev9LocalLinkMode", sanitizeLocalLinkMode(prefs[DEV9_LOCAL_LINK_MODE]))
+            put("dev9LocalLinkAddress", sanitizeIpv4(prefs[DEV9_LOCAL_LINK_ADDRESS], "192.168.43.1"))
+            put("dev9LocalLinkPort", (prefs[DEV9_LOCAL_LINK_PORT] ?: DEFAULT_LOCAL_LINK_PORT).coerceIn(1024, 65535))
+            put("dev9LocalLinkPeerId", (prefs[DEV9_LOCAL_LINK_PEER_ID] ?: defaultLocalLinkPeerId()).coerceIn(2, 65533))
+            put("dev9LocalLinkRoomCode", sanitizeLocalLinkRoomCode(prefs[DEV9_LOCAL_LINK_ROOM_CODE]))
             put("frameLimitEnabled", prefs[FRAME_LIMIT_ENABLED] ?: true)
             put("vSyncEnabled", prefs[VSYNC_ENABLED] ?: false)
             put("fastForwardSpeed", sanitizeFastForwardSpeed(prefs[FAST_FORWARD_SPEED]).toDouble())
@@ -3682,6 +3743,11 @@ class AppPreferences(private val context: Context) {
             prefs[DEV9_DNS2] = sanitizeIpv4(json.optString("dev9Dns2", "0.0.0.0"))
             prefs[DEV9_LOG_DHCP] = json.optBoolean("dev9LogDhcp", false)
             prefs[DEV9_LOG_DNS] = json.optBoolean("dev9LogDns", false)
+            prefs[DEV9_LOCAL_LINK_MODE] = sanitizeLocalLinkMode(json.optInt("dev9LocalLinkMode", DEV9_LOCAL_LINK_OFF))
+            prefs[DEV9_LOCAL_LINK_ADDRESS] = sanitizeIpv4(json.optString("dev9LocalLinkAddress", "192.168.43.1"), "192.168.43.1")
+            prefs[DEV9_LOCAL_LINK_PORT] = json.optInt("dev9LocalLinkPort", DEFAULT_LOCAL_LINK_PORT).coerceIn(1024, 65535)
+            prefs[DEV9_LOCAL_LINK_PEER_ID] = json.optInt("dev9LocalLinkPeerId", defaultLocalLinkPeerId()).coerceIn(2, 65533)
+            prefs[DEV9_LOCAL_LINK_ROOM_CODE] = sanitizeLocalLinkRoomCode(json.optString("dev9LocalLinkRoomCode", ""))
             prefs[FRAME_LIMIT_ENABLED] = json.optBoolean("frameLimitEnabled", true)
             prefs[VSYNC_ENABLED] = json.optBoolean("vSyncEnabled", false)
             prefs[FAST_FORWARD_SPEED] = sanitizeFastForwardSpeed(json.optDouble("fastForwardSpeed", DEFAULT_FAST_FORWARD_SPEED.toDouble()).toFloat())

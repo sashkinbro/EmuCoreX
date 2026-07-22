@@ -5,6 +5,7 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings as AndroidSettings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -140,6 +141,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.AndroidGyroscopeInput
@@ -3853,7 +3857,16 @@ private fun NetworkSettingsTab(
     defaults: SettingsSnapshot,
     viewModel: SettingsViewModel
 ) {
-    val adapters = remember(context) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var adapterRefreshKey by remember { mutableIntStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) adapterRefreshKey++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    val adapters = remember(context, adapterRefreshKey) {
         NetworkAdapterCollector.collectAdapters(context)
             .filter { adapter ->
                 adapter.isUp && !adapter.isLoopback && adapter.ipAddresses.any { !it.contains(':') }
@@ -3875,6 +3888,14 @@ private fun NetworkSettingsTab(
         AppPreferences.DEV9_DNS_MODE_MANUAL to stringResource(R.string.settings_network_dns_mode_manual),
         AppPreferences.DEV9_DNS_MODE_INTERNAL to stringResource(R.string.settings_network_dns_mode_internal)
     )
+    val localAddresses: List<String> = remember(adapters) {
+        adapters.asSequence()
+            .filterNot { it.displayName == "VPN" || it.displayName == "Mobile data" }
+            .flatMap { it.ipAddresses.asSequence() }
+            .filter(::isPrivateIpv4)
+            .distinct()
+            .toList()
+    }
 
     SettingsSection(title = stringResource(R.string.settings_network_tab)) {
         SettingsInlineNote(stringResource(R.string.settings_network_summary))
@@ -3887,20 +3908,98 @@ private fun NetworkSettingsTab(
             helpText = stringResource(R.string.settings_network_enable_help),
             onResetToDefault = { viewModel.setDev9EthernetEnabled(defaults.dev9EthernetEnabled) }
         )
-        SettingsItem(
-            icon = Icons.Rounded.Link,
-            label = stringResource(R.string.settings_network_api),
-            value = stringResource(R.string.settings_network_api_sockets),
-            onClick = {}
-        )
         ChoiceSection(
-            title = stringResource(R.string.settings_network_adapter),
-            options = devices.mapIndexed { index, (_, label) -> index to label },
-            selectedValue = devices.indexOfFirst { it.first == uiState.dev9EthernetDevice }.coerceAtLeast(0),
-            onSelect = { index -> devices.getOrNull(index)?.first?.let(viewModel::setDev9EthernetDevice) },
-            helpText = stringResource(R.string.settings_network_adapter_help),
-            onResetToDefault = { viewModel.setDev9EthernetDevice(defaults.dev9EthernetDevice) }
+            title = stringResource(R.string.settings_network_mode),
+            options = listOf(
+                AppPreferences.DEV9_LOCAL_LINK_OFF to stringResource(R.string.settings_network_mode_online),
+                AppPreferences.DEV9_LOCAL_LINK_HOST to stringResource(R.string.settings_network_mode_local_host),
+                AppPreferences.DEV9_LOCAL_LINK_JOIN to stringResource(R.string.settings_network_mode_local_join)
+            ),
+            selectedValue = uiState.dev9LocalLinkMode,
+            onSelect = viewModel::setDev9LocalLinkMode,
+            helpText = stringResource(R.string.settings_network_mode_help),
+            onResetToDefault = { viewModel.setDev9LocalLinkMode(defaults.dev9LocalLinkMode) }
         )
+        if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) {
+            SettingsItem(
+                icon = Icons.Rounded.Link,
+                label = stringResource(R.string.settings_network_api),
+                value = stringResource(R.string.settings_network_api_sockets),
+                onClick = {}
+            )
+            ChoiceSection(
+                title = stringResource(R.string.settings_network_adapter),
+                options = devices.mapIndexed { index, (_, label) -> index to label },
+                selectedValue = devices.indexOfFirst { it.first == uiState.dev9EthernetDevice }.coerceAtLeast(0),
+                onSelect = { index -> devices.getOrNull(index)?.first?.let(viewModel::setDev9EthernetDevice) },
+                helpText = stringResource(R.string.settings_network_adapter_help),
+                onResetToDefault = { viewModel.setDev9EthernetDevice(defaults.dev9EthernetDevice) }
+            )
+        } else {
+            SettingsInlineNote(stringResource(R.string.settings_network_local_summary))
+            SettingsItem(
+                icon = Icons.Rounded.Link,
+                label = stringResource(R.string.settings_network_open_wifi_settings),
+                value = stringResource(R.string.settings_network_open_wifi_settings_desc),
+                onClick = {
+                    runCatching { context.startActivity(Intent(AndroidSettings.ACTION_WIRELESS_SETTINGS)) }
+                }
+            )
+            if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_HOST) {
+                SettingsInlineNote(
+                    stringResource(
+                        R.string.settings_network_local_host_addresses,
+                        localAddresses.joinToString().ifBlank { stringResource(R.string.settings_network_local_no_address) }
+                    )
+                )
+            } else {
+                var hostDraft by remember(uiState.dev9LocalLinkAddress) { mutableStateOf(uiState.dev9LocalLinkAddress) }
+                val hostValid = remember(hostDraft) { isValidIpv4(hostDraft) }
+                OutlinedTextField(
+                    value = hostDraft,
+                    onValueChange = { value ->
+                        hostDraft = value.filter { it.isDigit() || it == '.' }.take(15)
+                        if (isValidIpv4(hostDraft)) viewModel.setDev9LocalLinkAddress(hostDraft)
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
+                    label = { Text(stringResource(R.string.settings_network_local_host_address)) },
+                    supportingText = { Text(stringResource(R.string.settings_network_local_host_address_desc)) },
+                    isError = !hostValid,
+                    singleLine = true
+                )
+            }
+            var portDraft by remember(uiState.dev9LocalLinkPort) { mutableStateOf(uiState.dev9LocalLinkPort.toString()) }
+            val portValid = portDraft.toIntOrNull() in 1024..65535
+            OutlinedTextField(
+                value = portDraft,
+                onValueChange = { value ->
+                    portDraft = value.filter(Char::isDigit).take(5)
+                    portDraft.toIntOrNull()?.takeIf { it in 1024..65535 }?.let(viewModel::setDev9LocalLinkPort)
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
+                label = { Text(stringResource(R.string.settings_network_local_port)) },
+                supportingText = { Text(stringResource(R.string.settings_network_local_port_desc)) },
+                isError = !portValid,
+                singleLine = true
+            )
+            var roomDraft by remember(uiState.dev9LocalLinkRoomCode) { mutableStateOf(uiState.dev9LocalLinkRoomCode) }
+            val roomValid = roomDraft.length in 4..12
+            OutlinedTextField(
+                value = roomDraft,
+                onValueChange = { value ->
+                    roomDraft = value.filter(Char::isLetterOrDigit).take(12).uppercase()
+                    viewModel.setDev9LocalLinkRoomCode(roomDraft)
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
+                label = { Text(stringResource(R.string.settings_network_local_room_code)) },
+                supportingText = { Text(stringResource(R.string.settings_network_local_room_code_desc)) },
+                isError = !roomValid,
+                singleLine = true
+            )
+            SettingsInlineNote(stringResource(R.string.settings_network_local_peer_id, uiState.dev9LocalLinkPeerId))
+            SettingsInlineNote(stringResource(R.string.settings_network_local_compatibility_note))
+        }
+        if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) {
         ChoiceSection(
             title = stringResource(R.string.settings_network_dns_preset),
             options = listOf(
@@ -3976,6 +4075,7 @@ private fun NetworkSettingsTab(
             onCheckedChange = viewModel::setDev9LogDns,
             onResetToDefault = { viewModel.setDev9LogDns(defaults.dev9LogDns) }
         )
+        }
     }
 }
 
@@ -4024,6 +4124,14 @@ private fun isValidIpv4(value: String): Boolean {
     return parts.size == 4 && parts.all { part ->
         part.isNotEmpty() && part.length <= 3 && part.toIntOrNull() in 0..255
     }
+}
+
+private fun isPrivateIpv4(value: String): Boolean {
+    val parts = value.split('.').mapNotNull(String::toIntOrNull)
+    if (parts.size != 4 || parts.any { it !in 0..255 }) return false
+    return parts[0] == 10 ||
+        (parts[0] == 172 && parts[1] in 16..31) ||
+        (parts[0] == 192 && parts[1] == 168)
 }
 
 @Composable
@@ -4662,6 +4770,9 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Fixes, R.string.settings_half_pixel_offset),
         entry(SettingsTab.Fixes, R.string.settings_bilinear_upscale),
         entry(SettingsTab.Network, R.string.settings_network_enable),
+        entry(SettingsTab.Network, R.string.settings_network_mode),
+        entry(SettingsTab.Network, R.string.settings_network_mode_local_host),
+        entry(SettingsTab.Network, R.string.settings_network_mode_local_join),
         entry(SettingsTab.Network, R.string.settings_network_adapter),
         entry(SettingsTab.Network, R.string.settings_network_dns1_mode),
         entry(SettingsTab.Network, R.string.settings_network_dns2_mode),

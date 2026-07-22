@@ -1893,4 +1893,22 @@
     <string name="cheat_manager_category_hotkeys">ボタンの組み合わせ</string>
     <string name="cheat_manager_category_other">その他</string>
     <string name="content_select_game_named">選択中のゲーム：%1$s</string>
+    <string name="settings_network_mode">ネットワークモード</string>
+    <string name="settings_network_mode_online">オンライン（Sockets）</string>
+    <string name="settings_network_mode_local_host">ローカルゲームをホスト</string>
+    <string name="settings_network_mode_local_join">ローカルゲームに参加</string>
+    <string name="settings_network_mode_help">オンラインはインターネットサーバーへ接続します。Local Link は同じ Wi‑Fi またはスマートフォンのテザリング上にプライベートな PS2 LAN を作成します。</string>
+    <string name="settings_network_local_summary">すべての端末を同じ Wi‑Fi またはテザリングに接続してください。ホストが先にゲームを起動し、参加者はホストの IPv4 アドレスと同じルームコードを入力します。</string>
+    <string name="settings_network_open_wifi_settings">Wi‑Fi とテザリングの設定</string>
+    <string name="settings_network_open_wifi_settings_desc">ゲーム開始前に端末を接続してください</string>
+    <string name="settings_network_local_host_addresses">ホストアドレス：%1$s</string>
+    <string name="settings_network_local_no_address">IPv4 アドレスを検出できません</string>
+    <string name="settings_network_local_host_address">ホストの IPv4 アドレス</string>
+    <string name="settings_network_local_host_address_desc">ホスト端末に表示されたアドレスを入力してください。</string>
+    <string name="settings_network_local_port">Local Link ポート</string>
+    <string name="settings_network_local_port_desc">すべての端末で同じポートを使用してください（1024～65535）。</string>
+    <string name="settings_network_local_room_code">ルームコード</string>
+    <string name="settings_network_local_room_code_desc">信頼できる Wi‑Fi またはテザリングで、同じ4～12文字の英数字コードを使用してください。</string>
+    <string name="settings_network_local_peer_id">ローカル参加者 ID：%1$d</string>
+    <string name="settings_network_local_compatibility_note">DEV9 LAN または System Link 対応ゲームでのみ動作します。オンライン専用ゲームや i.Link ゲームを LAN 対応に変換するものではありません。</string>
 </resources>

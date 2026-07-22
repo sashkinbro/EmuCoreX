@@ -1894,4 +1894,22 @@
     <string name="cheat_manager_category_hotkeys">Tuş kombinasyonları</string>
     <string name="cheat_manager_category_other">Diğer</string>
     <string name="content_select_game_named">Seçili oyun: %1$s</string>
+    <string name="settings_network_mode">Ağ modu</string>
+    <string name="settings_network_mode_online">Çevrimiçi (Sockets)</string>
+    <string name="settings_network_mode_local_host">Yerel oyun oluştur</string>
+    <string name="settings_network_mode_local_join">Yerel oyuna katıl</string>
+    <string name="settings_network_mode_help">Çevrimiçi mod İnternet sunucularına bağlanır. Local Link, aynı Wi‑Fi veya telefon erişim noktası üzerinden özel bir PS2 LAN ağı oluşturur.</string>
+    <string name="settings_network_local_summary">Tüm cihazları aynı Wi‑Fi ağına veya erişim noktasına bağlayın. Oyunu önce ana cihaz başlatır; katılanlar ana cihazın IPv4 adresini ve aynı oda kodunu girer.</string>
+    <string name="settings_network_open_wifi_settings">Wi‑Fi ve erişim noktası ayarları</string>
+    <string name="settings_network_open_wifi_settings_desc">Oyunu başlatmadan önce cihazları bağlayın</string>
+    <string name="settings_network_local_host_addresses">Ana cihaz adresi: %1$s</string>
+    <string name="settings_network_local_no_address">IPv4 adresi algılanmadı</string>
+    <string name="settings_network_local_host_address">Ana cihaz IPv4 adresi</string>
+    <string name="settings_network_local_host_address_desc">Ana cihazda gösterilen adresi girin.</string>
+    <string name="settings_network_local_port">Local Link bağlantı noktası</string>
+    <string name="settings_network_local_port_desc">Tüm cihazlarda aynı bağlantı noktasını kullanın (1024–65535).</string>
+    <string name="settings_network_local_room_code">Oda kodu</string>
+    <string name="settings_network_local_room_code_desc">Güvenilir Wi‑Fi veya erişim noktasında aynı 4–12 harf ya da rakamdan oluşan kodu kullanın.</string>
+    <string name="settings_network_local_peer_id">Yerel katılımcı kimliği: %1$d</string>
+    <string name="settings_network_local_compatibility_note">Yalnızca DEV9 LAN veya System Link destekleyen oyunlarda çalışır. Sadece çevrimiçi ve i.Link oyunları LAN oyununa dönüşmez.</string>
 </resources>

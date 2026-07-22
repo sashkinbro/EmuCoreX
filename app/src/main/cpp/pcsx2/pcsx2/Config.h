@@ -1059,6 +1059,7 @@ struct Pcsx2Config
 			PCAP_Switched = 2,
 			TAP = 3,
 			Sockets = 4,
+			LocalLink = 5,
 		};
 		static const char* NetApiNames[];
 
@@ -1086,6 +1087,11 @@ struct Pcsx2Config
 		std::string EthDevice;
 		bool EthLogDHCP{false};
 		bool EthLogDNS{false};
+		bool LocalLinkHost{false};
+		std::string LocalLinkAddress;
+		u32 LocalLinkPort{19072};
+		u32 LocalLinkPeerId{1};
+		std::string LocalLinkRoomCode;
 
 		bool InterceptDHCP{false};
 		u8 PS2IP[4]{};

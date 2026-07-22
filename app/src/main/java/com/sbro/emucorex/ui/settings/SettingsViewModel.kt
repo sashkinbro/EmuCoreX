@@ -251,6 +251,11 @@ data class SettingsUiState(
     val dev9Dns2: String = "0.0.0.0",
     val dev9LogDhcp: Boolean = false,
     val dev9LogDns: Boolean = false,
+    val dev9LocalLinkMode: Int = AppPreferences.DEV9_LOCAL_LINK_OFF,
+    val dev9LocalLinkAddress: String = "192.168.43.1",
+    val dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
+    val dev9LocalLinkPeerId: Int = 2,
+    val dev9LocalLinkRoomCode: String = "",
     val installedGpuDrivers: List<InstalledGpuDriver> = emptyList(),
     val remoteGpuDrivers: List<RemoteGpuDriver> = emptyList(),
     val gpuDriverCatalogLoading: Boolean = false,
@@ -500,6 +505,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             dev9Dns2 = snapshot.dev9Dns2,
             dev9LogDhcp = snapshot.dev9LogDhcp,
             dev9LogDns = snapshot.dev9LogDns,
+            dev9LocalLinkMode = snapshot.dev9LocalLinkMode,
+            dev9LocalLinkAddress = snapshot.dev9LocalLinkAddress,
+            dev9LocalLinkPort = snapshot.dev9LocalLinkPort,
+            dev9LocalLinkPeerId = snapshot.dev9LocalLinkPeerId,
+            dev9LocalLinkRoomCode = snapshot.dev9LocalLinkRoomCode,
             frameLimitEnabled = snapshot.frameLimitEnabled,
             vSyncEnabled = snapshot.vSyncEnabled,
             fastForwardSpeed = snapshot.fastForwardSpeed,
@@ -726,6 +736,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDev9LogDns(enabled: Boolean) = viewModelScope.launch {
         preferences.setDev9LogDns(enabled)
         EmulatorBridge.setSetting("DEV9/Eth", "EthLogDNS", "bool", enabled.toString())
+    }
+    fun setDev9LocalLinkMode(mode: Int) = viewModelScope.launch {
+        preferences.setDev9LocalLinkMode(mode)
+        if (mode != AppPreferences.DEV9_LOCAL_LINK_OFF) {
+            preferences.setDev9EthernetEnabled(true)
+        }
+    }
+    fun setDev9LocalLinkAddress(address: String) = viewModelScope.launch {
+        preferences.setDev9LocalLinkAddress(address)
+    }
+    fun setDev9LocalLinkPort(port: Int) = viewModelScope.launch {
+        val value = port.coerceIn(1024, 65535)
+        preferences.setDev9LocalLinkPort(value)
+    }
+    fun setDev9LocalLinkRoomCode(code: String) = viewModelScope.launch {
+        val value = code.filter(Char::isLetterOrDigit).take(12).uppercase()
+        if (value.length in 4..12) preferences.setDev9LocalLinkRoomCode(value)
     }
 
     fun purchasePro(activity: Activity) { proPurchaseManager.purchase(activity) }

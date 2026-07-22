@@ -1894,4 +1894,22 @@
     <string name="cheat_manager_category_hotkeys">बटन संयोजन</string>
     <string name="cheat_manager_category_other">अन्य</string>
     <string name="content_select_game_named">चुना गया गेम: %1$s</string>
+    <string name="settings_network_mode">नेटवर्क मोड</string>
+    <string name="settings_network_mode_online">ऑनलाइन (Sockets)</string>
+    <string name="settings_network_mode_local_host">लोकल गेम होस्ट करें</string>
+    <string name="settings_network_mode_local_join">लोकल गेम से जुड़ें</string>
+    <string name="settings_network_mode_help">ऑनलाइन मोड इंटरनेट सर्वर से जुड़ता है। Local Link एक ही Wi‑Fi या फ़ोन हॉटस्पॉट पर निजी PS2 LAN बनाता है।</string>
+    <string name="settings_network_local_summary">सभी डिवाइस एक ही Wi‑Fi या हॉटस्पॉट से जोड़ें। होस्ट पहले गेम शुरू करे; दूसरे खिलाड़ी होस्ट का IPv4 पता और वही रूम कोड दर्ज करें।</string>
+    <string name="settings_network_open_wifi_settings">Wi‑Fi और हॉटस्पॉट सेटिंग</string>
+    <string name="settings_network_open_wifi_settings_desc">गेम शुरू करने से पहले डिवाइस जोड़ें</string>
+    <string name="settings_network_local_host_addresses">होस्ट का पता: %1$s</string>
+    <string name="settings_network_local_no_address">कोई IPv4 पता नहीं मिला</string>
+    <string name="settings_network_local_host_address">होस्ट का IPv4 पता</string>
+    <string name="settings_network_local_host_address_desc">होस्ट डिवाइस पर दिखाया गया पता दर्ज करें।</string>
+    <string name="settings_network_local_port">Local Link पोर्ट</string>
+    <string name="settings_network_local_port_desc">सभी डिवाइस पर एक ही पोर्ट रखें (1024–65535)।</string>
+    <string name="settings_network_local_room_code">रूम कोड</string>
+    <string name="settings_network_local_room_code_desc">भरोसेमंद Wi‑Fi या हॉटस्पॉट पर वही 4–12 अक्षर या अंक वाला कोड उपयोग करें।</string>
+    <string name="settings_network_local_peer_id">लोकल खिलाड़ी ID: %1$d</string>
+    <string name="settings_network_local_compatibility_note">केवल DEV9 LAN या System Link समर्थित गेम में काम करता है। केवल ऑनलाइन और i.Link गेम LAN में नहीं बदलते।</string>
 </resources>

@@ -1898,4 +1898,22 @@
     <string name="cheat_manager_category_hotkeys">مجموعات الأزرار</string>
     <string name="cheat_manager_category_other">أخرى</string>
     <string name="content_select_game_named">اللعبة المحددة: %1$s</string>
+    <string name="settings_network_mode">وضع الشبكة</string>
+    <string name="settings_network_mode_online">عبر الإنترنت (Sockets)</string>
+    <string name="settings_network_mode_local_host">استضافة لعبة محلية</string>
+    <string name="settings_network_mode_local_join">الانضمام إلى لعبة محلية</string>
+    <string name="settings_network_mode_help">يتصل وضع الإنترنت بخوادم الإنترنت. ينشئ Local Link شبكة PS2 محلية خاصة عبر شبكة Wi‑Fi نفسها أو نقطة اتصال الهاتف.</string>
+    <string name="settings_network_local_summary">وصّل جميع الأجهزة بشبكة Wi‑Fi أو نقطة الاتصال نفسها. يبدأ المضيف اللعبة أولاً، ثم يُدخل الضيوف عنوان IPv4 الخاص به ورمز الغرفة نفسه.</string>
+    <string name="settings_network_open_wifi_settings">إعدادات Wi‑Fi ونقطة الاتصال</string>
+    <string name="settings_network_open_wifi_settings_desc">وصّل الأجهزة قبل بدء اللعبة</string>
+    <string name="settings_network_local_host_addresses">عنوان المضيف: %1$s</string>
+    <string name="settings_network_local_no_address">لم يتم اكتشاف عنوان IPv4</string>
+    <string name="settings_network_local_host_address">عنوان IPv4 للمضيف</string>
+    <string name="settings_network_local_host_address_desc">أدخل العنوان الظاهر على جهاز المضيف.</string>
+    <string name="settings_network_local_port">منفذ Local Link</string>
+    <string name="settings_network_local_port_desc">استخدم المنفذ نفسه على جميع الأجهزة (1024–65535).</string>
+    <string name="settings_network_local_room_code">رمز الغرفة</string>
+    <string name="settings_network_local_room_code_desc">استخدم الرمز نفسه المكوّن من 4–12 حرفاً أو رقماً على شبكة Wi‑Fi أو نقطة اتصال موثوقة.</string>
+    <string name="settings_network_local_peer_id">معرّف المشارك المحلي: %1$d</string>
+    <string name="settings_network_local_compatibility_note">يعمل فقط مع الألعاب التي تدعم DEV9 LAN أو System Link. لا تتحول ألعاب الإنترنت فقط وألعاب i.Link إلى LAN.</string>
 </resources>

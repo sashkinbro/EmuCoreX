@@ -1895,4 +1895,22 @@
     <string name="cheat_manager_category_hotkeys">按键组合</string>
     <string name="cheat_manager_category_other">其他</string>
     <string name="content_select_game_named">已选游戏：%1$s</string>
+    <string name="settings_network_mode">网络模式</string>
+    <string name="settings_network_mode_online">在线（Sockets）</string>
+    <string name="settings_network_mode_local_host">创建本地游戏</string>
+    <string name="settings_network_mode_local_join">加入本地游戏</string>
+    <string name="settings_network_mode_help">在线模式连接互联网服务器。Local Link 通过同一 Wi‑Fi 或手机热点创建私有 PS2 局域网。</string>
+    <string name="settings_network_local_summary">将所有设备连接到同一 Wi‑Fi 或热点。主机先启动游戏；其他玩家输入主机的 IPv4 地址和相同的房间代码。</string>
+    <string name="settings_network_open_wifi_settings">Wi‑Fi 和热点设置</string>
+    <string name="settings_network_open_wifi_settings_desc">开始游戏前先连接所有设备</string>
+    <string name="settings_network_local_host_addresses">主机地址：%1$s</string>
+    <string name="settings_network_local_no_address">未检测到 IPv4 地址</string>
+    <string name="settings_network_local_host_address">主机 IPv4 地址</string>
+    <string name="settings_network_local_host_address_desc">请输入主机设备上显示的地址。</string>
+    <string name="settings_network_local_port">Local Link 端口</string>
+    <string name="settings_network_local_port_desc">所有设备使用相同端口（1024–65535）。</string>
+    <string name="settings_network_local_room_code">房间代码</string>
+    <string name="settings_network_local_room_code_desc">请在可信 Wi‑Fi 或热点中使用相同的 4–12 位字母或数字代码。</string>
+    <string name="settings_network_local_peer_id">本地玩家 ID：%1$d</string>
+    <string name="settings_network_local_compatibility_note">仅适用于支持 DEV9 LAN 或 System Link 的游戏。纯在线游戏和 i.Link 游戏不会转换为局域网游戏。</string>
 </resources>

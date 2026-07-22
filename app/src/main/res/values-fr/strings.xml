@@ -1896,4 +1896,22 @@
     <string name="cheat_manager_category_hotkeys">Combinaisons de touches</string>
     <string name="cheat_manager_category_other">Autres</string>
     <string name="content_select_game_named">Jeu sélectionné : %1$s</string>
+    <string name="settings_network_mode">Mode réseau</string>
+    <string name="settings_network_mode_online">En ligne (Sockets)</string>
+    <string name="settings_network_mode_local_host">Héberger une partie locale</string>
+    <string name="settings_network_mode_local_join">Rejoindre une partie locale</string>
+    <string name="settings_network_mode_help">Le mode en ligne se connecte aux serveurs Internet. Local Link crée un réseau local PS2 privé sur le même Wi‑Fi ou point d’accès mobile.</string>
+    <string name="settings_network_local_summary">Connectez tous les appareils au même Wi‑Fi ou point d’accès. L’hôte lance le jeu en premier ; les invités saisissent son adresse IPv4 et le même code de salon.</string>
+    <string name="settings_network_open_wifi_settings">Réglages Wi‑Fi et point d’accès</string>
+    <string name="settings_network_open_wifi_settings_desc">Connectez les appareils avant de lancer le jeu</string>
+    <string name="settings_network_local_host_addresses">Adresse de l’hôte : %1$s</string>
+    <string name="settings_network_local_no_address">Aucune adresse IPv4 détectée</string>
+    <string name="settings_network_local_host_address">Adresse IPv4 de l’hôte</string>
+    <string name="settings_network_local_host_address_desc">Saisissez l’adresse affichée sur l’appareil hôte.</string>
+    <string name="settings_network_local_port">Port Local Link</string>
+    <string name="settings_network_local_port_desc">Utilisez le même port sur tous les appareils (1024–65535).</string>
+    <string name="settings_network_local_room_code">Code du salon</string>
+    <string name="settings_network_local_room_code_desc">Utilisez le même code de 4 à 12 lettres ou chiffres sur un Wi‑Fi ou point d’accès de confiance.</string>
+    <string name="settings_network_local_peer_id">ID local du participant : %1$d</string>
+    <string name="settings_network_local_compatibility_note">Fonctionne uniquement avec les jeux compatibles DEV9 LAN ou System Link. Les jeux exclusivement en ligne et i.Link ne sont pas convertis en LAN.</string>
 </resources>
