@@ -47,6 +47,9 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.GpuDriverCompatibility
+import com.sbro.emucorex.core.GpuDriverManager
+import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.RendererDefaults
 import androidx.compose.material.icons.rounded.Tune
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
@@ -141,6 +144,7 @@ private val GameSettingsSectionContentPadding = 16.dp
 @Composable
 fun PerGameSettingsManagerScreen(
     initialGamePath: String? = null,
+    onOpenGpuDriverManager: (String) -> Unit,
     onOpenControlsLayoutEditor: (GameItem) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -159,6 +163,7 @@ fun PerGameSettingsManagerScreen(
     var selectedGamePath by rememberSaveable { mutableStateOf(initialGamePath) }
     var selectedTab by rememberSaveable { mutableStateOf(GameSettingsManagerTab.Graphics) }
     var isOpeningControlsEditor by remember { mutableStateOf(false) }
+    var isOpeningGpuDriverManager by remember { mutableStateOf(false) }
     var showTopBarMenu by remember { mutableStateOf(false) }
     val pendingDeleteProfile = remember { mutableStateOf<PerGameSettings?>(null) }
     val showResetAllDialog = remember { mutableStateOf(false) }
@@ -208,6 +213,7 @@ fun PerGameSettingsManagerScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isOpeningControlsEditor = false
+                isOpeningGpuDriverManager = false
                 refreshProfiles()
             }
         }
@@ -491,6 +497,19 @@ fun PerGameSettingsManagerScreen(
                         defaultProfile = defaultProfile,
                         selectedTab = selectedTab,
                         maxUpscaleMultiplier = maxUpscaleMultiplier,
+                        onOpenGpuDriverManager = {
+                            if (isOpeningGpuDriverManager) return@GameSettingsManagerEditorPanel
+                            isOpeningGpuDriverManager = true
+                            scope.launch {
+                                val savedProfiles = runCatching { persistDraft(draft) }.getOrNull()
+                                if (savedProfiles != null) {
+                                    profiles = savedProfiles
+                                    onOpenGpuDriverManager(game.path)
+                                } else {
+                                    isOpeningGpuDriverManager = false
+                                }
+                            }
+                        },
                         onOpenControlsLayoutEditor = {
                             if (isOpeningControlsEditor) return@GameSettingsManagerEditorPanel
                             isOpeningControlsEditor = true
@@ -732,6 +751,7 @@ private fun GameSettingsManagerEditorPanel(
     defaultProfile: PerGameSettings,
     selectedTab: GameSettingsManagerTab,
     maxUpscaleMultiplier: Int,
+    onOpenGpuDriverManager: () -> Unit,
     onOpenControlsLayoutEditor: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
 ) {
@@ -779,6 +799,7 @@ private fun GameSettingsManagerEditorPanel(
             defaultProfile = defaultProfile,
             selectedTab = selectedTab,
             maxUpscaleMultiplier = maxUpscaleMultiplier,
+            onOpenGpuDriverManager = onOpenGpuDriverManager,
             onDraftChange = onDraftChange
         )
     }
@@ -790,6 +811,7 @@ private fun GameSettingsTabContent(
     defaultProfile: PerGameSettings,
     selectedTab: GameSettingsManagerTab,
     maxUpscaleMultiplier: Int,
+    onOpenGpuDriverManager: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
 ) {
     val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
@@ -811,6 +833,12 @@ private fun GameSettingsTabContent(
                         onSelected = { onDraftChange(draft.copy(renderer = it)) },
                         helpText = stringResource(R.string.settings_help_renderer),
                         onResetToDefault = { onDraftChange(draft.copy(renderer = normalizeManagerRenderer(defaultProfile.renderer))) }
+                    )
+                    GpuBackendProfileControls(
+                        draft = draft,
+                        defaultProfile = defaultProfile,
+                        onOpenGpuDriverManager = onOpenGpuDriverManager,
+                        onDraftChange = onDraftChange
                     )
                     SelectionRow(
                         title = stringResource(R.string.settings_upscale),
@@ -1604,6 +1632,11 @@ private fun GameSettingsEditorDialog(
                                 onSelected = { draft = draft.copy(renderer = it) },
                                 helpText = stringResource(R.string.settings_help_renderer),
                                 onResetToDefault = { draft = draft.copy(renderer = normalizeManagerRenderer(defaultProfile.renderer)) }
+                            )
+                            GpuBackendProfileControls(
+                                draft = draft,
+                                defaultProfile = defaultProfile,
+                                onDraftChange = { draft = it }
                             )
                             SelectionRow(
                                 title = stringResource(R.string.settings_upscale),
@@ -2476,6 +2509,96 @@ private fun EditorSection(
                 content()
             }
         }
+    }
+}
+
+@Composable
+private fun GpuBackendProfileControls(
+    draft: PerGameSettings,
+    defaultProfile: PerGameSettings,
+    onOpenGpuDriverManager: (() -> Unit)? = null,
+    onDraftChange: (PerGameSettings) -> Unit
+) {
+    val context = LocalContext.current
+    val supportsCustomDrivers = remember {
+        GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() &&
+            !GpuHardwareProfiles.isMediaTekHardware()
+    }
+    val isMediaTek = remember { GpuHardwareProfiles.isMediaTekHardware() }
+    val bundledAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
+
+    if (supportsCustomDrivers) {
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val driverManager = remember(context) { GpuDriverManager(context) }
+        var installedDrivers by remember(context) {
+            mutableStateOf(driverManager.listInstalledDrivers().filter { it.isUsable })
+        }
+        DisposableEffect(lifecycleOwner, driverManager) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    installedDrivers = driverManager.listInstalledDrivers().filter { it.isUsable }
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+        if (onOpenGpuDriverManager != null) {
+            ManagerActionButton(
+                modifier = Modifier.fillMaxWidth(),
+                icon = Icons.Rounded.Tune,
+                title = stringResource(R.string.settings_gpu_driver_manage),
+                onClick = onOpenGpuDriverManager
+            )
+        }
+        val driverOptions = buildList {
+            add(0 to stringResource(R.string.settings_gpu_driver_system))
+            installedDrivers.forEachIndexed { index, driver ->
+                add(index + 1 to driver.name)
+            }
+        }
+        val selectedDriverIndex = if (draft.gpuDriverType == 1) {
+            installedDrivers.indexOfFirst { it.mainLibraryPath == draft.customDriverPath }
+                .takeIf { it >= 0 }
+                ?.plus(1)
+                ?: 0
+        } else {
+            0
+        }
+        SelectionRow(
+            title = stringResource(R.string.settings_gpu_driver),
+            options = driverOptions,
+            selectedValue = selectedDriverIndex,
+            onSelected = { selectedIndex ->
+                val selectedDriver = installedDrivers.getOrNull(selectedIndex - 1)
+                onDraftChange(
+                    draft.copy(
+                        gpuDriverType = if (selectedDriver == null) 0 else 1,
+                        customDriverPath = selectedDriver?.mainLibraryPath
+                    )
+                )
+            },
+            helpText = stringResource(R.string.settings_help_gpu_driver),
+            onResetToDefault = {
+                onDraftChange(
+                    draft.copy(
+                        gpuDriverType = defaultProfile.gpuDriverType,
+                        customDriverPath = defaultProfile.customDriverPath
+                    )
+                )
+            }
+        )
+    }
+
+    if (isMediaTek && bundledAngleAvailable) {
+        ToggleRow(
+            title = stringResource(R.string.settings_mediatek_angle_opengl),
+            checked = draft.mediatekAngleOpenGl,
+            onCheckedChange = { onDraftChange(draft.copy(mediatekAngleOpenGl = it)) },
+            helpText = stringResource(R.string.settings_help_mediatek_angle_opengl),
+            onResetToDefault = {
+                onDraftChange(draft.copy(mediatekAngleOpenGl = defaultProfile.mediatekAngleOpenGl))
+            }
+        )
     }
 }
 
@@ -3512,6 +3635,9 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gameTitle = game.title,
         gameSerial = game.serial,
         renderer = renderer,
+        gpuDriverType = gpuDriverType,
+        customDriverPath = customDriverPath,
+        mediatekAngleOpenGl = mediatekAngleOpenGl,
         upscaleMultiplier = upscaleMultiplier,
         aspectRatio = aspectRatio,
         showFps = showFps,
@@ -3611,6 +3737,9 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         gameTitle = gameTitle,
         gameSerial = gameSerial,
         renderer = pick("renderer", renderer, defaultProfile.renderer),
+        gpuDriverType = pick("gpuDriverType", gpuDriverType, defaultProfile.gpuDriverType),
+        customDriverPath = pick("customDriverPath", customDriverPath, defaultProfile.customDriverPath),
+        mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl, defaultProfile.mediatekAngleOpenGl),
         upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier, defaultProfile.upscaleMultiplier),
         aspectRatio = pick("aspectRatio", aspectRatio, defaultProfile.aspectRatio),
         showFps = pick("showFps", showFps, defaultProfile.showFps),

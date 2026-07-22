@@ -44,9 +44,11 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.GameLaunchShortcut
+import com.sbro.emucorex.core.GpuDriverManager
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
 import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
@@ -139,7 +141,7 @@ data class SaveManagerRoute(
 object MemoryCardManagerRoute
 
 @Serializable
-object GpuDriverSettingsRoute
+data class GpuDriverSettingsRoute(val gamePath: String? = null)
 
 @Serializable
 data class GameDbBrowserRoute(val query: String? = null)
@@ -672,7 +674,7 @@ fun AppNavigation(
                             }
                         },
                         onOpenGpuDriverManager = {
-                            navController.navigate(GpuDriverSettingsRoute) {
+                            navController.navigate(GpuDriverSettingsRoute()) {
                                 launchSingleTop = true
                             }
                         },
@@ -697,9 +699,38 @@ fun AppNavigation(
                 )
             }
 
-            composable<GpuDriverSettingsRoute> {
+            composable<GpuDriverSettingsRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<GpuDriverSettingsRoute>()
+                val context = LocalContext.current
+                val perGameRepository = remember(context) { PerGameSettingsRepository(context) }
+                val gpuDriverManager = remember(context) { GpuDriverManager(context) }
+                val perGameProfile = remember(route.gamePath) {
+                    route.gamePath?.let(perGameRepository::get)
+                }
+                var perGameDriverPath by remember(route.gamePath) {
+                    mutableStateOf(
+                        perGameProfile
+                            ?.takeIf { it.gpuDriverType == 1 }
+                            ?.customDriverPath
+                    )
+                }
                 com.sbro.emucorex.ui.settings.GpuDriverScreen(
                     onBackClick = { navController.popBackStack() },
+                    selectedDriverPathOverride = perGameDriverPath,
+                    rendererOverride = perGameProfile?.renderer,
+                    onSelectDriverForGame = route.gamePath?.let { gamePath ->
+                        { driverName ->
+                            scope.launch {
+                                val (saved, driverPath) = withContext(Dispatchers.IO) {
+                                    val resolvedPath = driverName?.let(gpuDriverManager::readMainLibraryPath)
+                                    perGameRepository.setGpuDriverOverride(gamePath, resolvedPath) to resolvedPath
+                                }
+                                if (saved) {
+                                    perGameDriverPath = driverPath
+                                }
+                            }
+                        }
+                    },
                     viewModel = settingsViewModel
                 )
             }
@@ -716,6 +747,11 @@ fun AppNavigation(
                 val route = backStackEntry.toRoute<GameSettingsManagerRoute>()
                 PerGameSettingsManagerScreen(
                     initialGamePath = route.gamePath,
+                    onOpenGpuDriverManager = { gamePath ->
+                        navController.navigate(GpuDriverSettingsRoute(gamePath = gamePath)) {
+                            launchSingleTop = true
+                        }
+                    },
                     onOpenControlsLayoutEditor = { game ->
                         navController.navigate(
                             ControlsLayoutEditorRoute(

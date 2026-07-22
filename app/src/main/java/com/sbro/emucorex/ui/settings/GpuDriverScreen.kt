@@ -90,12 +90,18 @@ import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 @OptIn(ExperimentalLayoutApi::class)
 fun GpuDriverScreen(
     onBackClick: () -> Unit,
+    selectedDriverPathOverride: String? = null,
+    rendererOverride: Int? = null,
+    onSelectDriverForGame: ((String?) -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
-    val selectedDriver = remember(uiState.installedGpuDrivers, uiState.customDriverPath) {
-        uiState.installedGpuDrivers.firstOrNull { it.mainLibraryPath == uiState.customDriverPath }
+    val perGameMode = onSelectDriverForGame != null
+    val activeDriverPath = if (perGameMode) selectedDriverPathOverride else uiState.customDriverPath
+    val activeRenderer = rendererOverride ?: uiState.renderer
+    val selectedDriver = remember(uiState.installedGpuDrivers, activeDriverPath) {
+        uiState.installedGpuDrivers.firstOrNull { it.mainLibraryPath == activeDriverPath }
     }
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
     val installFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
@@ -126,8 +132,9 @@ fun GpuDriverScreen(
 
     val localDriverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
-        viewModel.installGpuDriver(uri) { result ->
+        viewModel.installGpuDriver(uri, activate = !perGameMode) { result ->
             result.onSuccess { driverName ->
+                onSelectDriverForGame?.invoke(driverName)
                 Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
             }.onFailure { error ->
                 Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
@@ -167,11 +174,13 @@ fun GpuDriverScreen(
         item {
             ActiveDriverCard(
                 selectedDriver = selectedDriver,
-                renderer = uiState.renderer,
-                onUseSystem = viewModel::useSystemGpuDriver,
+                renderer = activeRenderer,
+                onUseSystem = {
+                    onSelectDriverForGame?.invoke(null) ?: viewModel.useSystemGpuDriver()
+                },
                 onInstallFromFile = { localDriverPicker.launch(arrayOf("application/zip", "*/*")) },
-                onRemove = {
-                    selectedDriver?.let { viewModel.removeGpuDriver(it.name) }
+                onRemove = if (perGameMode) null else {
+                    { selectedDriver?.let { viewModel.removeGpuDriver(it.name) } }
                 }
             )
         }
@@ -187,9 +196,13 @@ fun GpuDriverScreen(
             items(uiState.installedGpuDrivers, key = { it.name }) { driver ->
                 InstalledDriverRow(
                     driver = driver,
-                    selected = driver.mainLibraryPath == uiState.customDriverPath && uiState.gpuDriverType == 1,
-                    onSelect = { viewModel.selectGpuDriver(driver.name) },
-                    onRemove = { viewModel.removeGpuDriver(driver.name) }
+                    selected = driver.mainLibraryPath == activeDriverPath,
+                    onSelect = {
+                        onSelectDriverForGame?.invoke(driver.name) ?: viewModel.selectGpuDriver(driver.name)
+                    },
+                    onRemove = if (perGameMode) null else {
+                        { viewModel.removeGpuDriver(driver.name) }
+                    }
                 )
             }
         }
@@ -281,15 +294,16 @@ fun GpuDriverScreen(
                 match = GpuDriverRecommendations.match(driver, deviceProfile),
                 expanded = expandedDriverId == driver.id,
                 installedDriver = installedDriver,
-                selected = installedDriver?.mainLibraryPath == uiState.customDriverPath && uiState.gpuDriverType == 1,
+                selected = installedDriver?.mainLibraryPath == activeDriverPath,
                 downloading = downloadingProgress != null,
                 progress = downloadingProgress ?: 0f,
                 onToggleExpanded = {
                     expandedDriverId = if (expandedDriverId == driver.id) null else driver.id
                 },
                 onDownload = {
-                    viewModel.installRemoteGpuDriver(driver) { result ->
+                    viewModel.installRemoteGpuDriver(driver, activate = !perGameMode) { result ->
                         result.onSuccess { driverName ->
+                            onSelectDriverForGame?.invoke(driverName)
                             Toast.makeText(context, installSuccessTemplate.format(driverName), Toast.LENGTH_SHORT).show()
                         }.onFailure { error ->
                             Toast.makeText(context, error.message ?: installFailedMessage, Toast.LENGTH_LONG).show()
@@ -297,10 +311,12 @@ fun GpuDriverScreen(
                     }
                 },
                 onSelect = {
-                    installedDriver?.let { viewModel.selectGpuDriver(it.name) }
+                    installedDriver?.let { selected ->
+                        onSelectDriverForGame?.invoke(selected.name) ?: viewModel.selectGpuDriver(selected.name)
+                    }
                 },
-                onRemove = {
-                    installedDriver?.let { viewModel.removeGpuDriver(it.name) }
+                onRemove = if (perGameMode) null else {
+                    { installedDriver?.let { viewModel.removeGpuDriver(it.name) } }
                 }
             )
         }
@@ -451,7 +467,7 @@ private fun ActiveDriverCard(
     renderer: Int,
     onUseSystem: () -> Unit,
     onInstallFromFile: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: (() -> Unit)?
 ) {
     val isActive = renderer == VULKAN_RENDERER && selectedDriver?.isUsable == true
     Surface(
@@ -491,7 +507,7 @@ private fun ActiveDriverCard(
                     )
                 }
             }
-            if (selectedDriver != null) {
+            if (selectedDriver != null && onRemove != null) {
                 OutlinedButton(
                     onClick = onRemove,
                     modifier = Modifier.fillMaxWidth()
@@ -547,7 +563,7 @@ private fun InstalledDriverRow(
     driver: InstalledGpuDriver,
     selected: Boolean,
     onSelect: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: (() -> Unit)?
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -575,8 +591,10 @@ private fun InstalledDriverRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            OutlinedButton(onClick = onRemove) {
-                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            if (onRemove != null) {
+                OutlinedButton(onClick = onRemove) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }
@@ -594,7 +612,7 @@ private fun RemoteDriverRow(
     onToggleExpanded: () -> Unit,
     onDownload: () -> Unit,
     onSelect: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: (() -> Unit)?
 ) {
     val uriHandler = LocalUriHandler.current
     Surface(
@@ -665,12 +683,14 @@ private fun RemoteDriverRow(
                                 stringResource(R.string.settings_gpu_driver_apply)
                             }
                         )
-                        CompactOutlinedActionButton(
-                            onClick = onRemove,
-                            modifier = Modifier.weight(1f),
-                            icon = { Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            text = stringResource(R.string.settings_gpu_driver_remove_short)
-                        )
+                        if (onRemove != null) {
+                            CompactOutlinedActionButton(
+                                onClick = onRemove,
+                                modifier = Modifier.weight(1f),
+                                icon = { Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                                text = stringResource(R.string.settings_gpu_driver_remove_short)
+                            )
+                        }
                     }
                 }
             }

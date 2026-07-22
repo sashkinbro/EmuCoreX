@@ -1989,11 +1989,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun installGpuDriver(uri: Uri, onComplete: (Result<String>) -> Unit) {
+    fun installGpuDriver(uri: Uri, activate: Boolean = true, onComplete: (Result<String>) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             val result = runCatching {
                 val driverName = gpuDriverManager.installFromArchive(uri)
-                selectGpuDriverInternal(driverName)
+                if (activate) selectGpuDriverInternal(driverName)
                 driverName
             }
             refreshInstalledGpuDrivers()
@@ -2027,7 +2027,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun installRemoteGpuDriver(driver: RemoteGpuDriver, onComplete: (Result<String>) -> Unit) {
+    fun installRemoteGpuDriver(
+        driver: RemoteGpuDriver,
+        activate: Boolean = true,
+        onComplete: (Result<String>) -> Unit
+    ) {
         if (_uiState.value.gpuDriverDownloads.containsKey(driver.id)) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -2040,7 +2044,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
                 val driverName = gpuDriverManager.installFromArchive(archive)
-                selectGpuDriverInternal(driverName)
+                if (activate) selectGpuDriverInternal(driverName)
                 driverName
             }
             _uiState.value = _uiState.value.copy(

@@ -75,6 +75,12 @@ enum class EmulationTransportMode {
     FastForward
 }
 
+private val PER_GAME_GPU_DRIVER_KEYS = setOf(
+    "gpuDriverType",
+    "customDriverPath",
+    "mediatekAngleOpenGl"
+)
+
 private fun buildPerformanceOverlayHeader(application: Application): String {
     val packageInfo = runCatching {
         application.packageManager.getPackageInfo(application.packageName, 0)
@@ -3406,20 +3412,28 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 ?: runtimeProfile.touchControlVisualStyle
             val pressEffectOverride = existingProfile?.touchControlPressEffect
                 ?: runtimeProfile.touchControlPressEffect
+            val driverOverrideKeys = when {
+                existingProfile == null -> emptySet()
+                existingProfile.providedKeys == null -> PER_GAME_GPU_DRIVER_KEYS
+                else -> existingProfile.providedKeys.intersect(PER_GAME_GPU_DRIVER_KEYS)
+            }
             val visualOverrideKeys = buildSet {
                 if (visualStyleOverride != null) add("touchControlVisualStyle")
                 if (pressEffectOverride != null) add("touchControlPressEffect")
             }
             val providedKeys = when {
                 runtimeProfile.providedKeys == null -> null
-                touchControlsLayout == null -> runtimeProfile.providedKeys + visualOverrideKeys
-                else -> runtimeProfile.providedKeys + visualOverrideKeys + PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY
+                touchControlsLayout == null -> runtimeProfile.providedKeys + visualOverrideKeys + driverOverrideKeys
+                else -> runtimeProfile.providedKeys + visualOverrideKeys + driverOverrideKeys + PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY
             }
             perGameSettingsRepository.save(
                 runtimeProfile.copy(
                     touchControlsLayout = touchControlsLayout,
                     touchControlVisualStyle = visualStyleOverride,
                     touchControlPressEffect = pressEffectOverride,
+                    gpuDriverType = existingProfile?.gpuDriverType ?: runtimeProfile.gpuDriverType,
+                    customDriverPath = existingProfile?.customDriverPath ?: runtimeProfile.customDriverPath,
+                    mediatekAngleOpenGl = existingProfile?.mediatekAngleOpenGl ?: runtimeProfile.mediatekAngleOpenGl,
                     providedKeys = providedKeys
                 )
             )
@@ -3483,7 +3497,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         if (savedGpuDriverType == 1 && resolvedGpuDriverType == 1 && resolvedCustomDriverPath != savedCustomDriverPath) {
             preferences.setCustomDriverPath(resolvedCustomDriverPath)
         }
-        return EmulationLaunchConfig(
+        val mergedConfig = EmulationLaunchConfig(
             performanceProfile = settings.performanceProfile,
             biosPath = settings.biosPath,
             emulatorDataPath = settings.emulatorDataPath,
@@ -3598,6 +3612,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             dev9LogDhcp = settings.dev9LogDhcp,
             dev9LogDns = settings.dev9LogDns
         ).applyProfile(profile)
+        val mergedDriverPath = if (mergedConfig.gpuDriverType == 1) {
+            GpuDriverManager(getApplication()).resolveUsableDriverPath(mergedConfig.customDriverPath)
+        } else {
+            null
+        }
+        return mergedConfig.copy(
+            gpuDriverType = if (mergedConfig.gpuDriverType == 1 && !mergedDriverPath.isNullOrBlank()) 1 else 0,
+            customDriverPath = mergedDriverPath
+        )
     }
 
     private suspend fun loadLiveRuntimeSnapshot(): LiveRuntimeSnapshot {
@@ -3704,6 +3727,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         return copy(
             renderer = pick("renderer", renderer) { renderer },
+            gpuDriverType = pick("gpuDriverType", gpuDriverType) { gpuDriverType },
+            customDriverPath = pick("customDriverPath", customDriverPath) { customDriverPath },
+            mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl) { mediatekAngleOpenGl },
             upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
             instantVu1 = pick("enableInstantVu1", instantVu1) { enableInstantVu1 },

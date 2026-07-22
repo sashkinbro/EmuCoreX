@@ -15,6 +15,9 @@ data class PerGameSettings(
     val gameTitle: String,
     val gameSerial: String? = null,
     val renderer: Int = EmulatorBridge.AUTO_RENDERER,
+    val gpuDriverType: Int = 0,
+    val customDriverPath: String? = null,
+    val mediatekAngleOpenGl: Boolean = false,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
     val showFps: Boolean = false,
@@ -137,6 +140,19 @@ class PerGameSettingsRepository(context: Context) {
         writeAll(items.sortedBy { it.gameTitle.lowercase() })
     }
 
+    fun setGpuDriverOverride(gameKey: String, customDriverPath: String?): Boolean {
+        val profile = get(gameKey) ?: return false
+        val overrideKeys = setOf("gpuDriverType", "customDriverPath")
+        save(
+            profile.copy(
+                gpuDriverType = if (customDriverPath.isNullOrBlank()) 0 else 1,
+                customDriverPath = customDriverPath?.takeIf { it.isNotBlank() },
+                providedKeys = profile.providedKeys?.plus(overrideKeys)
+            )
+        )
+        return true
+    }
+
     fun delete(gameKey: String) {
         writeAll(loadAll().filterNot { it.gameKey == gameKey })
     }
@@ -215,6 +231,9 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         gameTitle = optString("gameTitle"),
         gameSerial = optString("gameSerial").takeIf { it.isNotBlank() },
         renderer = optInt("renderer", RendererDefaults.AUTO).let(::sanitizeRendererValue),
+        gpuDriverType = optInt("gpuDriverType", 0).let { if (it == 1) 1 else 0 },
+        customDriverPath = optString("customDriverPath").takeIf { it.isNotBlank() },
+        mediatekAngleOpenGl = optBoolean("mediatekAngleOpenGl", false),
         upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1).let(::sanitizeAspectRatioValue),
         showFps = optBoolean("showFps", false),
@@ -358,6 +377,9 @@ private fun PerGameSettings.toJson(): JSONObject {
         val keys = providedKeys
         fun shouldWrite(key: String): Boolean = keys == null || key in keys
         if (shouldWrite("renderer")) put("renderer", sanitizeRendererValue(renderer))
+        if (shouldWrite("gpuDriverType")) put("gpuDriverType", if (gpuDriverType == 1) 1 else 0)
+        if (shouldWrite("customDriverPath")) put("customDriverPath", customDriverPath)
+        if (shouldWrite("mediatekAngleOpenGl")) put("mediatekAngleOpenGl", mediatekAngleOpenGl)
         if (shouldWrite("upscaleMultiplier")) put("upscaleMultiplier", upscaleMultiplier.toDouble())
         if (shouldWrite("aspectRatio")) put("aspectRatio", sanitizeAspectRatioValue(aspectRatio))
         if (shouldWrite("showFps")) put("showFps", showFps)
