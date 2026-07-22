@@ -438,10 +438,8 @@ void GSDownloadTextureOGL::CopyFromTexture(
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
 	}
 
-	// On GLES, glReadPixels uses bottom-left origin. Flip Y for top-down GS coordinates.
-	const bool is_gles = GSDeviceOGL::GetInstance()->IsGLESDevice();
 	const u32 read_x = src.left;
-	const u32 read_y = is_gles ? (glTex->GetHeight() - src.top - src.height()) : src.top;
+	const u32 read_y = src.top;
 	glReadPixels(read_x, read_y, src.width(), src.height(), glTex->GetIntFormat(), glTex->GetIntType(), m_cpu_buffer + copy_offset);
 
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);

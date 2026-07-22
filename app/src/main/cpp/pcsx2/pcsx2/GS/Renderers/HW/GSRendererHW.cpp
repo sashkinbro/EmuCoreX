@@ -1080,7 +1080,7 @@ GSVector4 GSRendererHW::RealignTargetTextureCoordinate(const GSTextureCache::Sou
 
 GSVector4i GSRendererHW::ComputeBoundingBox(const GSVector2i& rtsize, float rtscale)
 {
-	const GSVector4 offset = GSVector4(-1.0f, 1.0f); // Round value
+	const GSVector4 offset = IsCoverageAlphaSupported() ? GSVector4(-2.0f, 2.0f) : GSVector4(-1.0f, 1.0f); // Round value
 	const GSVector4 box = m_vt.m_min.p.upld(m_vt.m_max.p) + offset.xxyy();
 	return GSVector4i(box * GSVector4(rtscale)).rintersect(GSVector4i(0, 0, rtsize.x, rtsize.y));
 }
@@ -1981,7 +1981,8 @@ void GSRendererHW::InvalidateLocalMem(const GIFRegBITBLTBUF& BITBLTBUF, const GS
 	if (!skip)
 	{
 		const bool recursive_copy = (BITBLTBUF.SBP == BITBLTBUF.DBP) && (m_env.TRXDIR.XDIR == 2);
-		g_texture_cache->InvalidateLocalMem(m_mem.GetOffset(BITBLTBUF.SBP, BITBLTBUF.SBW, BITBLTBUF.SPSM), r, recursive_copy);
+		g_texture_cache->InvalidateLocalMem(m_mem.GetOffset(BITBLTBUF.SBP, BITBLTBUF.SBW, BITBLTBUF.SPSM), r,
+			recursive_copy, m_force_synchronous_local_readback);
 	}
 }
 
@@ -2016,7 +2017,11 @@ void GSRendererHW::Move()
 		return;
 	}
 
+	// The CPU fallback consumes the source immediately. It cannot use a frame-old async
+	// snapshot, so only this uncommon fallback forces the required source readback.
+	m_force_synchronous_local_readback = true;
 	GSRenderer::Move();
+	m_force_synchronous_local_readback = false;
 }
 
 u16 GSRendererHW::Interpolate_UV(float alpha, int t0, int t1)
@@ -2649,7 +2654,8 @@ void GSRendererHW::Draw()
 	// I hate that I have to do this, but some games (like Pac-Man World Rally) troll us by causing a flush with degenerate triangles, so we don't have all available information about the next draw.
 	// So we have to check when the next draw happens if our frame has changed or if it's become recursive.
 	const bool has_colclip_texture = g_gs_device->GetColorClipTexture() != nullptr;
-	if (!no_rt && has_colclip_texture && (m_conf.colclip_frame.FBP != m_cached_ctx.FRAME.FBP || m_conf.colclip_frame.Block() == m_cached_ctx.TEX0.TBP0))
+	if (!no_rt && has_colclip_texture && (m_conf.colclip_frame.FBP != m_cached_ctx.FRAME.FBP ||
+		(PRIM->TME && m_conf.colclip_frame.Block() == m_cached_ctx.TEX0.TBP0)))
 	{
 		GIFRegTEX0 FRAME;
 		FRAME.TBP0 = m_conf.colclip_frame.Block();
@@ -3142,7 +3148,7 @@ void GSRendererHW::Draw()
 		bool shuffle_target = false;
 		const u32 page_alignment = GSLocalMemory::IsPageAlignedMasked(m_cached_ctx.TEX0.PSM, m_r);
 		const bool page_aligned = (page_alignment & 0xF0F0) != 0; // Make sure Y is page aligned.
-		if (!no_rt && page_aligned && m_cached_ctx.ZBUF.ZMSK && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].bpp == 16 && GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].bpp >= 16 &&
+		if (!no_rt && page_aligned && m_cached_ctx.ZBUF.ZMSK && GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].bpp == 16 && GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].trbpp <= 16 &&
 			(m_vt.m_primclass == GS_SPRITE_CLASS || (m_vt.m_primclass == GS_TRIANGLE_CLASS && (m_index.tail % 6) == 0 && TrianglesAreQuads(true) && m_index.tail > 6)))
 		{
 			// Tail check is to make sure we have enough strips to go all the way across the page, or if it's using a region clamp could be used to draw strips.
@@ -7095,11 +7101,20 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 		}
 
 		GSVector4i::storel(&copy_dst_offset, copy_range);
-		if (m_channel_shuffle && (tex_diff || frame_diff))
+		const int tex_page_h = m_vt.m_min.t.x / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.x;
+		const int tex_page_v = m_vt.m_min.t.y / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.y;
+		const int frame_page_h = m_r.x / GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs.x;
+		const int frame_page_v = m_r.y / GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs.y;
+		if (m_channel_shuffle && (tex_diff || frame_diff || tex_page_h != frame_page_h || tex_page_v != frame_page_v))
 		{
-			const int page_offset = (m_cached_ctx.TEX0.TBP0 - src_target->m_TEX0.TBP0) >> 5;
-			const int horizontal_offset = ((page_offset % src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.x);
-			const int vertical_offset = ((page_offset / src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.y);
+			const int clamp_horizontal_page_offset = m_cached_ctx.CLAMP.WMS == CLAMP_REGION_REPEAT ? (m_cached_ctx.CLAMP.MAXU / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.x) : 0;
+			const int clamp_vertical_page_offset = m_cached_ctx.CLAMP.WMT == CLAMP_REGION_REPEAT ? (m_cached_ctx.CLAMP.MAXV / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.y) : 0;
+			const int page_offset = ((m_cached_ctx.TEX0.TBP0 - src_target->m_TEX0.TBP0) >> 5) + clamp_horizontal_page_offset + clamp_vertical_page_offset;
+			const GSVector2i draw_offset(
+				(static_cast<int>(m_vt.m_min.t.x) / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.x) * GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs.x,
+				(static_cast<int>(m_vt.m_min.t.y) / GSLocalMemory::m_psm[m_cached_ctx.TEX0.PSM].pgs.y) * GSLocalMemory::m_psm[m_cached_ctx.FRAME.PSM].pgs.y);
+			const int horizontal_offset = ((page_offset % src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.x) + draw_offset.x;
+			const int vertical_offset = ((page_offset / src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.y) + draw_offset.y;
 
 			if (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy)
 			{
@@ -7131,6 +7146,7 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 				copy_range.y += vertical_offset;
 				copy_range.z += horizontal_offset;
 				copy_range.w += vertical_offset;
+				GSVector4i::storel(&copy_dst_offset, copy_range);
 
 				if (!m_channel_shuffle)
 				{
@@ -8856,7 +8872,7 @@ bool GSRendererHW::CanUseSwPrimRender(bool no_rt, bool no_ds, bool draw_sprite_t
 			else
 			{
 				// If the target isn't dirty we might have valid data, so let's check their areas overlap, if so we need to read it back for SW.
-				GSVector4i src_rect = GSVector4i(m_vt.m_min.t.x, m_vt.m_min.t.y, m_vt.m_max.t.x, m_vt.m_max.t.x);
+				GSVector4i src_rect = GSVector4i(m_vt.m_min.t.x, m_vt.m_min.t.y, m_vt.m_max.t.x, m_vt.m_max.t.y);
 				GSVector4i area = g_texture_cache->TranslateAlignedRectByPage(src_target, m_cached_ctx.TEX0.TBP0, m_cached_ctx.TEX0.PSM, m_cached_ctx.TEX0.TBW, src_rect, false);
 				req_readback = !area.rintersect(src_target->m_drawn_since_read).eq(GSVector4i::zero());
 			}
@@ -9938,6 +9954,13 @@ void GSRendererHW::OffsetDraw(s32 fbp_offset, s32 zbp_offset, s32 xoffset, s32 y
 		m_vertex.buff[i].XYZ.X += fp_xoffset;
 		m_vertex.buff[i].XYZ.Y += fp_yoffset;
 	}
+
+	m_vt.m_min.p.x += static_cast<float>(xoffset);
+	m_vt.m_min.p.y += static_cast<float>(yoffset);
+	m_vt.m_max.p.x += static_cast<float>(xoffset);
+	m_vt.m_max.p.y += static_cast<float>(yoffset);
+
+	m_r += GSVector4i(xoffset, yoffset).xyxy();
 }
 
 GSHWDrawConfig& GSRendererHW::BeginHLEHardwareDraw(

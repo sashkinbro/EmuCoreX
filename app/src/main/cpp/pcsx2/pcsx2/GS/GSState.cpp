@@ -1927,7 +1927,7 @@ void GSState::FlushWrite()
 
 			if (m_draw_transfers.size() > 0 && m_tr.m_blit.DBP == m_draw_transfers.back().blit.DBP)
 			{
-				m_draw_transfers.back().rect = r;
+				m_draw_transfers.back().rect = m_draw_transfers.back().rect.runion(r);
 			}
 		}
 	}
@@ -1936,7 +1936,18 @@ void GSState::FlushWrite()
 
 	const GSLocalMemory::writeImage wi = GSLocalMemory::m_psm[m_env.BITBLTBUF.DPSM].wi;
 
+	const int start_x = m_tr.x;
+	const int start_y = m_tr.y;
 	wi(m_mem, m_tr.x, m_tr.y, &m_tr.buff[m_tr.start], len, m_tr.m_blit, m_tr.m_pos, m_tr.m_reg);
+	if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous)
+	{
+		const std::lock_guard lock(m_async_readback_mutex);
+		int async_x = start_x;
+		int async_y = start_y;
+		wi(m_async_readback_mem, async_x, async_y, &m_tr.buff[m_tr.start], len, m_tr.m_blit, m_tr.m_pos, m_tr.m_reg);
+		MarkAsyncReadbackPagesWritten(
+			m_async_readback_mem.GetOffset(m_tr.m_blit.DBP, m_tr.m_blit.DBW, m_tr.m_blit.DPSM), r);
+	}
 
 	m_tr.start += len;
 
@@ -2424,7 +2435,18 @@ void GSState::Write(const u8* mem, int len)
 			// received all data in one piece, no need to buffer it
 			InvalidateVideoMem(blit, r);
 
+			const int start_x = m_tr.x;
+			const int start_y = m_tr.y;
 			psm.wi(m_mem, m_tr.x, m_tr.y, mem, m_tr.total, blit, m_tr.m_pos, m_tr.m_reg);
+			if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous)
+			{
+				const std::lock_guard lock(m_async_readback_mutex);
+				int async_x = start_x;
+				int async_y = start_y;
+				psm.wi(m_async_readback_mem, async_x, async_y, mem, m_tr.total, blit, m_tr.m_pos, m_tr.m_reg);
+				MarkAsyncReadbackPagesWritten(
+					m_async_readback_mem.GetOffset(blit.DBP, blit.DBW, blit.DPSM), r);
+			}
 
 			m_tr.start = m_tr.end = m_tr.total;
 
@@ -2691,54 +2713,65 @@ void GSState::Move()
 		}
 	};
 
-	if (spsm.trbpp == dpsm.trbpp && spsm.trbpp >= 16)
+	const auto move_in_memory = [&](GSLocalMemory& local_mem)
 	{
-		if (spsm.trbpp == 32)
+		if (spsm.trbpp == dpsm.trbpp && spsm.trbpp >= 16)
 		{
-			u32* vm = m_mem.vm32();
-			copy(dpo.assertSizesMatch(GSLocalMemory::swizzle32), spo.assertSizesMatch(GSLocalMemory::swizzle32), [vm](u32 doff, u32 soff)
+			if (spsm.trbpp == 32)
+			{
+				u32* vm = local_mem.vm32();
+				copy(dpo.assertSizesMatch(GSLocalMemory::swizzle32), spo.assertSizesMatch(GSLocalMemory::swizzle32), [vm](u32 doff, u32 soff)
+				{
+					vm[doff] = vm[soff];
+				});
+			}
+			else if (spsm.trbpp == 24)
+			{
+				u32* vm = local_mem.vm32();
+				copy(dpo.assertSizesMatch(GSLocalMemory::swizzle32), spo.assertSizesMatch(GSLocalMemory::swizzle32), [vm](u32 doff, u32 soff)
+				{
+					vm[doff] = (vm[doff] & 0xff000000) | (vm[soff] & 0x00ffffff);
+				});
+			}
+			else // if (spsm.trbpp == 16)
+			{
+				u16* vm = local_mem.vm16();
+				copy(dpo.assertSizesMatch(GSLocalMemory::swizzle16), spo.assertSizesMatch(GSLocalMemory::swizzle16), [vm](u32 doff, u32 soff)
+				{
+					vm[doff] = vm[soff];
+				});
+			}
+		}
+		else if (m_env.BITBLTBUF.SPSM == PSMT8 && m_env.BITBLTBUF.DPSM == PSMT8)
+		{
+			u8* vm = local_mem.m_vm8;
+			copy(GSOffset::fromKnownPSM(dbp, dbw, PSMT8), GSOffset::fromKnownPSM(sbp, sbw, PSMT8), [vm](u32 doff, u32 soff)
 			{
 				vm[doff] = vm[soff];
 			});
 		}
-		else if (spsm.trbpp == 24)
+		else if (m_env.BITBLTBUF.SPSM == PSMT4 && m_env.BITBLTBUF.DPSM == PSMT4)
 		{
-			u32* vm = m_mem.vm32();
-			copy(dpo.assertSizesMatch(GSLocalMemory::swizzle32), spo.assertSizesMatch(GSLocalMemory::swizzle32), [vm](u32 doff, u32 soff)
+			copy(GSOffset::fromKnownPSM(dbp, dbw, PSMT4), GSOffset::fromKnownPSM(sbp, sbw, PSMT4), [&local_mem](u32 doff, u32 soff)
 			{
-				vm[doff] = (vm[doff] & 0xff000000) | (vm[soff] & 0x00ffffff);
+				local_mem.WritePixel4(doff, local_mem.ReadPixel4(soff));
 			});
 		}
-		else // if (spsm.trbpp == 16)
+		else
 		{
-			u16* vm = m_mem.vm16();
-			copy(dpo.assertSizesMatch(GSLocalMemory::swizzle16), spo.assertSizesMatch(GSLocalMemory::swizzle16), [vm](u32 doff, u32 soff)
+			copy(dpo, spo, [&local_mem, &dpsm, &spsm](u32 doff, u32 soff)
 			{
-				vm[doff] = vm[soff];
+				(local_mem.*dpsm.wpa)(doff, (local_mem.*spsm.rpa)(soff));
 			});
 		}
-	}
-	else if (m_env.BITBLTBUF.SPSM == PSMT8 && m_env.BITBLTBUF.DPSM == PSMT8)
+	};
+
+	move_in_memory(m_mem);
+	if (GSConfig.HWDownloadMode == GSHardwareDownloadMode::Asynchronous)
 	{
-		u8* vm = m_mem.m_vm8;
-		copy(GSOffset::fromKnownPSM(dbp, dbw, PSMT8), GSOffset::fromKnownPSM(sbp, sbw, PSMT8), [vm](u32 doff, u32 soff)
-		{
-			vm[doff] = vm[soff];
-		});
-	}
-	else if (m_env.BITBLTBUF.SPSM == PSMT4 && m_env.BITBLTBUF.DPSM == PSMT4)
-	{
-		copy(GSOffset::fromKnownPSM(dbp, dbw, PSMT4), GSOffset::fromKnownPSM(sbp, sbw, PSMT4), [&](u32 doff, u32 soff)
-		{
-			m_mem.WritePixel4(doff, m_mem.ReadPixel4(soff));
-		});
-	}
-	else
-	{
-		copy(dpo, spo, [&](u32 doff, u32 soff)
-		{
-			(m_mem.*dpsm.wpa)(doff, (m_mem.*spsm.rpa)(soff));
-		});
+		const std::lock_guard lock(m_async_readback_mutex);
+		move_in_memory(m_async_readback_mem);
+		MarkAsyncReadbackPagesWritten(dpo, r);
 	}
 
 	m_env.TRXDIR.XDIR = 3;
@@ -2827,6 +2860,41 @@ void GSState::SyncAsyncReadbackMemory()
 {
 	const std::lock_guard lock(m_async_readback_mutex);
 	std::memcpy(m_async_readback_mem.m_vm8, m_mem.m_vm8, m_mem.m_vmsize);
+	m_async_readback_page_generations.fill(++m_async_readback_generation);
+}
+
+void GSState::MarkAsyncReadbackPagesWritten(const GSOffset& offset, const GSVector4i& rect)
+{
+	const u64 generation = ++m_async_readback_generation;
+	offset.loopPages(rect, [this, generation](u32 page)
+	{
+		m_async_readback_page_generations[page] = generation;
+	});
+}
+
+std::array<u64, GS_MAX_PAGES> GSState::CaptureAsyncReadbackPageGenerations()
+{
+	const std::lock_guard lock(m_async_readback_mutex);
+	return m_async_readback_page_generations;
+}
+
+bool GSState::AreAsyncReadbackPagesCurrent(const std::array<u64, GS_MAX_PAGES>& generations,
+	const GIFRegTEX0& TEX0, const GSVector4i& rect)
+{
+	const std::lock_guard lock(m_async_readback_mutex);
+	bool current = true;
+	m_async_readback_mem.GetOffset(TEX0.TBP0, TEX0.TBW, TEX0.PSM).loopPages(rect,
+		[this, &generations, &current](u32 page)
+		{
+			current &= (m_async_readback_page_generations[page] == generations[page]);
+		});
+	return current;
+}
+
+void GSState::MarkAsyncReadbackPagesWrittenLocked(const GIFRegTEX0& TEX0, const GSVector4i& rect)
+{
+	MarkAsyncReadbackPagesWritten(
+		m_async_readback_mem.GetOffset(TEX0.TBP0, TEX0.TBW, TEX0.PSM), rect);
 }
 
 void GSState::PurgeTextureCache(bool sources, bool targets, bool hash_cache)

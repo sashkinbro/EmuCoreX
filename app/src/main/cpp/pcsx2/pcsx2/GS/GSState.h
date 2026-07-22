@@ -14,6 +14,7 @@
 #include "GS/GSVector.h"
 #include "GSAlignedClass.h"
 
+#include <array>
 #include <mutex>
 
 class GSDumpBase;
@@ -132,6 +133,10 @@ private:
 	// with the next frame's writes and exposing a half-old/half-new result.
 	GSLocalMemory m_async_readback_mem;
 	std::mutex m_async_readback_mutex;
+	std::array<u64, GS_MAX_PAGES> m_async_readback_page_generations = {};
+	u64 m_async_readback_generation = 0;
+
+	void MarkAsyncReadbackPagesWritten(const GSOffset& offset, const GSVector4i& rect);
 
 protected:
 	static constexpr int INVALID_ALPHA_MINMAX = 500;
@@ -490,6 +495,10 @@ public:
 	void ReadLocalMemoryUnsync(u8* mem, int qwc, GIFRegBITBLTBUF BITBLTBUF, GIFRegTRXPOS TRXPOS, GIFRegTRXREG TRXREG);
 	GSLocalMemory& GetAsyncReadbackMemory() { return m_async_readback_mem; }
 	std::mutex& GetAsyncReadbackMutex() { return m_async_readback_mutex; }
+	std::array<u64, GS_MAX_PAGES> CaptureAsyncReadbackPageGenerations();
+	bool AreAsyncReadbackPagesCurrent(const std::array<u64, GS_MAX_PAGES>& generations,
+		const GIFRegTEX0& TEX0, const GSVector4i& rect);
+	void MarkAsyncReadbackPagesWrittenLocked(const GIFRegTEX0& TEX0, const GSVector4i& rect);
 	void SyncAsyncReadbackMemory();
 	template<int index> void Transfer(const u8* mem, u32 size);
 	int Freeze(freezeData* fd, bool sizeonly);

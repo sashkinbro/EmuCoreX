@@ -141,6 +141,7 @@ public:
 	protected:
 		Surface();
 		~Surface();
+		bool OverlapsHelper(u32 start_block0, u32 end_block0, u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
 
 	public:
 		GSTexture* m_texture = nullptr;
@@ -266,6 +267,7 @@ public:
 		void UpdateDrawn(const GSVector4i& rect, bool can_resize = true);
 		void ResizeValidity(const GSVector4i& rect);
 		void UpdateValidity(const GSVector4i& rect, bool can_resize = true);
+		bool OverlapsValid(u32 bp, u32 bw, u32 psm, const GSVector4i& rect) const;
 
 		void ScaleRTAlpha();
 		void UnscaleRTAlpha();
@@ -464,6 +466,7 @@ protected:
 		GSVector4i target_rect = {};
 		u32 write_mask = 0;
 		u64 queued_frame = 0;
+		std::array<u64, GS_MAX_PAGES> page_generations = {};
 	};
 
 	static constexpr size_t MAX_PENDING_DOWNLOADS = 8;
@@ -512,7 +515,7 @@ public:
 	__fi u64 GetSourceMemoryUsage() const { return m_source_memory_usage; }
 	__fi u64 GetTargetMemoryUsage() const { return m_target_memory_usage; }
 
-	void Read(Target* t, const GSVector4i& r);
+	void Read(Target* t, const GSVector4i& r, bool force_synchronous = false);
 	void Read(Source* t, const GSVector4i& r);
 	void ProcessPendingDownloads();
 	void DiscardPendingDownloads();
@@ -558,7 +561,8 @@ public:
 	void InvalidateVideoMemType(int type, u32 bp, u32 write_psm = PSMCT32, u32 write_fbmsk = 0, bool dirty_only = false);
 	void InvalidateVideoMemSubTarget(GSTextureCache::Target* rt);
 	void InvalidateVideoMem(const GSOffset& off, const GSVector4i& r, bool target = true);
-	void InvalidateLocalMem(const GSOffset& off, const GSVector4i& r, bool full_flush = false);
+	void InvalidateLocalMem(const GSOffset& off, const GSVector4i& r, bool full_flush = false,
+		bool force_synchronous = false);
 
 	/// Removes any sources which point to the specified target.
 	void InvalidateSourcesFromTarget(const Target* t);

@@ -1092,7 +1092,8 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 			lowered_gpu_profile.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
 
 		if (lowered_gpu_profile == "mali" || lowered_gpu_profile == "adreno" ||
-			lowered_gpu_profile == "powervr" || lowered_gpu_profile == "auto")
+			lowered_gpu_profile == "powervr" || lowered_gpu_profile == "mediatek" ||
+			lowered_gpu_profile == "auto")
 		{
 			AndroidGpuProfileOverride = std::move(lowered_gpu_profile);
 		}
