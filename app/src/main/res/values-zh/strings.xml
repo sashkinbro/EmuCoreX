@@ -1096,7 +1096,6 @@
     <string name="settings_emulator_data_path_use_default_desc">将记忆卡、即时存档、金手指、补丁和日志还原到应用默认文件夹。</string>
     <string name="shell_texture_manager">纹理管理器</string>
     <string name="texture_manager_title">纹理管理器</string>
-    <string name="texture_manager_subtitle">替换包与导出转储</string>
     <string name="texture_manager_import_zip">导入 ZIP</string>
     <string name="texture_manager_import_success">已导入 %d 个纹理文件。</string>
     <string name="texture_manager_import_failed">纹理包导入失败。</string>
@@ -1844,7 +1843,6 @@
     <string name="texture_catalog_install_failed">无法安全下载或安装纹理包。</string>
     <string name="texture_catalog_pack_meta">版本 %1$s • %2$s • %3$d 个文件</string>
     <string name="cheat_manager_title">作弊管理器</string>
-    <string name="cheat_manager_subtitle">为每个游戏分别下载、导入和配置作弊码。</string>
     <string name="cheat_manager_enable">启用作弊码</string>
     <string name="cheat_manager_enable_desc">在游戏启动时应用已启用的 PNACH 代码块。</string>
     <string name="cheat_manager_import_pnach">为所选游戏导入 PNACH</string>
@@ -1862,4 +1860,17 @@
     <string name="cheat_manager_delete_confirm">导入的 PNACH 和已启用的选择将被删除。</string>
     <string name="cheat_manager_delete_success">作弊码已删除。</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d 个作弊代码块</string>
+    <string name="cheat_manager_search">搜索作弊码</string>
+    <string name="cheat_manager_categories">作弊码分类</string>
+    <string name="cheat_manager_category_count">%1$d 个作弊码</string>
+    <string name="cheat_manager_search_empty">没有符合搜索条件的作弊码。</string>
+    <string name="cheat_manager_category_player">玩家与资源</string>
+    <string name="cheat_manager_category_items">物品与武器</string>
+    <string name="cheat_manager_category_world">世界与时间</string>
+    <string name="cheat_manager_category_progress">进度与解锁</string>
+    <string name="cheat_manager_category_vehicles">载具与竞赛</string>
+    <string name="cheat_manager_category_stats">统计与记录</string>
+    <string name="cheat_manager_category_hotkeys">按键组合</string>
+    <string name="cheat_manager_category_other">其他</string>
+    <string name="content_select_game_named">已选游戏：%1$s</string>
 </resources>

@@ -1094,7 +1094,6 @@
     <string name="settings_emulator_data_path_use_default_desc">إرجاع بطاقات الذاكرة وحالات الحفظ والشفرات والتصحيحات والسجلات إلى مجلد التطبيق الافتراضي.</string>
     <string name="shell_texture_manager">مدير الإكساءات</string>
     <string name="texture_manager_title">مدير الإكساءات</string>
-    <string name="texture_manager_subtitle">حزم الاستبدال والاستخراج</string>
     <string name="texture_manager_import_zip">استيراد ملف ZIP</string>
     <string name="texture_manager_import_success">تم استيراد %d ملف/ملفات إكساء.</string>
     <string name="texture_manager_import_failed">فشل استيراد حزمة الإكساءات.</string>
@@ -1847,7 +1846,6 @@
     <string name="texture_catalog_install_failed">تعذر تنزيل حزمة الأنسجة أو تثبيتها بأمان.</string>
     <string name="texture_catalog_pack_meta">الإصدار %1$s • %2$s • %3$d ملف</string>
     <string name="cheat_manager_title">مدير الغش</string>
-    <string name="cheat_manager_subtitle">نزّل رموز الغش واستوردها واضبطها لكل لعبة على حدة.</string>
     <string name="cheat_manager_enable">تفعيل الغش</string>
     <string name="cheat_manager_enable_desc">يسمح بتطبيق كتل PNACH المفعلة عند تشغيل اللعبة.</string>
     <string name="cheat_manager_import_pnach">استيراد PNACH للعبة المحددة</string>
@@ -1865,4 +1863,17 @@
     <string name="cheat_manager_delete_confirm">سيتم حذف ملف PNACH المستورد واختيارات الغش المفعلة.</string>
     <string name="cheat_manager_delete_success">تم حذف رموز الغش.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d كتلة غش</string>
+    <string name="cheat_manager_search">البحث عن رموز الغش</string>
+    <string name="cheat_manager_categories">فئات رموز الغش</string>
+    <string name="cheat_manager_category_count">رموز الغش: %1$d</string>
+    <string name="cheat_manager_search_empty">لا توجد رموز غش تطابق بحثك.</string>
+    <string name="cheat_manager_category_player">اللاعب والموارد</string>
+    <string name="cheat_manager_category_items">العناصر والأسلحة</string>
+    <string name="cheat_manager_category_world">العالم والوقت</string>
+    <string name="cheat_manager_category_progress">التقدم والعناصر المفتوحة</string>
+    <string name="cheat_manager_category_vehicles">المركبات والسباقات</string>
+    <string name="cheat_manager_category_stats">الإحصاءات والسجلات</string>
+    <string name="cheat_manager_category_hotkeys">مجموعات الأزرار</string>
+    <string name="cheat_manager_category_other">أخرى</string>
+    <string name="content_select_game_named">اللعبة المحددة: %1$s</string>
 </resources>

@@ -751,7 +751,6 @@
 
     <!-- Texture Manager -->
     <string name="texture_manager_title">مدیریت بافت‌ها</string>
-    <string name="texture_manager_subtitle">بسته‌های جایگزین و دامپ‌ها</string>
     <string name="texture_manager_import_zip">وارد کردن ZIP</string>
     <string name="texture_manager_import_success">وارد کردن %d فایل بافت موفقیت‌آمیز بود.</string>
     <string name="texture_manager_import_failed">وارد کردن بسته بافت ناموفق بود.</string>
@@ -1858,7 +1857,6 @@
     <string name="texture_catalog_install_failed">بسته بافت با اطمینان بارگیری یا نصب نشد.</string>
     <string name="texture_catalog_pack_meta">نسخه %1$s • %2$s • %3$d فایل</string>
     <string name="cheat_manager_title">مدیریت تقلب‌ها</string>
-    <string name="cheat_manager_subtitle">تقلب‌ها را برای هر بازی جداگانه بارگیری، وارد و پیکربندی کنید.</string>
     <string name="cheat_manager_enable">فعال‌سازی تقلب‌ها</string>
     <string name="cheat_manager_enable_desc">بلوک‌های فعال PNACH را هنگام اجرای بازی اعمال می‌کند.</string>
     <string name="cheat_manager_import_pnach">وارد کردن PNACH برای بازی انتخاب‌شده</string>
@@ -1876,4 +1874,17 @@
     <string name="cheat_manager_delete_confirm">PNACH واردشده و انتخاب تقلب‌های فعال حذف می‌شوند.</string>
     <string name="cheat_manager_delete_success">تقلب‌ها حذف شدند.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d بلوک تقلب</string>
+    <string name="cheat_manager_search">جستجوی تقلب‌ها</string>
+    <string name="cheat_manager_categories">دسته‌بندی تقلب‌ها</string>
+    <string name="cheat_manager_category_count">%1$d تقلب</string>
+    <string name="cheat_manager_search_empty">هیچ تقلبی با جستجوی شما مطابقت ندارد.</string>
+    <string name="cheat_manager_category_player">بازیکن و منابع</string>
+    <string name="cheat_manager_category_items">آیتم‌ها و سلاح‌ها</string>
+    <string name="cheat_manager_category_world">دنیا و زمان</string>
+    <string name="cheat_manager_category_progress">پیشرفت و موارد بازشدنی</string>
+    <string name="cheat_manager_category_vehicles">وسایل نقلیه و مسابقات</string>
+    <string name="cheat_manager_category_stats">آمار و رکوردها</string>
+    <string name="cheat_manager_category_hotkeys">ترکیب دکمه‌ها</string>
+    <string name="cheat_manager_category_other">سایر</string>
+    <string name="content_select_game_named">بازی انتخاب‌شده: %1$s</string>
 </resources>

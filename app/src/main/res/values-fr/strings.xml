@@ -1096,7 +1096,6 @@
     <string name="settings_emulator_data_path_use_default_desc">Renvoyer les cartes mémoire, les états de sauvegarde, les codes de triche, les correctifs et les journaux vers le dossier par défaut de l\'application.</string>
     <string name="shell_texture_manager">Gestionnaire de textures</string>
     <string name="texture_manager_title">Gestionnaire de textures</string>
-    <string name="texture_manager_subtitle">Packs de remplacement et dumps</string>
     <string name="texture_manager_import_zip">Importer un ZIP</string>
     <string name="texture_manager_import_success">%d fichiers de textures importés.</string>
     <string name="texture_manager_import_failed">L\'importation du pack de textures a échoué.</string>
@@ -1845,7 +1844,6 @@
     <string name="texture_catalog_install_failed">Le pack de textures n’a pas pu être téléchargé ou installé en toute sécurité.</string>
     <string name="texture_catalog_pack_meta">Version %1$s • %2$s • %3$d fichiers</string>
     <string name="cheat_manager_title">Gestionnaire de codes</string>
-    <string name="cheat_manager_subtitle">Téléchargez, importez et configurez les codes séparément pour chaque jeu.</string>
     <string name="cheat_manager_enable">Activer les codes</string>
     <string name="cheat_manager_enable_desc">Permet d’appliquer les blocs PNACH activés au lancement du jeu.</string>
     <string name="cheat_manager_import_pnach">Importer un PNACH pour le jeu sélectionné</string>
@@ -1863,4 +1861,17 @@
     <string name="cheat_manager_delete_confirm">Le PNACH importé et la sélection des codes activés seront supprimés.</string>
     <string name="cheat_manager_delete_success">Codes supprimés.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d blocs de codes</string>
+    <string name="cheat_manager_search">Rechercher des codes</string>
+    <string name="cheat_manager_categories">Catégories de codes</string>
+    <string name="cheat_manager_category_count">%1$d codes</string>
+    <string name="cheat_manager_search_empty">Aucun code ne correspond à votre recherche.</string>
+    <string name="cheat_manager_category_player">Joueur et ressources</string>
+    <string name="cheat_manager_category_items">Objets et armes</string>
+    <string name="cheat_manager_category_world">Monde et temps</string>
+    <string name="cheat_manager_category_progress">Progression et déblocages</string>
+    <string name="cheat_manager_category_vehicles">Véhicules et courses</string>
+    <string name="cheat_manager_category_stats">Statistiques et records</string>
+    <string name="cheat_manager_category_hotkeys">Combinaisons de touches</string>
+    <string name="cheat_manager_category_other">Autres</string>
+    <string name="content_select_game_named">Jeu sélectionné : %1$s</string>
 </resources>

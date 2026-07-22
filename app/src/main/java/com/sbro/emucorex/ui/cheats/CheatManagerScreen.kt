@@ -4,10 +4,20 @@ import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,17 +35,26 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CloudDownload
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -58,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.CheatBlock
 import com.sbro.emucorex.data.CheatGameConfig
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.ContentLibraryRepository
@@ -93,6 +113,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
     var games by remember { mutableStateOf<List<GameItem>>(emptyList()) }
     var selectedPath by remember { mutableStateOf<String?>(null) }
     var identity by remember { mutableStateOf<SelectedGameIdentity?>(null) }
+    var identityPath by remember { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<List<RemoteCheatPack>>(emptyList()) }
     var config by remember { mutableStateOf<CheatGameConfig?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -101,6 +122,9 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
     var catalogFailed by remember { mutableStateOf(false) }
     var workingId by remember { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<CheatGameConfig?>(null) }
+    var selectedCheatCategory by remember { mutableStateOf<CheatCategory?>(null) }
+    var cheatSearchVisible by remember { mutableStateOf(false) }
+    var cheatSearchQuery by remember { mutableStateOf("") }
 
     val importSuccess = stringResource(R.string.cheat_manager_import_success)
     val importFailure = stringResource(R.string.cheat_manager_import_failed)
@@ -138,17 +162,48 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
         val game = selectedGame
         if (game == null) {
             identity = null
+            identityPath = null
             config = null
             return@LaunchedEffect
         }
+        identity = null
+        identityPath = null
         resolvingIdentity = true
         val resolved = withContext(Dispatchers.IO) { libraryRepository.resolveIdentity(game) }
         identity = resolved
+        identityPath = game.path
         refreshConfig(resolved)
         resolvingIdentity = false
     }
 
-    val available = remember(catalog, identity, selectedGame) {
+    LaunchedEffect(config?.gameKey) {
+        selectedCheatCategory = null
+        cheatSearchVisible = false
+        cheatSearchQuery = ""
+    }
+
+    val installedBlocks = config?.blocks.orEmpty()
+    val categoryGroups = remember(installedBlocks) {
+        CheatCategory.entries.mapNotNull { category ->
+            installedBlocks.filter { block -> block.category() == category }
+                .takeIf(List<CheatBlock>::isNotEmpty)
+                ?.let { category to it }
+        }
+    }
+    val visibleInstalledBlocks = remember(installedBlocks, selectedCheatCategory, cheatSearchQuery) {
+        when {
+            cheatSearchQuery.isNotBlank() -> installedBlocks.filter { block ->
+                block.title.contains(cheatSearchQuery.trim(), ignoreCase = true)
+            }
+            selectedCheatCategory != null -> installedBlocks.filter { block ->
+                block.category() == selectedCheatCategory
+            }
+            else -> emptyList()
+        }
+    }
+
+    val available = remember(catalog, identity, identityPath, selectedGame, selectedPath) {
+        if (identity == null || identityPath != selectedPath) return@remember emptyList()
         val serial = identity?.serial
         val crc = identity?.crc
         val normalizedTitle = selectedGame?.title.orEmpty().catalogTitleKey()
@@ -162,6 +217,17 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
             }
         }.sortedWith(compareByDescending<RemoteCheatPack> { it.crc.equals(crc, true) }.thenBy { it.title })
     }
+    val onlineContentState = CheatOnlineContentState(
+        phase = when {
+            loading || resolvingIdentity || identity == null || identityPath != selectedPath ->
+                CheatOnlinePhase.LOADING
+            catalogFailed -> CheatOnlinePhase.ERROR
+            selectedGame != null && available.isEmpty() -> CheatOnlinePhase.EMPTY
+            else -> CheatOnlinePhase.CONTENT
+        },
+        packs = available,
+        serial = selectedGame?.serial
+    )
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -192,14 +258,15 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontalSystemBarPadding)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontalSystemBarPadding),
             contentPadding = PaddingValues(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding,
@@ -210,7 +277,6 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
             item {
                 ScreenTopBar(
                     title = stringResource(R.string.cheat_manager_title),
-                    subtitle = stringResource(R.string.cheat_manager_subtitle),
                     onBackClick = onBackClick,
                     modifier = Modifier.padding(top = topInset)
                 )
@@ -253,7 +319,17 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                 LibraryGamePicker(
                     games = games,
                     selectedPath = selectedPath,
-                    onSelected = { selectedPath = it.path }
+                    onSelected = { game ->
+                        if (game.path != selectedPath) {
+                            identity = null
+                            identityPath = null
+                            config = null
+                            resolvingIdentity = true
+                            selectedPath = game.path
+                        }
+                    },
+                    horizontalContentPadding = ScreenHorizontalPadding,
+                    fullBleedPadding = ScreenHorizontalPadding
                 )
             }
             if (selectedGame != null) {
@@ -261,22 +337,45 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
                     ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            if (resolvingIdentity) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                            Text(
-                                text = if (identity?.crc != null) {
-                                    stringResource(R.string.cheat_manager_detected_identity, identity?.serial.orEmpty(), identity?.crc.orEmpty())
-                                } else {
-                                    stringResource(R.string.cheat_manager_crc_unavailable, identity?.serial.orEmpty())
-                                },
-                                style = MaterialTheme.typography.bodyMedium
-                            )
+                        AnimatedContent(
+                            targetState = Triple(
+                                resolvingIdentity,
+                                identity?.serial ?: selectedGame.serial,
+                                identity?.crc
+                            ),
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "selectedGameIdentity"
+                        ) { (resolving, serial, crc) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                if (resolving) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                }
+                                Text(
+                                    text = when {
+                                        resolving -> serial ?: stringResource(R.string.content_serial_unknown)
+                                        crc != null -> stringResource(
+                                            R.string.cheat_manager_detected_identity,
+                                            serial.orEmpty(),
+                                            crc
+                                        )
+                                        else -> stringResource(
+                                            R.string.cheat_manager_crc_unavailable,
+                                            serial.orEmpty()
+                                        )
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }
@@ -288,55 +387,81 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                     fontWeight = FontWeight.Bold
                 )
             }
-            when {
-                loading -> item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        Text(stringResource(R.string.content_catalog_loading))
-                    }
-                }
-                catalogFailed -> item {
-                    Text(stringResource(R.string.content_catalog_failed), color = MaterialTheme.colorScheme.error)
-                }
-                selectedGame != null && available.isEmpty() -> item {
-                    Text(
-                        stringResource(R.string.cheat_manager_no_cheats),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                else -> items(available, key = RemoteCheatPack::id) { pack ->
-                    CheatCatalogCard(
-                        pack = pack,
-                        working = workingId == pack.id,
-                        onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
-                        onDownload = {
-                            if (workingId == null) {
-                                scope.launch {
-                                    workingId = pack.id
-                                    val installedConfig = withContext(Dispatchers.IO) {
-                                        runCatching {
-                                            val text = catalogRepository.downloadCheatText(pack)
-                                            val serial = identity?.serial
-                                            val gameKey = if (!serial.isNullOrBlank()) "${serial}_${pack.crc}" else pack.crc
-                                            val count = cheatRepository.importCheatFile(gameKey, text, enableAllByDefault = false)
-                                            if (count <= 0) return@runCatching null
-                                            cheatRepository.getGameConfig(gameKey, serial.orEmpty(), pack.crc)
-                                        }.getOrNull()
+            item(key = "online-cheat-content") {
+                AnimatedContent(
+                    targetState = onlineContentState,
+                    transitionSpec = {
+                        (fadeIn(tween(220)) + slideInVertically(tween(220)) { height -> height / 10 }) togetherWith
+                            (fadeOut(tween(140)) + slideOutVertically(tween(140)) { height -> -height / 12 })
+                    },
+                    label = "onlineCheatContent"
+                ) { state ->
+                    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        when (state.phase) {
+                            CheatOnlinePhase.LOADING -> Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                                Text(
+                                    text = state.serial ?: stringResource(R.string.content_catalog_loading),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            CheatOnlinePhase.ERROR -> Text(
+                                stringResource(R.string.content_catalog_failed),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            CheatOnlinePhase.EMPTY -> CheatCatalogEmptyState()
+                            CheatOnlinePhase.CONTENT -> state.packs.forEach { pack ->
+                                CheatCatalogCard(
+                                    pack = pack,
+                                    working = workingId == pack.id,
+                                    onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
+                                    onDownload = {
+                                        if (workingId == null) {
+                                            scope.launch {
+                                                workingId = pack.id
+                                                val installedConfig = withContext(Dispatchers.IO) {
+                                                    runCatching {
+                                                        val text = catalogRepository.downloadCheatText(pack)
+                                                        val serial = identity?.serial
+                                                        val gameKey = if (!serial.isNullOrBlank()) {
+                                                            "${serial}_${pack.crc}"
+                                                        } else {
+                                                            pack.crc
+                                                        }
+                                                        val count = cheatRepository.importCheatFile(
+                                                            gameKey,
+                                                            text,
+                                                            enableAllByDefault = false,
+                                                            mergeWithExisting = true
+                                                        )
+                                                        if (count <= 0) return@runCatching null
+                                                        cheatRepository.getGameConfig(
+                                                            gameKey,
+                                                            serial.orEmpty(),
+                                                            pack.crc
+                                                        )
+                                                    }.getOrNull()
+                                                }
+                                                if (installedConfig != null) {
+                                                    preferences.setEnableCheats(true)
+                                                    config = installedConfig
+                                                }
+                                                Toast.makeText(
+                                                    context,
+                                                    if (installedConfig != null) downloadSuccess else downloadFailure,
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                workingId = null
+                                            }
+                                        }
                                     }
-                                    if (installedConfig != null) {
-                                        preferences.setEnableCheats(true)
-                                        config = installedConfig
-                                    }
-                                    Toast.makeText(
-                                        context,
-                                        if (installedConfig != null) downloadSuccess else downloadFailure,
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                    workingId = null
-                                }
+                                )
                             }
                         }
-                    )
+                    }
                 }
             }
             if (catalogCached) {
@@ -350,38 +475,128 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
             }
             config?.let { current ->
                 item {
-                    Text(
-                        text = stringResource(R.string.cheat_manager_installed),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                items(current.blocks, key = { it.id }) { block ->
-                    Surface(
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = stringResource(R.string.cheat_manager_installed),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = {
+                                cheatSearchVisible = !cheatSearchVisible
+                                selectedCheatCategory = null
+                                if (!cheatSearchVisible) cheatSearchQuery = ""
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (cheatSearchVisible) Icons.Rounded.Close else Icons.Rounded.Search,
+                                contentDescription = stringResource(R.string.cheat_manager_search)
+                            )
+                        }
+                    }
+                }
+                if (cheatSearchVisible) {
+                    item {
+                        OutlinedTextField(
+                            value = cheatSearchQuery,
+                            onValueChange = { cheatSearchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text(stringResource(R.string.cheat_manager_search)) },
+                            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                            trailingIcon = if (cheatSearchQuery.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { cheatSearchQuery = "" }) {
+                                        Icon(
+                                            Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.home_search_clear)
+                                        )
+                                    }
+                                }
+                            } else null,
+                            singleLine = true,
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                    }
+                }
+                if (!cheatSearchVisible) {
+                    item(key = "cheat-folder-header") {
+                        CheatCategoryBrowserHeader(
+                            selectedCategory = selectedCheatCategory,
+                            count = if (selectedCheatCategory == null) {
+                                categoryGroups.sumOf { it.second.size }
+                            } else {
+                                visibleInstalledBlocks.size
+                            },
+                            onBack = { selectedCheatCategory = null }
+                        )
+                    }
+                } else {
+                    item(key = "cheat-search-header") {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(block.title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                            Switch(
-                                checked = block.enabled,
-                                onCheckedChange = { enabled ->
-                                    val enabledIds = current.blocks
-                                        .filter { it.enabled }
-                                        .mapTo(mutableSetOf()) { it.id }
-                                        .apply { if (enabled) add(block.id) else remove(block.id) }
-                                    cheatRepository.setEnabledBlocks(current.gameKey, enabledIds)
-                                    config = current.copy(
-                                        blocks = current.blocks.map { item ->
-                                            if (item.id == block.id) item.copy(enabled = enabled) else item
-                                        }
-                                    )
-                                }
+                            Text(
+                                text = stringResource(R.string.cheat_manager_search),
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
                             )
+                            Text(
+                                text = stringResource(
+                                    R.string.cheat_manager_category_count,
+                                    visibleInstalledBlocks.size
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                if (!cheatSearchVisible && selectedCheatCategory == null) {
+                    itemsIndexed(categoryGroups, key = { _, item -> item.first.name }) { index, (category, blocks) ->
+                        AnimatedFolderEntry(
+                            transitionKey = "folders",
+                            itemKey = category.name,
+                            index = index
+                        ) {
+                            CheatCategoryCard(
+                                category = category,
+                                count = blocks.size,
+                                onClick = { selectedCheatCategory = category }
+                            )
+                        }
+                    }
+                } else {
+                    if (visibleInstalledBlocks.isEmpty()) {
+                        item { CheatSearchEmptyState() }
+                    } else {
+                        itemsIndexed(visibleInstalledBlocks, key = { _, block -> block.id }) { index, block ->
+                            AnimatedFolderEntry(
+                                transitionKey = selectedCheatCategory?.name ?: "search:$cheatSearchQuery",
+                                itemKey = block.id,
+                                index = index
+                            ) {
+                                CheatToggleCard(
+                                    block = block,
+                                    onEnabledChange = { enabled ->
+                                        val enabledIds = current.blocks
+                                            .filter { it.enabled }
+                                            .mapTo(mutableSetOf()) { it.id }
+                                            .apply { if (enabled) add(block.id) else remove(block.id) }
+                                        cheatRepository.setEnabledBlocks(current.gameKey, enabledIds)
+                                        config = current.copy(
+                                            blocks = current.blocks.map { item ->
+                                                if (item.id == block.id) item.copy(enabled = enabled) else item
+                                            }
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -413,6 +628,215 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                 TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
             }
         )
+    }
+}
+
+@Composable
+private fun CheatCategoryBrowserHeader(
+    selectedCategory: CheatCategory?,
+    count: Int,
+    onBack: () -> Unit
+) {
+    AnimatedContent(
+        targetState = selectedCategory,
+        transitionSpec = {
+            if (targetState != null) {
+                (slideInHorizontally(tween(260)) { width -> width / 3 } + fadeIn(tween(180))) togetherWith
+                    (slideOutHorizontally(tween(190)) { width -> -width / 5 } + fadeOut(tween(140)))
+            } else {
+                (slideInHorizontally(tween(260)) { width -> -width / 3 } + fadeIn(tween(180))) togetherWith
+                    (slideOutHorizontally(tween(190)) { width -> width / 5 } + fadeOut(tween(140)))
+            }
+        },
+        label = "cheatFolderHeader"
+    ) { category ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (category == null) {
+                Icon(
+                    imageVector = Icons.Rounded.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    text = stringResource(R.string.cheat_manager_categories),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            } else {
+                TextButton(onClick = onBack, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Icon(Icons.Rounded.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        text = stringResource(category.titleRes),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Text(
+                text = stringResource(R.string.cheat_manager_category_count, count),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun AnimatedFolderEntry(
+    transitionKey: String,
+    itemKey: String,
+    index: Int,
+    content: @Composable () -> Unit
+) {
+    val visibility = remember(transitionKey, itemKey) {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+    val delay = (index.coerceAtMost(6) * 24)
+    AnimatedVisibility(
+        visibleState = visibility,
+        enter = fadeIn(tween(durationMillis = 190, delayMillis = delay)) +
+            slideInHorizontally(tween(durationMillis = 250, delayMillis = delay)) { width -> width / 5 } +
+            scaleIn(tween(durationMillis = 220, delayMillis = delay), initialScale = 0.985f)
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun CheatCategoryCard(
+    category: CheatCategory,
+    count: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(13.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Folder,
+                    contentDescription = null,
+                    modifier = Modifier.padding(10.dp).size(21.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(category.titleRes),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = stringResource(R.string.cheat_manager_category_count, count),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheatToggleCard(
+    block: CheatBlock,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = block.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Switch(
+                checked = block.enabled,
+                onCheckedChange = onEnabledChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheatSearchEmptyState() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Text(
+            text = stringResource(R.string.cheat_manager_search_empty),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
+}
+
+@Composable
+private fun CheatCatalogEmptyState() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Info,
+                    contentDescription = null,
+                    modifier = Modifier.padding(11.dp).size(22.dp)
+                )
+            }
+            Text(
+                text = stringResource(R.string.cheat_manager_no_cheats),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -450,17 +874,33 @@ private fun CheatCatalogCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onDownload, enabled = !working) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onDownload,
+                    enabled = !working,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     if (working) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Rounded.CloudDownload, contentDescription = null)
                     Spacer(Modifier.width(7.dp))
-                    Text(stringResource(R.string.content_download_install))
+                    Text(
+                        text = stringResource(R.string.content_download_install),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                OutlinedButton(onClick = onSource, enabled = !working) {
-                    Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                OutlinedButton(
+                    onClick = onSource,
+                    enabled = !working,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null)
                     Spacer(Modifier.width(7.dp))
-                    Text(stringResource(R.string.content_source))
+                    Text(
+                        text = stringResource(R.string.content_source),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -471,3 +911,51 @@ private fun String.catalogTitleKey(): String =
     lowercase(Locale.US)
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
+
+private enum class CheatCategory(val titleRes: Int) {
+    PLAYER(R.string.cheat_manager_category_player),
+    ITEMS(R.string.cheat_manager_category_items),
+    WORLD(R.string.cheat_manager_category_world),
+    PROGRESS(R.string.cheat_manager_category_progress),
+    VEHICLES(R.string.cheat_manager_category_vehicles),
+    STATS(R.string.cheat_manager_category_stats),
+    HOTKEYS(R.string.cheat_manager_category_hotkeys),
+    OTHER(R.string.cheat_manager_category_other)
+}
+
+private enum class CheatOnlinePhase {
+    LOADING,
+    ERROR,
+    EMPTY,
+    CONTENT
+}
+
+private data class CheatOnlineContentState(
+    val phase: CheatOnlinePhase,
+    val packs: List<RemoteCheatPack>,
+    val serial: String?
+)
+
+private fun CheatBlock.category(): CheatCategory {
+    val value = title.lowercase(Locale.US)
+    return when {
+        value.containsAny(" press ", "press ", "hold ", "button", "{l1}", "{l2}", "{r1}", "{r2}", "{select}") ->
+            CheatCategory.HOTKEYS
+        value.containsAny("health", "money", "pocket change", "stamina", "energy", "trouble", "wanted", "player", "character") ->
+            CheatCategory.PLAYER
+        value.containsAny("weapon", "ammo", "inventory", "item", "fire cracker", "spud", "slingshot", "projectile", "outfit", "clothing") ->
+            CheatCategory.ITEMS
+        value.containsAny("time", "hour", "clock", "weather", "day", "night", "season") ->
+            CheatCategory.WORLD
+        value.containsAny("mission", "chapter", "unlock", "class", "grade", "complete", "progress", "troph", "collectible") ->
+            CheatCategory.PROGRESS
+        value.containsAny("vehicle", "bike", "bicycle", "car", "kart", "race", "skateboard", "lawnmower") ->
+            CheatCategory.VEHICLES
+        value.startsWith("max ") || value.startsWith("no ") ||
+            value.containsAny("stat", "record", "times ", "distance", "earned", "spent", "attempted", "hits", "killed", "thrown", "purchased") ->
+            CheatCategory.STATS
+        else -> CheatCategory.OTHER
+    }
+}
+
+private fun String.containsAny(vararg needles: String): Boolean = needles.any(::contains)

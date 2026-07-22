@@ -1094,7 +1094,6 @@
     <string name="settings_emulator_data_path_use_default_desc">메모리 카드, 상태 저장, 치트, 패치 및 로그를 앱 기본 폴더로 되돌립니다.</string>
     <string name="shell_texture_manager">텍스처 관리자</string>
     <string name="texture_manager_title">텍스처 관리자</string>
-    <string name="texture_manager_subtitle">교체 팩 및 덤프</string>
     <string name="texture_manager_import_zip">ZIP 가져오기</string>
     <string name="texture_manager_import_success">%d개의 텍스처 파일을 가져왔습니다.</string>
     <string name="texture_manager_import_failed">텍스처 팩 가져오기에 실패했습니다.</string>
@@ -1842,7 +1841,6 @@
     <string name="texture_catalog_install_failed">텍스처 팩을 안전하게 다운로드하거나 설치하지 못했습니다.</string>
     <string name="texture_catalog_pack_meta">버전 %1$s • %2$s • 파일 %3$d개</string>
     <string name="cheat_manager_title">치트 관리자</string>
-    <string name="cheat_manager_subtitle">게임별로 치트를 다운로드하고 가져와 설정합니다.</string>
     <string name="cheat_manager_enable">치트 활성화</string>
     <string name="cheat_manager_enable_desc">게임 시작 시 활성화된 PNACH 블록을 적용합니다.</string>
     <string name="cheat_manager_import_pnach">선택한 게임에 PNACH 가져오기</string>
@@ -1860,4 +1858,17 @@
     <string name="cheat_manager_delete_confirm">가져온 PNACH와 활성화 선택이 삭제됩니다.</string>
     <string name="cheat_manager_delete_success">치트를 삭제했습니다.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • 치트 블록 %2$d개</string>
+    <string name="cheat_manager_search">치트 검색</string>
+    <string name="cheat_manager_categories">치트 카테고리</string>
+    <string name="cheat_manager_category_count">치트 %1$d개</string>
+    <string name="cheat_manager_search_empty">검색과 일치하는 치트가 없습니다.</string>
+    <string name="cheat_manager_category_player">플레이어 및 자원</string>
+    <string name="cheat_manager_category_items">아이템 및 무기</string>
+    <string name="cheat_manager_category_world">월드 및 시간</string>
+    <string name="cheat_manager_category_progress">진행 및 잠금 해제</string>
+    <string name="cheat_manager_category_vehicles">탈것 및 레이스</string>
+    <string name="cheat_manager_category_stats">통계 및 기록</string>
+    <string name="cheat_manager_category_hotkeys">버튼 조합</string>
+    <string name="cheat_manager_category_other">기타</string>
+    <string name="content_select_game_named">선택한 게임: %1$s</string>
 </resources>

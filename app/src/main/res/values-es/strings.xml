@@ -1096,7 +1096,6 @@
     <string name="settings_emulator_data_path_use_default_desc">Devolver tarjetas de memoria, estados guardados, trucos, parches y registros a la carpeta predeterminada de la aplicación.</string>
     <string name="shell_texture_manager">Gestor de texturas</string>
     <string name="texture_manager_title">Gestor de texturas</string>
-    <string name="texture_manager_subtitle">Paquetes de reemplazo y volcados (dumps)</string>
     <string name="texture_manager_import_zip">Importar ZIP</string>
     <string name="texture_manager_import_success">Se importaron %d archivos de textura.</string>
     <string name="texture_manager_import_failed">Falló la importación del paquete de texturas.</string>
@@ -1845,7 +1844,6 @@
     <string name="texture_catalog_install_failed">No se pudo descargar o instalar el paquete de texturas de forma segura.</string>
     <string name="texture_catalog_pack_meta">Versión %1$s • %2$s • %3$d archivos</string>
     <string name="cheat_manager_title">Gestor de trucos</string>
-    <string name="cheat_manager_subtitle">Descarga, importa y configura trucos por separado para cada juego.</string>
     <string name="cheat_manager_enable">Activar trucos</string>
     <string name="cheat_manager_enable_desc">Permite aplicar los bloques PNACH activados al iniciar un juego.</string>
     <string name="cheat_manager_import_pnach">Importar PNACH para el juego seleccionado</string>
@@ -1863,4 +1861,17 @@
     <string name="cheat_manager_delete_confirm">Se eliminarán el PNACH importado y la selección de trucos activados.</string>
     <string name="cheat_manager_delete_success">Trucos eliminados.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d bloques de trucos</string>
+    <string name="cheat_manager_search">Buscar trucos</string>
+    <string name="cheat_manager_categories">Categorías de trucos</string>
+    <string name="cheat_manager_category_count">%1$d trucos</string>
+    <string name="cheat_manager_search_empty">No hay trucos que coincidan con la búsqueda.</string>
+    <string name="cheat_manager_category_player">Jugador y recursos</string>
+    <string name="cheat_manager_category_items">Objetos y armas</string>
+    <string name="cheat_manager_category_world">Mundo y tiempo</string>
+    <string name="cheat_manager_category_progress">Progreso y desbloqueos</string>
+    <string name="cheat_manager_category_vehicles">Vehículos y carreras</string>
+    <string name="cheat_manager_category_stats">Estadísticas y récords</string>
+    <string name="cheat_manager_category_hotkeys">Combinaciones de botones</string>
+    <string name="cheat_manager_category_other">Otros</string>
+    <string name="content_select_game_named">Juego seleccionado: %1$s</string>
 </resources>

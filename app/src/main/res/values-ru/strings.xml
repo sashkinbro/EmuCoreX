@@ -1096,7 +1096,6 @@
     <string name="settings_emulator_data_path_use_default_desc">Вернуть карты памяти, сохранения, читы, патчи и логи в папку приложения по умолчанию.</string>
     <string name="shell_texture_manager">Менеджер текстур</string>
     <string name="texture_manager_title">Менеджер текстур</string>
-    <string name="texture_manager_subtitle">Пакеты замен и дампы</string>
     <string name="texture_manager_import_zip">Импорт ZIP</string>
     <string name="texture_manager_import_success">Импортировано файлов текстур: %d.</string>
     <string name="texture_manager_import_failed">Не удалось импортировать пакет текстур.</string>
@@ -1847,7 +1846,6 @@
     <string name="texture_catalog_install_failed">Не удалось безопасно скачать или установить текстурный пак.</string>
     <string name="texture_catalog_pack_meta">Версия %1$s • %2$s • файлов: %3$d</string>
     <string name="cheat_manager_title">Менеджер читов</string>
-    <string name="cheat_manager_subtitle">Скачивайте, импортируйте и настраивайте читы отдельно для каждой игры.</string>
     <string name="cheat_manager_enable">Включить читы</string>
     <string name="cheat_manager_enable_desc">Разрешает применять включённые блоки PNACH при запуске игры.</string>
     <string name="cheat_manager_import_pnach">Импортировать PNACH для выбранной игры</string>
@@ -1865,4 +1863,17 @@
     <string name="cheat_manager_delete_confirm">Импортированный PNACH и выбор включённых читов будут удалены.</string>
     <string name="cheat_manager_delete_success">Читы удалены.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • блоков читов: %2$d</string>
+    <string name="cheat_manager_search">Поиск читов</string>
+    <string name="cheat_manager_categories">Категории читов</string>
+    <string name="cheat_manager_category_count">Читов: %1$d</string>
+    <string name="cheat_manager_search_empty">По вашему запросу читы не найдены.</string>
+    <string name="cheat_manager_category_player">Игрок и ресурсы</string>
+    <string name="cheat_manager_category_items">Предметы и оружие</string>
+    <string name="cheat_manager_category_world">Мир и время</string>
+    <string name="cheat_manager_category_progress">Прогресс и разблокировки</string>
+    <string name="cheat_manager_category_vehicles">Транспорт и гонки</string>
+    <string name="cheat_manager_category_stats">Статистика и рекорды</string>
+    <string name="cheat_manager_category_hotkeys">Комбинации кнопок</string>
+    <string name="cheat_manager_category_other">Другое</string>
+    <string name="content_select_game_named">Выбрана игра: %1$s</string>
 </resources>

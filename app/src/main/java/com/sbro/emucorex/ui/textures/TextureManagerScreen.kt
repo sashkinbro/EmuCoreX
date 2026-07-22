@@ -149,14 +149,15 @@ fun TextureManagerScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontalSystemBarPadding)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontalSystemBarPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(
                 start = ScreenHorizontalPadding,
@@ -366,7 +367,6 @@ private fun TextureManagerHeader(
         ) {
             ScreenTopBar(
                 title = stringResource(R.string.texture_manager_title),
-                subtitle = stringResource(R.string.texture_manager_subtitle),
                 onBackClick = onBackClick,
                 modifier = Modifier.weight(1f)
             )

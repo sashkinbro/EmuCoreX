@@ -1094,7 +1094,6 @@
     <string name="settings_emulator_data_path_use_default_desc">Hafıza kartlarını, kayıt durumlarını, hileleri, yamaları ve günlükleri varsayılan uygulama klasörüne döndür.</string>
     <string name="shell_texture_manager">Doku Yöneticisi</string>
     <string name="texture_manager_title">Doku Yöneticisi</string>
-    <string name="texture_manager_subtitle">Değiştirme paketleri ve dökümler</string>
     <string name="texture_manager_import_zip">ZIP İçe Aktar</string>
     <string name="texture_manager_import_success">%d doku dosyası içe aktarıldı.</string>
     <string name="texture_manager_import_failed">Doku paketi içe aktarılamadı.</string>
@@ -1843,7 +1842,6 @@
     <string name="texture_catalog_install_failed">Doku paketi güvenli biçimde indirilemedi veya yüklenemedi.</string>
     <string name="texture_catalog_pack_meta">Sürüm %1$s • %2$s • %3$d dosya</string>
     <string name="cheat_manager_title">Hile yöneticisi</string>
-    <string name="cheat_manager_subtitle">Hileleri her oyun için ayrı ayrı indirin, içe aktarın ve yapılandırın.</string>
     <string name="cheat_manager_enable">Hileleri etkinleştir</string>
     <string name="cheat_manager_enable_desc">Etkin PNACH bloklarının oyun başlarken uygulanmasını sağlar.</string>
     <string name="cheat_manager_import_pnach">Seçili oyun için PNACH içe aktar</string>
@@ -1861,4 +1859,17 @@
     <string name="cheat_manager_delete_confirm">İçe aktarılan PNACH ve etkin hile seçimleri kaldırılacak.</string>
     <string name="cheat_manager_delete_success">Hileler silindi.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d hile bloğu</string>
+    <string name="cheat_manager_search">Hile ara</string>
+    <string name="cheat_manager_categories">Hile kategorileri</string>
+    <string name="cheat_manager_category_count">%1$d hile</string>
+    <string name="cheat_manager_search_empty">Aramanızla eşleşen hile yok.</string>
+    <string name="cheat_manager_category_player">Oyuncu ve kaynaklar</string>
+    <string name="cheat_manager_category_items">Eşyalar ve silahlar</string>
+    <string name="cheat_manager_category_world">Dünya ve zaman</string>
+    <string name="cheat_manager_category_progress">İlerleme ve kilit açmalar</string>
+    <string name="cheat_manager_category_vehicles">Araçlar ve yarışlar</string>
+    <string name="cheat_manager_category_stats">İstatistikler ve rekorlar</string>
+    <string name="cheat_manager_category_hotkeys">Tuş kombinasyonları</string>
+    <string name="cheat_manager_category_other">Diğer</string>
+    <string name="content_select_game_named">Seçili oyun: %1$s</string>
 </resources>

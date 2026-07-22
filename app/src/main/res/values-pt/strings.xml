@@ -1096,7 +1096,6 @@
     <string name="settings_emulator_data_path_use_default_desc">Retornar cartões de memória, save states, cheats, patches e logs para a pasta padrão do aplicativo.</string>
     <string name="shell_texture_manager">Gerenciador de Texturas</string>
     <string name="texture_manager_title">Gerenciador de Texturas</string>
-    <string name="texture_manager_subtitle">Pacotes de substituição e dumps</string>
     <string name="texture_manager_import_zip">Importar ZIP</string>
     <string name="texture_manager_import_success">Importou %d arquivos de textura.</string>
     <string name="texture_manager_import_failed">A importação do pacote de texturas falhou.</string>
@@ -1845,7 +1844,6 @@
     <string name="texture_catalog_install_failed">Não foi possível transferir ou instalar o pacote de texturas em segurança.</string>
     <string name="texture_catalog_pack_meta">Versão %1$s • %2$s • %3$d ficheiros</string>
     <string name="cheat_manager_title">Gestor de cheats</string>
-    <string name="cheat_manager_subtitle">Transfira, importe e configure cheats separadamente para cada jogo.</string>
     <string name="cheat_manager_enable">Ativar cheats</string>
     <string name="cheat_manager_enable_desc">Permite aplicar os blocos PNACH ativados ao iniciar um jogo.</string>
     <string name="cheat_manager_import_pnach">Importar PNACH para o jogo selecionado</string>
@@ -1863,4 +1861,17 @@
     <string name="cheat_manager_delete_confirm">O PNACH importado e a seleção de cheats ativados serão removidos.</string>
     <string name="cheat_manager_delete_success">Cheats eliminados.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d blocos de cheats</string>
+    <string name="cheat_manager_search">Pesquisar cheats</string>
+    <string name="cheat_manager_categories">Categorias de cheats</string>
+    <string name="cheat_manager_category_count">%1$d cheats</string>
+    <string name="cheat_manager_search_empty">Nenhum cheat corresponde à pesquisa.</string>
+    <string name="cheat_manager_category_player">Jogador e recursos</string>
+    <string name="cheat_manager_category_items">Itens e armas</string>
+    <string name="cheat_manager_category_world">Mundo e tempo</string>
+    <string name="cheat_manager_category_progress">Progresso e desbloqueios</string>
+    <string name="cheat_manager_category_vehicles">Veículos e corridas</string>
+    <string name="cheat_manager_category_stats">Estatísticas e recordes</string>
+    <string name="cheat_manager_category_hotkeys">Combinações de botões</string>
+    <string name="cheat_manager_category_other">Outros</string>
+    <string name="content_select_game_named">Jogo selecionado: %1$s</string>
 </resources>

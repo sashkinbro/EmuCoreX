@@ -1094,7 +1094,6 @@
     <string name="settings_emulator_data_path_use_default_desc">メモリーカード、セーブステート、チート、パッチ、ログをアプリのデフォルトフォルダに戻します。</string>
     <string name="shell_texture_manager">テクスチャマネージャー</string>
     <string name="texture_manager_title">テクスチャマネージャー</string>
-    <string name="texture_manager_subtitle">リプレイスメントパックとダンプ</string>
     <string name="texture_manager_import_zip">ZIPをインポート</string>
     <string name="texture_manager_import_success">%d個のテクスチャファイルをインポートしました。</string>
     <string name="texture_manager_import_failed">テクスチャパックのインポートに失敗しました。</string>
@@ -1842,7 +1841,6 @@
     <string name="texture_catalog_install_failed">テクスチャパックを安全にダウンロードまたはインストールできませんでした。</string>
     <string name="texture_catalog_pack_meta">バージョン %1$s • %2$s • %3$d ファイル</string>
     <string name="cheat_manager_title">チートマネージャー</string>
-    <string name="cheat_manager_subtitle">ゲームごとにチートをダウンロード、インポート、設定します。</string>
     <string name="cheat_manager_enable">チートを有効化</string>
     <string name="cheat_manager_enable_desc">ゲーム開始時に有効な PNACH ブロックを適用します。</string>
     <string name="cheat_manager_import_pnach">選択したゲームに PNACH をインポート</string>
@@ -1860,4 +1858,17 @@
     <string name="cheat_manager_delete_confirm">インポートした PNACH と有効化の選択が削除されます。</string>
     <string name="cheat_manager_delete_success">チートを削除しました。</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d チートブロック</string>
+    <string name="cheat_manager_search">チートを検索</string>
+    <string name="cheat_manager_categories">チートのカテゴリ</string>
+    <string name="cheat_manager_category_count">チート %1$d件</string>
+    <string name="cheat_manager_search_empty">検索に一致するチートはありません。</string>
+    <string name="cheat_manager_category_player">プレイヤーとリソース</string>
+    <string name="cheat_manager_category_items">アイテムと武器</string>
+    <string name="cheat_manager_category_world">ワールドと時間</string>
+    <string name="cheat_manager_category_progress">進行とアンロック</string>
+    <string name="cheat_manager_category_vehicles">乗り物とレース</string>
+    <string name="cheat_manager_category_stats">統計と記録</string>
+    <string name="cheat_manager_category_hotkeys">ボタンの組み合わせ</string>
+    <string name="cheat_manager_category_other">その他</string>
+    <string name="content_select_game_named">選択中のゲーム：%1$s</string>
 </resources>

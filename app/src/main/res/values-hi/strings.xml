@@ -1094,7 +1094,6 @@
     <string name="settings_emulator_data_path_use_default_desc">मेमोरी कार्ड, सेव स्टेट्स, चीट्स, पैच और लॉग्स को ऐप के डिफ़ॉल्ट फ़ोल्डर में लौटाएं。</string>
     <string name="shell_texture_manager">टेक्सचर मैनेजर</string>
     <string name="texture_manager_title">टेक्सचर मैनेजर</string>
-    <string name="texture_manager_subtitle">रिप्लेसमेंट पैक्स और डंप</string>
     <string name="texture_manager_import_zip">ZIP आयात करें</string>
     <string name="texture_manager_import_success">%d टेक्सचर फ़ाइलें आयात की गईं।</string>
     <string name="texture_manager_import_failed">टेक्सचर पैक आयात विफल रहा।</string>
@@ -1843,7 +1842,6 @@
     <string name="texture_catalog_install_failed">टेक्सचर पैक सुरक्षित रूप से डाउनलोड या इंस्टॉल नहीं हो सका।</string>
     <string name="texture_catalog_pack_meta">संस्करण %1$s • %2$s • %3$d फ़ाइलें</string>
     <string name="cheat_manager_title">चीट प्रबंधक</string>
-    <string name="cheat_manager_subtitle">हर गेम के लिए चीट अलग से डाउनलोड, आयात और कॉन्फ़िगर करें।</string>
     <string name="cheat_manager_enable">चीट चालू करें</string>
     <string name="cheat_manager_enable_desc">गेम शुरू होने पर चालू PNACH ब्लॉक लागू करता है।</string>
     <string name="cheat_manager_import_pnach">चुने गए गेम के लिए PNACH आयात करें</string>
@@ -1861,4 +1859,17 @@
     <string name="cheat_manager_delete_confirm">आयात किया गया PNACH और चालू चीट का चयन हटा दिया जाएगा।</string>
     <string name="cheat_manager_delete_success">चीट हटा दिए गए।</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d चीट ब्लॉक</string>
+    <string name="cheat_manager_search">चीट खोजें</string>
+    <string name="cheat_manager_categories">चीट श्रेणियाँ</string>
+    <string name="cheat_manager_category_count">%1$d चीट</string>
+    <string name="cheat_manager_search_empty">आपकी खोज से मेल खाने वाली कोई चीट नहीं मिली।</string>
+    <string name="cheat_manager_category_player">खिलाड़ी और संसाधन</string>
+    <string name="cheat_manager_category_items">आइटम और हथियार</string>
+    <string name="cheat_manager_category_world">दुनिया और समय</string>
+    <string name="cheat_manager_category_progress">प्रगति और अनलॉक</string>
+    <string name="cheat_manager_category_vehicles">वाहन और रेस</string>
+    <string name="cheat_manager_category_stats">आँकड़े और रिकॉर्ड</string>
+    <string name="cheat_manager_category_hotkeys">बटन संयोजन</string>
+    <string name="cheat_manager_category_other">अन्य</string>
+    <string name="content_select_game_named">चुना गया गेम: %1$s</string>
 </resources>

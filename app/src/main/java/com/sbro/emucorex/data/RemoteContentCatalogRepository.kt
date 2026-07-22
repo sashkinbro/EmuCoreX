@@ -113,6 +113,18 @@ class RemoteContentCatalogRepository(context: Context) {
         cacheFile: File,
         parser: (String) -> List<T>
     ): RemoteCatalogResult<T> {
+        if (cacheFile.isFile) {
+            val cacheAge = (System.currentTimeMillis() - cacheFile.lastModified()).coerceAtLeast(0L)
+            if (cacheAge <= CATALOG_CACHE_TTL_MS) {
+                runCatching { parser(cacheFile.readText()) }
+                    .getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { entries ->
+                        // A fresh cache is the normal fast path, not an offline fallback warning.
+                        return RemoteCatalogResult(entries, fromCache = false)
+                    }
+            }
+        }
         var lastError: Throwable? = null
         urls.forEach { url ->
             val result = runCatching {
@@ -306,6 +318,7 @@ class RemoteContentCatalogRepository(context: Context) {
         const val MAX_CATALOG_BYTES = 8L * 1024L * 1024L
         const val MAX_CHEAT_BYTES = 2L * 1024L * 1024L
         const val MAX_TEXTURE_ARCHIVE_BYTES = 4L * 1024L * 1024L * 1024L
+        const val CATALOG_CACHE_TTL_MS = 6L * 60L * 60L * 1000L
 
         val TEXTURE_CATALOG_URLS = listOf(
             "https://raw.githubusercontent.com/sashkinbro/EmuCoreX-Textures/main/textures.json",

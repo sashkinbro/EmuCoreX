@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,9 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.GameItem
@@ -33,18 +36,33 @@ fun LibraryGamePicker(
     games: List<GameItem>,
     selectedPath: String?,
     onSelected: (GameItem) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    horizontalContentPadding: Dp = 0.dp,
+    fullBleedPadding: Dp = 0.dp
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    val selectedGame = games.firstOrNull { it.path == selectedPath }
+    Column(
+        modifier = modifier
+            .libraryPickerFullBleed(fullBleedPadding)
+            .fillMaxWidth()
+    ) {
         Text(
-            text = stringResource(R.string.content_select_game),
+            text = selectedGame?.let { game ->
+                stringResource(R.string.content_select_game_named, game.title)
+            } ?: stringResource(R.string.content_select_game),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = horizontalContentPadding)
         )
         Spacer(Modifier.height(10.dp))
         if (games.isEmpty()) {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = horizontalContentPadding),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             ) {
@@ -57,12 +75,16 @@ fun LibraryGamePicker(
             }
             return
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = horizontalContentPadding),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             items(games, key = GameItem::path) { game ->
                 val selected = game.path == selectedPath
                 Surface(
                     modifier = Modifier
                         .width(236.dp)
+                        .height(106.dp)
                         .clip(RoundedCornerShape(18.dp))
                         .clickable { onSelected(game) },
                     shape = RoundedCornerShape(18.dp),
@@ -91,7 +113,8 @@ fun LibraryGamePicker(
                                 text = game.title,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                maxLines = 3,
+                                minLines = 2,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(Modifier.height(6.dp))
@@ -106,6 +129,21 @@ fun LibraryGamePicker(
                     }
                 }
             }
+        }
+    }
+}
+
+private fun Modifier.libraryPickerFullBleed(horizontalPadding: Dp): Modifier {
+    if (horizontalPadding == 0.dp) return this
+    return layout { measurable, constraints ->
+        val sidePadding = horizontalPadding.roundToPx()
+        val expandedConstraints = constraints.copy(
+            minWidth = (constraints.minWidth + sidePadding * 2).coerceAtLeast(0),
+            maxWidth = (constraints.maxWidth + sidePadding * 2).coerceAtLeast(0)
+        )
+        val placeable = measurable.measure(expandedConstraints)
+        layout(constraints.maxWidth, placeable.height) {
+            placeable.placeRelative(-sidePadding, 0)
         }
     }
 }

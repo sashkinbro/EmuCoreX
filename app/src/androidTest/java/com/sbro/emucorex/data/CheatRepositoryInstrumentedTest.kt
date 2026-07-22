@@ -118,6 +118,38 @@ class CheatRepositoryInstrumentedTest {
     }
 
     @Test
+    fun remoteImportsMergeWithoutDuplicatingBlocksOrLosingEnabledState() {
+        val token = System.nanoTime().toString().takeLast(5).padStart(5, '0')
+        val serial = "TEST-$token"
+        val crc = System.nanoTime().toString(16).takeLast(8).padStart(8, '0').uppercase()
+        val gameKey = "${serial}_$crc"
+        try {
+            assertEquals(2, repository.importCheatFile(gameKey, TWO_CHEATS, enableAllByDefault = true))
+            assertEquals(
+                3,
+                repository.importCheatFile(
+                    gameKey,
+                    SECOND_PACK,
+                    enableAllByDefault = false,
+                    mergeWithExisting = true
+                )
+            )
+
+            val config = requireNotNull(repository.getGameConfig(gameKey, serial, crc))
+            assertEquals(listOf("Infinite health", "Infinite money", "Max score"), config.blocks.map { it.title })
+            assertTrue(config.blocks.first { it.title == "Infinite health" }.enabled)
+            assertTrue(config.blocks.first { it.title == "Infinite money" }.enabled)
+            assertFalse(config.blocks.first { it.title == "Max score" }.enabled)
+            assertEquals(
+                2,
+                config.blocks.first { it.title == "Infinite money" }.lines.size
+            )
+        } finally {
+            repository.deleteImportedCheats(gameKey, serial, crc)
+        }
+    }
+
+    @Test
     fun deleteInfersSerialAndCrcToCleanFilesCreatedByOlderVersions() {
         val token = System.nanoTime().toString().takeLast(5).padStart(5, '0')
         val serial = "TEST-$token"
@@ -153,6 +185,14 @@ patch=1,EE,00100004,word,00000002
         const val SECOND_CHEAT_ONLY = """
 // Infinite money
 patch=1,EE,00100004,word,00000002
+"""
+        const val SECOND_PACK = """
+// Infinite money
+patch=1,EE,00100004,word,00000002
+patch=1,EE,00100008,word,00000003
+
+// Max score
+patch=1,EE,0010000C,word,00000004
 """
     }
 }

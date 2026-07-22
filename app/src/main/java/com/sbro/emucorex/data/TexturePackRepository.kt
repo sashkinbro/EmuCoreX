@@ -315,7 +315,16 @@ class TexturePackRepository(
         val serialIndex = normalizedParts.indexOfFirst { it.equals(serial, ignoreCase = true) }
         val replacementIndex = normalizedParts.indexOfFirst { it.equals("replacements", ignoreCase = true) }
         val startIndex = maxOf(serialIndex, replacementIndex).let { if (it >= 0) it + 1 else 0 }
-        return parts.drop(startIndex)
+        val relative = parts.drop(startIndex)
+        return if (
+            startIndex == 0 &&
+            relative.size > 1 &&
+            githubCodeloadRootPattern.matches(relative.first())
+        ) {
+            relative.drop(1)
+        } else {
+            relative
+        }
     }
 
     private fun safeChild(root: File, relativeParts: List<String>): File? {
@@ -341,6 +350,7 @@ class TexturePackRepository(
         const val MAX_ARCHIVE_ENTRIES = 20_000
         const val MAX_TEXTURE_FILE_BYTES = 512L * 1024L * 1024L
         const val MAX_ARCHIVE_BYTES = 4L * 1024L * 1024L * 1024L
+        val githubCodeloadRootPattern = Regex(".+-[0-9a-fA-F]{40}")
     }
 }
 

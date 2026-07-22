@@ -5,6 +5,7 @@ import com.sbro.emucorex.core.EmulatorStorage
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.Locale
 
 data class CheatBlock(
     val id: String,
@@ -84,25 +85,32 @@ class CheatRepository(private val context: Context) {
     fun importCheatFile(
         gameKey: String,
         contents: String,
-        enableAllByDefault: Boolean = false
+        enableAllByDefault: Boolean = false,
+        mergeWithExisting: Boolean = false
     ): Int {
         val normalizedGameKey = normalizeGameKey(gameKey)
-        val blocks = parseCheatBlocks(contents)
-        if (blocks.isEmpty()) return 0
         val target = importedFile(normalizedGameKey)
         val state = loadEnabledIds()
         val old = storedValues(state, normalizedGameKey, gameKey)
-        val oldEnabledSignatures = if (target.exists()) {
-            runCatching { parseCheatBlocks(target.readText()) }
-                .getOrDefault(emptyList())
+        val existingBlocks = if (target.exists()) {
+            runCatching { parseCheatBlocks(target.readText()) }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+        val oldEnabledSignatures = existingBlocks
                 .filter { old.contains(it.id) }
                 .map(::cheatBlockSignature)
                 .toSet()
+        val importedBlocks = parseCheatBlocks(contents)
+        if (importedBlocks.isEmpty()) return 0
+        val blocks = if (mergeWithExisting) {
+            mergeCheatBlocks(existingBlocks, importedBlocks)
         } else {
-            emptySet()
+            importedBlocks
         }
+        val storedContents = if (mergeWithExisting) serializeCheatBlocks(blocks) else contents
         target.parentFile?.mkdirs()
-        target.writeText(contents)
+        target.writeText(storedContents)
         val enabledIds = if (enableAllByDefault) {
             blocks.map { it.id }
         } else {
@@ -113,6 +121,31 @@ class CheatRepository(private val context: Context) {
         if (normalizedGameKey != gameKey) state.remove(gameKey)
         writeEnabledIds(state)
         return blocks.size
+    }
+
+    private fun mergeCheatBlocks(
+        existing: List<CheatBlock>,
+        imported: List<CheatBlock>
+    ): List<CheatBlock> {
+        val merged = linkedMapOf<String, CheatBlock>()
+        (existing + imported).forEach { block ->
+            val key = block.title.trim().lowercase(Locale.US)
+            val previous = merged[key]
+            merged[key] = if (previous == null) {
+                block
+            } else {
+                previous.copy(lines = (previous.lines + block.lines).distinct())
+            }
+        }
+        return merged.values.toList()
+    }
+
+    private fun serializeCheatBlocks(blocks: List<CheatBlock>): String = buildString {
+        blocks.forEachIndexed { index, block ->
+            if (index > 0) append('\n')
+            append("// ").append(block.title).append('\n')
+            block.lines.forEach { line -> append(line).append('\n') }
+        }
     }
 
     fun setEnabledBlocks(gameKey: String, enabledIds: Set<String>) {
@@ -337,7 +370,7 @@ class CheatRepository(private val context: Context) {
             }
         }
         flush()
-        return blocks.ifEmpty {
+        val parsedBlocks = blocks.ifEmpty {
             lines
                 .mapNotNull { line ->
                     line.trim().takeIf { value ->
@@ -354,6 +387,17 @@ class CheatRepository(private val context: Context) {
                     )
                 }
         }
+        val merged = linkedMapOf<String, CheatBlock>()
+        parsedBlocks.forEach { block ->
+            val key = block.title.trim().lowercase()
+            val existing = merged[key]
+            merged[key] = if (existing == null) {
+                block
+            } else {
+                existing.copy(lines = (existing.lines + block.lines).distinct())
+            }
+        }
+        return merged.values.toList()
     }
 
     private fun cheatBlockSignature(block: CheatBlock): String {

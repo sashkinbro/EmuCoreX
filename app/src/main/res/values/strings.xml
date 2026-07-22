@@ -806,7 +806,6 @@
 
     <!-- Texture Manager -->
     <string name="texture_manager_title">Texture Manager</string>
-    <string name="texture_manager_subtitle">Replacement packs and dumps</string>
     <string name="texture_manager_import_zip">Import ZIP</string>
     <string name="texture_manager_import_success">Imported %d texture files.</string>
     <string name="texture_manager_import_failed">Texture pack import failed.</string>
@@ -1858,7 +1857,6 @@
     <string name="texture_catalog_install_failed">The texture pack could not be downloaded or installed safely.</string>
     <string name="texture_catalog_pack_meta">Version %1$s • %2$s • %3$d files</string>
     <string name="cheat_manager_title">Cheat manager</string>
-    <string name="cheat_manager_subtitle">Download, import, and configure cheats separately for each game.</string>
     <string name="cheat_manager_enable">Enable cheats</string>
     <string name="cheat_manager_enable_desc">Allows enabled PNACH blocks to be applied when a game starts.</string>
     <string name="cheat_manager_import_pnach">Import PNACH for selected game</string>
@@ -1876,4 +1874,17 @@
     <string name="cheat_manager_delete_confirm">The imported PNACH and its enabled selections will be removed.</string>
     <string name="cheat_manager_delete_success">Cheats deleted.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d cheat blocks</string>
+    <string name="cheat_manager_search">Search cheats</string>
+    <string name="cheat_manager_categories">Cheat categories</string>
+    <string name="cheat_manager_category_count">%1$d cheats</string>
+    <string name="cheat_manager_search_empty">No cheats match your search.</string>
+    <string name="cheat_manager_category_player">Player &amp; resources</string>
+    <string name="cheat_manager_category_items">Items &amp; weapons</string>
+    <string name="cheat_manager_category_world">World &amp; time</string>
+    <string name="cheat_manager_category_progress">Progress &amp; unlocks</string>
+    <string name="cheat_manager_category_vehicles">Vehicles &amp; races</string>
+    <string name="cheat_manager_category_stats">Stats &amp; records</string>
+    <string name="cheat_manager_category_hotkeys">Button combinations</string>
+    <string name="cheat_manager_category_other">Other</string>
+    <string name="content_select_game_named">Selected game: %1$s</string>
 </resources>

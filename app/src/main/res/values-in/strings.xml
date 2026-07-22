@@ -751,7 +751,6 @@
 
     <!-- Texture Manager -->
     <string name="texture_manager_title">Pengelola Tekstur</string>
-    <string name="texture_manager_subtitle">Paket pengganti dan dump</string>
     <string name="texture_manager_import_zip">Impor ZIP</string>
     <string name="texture_manager_import_success">Telah mengimpor %d file tekstur.</string>
     <string name="texture_manager_import_failed">Impor paket tekstur gagal.</string>
@@ -1857,7 +1856,6 @@
     <string name="texture_catalog_install_failed">Paket tekstur tidak dapat diunduh atau dipasang dengan aman.</string>
     <string name="texture_catalog_pack_meta">Versi %1$s • %2$s • %3$d file</string>
     <string name="cheat_manager_title">Pengelola cheat</string>
-    <string name="cheat_manager_subtitle">Unduh, impor, dan atur cheat secara terpisah untuk setiap game.</string>
     <string name="cheat_manager_enable">Aktifkan cheat</string>
     <string name="cheat_manager_enable_desc">Menerapkan blok PNACH yang diaktifkan saat game dimulai.</string>
     <string name="cheat_manager_import_pnach">Impor PNACH untuk game yang dipilih</string>
@@ -1875,4 +1873,17 @@
     <string name="cheat_manager_delete_confirm">PNACH yang diimpor dan pilihan cheat aktif akan dihapus.</string>
     <string name="cheat_manager_delete_success">Cheat dihapus.</string>
     <string name="cheat_manager_pack_meta">CRC %1$s • %2$d blok cheat</string>
+    <string name="cheat_manager_search">Cari cheat</string>
+    <string name="cheat_manager_categories">Kategori cheat</string>
+    <string name="cheat_manager_category_count">%1$d cheat</string>
+    <string name="cheat_manager_search_empty">Tidak ada cheat yang cocok dengan pencarian.</string>
+    <string name="cheat_manager_category_player">Pemain &amp; sumber daya</string>
+    <string name="cheat_manager_category_items">Item &amp; senjata</string>
+    <string name="cheat_manager_category_world">Dunia &amp; waktu</string>
+    <string name="cheat_manager_category_progress">Progres &amp; pembukaan</string>
+    <string name="cheat_manager_category_vehicles">Kendaraan &amp; balapan</string>
+    <string name="cheat_manager_category_stats">Statistik &amp; rekor</string>
+    <string name="cheat_manager_category_hotkeys">Kombinasi tombol</string>
+    <string name="cheat_manager_category_other">Lainnya</string>
+    <string name="content_select_game_named">Game terpilih: %1$s</string>
 </resources>

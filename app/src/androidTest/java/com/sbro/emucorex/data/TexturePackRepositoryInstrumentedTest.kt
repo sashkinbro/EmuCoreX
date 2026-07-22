@@ -102,6 +102,26 @@ class TexturePackRepositoryInstrumentedTest {
         }
     }
 
+    @Test
+    fun githubCodeloadWrapperIsNotInstalledInsideReplacements() {
+        val serial = uniqueSerial()
+        val root = packRoot(serial)
+        val wrapper = "texture-pack-0123456789abcdef0123456789abcdef01234567"
+        try {
+            val result = repository.importPackZip(
+                ByteArrayInputStream(zipOf("$wrapper/ui/menu.png" to byteArrayOf(8, 6, 7))),
+                "pack.zip",
+                targetSerial = serial
+            )
+
+            assertTrue(result.success)
+            assertArrayEquals(byteArrayOf(8, 6, 7), File(root, "replacements/ui/menu.png").readBytes())
+            assertFalse(File(root, "replacements/$wrapper").exists())
+        } finally {
+            repository.deletePack(serial)
+        }
+    }
+
     private fun packRoot(serial: String): File {
         return File(
             EmulatorStorage.texturesDir(context, preferences.getEmulatorDataPathSync()),
