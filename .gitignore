@@ -41,6 +41,7 @@ app/release/
 **/target/
 
 # Release artifacts
+/release/
 /key/
 key/
 *.apk
