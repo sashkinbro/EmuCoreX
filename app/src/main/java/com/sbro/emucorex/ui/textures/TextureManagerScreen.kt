@@ -197,8 +197,6 @@ fun TextureManagerScreen(
 
             item {
                 TextureOnlineCatalogSection(
-                    textureRepository = repository,
-                    preferences = preferences,
                     onInstalled = { refresh() }
                 )
             }

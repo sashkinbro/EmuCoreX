@@ -38,14 +38,17 @@ class RemoteContentInstallState(context: Context) {
         }
     }
 
-    fun recordTexture(pack: RemoteTexturePack, serial: String) = synchronized(lock) {
+    fun recordTexture(pack: RemoteTexturePack, serial: String) =
+        recordTexture(pack.id, pack.version, serial)
+
+    fun recordTexture(packId: String, version: String, serial: String) = synchronized(lock) {
         val root = readState()
         val textures = root.optJSONObject("textures") ?: JSONObject().also { root.put("textures", it) }
         textures.put(
-            pack.id,
+            packId,
             JSONObject()
                 .put("serial", serial)
-                .put("version", pack.version)
+                .put("version", version)
                 .put("installedAt", System.currentTimeMillis())
         )
         writeState(root)

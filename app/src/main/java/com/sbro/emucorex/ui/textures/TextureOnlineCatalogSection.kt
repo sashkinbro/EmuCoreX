@@ -1,6 +1,10 @@
 package com.sbro.emucorex.ui.textures
 
-import android.widget.Toast
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,6 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -33,10 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +54,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.sbro.emucorex.R
-import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.ContentLibraryRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.InstalledRemoteTexture
@@ -56,26 +63,29 @@ import com.sbro.emucorex.data.RemoteContentCatalogRepository
 import com.sbro.emucorex.data.RemoteContentInstallState
 import com.sbro.emucorex.data.RemoteTexturePack
 import com.sbro.emucorex.data.SelectedGameIdentity
-import com.sbro.emucorex.data.TexturePackRepository
+import com.sbro.emucorex.data.TextureDownloadManager
+import com.sbro.emucorex.data.TextureDownloadStatus
+import com.sbro.emucorex.data.TextureDownloadTask
+import com.sbro.emucorex.data.formatDownloadBytes
+import com.sbro.emucorex.data.formatDownloadDuration
 import com.sbro.emucorex.ui.common.LibraryGamePicker
 import com.sbro.emucorex.ui.common.contentCatalogTitleKey
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 @Composable
 internal fun TextureOnlineCatalogSection(
-    textureRepository: TexturePackRepository,
-    preferences: AppPreferences,
     onInstalled: () -> Unit
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val scope = rememberCoroutineScope()
     val catalogRepository = remember(context) { RemoteContentCatalogRepository(context) }
     val libraryRepository = remember(context) { ContentLibraryRepository(context) }
     val installState = remember(context) { RemoteContentInstallState(context) }
+    val downloadManager = remember(context) { TextureDownloadManager(context) }
     var games by remember { mutableStateOf<List<GameItem>>(emptyList()) }
     var selectedPath by remember { mutableStateOf<String?>(null) }
     var identity by remember { mutableStateOf<SelectedGameIdentity?>(null) }
@@ -86,11 +96,10 @@ internal fun TextureOnlineCatalogSection(
     var loading by remember { mutableStateOf(true) }
     var cached by remember { mutableStateOf(false) }
     var loadFailed by remember { mutableStateOf(false) }
-    var workingPackId by remember { mutableStateOf<String?>(null) }
-    var downloadProgress by remember { mutableFloatStateOf(0f) }
-
-    val installSuccess = stringResource(R.string.texture_catalog_install_success)
-    val installFailure = stringResource(R.string.texture_catalog_install_failed)
+    var downloadTasks by remember { mutableStateOf<List<TextureDownloadTask>>(emptyList()) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     LaunchedEffect(Unit) {
         val loaded = withContext(Dispatchers.IO) {
@@ -114,6 +123,18 @@ internal fun TextureOnlineCatalogSection(
                 cached = refreshed.fromCache
                 loadFailed = false
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            downloadTasks = withContext(Dispatchers.IO) { downloadManager.tasks() }
+            val refreshedInstalled = withContext(Dispatchers.IO) { installState.installedTextures() }
+            if (refreshedInstalled != installed) {
+                installed = refreshedInstalled
+                onInstalled()
+            }
+            delay(750)
         }
     }
 
@@ -182,6 +203,16 @@ internal fun TextureOnlineCatalogSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            TextureDownloadQueue(
+                tasks = downloadTasks.filter { task ->
+                    task.status != TextureDownloadStatus.COMPLETED &&
+                        task.status != TextureDownloadStatus.CANCELLED
+                },
+                onPause = downloadManager::pause,
+                onResume = downloadManager::resume,
+                onCancel = downloadManager::cancel,
+                onRemove = downloadManager::remove
+            )
             LibraryGamePicker(
                 games = games,
                 selectedPath = selectedPath,
@@ -228,53 +259,34 @@ internal fun TextureOnlineCatalogSection(
                                     val installedPack = installed[pack.id]
                                     val upToDate = installedPack?.version == pack.version &&
                                         installedPack.serial.equals(selectedSerial, ignoreCase = true)
+                                    val task = downloadTasks.firstOrNull { download ->
+                                        download.packId == pack.id &&
+                                            download.serial.equals(selectedSerial, ignoreCase = true)
+                                    }
                                     TextureCatalogCard(
                                         pack = pack,
                                         compatible = true,
                                         installed = upToDate,
                                         updateAvailable = installedPack != null && !upToDate,
-                                        working = workingPackId == pack.id,
-                                        progress = downloadProgress,
+                                        download = task,
                                         onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
                                         onInstall = {
                                             val serial = selectedSerial ?: return@TextureCatalogCard
-                                            if (workingPackId != null) return@TextureCatalogCard
-                                            scope.launch {
-                                                workingPackId = pack.id
-                                                downloadProgress = 0f
-                                                val success = withContext(Dispatchers.IO) {
-                                                    var archive: java.io.File? = null
-                                                    try {
-                                                        archive = catalogRepository.downloadTexturePack(pack) { progress ->
-                                                            downloadProgress = progress
-                                                        }
-                                                        val result = textureRepository.installRemotePack(archive, serial)
-                                                        if (!result.success) return@withContext false
-                                                        installState.removeTexturesForSerial(serial)
-                                                        installState.recordTexture(pack, serial)
-                                                        true
-                                                    } catch (_: Throwable) {
-                                                        false
-                                                    } finally {
-                                                        catalogRepository.discardDownload(archive)
-                                                    }
-                                                }
-                                                if (success) {
-                                                    preferences.setTextureReplacementsEnabled(true)
-                                                    installed = withContext(Dispatchers.IO) {
-                                                        installState.installedTextures()
-                                                    }
-                                                    onInstalled()
-                                                }
-                                                Toast.makeText(
+                                            if (
+                                                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                ContextCompat.checkSelfPermission(
                                                     context,
-                                                    if (success) installSuccess else installFailure,
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                                workingPackId = null
-                                                downloadProgress = 0f
+                                                    Manifest.permission.POST_NOTIFICATIONS
+                                                ) != PackageManager.PERMISSION_GRANTED
+                                            ) {
+                                                notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
-                                        }
+                                            downloadManager.enqueue(pack, serial)
+                                        },
+                                        onPause = { task?.let { downloadManager.pause(it.key) } },
+                                        onResume = { task?.let { downloadManager.resume(it.key) } },
+                                        onCancel = { task?.let { downloadManager.cancel(it.key) } },
+                                        onRemove = { task?.let { downloadManager.remove(it.key) } }
                                     )
                                 }
                             }
@@ -288,10 +300,13 @@ internal fun TextureOnlineCatalogSection(
                                         compatible = false,
                                         installed = false,
                                         updateAvailable = false,
-                                        working = false,
-                                        progress = 0f,
+                                        download = null,
                                         onSource = { runCatching { uriHandler.openUri(pack.sourceUrl) } },
-                                        onInstall = {}
+                                        onInstall = {},
+                                        onPause = {},
+                                        onResume = {},
+                                        onCancel = {},
+                                        onRemove = {}
                                     )
                                 }
                             }
@@ -351,10 +366,13 @@ private fun TextureCatalogCard(
     compatible: Boolean,
     installed: Boolean,
     updateAvailable: Boolean,
-    working: Boolean,
-    progress: Float,
+    download: TextureDownloadTask?,
     onSource: () -> Unit,
-    onInstall: () -> Unit
+    onInstall: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit,
+    onRemove: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -415,41 +433,74 @@ private fun TextureCatalogCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (working) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = stringResource(R.string.content_downloading_percent, (progress * 100).toInt()),
-                    style = MaterialTheme.typography.labelMedium
-                )
+            if (download != null && download.status != TextureDownloadStatus.COMPLETED) {
+                TextureDownloadProgress(task = download)
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (compatible) {
-                    Button(
-                        onClick = onInstall,
-                        enabled = !working,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Rounded.CloudDownload, contentDescription = null)
-                        Spacer(Modifier.width(7.dp))
-                        Text(
-                            text = stringResource(
-                                when {
-                                    installed -> R.string.content_reinstall
-                                    updateAvailable -> R.string.content_update
-                                    else -> R.string.content_download_install
-                                }
-                            ),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                    when (download?.status) {
+                        TextureDownloadStatus.QUEUED,
+                        TextureDownloadStatus.DOWNLOADING,
+                        TextureDownloadStatus.WAITING_NETWORK -> DownloadActionButton(
+                            text = stringResource(R.string.emulation_pause),
+                            icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
+                            onClick = onPause
                         )
+                        TextureDownloadStatus.PAUSED -> {
+                            DownloadActionButton(
+                                text = stringResource(R.string.detail_resume),
+                                icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                                onClick = onResume
+                            )
+                            DownloadSecondaryAction(
+                                text = stringResource(R.string.cancel),
+                                icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
+                                onClick = onCancel
+                            )
+                        }
+                        TextureDownloadStatus.FAILED -> {
+                            DownloadActionButton(
+                                text = stringResource(R.string.texture_download_retry),
+                                icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                                onClick = onResume
+                            )
+                            DownloadSecondaryAction(
+                                text = stringResource(R.string.settings_gpu_driver_remove_short),
+                                icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                                onClick = onRemove
+                            )
+                        }
+                        TextureDownloadStatus.CANCELLED -> DownloadActionButton(
+                            text = stringResource(R.string.content_download_install),
+                            icon = { Icon(Icons.Rounded.CloudDownload, contentDescription = null) },
+                            onClick = onInstall
+                        )
+                        TextureDownloadStatus.VERIFYING,
+                        TextureDownloadStatus.INSTALLING -> Unit
+                        else -> {
+                            Button(
+                                onClick = onInstall,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.CloudDownload, contentDescription = null)
+                                Spacer(Modifier.width(7.dp))
+                                Text(
+                                    text = stringResource(
+                                        when {
+                                            installed -> R.string.content_reinstall
+                                            updateAvailable -> R.string.content_update
+                                            else -> R.string.content_download_install
+                                        }
+                                    ),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
                 OutlinedButton(
                     onClick = onSource,
-                    enabled = !working,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null)
@@ -462,6 +513,158 @@ private fun TextureCatalogCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TextureDownloadQueue(
+    tasks: List<TextureDownloadTask>,
+    onPause: (String) -> Unit,
+    onResume: (String) -> Unit,
+    onCancel: (String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    if (tasks.isEmpty()) return
+    Text(
+        text = stringResource(R.string.texture_downloads_title),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold
+    )
+    tasks.forEach { task ->
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(task.packName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(task.serial, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextureDownloadProgress(task)
+                when (task.status) {
+                    TextureDownloadStatus.QUEUED,
+                    TextureDownloadStatus.DOWNLOADING,
+                    TextureDownloadStatus.WAITING_NETWORK -> DownloadActionButton(
+                        text = stringResource(R.string.emulation_pause),
+                        icon = { Icon(Icons.Rounded.Pause, contentDescription = null) },
+                        onClick = { onPause(task.key) }
+                    )
+                    TextureDownloadStatus.PAUSED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DownloadActionButton(
+                            text = stringResource(R.string.detail_resume),
+                            icon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
+                            onClick = { onResume(task.key) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        DownloadSecondaryAction(
+                            text = stringResource(R.string.cancel),
+                            icon = { Icon(Icons.Rounded.Close, contentDescription = null) },
+                            onClick = { onCancel(task.key) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    TextureDownloadStatus.FAILED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DownloadActionButton(
+                            text = stringResource(R.string.texture_download_retry),
+                            icon = { Icon(Icons.Rounded.Refresh, contentDescription = null) },
+                            onClick = { onResume(task.key) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        DownloadSecondaryAction(
+                            text = stringResource(R.string.settings_gpu_driver_remove_short),
+                            icon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+                            onClick = { onRemove(task.key) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextureDownloadProgress(task: TextureDownloadTask) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = textureDownloadStatusText(task.status),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = when (task.status) {
+                TextureDownloadStatus.FAILED -> MaterialTheme.colorScheme.error
+                TextureDownloadStatus.COMPLETED -> Color(0xFF1B6B3A)
+                else -> MaterialTheme.colorScheme.primary
+            }
+        )
+        LinearProgressIndicator(progress = { task.progress }, modifier = Modifier.fillMaxWidth())
+        val downloaded = formatDownloadBytes(task.downloadedBytes)
+        val total = formatDownloadBytes(task.totalBytes)
+        val speed = formatDownloadBytes(task.bytesPerSecond)
+        val detail = if (task.bytesPerSecond > 0L && task.etaSeconds > 0L) {
+            stringResource(
+                R.string.texture_download_progress_detail,
+                downloaded,
+                total,
+                speed,
+                formatDownloadDuration(task.etaSeconds)
+            )
+        } else {
+            stringResource(R.string.texture_download_progress_estimating, downloaded, total)
+        }
+        Text(detail, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (task.error.isNotBlank()) {
+            Text(
+                text = task.error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun textureDownloadStatusText(status: TextureDownloadStatus): String = stringResource(
+    when (status) {
+        TextureDownloadStatus.QUEUED -> R.string.texture_download_status_queued
+        TextureDownloadStatus.DOWNLOADING -> R.string.texture_download_status_downloading
+        TextureDownloadStatus.PAUSED -> R.string.texture_download_status_paused
+        TextureDownloadStatus.WAITING_NETWORK -> R.string.texture_download_status_waiting_network
+        TextureDownloadStatus.VERIFYING -> R.string.texture_download_status_verifying
+        TextureDownloadStatus.INSTALLING -> R.string.texture_download_status_installing
+        TextureDownloadStatus.COMPLETED -> R.string.texture_download_status_completed
+        TextureDownloadStatus.FAILED -> R.string.texture_download_status_failed
+        TextureDownloadStatus.CANCELLED -> R.string.texture_download_status_cancelled
+    }
+)
+
+@Composable
+private fun DownloadActionButton(
+    text: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+        icon()
+        Spacer(Modifier.width(7.dp))
+        Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun DownloadSecondaryAction(
+    text: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+        icon()
+        Spacer(Modifier.width(7.dp))
+        Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
