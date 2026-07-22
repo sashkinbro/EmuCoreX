@@ -40,4 +40,5 @@ namespace JitProfiler
 	void Stop();
 	void EmitBlockIncrement(void* counter_ptr);
 	void RecordBlockCompile(int type, u32 startpc, u32 guest_size, u32 host_size);
+	void RecordCodeCacheReset(int type, u64 discarded_host_bytes);
 }

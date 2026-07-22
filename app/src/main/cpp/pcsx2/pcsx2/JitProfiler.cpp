@@ -56,6 +56,7 @@ namespace JitProfiler
 namespace
 {
 	static std::atomic<bool> s_active{false};
+	static std::atomic<bool> s_collecting_runtime{false};
 	static std::chrono::steady_clock::time_point s_start_time;
 	static u64 s_start_frame = 0;
 	static std::mutex s_compile_mutex;
@@ -73,6 +74,8 @@ namespace
 	};
 
 	static std::vector<OpcodeRangeEvent> s_opcode_ranges;
+	static constexpr size_t OPCODE_RANGE_CAPACITY = 1u << 19;
+	static std::atomic<bool> s_opcode_range_limit_hit{false};
 
 	struct RawPcSample
 	{
@@ -110,6 +113,17 @@ namespace
 	};
 
 	static std::vector<CompileEvent> s_compile_events;
+	static constexpr size_t COMPILE_EVENT_CAPACITY = 1u << 19;
+	static std::atomic<u64> s_compile_events_dropped{0};
+
+	struct CacheResetEvent
+	{
+		int type = 0;
+		u64 discarded_host_bytes = 0;
+		u64 frame = 0;
+	};
+
+	static std::vector<CacheResetEvent> s_cache_reset_events;
 
 	struct CpuTotals
 	{
@@ -213,6 +227,7 @@ namespace
 		if (index >= SAMPLE_BUFFER_CAPACITY)
 		{
 			s_sample_dropped.fetch_add(1, std::memory_order_relaxed);
+			s_sampling_active.store(false, std::memory_order_release);
 			return;
 		}
 
@@ -313,6 +328,15 @@ namespace
 		event.type = type;
 
 		std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
+		if (s_opcode_ranges.size() >= OPCODE_RANGE_CAPACITY)
+		{
+			// Stop the sampler at the same boundary. Continuing to sample without
+			// recording newer ranges would attribute reused JIT addresses to stale
+			// code after a cache reset.
+			s_opcode_range_limit_hit.store(true, std::memory_order_relaxed);
+			s_sampling_active.store(false, std::memory_order_release);
+			return;
+		}
 		s_opcode_ranges.push_back(event);
 	}
 
@@ -984,7 +1008,9 @@ namespace
 		std::vector<OpcodeRangeEvent> ranges;
 		{
 			std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
-			ranges = s_opcode_ranges;
+			// Sampling is stopped before report generation, so ownership can move
+			// into the report without temporarily duplicating tens of megabytes.
+			ranges.swap(s_opcode_ranges);
 		}
 
 		std::unordered_map<uptr, std::vector<const OpcodeRangeEvent*>> page_map;
@@ -1090,6 +1116,8 @@ namespace
 		out << "Native/unmapped samples: " << native_samples << "\n";
 		out << "Dropped samples: " << dropped_samples << "\n";
 		out << "Recorded opcode host ranges: " << ranges.size() << "\n\n";
+		out << "Opcode range capture capped: "
+			<< (s_opcode_range_limit_hit.load(std::memory_order_relaxed) ? "yes" : "no") << "\n\n";
 
 		out << "Top Opcodes/Pairs by Sampled CPU Time\n";
 		out << "--------------------------------------\n";
@@ -1170,9 +1198,13 @@ namespace
 	void AppendCompilationHotspots(std::ostringstream& out)
 	{
 		std::vector<CompileEvent> events;
+		std::vector<CacheResetEvent> reset_events;
 		{
 			std::lock_guard<std::mutex> lock(s_compile_mutex);
-			events = s_compile_events;
+			// Report generation runs after collection has stopped. Transfer the
+			// backing allocations so they are released when this function returns.
+			events.swap(s_compile_events);
+			reset_events.swap(s_cache_reset_events);
 		}
 
 		out << "Compilation Hotspots\n";
@@ -1242,6 +1274,25 @@ namespace
 				<< std::setw(16) << static_cast<unsigned long long>(cpu.peak_frame_host_bytes)
 				<< "\n";
 		}
+
+		std::array<u64, 4> reset_counts = {};
+		std::array<u64, 4> reset_bytes = {};
+		for (const CacheResetEvent& reset : reset_events)
+		{
+			const int type = (reset.type >= 0 && reset.type < 4) ? reset.type : 0;
+			reset_counts[type]++;
+			reset_bytes[type] += reset.discarded_host_bytes;
+		}
+		out << "\nCode Cache Resets\n";
+		out << "CPU      Resets      DiscardedHostBytes\n";
+		for (size_t type = 0; type < reset_counts.size(); type++)
+		{
+			out << std::left << std::setw(5) << CpuName(static_cast<int>(type))
+				<< std::right << std::setw(12) << static_cast<unsigned long long>(reset_counts[type])
+				<< std::setw(24) << static_cast<unsigned long long>(reset_bytes[type]) << "\n";
+		}
+		out << "Compile events dropped at safety cap: "
+			<< static_cast<unsigned long long>(s_compile_events_dropped.load(std::memory_order_relaxed)) << "\n";
 
 		std::vector<CompileFrameAggregate> frames;
 		frames.reserve(frame_map.size());
@@ -1821,7 +1872,8 @@ bool IsActive()
 
 void OpcodeRangeScope::Begin(int type, u32 guest_pc, u32 opcode, u32 paired_opcode)
 {
-	if (m_active || !IsActive() || !oakAsm)
+	if (m_active || !IsActive() || !s_sampling_active.load(std::memory_order_acquire) ||
+		s_opcode_range_limit_hit.load(std::memory_order_relaxed) || !oakAsm)
 		return;
 
 	m_active = true;
@@ -1866,7 +1918,26 @@ void RecordBlockCompile(int type, u32 startpc, u32 guest_size, u32 host_size)
 	event.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - s_start_time).count();
 
 	std::lock_guard<std::mutex> lock(s_compile_mutex);
+	if (s_compile_events.size() >= COMPILE_EVENT_CAPACITY)
+	{
+		s_compile_events_dropped.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
 	s_compile_events.push_back(event);
+}
+
+void RecordCodeCacheReset(int type, u64 discarded_host_bytes)
+{
+	if (!s_collecting_runtime.load(std::memory_order_acquire) || discarded_host_bytes == 0)
+		return;
+
+	CacheResetEvent event;
+	event.type = type;
+	event.discarded_host_bytes = discarded_host_bytes;
+	event.frame = PerformanceMetrics::GetFrameNumber() - s_start_frame;
+
+	std::lock_guard<std::mutex> lock(s_compile_mutex);
+	s_cache_reset_events.push_back(event);
 }
 
 void EmitBlockIncrement(void* counter_ptr)
@@ -1883,11 +1954,15 @@ void Start()
 	{
 		std::lock_guard<std::mutex> lock(s_compile_mutex);
 		s_compile_events.clear();
+		s_cache_reset_events.clear();
 	}
 	{
 		std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
 		s_opcode_ranges.clear();
 	}
+	s_compile_events_dropped.store(0, std::memory_order_relaxed);
+	s_opcode_range_limit_hit.store(false, std::memory_order_relaxed);
+	s_collecting_runtime.store(false, std::memory_order_release);
 
 	Host::RunOnCPUThread([]() {
 		if (THREAD_VU1)
@@ -1907,6 +1982,7 @@ void Start()
 
 	s_start_time = std::chrono::steady_clock::now();
 	s_start_frame = PerformanceMetrics::GetFrameNumber();
+	s_collecting_runtime.store(true, std::memory_order_release);
 	StartPcSampler();
 }
 
@@ -1914,6 +1990,7 @@ void Stop()
 {
 	if (!s_active.exchange(false))
 		return;
+	s_collecting_runtime.store(false, std::memory_order_release);
 	StopPcSampler();
 
 	Host::RunOnCPUThread([]() {

@@ -53,7 +53,11 @@ void mVUreset(microVU& mVU, bool resetReserve)
 		}
 		VU0.VI[REG_VPU_STAT].UL &= ~0x100;
 	}
+	u8* const old_start = mVU.prog.x86start;
 	u8* const old_high_water = mVU.prog.x86ptr;
+	const u64 discarded_host_bytes = (old_start && old_high_water > old_start) ?
+		static_cast<u64>(old_high_water - old_start) : 0;
+	JitProfiler::RecordCodeCacheReset(mVU.index ? 3 : 2, discarded_host_bytes);
 
     oakSetAsmPtr(mVU.cache, mVU.index ? HostMemoryMap::mVU1recSize : HostMemoryMap::mVU0recSize);
     oakStartBlock();
@@ -201,10 +205,10 @@ __ri void mVUdeleteProg(microVU& mVU, microProgram*& prog)
 	safe_aligned_free(prog);
 }
 
-static __fi MvuContentKey mVUcomputeContentKey(const microVU& mVU)
+static __fi MvuContentKey mVUcomputeContentKey(const microVU& mVU, u32 startPC)
 {
 	const XXH128_hash_t hash = XXH3_128bits(mVU.regs().Micro, mVU.microMemSize);
-	return {hash.low64, hash.high64};
+	return {hash.low64, hash.high64, startPC};
 }
 
 static __fi void mVUcontentMapInsert(microVU& mVU, microProgram* prog)
@@ -288,7 +292,7 @@ __ri void mVUcacheProg(microVU& mVU, microProgram& prog)
 	// from hash lookup while keeping existing range/list references alive.
 	if (prog.contentKeyValid && prog.contentWriteGeneration != mVU.microMemWriteGeneration)
 	{
-		const MvuContentKey liveKey = mVUcomputeContentKey(mVU);
+		const MvuContentKey liveKey = mVUcomputeContentKey(mVU, prog.startPC);
 		if (!(liveKey == prog.contentKey))
 			mVUcontentMapRefreshOrEvict(mVU, prog, liveKey);
 		else
@@ -388,9 +392,10 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 
 	if (!quick.prog) // If null, we need to search for new program
 	{
-		// An exact full-memory hit is O(1) and always safe. Check it before the
-		// historical per-PC list, which can contain many partial-range variants.
-		const MvuContentKey liveKey = mVUcomputeContentKey(mVU);
+		// An exact full-memory and entry-PC hit is O(1) and always safe. Keeping
+		// entry PCs separate preserves microVU's indirect-jump partitioning and
+		// prevents one giant program from being invalidated by every upload.
+		const MvuContentKey liveKey = mVUcomputeContentKey(mVU, regs_start_pc_8);
 		auto contentIt = mVU.contentPrograms.find(liveKey);
 		if (contentIt != mVU.contentPrograms.end())
 		{

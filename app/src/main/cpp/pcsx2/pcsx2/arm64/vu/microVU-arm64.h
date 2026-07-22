@@ -50,10 +50,11 @@ struct MvuContentKey
 {
 	u64 low64;
 	u64 high64;
+	u32 start_pc;
 
 	bool operator==(const MvuContentKey& rhs) const noexcept
 	{
-		return low64 == rhs.low64 && high64 == rhs.high64;
+		return low64 == rhs.low64 && high64 == rhs.high64 && start_pc == rhs.start_pc;
 	}
 };
 
@@ -61,8 +62,9 @@ struct MvuContentKeyHash
 {
 	size_t operator()(const MvuContentKey& key) const noexcept
 	{
-		const u64 mixed = key.low64 ^ (key.high64 + 0x9e3779b97f4a7c15ULL +
+		u64 mixed = key.low64 ^ (key.high64 + 0x9e3779b97f4a7c15ULL +
 			(key.low64 << 6) + (key.low64 >> 2));
+		mixed ^= static_cast<u64>(key.start_pc) + 0x9e3779b97f4a7c15ULL + (mixed << 6) + (mixed >> 2);
 		return static_cast<size_t>(mixed);
 	}
 };
@@ -147,9 +149,10 @@ struct microVU
 	u32 totalCycles;  // Total Cycles that mVU is expected to run for
 	s32 cycles;       // Cycles Counter
 
-	// The content map owns live programs. Per-start-PC lists and quick slots
-	// only reference them. Programs whose compiled ranges drift from their
-	// original full-memory image are parked separately until the next reset.
+	// The content map owns live programs. The entry PC is part of the key so
+	// indirect-jump targets remain separate programs; merging them makes ranges
+	// grow until small micro-memory uploads invalidate nearly the entire cache.
+	// Per-start-PC lists and quick slots only reference these programs.
 	std::unordered_map<MvuContentKey, microProgram*, MvuContentKeyHash> contentPrograms;
 	std::vector<microProgram*> orphanedPrograms;
 	u64 microMemWriteGeneration = 0;

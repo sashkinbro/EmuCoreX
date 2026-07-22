@@ -497,8 +497,14 @@ _vifT __fi nVifBlock* dVifCompile(nVifBlock& block, bool isFill)
 	if (v.recWritePtr >= v.recEndPtr)
 		dVifReset(idx);
 
-	// Compile the block now
-	oakSetAsmPtr(v.recWritePtr, v.recEndPtr - v.recWritePtr);
+	// recEndPtr is the reset threshold. The reserved 256 KiB remains available
+	// to the block already being compiled, but Oaknut must never cross into the
+	// neighboring code-cache region.
+	const size_t offset = idx ? HostMemoryMap::VIF1recOffset : HostMemoryMap::VIF0recOffset;
+	const size_t size = idx ? HostMemoryMap::VIF1recSize : HostMemoryMap::VIF0recSize;
+	u8* const physical_end = SysMemory::GetCodePtr(offset + size);
+	pxAssert(v.recWritePtr < physical_end);
+	oakSetAsmPtr(v.recWritePtr, physical_end - v.recWritePtr);
 
 	block.startPtr = (uptr)oakStartBlock();
 	block.length = dVifComputeLength(block.cl, block.wl, block.num, isFill);

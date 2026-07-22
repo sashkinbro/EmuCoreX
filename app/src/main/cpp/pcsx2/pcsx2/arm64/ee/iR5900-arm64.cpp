@@ -488,6 +488,10 @@ alignas(16) static u8 manual_counter[Ps2MemSize::TotalRam >> __pageshift];
 static void recResetRaw()
 {
 	u8* const old_high_water = recPtr;
+	u8* const cache_start = SysMemory::GetEERec();
+	const u64 discarded_host_bytes = (old_high_water && old_high_water > cache_start) ?
+		static_cast<u64>(old_high_water - cache_start) : 0;
+	JitProfiler::RecordCodeCacheReset(0, discarded_host_bytes);
 	if (CHECK_EXTRAMEM != extraRam)
 	{
 		recReserveRAM();
@@ -2358,7 +2362,11 @@ static void recRecompile(const u32 startpc)
 		recResetRaw();
 	}
 
-	oakSetAsmPtr(recPtr, _256kb);
+	// recPtrEnd is the reset threshold, while the remaining 64 KiB is the
+	// in-flight block reserve. Never advertise capacity beyond EE's own region.
+	u8* const physical_end = SysMemory::GetEERecEnd();
+	pxAssert(recPtr < physical_end);
+	oakSetAsmPtr(recPtr, physical_end - recPtr);
 	recPtr = oakStartBlock();
 
 	s_pCurBlock = PC_GETBLOCK(startpc);

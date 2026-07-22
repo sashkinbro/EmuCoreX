@@ -884,6 +884,10 @@ static void recReserve()
 void recResetIOP()
 {
 	u8* const old_high_water = recPtr;
+	u8* const cache_start = SysMemory::GetIOPRec();
+	const u64 discarded_host_bytes = (old_high_water && old_high_water > cache_start) ?
+		static_cast<u64>(old_high_water - cache_start) : 0;
+	JitProfiler::RecordCodeCacheReset(1, discarded_host_bytes);
 	oakSetAsmPtr(SysMemory::GetIOPRec(), _4kb);
 	oakStartBlock();
 
@@ -1542,7 +1546,11 @@ static void iopRecRecompile(const u32 startpc)
 		recResetIOP();
 	}
 
-	oakSetAsmPtr(recPtr, _256kb);
+	// recPtrEnd is the reset threshold, while the remaining 64 KiB is the
+	// in-flight block reserve. Keep Oaknut inside the IOP cache reservation.
+	u8* const physical_end = SysMemory::GetIOPRecEnd();
+	pxAssert(recPtr < physical_end);
+	oakSetAsmPtr(recPtr, physical_end - recPtr);
 	recPtr = oakStartBlock();
 
 	s_pCurBlock = PSX_GETBLOCK(startpc);
