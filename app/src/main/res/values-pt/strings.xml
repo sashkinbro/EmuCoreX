@@ -1818,4 +1818,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 e muitos modelos Snapdragon das séries 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, modelos recentes da série Snapdragon 7 e 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 e 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">Analógico direito na tela sensível ao toque</string>
+    <string name="settings_touchscreen_right_stick_desc">Deslize por uma área livre da tela para controlar o analógico direito virtual.</string>
+    <string name="settings_help_touchscreen_right_stick">Mapeia gestos de arrastar nas áreas livres da tela do jogo para os eixos do analógico direito virtual, permitindo mover a câmera sem tocar no analógico visível. Os botões de toque e os analógicos visíveis mantêm o comportamento normal.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">Sensibilidade tátil do analógico direito</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">Ajusta o quanto a distância arrastada na tela move o analógico direito virtual. Não altera a sensibilidade do analógico direito visível.</string>
 </resources>

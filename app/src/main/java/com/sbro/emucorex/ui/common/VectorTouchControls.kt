@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
@@ -629,7 +630,7 @@ fun VectorAnalogStick(
     var thumbOffset by remember { mutableStateOf(Offset.Zero) }
     var lastSentX by remember { mutableIntStateOf(0) }
     var lastSentY by remember { mutableIntStateOf(0) }
-    var activePointerId by remember { mutableIntStateOf(MotionEvent.INVALID_POINTER_ID) }
+    var activePointerId by remember { mutableStateOf<Long?>(null) }
 
     fun dispatchStickValue(x: Float, y: Float) {
         val quantizedX = (x * 255f).roundToInt()
@@ -666,44 +667,49 @@ fun VectorAnalogStick(
     }
 
     val pointerModifier = if (interactive && onValueChange != null) {
-        Modifier.pointerInteropFilter { event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                    if (activePointerId == MotionEvent.INVALID_POINTER_ID) {
-                        val index = event.actionIndex
-                        activePointerId = event.getPointerId(index)
-                        onTouchStart?.invoke()
-                        updateStickFromPosition(Offset(event.getX(index), event.getY(index)))
+        Modifier.pointerInput(Unit) {
+            try {
+                awaitPointerEventScope {
+                    while (true) {
+                        var pointerId: Long? = null
+
+                        while (pointerId == null) {
+                            val event = awaitPointerEvent()
+                            val down = event.changes.firstOrNull { change ->
+                                change.pressed &&
+                                    !change.previousPressed &&
+                                    !change.isConsumed &&
+                                    change.position.x in 0f..size.width &&
+                                    change.position.y in 0f..size.height
+                            }
+                            if (down != null) {
+                                pointerId = down.id.value
+                                activePointerId = pointerId
+                                onTouchStart?.invoke()
+                                updateStickFromPosition(down.position)
+                                down.consume()
+                            }
+                        }
+
+                        while (pointerId != null) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id.value == pointerId }
+                                ?: continue
+                            if (!change.pressed) {
+                                pointerId = null
+                                activePointerId = null
+                                resetStick()
+                                continue
+                            }
+
+                            updateStickFromPosition(change.position)
+                            change.consume()
+                        }
                     }
-                    true
                 }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val index = event.findPointerIndex(activePointerId)
-                    if (index >= 0) {
-                        updateStickFromPosition(Offset(event.getX(index), event.getY(index)))
-                        true
-                    } else {
-                        false
-                    }
-                }
-
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                    val pointerId = event.getPointerId(event.actionIndex)
-                    if (pointerId == activePointerId) {
-                        activePointerId = MotionEvent.INVALID_POINTER_ID
-                        resetStick()
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_CANCEL -> {
-                    activePointerId = MotionEvent.INVALID_POINTER_ID
-                    resetStick()
-                    true
-                }
-
-                else -> activePointerId != MotionEvent.INVALID_POINTER_ID
+            } finally {
+                activePointerId = null
+                resetStick()
             }
         }
     } else {
@@ -735,7 +741,7 @@ fun VectorAnalogStick(
         animationSpec = tween(durationMillis = 90),
         label = "vector_analog_stick_visual_y"
     )
-    val displayedThumbOffset = if (activePointerId != MotionEvent.INVALID_POINTER_ID) {
+    val displayedThumbOffset = if (activePointerId != null) {
         thumbOffset
     } else {
         Offset(animatedVisualThumbX, animatedVisualThumbY)
@@ -751,7 +757,7 @@ fun VectorAnalogStick(
             TouchControlVisualStyle.MINIMAL -> RoundedCornerShape(20.dp)
         }
     }
-    val isActivelyPressed = pressed || activePointerId != MotionEvent.INVALID_POINTER_ID
+    val isActivelyPressed = pressed || activePointerId != null
     val pressScale = animatedPressScale(
         pressed = isActivelyPressed,
         effect = pressEffect,

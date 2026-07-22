@@ -1817,4 +1817,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx：Snapdragon 845/855/865/888 及众多 Snapdragon 6/7 系列型号</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx：Snapdragon 8 Gen 1/2/3、8s Gen 3、较新的 Snapdragon 7 系列和 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx：Snapdragon 8 Elite Gen 5、8 Gen 5、8 Elite、8s Gen 4 和 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">触屏右摇杆</string>
+    <string name="settings_touchscreen_right_stick_desc">在屏幕空白区域滑动以控制虚拟右摇杆。</string>
+    <string name="settings_help_touchscreen_right_stick">将游戏画面未使用区域中的拖动手势映射到虚拟右摇杆轴，无需触碰可见摇杆即可移动镜头。触控按键和可见摇杆仍保持原有操作方式。</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">触屏右摇杆灵敏度</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">调整屏幕拖动距离对虚拟右摇杆的驱动强度。此设置不会改变可见右摇杆的灵敏度。</string>
 </resources>

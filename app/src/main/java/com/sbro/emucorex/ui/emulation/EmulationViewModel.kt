@@ -119,7 +119,7 @@ data class EmulationUiState(
     val fpsOverlayScale: Int = AppPreferences.DEFAULT_FPS_OVERLAY_SCALE,
     val fpsOverlayMetrics: Int = PerformanceOverlayMetrics.DEFAULT,
     val overlayScale: Int = 100,
-    val overlayOpacity: Int = 80,
+    val overlayOpacity: Int = AppPreferences.DEFAULT_OVERLAY_OPACITY,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
     val gameMenuLayoutStyle: GameMenuLayoutStyle = GameMenuLayoutStyle.SIDEBAR,
@@ -143,6 +143,8 @@ data class EmulationUiState(
     val invertLeftStickHorizontal: Boolean = false,
     val invertRightStickHorizontal: Boolean = false,
     val racingMode: Boolean = false,
+    val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+    val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
@@ -394,6 +396,8 @@ private data class LiveRuntimeSnapshot(
     val frameLimitEnabled: Boolean,
     val fastForwardSpeed: Float,
     val racingMode: Boolean,
+    val touchscreenRightStick: Boolean,
+    val touchscreenRightStickSensitivity: Int,
     val touchHaptics: Boolean,
     val touchHapticsPreset: Int,
     val touchHapticsStrength: Int,
@@ -1125,6 +1129,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            preferences.touchscreenRightStick.collect { enabled ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(touchscreenRightStick = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.touchscreenRightStickSensitivity.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(touchscreenRightStickSensitivity = value) }
+            }
+        }
+        viewModelScope.launch {
             preferences.touchHaptics.collect { enabled ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(touchHaptics = enabled) }
             }
@@ -1764,6 +1778,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     frameLimitEnabled = liveRuntime.frameLimitEnabled,
                     fastForwardSpeed = liveRuntime.fastForwardSpeed,
                     racingMode = liveRuntime.racingMode,
+                    touchscreenRightStick = liveRuntime.touchscreenRightStick,
+                    touchscreenRightStickSensitivity = liveRuntime.touchscreenRightStickSensitivity,
                     touchHaptics = liveRuntime.touchHaptics,
                     touchHapticsPreset = liveRuntime.touchHapticsPreset,
                     touchHapticsStrength = liveRuntime.touchHapticsStrength,
@@ -2061,7 +2077,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setOverlayOpacity(value: Int) {
         viewModelScope.launch {
             preferences.setOverlayOpacity(value)
-            _uiState.value = _uiState.value.copy(overlayOpacity = value.coerceIn(20, 100))
+            _uiState.value = _uiState.value.copy(
+                overlayOpacity = value.coerceIn(
+                    AppPreferences.OVERLAY_OPACITY_MIN,
+                    AppPreferences.OVERLAY_OPACITY_MAX
+                )
+            )
         }
     }
 
@@ -3649,6 +3670,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             frameLimitEnabled = settings.frameLimitEnabled,
             fastForwardSpeed = settings.fastForwardSpeed,
             racingMode = settings.racingMode,
+            touchscreenRightStick = settings.touchscreenRightStick,
+            touchscreenRightStickSensitivity = settings.touchscreenRightStickSensitivity,
             touchHaptics = settings.touchHaptics,
             touchHapticsPreset = settings.touchHapticsPreset,
             touchHapticsStrength = settings.touchHapticsStrength,
@@ -3817,6 +3840,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             showFps = pick("showFps", showFps) { showFps },
             fpsOverlayMode = pick("fpsOverlayMode", fpsOverlayMode) { fpsOverlayMode },
             racingMode = pick("racingMode", racingMode) { racingMode },
+            touchscreenRightStick = pick("touchscreenRightStick", touchscreenRightStick) { touchscreenRightStick },
+            touchscreenRightStickSensitivity = pick(
+                "touchscreenRightStickSensitivity",
+                touchscreenRightStickSensitivity
+            ) { touchscreenRightStickSensitivity },
             touchHaptics = pick("touchHaptics", touchHaptics) { touchHaptics },
             touchHapticsPreset = pick("touchHapticsPreset", touchHapticsPreset) { touchHapticsPreset },
             touchHapticsStrength = touchHapticsStrength,
@@ -3921,6 +3949,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
         val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
         val globalRacingMode = preferences.racingMode.first()
+        val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
+        val globalTouchscreenRightStickSensitivity = preferences.touchscreenRightStickSensitivity.first()
         val globalTouchHaptics = preferences.touchHaptics.first()
         val globalTouchHapticsPreset = preferences.touchHapticsPreset.first()
         val globalTouchControlVisualStyle = preferences.touchControlVisualStyle.first()
@@ -3965,6 +3995,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             skipDuplicateFrames = skipDuplicateFrames,
             frameLimitEnabled = frameLimitEnabled,
             racingMode = racingMode,
+            touchscreenRightStick = touchscreenRightStick,
+            touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
             touchHaptics = touchHaptics,
             touchHapticsPreset = touchHapticsPreset,
             touchControlVisualStyle = touchControlVisualStyle.takeIf { it != globalTouchControlVisualStyle },
@@ -4052,6 +4084,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (skipDuplicateFrames != globalSkipDuplicateFrames) add("skipDuplicateFrames")
             if (frameLimitEnabled != globalFrameLimitEnabled) add("frameLimitEnabled")
             if (racingMode != globalRacingMode) add("racingMode")
+            if (touchscreenRightStick != globalTouchscreenRightStick) add("touchscreenRightStick")
+            if (touchscreenRightStickSensitivity != globalTouchscreenRightStickSensitivity) {
+                add("touchscreenRightStickSensitivity")
+            }
             if (touchHaptics != globalTouchHaptics) add("touchHaptics")
             if (touchHapticsPreset != globalTouchHapticsPreset) add("touchHapticsPreset")
             if (profile.touchControlVisualStyle != null) add("touchControlVisualStyle")

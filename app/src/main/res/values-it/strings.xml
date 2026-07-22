@@ -1816,4 +1816,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 e molti modelli Snapdragon serie 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, recenti modelli Snapdragon serie 7 e 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 e 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">Stick destro sul touchscreen</string>
+    <string name="settings_touchscreen_right_stick_desc">Scorri su una zona libera dello schermo per controllare lo stick destro virtuale.</string>
+    <string name="settings_help_touchscreen_right_stick">Associa i gesti di trascinamento nelle aree libere della schermata di gioco agli assi dello stick destro virtuale, consentendo di muovere la visuale senza toccare lo stick visibile. I pulsanti touch e gli stick visibili mantengono il comportamento normale.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">Sensibilità touch dello stick destro</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">Regola quanto la distanza di trascinamento sullo schermo inclina lo stick destro virtuale. Non modifica la sensibilità dello stick destro visibile.</string>
 </resources>

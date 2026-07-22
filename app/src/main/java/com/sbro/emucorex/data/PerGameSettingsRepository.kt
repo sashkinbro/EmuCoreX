@@ -23,6 +23,8 @@ data class PerGameSettings(
     val showFps: Boolean = false,
     val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
     val racingMode: Boolean = false,
+    val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+    val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
@@ -239,6 +241,17 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         showFps = optBoolean("showFps", false),
         fpsOverlayMode = optInt("fpsOverlayMode", AppPreferences.FPS_OVERLAY_MODE_DETAILED),
         racingMode = optBoolean("racingMode", false),
+        touchscreenRightStick = optBoolean(
+            "touchscreenRightStick",
+            AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK
+        ),
+        touchscreenRightStickSensitivity = optInt(
+            "touchscreenRightStickSensitivity",
+            AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY
+        ).coerceIn(
+            AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+            AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+        ),
         touchHaptics = optBoolean("touchHaptics", false),
         touchHapticsPreset = optInt("touchHapticsPreset", AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET)
             .coerceIn(AppPreferences.TOUCH_HAPTICS_PRESET_SOFT, AppPreferences.TOUCH_HAPTICS_PRESET_STRONG),
@@ -385,6 +398,10 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("showFps")) put("showFps", showFps)
         if (shouldWrite("fpsOverlayMode")) put("fpsOverlayMode", fpsOverlayMode)
         if (shouldWrite("racingMode")) put("racingMode", racingMode)
+        if (shouldWrite("touchscreenRightStick")) put("touchscreenRightStick", touchscreenRightStick)
+        if (shouldWrite("touchscreenRightStickSensitivity")) {
+            put("touchscreenRightStickSensitivity", touchscreenRightStickSensitivity)
+        }
         if (shouldWrite("touchHaptics")) put("touchHaptics", touchHaptics)
         if (shouldWrite("touchHapticsPreset")) put("touchHapticsPreset", touchHapticsPreset)
         if (shouldWrite("gyroMode")) put("gyroMode", gyroMode)

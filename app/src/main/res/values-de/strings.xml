@@ -1818,4 +1818,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 und viele Modelle der Snapdragon-6/7-Serie</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, aktuelle Snapdragon-7-Serie und 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 und 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">Rechter Stick per Touchscreen</string>
+    <string name="settings_touchscreen_right_stick_desc">Wische über freie Bildschirmbereiche, um den virtuellen rechten Stick zu steuern.</string>
+    <string name="settings_help_touchscreen_right_stick">Ordnet Ziehgesten in ungenutzten Bereichen des Spielbildschirms den Achsen des virtuellen rechten Sticks zu. So lässt sich die Kamera bewegen, ohne den sichtbaren Stick zu berühren. Touch-Tasten und sichtbare Sticks funktionieren weiterhin wie gewohnt.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">Touchscreen-Empfindlichkeit des rechten Sticks</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">Legt fest, wie stark die Ziehstrecke auf dem Bildschirm den virtuellen rechten Stick auslenkt. Die Empfindlichkeit des sichtbaren rechten Sticks wird nicht verändert.</string>
 </resources>

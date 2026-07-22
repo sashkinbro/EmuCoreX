@@ -1256,6 +1256,35 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(racingMode = defaultProfile.racingMode)) }
                     )
                     ToggleRow(
+                        title = stringResource(R.string.settings_touchscreen_right_stick),
+                        checked = draft.touchscreenRightStick,
+                        onCheckedChange = { onDraftChange(draft.copy(touchscreenRightStick = it)) },
+                        helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
+                        onResetToDefault = { onDraftChange(draft.copy(touchscreenRightStick = defaultProfile.touchscreenRightStick)) }
+                    )
+                    if (draft.touchscreenRightStick) {
+                        SliderRow(
+                            title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
+                            value = draft.touchscreenRightStickSensitivity.toFloat(),
+                            valueLabel = "${draft.touchscreenRightStickSensitivity}%",
+                            range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                            steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                            onValueChange = {
+                                onDraftChange(draft.copy(touchscreenRightStickSensitivity = it.roundToInt()))
+                            },
+                            helpText = stringResource(R.string.settings_help_touchscreen_right_stick_sensitivity),
+                            onResetToDefault = {
+                                onDraftChange(
+                                    draft.copy(
+                                        touchscreenRightStickSensitivity = defaultProfile.touchscreenRightStickSensitivity
+                                    )
+                                )
+                            }
+                        )
+                    }
+                    ToggleRow(
                         title = stringResource(R.string.settings_touch_haptics),
                         checked = draft.touchHaptics,
                         onCheckedChange = { onDraftChange(draft.copy(touchHaptics = it)) },
@@ -1724,6 +1753,33 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_racing_mode),
                                 onResetToDefault = { draft = draft.copy(racingMode = defaultProfile.racingMode) }
                             )
+                            ToggleRow(
+                                title = stringResource(R.string.settings_touchscreen_right_stick),
+                                checked = draft.touchscreenRightStick,
+                                onCheckedChange = { draft = draft.copy(touchscreenRightStick = it) },
+                                helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
+                                onResetToDefault = { draft = draft.copy(touchscreenRightStick = defaultProfile.touchscreenRightStick) }
+                            )
+                            if (draft.touchscreenRightStick) {
+                                SliderRow(
+                                    title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
+                                    value = draft.touchscreenRightStickSensitivity.toFloat(),
+                                    valueLabel = "${draft.touchscreenRightStickSensitivity}%",
+                                    range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                    steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                        AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                    onValueChange = {
+                                        draft = draft.copy(touchscreenRightStickSensitivity = it.roundToInt())
+                                    },
+                                    helpText = stringResource(R.string.settings_help_touchscreen_right_stick_sensitivity),
+                                    onResetToDefault = {
+                                        draft = draft.copy(
+                                            touchscreenRightStickSensitivity = defaultProfile.touchscreenRightStickSensitivity
+                                        )
+                                    }
+                                )
+                            }
                             ToggleRow(
                                 title = stringResource(R.string.settings_touch_haptics),
                                 checked = draft.touchHaptics,
@@ -3643,6 +3699,8 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         showFps = showFps,
         fpsOverlayMode = fpsOverlayMode,
         racingMode = racingMode,
+        touchscreenRightStick = touchscreenRightStick,
+        touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
         touchHaptics = touchHaptics,
         touchHapticsPreset = touchHapticsPreset,
         gyroMode = gyroMode,
@@ -3745,6 +3803,12 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         showFps = pick("showFps", showFps, defaultProfile.showFps),
         fpsOverlayMode = pick("fpsOverlayMode", fpsOverlayMode, defaultProfile.fpsOverlayMode),
         racingMode = pick("racingMode", racingMode, defaultProfile.racingMode),
+        touchscreenRightStick = pick("touchscreenRightStick", touchscreenRightStick, defaultProfile.touchscreenRightStick),
+        touchscreenRightStickSensitivity = pick(
+            "touchscreenRightStickSensitivity",
+            touchscreenRightStickSensitivity,
+            defaultProfile.touchscreenRightStickSensitivity
+        ),
         touchHaptics = pick("touchHaptics", touchHaptics, defaultProfile.touchHaptics),
         touchHapticsPreset = pick("touchHapticsPreset", touchHapticsPreset, defaultProfile.touchHapticsPreset),
         gyroMode = pick("gyroMode", gyroMode, defaultProfile.gyroMode),

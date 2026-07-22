@@ -1815,4 +1815,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 および多くの Snapdragon 6/7 シリーズ</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3、8s Gen 3、新しい Snapdragon 7 シリーズ、6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5、8 Gen 5、8 Elite、8s Gen 4、6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">タッチスクリーン右スティック</string>
+    <string name="settings_touchscreen_right_stick_desc">画面の空いている部分をスワイプして、仮想右スティックを操作します。</string>
+    <string name="settings_help_touchscreen_right_stick">ゲーム画面の未使用領域でのドラッグ操作を仮想右スティックの軸に割り当て、表示中のスティックに触れずにカメラを動かせます。タッチボタンと表示中のスティックは通常どおり動作します。</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">タッチスクリーン右スティック感度</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">画面上のドラッグ距離が仮想右スティックをどの程度動かすかを調整します。表示中の右スティックの感度は変更されません。</string>
 </resources>

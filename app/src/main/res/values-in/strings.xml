@@ -1830,4 +1830,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 dan banyak model seri Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, model seri Snapdragon 7 terbaru, dan 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4, dan 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">Stik kanan di layar sentuh</string>
+    <string name="settings_touchscreen_right_stick_desc">Usap area layar yang kosong untuk mengontrol stik kanan virtual.</string>
+    <string name="settings_help_touchscreen_right_stick">Memetakan gerakan seret di area layar permainan yang tidak terpakai ke sumbu stik kanan virtual, sehingga kamera dapat digerakkan tanpa menyentuh stik yang terlihat. Tombol sentuh dan stik yang terlihat tetap berfungsi seperti biasa.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">Sensitivitas stik kanan layar sentuh</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">Mengatur seberapa kuat jarak seretan di layar menggerakkan stik kanan virtual. Pengaturan ini tidak mengubah sensitivitas stik kanan yang terlihat.</string>
 </resources>

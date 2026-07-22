@@ -1820,4 +1820,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 и многие модели серий Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, новые модели серии Snapdragon 7 и 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 и 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">Правый стик на сенсорном экране</string>
+    <string name="settings_touchscreen_right_stick_desc">Проводите пальцем по свободной части экрана, чтобы управлять виртуальным правым стиком.</string>
+    <string name="settings_help_touchscreen_right_stick">Привязывает жесты перетаскивания в свободных областях игрового экрана к осям виртуального правого стика, позволяя двигать камерой без касания видимого стика. Сенсорные кнопки и видимые стики работают как обычно.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">Чувствительность правого стика на сенсорном экране</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">Определяет, насколько сильно расстояние перетаскивания по экрану отклоняет виртуальный правый стик. Не изменяет чувствительность видимого правого стика.</string>
 </resources>

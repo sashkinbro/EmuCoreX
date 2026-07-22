@@ -1816,4 +1816,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 और Snapdragon 6/7 सीरीज़ के कई मॉडल</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, नए Snapdragon 7 सीरीज़ मॉडल और 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 और 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">टचस्क्रीन दायाँ स्टिक</string>
+    <string name="settings_touchscreen_right_stick_desc">वर्चुअल दाएँ स्टिक को नियंत्रित करने के लिए स्क्रीन के खाली हिस्से पर स्वाइप करें।</string>
+    <string name="settings_help_touchscreen_right_stick">गेम स्क्रीन के खाली क्षेत्रों में ड्रैग जेस्चर को वर्चुअल दाएँ स्टिक के अक्षों से जोड़ता है, जिससे दिखाई देने वाले स्टिक को छुए बिना कैमरा घुमाया जा सकता है। टच बटन और दिखाई देने वाले स्टिक सामान्य रूप से काम करते रहते हैं।</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">टचस्क्रीन दाएँ स्टिक की संवेदनशीलता</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">यह तय करता है कि स्क्रीन पर खींचने की दूरी वर्चुअल दाएँ स्टिक को कितनी तेज़ी से चलाएगी। इससे दिखाई देने वाले दाएँ स्टिक की संवेदनशीलता नहीं बदलती।</string>
 </resources>

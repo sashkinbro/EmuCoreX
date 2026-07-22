@@ -116,6 +116,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInteropFilter
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
@@ -1181,6 +1182,8 @@ fun EmulationScreen(
                 invertRightStickHorizontal = uiState.invertRightStickHorizontal,
                 rightStickUpToR2 = uiState.gamepadRightStickUpToR2,
                 rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
+                touchscreenRightStick = uiState.touchscreenRightStick,
+                touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
                 touchHaptics = uiState.touchHaptics,
                 touchHapticsPreset = uiState.touchHapticsPreset,
                 touchHapticsStrength = uiState.touchHapticsStrength,
@@ -1745,6 +1748,8 @@ private fun OnScreenControls(
     invertRightStickHorizontal: Boolean = false,
     rightStickUpToR2: Boolean = false,
     rightStickDownToL2: Boolean = false,
+    touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+    touchscreenRightStickSensitivity: Float = 1.0f,
     touchHaptics: Boolean = false,
     touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
@@ -1946,19 +1951,27 @@ private fun OnScreenControls(
                 (if (rightStickUpToR2 && touchR2Pressed) 1f else 0f)
             ).coerceIn(-1f, 1f)
 
-        val leftShoulderSpecs = runtimeSpecs(layout.leftShoulders)
-        if (leftShoulderSpecs.isNotEmpty()) {
-            TouchButtonGroup(specs = leftShoulderSpecs, visualStyle = visualStyle, pressEffect = pressEffect, onTouchHaptic = ::performTouchHaptic)
-        }
-
-        val rightShoulderSpecs = runtimeSpecs(layout.rightShoulders)
-        if (rightShoulderSpecs.isNotEmpty()) {
-            TouchButtonGroup(specs = rightShoulderSpecs, visualStyle = visualStyle, pressEffect = pressEffect, onTouchHaptic = ::performTouchHaptic)
-        }
-
-        val dpadSpecs = runtimeSpecs(layout.dpadButtons)
-        if (dpadSpecs.isNotEmpty()) {
-            TouchButtonGroup(specs = dpadSpecs, visualStyle = visualStyle, pressEffect = pressEffect, onTouchHaptic = ::performTouchHaptic)
+        val allButtonSpecs = runtimeSpecs(
+            layout.leftShoulders +
+                layout.rightShoulders +
+                layout.dpadButtons +
+                layout.actionButtons +
+                layout.centerButtons
+        )
+        if (allButtonSpecs.isNotEmpty() || touchscreenRightStick) {
+            TouchButtonGroup(
+                specs = allButtonSpecs,
+                inputWidth = maxWidth,
+                inputHeight = maxHeight,
+                touchscreenRightStick = touchscreenRightStick,
+                touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
+                invertRightStick = invertRightStick,
+                invertRightStickHorizontal = invertRightStickHorizontal,
+                onPadInput = onPadInput,
+                visualStyle = visualStyle,
+                pressEffect = pressEffect,
+                onTouchHaptic = ::performTouchHaptic
+            )
         }
 
         layout.dpadCluster?.takeIf { it.visible }?.let { cluster ->
@@ -2002,11 +2015,6 @@ private fun OnScreenControls(
             )
         }
 
-        val actionSpecs = runtimeSpecs(layout.actionButtons)
-        if (actionSpecs.isNotEmpty()) {
-            TouchButtonGroup(specs = actionSpecs, visualStyle = visualStyle, pressEffect = pressEffect, onTouchHaptic = ::performTouchHaptic)
-        }
-
         layout.rightStick?.takeIf { it.visible }?.let { stick ->
             val panelWidth = stickPanelWidth(stick)
             VectorAnalogStick(
@@ -2032,10 +2040,6 @@ private fun OnScreenControls(
             )
         }
 
-        val centerSpecs = runtimeSpecs(layout.centerButtons)
-        if (centerSpecs.isNotEmpty()) {
-            TouchButtonGroup(specs = centerSpecs, visualStyle = visualStyle, pressEffect = pressEffect, onTouchHaptic = ::performTouchHaptic)
-        }
     }
 }
 
@@ -2116,6 +2120,13 @@ private fun RetroAchievementsNotificationToast(
 @Composable
 private fun TouchButtonGroup(
     specs: List<TouchButtonSpec>,
+    inputWidth: Dp,
+    inputHeight: Dp,
+    touchscreenRightStick: Boolean,
+    touchscreenRightStickSensitivity: Float,
+    invertRightStick: Boolean,
+    invertRightStickHorizontal: Boolean,
+    onPadInput: (Int, Int, Boolean) -> Unit,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
     onTouchHaptic: (ButtonPhase) -> Unit,
@@ -2123,13 +2134,20 @@ private fun TouchButtonGroup(
 ) {
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
-    val activeTargets = remember { mutableStateMapOf<Int, String>() }
-    val downTargets = remember { mutableMapOf<Int, String?>() }
+    val activeTargets = remember { mutableStateMapOf<Long, String>() }
+    val downTargets = remember { mutableMapOf<Long, String?>() }
     val latchedTargets = remember { mutableStateMapOf<String, Boolean>() }
-    val longPressJobs = remember { mutableMapOf<Int, Job>() }
-    val longPressActiveTargets = remember { mutableStateMapOf<Int, String>() }
+    val longPressJobs = remember { mutableMapOf<Long, Job>() }
+    val longPressActiveTargets = remember { mutableStateMapOf<Long, String>() }
     val specById = specs.associateBy { it.id }
     val currentSpecById by rememberUpdatedState(specById)
+    val currentOnPadInput by rememberUpdatedState(onPadInput)
+    val currentTouchscreenRightStickSensitivity by rememberUpdatedState(touchscreenRightStickSensitivity)
+    val currentInvertRightStick by rememberUpdatedState(invertRightStick)
+    val currentInvertRightStickHorizontal by rememberUpdatedState(invertRightStickHorizontal)
+    var gesturePointerId by remember { mutableStateOf<Long?>(null) }
+    var gestureOrigin by remember { mutableStateOf(Offset.Zero) }
+    val gestureRadiusPx = with(density) { 96.dp.toPx() }
     val layoutKey = specs.map { spec ->
         TouchButtonLayoutKey(
             id = spec.id,
@@ -2151,17 +2169,22 @@ private fun TouchButtonGroup(
                     bottom = spec.y.toPx() + spec.height.toPx()
                 )
             }
-            val left = rects.values.minOfOrNull { it.left } ?: 0f
-            val top = rects.values.minOfOrNull { it.top } ?: 0f
-            val right = rects.values.maxOfOrNull { it.right } ?: 0f
-            val bottom = rects.values.maxOfOrNull { it.bottom } ?: 0f
-            Triple(rects, Rect(left = left, top = top, right = right, bottom = bottom), Unit)
+            Triple(rects, Unit, Unit)
         }
     }
     val rects = bounds.first
-    val groupRect = bounds.second
-    val groupWidth = with(density) { (groupRect.right - groupRect.left).coerceAtLeast(0f).toDp() }
-    val groupHeight = with(density) { (groupRect.bottom - groupRect.top).coerceAtLeast(0f).toDp() }
+    val groupRect = remember(inputWidth, inputHeight, density) {
+        with(density) {
+            Rect(
+                left = 0f,
+                top = 0f,
+                right = inputWidth.toPx(),
+                bottom = inputHeight.toPx()
+            )
+        }
+    }
+    val groupWidth = inputWidth
+    val groupHeight = inputHeight
 
     fun hitTarget(x: Float, y: Float): String? =
         specs.lastOrNull { spec -> rects.getValue(spec.id).contains(Offset(x, y)) }?.id
@@ -2184,7 +2207,7 @@ private fun TouchButtonGroup(
         }
     }
 
-    fun cancelLongPress(pointerId: Int) {
+    fun cancelLongPress(pointerId: Long) {
         longPressJobs.remove(pointerId)?.cancel()
         val activeTarget = longPressActiveTargets.remove(pointerId)
         if (activeTarget != null && !longPressActiveTargets.containsValue(activeTarget)) {
@@ -2192,7 +2215,7 @@ private fun TouchButtonGroup(
         }
     }
 
-    fun startLongPress(pointerId: Int, targetId: String) {
+    fun startLongPress(pointerId: Long, targetId: String) {
         val spec = specById[targetId] ?: return
         if (!spec.hasLongPressAction()) return
         longPressJobs.remove(pointerId)?.cancel()
@@ -2216,7 +2239,7 @@ private fun TouchButtonGroup(
         }
     }
 
-    fun updatePointerTarget(pointerId: Int, newTarget: String?, emitReleaseHaptic: Boolean = true) {
+    fun updatePointerTarget(pointerId: Long, newTarget: String?, emitReleaseHaptic: Boolean = true) {
         val oldTarget = activeTargets[pointerId]
         if (oldTarget == newTarget) return
 
@@ -2252,7 +2275,17 @@ private fun TouchButtonGroup(
         }
     }
 
-    DisposableEffect(layoutKey) {
+    fun releaseTouchscreenRightStick() {
+        updateRightAnalogStick(
+            x = 0f,
+            y = 0f,
+            sensitivity = currentTouchscreenRightStickSensitivity,
+            onPadInput = currentOnPadInput
+        )
+        gesturePointerId = null
+    }
+
+    DisposableEffect(layoutKey, touchscreenRightStick) {
         onDispose {
             longPressJobs.values.forEach { it.cancel() }
             longPressActiveTargets.values.toSet().forEach { targetId ->
@@ -2272,6 +2305,7 @@ private fun TouchButtonGroup(
             latchedTargets.clear()
             longPressJobs.clear()
             longPressActiveTargets.clear()
+            releaseTouchscreenRightStick()
         }
     }
 
@@ -2281,68 +2315,88 @@ private fun TouchButtonGroup(
                 IntOffset(groupRect.left.roundToInt(), groupRect.top.roundToInt())
             }
             .size(groupWidth, groupHeight)
-            .pointerInteropFilter { event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index)
-                        val target = hitTarget(
-                            event.getX(index) + groupRect.left,
-                            event.getY(index) + groupRect.top
-                        )
-                        downTargets[pointerId] = target
-                        updatePointerTarget(pointerId, target)
-                        target != null
-                    }
+            .pointerInput(layoutKey, inputWidth, inputHeight, touchscreenRightStick) {
+                try {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { change ->
+                                val pointerId = change.id.value
+                                val x = change.position.x + groupRect.left
+                                val y = change.position.y + groupRect.top
 
-                    MotionEvent.ACTION_MOVE -> {
-                        var handled = false
-                        for (index in 0 until event.pointerCount) {
-                            val pointerId = event.getPointerId(index)
-                            val currentTarget = activeTargets[pointerId]
-                            val target = hitTarget(
-                                event.getX(index) + groupRect.left,
-                                event.getY(index) + groupRect.top
-                            )
-                            updatePointerTarget(pointerId, target)
-                            handled = handled || target != null || currentTarget != null
-                        }
-                        handled
-                    }
+                                when {
+                                    change.pressed && !change.previousPressed -> {
+                                        val target = hitTarget(x, y)
+                                        if (target != null) {
+                                            downTargets[pointerId] = target
+                                            updatePointerTarget(pointerId, target)
+                                            change.consume()
+                                        } else if (
+                                            touchscreenRightStick &&
+                                            gesturePointerId == null &&
+                                            !change.isConsumed
+                                        ) {
+                                            gesturePointerId = pointerId
+                                            gestureOrigin = change.position
+                                            change.consume()
+                                        }
+                                    }
 
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index)
-                        val downTarget = downTargets.remove(pointerId)
-                        val upTarget = hitTarget(
-                            event.getX(index) + groupRect.left,
-                            event.getY(index) + groupRect.top
-                        )
-                        val downSpec = downTarget?.let { specById[it] }
-                        val consumedByLongPress = downTarget != null && longPressActiveTargets[pointerId] == downTarget
-                        updatePointerTarget(pointerId, null)
-                        if (downTarget != null && downTarget == upTarget) {
-                            if (downSpec?.hasLongPressAction() == true) {
-                                if (!consumedByLongPress) {
-                                    sendShortTap(downSpec)
+                                    change.pressed -> {
+                                        if (downTargets.containsKey(pointerId)) {
+                                            val target = hitTarget(x, y)
+                                            updatePointerTarget(pointerId, target)
+                                            change.consume()
+                                        } else if (gesturePointerId == pointerId) {
+                                            val value = calculateRightStickGestureValue(
+                                                deltaX = change.position.x - gestureOrigin.x,
+                                                deltaY = change.position.y - gestureOrigin.y,
+                                                radiusPx = gestureRadiusPx
+                                            )
+                                            updateRightAnalogStick(
+                                                x = if (currentInvertRightStickHorizontal) -value.x else value.x,
+                                                y = if (currentInvertRightStick) -value.y else value.y,
+                                                sensitivity = currentTouchscreenRightStickSensitivity,
+                                                onPadInput = currentOnPadInput
+                                            )
+                                            change.consume()
+                                        }
+                                    }
+
+                                    change.previousPressed -> {
+                                        val downTarget = downTargets.remove(pointerId)
+                                        if (downTarget != null) {
+                                            val upTarget = hitTarget(x, y)
+                                            val downSpec = specById[downTarget]
+                                            val consumedByLongPress =
+                                                longPressActiveTargets[pointerId] == downTarget
+                                            updatePointerTarget(pointerId, null)
+                                            if (downTarget == upTarget) {
+                                                if (downSpec?.hasLongPressAction() == true) {
+                                                    if (!consumedByLongPress) sendShortTap(downSpec)
+                                                } else if (downSpec?.hasTapToHoldAction() == true) {
+                                                    toggleLatchedTarget(downSpec)
+                                                } else {
+                                                    downSpec?.onClick?.invoke()
+                                                }
+                                            }
+                                            change.consume()
+                                        } else if (gesturePointerId == pointerId) {
+                                            releaseTouchscreenRightStick()
+                                            change.consume()
+                                        }
+                                    }
                                 }
-                            } else if (downSpec?.hasTapToHoldAction() == true) {
-                                toggleLatchedTarget(downSpec)
-                            } else {
-                                downSpec?.onClick?.invoke()
                             }
                         }
-                        downTarget != null || upTarget != null
                     }
-
-                    MotionEvent.ACTION_CANCEL -> {
-                        val activePointerIds = activeTargets.keys.toList()
-                        activePointerIds.forEach { updatePointerTarget(it, null, emitReleaseHaptic = false) }
-                        downTargets.clear()
-                        true
+                } finally {
+                    activeTargets.keys.toList().forEach { pointerId ->
+                        updatePointerTarget(pointerId, null, emitReleaseHaptic = false)
                     }
-
-                    else -> false
+                    downTargets.clear()
+                    releaseTouchscreenRightStick()
                 }
             }
     ) {
@@ -3095,8 +3149,10 @@ private fun EmulationSidebarMenu(
                             title = stringResource(R.string.settings_overlay_opacity),
                             valueLabelForValue = { "$it%" },
                             value = uiState.overlayOpacity.toFloat(),
-                            range = 20f..100f,
-                            steps = 79,
+                            range = AppPreferences.OVERLAY_OPACITY_MIN.toFloat()..
+                                AppPreferences.OVERLAY_OPACITY_MAX.toFloat(),
+                            steps = AppPreferences.OVERLAY_OPACITY_MAX -
+                                AppPreferences.OVERLAY_OPACITY_MIN - 1,
                             onValueChange = { onSetOverlayOpacity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_overlay_opacity),
                             onResetToDefault = { onSetOverlayOpacity(overlayDefaults.overlayOpacity) }

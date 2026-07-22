@@ -1831,4 +1831,9 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: ‏Snapdragon 845/855/865/888 و بسیاری از مدل‌های سری Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: ‏Snapdragon 8 Gen 1/2/3، ‏8s Gen 3، مدل‌های جدید سری Snapdragon 7 و 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: ‏Snapdragon 8 Elite Gen 5، ‏8 Gen 5، ‏8 Elite، ‏8s Gen 4 و 6 Gen 4</string>
+    <string name="settings_touchscreen_right_stick">آنالوگ راست روی صفحه لمسی</string>
+    <string name="settings_touchscreen_right_stick_desc">برای کنترل آنالوگ راست مجازی، انگشت خود را روی فضای خالی صفحه بکشید.</string>
+    <string name="settings_help_touchscreen_right_stick">حرکت کشیدن انگشت در بخش‌های بدون استفاده صفحه بازی را به محورهای آنالوگ راست مجازی متصل می‌کند تا بدون لمس آنالوگ نمایان، دوربین را حرکت دهید. دکمه‌های لمسی و آنالوگ‌های نمایان مانند همیشه کار می‌کنند.</string>
+    <string name="settings_touchscreen_right_stick_sensitivity">حساسیت آنالوگ راست روی صفحه لمسی</string>
+    <string name="settings_help_touchscreen_right_stick_sensitivity">میزان تأثیر فاصله کشیدن انگشت روی صفحه بر حرکت آنالوگ راست مجازی را تنظیم می‌کند. حساسیت آنالوگ راست نمایان تغییر نمی‌کند.</string>
 </resources>

@@ -189,9 +189,11 @@ data class SettingsSnapshot(
     val nativePaletteDraw: Boolean = false,
     val performancePreset: Int = PerformancePresets.CUSTOM,
     val overlayScale: Int = 100,
-    val overlayOpacity: Int = 80,
+    val overlayOpacity: Int = AppPreferences.DEFAULT_OVERLAY_OPACITY,
     val overlayShow: Boolean = true,
     val racingMode: Boolean = false,
+    val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+    val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
@@ -250,7 +252,7 @@ data class SettingsSnapshot(
 
 data class OverlayLayoutSnapshot(
     val overlayScale: Int = 100,
-    val overlayOpacity: Int = 80,
+    val overlayOpacity: Int = AppPreferences.DEFAULT_OVERLAY_OPACITY,
     val hideOverlayOnGamepad: Boolean = true,
     val dpadOffset: Pair<Float, Float> = AppPreferences.DEFAULT_DPAD_OFFSET_X to AppPreferences.DEFAULT_DPAD_OFFSET_Y,
     val lstickOffset: Pair<Float, Float> = AppPreferences.DEFAULT_LSTICK_OFFSET_X to AppPreferences.DEFAULT_LSTICK_OFFSET_Y,
@@ -337,6 +339,13 @@ class AppPreferences(private val context: Context) {
         const val OVERLAY_CONTROL_OPACITY_MIN = 20
         const val OVERLAY_CONTROL_OPACITY_MAX = 100
         const val OVERLAY_CONTROL_OPACITY_DEFAULT = 100
+        const val OVERLAY_OPACITY_MIN = 0
+        const val OVERLAY_OPACITY_MAX = 100
+        const val DEFAULT_OVERLAY_OPACITY = 80
+        const val DEFAULT_TOUCHSCREEN_RIGHT_STICK = false
+        const val TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN = 50
+        const val TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX = 200
+        const val DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY = 100
         const val DEFAULT_GAMEPAD_STICK_DEADZONE = 15
         const val DEFAULT_GAMEPAD_STICK_SENSITIVITY = 100
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
@@ -480,6 +489,8 @@ class AppPreferences(private val context: Context) {
         private val OVERLAY_OPACITY = intPreferencesKey("overlay_opacity")
         private val OVERLAY_SHOW = booleanPreferencesKey("overlay_show")
         private val RACING_MODE = booleanPreferencesKey("racing_mode")
+        private val TOUCHSCREEN_RIGHT_STICK = booleanPreferencesKey("touchscreen_right_stick")
+        private val TOUCHSCREEN_RIGHT_STICK_SENSITIVITY = intPreferencesKey("touchscreen_right_stick_sensitivity")
         // Extended emulator settings
         private val ENABLE_FAST_BOOT = booleanPreferencesKey("enable_fast_boot")
         private val EE_CYCLE_RATE = intPreferencesKey("ee_cycle_rate")
@@ -1521,9 +1532,16 @@ class AppPreferences(private val context: Context) {
                 nativePaletteDraw = prefs[NATIVE_PALETTE_DRAW] ?: false,
                 performancePreset = PerformancePresets.CUSTOM,
                 overlayScale = prefs[OVERLAY_SCALE] ?: 100,
-                overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
+                overlayOpacity = (prefs[OVERLAY_OPACITY] ?: DEFAULT_OVERLAY_OPACITY)
+                    .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 overlayShow = prefs[OVERLAY_SHOW] ?: true,
                 racingMode = prefs[RACING_MODE] ?: false,
+                touchscreenRightStick = prefs[TOUCHSCREEN_RIGHT_STICK] ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+                touchscreenRightStickSensitivity = (prefs[TOUCHSCREEN_RIGHT_STICK_SENSITIVITY]
+                    ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY).coerceIn(
+                    TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+                    TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+                ),
                 touchHaptics = prefs[TOUCH_HAPTICS] ?: false,
                 touchHapticsPreset = (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG),
                 touchHapticsStrength = (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100),
@@ -1609,7 +1627,8 @@ class AppPreferences(private val context: Context) {
         .map { prefs ->
             OverlayLayoutSnapshot(
                 overlayScale = prefs[OVERLAY_SCALE] ?: 100,
-                overlayOpacity = prefs[OVERLAY_OPACITY] ?: 80,
+                overlayOpacity = (prefs[OVERLAY_OPACITY] ?: DEFAULT_OVERLAY_OPACITY)
+                    .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX),
                 hideOverlayOnGamepad = prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true,
                 dpadOffset = parseOffsetStr(
                     prefs[DPAD_OFFSET],
@@ -2040,11 +2059,14 @@ class AppPreferences(private val context: Context) {
     }
 
     val overlayOpacity: Flow<Int> = context.dataStore.data.map { prefs ->
-        prefs[OVERLAY_OPACITY] ?: 80
+        (prefs[OVERLAY_OPACITY] ?: DEFAULT_OVERLAY_OPACITY)
+            .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX)
     }
 
     suspend fun setOverlayOpacity(opacity: Int) {
-        context.dataStore.edit { it[OVERLAY_OPACITY] = opacity.coerceIn(20, 100) }
+        context.dataStore.edit {
+            it[OVERLAY_OPACITY] = opacity.coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX)
+        }
     }
 
     val overlayShow: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -2061,6 +2083,31 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setRacingMode(enabled: Boolean) {
         context.dataStore.edit { it[RACING_MODE] = enabled }
+    }
+
+    val touchscreenRightStick: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[TOUCHSCREEN_RIGHT_STICK] ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK
+    }
+
+    suspend fun setTouchscreenRightStick(enabled: Boolean) {
+        context.dataStore.edit { it[TOUCHSCREEN_RIGHT_STICK] = enabled }
+    }
+
+    val touchscreenRightStickSensitivity: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[TOUCHSCREEN_RIGHT_STICK_SENSITIVITY]
+            ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY).coerceIn(
+            TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+            TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+        )
+    }
+
+    suspend fun setTouchscreenRightStickSensitivity(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[TOUCHSCREEN_RIGHT_STICK_SENSITIVITY] = value.coerceIn(
+                TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+                TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+            )
+        }
     }
 
     val gamepadStickDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -3032,6 +3079,7 @@ class AppPreferences(private val context: Context) {
                 prefs.remove(STICK_SCALE)
                 prefs.remove(LEFT_STICK_SENSITIVITY)
                 prefs.remove(RIGHT_STICK_SENSITIVITY)
+                prefs.remove(TOUCHSCREEN_RIGHT_STICK_SENSITIVITY)
                 prefs.remove(STICK_SURFACE_MODE)
                 prefs.remove(CONTROL_LAYOUTS)
             } else {
@@ -3172,9 +3220,25 @@ class AppPreferences(private val context: Context) {
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
-            put("overlayOpacity", prefs[OVERLAY_OPACITY] ?: 80)
+            put(
+                "overlayOpacity",
+                (prefs[OVERLAY_OPACITY] ?: DEFAULT_OVERLAY_OPACITY)
+                    .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX)
+            )
             put("overlayShow", prefs[OVERLAY_SHOW] ?: true)
             put("racingMode", prefs[RACING_MODE] ?: false)
+            put(
+                "touchscreenRightStick",
+                prefs[TOUCHSCREEN_RIGHT_STICK] ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK
+            )
+            put(
+                "touchscreenRightStickSensitivity",
+                (prefs[TOUCHSCREEN_RIGHT_STICK_SENSITIVITY]
+                    ?: DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY).coerceIn(
+                    TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+                    TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+                )
+            )
             put("touchHaptics", prefs[TOUCH_HAPTICS] ?: false)
             put("touchHapticsPreset", (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG))
             put("touchHapticsStrength", (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100))
@@ -3476,9 +3540,21 @@ class AppPreferences(private val context: Context) {
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 2)
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
-            prefs[OVERLAY_OPACITY] = json.optInt("overlayOpacity", 80)
+            prefs[OVERLAY_OPACITY] = json.optInt("overlayOpacity", DEFAULT_OVERLAY_OPACITY)
+                .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX)
             prefs[OVERLAY_SHOW] = json.optBoolean("overlayShow", true)
             prefs[RACING_MODE] = json.optBoolean("racingMode", false)
+            prefs[TOUCHSCREEN_RIGHT_STICK] = json.optBoolean(
+                "touchscreenRightStick",
+                DEFAULT_TOUCHSCREEN_RIGHT_STICK
+            )
+            prefs[TOUCHSCREEN_RIGHT_STICK_SENSITIVITY] = json.optInt(
+                "touchscreenRightStickSensitivity",
+                DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY
+            ).coerceIn(
+                TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN,
+                TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
+            )
             prefs[TOUCH_HAPTICS] = json.optBoolean("touchHaptics", false)
             prefs[TOUCH_HAPTICS_PRESET] = json.optInt("touchHapticsPreset", DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG)
             prefs[TOUCH_HAPTICS_STRENGTH] = json.optInt("touchHapticsStrength", DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100)

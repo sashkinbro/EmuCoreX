@@ -208,9 +208,11 @@ data class SettingsUiState(
     val performancePreset: Int = PerformancePresets.CUSTOM,
     // Overlay
     val overlayScale: Int = 100,
-    val overlayOpacity: Int = 80,
+    val overlayOpacity: Int = AppPreferences.DEFAULT_OVERLAY_OPACITY,
     val overlayShow: Boolean = true,
     val racingMode: Boolean = false,
+    val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
+    val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
@@ -459,6 +461,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             overlayOpacity = snapshot.overlayOpacity,
             overlayShow = snapshot.overlayShow,
             racingMode = snapshot.racingMode,
+            touchscreenRightStick = snapshot.touchscreenRightStick,
+            touchscreenRightStickSensitivity = snapshot.touchscreenRightStickSensitivity,
             touchHaptics = snapshot.touchHaptics,
             touchHapticsPreset = snapshot.touchHapticsPreset,
             touchHapticsStrength = snapshot.touchHapticsStrength,
@@ -991,6 +995,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setKeepScreenOn(enabled: Boolean) { viewModelScope.launch { preferences.setKeepScreenOn(enabled) } }
     fun setRacingMode(enabled: Boolean) { viewModelScope.launch { preferences.setRacingMode(enabled) } }
     fun setTouchHaptics(enabled: Boolean) { viewModelScope.launch { preferences.setTouchHaptics(enabled) } }
+    fun setTouchscreenRightStick(enabled: Boolean) { viewModelScope.launch { preferences.setTouchscreenRightStick(enabled) } }
+    fun setTouchscreenRightStickSensitivity(value: Int) {
+        viewModelScope.launch { preferences.setTouchscreenRightStickSensitivity(value) }
+    }
     fun setTouchHapticsPreset(value: Int) { viewModelScope.launch { preferences.setTouchHapticsPreset(value) } }
     fun setTouchHapticsStrength(value: Int) { viewModelScope.launch { preferences.setTouchHapticsStrength(value) } }
     fun setGyroMode(value: Int) { viewModelScope.launch { preferences.setGyroMode(value) } }

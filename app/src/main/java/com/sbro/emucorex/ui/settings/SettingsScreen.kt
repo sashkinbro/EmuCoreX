@@ -1621,12 +1621,50 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_overlay_opacity),
                             subtitle = "${uiState.overlayOpacity}%",
                             value = uiState.overlayOpacity.toFloat(),
-                            range = 20f..100f,
-                            steps = 7,
+                            range = AppPreferences.OVERLAY_OPACITY_MIN.toFloat()..
+                                AppPreferences.OVERLAY_OPACITY_MAX.toFloat(),
+                            steps = AppPreferences.OVERLAY_OPACITY_MAX -
+                                AppPreferences.OVERLAY_OPACITY_MIN - 1,
                             onValueChange = { viewModel.setOverlayOpacity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_overlay_opacity),
                             onResetToDefault = { viewModel.setOverlayOpacity(overlayDefaults.overlayOpacity) }
                         )
+                        ToggleItem(
+                            icon = Icons.Rounded.TouchApp,
+                            title = stringResource(R.string.settings_touchscreen_right_stick),
+                            subtitle = stringResource(R.string.settings_touchscreen_right_stick_desc),
+                            checked = uiState.touchscreenRightStick,
+                            onCheckedChange = viewModel::setTouchscreenRightStick,
+                            helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
+                            onResetToDefault = {
+                                viewModel.setTouchscreenRightStick(
+                                    AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK
+                                )
+                            }
+                        )
+                        if (uiState.touchscreenRightStick) {
+                            SliderItem(
+                                icon = Icons.Rounded.TouchApp,
+                                title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
+                                subtitle = "${uiState.touchscreenRightStickSensitivity}%",
+                                value = uiState.touchscreenRightStickSensitivity.toFloat(),
+                                range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                onValueChange = {
+                                    viewModel.setTouchscreenRightStickSensitivity(it.roundToInt())
+                                },
+                                helpText = stringResource(
+                                    R.string.settings_help_touchscreen_right_stick_sensitivity
+                                ),
+                                onResetToDefault = {
+                                    viewModel.setTouchscreenRightStickSensitivity(
+                                        AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY
+                                    )
+                                }
+                            )
+                        }
                         ToggleItem(
                             icon = Icons.Rounded.TouchApp,
                             title = stringResource(R.string.settings_racing_mode),
@@ -4672,6 +4710,8 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Fixes, R.string.settings_anti_blur),
         entry(SettingsTab.Controls, R.string.settings_overlay_scale),
         entry(SettingsTab.Controls, R.string.settings_overlay_opacity),
+        entry(SettingsTab.Controls, R.string.settings_touchscreen_right_stick),
+        entry(SettingsTab.Controls, R.string.settings_touchscreen_right_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_racing_mode),
         entry(SettingsTab.Controls, R.string.settings_left_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_right_stick_sensitivity),
