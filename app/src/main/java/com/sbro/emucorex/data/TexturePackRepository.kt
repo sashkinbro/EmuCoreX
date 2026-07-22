@@ -74,8 +74,27 @@ class TexturePackRepository(
         return input.use { importPackZip(it, displayName) }
     }
 
-    internal fun importPackZip(input: InputStream, displayName: String?): TextureImportResult {
-        val stagingRoot = File(context.cacheDir, "texture-import-${UUID.randomUUID()}")
+    fun installRemotePack(archive: File, targetSerial: String): TextureImportResult {
+        if (!archive.isFile) return TextureImportResult(success = false)
+        return archive.inputStream().use { input ->
+            importPackZip(
+                input = input,
+                displayName = archive.name,
+                targetSerial = targetSerial,
+                replaceExisting = true
+            )
+        }
+    }
+
+    internal fun importPackZip(
+        input: InputStream,
+        displayName: String?,
+        targetSerial: String? = null,
+        replaceExisting: Boolean = false
+    ): TextureImportResult {
+        val normalizedTargetSerial = targetSerial?.let(::normalizeSerial)
+        if (targetSerial != null && normalizedTargetSerial == null) return TextureImportResult(success = false)
+        val stagingRoot = File(texturesRoot(), ".texture-import-${UUID.randomUUID()}")
         val fallbackSerial = findSerial(displayName)
         val importedSerials = linkedSetOf<String>()
         val stagedFiles = linkedSetOf<String>()
@@ -95,7 +114,7 @@ class TexturePackRepository(
                         val cleanParts = cleanZipPath(entry.name) ?: error("Invalid texture archive path")
                         if (cleanParts.isEmpty() || !isTextureFile(cleanParts.last())) continue
 
-                        val serial = serialFromParts(cleanParts) ?: fallbackSerial ?: continue
+                        val serial = normalizedTargetSerial ?: serialFromParts(cleanParts) ?: fallbackSerial ?: continue
                         val relativeParts = replacementRelativePath(cleanParts, serial)
                         if (relativeParts.isEmpty()) continue
                         val stagedRoot = File(canonicalStagingRoot, serial)
@@ -117,6 +136,18 @@ class TexturePackRepository(
 
             if (stagedFiles.isEmpty()) {
                 TextureImportResult(success = false)
+            } else if (replaceExisting) {
+                importedSerials.forEach { serial ->
+                    replaceReplacementsAtomically(
+                        stagedSerialRoot = File(canonicalStagingRoot, serial),
+                        serial = serial
+                    )
+                }
+                TextureImportResult(
+                    success = true,
+                    importedFiles = stagedFiles.size,
+                    importedSerials = importedSerials
+                )
             } else {
                 stagedFiles.forEach { stagedPath ->
                     val staged = File(stagedPath)
@@ -137,6 +168,37 @@ class TexturePackRepository(
             TextureImportResult(success = false)
         } finally {
             stagingRoot.deleteRecursively()
+        }
+    }
+
+    private fun replaceReplacementsAtomically(stagedSerialRoot: File, serial: String) {
+        val root = texturesRoot().canonicalFile
+        val targetGame = File(root, serial).canonicalFile
+        require(targetGame.parentFile == root) { "Invalid texture target" }
+        targetGame.mkdirs()
+        val target = File(targetGame, "replacements")
+        val backup = File(targetGame, ".replacements-backup-${UUID.randomUUID()}")
+        var oldMoved = false
+        try {
+            if (target.exists()) {
+                require(target.renameTo(backup)) { "Could not prepare texture update" }
+                oldMoved = true
+            }
+            target.mkdirs()
+            stagedSerialRoot.walkTopDown()
+                .filter(File::isFile)
+                .forEach { source ->
+                    val relative = source.relativeTo(stagedSerialRoot).invariantSeparatorsPath
+                    val destination = safeChild(target, relative.split('/'))
+                        ?: error("Invalid staged texture path")
+                    destination.parentFile?.mkdirs()
+                    source.copyTo(destination, overwrite = true)
+                }
+            if (backup.exists()) backup.deleteRecursively()
+        } catch (error: Throwable) {
+            if (target.exists()) target.deleteRecursively()
+            if (oldMoved && backup.exists()) backup.renameTo(target)
+            throw error
         }
     }
 

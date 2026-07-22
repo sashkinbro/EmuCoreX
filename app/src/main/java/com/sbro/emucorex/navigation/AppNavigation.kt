@@ -54,6 +54,7 @@ import com.sbro.emucorex.ui.achievements.AccountUnlockedAchievementsScreen
 import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
 import com.sbro.emucorex.ui.achievements.GameAchievementsScreen
 import com.sbro.emucorex.ui.catalog.CatalogSearchScreen
+import com.sbro.emucorex.ui.cheats.CheatManagerScreen
 import com.sbro.emucorex.ui.detail.GameDetailScreen
 import com.sbro.emucorex.ui.emulation.EmulationScreen
 import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
@@ -148,6 +149,9 @@ data class GameDbBrowserRoute(val query: String? = null)
 
 @Serializable
 object TextureManagerRoute
+
+@Serializable
+object CheatManagerRoute
 
 @Serializable
 object AchievementsRoute
@@ -324,6 +328,11 @@ fun AppNavigation(
             launchSingleTop = true
         }
     }
+    val navigateCheatManager: () -> Unit = {
+        navController.navigate(CheatManagerRoute) {
+            launchSingleTop = true
+        }
+    }
     val navigateProfile: () -> Unit = {
         navController.navigate(ProfileRoute) {
             launchSingleTop = true
@@ -422,6 +431,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onLaunchGame = launchGamePickerAction,
                     onLaunchBios = {
                         navController.navigate(EmulationRoute(bootBios = true)) {
@@ -525,6 +535,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -613,6 +624,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -661,6 +673,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -815,6 +828,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -876,6 +890,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -943,6 +958,7 @@ fun AppNavigation(
                     },
                     onNavigateMemoryCardManager = navigateMemoryCardManager,
                     onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
                     onBackClick = { navController.popBackStack() },
                     onLaunchGame = launchGamePickerAction
                 ) {
@@ -982,6 +998,12 @@ fun AppNavigation(
 
             composable<TextureManagerRoute> {
                 TextureManagerScreen(
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+
+            composable<CheatManagerRoute> {
+                CheatManagerScreen(
                     onBackClick = { navController.popBackStack() }
                 )
             }

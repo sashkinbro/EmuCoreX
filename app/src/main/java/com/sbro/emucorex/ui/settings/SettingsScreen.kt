@@ -99,7 +99,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -159,7 +158,6 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
-import com.sbro.emucorex.data.CheatFileEntry
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.HomeBackgroundRepository
@@ -221,11 +219,6 @@ fun SettingsScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
-    val cheatRepository = remember(context) { CheatRepository(context) }
-    var cheatEntries by remember { mutableStateOf(cheatRepository.listImportedCheatFiles()) }
-    val cheatEditorGameKey = remember { mutableStateOf<String?>(null) }
-    val cheatEditorFileName = remember { mutableStateOf<String?>(null) }
-    val cheatEditorText = remember { mutableStateOf("") }
     val pendingGamepadActionId = remember { mutableStateOf<String?>(null) }
     var pendingGamepadPadIndex by rememberSaveable { mutableIntStateOf(0) }
     var showTopBarMenu by remember { mutableStateOf(false) }
@@ -253,10 +246,6 @@ fun SettingsScreen(
     val backupExportFailureMessage = stringResource(R.string.settings_backup_export_failed)
     val backupRestoreSuccessMessage = stringResource(R.string.settings_backup_restore_success)
     val backupRestoreFailureMessage = stringResource(R.string.settings_backup_restore_failed)
-    val cheatsImportSuccessMessage = stringResource(R.string.settings_cheats_import_success)
-    val cheatsImportFailureMessage = stringResource(R.string.settings_cheats_import_failed)
-    val cheatsSavedMessage = stringResource(R.string.settings_cheats_saved)
-    val cheatsDeletedMessage = stringResource(R.string.settings_cheats_deleted)
     val coverUrlCopiedMessage = stringResource(R.string.settings_cover_download_url_copied)
     val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
     stringResource(R.string.settings_not_set)
@@ -316,12 +305,6 @@ fun SettingsScreen(
         }
     )
     val openLanguageSheet = rememberDebouncedClick(onClick = { onOpenLanguageScreen?.invoke() })
-    val refreshCheatEntries = remember {
-        {
-            cheatEntries = cheatRepository.listImportedCheatFiles()
-        }
-    }
-
     val settingsTabs = remember { SettingsTab.entries.toList() }
     fun selectRelativeTab(offset: Int) {
         val currentIndex = settingsTabs.indexOf(selectedTab).coerceAtLeast(0)
@@ -402,34 +385,6 @@ fun SettingsScreen(
             ).show()
         }
     }
-    val cheatImporter = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            val fileName = DocumentPathResolver.getDisplayName(context, uri.toString())
-            val contents = runCatching {
-                context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-            }.getOrNull()
-            if (contents.isNullOrBlank()) {
-                Toast.makeText(context, cheatsImportFailureMessage, Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            val gameKey = fileName.substringBeforeLast('.').ifBlank { "cheat_${System.currentTimeMillis()}" }
-            val blockCount = cheatRepository.importCheatFile(
-                gameKey = gameKey,
-                contents = contents,
-                enableAllByDefault = true
-            )
-            if (blockCount <= 0) {
-                Toast.makeText(context, cheatsImportFailureMessage, Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-            viewModel.setEnableCheats(true)
-            refreshCheatEntries()
-            Toast.makeText(context, cheatsImportSuccessMessage, Toast.LENGTH_SHORT).show()
-        }
-    }
     ProvideGamepadShoulderActions(
         enabled = !searchEnabled,
         onPrevious = { selectRelativeTab(-1) },
@@ -507,16 +462,7 @@ fun SettingsScreen(
                     showBackupExportDialog = true
                 },
                 launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
-                launchCheatImport = { cheatImporter.launch(arrayOf("*/*")) },
                 openLanguageSheet = openLanguageSheet,
-                cheatEntries = cheatEntries,
-                onOpenCheatEditor = { gameKey ->
-                    cheatEditorGameKey.value = gameKey
-                    cheatEditorFileName.value = cheatRepository.listImportedCheatFiles()
-                        .firstOrNull { it.gameKey == gameKey }
-                        ?.fileName ?: "$gameKey.pnach"
-                    cheatEditorText.value = cheatRepository.getImportedCheatText(gameKey).orEmpty()
-                },
                 onRequestGamepadBinding = { padIndex, actionId ->
                     pendingGamepadPadIndex = padIndex
                     pendingGamepadActionId.value = actionId
@@ -539,43 +485,6 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(bottomInset))
         }
-    }
-
-    if (cheatEditorGameKey.value != null) {
-        CheatEditorSheet(
-            fileName = cheatEditorFileName.value.orEmpty(),
-            value = cheatEditorText.value,
-            onValueChange = { cheatEditorText.value = it },
-            onDismiss = {
-                cheatEditorGameKey.value = null
-                cheatEditorFileName.value = null
-                cheatEditorText.value = ""
-            },
-            onSave = {
-                cheatEditorGameKey.value?.let { gameKey ->
-                    val updatedBlocks = cheatRepository.updateImportedCheatText(gameKey, cheatEditorText.value)
-                    if (updatedBlocks > 0) {
-                        refreshCheatEntries()
-                        Toast.makeText(context, cheatsSavedMessage, Toast.LENGTH_SHORT).show()
-                        cheatEditorGameKey.value = null
-                        cheatEditorFileName.value = null
-                        cheatEditorText.value = ""
-                    } else {
-                        Toast.makeText(context, cheatsImportFailureMessage, Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onDelete = {
-                cheatEditorGameKey.value?.let { gameKey ->
-                    cheatRepository.deleteImportedCheats(gameKey, null, null)
-                    refreshCheatEntries()
-                    Toast.makeText(context, cheatsDeletedMessage, Toast.LENGTH_SHORT).show()
-                    cheatEditorGameKey.value = null
-                    cheatEditorFileName.value = null
-                    cheatEditorText.value = ""
-                }
-            }
-        )
     }
 
     if (uiState.showMediatekCompatibilityNotice) {
@@ -1105,10 +1014,7 @@ private fun SettingsContent(
     onOpenCoverUrlEditor: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
-    launchCheatImport: () -> Unit,
     openLanguageSheet: () -> Unit,
-    cheatEntries: List<CheatFileEntry>,
-    onOpenCheatEditor: (String) -> Unit,
     onRequestGamepadBinding: (Int, String) -> Unit,
     onSearchResultSelected: (SettingsTab) -> Unit,
     viewModel: SettingsViewModel,
@@ -2593,38 +2499,9 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_cheats),
                             onResetToDefault = { viewModel.setEnableCheats(defaults.enableCheats) }
                         )
-                        SettingsItem(
-                            icon = Icons.Rounded.FolderOpen,
-                            label = stringResource(R.string.settings_cheats_import_title),
-                            value = stringResource(R.string.settings_cheats_import_desc),
-                            onClick = launchCheatImport
-                        )
                         SettingsInlineNote(
                             text = stringResource(R.string.settings_cheats_note)
                         )
-                    }
-                    SettingsSection(title = stringResource(R.string.settings_cheats_files_title)) {
-                        if (cheatEntries.isEmpty()) {
-                            CheatEmptyState(
-                                title = stringResource(R.string.settings_cheats_empty_title),
-                                body = stringResource(R.string.settings_cheats_empty),
-                                icon = Icons.Rounded.Star
-                            )
-                        } else {
-                            cheatEntries.forEach { entry ->
-                                val cheatFileSummary = stringResource(
-                                    R.string.settings_cheats_file_summary,
-                                    entry.fileName,
-                                    entry.blockCount
-                                )
-                                SettingsItem(
-                                    icon = Icons.Rounded.SaveAs,
-                                    label = entry.displayName,
-                                    value = cheatFileSummary,
-                                    onClick = { onOpenCheatEditor(entry.gameKey) }
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -3242,6 +3119,7 @@ private fun CustomizationSettingsTab(
             stringResource(R.string.shell_tools_section) to listOf(
                 DrawerItemId.MEMORY_CARDS,
                 DrawerItemId.TEXTURE_MANAGER,
+                DrawerItemId.CHEAT_MANAGER,
                 DrawerItemId.SAVE_STATES
             ),
             stringResource(R.string.settings_customization_drawer_other) to listOf(
@@ -3833,6 +3711,7 @@ private fun drawerItemIcon(item: DrawerItemId): ImageVector = when (item) {
     DrawerItemId.RESET_SETTINGS -> Icons.Rounded.Restore
     DrawerItemId.MEMORY_CARDS, DrawerItemId.SUPPORTED_FORMATS -> Icons.Rounded.Memory
     DrawerItemId.TEXTURE_MANAGER -> Icons.Rounded.FolderOpen
+    DrawerItemId.CHEAT_MANAGER -> Icons.Rounded.Gamepad
     DrawerItemId.SAVE_STATES -> Icons.Rounded.Save
     DrawerItemId.APP_SETTINGS -> Icons.Rounded.SettingsSuggest
     DrawerItemId.FEEDBACK -> Icons.Rounded.RateReview
@@ -3852,6 +3731,7 @@ private fun drawerItemLabel(item: DrawerItemId): String = when (item) {
     DrawerItemId.RESET_SETTINGS -> stringResource(R.string.settings_reset_all_action)
     DrawerItemId.MEMORY_CARDS -> stringResource(R.string.shell_memory_cards)
     DrawerItemId.TEXTURE_MANAGER -> stringResource(R.string.shell_texture_manager)
+    DrawerItemId.CHEAT_MANAGER -> stringResource(R.string.shell_cheat_manager)
     DrawerItemId.SAVE_STATES -> stringResource(R.string.shell_save_states)
     DrawerItemId.APP_SETTINGS -> stringResource(R.string.shell_app_settings)
     DrawerItemId.SUPPORTED_FORMATS -> stringResource(R.string.shell_supported_formats)
@@ -5330,54 +5210,6 @@ private fun SettingsInlineNote(text: String) {
 }
 
 @Composable
-private fun CheatEmptyState(
-    title: String,
-    body: String,
-    icon: ImageVector
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun hwDownloadModeOptions(): List<Pair<Int, String>> = listOf(
     0 to stringResource(R.string.settings_hw_download_mode_accurate),
     1 to stringResource(R.string.settings_hw_download_mode_force_full),
@@ -5690,69 +5522,6 @@ private fun gamepadPlayerLabel(padIndex: Int): String {
     return stringResource(
         if (padIndex == 0) R.string.settings_gamepad_player_1 else R.string.settings_gamepad_player_2
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CheatEditorSheet(
-    fileName: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onSave: () -> Unit,
-    onDelete: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
-        val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ScreenHorizontalPadding, vertical = 12.dp)
-                .padding(bottom = bottomInset),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.settings_cheats_editor_title),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = fileName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.65f),
-                textStyle = MaterialTheme.typography.bodySmall,
-                label = { Text(stringResource(R.string.settings_cheats_editor_field)) }
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onDelete) {
-                    Text(stringResource(R.string.settings_cheats_delete))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onDismiss) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                    TextButton(onClick = onSave) {
-                        Text(stringResource(R.string.settings_cheats_save))
-                    }
-                }
-            }
-        }
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

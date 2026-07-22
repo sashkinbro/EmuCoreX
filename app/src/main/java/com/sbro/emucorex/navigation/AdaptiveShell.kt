@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.FolderZip
 import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
@@ -140,6 +141,7 @@ fun AdaptiveShell(
     onNavigateSaveManager: (() -> Unit)? = null,
     onNavigateMemoryCardManager: (() -> Unit)? = null,
     onNavigateTextureManager: (() -> Unit)? = null,
+    onNavigateCheatManager: (() -> Unit)? = null,
     onBackClick: (() -> Unit)? = null,
     onLaunchGame: (() -> Unit)? = null,
     onLaunchBios: (() -> Unit)? = null,
@@ -168,6 +170,7 @@ fun AdaptiveShell(
             onNavigateSaveManager = onNavigateSaveManager,
             onNavigateMemoryCardManager = onNavigateMemoryCardManager,
             onNavigateTextureManager = onNavigateTextureManager,
+            onNavigateCheatManager = onNavigateCheatManager,
             onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
             onCloseDrawer = { }
@@ -225,6 +228,7 @@ fun AdaptiveShell(
             onNavigateSaveManager = onNavigateSaveManager,
             onNavigateMemoryCardManager = onNavigateMemoryCardManager,
             onNavigateTextureManager = onNavigateTextureManager,
+            onNavigateCheatManager = onNavigateCheatManager,
             onBackClick = onBackClick,
             onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
@@ -255,6 +259,7 @@ private fun CompactAdaptiveShell(
     onNavigateSaveManager: (() -> Unit)?,
     onNavigateMemoryCardManager: (() -> Unit)?,
     onNavigateTextureManager: (() -> Unit)?,
+    onNavigateCheatManager: (() -> Unit)?,
     onBackClick: (() -> Unit)?,
     onLaunchGame: (() -> Unit)?,
     onLaunchBios: (() -> Unit)?,
@@ -421,6 +426,7 @@ private fun CompactAdaptiveShell(
                     onNavigateSaveManager = onNavigateSaveManager,
                     onNavigateMemoryCardManager = onNavigateMemoryCardManager,
                     onNavigateTextureManager = onNavigateTextureManager,
+                    onNavigateCheatManager = onNavigateCheatManager,
                     onLaunchGame = onLaunchGame,
                     onLaunchBios = onLaunchBios,
                     selectedItemFocusRequester = selectedDrawerItemFocusRequester,
@@ -454,6 +460,7 @@ private fun SideNavigation(
     onNavigateSaveManager: (() -> Unit)?,
     onNavigateMemoryCardManager: (() -> Unit)?,
     onNavigateTextureManager: (() -> Unit)?,
+    onNavigateCheatManager: (() -> Unit)?,
     onLaunchGame: (() -> Unit)?,
     onLaunchBios: (() -> Unit)?,
     selectedItemFocusRequester: FocusRequester? = null,
@@ -532,6 +539,11 @@ private fun SideNavigation(
             closeDrawerThen(it)
         }
     }
+    val navigateCheatManager = onNavigateCheatManager?.let {
+        rememberDebouncedClick {
+            closeDrawerThen(it)
+        }
+    }
     val navigateFormats = rememberDebouncedClick {
         closeDrawerThen(onNavigateFormats)
     }
@@ -563,6 +575,7 @@ private fun SideNavigation(
     val showTools =
         (navigateMemoryCardManager != null && DrawerItemId.MEMORY_CARDS !in hiddenDrawerItems) ||
             (navigateTextureManager != null && DrawerItemId.TEXTURE_MANAGER !in hiddenDrawerItems) ||
+            (navigateCheatManager != null && DrawerItemId.CHEAT_MANAGER !in hiddenDrawerItems) ||
             (navigateSaveManager != null && DrawerItemId.SAVE_STATES !in hiddenDrawerItems)
 
     val content: @Composable () -> Unit = {
@@ -740,6 +753,13 @@ private fun SideNavigation(
                         icon = Icons.Rounded.FolderZip,
                         label = stringResource(R.string.shell_texture_manager),
                         onClick = navigateTextureManager
+                    )
+                }
+                if (navigateCheatManager != null && DrawerItemId.CHEAT_MANAGER !in hiddenDrawerItems) {
+                    ShellAction(
+                        icon = Icons.Rounded.Gamepad,
+                        label = stringResource(R.string.shell_cheat_manager),
+                        onClick = navigateCheatManager
                     )
                 }
                 if (navigateSaveManager != null && DrawerItemId.SAVE_STATES !in hiddenDrawerItems) {

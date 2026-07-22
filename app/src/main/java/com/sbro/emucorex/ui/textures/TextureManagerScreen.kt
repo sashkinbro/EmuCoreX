@@ -62,6 +62,7 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.TexturePackInfo
 import com.sbro.emucorex.data.TexturePackRepository
 import com.sbro.emucorex.data.TexturePackSummary
+import com.sbro.emucorex.data.RemoteContentInstallState
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
@@ -80,6 +81,7 @@ fun TextureManagerScreen(
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val repository = remember(context) { TexturePackRepository(context, preferences) }
+    val remoteInstallState = remember(context) { RemoteContentInstallState(context) }
     val scope = rememberCoroutineScope()
     val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -193,6 +195,14 @@ fun TextureManagerScreen(
             }
 
             item {
+                TextureOnlineCatalogSection(
+                    textureRepository = repository,
+                    preferences = preferences,
+                    onInstalled = { refresh() }
+                )
+            }
+
+            item {
                 TextureOptionsPanel(
                     replacementsEnabled = replacementsEnabled,
                     asyncLoading = asyncLoading,
@@ -270,7 +280,11 @@ fun TextureManagerScreen(
                             isWorking = true
                             val success = try {
                                 withContext(Dispatchers.IO) {
-                                    runCatching { repository.deletePack(pack.serial) }.getOrDefault(false)
+                                    runCatching {
+                                        val deleted = repository.deletePack(pack.serial)
+                                        if (deleted) remoteInstallState.removeTexturesForSerial(pack.serial)
+                                        deleted
+                                    }.getOrDefault(false)
                                 }
                             } finally {
                                 isWorking = false

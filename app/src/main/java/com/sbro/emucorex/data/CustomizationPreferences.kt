@@ -98,6 +98,7 @@ enum class DrawerItemId(val required: Boolean = false) {
     RESET_SETTINGS,
     MEMORY_CARDS,
     TEXTURE_MANAGER,
+    CHEAT_MANAGER,
     SAVE_STATES,
     APP_SETTINGS(required = true),
     SUPPORTED_FORMATS,
