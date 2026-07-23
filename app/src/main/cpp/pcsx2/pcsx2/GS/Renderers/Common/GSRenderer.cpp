@@ -174,6 +174,11 @@ bool GSRenderer::Merge(int field)
 		mode = ((static_cast<int>(GSConfig.InterlaceMode) - 2) >> 1);
 	}
 
+	// Clamp mode to valid range [0,3] - mode=-1 can happen with Automatic + no FFMD,
+	// which causes DoInterlace to be skipped entirely on OpenGL.
+	if (mode < 0 || mode > 3)
+		mode = 3;
+
 	// FastMAD stores four fields in a two-bank history target. Older Mali-G57 Vulkan drivers can
 	// expose stale/alternating banks during reconstruction. Bob is not a safe fallback here: its
 	// intentionally alternating field phase makes the entire picture move vertically. Use the
@@ -382,7 +387,7 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 			const GSVector2i fs = GSVector2i(static_cast<int>(static_cast<float>(resolution.x) * g_gs_renderer->GetUpscaleMultiplier()),
 				static_cast<int>(static_cast<float>(resolution.y) * g_gs_renderer->GetUpscaleMultiplier()));
 
-			if (g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y)
+			if ((g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y) && fs.x > 0 && fs.y > 0)
 			{
 				t_width *= static_cast<float>(fs.x) / src_rect.width();
 				t_height *= static_cast<float>(fs.y) / src_rect.height();
@@ -477,7 +482,8 @@ static bool ShouldGuardPresentEdges()
 static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i real_size, bool guard_edges = false)
 {
 	const GSVector2i size(src->GetSize());
-	const GSVector2 scale = GSVector2(size.x, size.y) / GSVector2(real_size.x, real_size.y).max(GSVector2(0.1f, 0.1f));
+	const GSVector2 scale = (real_size.x > 0 && real_size.y > 0) ?
+		(GSVector2(size.x, size.y) / GSVector2(real_size.x, real_size.y)) : GSVector2(1.0f, 1.0f);
 	const float upscale = GSIsHardwareRenderer() ? GSConfig.UpscaleMultiplier : 1;
 	int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0] * scale.x) * upscale);
 	int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1] * scale.y) * upscale);
@@ -776,11 +782,30 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 	const bool blank_frame = !Merge(field);
 
+	if (blank_frame)
+		m_consecutive_blank_frames++;
+	else
+		m_consecutive_blank_frames = 0;
+
 	m_last_draw_n = s_n;
 	m_last_transfer_n = s_transfer_n;
 
+#ifdef __ANDROID__
+	// Skip presenting blank frames to avoid flickering on Vulkan/OpenGL.
+	// This covers two cases:
+	// 1. Before game starts: blank_frame=true, current_tex=nullptr (no content yet)
+	// 2. Interlaced fields: blank_frame=true, current_tex!=nullptr (stale texture from prev frame)
+	// On software renderer this is not needed because there's no swapchain.
+	// To preserve GT3/GT4 fade effects (which produce consecutive blank frames),
+	// we only skip if the blank_frame is alternating (consecutive == 1).
+	const bool skip_present = (skip_frame || g_gs_device->ShouldSkipPresentingFrame()) ||
+		(blank_frame && m_consecutive_blank_frames == 1);
+#else
+	const bool skip_present = skip_frame || g_gs_device->ShouldSkipPresentingFrame();
+#endif
+
 	// Skip presentation when running uncapped while vsync is on.
-	if (skip_frame || g_gs_device->ShouldSkipPresentingFrame())
+	if (skip_present)
 	{
 		if (BeginPresentFrame(true))
 			EndPresentFrame();
@@ -1084,6 +1109,11 @@ void GSRenderer::StopGSDump()
 
 void GSRenderer::PresentCurrentFrame()
 {
+#ifdef __ANDROID__
+	// Skip idle present when there's no content to show (avoids blank frame flicker)
+	if (!g_gs_device->GetCurrent())
+		return;
+#endif
 	if (BeginPresentFrame(false))
 	{
 		GSTexture* current = g_gs_device->GetCurrent();
