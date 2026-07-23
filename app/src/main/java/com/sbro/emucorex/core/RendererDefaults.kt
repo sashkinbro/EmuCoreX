@@ -10,7 +10,13 @@ object RendererDefaults {
     fun defaultForHardware(
         @Suppress("UNUSED_PARAMETER")
         isMediaTekHardware: Boolean = GpuHardwareProfiles.isMediaTekHardware()
-    ): Int = DEFAULT
+    ): Int {
+        return if (GpuHardwareProfiles.detectHardwareProfile() == GpuHardwareProfiles.ADRENO) {
+            VULKAN
+        } else {
+            DEFAULT
+        }
+    }
 
     fun normalizeAndroidRenderer(
         value: Int,

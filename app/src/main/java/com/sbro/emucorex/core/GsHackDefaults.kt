@@ -24,7 +24,7 @@ object GsHackDefaults {
     const val TEXTURE_PRELOADING_MAX = 2
     const val ANISOTROPIC_FILTERING_DEFAULT = 0
     const val HW_MIPMAPPING_DEFAULT = true
-    const val ANTI_BLUR_DEFAULT = true
+    const val ANTI_BLUR_DEFAULT = false
     // Balanced Android default: keeps GS ordering without forcing expensive GPU readbacks.
     const val HW_DOWNLOAD_MODE_DEFAULT = 2
     const val HW_DOWNLOAD_MODE_MIN = 0
