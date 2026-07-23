@@ -117,6 +117,10 @@ object DocumentPathResolver {
 
         val uri = rawPath.toUri()
         val targetDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "imported-bios")
+
+        val existing = preparedBiosForSource(targetDir, rawPath)
+        if (existing != null) return existing
+
         if (!targetDir.exists() && !targetDir.mkdirs()) return null
         val stagingDir = File(targetDir.parentFile ?: context.filesDir, "imported-bios-staging")
 
@@ -485,8 +489,15 @@ object DocumentPathResolver {
             return false
         }
 
+        val preserveExtensions = setOf("nvm", "mec")
         backupDir.listFiles().orEmpty().forEach { file ->
-            if (file.isFile) file.delete()
+            if (file.isFile) {
+                if (file.extension.lowercase() in preserveExtensions) {
+                    val targetFile = File(targetDir, file.name)
+                    if (!targetFile.exists()) file.copyTo(targetFile, overwrite = false)
+                }
+                file.delete()
+            }
         }
         backupDir.delete()
         return true
