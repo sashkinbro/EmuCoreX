@@ -99,6 +99,12 @@ public:
 	/// Returns true if running on an AMD GPU.
 	__fi bool IsDeviceAMD() const { return (m_device_properties.vendorID == 0x1002); }
 
+	/// Returns true if running on an ARM Mali GPU.
+	__fi bool IsDeviceMali() const { return (m_device_properties.vendorID == 0x13B5u); }
+
+	/// Returns true if running on a Qualcomm Adreno GPU.
+	__fi bool IsDeviceAdreno() const { return (m_device_properties.vendorID == 0x5143u); }
+
 	// Creates a simple render pass.
 	VkRenderPass GetRenderPass(VkFormat color_format, VkFormat depth_format,
 		VkAttachmentLoadOp color_load_op = VK_ATTACHMENT_LOAD_OP_LOAD,

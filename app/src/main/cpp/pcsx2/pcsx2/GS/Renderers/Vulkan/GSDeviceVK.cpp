@@ -479,7 +479,8 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_calibrated_timestamps =
 		SupportsExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
-		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
+		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false) ||
+		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
 	// Disable feedback loop layout for Mali (older drivers have issues) and PowerVR.
 	// Only enable for non-mobile vendors or when explicitly supported.
 	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
@@ -818,7 +819,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
 	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
 	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_TRUE};
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR, nullptr, VK_FALSE};
 	VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT attachment_feedback_loop_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
 
@@ -839,6 +840,9 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 	// confirm we actually support it
 	m_optional_extensions.vk_ext_provoking_vertex &= (provoking_vertex_features.provokingVertexLast == VK_TRUE);
+	if (m_optional_extensions.vk_ext_provoking_vertex && IsDeviceAdreno() &&
+		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
+		m_optional_extensions.vk_ext_provoking_vertex = false;
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access &=
 		(rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess == VK_TRUE);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
@@ -870,6 +874,10 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		m_use_push_descriptors = false;
 	}
 	if (m_use_push_descriptors && (properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
+		m_use_push_descriptors = false;
+	if (m_use_push_descriptors && properties2.properties.vendorID == 0x5143u &&
+		m_device_driver_properties.driverID != VK_DRIVER_ID_QUALCOMM_PROPRIETARY &&
+		m_device_driver_properties.driverID != VK_DRIVER_ID_MESA_TURNIP)
 		m_use_push_descriptors = false;
 	if (!m_use_push_descriptors)
 		Console.Warning("VK: Using non-push-descriptor texture binding fallback.");
@@ -2548,6 +2556,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 			if (!m_swap_chain->RecreateSurface(m_window_info))
 			{
 				Console.Error("VK: Failed to recreate surface after loss");
+				DestroySurface();
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}
