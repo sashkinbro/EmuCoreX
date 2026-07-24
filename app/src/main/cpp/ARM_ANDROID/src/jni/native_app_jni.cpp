@@ -496,13 +496,20 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setFrame
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setFrameLimitEnabled(JNIEnv*, jclass, jboolean enabled) { AndroidRuntime::Instance().SetFrameLimitEnabled(enabled == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setTurboModeEnabled(JNIEnv*, jclass, jboolean enabled) { AndroidRuntime::Instance().SetTurboModeEnabled(enabled == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_reloadPatches(JNIEnv*, jclass) { AndroidRuntime::Instance().ReloadPatches(); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceCreated(JNIEnv*, jclass) {}
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceCreated(JNIEnv*, jclass) {
+	__android_log_write(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceCreated: JNI callback (no-op)");
+}
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv* env, jclass, jobject surface, jint width, jint height)
 {
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: surface=%p width=%d height=%d", surface, width, height);
 	ANativeWindow* window = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: ANativeWindow=%p", window);
 	AndroidRuntime::Instance().SetNativeSurface(window, width, height);
 }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv*, jclass) { AndroidRuntime::Instance().ClearSurface(); }
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv*, jclass) {
+	__android_log_write(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceDestroyed: JNI callback");
+	AndroidRuntime::Instance().ClearSurface();
+}
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runVMThread(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, 0) ? JNI_TRUE : JNI_FALSE; }
 extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_runBootSmokeProbe(JNIEnv* env, jclass, jstring path, jint steps) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, steps) ? 1 : 0; }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runJitExecutableMemorySmokeTest(JNIEnv*, jclass) { return RunExecutableMemorySmokeTest() ? JNI_TRUE : JNI_FALSE; }

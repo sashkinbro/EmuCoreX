@@ -1926,4 +1926,7 @@
     <string name="settings_enable_fastmem">快速内存（Fastmem）</string>
     <string name="settings_enable_fastmem_desc">为 EE JIT 使用直接虚拟内存访问。仅在诊断崩溃或重编译器问题时关闭。</string>
     <string name="settings_help_enable_fastmem">将 PS2 地址映射到预留的主机地址范围，使重编译后的内存操作绕过较慢的处理程序。正常游玩时请保持启用。关闭后性能会显著下降，但有助于排查 Fastmem 故障或特定设备的内存映射问题。重启游戏后生效。</string>
+    <string name="settings_debug_logcat_gs">在 logcat 中调试 GS</string>
+    <string name="settings_debug_logcat_gs_desc">将详细的 Vulkan/OpenGL GS 事件记录到 logcat（标签：DebugGS）。</string>
+    <string name="settings_help_debug_logcat_gs">启用将 Vulkan/OpenGL 图形合成器的详细日志记录到 Android logcat。按标签 \"DebugGS\" 过滤。仅在诊断渲染崩溃和 GPU 设备丢失错误时有用。在正常游戏时请保持此选项关闭。</string>
 </resources>

@@ -32,6 +32,7 @@
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
+#include "emucorex/debug_logcat.h"
 
 // Tweakables
 enum : u32
@@ -1308,6 +1309,7 @@ void GSDeviceVK::WaitForCommandBufferCompletion(u32 index)
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "WaitForCommandBufferCompletion: vkWaitForFences FAILED for index=%u VkResult=%d, setting m_last_submit_failed", index, static_cast<int>(res));
 		m_last_submit_failed = true;
 		return;
 	}
@@ -1438,6 +1440,7 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "SubmitCommandBuffer: vkQueueSubmit FAILED VkResult=%d, setting m_last_submit_failed", static_cast<int>(res));
 		m_last_submit_failed = true;
 		return;
 	}
@@ -1458,10 +1461,16 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 		{
 			// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
 			if (res == VK_ERROR_OUT_OF_DATE_KHR)
+			{
 				// Defer until next frame, otherwise resizing would invalidate swapchain before next present.
+				DEBUG_GS_LOG(ANDROID_LOG_INFO, "SubmitCommandBuffer: vkQueuePresentKHR OUT_OF_DATE, deferring resize");
 				m_resize_requested = true;
+			}
 			else
+			{
+				DEBUG_GS_LOG(ANDROID_LOG_ERROR, "SubmitCommandBuffer: vkQueuePresentKHR FAILED VkResult=%d", static_cast<int>(res));
 				LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
+			}
 
 			return;
 		}
@@ -2016,6 +2025,7 @@ void GSDeviceVK::WaitForSpinCompletion(u32 index)
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkWaitForFences failed: ");
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "WaitForSpinCompletion: vkWaitForFENCES FAILED index=%u VkResult=%d", index, static_cast<int>(res));
 		m_last_submit_failed = true;
 		return;
 	}
@@ -2373,13 +2383,20 @@ void GSDeviceVK::Destroy()
 
 bool GSDeviceVK::UpdateWindow()
 {
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: destroying old surface and acquiring new window");
 	DestroySurface();
 
 	if (!AcquireWindow(false))
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "UpdateWindow: AcquireWindow failed, returning false");
 		return false;
+	}
 
 	if (m_window_info.type == WindowInfo::Type::Surfaceless)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: surfaceless mode, returning true");
 		return true;
+	}
 
 	// make sure previous frames are presented
 	ExecuteCommandBuffer(false);
@@ -2388,21 +2405,26 @@ bool GSDeviceVK::UpdateWindow()
 	// recreate surface in existing swap chain if it already exists
 	if (m_swap_chain)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: recreating surface in existing swap chain");
 		if (m_swap_chain->RecreateSurface(m_window_info))
 		{
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: RecreateSurface succeeded");
 			m_window_info = m_swap_chain->GetWindowInfo();
 			return true;
 		}
 
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "UpdateWindow: RecreateSurface failed, resetting swap chain");
 		m_swap_chain.reset();
 	}
 
 	VkSurfaceKHR surface = VKSwapChain::CreateVulkanSurface(m_instance, m_physical_device, &m_window_info);
 	if (surface == VK_NULL_HANDLE)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "UpdateWindow: CreateVulkanSurface returned VK_NULL_HANDLE");
 		Console.Error("VK: Failed to create new surface for swap chain");
 		return false;
 	}
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: new VkSurface created=%p", surface);
 
 	VkPresentModeKHR present_mode;
 	if (!VKSwapChain::SelectPresentMode(surface, &m_vsync_mode, &present_mode) ||
@@ -2423,6 +2445,7 @@ bool GSDeviceVK::UpdateWindow()
 
 void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float new_window_scale)
 {
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "ResizeWindow: %ux%u scale=%.2f", new_window_width, new_window_height, new_window_scale);
 	m_resize_requested = false;
 
 	if (!m_swap_chain || (m_swap_chain->GetWidth() == new_window_width &&
@@ -2439,6 +2462,7 @@ void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float
 	if (!m_swap_chain->ResizeSwapChain(new_window_width, new_window_height, new_window_scale))
 	{
 		// AcquireNextImage() will fail, and we'll recreate the surface.
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "ResizeWindow: ResizeSwapChain FAILED");
 		Console.Error("VK: Failed to resize swap chain. Next present will fail.");
 		return;
 	}
@@ -2453,6 +2477,7 @@ bool GSDeviceVK::SupportsExclusiveFullscreen() const
 
 void GSDeviceVK::DestroySurface()
 {
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "DestroySurface: waiting for GPU idle and destroying swap chain");
 	WaitForGPUIdle();
 	m_swap_chain.reset();
 }
@@ -2520,7 +2545,10 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 
 	// Check if the device was lost.
 	if (m_last_submit_failed)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresent: m_last_submit_failed=true, returning DeviceLost");
 		return PresentResult::DeviceLost;
+	}
 
 	if (frame_skip)
 		return PresentResult::FrameSkipped;
@@ -2528,6 +2556,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	// If we're running surfaceless, kick the command buffer so we don't run out of descriptors.
 	if (!m_swap_chain)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresent: no swap_chain, executing cmd buffer and skipping");
 		ExecuteCommandBuffer(false);
 		return PresentResult::FrameSkipped;
 	}
@@ -2535,41 +2564,53 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	VkResult res = m_resize_requested ? VK_ERROR_OUT_OF_DATE_KHR : m_swap_chain->AcquireNextImage();
 	if (res != VK_SUCCESS)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresent: AcquireNextImage failed with VkResult=%d", static_cast<int>(res));
 		m_swap_chain->ReleaseCurrentImage();
 
 		if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
 		{
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: resize/out-of-date, calling ResizeWindow");
 			ResizeWindow(0, 0, m_window_info.surface_scale);
 			res = m_swap_chain->AcquireNextImage();
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: retry AcquireNextImage result=%d", static_cast<int>(res));
 		}
 		else if (res == VK_ERROR_SURFACE_LOST_KHR)
 		{
+			DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresent: VK_ERROR_SURFACE_LOST_KHR, attempting recovery");
 			Console.Warning("VK: Surface lost, attempting to recreate");
 			WaitForGPUIdle();
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: WaitForGPUIdle done, calling AcquireWindow(true)");
 			if (!AcquireWindow(true))
 			{
+				DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresent: AcquireWindow failed after surface loss");
 				Console.Error("VK: Failed to reacquire Android window after surface loss");
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}
-
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: AcquireWindow succeeded, calling RecreateSurface");
 			if (!m_swap_chain->RecreateSurface(m_window_info))
 			{
+				DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresent: RecreateSurface FAILED");
 				Console.Error("VK: Failed to recreate surface after loss");
 				DestroySurface();
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}
-
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: RecreateSurface succeeded, retrying AcquireNextImage");
 			res = m_swap_chain->AcquireNextImage();
+			DEBUG_GS_LOG(ANDROID_LOG_INFO, "BeginPresent: post-recovery AcquireNextImage result=%d", static_cast<int>(res));
 		}
 		else
+		{
+			DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresent: unexpected VkResult=%d from AcquireNextImage", static_cast<int>(res));
 			LOG_VULKAN_ERROR(res, "vkAcquireNextImageKHR() failed: ");
+		}
 
 		// This can happen when multiple resize events happen in quick succession.
 		// In this case, just wait until the next frame to try again.
 		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 		{
+			DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresent: acquire still failed after recovery, skipping frame");
 			// Still submit the command buffer, otherwise we'll end up with several frames waiting.
 			ExecuteCommandBuffer(false);
 			return PresentResult::FrameSkipped;

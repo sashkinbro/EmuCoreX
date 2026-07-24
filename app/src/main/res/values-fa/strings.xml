@@ -1940,4 +1940,7 @@
     <string name="settings_enable_fastmem">حافظه سریع (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">برای JIT پردازنده EE از دسترسی مستقیم به حافظه مجازی استفاده می‌کند. فقط برای بررسی خرابی یا مشکل کامپایلر مجدد غیرفعال کنید.</string>
     <string name="settings_help_enable_fastmem">نشانی‌های PS2 را به یک محدوده رزروشده در حافظه دستگاه نگاشت می‌کند تا عملیات بازکامپایل‌شده از پردازشگرهای کندتر عبور نکنند. برای بازی عادی روشن بماند. خاموش کردن آن کارایی را بسیار کاهش می‌دهد، اما به تشخیص خطاهای Fastmem یا مشکلات نگاشت حافظه در دستگاه‌های خاص کمک می‌کند. برای اعمال، بازی را دوباره اجرا کنید.</string>
+    <string name="settings_debug_logcat_gs">اشکال‌زدایی GS در logcat</string>
+    <string name="settings_debug_logcat_gs_desc">ثبت رویدادهای دقیق Vulkan/OpenGL GS در logcat (برچسب: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">ثبت دقیق ترکیب‌کننده گرافیکی Vulkan/OpenGL را در logcat اندروید فعال می‌کند. با برچسب \"DebugGS\" فیلتر کنید. فقط برای تشخیص خرابی‌های رندر و خطاهای از دست رفتن دستگاه GPU مفید است. برای بازی عادی این گزینه را خاموش نگه دارید.</string>
 </resources>

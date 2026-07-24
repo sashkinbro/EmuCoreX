@@ -1927,4 +1927,7 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">Verwendet direkten virtuellen Speicherzugriff für den EE-JIT. Nur zur Diagnose von Abstürzen oder Recompiler-Problemen deaktivieren.</string>
     <string name="settings_help_enable_fastmem">Bildet PS2-Adressen in einem reservierten Hostbereich ab, damit rekompilierte Speicherzugriffe langsamere Handler umgehen. Für normales Spielen aktiviert lassen. Das Deaktivieren verringert die Leistung deutlich, kann aber Fastmem-Fehler oder gerätespezifische Probleme bei der Speicherabbildung eingrenzen. Zum Anwenden das Spiel neu starten.</string>
+    <string name="settings_debug_logcat_gs">GS-Logcat debuggen</string>
+    <string name="settings_debug_logcat_gs_desc">Detaillierte Vulkan/OpenGL GS-Ereignisse im Logcat protokollieren (Tag: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Aktiviert die ausführliche Protokollierung des Vulkan/OpenGL-Grafiksynthesizers im Android-Logcat. Filtern Sie nach dem Tag \"DebugGS\". Nur nützlich zur Diagnose von Rendering-Abstürzen und Fehlern durch verlorene GPU-Geräte. Lassen Sie dies für das normale Spielen deaktiviert.</string>
 </resources>

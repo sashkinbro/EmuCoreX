@@ -1927,4 +1927,7 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">Usa memória virtual direta para o JIT da EE. Desative apenas para diagnosticar falhas ou problemas do recompilador.</string>
     <string name="settings_help_enable_fastmem">Mapeia os endereços do PS2 para uma faixa reservada do sistema, permitindo que operações recompiladas evitem manipuladores mais lentos. Mantenha ativado para jogar normalmente. Desativar reduz muito o desempenho, mas pode ajudar a isolar falhas do Fastmem ou problemas de mapeamento específicos do dispositivo. Reinicie o jogo para aplicar.</string>
+    <string name="settings_debug_logcat_gs">Depurar GS no logcat</string>
+    <string name="settings_debug_logcat_gs_desc">Registrar eventos detalhados do Vulkan/OpenGL GS no logcat (tag: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Ativa o registro detalhado do sintetizador de gráficos Vulkan/OpenGL no logcat do Android. Filtre pela tag \"DebugGS\". Útil apenas para diagnosticar travamentos de renderização e erros de perda de dispositivo de GPU. Mantenha isso desativado durante o jogo normal.</string>
 </resources>

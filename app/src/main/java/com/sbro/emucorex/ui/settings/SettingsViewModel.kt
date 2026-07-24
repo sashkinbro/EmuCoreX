@@ -120,6 +120,7 @@ data class SettingsUiState(
     val showRecentGames: Boolean = true,
     val showHomeSearch: Boolean = false,
     val showDebugOptions: Boolean = false,
+    val debugLogcatGs: Boolean = false,
     val preferEnglishGameTitles: Boolean = false,
     val biosPath: String? = null,
     val gamePath: String? = null,
@@ -382,6 +383,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             showRecentGames = snapshot.showRecentGames,
             showHomeSearch = snapshot.showHomeSearch,
             showDebugOptions = snapshot.showDebugOptions,
+            debugLogcatGs = snapshot.debugLogcatGs,
             preferEnglishGameTitles = snapshot.preferEnglishGameTitles,
             biosPath = snapshot.biosPath,
             gamePath = snapshot.gamePath,
@@ -1064,6 +1066,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setShowRecentGames(enabled: Boolean) { viewModelScope.launch { preferences.setShowRecentGames(enabled) } }
     fun setShowHomeSearch(enabled: Boolean) { viewModelScope.launch { preferences.setShowHomeSearch(enabled) } }
     fun setShowDebugOptions(enabled: Boolean) { viewModelScope.launch { preferences.setShowDebugOptions(enabled) } }
+    fun setDebugLogcatGs(enabled: Boolean) { viewModelScope.launch { preferences.setDebugLogcatGs(enabled) } }
     fun setPreferEnglishGameTitles(enabled: Boolean) {
         viewModelScope.launch {
             EmulatorBridge.setSetting("UI", "PreferEnglishGameTitles", "bool", enabled.toString())

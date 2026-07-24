@@ -1929,4 +1929,7 @@
     <string name="settings_enable_fastmem">Швидка памʼять (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">Використовує прямий доступ до віртуальної памʼяті для EE JIT. Вимикайте лише для діагностики збоїв або рекомпілятора.</string>
     <string name="settings_help_enable_fastmem">Відображає адреси PS2 у зарезервований діапазон памʼяті пристрою, щоб рекомпільовані операції не проходили через повільніші обробники. Для звичайної гри залишайте увімкненим. Вимкнення суттєво знижує продуктивність, але допомагає виявити помилки Fastmem або проблеми відображення памʼяті на окремих пристроях. Для застосування перезапустіть гру.</string>
+    <string name="settings_debug_logcat_gs">Налагодження GS у logcat</string>
+    <string name="settings_debug_logcat_gs_desc">Записувати детальні події Vulkan/OpenGL GS до logcat (тег: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Вмикає детальний запис графічного синтезатора Vulkan/OpenGL до Android logcat. Фільтруйте за тегом \"DebugGS\". Корисно лише для діагностики збоїв рендерингу та помилок втрати пристрою GPU. Тримайте цю функцію вимкненою під час звичайної гри.</string>
 </resources>

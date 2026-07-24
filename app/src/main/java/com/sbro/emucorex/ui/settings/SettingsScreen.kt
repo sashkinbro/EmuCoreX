@@ -49,6 +49,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -1179,6 +1180,15 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setShowDebugOptions,
                             helpText = stringResource(R.string.settings_help_debug_options),
                             onResetToDefault = { viewModel.setShowDebugOptions(defaults.showDebugOptions) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.BugReport,
+                            title = stringResource(R.string.settings_debug_logcat_gs),
+                            subtitle = stringResource(R.string.settings_debug_logcat_gs_desc),
+                            checked = uiState.debugLogcatGs,
+                            onCheckedChange = viewModel::setDebugLogcatGs,
+                            helpText = stringResource(R.string.settings_help_debug_logcat_gs),
+                            onResetToDefault = { viewModel.setDebugLogcatGs(defaults.debugLogcatGs) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Language,
@@ -4790,6 +4800,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_show_recent_games),
         entry(SettingsTab.General, R.string.settings_show_home_search),
         entry(SettingsTab.General, R.string.settings_prefer_english_game_titles),
+        entry(SettingsTab.General, R.string.settings_debug_logcat_gs),
         entry(SettingsTab.Graphics, R.string.settings_renderer),
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver) else null,
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver_manager_title) else null,

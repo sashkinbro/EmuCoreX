@@ -2,6 +2,7 @@
 #include "emucorex/retro_achievements_android.h"
 #include "emucorex/android_crash_diagnostics.h"
 #include "emucorex/android_runtime.h"
+#include "emucorex/debug_logcat.h"
 
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Config.h"
@@ -211,6 +212,11 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	si.SetBoolValue("Logging", "EnableFileLogging", autotest_mode);
 	si.SetBoolValue("Logging", "EnableEEConsole", autotest_mode);
 	si.SetBoolValue("Logging", "EnableIOPConsole", autotest_mode);
+
+	emucorex::SetDebugLogcatEnabled(
+		GetBoolSetting(config.settings, "EmuCoreX", "DebugLogcatGS", false));
+	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Debug GS logcat: %s",
+		emucorex::IsDebugLogcatEnabled() ? "enabled" : "disabled");
 	si.SetIntValue("EmuCore/GS", "Renderer",
 		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
 	si.SetBoolValue("EmuCore/GS", "VsyncEnable",

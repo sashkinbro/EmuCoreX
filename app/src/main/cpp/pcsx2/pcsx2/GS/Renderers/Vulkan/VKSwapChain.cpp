@@ -17,6 +17,7 @@
 #if defined(__ANDROID__)
 #include <android/log.h>
 #endif
+#include "emucorex/debug_logcat.h"
 
 #if defined(VK_USE_PLATFORM_XLIB_KHR)
 #include <X11/Xlib.h>
@@ -628,7 +629,10 @@ VkResult VKSwapChain::AcquireNextImage()
 		return m_image_acquire_result.value();
 
 	if (!m_swap_chain)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "AcquireNextImage: swap_chain is null, returning SURFACE_LOST");
 		return VK_ERROR_SURFACE_LOST_KHR;
+	}
 
 	// Use a different semaphore for each image.
 	m_current_semaphore = (m_current_semaphore + 1) % static_cast<u32>(m_semaphores.size());
@@ -636,6 +640,11 @@ VkResult VKSwapChain::AcquireNextImage()
 	const VkResult res = vkAcquireNextImageKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, UINT64_MAX,
 		m_semaphores[m_current_semaphore].available_semaphore, VK_NULL_HANDLE, &m_current_image);
 	m_image_acquire_result = res;
+	if (res != VK_SUCCESS)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "AcquireNextImage: vkAcquireNextImageKHR FAILED VkResult=%d m_swap_chain=%p",
+			static_cast<int>(res), m_swap_chain);
+	}
 	return res;
 }
 
@@ -716,6 +725,7 @@ bool VKSwapChain::SetPresentMode(VkPresentModeKHR present_mode)
 
 bool VKSwapChain::RecreateSurface(const WindowInfo& new_wi)
 {
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "RecreateSurface: destroying old swap chain and surface");
 	// Destroy the old swap chain, images, and surface.
 	DestroySwapChain();
 	DestroySurface();
@@ -725,7 +735,11 @@ bool VKSwapChain::RecreateSurface(const WindowInfo& new_wi)
 	m_surface = CreateVulkanSurface(
 		GSDeviceVK::GetInstance()->GetVulkanInstance(), GSDeviceVK::GetInstance()->GetPhysicalDevice(), &m_window_info);
 	if (m_surface == VK_NULL_HANDLE)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "RecreateSurface: CreateVulkanSurface returned VK_NULL_HANDLE");
 		return false;
+	}
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "RecreateSurface: new VkSurface=%p", m_surface);
 
 	// The validation layers get angry at us if we don't call this before creating the swapchain.
 	VkBool32 present_supported = VK_TRUE;
@@ -733,22 +747,27 @@ bool VKSwapChain::RecreateSurface(const WindowInfo& new_wi)
 		GSDeviceVK::GetInstance()->GetPresentQueueFamilyIndex(), m_surface, &present_supported);
 	if (res != VK_SUCCESS)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "RecreateSurface: vkGetPhysicalDeviceSurfaceSupportKHR FAILED VkResult=%d", static_cast<int>(res));
 		LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceSupportKHR failed: ");
 		return false;
 	}
 	if (!present_supported)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "RecreateSurface: surface does not support presenting");
 		pxFailRel("Recreated surface does not support presenting.");
 		return false;
 	}
 
 	// Finally re-create the swap chain
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "RecreateSurface: calling CreateSwapChain");
 	if (!CreateSwapChain())
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "RecreateSurface: CreateSwapChain FAILED");
 		DestroySwapChain();
 		return false;
 	}
 
+	DEBUG_GS_LOG(ANDROID_LOG_INFO, "RecreateSurface: success");
 	return true;
 }
 

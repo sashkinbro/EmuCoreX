@@ -1939,4 +1939,7 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">Menggunakan akses memori virtual langsung untuk JIT EE. Nonaktifkan hanya untuk mendiagnosis crash atau masalah rekompiler.</string>
     <string name="settings_help_enable_fastmem">Memetakan alamat PS2 ke rentang sistem yang dicadangkan agar operasi memori hasil rekompilasi melewati penangan yang lebih lambat. Biarkan aktif untuk bermain normal. Menonaktifkannya sangat mengurangi performa, tetapi dapat membantu mengisolasi kesalahan Fastmem atau masalah pemetaan memori khusus perangkat. Mulai ulang game untuk menerapkan.</string>
+    <string name="settings_debug_logcat_gs">Debug GS logcat</string>
+    <string name="settings_debug_logcat_gs_desc">Catat detail peristiwa Vulkan/OpenGL GS ke logcat (tag: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Mengaktifkan pencatatan verbose synthesizer grafis Vulkan/OpenGL ke logcat Android. Filter berdasarkan tag \"DebugGS\". Hanya berguna untuk mendiagnosis crash rendering dan kesalahan perangkat GPU yang hilang. Biarkan ini nonaktif untuk bermain normal.</string>
 </resources>

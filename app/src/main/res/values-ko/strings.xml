@@ -1924,4 +1924,7 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">EE JIT 메모리 접근에 직접 가상 메모리를 사용합니다. 충돌이나 리컴파일러 문제를 진단할 때만 끄세요.</string>
     <string name="settings_help_enable_fastmem">PS2 주소를 예약된 호스트 영역에 매핑하여 재컴파일된 메모리 작업이 느린 처리기를 거치지 않도록 합니다. 일반 플레이에서는 활성화해 두세요. 비활성화하면 성능이 크게 저하되지만 Fastmem 오류나 기기별 메모리 매핑 문제를 구분하는 데 도움이 됩니다. 적용하려면 게임을 다시 시작하세요.</string>
+    <string name="settings_debug_logcat_gs">logcat에서 GS 디버그</string>
+    <string name="settings_debug_logcat_gs_desc">자세한 Vulkan/OpenGL GS 이벤트를 logcat에 기록합니다(태그: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Android logcat에 자세한 Vulkan/OpenGL 그래픽 신시사이저 로깅을 사용 설정합니다. \"DebugGS\" 태그로 필터링하세요. 렌더링 충돌 및 GPU 기기 손실 오류를 진단할 때만 유용합니다. 일반적인 게임 플레이 시에는 이 기능을 꺼두세요.</string>
 </resources>

@@ -672,6 +672,7 @@ object EmulatorBridge {
                 add(settingOp("EmuCoreX", "GpuHardwareProfile", "int", normalizedGpuHardwareProfile.toString()))
                 add(settingOp("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString()))
                 add(settingOp("EmuCoreX", "AutotestMode", "bool", autotestMode.toString()))
+                add(settingOp("EmuCoreX", "DebugLogcatGS", "bool", prefs.debugLogcatGsSync().toString()))
                 add(settingOp("EmuCoreX", "AppVersion", "string", appVersionName(context)))
                 add(settingOp("EmuCore", "WarnAboutUnsafeSettings", "bool", "false"))
                 add(settingOp("InputSources", "PadVibration", "bool", padVibrationEnabled.toString()))
@@ -1223,18 +1224,23 @@ object EmulatorBridge {
 
     fun onSurfaceCreated() {
         if (!isNativeLoaded) return
+        Log.i(TAG, "onSurfaceCreated: called")
         NativeApp.setCrashContextString("emu_surface_state", "created")
         NativeApp.logCrashBreadcrumb("surfaceCreated")
         launchSerial {
             try {
                 NativeApp.onNativeSurfaceCreated()
-            } catch (_: Exception) { }
+                Log.i(TAG, "onSurfaceCreated: native callback done")
+            } catch (e: Exception) {
+                Log.e(TAG, "onSurfaceCreated: native callback failed", e)
+            }
         }
     }
 
     fun onSurfaceChanged(surface: Surface, width: Int, height: Int) {
         if (!isNativeLoaded) return
         val eventVersion = ++surfaceEventVersion
+        Log.i(TAG, "onSurfaceChanged: width=$width height=$height valid=${surface.isValid} eventVersion=$eventVersion")
         lastSurface = surface
         lastSurfaceWidth = width
         lastSurfaceHeight = height
@@ -1244,34 +1250,50 @@ object EmulatorBridge {
         NativeApp.setCrashContextBool("emu_surface_valid", surface.isValid)
         NativeApp.logCrashBreadcrumb("surfaceChanged width=$width height=$height valid=${surface.isValid}")
         launchSerial {
-            if (surfaceEventVersion != eventVersion) return@launchSerial
+            if (surfaceEventVersion != eventVersion) {
+                Log.w(TAG, "onSurfaceChanged: eventVersion mismatch ($eventVersion != $surfaceEventVersion), skipping")
+                return@launchSerial
+            }
             try {
                 NativeApp.onNativeSurfaceChanged(surface, width, height)
-            } catch (_: Exception) { }
+                Log.i(TAG, "onSurfaceChanged: native callback done")
+            } catch (e: Exception) {
+                Log.e(TAG, "onSurfaceChanged: native callback failed", e)
+            }
         }
     }
 
     fun onSurfaceDestroyed() {
         if (!isNativeLoaded) return
+        val oldVersion = surfaceEventVersion
         ++surfaceEventVersion
         lastSurface = null
         lastSurfaceWidth = 0
         lastSurfaceHeight = 0
+        Log.i(TAG, "onSurfaceDestroyed: called, version $oldVersion -> $surfaceEventVersion")
         NativeApp.setCrashContextString("emu_surface_state", "destroyed")
         NativeApp.logCrashBreadcrumb("surfaceDestroyed")
         runCatching { NativeApp.pause() }
+        Log.i(TAG, "onSurfaceDestroyed: pause done, calling native destroy")
         // Android invalidates the BufferQueue as soon as this callback returns.
         // Detach GS synchronously so it cannot keep presenting to an abandoned Surface.
         try {
             NativeApp.onNativeSurfaceDestroyed()
-        } catch (_: Exception) { }
+            Log.i(TAG, "onSurfaceDestroyed: native destroy done")
+        } catch (e: Exception) {
+            Log.e(TAG, "onSurfaceDestroyed: native destroy failed", e)
+        }
     }
 
     private fun rebindSurface() {
         val surface = lastSurface ?: return
         val width = lastSurfaceWidth
         val height = lastSurfaceHeight
-        if (!surface.isValid || width <= 0 || height <= 0) return
+        if (!surface.isValid || width <= 0 || height <= 0) {
+            Log.w(TAG, "rebindSurface: skipped (valid=${surface.isValid} w=$width h=$height)")
+            return
+        }
+        Log.i(TAG, "rebindSurface: width=$width height=$height")
         NativeApp.logCrashBreadcrumb("rebindSurface width=$width height=$height")
         try {
             NativeApp.onNativeSurfaceChanged(surface, width, height)

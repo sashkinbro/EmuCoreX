@@ -412,6 +412,7 @@ void AndroidRuntime::ReloadPatches()
 
 void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
 {
+	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d", window, width, height);
 	bool update_display_window = false;
 	ANativeWindow* old_window = nullptr;
 	{
@@ -428,6 +429,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
 
 	if (update_display_window)
 	{
+		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		// Surface callbacks run on Android's UI/Binder threads, while the MTGS ring
 		// buffer has exactly one producer: the CPU thread. Keep the old window alive
 		// until the serialized GS update has detached from it.
@@ -452,6 +454,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
 
 void AndroidRuntime::ClearSurface()
 {
+	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "ClearSurface: clearing native window");
 	ANativeWindow* old_window = nullptr;
 	bool update_display_window = false;
 	{
@@ -465,6 +468,7 @@ void AndroidRuntime::ClearSurface()
 
 	if (update_display_window)
 	{
+		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
 			if (value)
 				ANativeWindow_release(value);

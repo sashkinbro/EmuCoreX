@@ -32,6 +32,8 @@
 #include <thread>
 #include <mutex>
 
+#include "emucorex/debug_logcat.h"
+
 static void DumpGSPrivRegs(const GSPrivRegSet& r, const std::string& filename);
 
 static constexpr std::array<PresentShader, 8> s_tv_shader_indices = {
@@ -588,14 +590,19 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 	// shutting the VM down. Re-entering BeginPresent() can otherwise trigger the
 	// same device-lost path every frame.
 	if (m_gpu_device_failed)
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresentFrame: gpu_device_failed=true, returning false");
 		return false;
+	}
 #endif
 
 	Host::BeginPresentFrame();
 
+	DEBUG_GS_LOG(ANDROID_LOG_DEBUG, "BeginPresentFrame: calling BeginPresent(frame_skip=%d)", frame_skip ? 1 : 0);
 	const GSDevice::PresentResult res = g_gs_device->BeginPresent(frame_skip);
 	if (res == GSDevice::PresentResult::FrameSkipped)
 	{
+		DEBUG_GS_LOG(ANDROID_LOG_DEBUG, "BeginPresentFrame: FrameSkipped");
 #ifndef __ANDROID__
 		// If we're skipping a frame, we need to reset imgui's state, since
 		// we won't be calling EndPresentFrame().
@@ -609,6 +616,9 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 		return true;
 	}
 
+	// PresentResult::DeviceLost here
+	DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresentFrame: DeviceLost received from BeginPresent");
+
 	// If we're constantly crashing on something in particular, we don't want to end up in an
 	// endless reset loop.. that'd probably end up leaking memory and/or crashing us for other
 	// reasons.
@@ -620,6 +630,8 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 		// abort() turns a recoverable driver failure into a Play Console native
 		// crash. On Android, keep the process alive and stop only the current VM.
 		m_gpu_device_failed = true;
+		const float elapsed = Common::Timer::ConvertValueToSeconds(current_time - m_last_gpu_reset_time);
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresentFrame: GPU lost repeatedly (last_reset=%.2fs ago). Shutting down VM.", elapsed);
 		constexpr const char* message =
 			"Host GPU was lost repeatedly. Stopping emulation because the graphics driver is not responding.";
 		Console.Error(message);
@@ -634,10 +646,12 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 
 	// Device lost, something went really bad.
 	// Let's just toss out everything, and try to hobble on.
+	DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresentFrame: attempting GSreopen (renderer=%d)", static_cast<int>(GSGetCurrentRenderer()));
 	if (!GSreopen(true, false, GSGetCurrentRenderer(), std::nullopt))
 	{
 #ifdef __ANDROID__
 		m_gpu_device_failed = true;
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "BeginPresentFrame: GSreopen FAILED. Shutting down VM.");
 		constexpr const char* message =
 			"Failed to recreate the host GPU device. Stopping emulation safely.";
 		Console.Error(message);
@@ -649,6 +663,7 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 		return false;
 	}
 
+	DEBUG_GS_LOG(ANDROID_LOG_WARN, "BeginPresentFrame: GSreopen succeeded, skipping first frame");
 	// First frame after reopening is definitely going to be trash, so skip it.
 	Host::AddIconOSDMessage("GSDeviceLost", ICON_FA_TRIANGLE_EXCLAMATION,
 		TRANSLATE_SV("GS", "Host GPU device encountered an error and was recovered. This may have broken rendering."),

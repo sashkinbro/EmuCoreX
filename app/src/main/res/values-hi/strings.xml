@@ -1925,4 +1925,7 @@
     <string name="settings_enable_fastmem">तेज़ मेमोरी (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">EE JIT के लिए सीधे वर्चुअल मेमोरी एक्सेस का उपयोग करता है। केवल क्रैश या रीकंपाइलर समस्या की जाँच के लिए बंद करें।</string>
     <string name="settings_help_enable_fastmem">PS2 पतों को होस्ट मेमोरी की आरक्षित सीमा में मैप करता है, ताकि रीकंपाइल किए गए मेमोरी ऑपरेशन धीमे हैंडलरों से बच सकें। सामान्य खेल में इसे चालू रखें। इसे बंद करने से प्रदर्शन बहुत घटता है, लेकिन Fastmem त्रुटि या किसी डिवाइस की मेमोरी मैपिंग समस्या अलग करने में मदद मिल सकती है। लागू करने के लिए गेम दोबारा शुरू करें।</string>
+    <string name="settings_debug_logcat_gs">logcat में GS डीबग करें</string>
+    <string name="settings_debug_logcat_gs_desc">logcat में विस्तृत Vulkan/OpenGL GS इवेंट लॉग करें (टैग: DebugGS)।</string>
+    <string name="settings_help_debug_logcat_gs">Android logcat में विस्तृत Vulkan/OpenGL ग्राफ़िक्स सिंथेसाइज़र लॉगिंग सक्षम करता है। टैग \"DebugGS\" द्वारा फ़िल्टर करें। केवल रेंडरिंग क्रैश और GPU डिवाइस लॉस्ट त्रुटियों के निदान के लिए उपयोगी है। सामान्य खेल के लिए इसे बंद रखें。</string>
 </resources>

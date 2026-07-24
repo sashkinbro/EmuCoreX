@@ -1929,4 +1929,7 @@
     <string name="settings_enable_fastmem">الذاكرة السريعة (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">يستخدم وصولاً مباشراً إلى الذاكرة الافتراضية لمترجم EE الفوري. عطّله فقط لتشخيص الأعطال أو مشكلات إعادة الترجمة.</string>
     <string name="settings_help_enable_fastmem">يربط عناوين PS2 بنطاق محجوز في ذاكرة الجهاز كي تتجاوز عمليات الذاكرة المعاد ترجمتها المعالجات الأبطأ. اتركه مفعّلاً للعب العادي. يؤدي تعطيله إلى خفض الأداء كثيراً، لكنه قد يساعد في عزل أخطاء Fastmem أو مشكلات ربط الذاكرة الخاصة بالجهاز. أعد تشغيل اللعبة لتطبيق التغيير.</string>
+    <string name="settings_debug_logcat_gs">تصحيح أخطاء GS في logcat</string>
+    <string name="settings_debug_logcat_gs_desc">تسجيل أحداث Vulkan/OpenGL GS التفصيلية في logcat (العلامة: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">يمكّن التسجيل المطول لمُركِّب رسومات Vulkan/OpenGL في Android logcat. قم بالتصفية حسب العلامة \"DebugGS\". مفيد فقط لتشخيص أعطال العرض وأخطاء فقدان جهاز GPU. اترك هذا الإعداد قيد الإيقاف للعب العادي.</string>
 </resources>

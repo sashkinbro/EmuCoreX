@@ -1925,4 +1925,7 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">EE JIT için doğrudan sanal bellek erişimi kullanır. Yalnızca çökmeleri veya yeniden derleyici sorunlarını tanılamak için kapatın.</string>
     <string name="settings_help_enable_fastmem">Yeniden derlenmiş bellek işlemlerinin daha yavaş işleyicileri atlaması için PS2 adreslerini ayrılmış bir sistem aralığına eşler. Normal oyun için açık bırakın. Kapatmak performansı ciddi ölçüde düşürür; ancak Fastmem hatalarını veya cihaza özgü bellek eşleme sorunlarını ayırmaya yardımcı olabilir. Uygulamak için oyunu yeniden başlatın.</string>
+    <string name="settings_debug_logcat_gs">logcat\'te GS hata ayıklama</string>
+    <string name="settings_debug_logcat_gs_desc">Ayrıntılı Vulkan/OpenGL GS etkinliklerini logcat\'e kaydeder (etiket: DebugGS).</string>
+    <string name="settings_help_debug_logcat_gs">Android logcat\'e ayrıntılı Vulkan/OpenGL grafik sentezleyici kaydetmeyi etkinleştirir. \"DebugGS\" etiketiyle filtreleyin. Yalnızca oluşturma çökmelerini ve kayıp GPU cihazı hatalarını teşhis etmek için kullanışlıdır. Normal oyun için bunu kapalı tutun.</string>
 </resources>
