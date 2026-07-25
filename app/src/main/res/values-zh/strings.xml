@@ -1929,4 +1929,24 @@
     <string name="settings_debug_logcat_gs">在 logcat 中调试 GS</string>
     <string name="settings_debug_logcat_gs_desc">将详细的 Vulkan/OpenGL GS 事件记录到 logcat（标签：DebugGS）。</string>
     <string name="settings_help_debug_logcat_gs">启用将 Vulkan/OpenGL 图形合成器的详细日志记录到 Android logcat。按标签 \"DebugGS\" 过滤。仅在诊断渲染崩溃和 GPU 设备丢失错误时有用。在正常游戏时请保持此选项关闭。</string>
+    <string name="settings_network_local_host_hotspot">创建热点</string>
+    <string name="settings_network_local_host_hotspot_desc">启用您的热点以便其他设备连接。</string>
+    <string name="settings_network_local_host_hotspot_active">热点已激活：%1$s</string>
+    <string name="settings_network_local_host_hotspot_password">密码：%1$s</string>
+    <string name="settings_network_local_auto">自动</string>
+    <string name="settings_network_local_search">搜索游戏</string>
+    <string name="settings_network_local_search_desc">自动查找本地网络上的主机。</string>
+    <string name="settings_network_local_searching">正在搜索主机…</string>
+    <string name="settings_network_local_no_hosts">未找到主机。请确保主机正在运行游戏。</string>
+    <string name="settings_network_local_search_again">再次搜索</string>
+    <string name="settings_network_local_manual_settings">手动输入地址</string>
+    <string name="settings_network_local_client_connect">连接到热点</string>
+    <string name="settings_network_local_client_connect_desc">请先连接到主机的 Wi-Fi 热点。</string>
+    <string name="settings_network_local_connect_title">连接到主机</string>
+    <string name="settings_network_local_connect_confirm">连接到 %1$s？</string>
+    <string name="settings_network_local_connect_action">连接</string>
+    <string name="settings_network_local_port_value">端口 %1$d</string>
+    <string name="settings_network_local_close">关闭</string>
+    <string name="settings_network_local_room_code_required">在搜索之前输入房间代码（4-12 个字符）。</string>
+    <string name="settings_network_local_search_hint">主机必须在同一个 Wi-Fi 或热点上运行游戏。在两台设备上输入相同的房间代码。</string>
 </resources>

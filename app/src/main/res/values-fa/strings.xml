@@ -1943,4 +1943,24 @@
     <string name="settings_debug_logcat_gs">اشکال‌زدایی GS در logcat</string>
     <string name="settings_debug_logcat_gs_desc">ثبت رویدادهای دقیق Vulkan/OpenGL GS در logcat (برچسب: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">ثبت دقیق ترکیب‌کننده گرافیکی Vulkan/OpenGL را در logcat اندروید فعال می‌کند. با برچسب \"DebugGS\" فیلتر کنید. فقط برای تشخیص خرابی‌های رندر و خطاهای از دست رفتن دستگاه GPU مفید است. برای بازی عادی این گزینه را خاموش نگه دارید.</string>
+    <string name="settings_network_local_host_hotspot">ایجاد نقطه اتصال</string>
+    <string name="settings_network_local_host_hotspot_desc">نقطه اتصال خود را فعال کنید تا دستگاه‌های دیگر بتوانند متصل شوند.</string>
+    <string name="settings_network_local_host_hotspot_active">نقطه اتصال فعال: %1$s</string>
+    <string name="settings_network_local_host_hotspot_password">رمز عبور: %1$s</string>
+    <string name="settings_network_local_auto">خودکار</string>
+    <string name="settings_network_local_search">جستجوی بازی‌ها</string>
+    <string name="settings_network_local_search_desc">میزبان‌ها را به‌طور خودکار در شبکه محلی پیدا کنید.</string>
+    <string name="settings_network_local_searching">در حال جستجوی میزبان‌ها…</string>
+    <string name="settings_network_local_no_hosts">هیچ میزبانی یافت نشد. مطمئن شوید که بازی در دستگاه میزبان در حال اجراست.</string>
+    <string name="settings_network_local_search_again">جستجوی مجدد</string>
+    <string name="settings_network_local_manual_settings">آدرس را به‌صورت دستی وارد کنید</string>
+    <string name="settings_network_local_client_connect">اتصال به نقطه اتصال</string>
+    <string name="settings_network_local_client_connect_desc">ابتدا به نقطه اتصال Wi-Fi میزبان متصل شوید.</string>
+    <string name="settings_network_local_connect_title">اتصال به میزبان</string>
+    <string name="settings_network_local_connect_confirm">به %1$s متصل شوید؟</string>
+    <string name="settings_network_local_connect_action">اتصال</string>
+    <string name="settings_network_local_port_value">پورت %1$d</string>
+    <string name="settings_network_local_close">بستن</string>
+    <string name="settings_network_local_room_code_required">قبل از جستجو یک کد اتاق (۴ تا ۱۲ کاراکتر) وارد کنید.</string>
+    <string name="settings_network_local_search_hint">میزبان باید بازی را در همان Wi-Fi یا نقطه اتصال در حال اجرا داشته باشد. کد اتاق یکسانی را در هر دو دستگاه وارد کنید.</string>
 </resources>

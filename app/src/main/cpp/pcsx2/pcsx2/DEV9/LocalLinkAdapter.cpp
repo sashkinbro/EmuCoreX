@@ -5,8 +5,11 @@
 
 #include "DEV9.h"
 
+#include "common/Console.h"
+
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
 #include <random>
 
@@ -16,6 +19,7 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <fcntl.h>
+#include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -235,11 +239,49 @@ bool LocalLinkAdapter::ConfigureEndpoint()
 
 	m_host_endpoint.sin_family = AF_INET;
 	m_host_endpoint.sin_port = htons(m_port);
-	if (inet_pton(AF_INET, EmuConfig.DEV9.LocalLinkAddress.c_str(), &m_host_endpoint.sin_addr) != 1)
+
+	const std::string& host = EmuConfig.DEV9.LocalLinkAddress;
+	if (host.empty())
 	{
-		Console.Error("DEV9: Local Link host must be a numeric IPv4 address");
+		Console.Error("DEV9: Local Link join mode needs the host device's address");
 		return false;
 	}
+
+	// Numeric IPv4 FIRST, and deliberately so: a LAN address or a VPN address (Tailscale's
+	// 100.x.y.z, ZeroTier, WireGuard) is the overwhelmingly common case, and this path must never
+	// touch DNS. ConfigureEndpoint runs from the adapter's constructor via GetNetAdapter() while
+	// the VM is booting on the CPU thread, so a blocking resolve here stalls game start.
+	if (inet_pton(AF_INET, host.c_str(), &m_host_endpoint.sin_addr) == 1)
+		return true;
+
+	// Not a literal, so treat it as a hostname — a dynamic-DNS name for a port-forwarded host, or
+	// a VPN's own DNS name. One blocking lookup, once, at boot. There is no portable timeout for
+	// getaddrinfo (DNS_Server.cpp sidesteps that by resolving on its own thread), so a name that
+	// does not resolve costs the platform's DNS timeout before we give up — at which point DEV9
+	// fails safe: GetNetAdapter deletes the adapter and InitNet clears EthEnable.
+	addrinfo hints{};
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+#ifdef AI_ADDRCONFIG
+	hints.ai_flags = AI_ADDRCONFIG;
+#endif
+	addrinfo* results = nullptr;
+	if (getaddrinfo(host.c_str(), nullptr, &hints, &results) != 0 || results == nullptr)
+	{
+		if (results != nullptr)
+			freeaddrinfo(results);
+		Console.Error("DEV9: Local Link could not resolve host '%s' (use the numeric IPv4 address "
+					  "shown on the host device if this keeps failing)",
+			host.c_str());
+		return false;
+	}
+	m_host_endpoint.sin_addr = reinterpret_cast<const sockaddr_in*>(results->ai_addr)->sin_addr;
+	freeaddrinfo(results);
+
+	char resolved[INET_ADDRSTRLEN] = {};
+	inet_ntop(AF_INET, &m_host_endpoint.sin_addr, resolved, sizeof(resolved));
+	Console.WriteLn("DEV9: Local Link resolved host '%s' to %s", host.c_str(), resolved);
 	return true;
 }
 

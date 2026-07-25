@@ -83,11 +83,16 @@ NetAdapter* GetNetAdapter()
 			na = static_cast<NetAdapter*>(new LocalLinkAdapter());
 			break;
 		default:
+			Console.Error("DEV9: no network backend for EthApi=%d, Ethernet stays off (a stale "
+						  "per-game gamesettings INI can override your choice here)",
+				static_cast<int>(EmuConfig.DEV9.EthApi));
 			return 0;
 	}
 
 	if (!na->isInitialised())
 	{
+		Console.Error("DEV9: network backend for EthApi=%d failed to initialise, Ethernet stays off",
+			static_cast<int>(EmuConfig.DEV9.EthApi));
 		delete na;
 		return 0;
 	}
