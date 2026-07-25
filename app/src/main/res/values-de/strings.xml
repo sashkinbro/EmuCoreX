@@ -1930,24 +1930,4 @@
     <string name="settings_debug_logcat_gs">GS-Logcat debuggen</string>
     <string name="settings_debug_logcat_gs_desc">Detaillierte Vulkan/OpenGL GS-Ereignisse im Logcat protokollieren (Tag: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">Aktiviert die ausführliche Protokollierung des Vulkan/OpenGL-Grafiksynthesizers im Android-Logcat. Filtern Sie nach dem Tag \"DebugGS\". Nur nützlich zur Diagnose von Rendering-Abstürzen und Fehlern durch verlorene GPU-Geräte. Lassen Sie dies für das normale Spielen deaktiviert.</string>
-    <string name="settings_network_local_host_hotspot">Hotspot erstellen</string>
-    <string name="settings_network_local_host_hotspot_desc">Aktiviere deinen Hotspot, damit andere Geräte sich verbinden können.</string>
-    <string name="settings_network_local_host_hotspot_active">Hotspot aktiv: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">Passwort: %1$s</string>
-    <string name="settings_network_local_auto">Auto</string>
-    <string name="settings_network_local_search">Nach Spielen suchen</string>
-    <string name="settings_network_local_search_desc">Automatisch nach Hosts im lokalen Netzwerk suchen.</string>
-    <string name="settings_network_local_searching">Suche nach Hosts…</string>
-    <string name="settings_network_local_no_hosts">Keine Hosts gefunden. Stelle sicher, dass das Spiel auf dem Host läuft.</string>
-    <string name="settings_network_local_search_again">Erneut suchen</string>
-    <string name="settings_network_local_manual_settings">Adresse manuell eingeben</string>
-    <string name="settings_network_local_client_connect">Mit Hotspot verbinden</string>
-    <string name="settings_network_local_client_connect_desc">Verbinde dich zuerst mit dem WLAN-Hotspot des Hosts.</string>
-    <string name="settings_network_local_connect_title">Mit Host verbinden</string>
-    <string name="settings_network_local_connect_confirm">Mit %1$s verbinden?</string>
-    <string name="settings_network_local_connect_action">Verbinden</string>
-    <string name="settings_network_local_port_value">Port %1$d</string>
-    <string name="settings_network_local_close">Schließen</string>
-    <string name="settings_network_local_room_code_required">Gib einen Raumcode ein (4–12 Zeichen), bevor du suchst.</string>
-    <string name="settings_network_local_search_hint">Das Spiel muss auf dem Host im selben WLAN oder Hotspot laufen. Gib auf beiden Geräten denselben Raumcode ein.</string>
 </resources>

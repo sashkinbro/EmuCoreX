@@ -1932,24 +1932,4 @@
     <string name="settings_debug_logcat_gs">تصحيح أخطاء GS في logcat</string>
     <string name="settings_debug_logcat_gs_desc">تسجيل أحداث Vulkan/OpenGL GS التفصيلية في logcat (العلامة: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">يمكّن التسجيل المطول لمُركِّب رسومات Vulkan/OpenGL في Android logcat. قم بالتصفية حسب العلامة \"DebugGS\". مفيد فقط لتشخيص أعطال العرض وأخطاء فقدان جهاز GPU. اترك هذا الإعداد قيد الإيقاف للعب العادي.</string>
-    <string name="settings_network_local_host_hotspot">إنشاء نقطة اتصال</string>
-    <string name="settings_network_local_host_hotspot_desc">قم بتمكين نقطة الاتصال الخاصة بك حتى تتمكن الأجهزة الأخرى من الاتصال.</string>
-    <string name="settings_network_local_host_hotspot_active">نقطة الاتصال نشطة: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">كلمة المرور: %1$s</string>
-    <string name="settings_network_local_auto">تلقائي</string>
-    <string name="settings_network_local_search">البحث عن ألعاب</string>
-    <string name="settings_network_local_search_desc">ابحث عن المضيفين على الشبكة المحلية تلقائيًا.</string>
-    <string name="settings_network_local_searching">جاري البحث عن مضيفين…</string>
-    <string name="settings_network_local_no_hosts">لم يتم العثور على مضيفين. تأكد من تشغيل اللعبة لدى المضيف.</string>
-    <string name="settings_network_local_search_again">البحث مرة أخرى</string>
-    <string name="settings_network_local_manual_settings">إدخال العنوان يدويًا</string>
-    <string name="settings_network_local_client_connect">الاتصال بنقطة الاتصال</string>
-    <string name="settings_network_local_client_connect_desc">اتصل بنقطة اتصال شبكة Wi-Fi الخاصة بالمضيف أولاً.</string>
-    <string name="settings_network_local_connect_title">الاتصال بالمضيف</string>
-    <string name="settings_network_local_connect_confirm">هل تريد الاتصال بـ %1$s؟</string>
-    <string name="settings_network_local_connect_action">اتصال</string>
-    <string name="settings_network_local_port_value">المنفذ %1$d</string>
-    <string name="settings_network_local_close">إغلاق</string>
-    <string name="settings_network_local_room_code_required">أدخل رمز الغرفة (4-12 حرفًا) قبل البحث.</string>
-    <string name="settings_network_local_search_hint">يجب أن يكون لدى المضيف اللعبة قيد التشغيل على نفس شبكة Wi-Fi أو نقطة الاتصال. أدخل نفس رمز الغرفة على كلا الجهازين.</string>
 </resources>

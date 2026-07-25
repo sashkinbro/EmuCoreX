@@ -1928,24 +1928,4 @@
     <string name="settings_debug_logcat_gs">logcat\'te GS hata ayıklama</string>
     <string name="settings_debug_logcat_gs_desc">Ayrıntılı Vulkan/OpenGL GS etkinliklerini logcat\'e kaydeder (etiket: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">Android logcat\'e ayrıntılı Vulkan/OpenGL grafik sentezleyici kaydetmeyi etkinleştirir. \"DebugGS\" etiketiyle filtreleyin. Yalnızca oluşturma çökmelerini ve kayıp GPU cihazı hatalarını teşhis etmek için kullanışlıdır. Normal oyun için bunu kapalı tutun.</string>
-    <string name="settings_network_local_host_hotspot">Hotspot oluştur</string>
-    <string name="settings_network_local_host_hotspot_desc">Diğer cihazların bağlanabilmesi için hotspot\'unuzu etkinleştirin.</string>
-    <string name="settings_network_local_host_hotspot_active">Hotspot aktif: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">Şifre: %1$s</string>
-    <string name="settings_network_local_auto">Otomatik</string>
-    <string name="settings_network_local_search">Oyun ara</string>
-    <string name="settings_network_local_search_desc">Yerel ağdaki ana bilgisayarları (host) otomatik olarak bulun.</string>
-    <string name="settings_network_local_searching">Ana bilgisayarlar aranıyor…</string>
-    <string name="settings_network_local_no_hosts">Ana bilgisayar bulunamadı. Ana bilgisayarda oyunun açık olduğundan emin olun.</string>
-    <string name="settings_network_local_search_again">Tekrar ara</string>
-    <string name="settings_network_local_manual_settings">Adresi manuel girin</string>
-    <string name="settings_network_local_client_connect">Hotspot\'a bağlan</string>
-    <string name="settings_network_local_client_connect_desc">Önce ana bilgisayarın Wi-Fi hotspot\'una bağlanın.</string>
-    <string name="settings_network_local_connect_title">Ana bilgisayara bağlan</string>
-    <string name="settings_network_local_connect_confirm">%1$s ağına bağlanılsın mı?</string>
-    <string name="settings_network_local_connect_action">Bağlan</string>
-    <string name="settings_network_local_port_value">Port %1$d</string>
-    <string name="settings_network_local_close">Kapat</string>
-    <string name="settings_network_local_room_code_required">Aramadan önce bir oda kodu (4-12 karakter) girin.</string>
-    <string name="settings_network_local_search_hint">Ana bilgisayarın aynı Wi-Fi veya hotspot üzerinde oyunu çalıştırıyor olması gerekir. Her iki cihaza da aynı oda kodunu girin.</string>
 </resources>

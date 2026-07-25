@@ -1930,24 +1930,4 @@
     <string name="settings_debug_logcat_gs">Depurar GS en logcat</string>
     <string name="settings_debug_logcat_gs_desc">Registrar eventos detallados de Vulkan/OpenGL GS en logcat (etiqueta: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">Habilita el registro detallado del sintetizador de gráficos Vulkan/OpenGL en Android logcat. Filtra por la etiqueta \"DebugGS\". Útil solo para diagnosticar bloqueos de renderizado y errores de pérdida de dispositivo GPU. Mantenlo apagado para jugar normalmente.</string>
-    <string name="settings_network_local_host_hotspot">Crear punto de acceso</string>
-    <string name="settings_network_local_host_hotspot_desc">Activa tu punto de acceso para que otros dispositivos puedan conectarse.</string>
-    <string name="settings_network_local_host_hotspot_active">Punto de acceso activo: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">Contraseña: %1$s</string>
-    <string name="settings_network_local_auto">Auto</string>
-    <string name="settings_network_local_search">Buscar partidas</string>
-    <string name="settings_network_local_search_desc">Buscar hosts en la red local automáticamente.</string>
-    <string name="settings_network_local_searching">Buscando hosts…</string>
-    <string name="settings_network_local_no_hosts">No se encontraron hosts. Asegúrate de que el host tenga el juego en ejecución.</string>
-    <string name="settings_network_local_search_again">Buscar de nuevo</string>
-    <string name="settings_network_local_manual_settings">Introducir dirección manualmente</string>
-    <string name="settings_network_local_client_connect">Conectar al punto de acceso</string>
-    <string name="settings_network_local_client_connect_desc">Conéctate primero al punto de acceso Wi-Fi del host.</string>
-    <string name="settings_network_local_connect_title">Conectar al host</string>
-    <string name="settings_network_local_connect_confirm">¿Conectar a %1$s?</string>
-    <string name="settings_network_local_connect_action">Conectar</string>
-    <string name="settings_network_local_port_value">Puerto %1$d</string>
-    <string name="settings_network_local_close">Cerrar</string>
-    <string name="settings_network_local_room_code_required">Introduce un código de sala (4-12 caracteres) antes de buscar.</string>
-    <string name="settings_network_local_search_hint">El host debe tener el juego en ejecución en el mismo Wi-Fi o punto de acceso. Introduce el mismo código de sala en ambos dispositivos.</string>
 </resources>

@@ -1932,24 +1932,4 @@
     <string name="settings_debug_logcat_gs">Налагодження GS у logcat</string>
     <string name="settings_debug_logcat_gs_desc">Записувати детальні події Vulkan/OpenGL GS до logcat (тег: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">Вмикає детальний запис графічного синтезатора Vulkan/OpenGL до Android logcat. Фільтруйте за тегом \"DebugGS\". Корисно лише для діагностики збоїв рендерингу та помилок втрати пристрою GPU. Тримайте цю функцію вимкненою під час звичайної гри.</string>
-    <string name="settings_network_local_host_hotspot">Створити точку доступу</string>
-    <string name="settings_network_local_host_hotspot_desc">Увімкніть точку доступу, щоб інші пристрої могли підключитися.</string>
-    <string name="settings_network_local_host_hotspot_active">Точка доступу активна: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">Пароль: %1$s</string>
-    <string name="settings_network_local_auto">Авто</string>
-    <string name="settings_network_local_search">Пошук ігор</string>
-    <string name="settings_network_local_search_desc">Автоматичний пошук хостів у локальній мережі.</string>
-    <string name="settings_network_local_searching">Пошук хостів…</string>
-    <string name="settings_network_local_no_hosts">Хостів не знайдено. Переконайтеся, що на хості запущено гру.</string>
-    <string name="settings_network_local_search_again">Шукати знову</string>
-    <string name="settings_network_local_manual_settings">Ввести адресу вручну</string>
-    <string name="settings_network_local_client_connect">Підключитися до точки доступу</string>
-    <string name="settings_network_local_client_connect_desc">Спочатку підключіться до Wi-Fi точки доступу хоста.</string>
-    <string name="settings_network_local_connect_title">Підключитися до хоста</string>
-    <string name="settings_network_local_connect_confirm">Підключитися до %1$s?</string>
-    <string name="settings_network_local_connect_action">Підключитися</string>
-    <string name="settings_network_local_port_value">Порт %1$d</string>
-    <string name="settings_network_local_close">Закрити</string>
-    <string name="settings_network_local_room_code_required">Введіть код кімнати (4–12 символів) перед пошуком.</string>
-    <string name="settings_network_local_search_hint">Гра на хості має бути запущена в тій самій мережі Wi-Fi або точці доступу. Введіть однаковий код кімнати на обох пристроях.</string>
 </resources>

@@ -1928,24 +1928,4 @@
     <string name="settings_debug_logcat_gs">logcat में GS डीबग करें</string>
     <string name="settings_debug_logcat_gs_desc">logcat में विस्तृत Vulkan/OpenGL GS इवेंट लॉग करें (टैग: DebugGS)।</string>
     <string name="settings_help_debug_logcat_gs">Android logcat में विस्तृत Vulkan/OpenGL ग्राफ़िक्स सिंथेसाइज़र लॉगिंग सक्षम करता है। टैग \"DebugGS\" द्वारा फ़िल्टर करें। केवल रेंडरिंग क्रैश और GPU डिवाइस लॉस्ट त्रुटियों के निदान के लिए उपयोगी है। सामान्य खेल के लिए इसे बंद रखें。</string>
-    <string name="settings_network_local_host_hotspot">हॉटस्पॉट बनाएँ</string>
-    <string name="settings_network_local_host_hotspot_desc">अपना हॉटस्पॉट सक्षम करें ताकि अन्य डिवाइस कनेक्ट हो सकें。</string>
-    <string name="settings_network_local_host_hotspot_active">हॉटस्पॉट सक्रिय: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">पासवर्ड: %1$s</string>
-    <string name="settings_network_local_auto">ऑटो</string>
-    <string name="settings_network_local_search">गेम खोजें</string>
-    <string name="settings_network_local_search_desc">स्थानीय नेटवर्क पर स्वचालित रूप से होस्ट खोजें。</string>
-    <string name="settings_network_local_searching">होस्ट खोजे जा रहे हैं…</string>
-    <string name="settings_network_local_no_hosts">कोई होस्ट नहीं मिला। सुनिश्चित करें कि होस्ट पर गेम चल रहा है。</string>
-    <string name="settings_network_local_search_again">फिर से खोजें</string>
-    <string name="settings_network_local_manual_settings">मैन्युअल रूप से पता दर्ज करें</string>
-    <string name="settings_network_local_client_connect">हॉटस्पॉट से कनेक्ट करें</string>
-    <string name="settings_network_local_client_connect_desc">पहले होस्ट के वाई-फ़ाई हॉटस्पॉट से कनेक्ट करें。</string>
-    <string name="settings_network_local_connect_title">होस्ट से कनेक्ट करें</string>
-    <string name="settings_network_local_connect_confirm">%1$s से कनेक्ट करें?</string>
-    <string name="settings_network_local_connect_action">कनेक्ट करें</string>
-    <string name="settings_network_local_port_value">पोर्ट %1$d</string>
-    <string name="settings_network_local_close">बंद करें</string>
-    <string name="settings_network_local_room_code_required">खोजने से पहले एक रूम कोड (4-12 अक्षर) दर्ज करें。</string>
-    <string name="settings_network_local_search_hint">होस्ट का गेम उसी वाई-फ़ाई या हॉटस्पॉट पर चल रहा होना चाहिए। दोनों डिवाइस पर एक ही रूम कोड दर्ज करें。</string>
 </resources>

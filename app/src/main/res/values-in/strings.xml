@@ -1942,24 +1942,4 @@
     <string name="settings_debug_logcat_gs">Debug GS logcat</string>
     <string name="settings_debug_logcat_gs_desc">Catat detail peristiwa Vulkan/OpenGL GS ke logcat (tag: DebugGS).</string>
     <string name="settings_help_debug_logcat_gs">Mengaktifkan pencatatan verbose synthesizer grafis Vulkan/OpenGL ke logcat Android. Filter berdasarkan tag \"DebugGS\". Hanya berguna untuk mendiagnosis crash rendering dan kesalahan perangkat GPU yang hilang. Biarkan ini nonaktif untuk bermain normal.</string>
-    <string name="settings_network_local_host_hotspot">Buat hotspot</string>
-    <string name="settings_network_local_host_hotspot_desc">Aktifkan hotspot Anda agar perangkat lain dapat terhubung.</string>
-    <string name="settings_network_local_host_hotspot_active">Hotspot aktif: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">Sandi: %1$s</string>
-    <string name="settings_network_local_auto">Otomatis</string>
-    <string name="settings_network_local_search">Cari game</string>
-    <string name="settings_network_local_search_desc">Temukan host di jaringan lokal secara otomatis.</string>
-    <string name="settings_network_local_searching">Mencari host…</string>
-    <string name="settings_network_local_no_hosts">Tidak ada host ditemukan. Pastikan host sedang menjalankan game.</string>
-    <string name="settings_network_local_search_again">Cari lagi</string>
-    <string name="settings_network_local_manual_settings">Masukkan alamat secara manual</string>
-    <string name="settings_network_local_client_connect">Hubungkan ke hotspot</string>
-    <string name="settings_network_local_client_connect_desc">Hubungkan ke hotspot Wi-Fi host terlebih dahulu.</string>
-    <string name="settings_network_local_connect_title">Hubungkan ke host</string>
-    <string name="settings_network_local_connect_confirm">Hubungkan ke %1$s?</string>
-    <string name="settings_network_local_connect_action">Hubungkan</string>
-    <string name="settings_network_local_port_value">Port %1$d</string>
-    <string name="settings_network_local_close">Tutup</string>
-    <string name="settings_network_local_room_code_required">Masukkan kode ruangan (4–12 karakter) sebelum mencari.</string>
-    <string name="settings_network_local_search_hint">Host harus menjalankan game di Wi-Fi atau hotspot yang sama. Masukkan kode ruangan yang sama di kedua perangkat.</string>
 </resources>

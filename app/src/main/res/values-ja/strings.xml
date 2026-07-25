@@ -1927,24 +1927,4 @@
     <string name="settings_debug_logcat_gs">logcatでGSをデバッグ</string>
     <string name="settings_debug_logcat_gs_desc">Vulkan/OpenGL GSの詳細なイベントをlogcatに記録します（タグ：DebugGS）。</string>
     <string name="settings_help_debug_logcat_gs">AndroidのlogcatにVulkan/OpenGLグラフィックシンセサイザーの詳細なログ記録を有効にします。「DebugGS」タグでフィルタリングしてください。レンダリングのクラッシュやGPUデバイス消失エラーの診断にのみ役立ちます。通常のプレイではオフのままにしてください。</string>
-    <string name="settings_network_local_host_hotspot">ホットスポットを作成</string>
-    <string name="settings_network_local_host_hotspot_desc">他のデバイスが接続できるようにホットスポットを有効にします。</string>
-    <string name="settings_network_local_host_hotspot_active">ホットスポットがアクティブ: %1$s</string>
-    <string name="settings_network_local_host_hotspot_password">パスワード: %1$s</string>
-    <string name="settings_network_local_auto">自動</string>
-    <string name="settings_network_local_search">ゲームを検索</string>
-    <string name="settings_network_local_search_desc">ローカルネットワーク上のホストを自動的に検索します。</string>
-    <string name="settings_network_local_searching">ホストを検索しています…</string>
-    <string name="settings_network_local_no_hosts">ホストが見つかりません。ホストでゲームが実行されていることを確認してください。</string>
-    <string name="settings_network_local_search_again">もう一度検索</string>
-    <string name="settings_network_local_manual_settings">アドレスを手動で入力</string>
-    <string name="settings_network_local_client_connect">ホットスポットに接続</string>
-    <string name="settings_network_local_client_connect_desc">まずホストのWi-Fiホットスポットに接続してください。</string>
-    <string name="settings_network_local_connect_title">ホストに接続</string>
-    <string name="settings_network_local_connect_confirm">%1$s に接続しますか？</string>
-    <string name="settings_network_local_connect_action">接続</string>
-    <string name="settings_network_local_port_value">ポート %1$d</string>
-    <string name="settings_network_local_close">閉じる</string>
-    <string name="settings_network_local_room_code_required">検索する前にルームコード（4～12文字）を入力してください。</string>
-    <string name="settings_network_local_search_hint">ホストは同じWi-Fiまたはホットスポットでゲームを実行している必要があります。両方のデバイスで同じルームコードを入力してください。</string>
 </resources>
