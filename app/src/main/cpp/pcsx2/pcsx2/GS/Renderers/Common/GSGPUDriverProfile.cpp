@@ -1,0 +1,462 @@
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+// SPDX-License-Identifier: GPL-3.0+
+
+#include "GS/Renderers/Common/GSGPUProfilePrivate.h"
+
+#include <array>
+#include <cctype>
+#include <limits>
+
+namespace GpuProfileDetail
+{
+namespace
+{
+constexpr u32 VENDOR_ARM = 0x13B5;
+constexpr u32 VENDOR_QUALCOMM = 0x5143;
+constexpr u32 VENDOR_IMAGINATION = 0x1010;
+
+// VkDriverId values. Duplicating the numeric ABI values keeps this portable file independent from
+// Vulkan headers and lets the same resolver serve OpenGL unit tests.
+constexpr u32 DRIVER_ID_IMAGINATION_PROPRIETARY = 7;
+constexpr u32 DRIVER_ID_QUALCOMM_PROPRIETARY = 8;
+constexpr u32 DRIVER_ID_ARM_PROPRIETARY = 9;
+constexpr u32 DRIVER_ID_MESA_TURNIP = 18;
+constexpr u32 DRIVER_ID_MESA_PANVK = 20;
+constexpr u32 DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA = 25;
+
+constexpr u64 Bug(DriverBug bug)
+{
+	return u64{1} << static_cast<u8>(bug);
+}
+
+constexpr u64 Workaround(DriverWorkaround workaround)
+{
+	return u64{1} << static_cast<u8>(workaround);
+}
+
+struct VersionBound
+{
+	u16 major = 0;
+	u16 minor = 0;
+	u16 patch = 0;
+};
+
+struct DriverRule
+{
+	const char* id;
+	MobileGpuApi api = MobileGpuApi::Unknown;
+	RuntimeGpuProfile vendor = RuntimeGpuProfile::Unknown;
+	MobileGpuDriver driver = MobileGpuDriver::Unknown;
+	MobileGpuArchitecture architecture = MobileGpuArchitecture::Unknown;
+	u16 model_min = 0;
+	u16 model_max = 0;
+	u32 exact_raw_version = 0;
+	VersionBound min_version;
+	VersionBound max_version_exclusive;
+	u32 min_android_sdk = 0;
+	u32 max_android_sdk = 0;
+	bool match_unknown_version = false;
+	u64 bugs = 0;
+	u64 workarounds = 0;
+};
+
+constexpr int CompareVersion(const MobileDriverVersion& lhs, VersionBound rhs)
+{
+	if (lhs.major != rhs.major)
+		return (lhs.major < rhs.major) ? -1 : 1;
+	if (lhs.minor != rhs.minor)
+		return (lhs.minor < rhs.minor) ? -1 : 1;
+	if (lhs.patch != rhs.patch)
+		return (lhs.patch < rhs.patch) ? -1 : 1;
+	return 0;
+}
+
+constexpr bool HasVersionBound(VersionBound bound)
+{
+	return bound.major != 0 || bound.minor != 0 || bound.patch != 0;
+}
+
+static bool ParseUnsigned(std::string_view text, size_t start, u16* value, size_t* end)
+{
+	if (start >= text.size() || !std::isdigit(static_cast<unsigned char>(text[start])))
+		return false;
+
+	u32 parsed = 0;
+	size_t pos = start;
+	while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos])))
+	{
+		parsed = parsed * 10 + static_cast<u32>(text[pos++] - '0');
+		if (parsed > std::numeric_limits<u16>::max())
+			return false;
+	}
+
+	*value = static_cast<u16>(parsed);
+	*end = pos;
+	return true;
+}
+
+static MobileDriverVersion ParseOpenGLDriverVersion(std::string_view version_string,
+	RuntimeGpuProfile vendor)
+{
+	MobileDriverVersion version;
+	const std::string lowered = ToLowerASCII(version_string);
+
+	// ARM strings commonly contain "r54p1"; this is the only portion that has stable ordering.
+	if (vendor == RuntimeGpuProfile::Mali)
+	{
+		for (size_t r = lowered.find('r'); r != std::string::npos; r = lowered.find('r', r + 1))
+		{
+			size_t end = r + 1;
+			u16 release = 0;
+			if (!ParseUnsigned(lowered, r + 1, &release, &end))
+				continue;
+
+			u16 patch = 0;
+			if (end < lowered.size() && lowered[end] == 'p')
+			{
+				size_t patch_end = end + 1;
+				ParseUnsigned(lowered, end + 1, &patch, &patch_end);
+			}
+
+			version.major = release;
+			version.minor = patch;
+			version.known = true;
+			return version;
+		}
+	}
+
+	// Qualcomm strings commonly contain "V@0502"; PowerVR strings often expose "1.8@...".
+	size_t start = 0;
+	if (vendor == RuntimeGpuProfile::Adreno)
+	{
+		const size_t marker = lowered.find("v@");
+		if (marker != std::string::npos)
+			start = marker + 2;
+	}
+
+	for (size_t pos = start; pos < lowered.size(); pos++)
+	{
+		u16 major = 0;
+		size_t end = pos;
+		if (!ParseUnsigned(lowered, pos, &major, &end))
+			continue;
+
+		u16 minor = 0;
+		u16 patch = 0;
+		if (end < lowered.size() && lowered[end] == '.')
+		{
+			size_t minor_end = end + 1;
+			ParseUnsigned(lowered, end + 1, &minor, &minor_end);
+			if (minor_end < lowered.size() && lowered[minor_end] == '.')
+			{
+				size_t patch_end = minor_end + 1;
+				ParseUnsigned(lowered, minor_end + 1, &patch, &patch_end);
+			}
+		}
+
+		version.major = major;
+		version.minor = minor;
+		version.patch = patch;
+		version.known = true;
+		return version;
+	}
+
+	return version;
+}
+
+static MobileDriverVersion ParseVulkanDriverVersion(const MobileDriverContext& context,
+	MobileGpuDriver driver)
+{
+	MobileDriverVersion version;
+	version.raw = context.driver_version;
+	if (context.driver_version == 0)
+		return version;
+
+	const u32 raw = context.driver_version;
+	version.major = static_cast<u16>(raw >> 22);
+	version.minor = static_cast<u16>((raw >> 12) & 0x3ff);
+	version.patch = static_cast<u16>(raw & 0xfff);
+
+	if (driver == MobileGpuDriver::QualcommProprietary && (raw & 0x80000000u) == 0)
+	{
+		// Older Qualcomm releases used an undocumented, non-orderable encoding.
+		version.known = false;
+		version.major = 0;
+		version.minor = 0;
+		version.patch = 0;
+		return version;
+	}
+
+	if (driver == MobileGpuDriver::ArmProprietary &&
+		(version.patch != 0 || version.major > 100))
+	{
+		// Old Mali Vulkan releases placed a source hash in driverVersion.
+		version.known = false;
+		version.legacy_hash = true;
+		version.major = 0;
+		version.minor = 0;
+		version.patch = 0;
+		return version;
+	}
+
+	version.known = true;
+	return version;
+}
+
+static MobileGpuDriver DetectDriver(const GpuProfileSelection& selection,
+	const MobileDriverContext& context, std::string_view lowered_hints)
+{
+	switch (context.driver_id)
+	{
+		case DRIVER_ID_ARM_PROPRIETARY: return MobileGpuDriver::ArmProprietary;
+		case DRIVER_ID_MESA_PANVK: return MobileGpuDriver::MesaPanVK;
+		case DRIVER_ID_QUALCOMM_PROPRIETARY: return MobileGpuDriver::QualcommProprietary;
+		case DRIVER_ID_MESA_TURNIP: return MobileGpuDriver::MesaTurnip;
+		case DRIVER_ID_IMAGINATION_PROPRIETARY: return MobileGpuDriver::ImaginationProprietary;
+		case DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA: return MobileGpuDriver::MesaPowerVR;
+		default: break;
+	}
+
+	const std::string driver_hints = ToLowerASCII(
+		std::string(context.driver_name) + " " + std::string(context.driver_info) + " " +
+		std::string(lowered_hints));
+	if (ContainsAny(driver_hints, {"turnip", "freedreno"}))
+		return MobileGpuDriver::MesaTurnip;
+	if (ContainsAny(driver_hints, {"panvk", "panfrost"}))
+		return MobileGpuDriver::MesaPanVK;
+	if (ContainsAny(driver_hints, {"pvr mesa", "powervr mesa"}))
+		return MobileGpuDriver::MesaPowerVR;
+	if (ContainsAny(driver_hints, {"angle"}))
+		return MobileGpuDriver::Angle;
+
+	// With no explicit driver ID, Vulkan and native GLES vendor IDs identify the proprietary stack.
+	switch (selection.runtime_profile)
+	{
+		case RuntimeGpuProfile::Mali:
+			return MobileGpuDriver::ArmProprietary;
+		case RuntimeGpuProfile::Adreno:
+			return MobileGpuDriver::QualcommProprietary;
+		case RuntimeGpuProfile::PowerVR:
+			return MobileGpuDriver::ImaginationProprietary;
+		default:
+			return MobileGpuDriver::Unknown;
+	}
+}
+
+static bool RuleMatches(const DriverRule& rule, const GpuProfileSelection& selection,
+	const MobileDriverContext& context, const MobileDriverProfile& profile)
+{
+	if (rule.api != MobileGpuApi::Unknown && rule.api != profile.api)
+		return false;
+	if (rule.vendor != RuntimeGpuProfile::Unknown && rule.vendor != selection.runtime_profile)
+		return false;
+	if (rule.driver != MobileGpuDriver::Unknown && rule.driver != profile.driver)
+		return false;
+	if (rule.architecture != MobileGpuArchitecture::Unknown &&
+		rule.architecture != selection.gpu.architecture)
+	{
+		return false;
+	}
+	if ((rule.model_min != 0 || rule.model_max != 0) &&
+		(selection.gpu.model_number < rule.model_min || selection.gpu.model_number > rule.model_max))
+	{
+		return false;
+	}
+	if (rule.exact_raw_version != 0 && profile.version.raw != rule.exact_raw_version)
+		return false;
+	if (rule.min_android_sdk != 0 && context.android_sdk < rule.min_android_sdk)
+		return false;
+	if (rule.max_android_sdk != 0 && context.android_sdk > rule.max_android_sdk)
+		return false;
+
+	const bool has_version_range =
+		HasVersionBound(rule.min_version) || HasVersionBound(rule.max_version_exclusive);
+	if (has_version_range && !profile.version.known)
+		return rule.match_unknown_version;
+	if (HasVersionBound(rule.min_version) && CompareVersion(profile.version, rule.min_version) < 0)
+		return false;
+	if (HasVersionBound(rule.max_version_exclusive) &&
+		CompareVersion(profile.version, rule.max_version_exclusive) >= 0)
+	{
+		return false;
+	}
+	return true;
+}
+
+// Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. Rules here
+// intentionally describe driver mechanisms, not game-specific GS hacks.
+static constexpr std::array<DriverRule, 22> s_driver_rules = {{
+	{"gl-arm-buffer-stream", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenUnsynchronizedMapping) |
+			Bug(DriverBug::BrokenVectorBitwiseAnd) | Bug(DriverBug::BrokenVSync),
+		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
+			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
+	{"gl-arm-g57-fifo", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
+	{"gl-qualcomm-compiler", MobileGpuApi::OpenGL, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenNegatedBoolean) |
+			Bug(DriverBug::BrokenPrimitiveRestart),
+		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
+			Workaround(DriverWorkaround::RewriteBooleanNegation) |
+			Workaround(DriverWorkaround::DisablePrimitiveRestart)},
+	{"gl-powervr-compiler", MobileGpuApi::OpenGL, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenBitwiseOpNegation) |
+			Bug(DriverBug::BrokenGenerateMipmapTallTexture),
+		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
+			Workaround(DriverWorkaround::StoreBitwiseNegationInTemporary) |
+			Workaround(DriverWorkaround::GenerateMipmapManuallyForTallTextures)},
+	{"gl-android-shader-serialization", MobileGpuApi::OpenGL, RuntimeGpuProfile::Unknown,
+		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 1, 0, false,
+		Bug(DriverBug::BrokenMultithreadedShaderCompilation),
+		Workaround(DriverWorkaround::SerializeShaderCompilation)},
+	{"vk-android-shader-serialization", MobileGpuApi::Vulkan, RuntimeGpuProfile::Unknown,
+		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 1, 0, false,
+		Bug(DriverBug::BrokenMultithreadedShaderCompilation),
+		Workaround(DriverWorkaround::SerializeShaderCompilation)},
+	{"vk-arm-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenPushDescriptors) |
+			Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
+			Bug(DriverBug::SlowCachedReadbackMemory) | Bug(DriverBug::BrokenVectorBitwiseAnd),
+		Workaround(DriverWorkaround::DisablePrimitiveRestart) |
+			Workaround(DriverWorkaround::UseDescriptorSets) |
+			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
+			Workaround(DriverWorkaround::PreferCoherentReadback) |
+			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
+	{"vk-arm-hash-barriers", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		0, Workaround(DriverWorkaround::UseExplicitBarrierSubresourceCounts)},
+	{"vk-arm-empty-renderpass", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0xaa9c4b29u, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenEmptyRenderPass), Workaround(DriverWorkaround::TransitionEmptyClearViaGeneral)},
+	{"vk-arm-constant-load-r32-r39", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {32, 0, 0}, {40, 0, 0},
+		0, 0, false, Bug(DriverBug::BrokenConstantLoad), Workaround(DriverWorkaround::RewriteConstantLoads)},
+	{"vk-arm-midgard-uniform-indexing", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::MaliMidgard, 830, 880, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenUniformIndexing), Workaround(DriverWorkaround::RewriteUniformIndexing)},
+	{"vk-arm-imageless-r38", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {38, 0, 0}, {38, 2, 0},
+		0, 0, false, Bug(DriverBug::BrokenImagelessFramebuffer),
+		Workaround(DriverWorkaround::DisableImagelessFramebuffer)},
+	{"vk-arm-extended-dynamic-before-r44p1", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {44, 1, 0},
+		0, 0, true, Bug(DriverBug::BrokenExtendedDynamicState),
+		Workaround(DriverWorkaround::DisableExtendedDynamicState)},
+	{"vk-arm-dynamic-rendering-before-r52", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {52, 0, 0},
+		0, 0, true, Bug(DriverBug::BrokenDynamicRendering),
+		Workaround(DriverWorkaround::DisableDynamicRendering)},
+	{"vk-qualcomm-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenProvokingVertex) |
+			Bug(DriverBug::BrokenSubpassFeedback) | Bug(DriverBug::BrokenD32FClear) |
+			Bug(DriverBug::BrokenReversedDepthRange) | Bug(DriverBug::SlowCachedReadbackMemory) |
+			Bug(DriverBug::SlowOptimalImageToBufferCopy),
+		Workaround(DriverWorkaround::DisablePrimitiveRestart) |
+			Workaround(DriverWorkaround::DisableProvokingVertex) |
+			Workaround(DriverWorkaround::UseCopyForFeedbackLoop) |
+			Workaround(DriverWorkaround::UseD24S8Depth) |
+			Workaround(DriverWorkaround::AvoidReversedDepthRange) |
+			Workaround(DriverWorkaround::PreferCoherentReadback) |
+			Workaround(DriverWorkaround::UseStagingImageForReadback)},
+	{"vk-adreno5xx-depth-stencil", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Adreno5xx, 500, 599, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenDepthStencilDiscard) | Bug(DriverBug::BrokenColorWriteMaskWithDepthTest),
+		Workaround(DriverWorkaround::PreserveDepthStencilAttachment) |
+			Workaround(DriverWorkaround::EmulateColorWriteMask)},
+	{"vk-qualcomm-dynamic-rendering-before-512-801", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {512, 801, 0},
+		0, 0, true, Bug(DriverBug::BrokenDynamicRendering),
+		Workaround(DriverWorkaround::DisableDynamicRendering)},
+	{"vk-qualcomm-imageless-before-512-806", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {512, 806, 0},
+		0, 0, true, Bug(DriverBug::BrokenImagelessFramebuffer),
+		Workaround(DriverWorkaround::DisableImagelessFramebuffer)},
+	{"vk-powervr-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenPushDescriptors) | Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
+			Bug(DriverBug::BrokenClearLoadOpRenderPass) | Bug(DriverBug::Broken16BitTextureFormats) |
+			Bug(DriverBug::BrokenDynamicRendering) | Bug(DriverBug::BrokenImagelessFramebuffer) |
+			Bug(DriverBug::BrokenPrimitiveTopologyDynamicState) |
+			Bug(DriverBug::BrokenGraphicsPipelineLibrary),
+		Workaround(DriverWorkaround::UseDescriptorSets) |
+			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
+			Workaround(DriverWorkaround::AvoidClearLoadOpRenderPass) |
+			Workaround(DriverWorkaround::Avoid16BitTextureFormats) |
+			Workaround(DriverWorkaround::DisableDynamicRendering) |
+			Workaround(DriverWorkaround::DisableImagelessFramebuffer) |
+			Workaround(DriverWorkaround::DisablePrimitiveTopologyDynamicState) |
+			Workaround(DriverWorkaround::DisableGraphicsPipelineLibrary)},
+	{"vk-powervr-old-swapchain-width", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		0, Workaround(DriverWorkaround::AlignSwapchainWidthTo32)},
+	{"vk-powervr-primitive-topology", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenPrimitiveTopologyDynamicState),
+		Workaround(DriverWorkaround::DisablePrimitiveTopologyDynamicState)},
+	{"vk-arm-jm-r46-r50-extended-dynamic", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {46, 0, 0}, {51, 0, 0},
+		0, 0, false, Bug(DriverBug::BrokenExtendedDynamicState),
+		Workaround(DriverWorkaround::DisableExtendedDynamicState)},
+}};
+} // namespace
+
+MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
+	const MobileDriverContext& context, std::string_view lowered_hints)
+{
+	MobileDriverProfile profile;
+	profile.api = context.api;
+	profile.driver = DetectDriver(selection, context, lowered_hints);
+	profile.driver_name = context.driver_name.empty() ? std::string() : std::string(context.driver_name);
+	profile.version = (context.api == MobileGpuApi::Vulkan) ?
+		ParseVulkanDriverVersion(context, profile.driver) :
+		ParseOpenGLDriverVersion(context.api_version_string, selection.runtime_profile);
+	profile.version.raw = context.driver_version;
+
+	if (selection.runtime_profile != RuntimeGpuProfile::Unknown)
+		profile.confidence = selection.gpu.recognized ?
+			DriverProfileConfidence::Model : DriverProfileConfidence::Vendor;
+	if (profile.driver != MobileGpuDriver::Unknown)
+		profile.confidence = DriverProfileConfidence::Driver;
+	if (profile.version.known)
+		profile.confidence = DriverProfileConfidence::DriverVersion;
+
+	for (const DriverRule& rule : s_driver_rules)
+	{
+		if (std::string_view(rule.id) == "vk-arm-hash-barriers" && !profile.version.legacy_hash)
+			continue;
+		if (std::string_view(rule.id) == "vk-powervr-old-swapchain-width" &&
+			(profile.version.raw == 0 || profile.version.raw >= 0x00582558u))
+		{
+			continue;
+		}
+		if (std::string_view(rule.id) == "vk-arm-midgard-uniform-indexing" &&
+			(!profile.version.legacy_hash ||
+				(selection.gpu.model_number != 830 && selection.gpu.model_number != 860 &&
+					selection.gpu.model_number != 880)))
+		{
+			continue;
+		}
+		if (std::string_view(rule.id) == "vk-arm-jm-r46-r50-extended-dynamic" &&
+			context.max_draw_indirect_count > 1)
+		{
+			continue;
+		}
+		if (!RuleMatches(rule, selection, context, profile))
+			continue;
+
+		profile.bugs |= rule.bugs;
+		profile.workarounds |= rule.workarounds;
+		profile.matched_rule_count++;
+	}
+
+	profile.conservative_fallback =
+		(selection.runtime_profile == RuntimeGpuProfile::Unknown || profile.driver == MobileGpuDriver::Unknown);
+	return profile;
+}
+} // namespace GpuProfileDetail

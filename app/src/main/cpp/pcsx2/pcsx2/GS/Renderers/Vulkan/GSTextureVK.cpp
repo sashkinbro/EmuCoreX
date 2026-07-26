@@ -827,6 +827,8 @@ GSDownloadTextureVK::~GSDownloadTextureVK()
 	// Buffer was created mapped, no need to manually unmap.
 	if (m_buffer != VK_NULL_HANDLE)
 		GSDeviceVK::GetInstance()->DeferBufferDestruction(m_buffer, m_allocation);
+	if (m_staging_image != VK_NULL_HANDLE)
+		GSDeviceVK::GetInstance()->DeferImageDestruction(m_staging_image, m_staging_image_allocation);
 }
 
 std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 height, GSTexture::Format format)
@@ -840,7 +842,12 @@ std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 
 	VmaAllocationCreateInfo aci = {};
 	aci.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
 	aci.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	// ARM and Qualcomm proprietary drivers expose cached readback heaps which are substantially
+	// slower than coherent memory. Keep the normal cached preference for unaffected drivers.
+	aci.preferredFlags =
+		GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(DriverWorkaround::PreferCoherentReadback) ?
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT :
+			VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 
 	VmaAllocationInfo ai = {};
 	VmaAllocation allocation;
@@ -858,6 +865,46 @@ std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 
 	tex->m_buffer = buffer;
 	tex->m_buffer_size = buffer_size;
 	tex->m_map_pointer = static_cast<const u8*>(ai.pMappedData);
+
+	GSDeviceVK* const dev = GSDeviceVK::GetInstance();
+	if (dev->UsesMobileDriverWorkaround(DriverWorkaround::UseStagingImageForReadback) &&
+		format != GSTexture::Format::DepthStencil)
+	{
+		const VkFormat vk_format = dev->LookupNativeFormat(format);
+		const VkImageCreateInfo ici = {
+			VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			nullptr,
+			0,
+			VK_IMAGE_TYPE_2D,
+			vk_format,
+			{width, height, 1},
+			1,
+			1,
+			VK_SAMPLE_COUNT_1_BIT,
+			VK_IMAGE_TILING_LINEAR,
+			VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			VK_SHARING_MODE_EXCLUSIVE,
+			0,
+			nullptr,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+		};
+		VkImageFormatProperties image_properties = {};
+		if (vkGetPhysicalDeviceImageFormatProperties(dev->GetPhysicalDevice(), vk_format, ici.imageType,
+				ici.tiling, ici.usage, ici.flags, &image_properties) == VK_SUCCESS)
+		{
+			VmaAllocationCreateInfo image_aci = {};
+			image_aci.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+			const VkResult image_res = vmaCreateImage(dev->GetAllocator(), &ici, &image_aci,
+				&tex->m_staging_image, &tex->m_staging_image_allocation, nullptr);
+			if (image_res != VK_SUCCESS)
+			{
+				tex->m_staging_image = VK_NULL_HANDLE;
+				tex->m_staging_image_allocation = VK_NULL_HANDLE;
+				Console.Warning("VK: Qualcomm linear readback staging image unavailable; using direct copy.");
+			}
+		}
+	}
+
 	return tex;
 }
 
@@ -900,8 +947,48 @@ void GSDownloadTextureVK::CopyFromTexture(
 	image_copy.imageOffset = {src.left, src.top, 0};
 	image_copy.imageExtent = {static_cast<u32>(src.width()), static_cast<u32>(src.height()), 1u};
 
-	// do the copy
-	vkCmdCopyImageToBuffer(cmdbuf, vkTex->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_buffer, 1, &image_copy);
+	VkImage readback_image = vkTex->GetImage();
+	if (m_staging_image != VK_NULL_HANDLE)
+	{
+		VkImageMemoryBarrier staging_barrier = {
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+			nullptr,
+			0,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			m_staging_image,
+			{aspect, 0, 1, 0, 1},
+		};
+		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0, 0, nullptr, 0, nullptr, 1, &staging_barrier);
+
+		const VkImageCopy staging_copy = {
+			{aspect, src_level, 0, 1},
+			{src.left, src.top, 0},
+			{aspect, 0, 0, 1},
+			{0, 0, 0},
+			{static_cast<u32>(src.width()), static_cast<u32>(src.height()), 1},
+		};
+		vkCmdCopyImage(cmdbuf, vkTex->GetImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			m_staging_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &staging_copy);
+
+		staging_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		staging_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		staging_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		staging_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		vkCmdPipelineBarrier(cmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0, 0, nullptr, 0, nullptr, 1, &staging_barrier);
+
+		readback_image = m_staging_image;
+		image_copy.imageSubresource.mipLevel = 0;
+		image_copy.imageOffset = {0, 0, 0};
+	}
+
+	vkCmdCopyImageToBuffer(
+		cmdbuf, readback_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_buffer, 1, &image_copy);
 
 	// flush gpu cache
 	const VkBufferMemoryBarrier buffer_info = {

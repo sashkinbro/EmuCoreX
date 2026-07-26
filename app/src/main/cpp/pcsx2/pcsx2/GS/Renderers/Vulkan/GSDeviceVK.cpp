@@ -118,15 +118,29 @@ static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
 	if (!tex)
 		return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 
-	// clang-format off
 	switch (tex->GetState())
 	{
-	case GSTextureVK::State::Cleared:       tex->SetState(GSTexture::State::Dirty); return VK_ATTACHMENT_LOAD_OP_CLEAR;
-	case GSTextureVK::State::Invalidated:   tex->SetState(GSTexture::State::Dirty); return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	case GSTextureVK::State::Dirty:         return VK_ATTACHMENT_LOAD_OP_LOAD;
-	default:                                return VK_ATTACHMENT_LOAD_OP_LOAD;
+		case GSTextureVK::State::Cleared:
+		{
+			if (GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(
+					DriverWorkaround::AvoidClearLoadOpRenderPass))
+			{
+				// PowerVR drivers can mishandle render passes whose attachment load op is CLEAR.
+				// Materialize the lazy clear first, then preserve it through a LOAD render pass.
+				tex->CommitClear();
+				return VK_ATTACHMENT_LOAD_OP_LOAD;
+			}
+
+			tex->SetState(GSTexture::State::Dirty);
+			return VK_ATTACHMENT_LOAD_OP_CLEAR;
+		}
+		case GSTextureVK::State::Invalidated:
+			tex->SetState(GSTexture::State::Dirty);
+			return VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		case GSTextureVK::State::Dirty:
+		default:
+			return VK_ATTACHMENT_LOAD_OP_LOAD;
 	}
-	// clang-format on
 }
 
 static constexpr VkClearValue s_present_clear_color = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
@@ -482,16 +496,23 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
 		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false) ||
 		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
-	// Disable feedback loop layout for Mali (older drivers have issues) and PowerVR.
-	// Only enable for non-mobile vendors or when explicitly supported.
-	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
-		(!(m_device_properties.vendorID == 0x13B5u || is_powervr)) &&
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
+#if !defined(__ANDROID__)
+	// Mobile driver profiles are resolved by Android. Preserve the established conservative
+	// fallback on other platforms which expose these mobile vendor IDs.
+	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
+		(m_device_properties.vendorID != 0x13B5u && m_device_properties.vendorID != 0x1010u);
+#endif
 	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_push_descriptor =
 		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
-	m_optional_extensions.vk_khr_driver_properties = SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
+	// VK_KHR_driver_properties is core in Vulkan 1.2 and may no longer be advertised as an
+	// extension. Keep querying VkPhysicalDeviceDriverProperties so Turnip/PanVK never inherit
+	// proprietary-driver workarounds.
+	m_optional_extensions.vk_khr_driver_properties =
+		(m_device_properties.apiVersion >= VK_API_VERSION_1_2) ||
+		SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
 
 	if (m_optional_extensions.vk_swapchain_maintenance1)
 	{
@@ -545,21 +566,21 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	m_name = m_device_properties.deviceName;
 
 #if defined(__ANDROID__)
-	const GpuProfileSelection gpu_profile_selection =
+	MobileDriverContext driver_context;
+	driver_context.api = MobileGpuApi::Vulkan;
+	driver_context.vendor_id = m_device_properties.vendorID;
+	driver_context.device_id = m_device_properties.deviceID;
+	driver_context.driver_version = m_device_properties.driverVersion;
+	driver_context.api_version = m_device_properties.apiVersion;
+	driver_context.max_draw_indirect_count = m_device_properties.limits.maxDrawIndirectCount;
+	GpuProfileSelection gpu_profile_selection =
 		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
-			GetVulkanVendorHint(m_device_properties.vendorID), m_name);
+			GetVulkanVendorHint(m_device_properties.vendorID), m_name, driver_context);
 	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
 	SetMobileGPUIdentity(gpu_profile_selection.gpu);
 	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
+	SetMobileDriverProfile(gpu_profile_selection.driver);
 	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
-	Console.WriteLn("VK: Android GPU profile override='%s' resolved='%s' soc='%s' model='%s' architecture='%s'%s.",
-		GpuProfileDetector::OverrideToConfigString(gpu_profile_selection.override_mode),
-		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-		IsMediaTekSoC() ? "MediaTek" : "other/unknown",
-		gpu_profile_selection.gpu.name.c_str(),
-		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
-		gpu_profile_selection.gs_tuning.constrained ? " constrained" : "");
-	DevCon.WriteLn("VK: Android GPU profile hints: %s", gpu_profile_selection.hints.c_str());
 #else
 	SetRuntimeGPUProfile(RuntimeGpuProfile::Unknown);
 #endif
@@ -697,6 +718,51 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	ExtensionList enabled_extensions;
 	if (!SelectDeviceExtensions(&enabled_extensions, surface != VK_NULL_HANDLE))
 		return false;
+
+	// Query driver identity before creating the logical device. Several extension workarounds are
+	// specific to proprietary drivers and must not leak onto Mesa Turnip/PanVK.
+	if (m_optional_extensions.vk_khr_driver_properties)
+	{
+		VkPhysicalDeviceProperties2 driver_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+		m_device_driver_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+		Vulkan::AddPointerToChain(&driver_properties, &m_device_driver_properties);
+		vkGetPhysicalDeviceProperties2(m_physical_device, &driver_properties);
+	}
+
+#if defined(__ANDROID__)
+	driver_context.driver_id = static_cast<u32>(m_device_driver_properties.driverID);
+	driver_context.driver_name = m_device_driver_properties.driverName;
+	driver_context.driver_info = m_device_driver_properties.driverInfo;
+	gpu_profile_selection = GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
+		GetVulkanVendorHint(m_device_properties.vendorID), m_name, driver_context);
+	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
+	SetMobileGPUIdentity(gpu_profile_selection.gpu);
+	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
+	SetMobileDriverProfile(gpu_profile_selection.driver);
+	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
+
+	m_optional_extensions.vk_ext_provoking_vertex &=
+		!UsesMobileDriverWorkaround(DriverWorkaround::DisableProvokingVertex);
+	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
+		!UsesMobileDriverWorkaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout);
+
+	Console.WriteLn("VK: Android GPU profile override='%s' resolved='%s' soc='%s' model='%s' "
+		"architecture='%s' driver='%s' version=%u.%u.%u raw=%08x rules=%u "
+		"bugs=%016llx workarounds=%016llx%s.",
+		GpuProfileDetector::OverrideToConfigString(gpu_profile_selection.override_mode),
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
+		IsMediaTekSoC() ? "MediaTek" : "other/unknown",
+		gpu_profile_selection.gpu.name.c_str(),
+		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
+		GpuProfileDetector::DriverToString(gpu_profile_selection.driver.driver),
+		gpu_profile_selection.driver.version.major, gpu_profile_selection.driver.version.minor,
+		gpu_profile_selection.driver.version.patch, gpu_profile_selection.driver.version.raw,
+		gpu_profile_selection.driver.matched_rule_count,
+		static_cast<unsigned long long>(gpu_profile_selection.driver.bugs),
+		static_cast<unsigned long long>(gpu_profile_selection.driver.workarounds),
+		gpu_profile_selection.gs_tuning.constrained ? " constrained" : "");
+	DevCon.WriteLn("VK: Android GPU profile hints: %s", gpu_profile_selection.hints.c_str());
+#endif
 
 	device_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
 	device_info.ppEnabledExtensionNames = enabled_extensions.data();
@@ -865,8 +931,6 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	// query
 	vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
 
-	// Mali (ARM, vendorID 0x13B5) advertises VK_KHR_push_descriptor but its driver
-	// null-derefs inside vkCmdPushDescriptorSetKHR. Also disable for PowerVR.
 	m_use_push_descriptors = m_optional_extensions.vk_khr_push_descriptor;
 	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
 	{
@@ -874,7 +938,14 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 			push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
 		m_use_push_descriptors = false;
 	}
-	if (m_use_push_descriptors && (properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
+	const bool profile_disables_push_descriptors =
+		UsesMobileDriverWorkaround(DriverWorkaround::UseDescriptorSets);
+#if defined(__ANDROID__)
+	if (m_use_push_descriptors && profile_disables_push_descriptors)
+#else
+	if (m_use_push_descriptors && (profile_disables_push_descriptors ||
+		properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
+#endif
 		m_use_push_descriptors = false;
 	if (m_use_push_descriptors && properties2.properties.vendorID == 0x5143u &&
 		m_device_driver_properties.driverID != VK_DRIVER_ID_QUALCOMM_PROPRIETARY &&
@@ -1145,6 +1216,20 @@ VkRenderPass GSDeviceVK::GetRenderPass(VkFormat color_format, VkFormat depth_for
 	VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op, bool color_feedback_loop,
 	bool depth_sampling)
 {
+	if (depth_format != VK_FORMAT_UNDEFINED &&
+		UsesMobileDriverWorkaround(DriverWorkaround::PreserveDepthStencilAttachment))
+	{
+		// Adreno 5xx can corrupt depth/stencil state when either aspect is discarded.
+		if (depth_load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		if (depth_store_op == VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			depth_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+		if (stencil_load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+			stencil_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
+		if (stencil_store_op == VK_ATTACHMENT_STORE_OP_DONT_CARE)
+			stencil_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+	}
+
 	RenderPassCacheKey key = {};
 	key.color_format = color_format;
 	key.depth_format = depth_format;
@@ -2916,14 +3001,19 @@ bool GSDeviceVK::CheckFeatures()
 	// All Mali and PowerVR GPUs have unreliable ROAA (framebuffer fetch).
 	// This causes black/stale textures. Disable fbfetch for all mobile GPUs except Adreno.
 	const bool unreliable_mali_fbfetch = is_mali_vk || is_powervr;
+	const bool force_copy_feedback =
+		UsesMobileDriverWorkaround(DriverWorkaround::UseCopyForFeedbackLoop);
 	const bool vendor_allows_fbfetch =
-		!unreliable_mali_fbfetch && (is_mali_vk || GSConfig.EnableAdrenoFramebufferFetch);
+		!unreliable_mali_fbfetch && !force_copy_feedback &&
+		(is_mali_vk || GSConfig.EnableAdrenoFramebufferFetch);
 	bool framebuffer_fetch = vendor_allows_fbfetch &&
 		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
 	if (unreliable_mali_fbfetch && has_framebuffer_fetch_extension)
 	{
 		Console.Warning("VK: Disabled unreliable Mali framebuffer fetch; using texture-barrier feedback.");
 	}
+	if (force_copy_feedback && has_framebuffer_fetch_extension)
+		Console.Warning("VK: Disabled proprietary Adreno framebuffer fetch; using the GS feedback fallback.");
 
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 
@@ -2972,12 +3062,28 @@ bool GSDeviceVK::CheckFeatures()
 	if (!m_features.texture_barrier)
 		Console.Warning("VK: Texture buffers are disabled. This may break some graphical effects.");
 
-	// Test for D32S8 support.
+	// Qualcomm's proprietary Vulkan stack has shipped broken D32F clears. Prefer D24S8
+	// there, while retaining D32S8 as a capability-checked fallback.
 	{
+		const VkFormat preferred_format =
+			UsesMobileDriverWorkaround(DriverWorkaround::UseD24S8Depth) ?
+				VK_FORMAT_D24_UNORM_S8_UINT :
+				VK_FORMAT_D32_SFLOAT_S8_UINT;
+		constexpr VkFormatFeatureFlags required =
+			VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		VkFormatProperties props = {};
-		vkGetPhysicalDeviceFormatProperties(m_physical_device, VK_FORMAT_D32_SFLOAT_S8_UINT, &props);
-		m_features.stencil_buffer =
-			((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0);
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, preferred_format, &props);
+		if ((props.optimalTilingFeatures & required) == required)
+		{
+			m_depth_format = preferred_format;
+		}
+		else if (preferred_format != VK_FORMAT_D32_SFLOAT_S8_UINT)
+		{
+			vkGetPhysicalDeviceFormatProperties(m_physical_device, VK_FORMAT_D32_SFLOAT_S8_UINT, &props);
+			if ((props.optimalTilingFeatures & required) == required)
+				m_depth_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+		}
+		m_features.stencil_buffer = (m_depth_format != VK_FORMAT_D32_SFLOAT);
 	}
 
 	// Fbfetch is useless if we don't have barriers enabled.
@@ -2986,8 +3092,14 @@ bool GSDeviceVK::CheckFeatures()
 	// Concurrent depth testing/sampling relies on the same feedback synchronization path.
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 
-	// Use D32F depth instead of D32S8 when we have framebuffer fetch.
-	m_features.stencil_buffer &= !m_features.framebuffer_fetch;
+	// Use D32F depth instead of a stencil format when framebuffer fetch needs it, except
+	// on proprietary Adreno where D32F clears are the exact operation being avoided.
+	if (m_features.framebuffer_fetch &&
+		!UsesMobileDriverWorkaround(DriverWorkaround::UseD24S8Depth))
+	{
+		m_features.stencil_buffer = false;
+		m_depth_format = VK_FORMAT_D32_SFLOAT;
+	}
 
 	// whether we can do point/line expand depends on the range of the device
 	const float f_upscale = GSConfig.UpscaleMultiplier;
@@ -3132,9 +3244,9 @@ VkFormat GSDeviceVK::LookupNativeFormat(GSTexture::Format format) const
 		VK_FORMAT_BC7_UNORM_BLOCK, // BC7
 	}};
 
-	return (format != GSTexture::Format::DepthStencil || m_features.stencil_buffer) ?
-	           s_format_mapping[static_cast<int>(format)] :
-	           VK_FORMAT_D32_SFLOAT;
+	return (format == GSTexture::Format::DepthStencil) ?
+		m_depth_format :
+		s_format_mapping[static_cast<int>(format)];
 }
 
 GSTexture* GSDeviceVK::CreateSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format)
@@ -4040,6 +4152,84 @@ static void AddShaderHeader(std::stringstream& ss)
 		ss << "#define DISABLE_TEXTURE_BARRIER 1\n";
 	if (features.texture_barrier && dev->UseFeedbackLoopLayout())
 		ss << "#define HAS_FEEDBACK_LOOP_LAYOUT 1\n";
+
+	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND",
+		dev->UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
+	AddMacro(ss, "DRIVER_REWRITE_UNIFORM_INDEXING",
+		dev->UsesMobileDriverWorkaround(DriverWorkaround::RewriteUniformIndexing) ? 1 : 0);
+	AddMacro(ss, "DRIVER_REWRITE_CONSTANT_LOADS",
+		dev->UsesMobileDriverWorkaround(DriverWorkaround::RewriteConstantLoads) ? 1 : 0);
+	ss << R"(
+uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec2(a.x & b.x, a.y & b.y);
+#else
+	return a & b;
+#endif
+}
+
+uvec3 gpu_bitwise_and(uvec3 a, uvec3 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec3(a.x & b.x, a.y & b.y, a.z & b.z);
+#else
+	return a & b;
+#endif
+}
+
+uvec4 gpu_bitwise_and(uvec4 a, uvec4 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
+#else
+	return a & b;
+#endif
+}
+
+ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return ivec3(a.x & b.x, a.y & b.y, a.z & b.z);
+#else
+	return a & b;
+#endif
+}
+
+float gpu_matrix_element(mat4 value, int column, int row)
+{
+#if DRIVER_REWRITE_UNIFORM_INDEXING
+	vec4 selected_column;
+	if (column == 0)
+		selected_column = value[0];
+	else if (column == 1)
+		selected_column = value[1];
+	else if (column == 2)
+		selected_column = value[2];
+	else
+		selected_column = value[3];
+
+	if (row == 0)
+		return selected_column[0];
+	if (row == 1)
+		return selected_column[1];
+	if (row == 2)
+		return selected_column[2];
+	return selected_column[3];
+#else
+	return value[column][row];
+#endif
+}
+
+float gpu_rewrite_constant_load(float value)
+{
+#if DRIVER_REWRITE_CONSTANT_LOADS
+	return value + 0.000001;
+#else
+	return value;
+#endif
+}
+)";
 }
 
 static void AddShaderStageMacro(std::stringstream& ss, bool vs, bool gs, bool fs)
@@ -5321,6 +5511,13 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 	}
 
 	// Blending
+	const bool emulate_masked_rgb =
+		UsesMobileDriverWorkaround(DriverWorkaround::EmulateColorWriteMask) &&
+		((p.cms.wrgba & 0x7) == 0) && (p.dss.ztst != ZTST_ALWAYS || p.dss.zwe);
+	const VkColorComponentFlags color_write_mask = emulate_masked_rgb ?
+		(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT) :
+		static_cast<VkColorComponentFlags>(p.cms.wrgba);
 	if (IsDATEModePrimIDInit(p.ps.date))
 	{
 		// image DATE prepass
@@ -5341,9 +5538,18 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 		}};
 		// clang-format on
 
-		gpb.SetBlendAttachment(0, true, vk_blend_factors[pbs.src_factor], vk_blend_factors[pbs.dst_factor],
+		gpb.SetBlendAttachment(0, true,
+			emulate_masked_rgb ? VK_BLEND_FACTOR_ZERO : vk_blend_factors[pbs.src_factor],
+			emulate_masked_rgb ? VK_BLEND_FACTOR_ONE : vk_blend_factors[pbs.dst_factor],
 			vk_blend_ops[pbs.op], vk_blend_factors[pbs.src_factor_alpha], vk_blend_factors[pbs.dst_factor_alpha],
-			VK_BLEND_OP_ADD, p.cms.wrgba);
+			VK_BLEND_OP_ADD, color_write_mask);
+	}
+	else if (emulate_masked_rgb)
+	{
+		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD,
+			p.cms.wa ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ZERO,
+			p.cms.wa ? VK_BLEND_FACTOR_ZERO : VK_BLEND_FACTOR_ONE,
+			VK_BLEND_OP_ADD, color_write_mask);
 	}
 	else
 	{
@@ -5751,9 +5957,18 @@ void GSDeviceVK::BeginRenderPass(VkRenderPass rp, const GSVector4i& rect)
 
 void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, const VkClearValue* cv, u32 cv_count)
 {
-
 	if (m_current_render_pass != VK_NULL_HANDLE)
 		EndRenderPass();
+
+	if (m_current_render_target &&
+		UsesMobileDriverWorkaround(DriverWorkaround::TransitionEmptyClearViaGeneral))
+	{
+		// The exact Mali driver used by Galaxy S8/S9 can lose an otherwise empty clear-only
+		// render pass. ARM's published workaround is a GENERAL round-trip before the pass.
+		const GSTextureVK::Layout original_layout = m_current_render_target->GetLayout();
+		m_current_render_target->TransitionToLayout(GSTextureVK::Layout::General);
+		m_current_render_target->TransitionToLayout(original_layout);
+	}
 
 	m_current_render_pass = rp;
 	m_current_render_pass_area = rect;

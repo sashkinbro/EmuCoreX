@@ -316,6 +316,56 @@ void GSTextureOGL::GenerateMipmap()
 {
 	pxAssert(m_mipmap_levels > 1);
 	GSDeviceOGL::GetInstance()->CommitClear(this, true);
+
+	if (m_size.y > m_size.x && m_size.x > 1 &&
+		GSDeviceOGL::GetInstance()->UsesMobileDriverWorkaround(
+			DriverWorkaround::GenerateMipmapManuallyForTallTextures))
+	{
+		GLint previous_read_fbo = 0;
+		GLint previous_draw_fbo = 0;
+		glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previous_read_fbo);
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previous_draw_fbo);
+
+		GLuint fbos[2] = {};
+		glGenFramebuffers(2, fbos);
+		bool complete = (fbos[0] != 0 && fbos[1] != 0);
+		const GLenum filter = IsIntegerFormat() ? GL_NEAREST : GL_LINEAR;
+		for (int dst_level = 1; complete && dst_level < m_mipmap_levels; dst_level++)
+		{
+			const int src_width = std::max(m_size.x >> (dst_level - 1), 1);
+			const int src_height = std::max(m_size.y >> (dst_level - 1), 1);
+			const int dst_width = std::max(m_size.x >> dst_level, 1);
+			const int dst_height = std::max(m_size.y >> dst_level, 1);
+
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
+			glFramebufferTexture2D(
+				GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture_id, dst_level - 1);
+			glReadBuffer(GL_COLOR_ATTACHMENT0);
+
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
+			glFramebufferTexture2D(
+				GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture_id, dst_level);
+			const GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+			glDrawBuffers(1, &draw_buffer);
+
+			complete = (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE &&
+				glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+			if (complete)
+			{
+				glBlitFramebuffer(0, 0, src_width, src_height, 0, 0, dst_width, dst_height,
+					GL_COLOR_BUFFER_BIT, filter);
+			}
+		}
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(previous_read_fbo));
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(previous_draw_fbo));
+		glDeleteFramebuffers(2, fbos);
+		if (complete)
+			return;
+
+		Console.Warning("GL: Manual PowerVR mipmap generation was unavailable; using driver fallback.");
+	}
+
 	glGenerateTextureMipmap(m_texture_id);
 }
 

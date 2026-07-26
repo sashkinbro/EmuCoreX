@@ -715,6 +715,7 @@ private:
 
 	GSTextureVK* m_current_render_target = nullptr;
 	GSTextureVK* m_current_depth_target = nullptr;
+	VkFormat m_depth_format = VK_FORMAT_D32_SFLOAT;
 	VkFramebuffer m_current_framebuffer = VK_NULL_HANDLE;
 	VkRenderPass m_current_render_pass = VK_NULL_HANDLE;
 	GSVector4i m_current_render_pass_area = GSVector4i::zero();

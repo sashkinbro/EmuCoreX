@@ -418,6 +418,19 @@ bool VKSwapChain::CreateSwapChain()
 		std::clamp(size.width, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
 	size.height =
 		std::clamp(size.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
+	if (GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(
+			DriverWorkaround::AlignSwapchainWidthTo32) &&
+		size.width >= 32)
+	{
+		const u32 aligned_width = size.width & ~31u;
+		if (aligned_width >= surface_capabilities.minImageExtent.width &&
+			aligned_width <= surface_capabilities.maxImageExtent.width)
+		{
+			Console.WriteLn("VK: Applying legacy PowerVR swapchain width alignment: %u -> %u.",
+				size.width, aligned_width);
+			size.width = aligned_width;
+		}
+	}
 
 	// Prefer identity transform if possible
 	VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;

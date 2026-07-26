@@ -34,6 +34,9 @@ app/.cxx/
 .externalNativeBuild/
 .angle-build/
 scripts/
+!scripts/
+scripts/*
+!scripts/validate_gpu_driver_database.py
 captures/
 out/
 dist/
@@ -61,6 +64,11 @@ build_output.txt
 hs_err_pid*
 autotests/
 tests/
+!app/src/main/cpp/pcsx2/tests/
+!app/src/main/cpp/pcsx2/tests/ctest/
+!app/src/main/cpp/pcsx2/tests/ctest/core/
+!app/src/main/cpp/pcsx2/tests/ctest/core/GS/
+!app/src/main/cpp/pcsx2/tests/ctest/core/GS/gpu_profile_tests.cpp
 
 # Nested repositories and local vendor metadata
 **/.git/
@@ -89,7 +97,11 @@ Thumbs.db
 emulog.txt
 # Local investigation notes and profiling captures
 docs/
-docs/vu0-camera-progress.md
+!docs/
+docs/*
+!docs/GPU_DRIVER_PROFILES.md
+# Private local GPU research database; never publish it.
+docs/gpu-driver-database.json
 profiling-runs/
 profiler/
 /local-traces/

@@ -132,7 +132,7 @@ void ps_convert_float16_rgb5a1()
 #else
 	uint d = uint(sample_c().r * exp2(24.0f));
 #endif
-	SV_Target0 = vec4(uvec4(d << 3, d >> 2, d >> 7, d >> 8) & uvec4(0xf8, 0xf8, 0xf8, 0x80)) / 255.0f;
+	SV_Target0 = vec4(gpu_bitwise_and(uvec4(d << 3, d >> 2, d >> 7, d >> 8), uvec4(0xf8, 0xf8, 0xf8, 0x80))) / 255.0f;
 }
 #endif
 
@@ -309,8 +309,8 @@ void ps_convert_rgb5a1_8i()
 	uvec2 pos = uvec2(gl_FragCoord.xy);
 
 	// Collapse separate R G B A areas into their base pixel
-	uvec2 column = (pos & ~uvec2(0u, 3u)) / uvec2(1,2);
-	uvec2 subcolumn = (pos & uvec2(0u, 1u));
+	uvec2 column = gpu_bitwise_and(pos, ~uvec2(0u, 3u)) / uvec2(1,2);
+	uvec2 subcolumn = gpu_bitwise_and(pos, uvec2(0u, 1u));
 	column.x -= (column.x / 128u) * 64u;
 	column.y += (column.y / 32u) * 32u;
 	
@@ -429,8 +429,8 @@ void ps_convert_rgba_8i()
 	uvec2 pos = uvec2(gl_FragCoord.xy);
 
 	// Collapse separate R G B A areas into their base pixel
-	uvec2 block = (pos & ~uvec2(15u, 3u)) >> 1;
-	uvec2 subblock = pos & uvec2(7u, 1u);
+	uvec2 block = gpu_bitwise_and(pos, ~uvec2(15u, 3u)) >> 1;
+	uvec2 subblock = gpu_bitwise_and(pos, uvec2(7u, 1u));
 	uvec2 coord = block | subblock;
 
 	// Compensate for potentially differing page pitch.
@@ -533,7 +533,7 @@ void ps_colclip_init()
 void ps_colclip_resolve()
 {
 	vec4 value = sample_c();
-	SV_Target0 = vec4(vec3(uvec3(value.rgb * 65535.0f) & 255u) / 255.0f, value.a);
+	SV_Target0 = vec4(vec3(gpu_bitwise_and(uvec3(value.rgb * 65535.0f), uvec3(255u))) / 255.0f, value.a);
 }
 #endif
 

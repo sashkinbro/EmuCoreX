@@ -260,7 +260,7 @@ vec4 clamp_wrap_uv(vec4 uv)
 	// textures. Fixes Xenosaga's hair issue.
 	uv = fract(uv);
 	#endif
-	uv_out = vec4((uvec4(uv * tex_size) & floatBitsToUint(MinMax.xyxy)) | floatBitsToUint(MinMax.zwzw)) / tex_size;
+	uv_out = vec4(gpu_bitwise_and(uvec4(uv * tex_size), floatBitsToUint(MinMax.xyxy)) | floatBitsToUint(MinMax.zwzw)) / tex_size;
 #endif
 
 #else // PS_WMS != PS_WMT
@@ -278,7 +278,7 @@ vec4 clamp_wrap_uv(vec4 uv)
 	#if PS_FST == 0
 		uv.xz = fract(uv.xz);
 	#endif
-	uv_out.xz = vec2((uvec2(uv.xz * tex_size.xx) & floatBitsToUint(MinMax.xx)) | floatBitsToUint(MinMax.zz)) / tex_size.xx;
+	uv_out.xz = vec2(gpu_bitwise_and(uvec2(uv.xz * tex_size.xx), floatBitsToUint(MinMax.xx)) | floatBitsToUint(MinMax.zz)) / tex_size.xx;
 
 #endif
 
@@ -295,7 +295,7 @@ vec4 clamp_wrap_uv(vec4 uv)
 	#if PS_FST == 0
 		uv.yw = fract(uv.yw);
 	#endif
-	uv_out.yw = vec2((uvec2(uv.yw * tex_size.yy) & floatBitsToUint(MinMax.yy)) | floatBitsToUint(MinMax.ww)) / tex_size.yy;
+	uv_out.yw = vec2(gpu_bitwise_and(uvec2(uv.yw * tex_size.yy), floatBitsToUint(MinMax.yy)) | floatBitsToUint(MinMax.ww)) / tex_size.yy;
 #endif
 
 #endif
@@ -632,7 +632,7 @@ vec4 sample_color(vec2 st)
 		c[i].a = ( (PS_AEM == 0) || any(bvec3(c[i].rgb))  ) ? TA.x : 0.0f;
 		//c[i].a = ( (PS_AEM == 0) || (sum > 0.0f) ) ? TA.x : 0.0f;
 #elif (PS_AEM_FMT == FMT_16)
-		c[i].a = c[i].a >= 0.5 ? TA.y : ( (PS_AEM == 0) || any(bvec3(ivec3(c[i].rgb * 255.0f) & ivec3(0xF8))) ) ? TA.x : 0.0f;
+		c[i].a = c[i].a >= 0.5 ? TA.y : ( (PS_AEM == 0) || any(bvec3(gpu_bitwise_and(ivec3(c[i].rgb * 255.0f), ivec3(0xF8)))) ) ? TA.x : 0.0f;
 		//c[i].a = c[i].a >= 0.5 ? TA.y : ( (PS_AEM == 0) || (sum > 0.0f) ) ? TA.x : 0.0f;
 #endif
 	}
@@ -785,7 +785,7 @@ vec4 ps_color()
 			T.a = float(denorm_c_before.g & 0x80u);
 		#endif
 		
-		T.a = ((T.a >= 127.5f) ? TA.y : ((PS_AEM == 0 || any(bvec3(ivec3(T.rgb) & ivec3(0xF8)))) ? TA.x : 0.0f)) * 255.0f;
+		T.a = ((T.a >= 127.5f) ? TA.y : ((PS_AEM == 0 || any(bvec3(gpu_bitwise_and(ivec3(T.rgb), ivec3(0xF8))))) ? TA.x : 0.0f)) * 255.0f;
 	#endif
 	
 	vec4 C = tfx(T, PSin.c);
@@ -804,7 +804,7 @@ void ps_fbmask(inout vec4 C)
 	#else
 		vec4 RT = trunc(sample_from_rt() * 255.0f + 0.1f);
 	#endif
-	C = vec4((uvec4(C) & ~FbMask) | (uvec4(RT) & FbMask));
+	C = vec4(gpu_bitwise_and(uvec4(C), gpu_bitwise_not(FbMask)) | gpu_bitwise_and(uvec4(RT), FbMask));
 #endif
 }
 
@@ -862,13 +862,13 @@ void ps_color_clamp_wrap(inout vec3 C)
 	// GPU: Color = 1/255, Alpha = 255/255 * 255/128 => output 1.9921875
 #if PS_DST_FMT == FMT_16 && PS_DITHER < 3 && (PS_BLEND_MIX == 0 || PS_DITHER)
 	// In 16 bits format, only 5 bits of colors are used. It impacts shadows computation of Castlevania
-	C = vec3(ivec3(C) & ivec3(0xF8));
+	C = vec3(gpu_bitwise_and(ivec3(C), ivec3(0xF8)));
 #elif PS_COLCLIP == 1 || PS_COLCLIP_HW == 1
-	C = vec3(ivec3(C) & ivec3(0xFF));
+	C = vec3(gpu_bitwise_and(ivec3(C), ivec3(0xFF)));
 #endif
 
 #elif PS_DST_FMT == FMT_16 && PS_DITHER != 3 && PS_BLEND_MIX == 0 && PS_BLEND_HW == 0
-	C = vec3(ivec3(C) & ivec3(0xF8));
+	C = vec3(gpu_bitwise_and(ivec3(C), ivec3(0xF8)));
 #endif
 }
 
@@ -1131,7 +1131,7 @@ void ps_main()
 	bool atst_pass = atst(C);
 
 #if PS_AFAIL == AFAIL_KEEP
-	if (!atst_pass)
+	if (gpu_boolean_not(atst_pass))
 		discard;
 #endif
 
@@ -1240,13 +1240,13 @@ void ps_main()
 	
 	// Alpha test with feedback
 	#if (PS_AFAIL == AFAIL_FB_ONLY) && NEEDS_DEPTH && PS_ZWRITE
-		if (!atst_pass)
+		if (gpu_boolean_not(atst_pass))
 			input_z = sample_from_depth().r;
 	#elif (PS_AFAIL == AFAIL_ZB_ONLY) && NEEDS_RT
-		if (!atst_pass)
+		if (gpu_boolean_not(atst_pass))
 			C = sample_from_rt();
 	#elif (PS_AFAIL == AFAIL_RGB_ONLY) 
-		if (!atst_pass)
+		if (gpu_boolean_not(atst_pass))
 		{
 		#if NEEDS_RT
 			C.a = sample_from_rt().a;

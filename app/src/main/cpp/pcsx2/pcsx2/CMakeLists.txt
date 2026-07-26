@@ -505,6 +505,7 @@ set(pcsx2GSSources
 	GS/Renderers/Common/GSDirtyRect.cpp
 	GS/Renderers/Common/GSFunctionMap.cpp
 	GS/Renderers/Common/GSGPUProfile.cpp
+	GS/Renderers/Common/GSGPUDriverProfile.cpp
 	GS/Renderers/Common/GSGPUProfileAdreno.cpp
 	GS/Renderers/Common/GSGPUProfileMali.cpp
 	GS/Renderers/Common/GSGPUProfilePowerVR.cpp

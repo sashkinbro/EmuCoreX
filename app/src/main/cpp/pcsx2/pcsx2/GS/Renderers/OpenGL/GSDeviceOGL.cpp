@@ -377,7 +377,11 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		RenderBlankFrame();
 
 	if (GLAD_GL_KHR_parallel_shader_compile)
-		glMaxShaderCompilerThreadsKHR(4);
+	{
+		const GLuint compiler_threads =
+			UsesMobileDriverWorkaround(DriverWorkaround::SerializeShaderCompilation) ? 1 : 4;
+		glMaxShaderCompilerThreadsKHR(compiler_threads);
+	}
 
 	if (!GSConfig.DisableShaderCache)
 	{
@@ -442,13 +446,20 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	{
 		GL_PUSH("GSDeviceOGL::Vertex Buffer");
 
+		const bool force_orphaning =
+			UsesMobileDriverWorkaround(DriverWorkaround::OrphanBufferOnUpload);
+		if (force_orphaning)
+			Console.WriteLn("GL: Using orphaned streaming buffers for this mobile driver.");
+
 		glGenVertexArrays(1, &m_vao);
 		IASetVAO(m_vao);
 
-		m_vertex_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE);
-		m_index_stream_buffer = GLStreamBuffer::Create(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE);
-		m_vertex_uniform_stream_buffer = GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_UNIFORM_BUFFER_SIZE);
-		m_fragment_uniform_stream_buffer = GLStreamBuffer::Create(GL_UNIFORM_BUFFER, FRAGMENT_UNIFORM_BUFFER_SIZE);
+		m_vertex_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE, force_orphaning);
+		m_index_stream_buffer = GLStreamBuffer::Create(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, force_orphaning);
+		m_vertex_uniform_stream_buffer =
+			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_UNIFORM_BUFFER_SIZE, force_orphaning);
+		m_fragment_uniform_stream_buffer =
+			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, FRAGMENT_UNIFORM_BUFFER_SIZE, force_orphaning);
 		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &m_uniform_buffer_alignment);
 		if (!m_vertex_stream_buffer || !m_index_stream_buffer || !m_vertex_uniform_stream_buffer || !m_fragment_uniform_stream_buffer)
 		{
@@ -727,7 +738,8 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	// ****************************************************************
 	if (!m_bugs.buggy_pbo)
 	{
-		m_texture_upload_buffer = GLStreamBuffer::Create(GL_PIXEL_UNPACK_BUFFER, TEXTURE_UPLOAD_BUFFER_SIZE);
+		m_texture_upload_buffer = GLStreamBuffer::Create(GL_PIXEL_UNPACK_BUFFER, TEXTURE_UPLOAD_BUFFER_SIZE,
+			UsesMobileDriverWorkaround(DriverWorkaround::OrphanBufferOnUpload));
 		if (m_texture_upload_buffer)
 		{
 			// Don't keep it bound, we'll re-bind when we need it.
@@ -811,8 +823,10 @@ bool GSDeviceOGL::CheckFeatures()
 
 	const char* vendor = (const char*)glGetString(GL_VENDOR);
 	const char* renderer = (const char*)glGetString(GL_RENDERER);
+	const char* version = (const char*)glGetString(GL_VERSION);
 	const char* vendor_str = vendor ? vendor : "";
 	const char* renderer_str = renderer ? renderer : "";
+	const char* version_str = version ? version : "";
 	if (std::strstr(vendor_str, "Advanced Micro Devices") || std::strstr(vendor_str, "ATI Technologies Inc.") ||
 		std::strstr(vendor_str, "ATI"))
 	{
@@ -842,17 +856,28 @@ bool GSDeviceOGL::CheckFeatures()
 	}
 
 #if defined(__ANDROID__)
+	MobileDriverContext driver_context;
+	driver_context.api = MobileGpuApi::OpenGL;
+	driver_context.driver_name = renderer_str;
+	driver_context.api_version_string = version_str;
 	const GpuProfileSelection gpu_profile_selection =
-		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str);
+		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str, driver_context);
 	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
 	SetMobileGPUIdentity(gpu_profile_selection.gpu);
 	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
+	SetMobileDriverProfile(gpu_profile_selection.driver);
 	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
-	Console.WriteLn("GL: Android GPU profile override='%s' resolved='%s' model='%s' architecture='%s'%s.",
+	Console.WriteLn("GL: Android GPU profile override='%s' resolved='%s' model='%s' architecture='%s' "
+		"driver='%s' version=%u.%u.%u rules=%u bugs=%016llx workarounds=%016llx%s.",
 		GpuProfileDetector::OverrideToConfigString(gpu_profile_selection.override_mode),
 		GpuProfileDetector::RuntimeProfileToString(gpu_profile_selection.runtime_profile),
 		gpu_profile_selection.gpu.name.c_str(),
 		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
+		GpuProfileDetector::DriverToString(gpu_profile_selection.driver.driver),
+		gpu_profile_selection.driver.version.major, gpu_profile_selection.driver.version.minor,
+		gpu_profile_selection.driver.version.patch, gpu_profile_selection.driver.matched_rule_count,
+		static_cast<unsigned long long>(gpu_profile_selection.driver.bugs),
+		static_cast<unsigned long long>(gpu_profile_selection.driver.workarounds),
 		gpu_profile_selection.gs_tuning.constrained ? " constrained" : "");
 	DevCon.WriteLn("GL: Android GPU profile hints: %s", gpu_profile_selection.hints.c_str());
 	bool gpu_profile_mali = IsMaliGPUProfile();
@@ -1050,7 +1075,6 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.multidraw_fb_copy = !m_features.texture_barrier;
 
 #if defined(__ANDROID__)
-	const char* version_str = reinterpret_cast<const char*>(glGetString(GL_VERSION));
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
 		"OpenGL GS vendor=%s renderer=%s version=%s profile=%s model=%s arch=%s "
 		"armFetch=%d extFetch=%d fbfetch=%d textureBarrier=%d copyFallback=%d dualSrcBlend=%d",
@@ -1141,9 +1165,7 @@ void GSDeviceOGL::SetSwapInterval()
 	// the user's low-latency setting.
 	const bool force_android_fifo =
 #if defined(__ANDROID__)
-		IsMaliGPUProfile() &&
-		(GetMobileGPUIdentity().model_number == 57 ||
-			GetMobileGPUIdentity().name.find("Mali-G57") != std::string::npos);
+		UsesMobileDriverWorkaround(DriverWorkaround::ForceFifoPresent);
 #else
 		false;
 #endif
@@ -1732,11 +1754,76 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define GPU_PROFILE_MALI {}\n", IsMaliGPUProfile() ? 1 : 0);
 	header += fmt::format("#define GPU_PROFILE_ADRENO {}\n", IsAdrenoGPUProfile() ? 1 : 0);
 	header += fmt::format("#define GPU_PROFILE_POWERVR {}\n", IsPowerVRGPUProfile() ? 1 : 0);
+	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n",
+		UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
+	header += fmt::format("#define DRIVER_REWRITE_BOOLEAN_NEGATION {}\n",
+		UsesMobileDriverWorkaround(DriverWorkaround::RewriteBooleanNegation) ? 1 : 0);
+	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n",
+		UsesMobileDriverWorkaround(DriverWorkaround::StoreBitwiseNegationInTemporary) ? 1 : 0);
 #else
 	header += "#define GPU_PROFILE_MALI 0\n";
 	header += "#define GPU_PROFILE_ADRENO 0\n";
 	header += "#define GPU_PROFILE_POWERVR 0\n";
+	header += "#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND 0\n";
+	header += "#define DRIVER_REWRITE_BOOLEAN_NEGATION 0\n";
+	header += "#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY 0\n";
 #endif
+	header += R"(
+bool gpu_boolean_not(bool value)
+{
+#if DRIVER_REWRITE_BOOLEAN_NEGATION
+	return value == false;
+#else
+	return !value;
+#endif
+}
+
+uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec2(a.x & b.x, a.y & b.y);
+#else
+	return a & b;
+#endif
+}
+
+uvec3 gpu_bitwise_and(uvec3 a, uvec3 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec3(a.x & b.x, a.y & b.y, a.z & b.z);
+#else
+	return a & b;
+#endif
+}
+
+uvec4 gpu_bitwise_and(uvec4 a, uvec4 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return uvec4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
+#else
+	return a & b;
+#endif
+}
+
+ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
+{
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
+	return ivec3(a.x & b.x, a.y & b.y, a.z & b.z);
+#else
+	return a & b;
+#endif
+}
+
+uvec4 gpu_bitwise_not(uvec4 value)
+{
+#if DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY
+	uvec4 result = ~value;
+	return result;
+#else
+	return ~value;
+#endif
+}
+)";
 
 	if (GLAD_GL_ARB_conservative_depth)
 	{

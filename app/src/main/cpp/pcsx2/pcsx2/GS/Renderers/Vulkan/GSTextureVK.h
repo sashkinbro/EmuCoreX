@@ -131,6 +131,8 @@ private:
 
 	VmaAllocation m_allocation = VK_NULL_HANDLE;
 	VkBuffer m_buffer = VK_NULL_HANDLE;
+	VmaAllocation m_staging_image_allocation = VK_NULL_HANDLE;
+	VkImage m_staging_image = VK_NULL_HANDLE;
 
 	u64 m_copy_fence_counter = 0;
 	u32 m_buffer_size = 0;

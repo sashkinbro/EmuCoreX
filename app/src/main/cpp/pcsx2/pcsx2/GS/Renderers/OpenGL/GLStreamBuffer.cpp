@@ -310,8 +310,13 @@ namespace
 	};
 } // namespace
 
-std::unique_ptr<GLStreamBuffer> GLStreamBuffer::Create(GLenum target, u32 size)
+std::unique_ptr<GLStreamBuffer> GLStreamBuffer::Create(GLenum target, u32 size, bool force_orphaning)
 {
+	// Some mobile drivers serialize BufferSubData and perform poorly with persistent mappings.
+	// Orphaning through BufferData keeps uploads asynchronous on those explicitly profiled drivers.
+	if (force_orphaning)
+		return BufferDataStreamBuffer::Create(target, size);
+
 	std::unique_ptr<GLStreamBuffer> buf;
 	if (GLAD_GL_VERSION_4_4 || GLAD_GL_ARB_buffer_storage || GLAD_GL_EXT_buffer_storage)
 	{
