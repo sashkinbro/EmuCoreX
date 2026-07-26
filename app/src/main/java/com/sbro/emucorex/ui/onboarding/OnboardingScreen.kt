@@ -116,6 +116,7 @@ import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -374,6 +375,7 @@ fun OnboardingScreen(
                     )
                 )
             )
+            .padding(top = appScreenTopPadding())
     ) {
         Box(
             modifier = Modifier

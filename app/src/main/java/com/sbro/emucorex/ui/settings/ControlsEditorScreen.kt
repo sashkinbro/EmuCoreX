@@ -632,7 +632,8 @@ private fun PreviewLayout(
             navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
         )
     )
-    val safeTop = overlayTopSafeInset ?: maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
+    val safeTop = overlayTopSafeInset
+        ?: maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
     val safeBottom = overlayBottomSafeInset ?: maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
     BoxWithConstraints(
         modifier = modifier.fillMaxSize()

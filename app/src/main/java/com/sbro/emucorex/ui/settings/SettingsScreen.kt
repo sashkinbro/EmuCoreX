@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -201,6 +200,7 @@ import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.VectorAnalogStick
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
@@ -224,12 +224,14 @@ fun SettingsScreen(
     onOpenGpuDriverManager: (() -> Unit)? = null,
     onOpenGameDbBrowser: (() -> Unit)? = null,
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
+    onOpenThemeManager: (() -> Unit)? = null,
+    onOpenTouchControlCreator: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab.toSettingsTab()) }
@@ -508,6 +510,8 @@ fun SettingsScreen(
                 onOpenGpuDriverManager = onOpenGpuDriverManager,
                 onOpenGameDbBrowser = onOpenGameDbBrowser,
                 onOpenControlsLayoutEditor = onOpenControlsLayoutEditor,
+                onOpenThemeManager = onOpenThemeManager,
+                onOpenTouchControlCreator = onOpenTouchControlCreator,
                 viewModel = viewModel,
                 topInset = 0.dp,
                 modifier = Modifier
@@ -875,7 +879,7 @@ private fun SettingsCompactTopBar(
             .padding(
                 start = ScreenHorizontalPadding,
                 end = ScreenHorizontalPadding,
-                top = topInset + 8.dp,
+                top = topInset,
                 bottom = 4.dp
             ),
         shape = RoundedCornerShape(26.dp),
@@ -1059,7 +1063,9 @@ private fun SettingsContent(
     onOpenMemoryCardManager: (() -> Unit)? = null,
     onOpenGpuDriverManager: (() -> Unit)? = null,
     onOpenGameDbBrowser: (() -> Unit)? = null,
-    onOpenControlsLayoutEditor: (() -> Unit)? = null
+    onOpenControlsLayoutEditor: (() -> Unit)? = null,
+    onOpenThemeManager: (() -> Unit)? = null,
+    onOpenTouchControlCreator: (() -> Unit)? = null
 ) {
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val defaults = remember { SettingsSnapshot() }
@@ -1126,6 +1132,17 @@ private fun SettingsContent(
                             onProLockedSelected = {
                                 (context as? Activity)?.let(viewModel::purchasePro)
                             }
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.Palette,
+                            label = stringResource(R.string.settings_theme_manager),
+                            value = if (uiState.isProUnlocked) {
+                                uiState.customTheme.name
+                            } else {
+                                stringResource(R.string.settings_theme_manager_locked)
+                            },
+                            onClick = { onOpenThemeManager?.invoke() },
+                            helpText = stringResource(R.string.settings_theme_manager_desc)
                         )
                         ToggleItem(
                             icon = Icons.Rounded.StayPrimaryPortrait,
@@ -1207,6 +1224,7 @@ private fun SettingsContent(
                         uiState = uiState,
                         onPickBackground = launchHomeBackgroundPicker,
                         onPickCustomFont = launchCustomFontPicker,
+                        onOpenTouchControlCreator = onOpenTouchControlCreator,
                         viewModel = viewModel
                     )
                 }
@@ -2978,6 +2996,7 @@ private fun CustomizationSettingsTab(
     uiState: SettingsUiState,
     onPickBackground: () -> Unit,
     onPickCustomFont: () -> Unit,
+    onOpenTouchControlCreator: (() -> Unit)?,
     viewModel: SettingsViewModel
 ) {
     val context = LocalContext.current
@@ -3310,6 +3329,15 @@ private fun CustomizationSettingsTab(
             },
             helpText = stringResource(R.string.settings_customization_touch_press_effect_help),
             onResetToDefault = { viewModel.setTouchControlPressEffect(TouchControlPressEffect.GROW) }
+        )
+        ActionItem(
+            icon = Icons.Rounded.Gamepad,
+            title = stringResource(R.string.touch_control_creator_settings_entry),
+            subtitle = stringResource(R.string.touch_control_creator_settings_desc),
+            actionIcon = Icons.Rounded.Tune,
+            actionLabel = stringResource(R.string.settings_edit_controls_action),
+            onClick = { onOpenTouchControlCreator?.invoke() },
+            enabled = onOpenTouchControlCreator != null
         )
     }
 
@@ -4272,6 +4300,16 @@ private fun ProSettingsTab(
             active = uiState.isProUnlocked
         )
         ProFeatureRow(
+            title = stringResource(R.string.settings_pro_feature_theme_manager_title),
+            description = stringResource(R.string.settings_pro_feature_theme_manager_desc),
+            active = uiState.isProUnlocked
+        )
+        ProFeatureRow(
+            title = stringResource(R.string.settings_pro_feature_controls_manager_title),
+            description = stringResource(R.string.settings_pro_feature_controls_manager_desc),
+            active = uiState.isProUnlocked
+        )
+        ProFeatureRow(
             title = stringResource(R.string.settings_pro_feature_icon_title),
             description = stringResource(R.string.settings_pro_feature_icon_desc),
             active = uiState.isProUnlocked
@@ -4597,6 +4635,11 @@ private fun ThemeSelector(
                 stringResource(R.string.settings_theme_pro)
             } else {
                 stringResource(R.string.settings_theme_pro_locked)
+            },
+            4 to if (isProUnlocked) {
+                stringResource(R.string.settings_theme_custom)
+            } else {
+                stringResource(R.string.settings_theme_custom_locked)
             }
         ),
         selectedValue = when (selected) {
@@ -4604,6 +4647,7 @@ private fun ThemeSelector(
             ThemeMode.LIGHT -> 1
             ThemeMode.DARK -> 2
             ThemeMode.PRO -> 3
+            ThemeMode.CUSTOM -> 4
         },
         onResetToDefault = { onSelected(ThemeMode.SYSTEM) },
         onSelect = { value ->
@@ -4611,6 +4655,7 @@ private fun ThemeSelector(
                 1 -> onSelected(ThemeMode.LIGHT)
                 2 -> onSelected(ThemeMode.DARK)
                 3 -> if (isProUnlocked) onSelected(ThemeMode.PRO) else onProLockedSelected()
+                4 -> if (isProUnlocked) onSelected(ThemeMode.CUSTOM) else onProLockedSelected()
                 else -> onSelected(ThemeMode.SYSTEM)
             }
         }
@@ -4783,6 +4828,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_language),
         entry(SettingsTab.General, R.string.settings_tv_interface),
         entry(SettingsTab.General, R.string.settings_theme),
+        entry(SettingsTab.General, R.string.settings_theme_manager),
         entry(SettingsTab.Customization, R.string.settings_customization_background),
         entry(SettingsTab.Customization, R.string.settings_customization_grid_size),
         entry(SettingsTab.Customization, R.string.settings_customization_font),
@@ -5893,7 +5939,7 @@ fun LanguageSettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 10.dp
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val options = rememberLanguageOptions()

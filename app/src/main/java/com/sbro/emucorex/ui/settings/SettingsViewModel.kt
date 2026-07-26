@@ -42,6 +42,9 @@ import com.sbro.emucorex.data.DefaultGameMenuSectionOrder
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CustomFontRepository
+import com.sbro.emucorex.data.CustomThemeConfig
+import com.sbro.emucorex.data.CustomThemeLibrary
+import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.ui.theme.ThemeMode
@@ -64,6 +67,9 @@ data class SettingsUiState(
     val isLoaded: Boolean = false,
     val showMediatekCompatibilityNotice: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val customTheme: CustomThemeConfig = CustomThemeConfig.Default,
+    val customThemeLibrary: CustomThemeLibrary = CustomThemeLibrary.Empty,
+    val customTouchControls: CustomTouchControlLibrary = CustomTouchControlLibrary.Empty,
     val appFontChoice: AppFontChoice = AppFontChoice.SYSTEM,
     val appFontScale: Float = AppPreferences.DEFAULT_APP_FONT_SCALE,
     val customFontName: String? = null,
@@ -334,6 +340,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(
             isLoaded = true,
             themeMode = snapshot.themeMode,
+            customTheme = snapshot.customTheme,
+            customThemeLibrary = snapshot.customThemeLibrary,
+            customTouchControls = snapshot.customTouchControls,
             appFontChoice = snapshot.appFontChoice,
             appFontScale = snapshot.appFontScale,
             customFontName = snapshot.customFontName,
@@ -546,6 +555,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { preferences.setThemeMode(mode) } }
+    fun saveCustomTheme(config: CustomThemeConfig, activate: Boolean) = viewModelScope.launch {
+        if (!_uiState.value.isProUnlocked) return@launch
+        if (activate) preferences.applyCustomTheme(config) else preferences.setCustomTheme(config)
+    }
+    fun saveCustomThemeLibrary(library: CustomThemeLibrary, activate: Boolean) = viewModelScope.launch {
+        if (!_uiState.value.isProUnlocked) return@launch
+        preferences.setCustomThemeLibrary(library, activate)
+    }
+    fun saveCustomTouchControls(library: CustomTouchControlLibrary) = viewModelScope.launch {
+        if (!_uiState.value.isProUnlocked) return@launch
+        preferences.setCustomTouchControls(library)
+    }
     fun setAppFontChoice(choice: AppFontChoice) = viewModelScope.launch {
         if (choice == AppFontChoice.CUSTOM && customFontRepository.installedFile() == null) return@launch
         preferences.setAppFontChoice(choice)
@@ -697,6 +718,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.setTouchControlPressEffect(TouchControlPressEffect.GROW)
         preferences.setDrawerVisualStyle(DrawerVisualStyle.CLASSIC)
         preferences.setHiddenDrawerItems(emptySet())
+        preferences.setCustomTheme(CustomThemeConfig.Default)
         _uiState.value = _uiState.value.copy(
             customizationMessageResId = com.sbro.emucorex.R.string.settings_customization_reset_done
         )

@@ -34,7 +34,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -113,6 +112,7 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.shimmer
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -601,7 +601,7 @@ private fun AchievementsTopBar(
     onBackClick: () -> Unit,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val topInset = appScreenTopPadding()
     ScreenTopBar(
         title = title,
         subtitle = subtitle.takeIf { it.isNotEmpty() },
@@ -610,7 +610,7 @@ private fun AchievementsTopBar(
         modifier = Modifier.padding(
             start = ScreenHorizontalPadding,
             end = ScreenHorizontalPadding,
-            top = topInset + 8.dp,
+            top = topInset,
             bottom = 12.dp
         ),
         actions = actions

@@ -8,21 +8,21 @@ import org.junit.Test
 
 class ThreadPinningDefaultsTest {
     @Test
-    fun threadPinningIsEnabledAcrossFreshGlobalAndGameStates() {
-        assertTrue(AppPreferences.DEFAULT_THREAD_PINNING)
-        assertTrue(SettingsSnapshot().enableThreadPinning)
-        assertTrue(SettingsUiState().enableThreadPinning)
-        assertTrue(EmulationUiState().enableThreadPinning)
-        assertTrue(PerGameSettings(gameKey = "game", gameTitle = "Game").enableThreadPinning)
+    fun threadPinningIsDisabledAcrossFreshGlobalAndGameStates() {
+        assertFalse(AppPreferences.DEFAULT_THREAD_PINNING)
+        assertFalse(SettingsSnapshot().enableThreadPinning)
+        assertFalse(SettingsUiState().enableThreadPinning)
+        assertFalse(EmulationUiState().enableThreadPinning)
+        assertFalse(PerGameSettings(gameKey = "game", gameTitle = "Game").enableThreadPinning)
     }
 
     @Test
-    fun explicitUserOptOutRemainsSupported() {
-        assertFalse(
+    fun explicitUserOptInRemainsSupported() {
+        assertTrue(
             PerGameSettings(
                 gameKey = "game",
                 gameTitle = "Game",
-                enableThreadPinning = false
+                enableThreadPinning = true
             ).enableThreadPinning
         )
     }

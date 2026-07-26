@@ -1,13 +1,35 @@
 package com.sbro.emucorex.ui.common
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+
+val AppScreenTopSpacing = 6.dp
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun appStatusBarTopPadding(): Dp {
+    val statusBarTop = WindowInsets.statusBarsIgnoringVisibility
+        .asPaddingValues()
+        .calculateTopPadding()
+    val cutoutTop = WindowInsets.displayCutout
+        .asPaddingValues()
+        .calculateTopPadding()
+    return maxOf(statusBarTop, cutoutTop)
+}
+
+@Composable
+fun appScreenTopPadding(): Dp = appStatusBarTopPadding() + AppScreenTopSpacing
 
 @Composable
 fun navigationBarsHorizontalPaddingValues(): PaddingValues {

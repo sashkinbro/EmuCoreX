@@ -377,11 +377,7 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		RenderBlankFrame();
 
 	if (GLAD_GL_KHR_parallel_shader_compile)
-	{
-		const GLuint compiler_threads =
-			UsesMobileDriverWorkaround(DriverWorkaround::SerializeShaderCompilation) ? 1 : 4;
-		glMaxShaderCompilerThreadsKHR(compiler_threads);
-	}
+		glMaxShaderCompilerThreadsKHR(4);
 
 	if (!GSConfig.DisableShaderCache)
 	{
@@ -446,20 +442,15 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	{
 		GL_PUSH("GSDeviceOGL::Vertex Buffer");
 
-		const bool force_orphaning =
-			UsesMobileDriverWorkaround(DriverWorkaround::OrphanBufferOnUpload);
-		if (force_orphaning)
-			Console.WriteLn("GL: Using orphaned streaming buffers for this mobile driver.");
-
 		glGenVertexArrays(1, &m_vao);
 		IASetVAO(m_vao);
 
-		m_vertex_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE, force_orphaning);
-		m_index_stream_buffer = GLStreamBuffer::Create(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE, force_orphaning);
+		m_vertex_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE);
+		m_index_stream_buffer = GLStreamBuffer::Create(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE);
 		m_vertex_uniform_stream_buffer =
-			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_UNIFORM_BUFFER_SIZE, force_orphaning);
+			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_UNIFORM_BUFFER_SIZE);
 		m_fragment_uniform_stream_buffer =
-			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, FRAGMENT_UNIFORM_BUFFER_SIZE, force_orphaning);
+			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, FRAGMENT_UNIFORM_BUFFER_SIZE);
 		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &m_uniform_buffer_alignment);
 		if (!m_vertex_stream_buffer || !m_index_stream_buffer || !m_vertex_uniform_stream_buffer || !m_fragment_uniform_stream_buffer)
 		{
@@ -738,8 +729,7 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	// ****************************************************************
 	if (!m_bugs.buggy_pbo)
 	{
-		m_texture_upload_buffer = GLStreamBuffer::Create(GL_PIXEL_UNPACK_BUFFER, TEXTURE_UPLOAD_BUFFER_SIZE,
-			UsesMobileDriverWorkaround(DriverWorkaround::OrphanBufferOnUpload));
+		m_texture_upload_buffer = GLStreamBuffer::Create(GL_PIXEL_UNPACK_BUFFER, TEXTURE_UPLOAD_BUFFER_SIZE);
 		if (m_texture_upload_buffer)
 		{
 			// Don't keep it bound, we'll re-bind when we need it.
@@ -1769,60 +1759,48 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += "#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY 0\n";
 #endif
 	header += R"(
+#if DRIVER_REWRITE_BOOLEAN_NEGATION
 bool gpu_boolean_not(bool value)
 {
-#if DRIVER_REWRITE_BOOLEAN_NEGATION
 	return value == false;
-#else
-	return !value;
-#endif
 }
+#else
+#define gpu_boolean_not(value) (!(value))
+#endif
 
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec2(a.x & b.x, a.y & b.y);
-#else
-	return a & b;
-#endif
 }
 
 uvec3 gpu_bitwise_and(uvec3 a, uvec3 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec3(a.x & b.x, a.y & b.y, a.z & b.z);
-#else
-	return a & b;
-#endif
 }
 
 uvec4 gpu_bitwise_and(uvec4 a, uvec4 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
-#else
-	return a & b;
-#endif
 }
 
 ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return ivec3(a.x & b.x, a.y & b.y, a.z & b.z);
-#else
-	return a & b;
-#endif
 }
+#else
+#define gpu_bitwise_and(a, b) ((a) & (b))
+#endif
 
+#if DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY
 uvec4 gpu_bitwise_not(uvec4 value)
 {
-#if DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY
 	uvec4 result = ~value;
 	return result;
-#else
-	return ~value;
-#endif
 }
+#else
+#define gpu_bitwise_not(value) (~(value))
+#endif
 )";
 
 	if (GLAD_GL_ARB_conservative_depth)

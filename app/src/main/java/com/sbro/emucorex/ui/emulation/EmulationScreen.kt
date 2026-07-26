@@ -169,10 +169,13 @@ import com.sbro.emucorex.data.RetroAchievementsRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
+import com.sbro.emucorex.data.CustomTouchControl
 import com.sbro.emucorex.data.GameMenuTabId
 import com.sbro.emucorex.data.GameMenuSectionId
 import com.sbro.emucorex.data.GameMenuLayoutStyle
 import com.sbro.emucorex.data.gameMenuSectionsForTab
+import com.sbro.emucorex.ui.controls.CustomControlVisual
+import com.sbro.emucorex.ui.controls.composeShape
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.ProvideGamepadMenuAction
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
@@ -246,13 +249,15 @@ private data class OverlayAchievementsContentState(
 
 private data class TouchButtonSpec(
     val id: String,
-    val drawableRes: Int,
+    val drawableRes: Int? = null,
     val width: Dp,
     val height: Dp,
     val x: Dp,
     val y: Dp,
     val shape: androidx.compose.ui.graphics.Shape,
     val opacity: Float = 1f,
+    val customControl: CustomTouchControl? = null,
+    val haptics: Boolean = true,
     val onPressChange: ((Boolean) -> Unit)? = null,
     val onClick: (() -> Unit)? = null,
     val tapToHold: Boolean = false,
@@ -387,8 +392,9 @@ fun EmulationScreen(
         {
             activity?.requestedOrientation = originalRequestedOrientation
             activity?.window?.let { window ->
-                WindowCompat.getInsetsController(window, window.decorView)
-                    .show(WindowInsetsCompat.Type.systemBars())
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.show(WindowInsetsCompat.Type.navigationBars())
+                controller.hide(WindowInsetsCompat.Type.statusBars())
             }
             Unit
         }
@@ -1192,6 +1198,7 @@ fun EmulationScreen(
                 touchHapticsStrength = uiState.touchHapticsStrength,
                 visualStyle = uiState.touchControlVisualStyle,
                 pressEffect = uiState.touchControlPressEffect,
+                customControls = uiState.customTouchControls.controls,
                 dpadOffset = uiState.dpadOffset,
                 lstickOffset = uiState.lstickOffset,
                 rstickOffset = uiState.rstickOffset,
@@ -1758,6 +1765,7 @@ private fun OnScreenControls(
     touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
     visualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     pressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
+    customControls: List<CustomTouchControl> = emptyList(),
     dpadOffset: Pair<Float, Float>,
     lstickOffset: Pair<Float, Float>,
     rstickOffset: Pair<Float, Float>,
@@ -1845,10 +1853,10 @@ private fun OnScreenControls(
             dispatchTouchR2()
         }
         "r1" -> { pressed -> onPadInput(PadKey.R1, 0, pressed) }
-        "dpad_up" -> { pressed -> onPadInput(PadKey.UP, 0, pressed) }
-        "dpad_down" -> { pressed -> onPadInput(PadKey.DOWN, 0, pressed) }
-        "dpad_left" -> { pressed -> onPadInput(PadKey.LEFT, 0, pressed) }
-        "dpad_right" -> { pressed -> onPadInput(PadKey.RIGHT, 0, pressed) }
+        "dpad_up", "up" -> { pressed -> onPadInput(PadKey.UP, 0, pressed) }
+        "dpad_down", "down" -> { pressed -> onPadInput(PadKey.DOWN, 0, pressed) }
+        "dpad_left", "left" -> { pressed -> onPadInput(PadKey.LEFT, 0, pressed) }
+        "dpad_right", "right" -> { pressed -> onPadInput(PadKey.RIGHT, 0, pressed) }
         "triangle" -> { pressed -> onPadInput(PadKey.TRIANGLE, 0, pressed) }
         "cross" -> { pressed -> onPadInput(PadKey.CROSS, 0, pressed) }
         "square" -> { pressed -> onPadInput(PadKey.SQUARE, 0, pressed) }
@@ -1960,7 +1968,28 @@ private fun OnScreenControls(
                 layout.dpadButtons +
                 layout.actionButtons +
                 layout.centerButtons
-        )
+        ) + customControls
+            .asSequence()
+            .filter(CustomTouchControl::enabled)
+            .mapNotNull(CustomTouchControl::sanitized)
+            .map { control ->
+                val width = control.widthDp.dp
+                val height = control.heightDp.dp
+                val travelX = (maxWidth - safeLeft - safeRight - width).coerceAtLeast(0.dp)
+                val travelY = (maxHeight - safeTop - safeBottom - height).coerceAtLeast(0.dp)
+                TouchButtonSpec(
+                    id = "custom:${control.id}",
+                    width = width,
+                    height = height,
+                    x = safeLeft + travelX * control.positionX,
+                    y = safeTop + travelY * control.positionY,
+                    shape = control.composeShape(),
+                    customControl = control,
+                    haptics = control.haptics,
+                    onPressChange = buttonPressHandler(control.actionId)
+                )
+            }
+            .toList()
         if (allButtonSpecs.isNotEmpty() || touchscreenRightStick) {
             TouchButtonGroup(
                 specs = allButtonSpecs,
@@ -2256,7 +2285,12 @@ private fun TouchButtonGroup(
             } else if (!activeTargets.containsValue(oldTarget)) {
                 oldSpec?.onPressChange?.invoke(false)
             }
-            if (newTarget == null && emitReleaseHaptic && !activeTargets.containsValue(oldTarget)) {
+            if (
+                newTarget == null &&
+                emitReleaseHaptic &&
+                oldSpec?.haptics != false &&
+                !activeTargets.containsValue(oldTarget)
+            ) {
                 onTouchHaptic(ButtonPhase.RELEASE)
             }
         }
@@ -2265,7 +2299,7 @@ private fun TouchButtonGroup(
             val alreadyActive = activeTargets.containsValue(newTarget)
             activeTargets[pointerId] = newTarget
             val newSpec = specById[newTarget]
-            if (!alreadyActive) {
+            if (!alreadyActive && newSpec?.haptics != false) {
                 onTouchHaptic(ButtonPhase.PRESS)
             }
             if (newSpec?.hasLongPressAction() == true) {
@@ -2404,23 +2438,33 @@ private fun TouchButtonGroup(
             }
     ) {
         specs.forEach { spec ->
-            VectorOverlayButton(
-                drawableRes = spec.drawableRes,
-                width = spec.width,
-                height = spec.height,
-                shape = spec.shape,
-                alpha = spec.opacity,
-                interactive = false,
-                pressed = activeTargets.containsValue(spec.id) || latchedTargets[spec.id] == true,
-                visualStyle = visualStyle,
-                pressEffect = pressEffect,
-                modifier = Modifier.offset {
+            val controlModifier = Modifier.offset {
                     IntOffset(
                         (spec.x.roundToPx() - groupRect.left.roundToInt()),
                         (spec.y.roundToPx() - groupRect.top.roundToInt())
                     )
                 }
-            )
+            val pressed = activeTargets.containsValue(spec.id) || latchedTargets[spec.id] == true
+            if (spec.customControl != null) {
+                CustomControlVisual(
+                    control = spec.customControl,
+                    pressed = pressed,
+                    modifier = controlModifier.size(spec.width, spec.height)
+                )
+            } else {
+                VectorOverlayButton(
+                    drawableRes = requireNotNull(spec.drawableRes),
+                    width = spec.width,
+                    height = spec.height,
+                    shape = spec.shape,
+                    alpha = spec.opacity,
+                    interactive = false,
+                    pressed = pressed,
+                    visualStyle = visualStyle,
+                    pressEffect = pressEffect,
+                    modifier = controlModifier
+                )
+            }
         }
     }
 }

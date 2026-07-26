@@ -842,17 +842,33 @@ std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 
 	VmaAllocationCreateInfo aci = {};
 	aci.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
 	aci.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	// ARM and Qualcomm proprietary drivers expose cached readback heaps which are substantially
-	// slower than coherent memory. Keep the normal cached preference for unaffected drivers.
-	aci.preferredFlags =
-		GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(DriverWorkaround::PreferCoherentReadback) ?
-			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT :
-			VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	const bool require_coherent_readback =
+		GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(DriverWorkaround::PreferCoherentReadback);
+	if (require_coherent_readback)
+	{
+		// Cached-only heaps are pathologically slow on the affected unified-memory drivers.
+		// Require coherent host-visible memory and prefer cached memory only when both are available.
+		aci.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	}
+	else
+	{
+		aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	}
 
 	VmaAllocationInfo ai = {};
 	VmaAllocation allocation;
 	VkBuffer buffer;
 	VkResult res = vmaCreateBuffer(GSDeviceVK::GetInstance()->GetAllocator(), &bci, &aci, &buffer, &allocation, &ai);
+	if (res != VK_SUCCESS && require_coherent_readback)
+	{
+		// A profile must never make download texture creation fail on an unusual memory layout.
+		Console.Warning("VK: Coherent readback heap unavailable; retrying the normal cached allocation.");
+		aci.requiredFlags = 0;
+		aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+		res = vmaCreateBuffer(
+			GSDeviceVK::GetInstance()->GetAllocator(), &bci, &aci, &buffer, &allocation, &ai);
+	}
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vmaCreateBuffer() failed: ");

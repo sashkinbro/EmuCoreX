@@ -112,6 +112,21 @@ static bool ParseMaliModel(std::string_view hints, char* series, u16* model, boo
 		if (!ParseUnsigned(hints.substr(0, end_limit), pos, &parsed_model, &parsed_end))
 			return false;
 
+		if (parsed_end < end_limit &&
+			std::isalnum(static_cast<unsigned char>(hints[parsed_end])))
+		{
+			const std::string_view suffix = hints.substr(parsed_end, end_limit - parsed_end);
+			const bool valid_suffix =
+				(suffix.starts_with("ae") &&
+					(suffix.size() == 2 ||
+						!std::isalnum(static_cast<unsigned char>(suffix[2])))) ||
+				((suffix.starts_with("mc") || suffix.starts_with("mp")) &&
+					suffix.size() > 2 &&
+					std::isdigit(static_cast<unsigned char>(suffix[2])));
+			if (!valid_suffix)
+				return false;
+		}
+
 		*series = parsed_series;
 		*model = parsed_model;
 		return true;
@@ -143,6 +158,29 @@ static u8 ParseCoreCount(std::string_view hints)
 		size_t end = pos + 2;
 		if (ParseUnsigned(hints, pos + 2, &value, &end) && value <= 255)
 			return static_cast<u8>(value);
+	}
+	return 0;
+}
+
+static u8 ParseMaliCoreCount(std::string_view hints)
+{
+	size_t segment_start = 0;
+	while (segment_start < hints.size())
+	{
+		const size_t separator = hints.find('|', segment_start);
+		const size_t segment_end =
+			(separator == std::string_view::npos) ? hints.size() : separator;
+		const std::string_view segment =
+			hints.substr(segment_start, segment_end - segment_start);
+		if (segment.find("mali") != std::string_view::npos ||
+			segment.find("immortalis") != std::string_view::npos)
+		{
+			if (const u8 count = ParseCoreCount(segment); count != 0)
+				return count;
+		}
+		if (separator == std::string_view::npos)
+			break;
+		segment_start = separator + 1;
 	}
 	return 0;
 }
@@ -258,7 +296,7 @@ ResolvedGpuProfile ResolveMaliProfile(std::string_view lowered_hints)
 	const MaliSpec* spec = FindMaliSpec(series, model);
 	resolved.gpu.architecture = spec ? spec->architecture : ArchitectureForUnknownMali(series, model);
 	resolved.gpu.model_number = model;
-	resolved.gpu.core_count = ParseCoreCount(lowered_hints);
+	resolved.gpu.core_count = ParseMaliCoreCount(lowered_hints);
 	resolved.gpu.recognized = (spec != nullptr);
 
 	if (immortalis)

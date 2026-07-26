@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -81,6 +80,7 @@ import com.sbro.emucorex.data.MemoryCardAssignments
 import com.sbro.emucorex.data.MemoryCardInfo
 import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.text.DateFormat
@@ -97,7 +97,7 @@ fun MemoryCardManagerScreen(
     val context = LocalContext.current
     val repository = remember(context) { MemoryCardRepository(context, AppPreferences(context)) }
     val scope = rememberCoroutineScope()
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
 

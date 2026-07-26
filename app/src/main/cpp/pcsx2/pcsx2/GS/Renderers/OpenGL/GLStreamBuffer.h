@@ -38,7 +38,7 @@ public:
 	/// Returns the minimum granularity of blocks which sync objects will be created around.
 	virtual u32 GetChunkSize() const = 0;
 
-	static std::unique_ptr<GLStreamBuffer> Create(GLenum target, u32 size, bool force_orphaning = false);
+	static std::unique_ptr<GLStreamBuffer> Create(GLenum target, u32 size);
 
 protected:
 	GLStreamBuffer(GLenum target, GLuint buffer_id, u32 size);

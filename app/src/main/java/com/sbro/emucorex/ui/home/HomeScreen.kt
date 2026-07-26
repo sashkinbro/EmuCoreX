@@ -42,7 +42,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -141,6 +140,7 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
 import com.sbro.emucorex.ui.theme.GradientEnd
 import com.sbro.emucorex.ui.theme.GradientStart
@@ -185,7 +185,7 @@ fun HomeScreen(
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isWide = isTabletClass && windowMetrics.widthDp >= 900
     val isShelfView = uiState.libraryViewMode == HomeLibraryViewMode.SHELF
-    val topInset = if (isShelfView) 0.dp else WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val topInset = if (isShelfView) 0.dp else appScreenTopPadding()
     val bottomInset = if (isShelfView) 0.dp else WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = if (isShelfView) PaddingValues(0.dp) else navigationBarsHorizontalPaddingValues()
     val horizontalInset = ScreenHorizontalPadding
@@ -229,7 +229,8 @@ fun HomeScreen(
         if (isShelfView) {
             applyShelfSystemBarsHidden()
         } else {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            controller?.show(WindowInsetsCompat.Type.navigationBars())
+            controller?.hide(WindowInsetsCompat.Type.statusBars())
         }
 
         onDispose {
@@ -432,7 +433,7 @@ fun HomeScreen(
                             state = gridState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(
-                                top = topInset + 4.dp,
+                                top = topInset,
                                 bottom = 76.dp + bottomInset
                             ),
                             horizontalArrangement = Arrangement.spacedBy(12.dp),

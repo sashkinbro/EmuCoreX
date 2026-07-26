@@ -20,6 +20,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -33,6 +35,7 @@ import com.sbro.emucorex.core.TvUiPolicy
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.CustomFontRepository
+import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.navigation.AppNavigation
 import com.sbro.emucorex.ui.common.GamepadUiInputRouter
 import com.sbro.emucorex.ui.theme.EmuCoreXTheme
@@ -60,6 +63,7 @@ open class MainActivity : ComponentActivity() {
     private var restoredFromSavedState = false
     private var reviewRequestInFlight = false
     private var reviewRetryAfterResumeScheduled = false
+    private var appliedDarkTheme = true
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocaleManager.wrap(newBase))
@@ -93,6 +97,7 @@ open class MainActivity : ComponentActivity() {
         setContent {
             val customFontRepository = remember { CustomFontRepository(applicationContext) }
             val themeMode by preferences.themeMode.collectAsState(initial = ThemeMode.SYSTEM)
+            val customTheme by preferences.customTheme.collectAsState(initial = CustomThemeConfig.Default)
             val fontChoice by preferences.appFontChoice.collectAsState(initial = AppFontChoice.SYSTEM)
             val appFontScale by preferences.appFontScale.collectAsState(initial = 1f)
             val customFontRevision by preferences.customFontRevision.collectAsState(initial = 0)
@@ -110,15 +115,20 @@ open class MainActivity : ComponentActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
                 ThemeMode.PRO -> true
+                ThemeMode.CUSTOM -> customTheme.dark
             }
 
             SideEffect {
+                appliedDarkTheme = darkTheme
                 applySystemBarTheme(darkTheme)
             }
 
-            CompositionLocalProvider(LocalTvUiEnvironment provides tvUiEnvironment) {
+            CompositionLocalProvider(
+                LocalTvUiEnvironment provides tvUiEnvironment
+            ) {
                 EmuCoreXTheme(
                     themeMode = themeMode,
+                    customTheme = customTheme,
                     fontChoice = fontChoice,
                     fontScale = appFontScale,
                     customFontFile = customFontRepository.installedFile(),
@@ -238,6 +248,23 @@ open class MainActivity : ComponentActivity() {
         val useDarkIcons = !darkTheme
         controller.isAppearanceLightStatusBars = useDarkIcons
         controller.isAppearanceLightNavigationBars = useDarkIcons
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+    }
+
+    override fun onResume() {
+        super.onResume()
+        window.decorView.post {
+            applySystemBarTheme(appliedDarkTheme)
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            applySystemBarTheme(appliedDarkTheme)
+        }
     }
 
     private fun applyEdgeToEdge() {

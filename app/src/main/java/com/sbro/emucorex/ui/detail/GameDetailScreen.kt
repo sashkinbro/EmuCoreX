@@ -121,6 +121,8 @@ import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.common.tvFocusGroup
+import com.sbro.emucorex.ui.common.appStatusBarTopPadding
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -142,7 +144,7 @@ fun GameDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val debouncedBack = rememberDebouncedClick(onClick = onBackClick)
@@ -1281,7 +1283,8 @@ private fun ScreenshotViewerOverlay(
         controller?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            controller?.show(WindowInsetsCompat.Type.navigationBars())
+            controller?.hide(WindowInsetsCompat.Type.statusBars())
         }
     }
 
@@ -1387,7 +1390,8 @@ private fun VideoPlayerOverlay(
         controller?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            controller?.show(WindowInsetsCompat.Type.navigationBars())
+            controller?.hide(WindowInsetsCompat.Type.statusBars())
         }
     }
 
@@ -1478,10 +1482,16 @@ private fun LandscapeVideoTopBar(
     counter: String,
     onDismiss: () -> Unit
 ) {
+    val layoutDirection = LocalLayoutDirection.current
+    val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(WindowInsets.statusBarsIgnoringVisibility.asPaddingValues())
+            .padding(
+                start = statusInsets.calculateLeftPadding(layoutDirection),
+                top = appStatusBarTopPadding(),
+                end = statusInsets.calculateRightPadding(layoutDirection)
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -1533,7 +1543,7 @@ private fun ViewerTopBar(
     val layoutDirection = LocalLayoutDirection.current
     val statusInsets = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues()
     val topSafePadding = if (respectStatusBar) {
-        statusInsets.calculateTopPadding()
+        appStatusBarTopPadding()
     } else {
         0.dp
     }

@@ -2,13 +2,17 @@ package com.sbro.emucorex.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.CustomThemeConfig
 import java.io.File
 
 private val DarkColorScheme = darkColorScheme(
@@ -90,12 +94,13 @@ private val LightColorScheme = lightColorScheme(
 )
 
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK, PRO
+    SYSTEM, LIGHT, DARK, PRO, CUSTOM
 }
 
 @Composable
 fun EmuCoreXTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    customTheme: CustomThemeConfig = CustomThemeConfig.Default,
     fontChoice: AppFontChoice = AppFontChoice.SYSTEM,
     fontScale: Float = 1f,
     customFontFile: File? = null,
@@ -107,11 +112,19 @@ fun EmuCoreXTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
         ThemeMode.PRO -> true
+        ThemeMode.CUSTOM -> customTheme.dark
     }
 
+    val safeCustomTheme = remember(customTheme) { customTheme.sanitized() }
     val colorScheme = when (themeMode) {
         ThemeMode.PRO -> ProColorScheme
+        ThemeMode.CUSTOM -> safeCustomTheme.toColorScheme()
         else -> if (darkTheme) DarkColorScheme else LightColorScheme
+    }
+    val shapes = if (themeMode == ThemeMode.CUSTOM) {
+        safeCustomTheme.toShapes()
+    } else {
+        MaterialTheme.shapes
     }
 
     val safeFontScale = fontScale.coerceIn(AppPreferences.MIN_APP_FONT_SCALE, AppPreferences.MAX_APP_FONT_SCALE)
@@ -129,6 +142,76 @@ fun EmuCoreXTheme(
                 fontScale = safeFontScale
             )
         },
+        shapes = shapes,
         content = content
+    )
+}
+
+fun CustomThemeConfig.toColorScheme() = if (dark) {
+    darkColorScheme(
+        primary = Color(primary),
+        onPrimary = Color(onPrimary),
+        primaryContainer = Color(primaryContainer),
+        onPrimaryContainer = Color(onPrimaryContainer),
+        secondary = Color(secondary),
+        onSecondary = Color(onSecondary),
+        secondaryContainer = Color(secondaryContainer),
+        onSecondaryContainer = Color(onSecondaryContainer),
+        tertiary = Color(tertiary),
+        onTertiary = Color(onTertiary),
+        tertiaryContainer = Color(tertiaryContainer),
+        onTertiaryContainer = Color(onTertiaryContainer),
+        background = Color(background),
+        onBackground = Color(onBackground),
+        surface = Color(surface),
+        onSurface = Color(onSurface),
+        surfaceVariant = Color(surfaceVariant),
+        onSurfaceVariant = Color(onSurfaceVariant),
+        outline = Color(outline),
+        outlineVariant = Color(outlineVariant),
+        error = Color(error),
+        onError = Color(onError),
+        errorContainer = Color(errorContainer),
+        onErrorContainer = Color(onErrorContainer),
+        scrim = Color.Black.copy(alpha = 0.72f)
+    )
+} else {
+    lightColorScheme(
+        primary = Color(primary),
+        onPrimary = Color(onPrimary),
+        primaryContainer = Color(primaryContainer),
+        onPrimaryContainer = Color(onPrimaryContainer),
+        secondary = Color(secondary),
+        onSecondary = Color(onSecondary),
+        secondaryContainer = Color(secondaryContainer),
+        onSecondaryContainer = Color(onSecondaryContainer),
+        tertiary = Color(tertiary),
+        onTertiary = Color(onTertiary),
+        tertiaryContainer = Color(tertiaryContainer),
+        onTertiaryContainer = Color(onTertiaryContainer),
+        background = Color(background),
+        onBackground = Color(onBackground),
+        surface = Color(surface),
+        onSurface = Color(onSurface),
+        surfaceVariant = Color(surfaceVariant),
+        onSurfaceVariant = Color(onSurfaceVariant),
+        outline = Color(outline),
+        outlineVariant = Color(outlineVariant),
+        error = Color(error),
+        onError = Color(onError),
+        errorContainer = Color(errorContainer),
+        onErrorContainer = Color(onErrorContainer),
+        scrim = Color.Black.copy(alpha = 0.48f)
+    )
+}
+
+fun CustomThemeConfig.toShapes(): Shapes {
+    val safe = sanitized()
+    return Shapes(
+        extraSmall = RoundedCornerShape((safe.smallCornerDp * 0.65f).dp),
+        small = RoundedCornerShape(safe.smallCornerDp.dp),
+        medium = RoundedCornerShape(safe.mediumCornerDp.dp),
+        large = RoundedCornerShape(safe.largeCornerDp.dp),
+        extraLarge = RoundedCornerShape((safe.largeCornerDp * 1.25f).coerceAtMost(60f).dp)
     )
 }

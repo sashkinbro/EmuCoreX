@@ -57,6 +57,9 @@ data class AchievementsAccountProgressCache(
 
 data class SettingsSnapshot(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val customTheme: CustomThemeConfig = CustomThemeConfig.Default,
+    val customThemeLibrary: CustomThemeLibrary = CustomThemeLibrary.Empty,
+    val customTouchControls: CustomTouchControlLibrary = CustomTouchControlLibrary.Empty,
     val appFontChoice: AppFontChoice = AppFontChoice.SYSTEM,
     val appFontScale: Float = AppPreferences.DEFAULT_APP_FONT_SCALE,
     val customFontName: String? = null,
@@ -427,6 +430,8 @@ class AppPreferences(private val context: Context) {
         )
 
         private val THEME_MODE = intPreferencesKey("theme_mode")
+        private val CUSTOM_THEME_JSON = stringPreferencesKey("custom_theme_json")
+        private val CUSTOM_THEME_LIBRARY_JSON = stringPreferencesKey("custom_theme_library_json")
         private val TV_INTERFACE_MODE = intPreferencesKey("tv_interface_mode")
         private val APP_FONT_CHOICE = intPreferencesKey("app_font_choice")
         private val APP_FONT_SCALE = floatPreferencesKey("app_font_scale")
@@ -438,6 +443,7 @@ class AppPreferences(private val context: Context) {
         private val HOME_BACKGROUND_DIM = intPreferencesKey("home_background_dim")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
+        private val CUSTOM_TOUCH_CONTROLS_JSON = stringPreferencesKey("custom_touch_controls_json")
         private val GAME_MENU_LAYOUT_STYLE = intPreferencesKey("game_menu_layout_style")
         private val DRAWER_VISUAL_STYLE = intPreferencesKey("drawer_visual_style")
         private val HIDDEN_DRAWER_ITEMS = stringPreferencesKey("hidden_drawer_items")
@@ -683,12 +689,34 @@ class AppPreferences(private val context: Context) {
             1 -> ThemeMode.LIGHT
             2 -> ThemeMode.DARK
             3 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.PRO else ThemeMode.SYSTEM
+            4 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.CUSTOM else ThemeMode.SYSTEM
             else -> ThemeMode.SYSTEM
         }
     }
 
+    private fun readCustomThemeLibrary(prefs: Preferences): CustomThemeLibrary {
+        return CustomThemeLibrary.decode(
+            raw = prefs[CUSTOM_THEME_LIBRARY_JSON],
+            legacyThemeRaw = prefs[CUSTOM_THEME_JSON]
+        )
+    }
+
     // Theme
-    val themeMode: Flow<ThemeMode> = context.dataStore.data.map { prefs -> readThemeMode(prefs) }
+    val themeMode: Flow<ThemeMode> = context.dataStore.data
+        .map { prefs -> readThemeMode(prefs) }
+        .distinctUntilChanged()
+
+    val customThemeLibrary: Flow<CustomThemeLibrary> = context.dataStore.data
+        .map(::readCustomThemeLibrary)
+        .distinctUntilChanged()
+
+    val customTheme: Flow<CustomThemeConfig> = customThemeLibrary
+        .map { library -> library.activeTheme()?.config ?: CustomThemeConfig.Default }
+        .distinctUntilChanged()
+
+    val customTouchControls: Flow<CustomTouchControlLibrary> = context.dataStore.data
+        .map { prefs -> CustomTouchControlLibrary.decode(prefs[CUSTOM_TOUCH_CONTROLS_JSON]) }
+        .distinctUntilChanged()
 
     val tvInterfaceMode: Flow<TvInterfaceMode> = context.dataStore.data
         .map { prefs -> TvInterfaceMode.fromPreference(prefs[TV_INTERFACE_MODE]) }
@@ -764,13 +792,66 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit { prefs ->
-            if (mode == ThemeMode.PRO && prefs[PRO_UNLOCKED] != true) return@edit
+            if (mode in setOf(ThemeMode.PRO, ThemeMode.CUSTOM) && prefs[PRO_UNLOCKED] != true) return@edit
             prefs[THEME_MODE] = when (mode) {
                 ThemeMode.SYSTEM -> 0
                 ThemeMode.LIGHT -> 1
                 ThemeMode.DARK -> 2
                 ThemeMode.PRO -> 3
+                ThemeMode.CUSTOM -> 4
             }
+        }
+    }
+
+    suspend fun setCustomTheme(config: CustomThemeConfig) {
+        context.dataStore.edit { prefs ->
+            if (prefs[PRO_UNLOCKED] != true) return@edit
+            val safeConfig = config.sanitized()
+            val current = readCustomThemeLibrary(prefs)
+            val activeId = current.activeThemeId ?: CustomThemeLibrary.LEGACY_THEME_ID
+            val existing = current.themes.firstOrNull { it.id == activeId }
+            val updated = SavedCustomTheme(
+                id = activeId,
+                config = safeConfig,
+                createdAtMillis = existing?.createdAtMillis ?: 0L,
+                updatedAtMillis = existing?.updatedAtMillis ?: 0L
+            )
+            val themes = current.themes.filterNot { it.id == activeId } + updated
+            val library = current.copy(activeThemeId = activeId, themes = themes).sanitized()
+            prefs[CUSTOM_THEME_LIBRARY_JSON] = library.encode()
+            prefs[CUSTOM_THEME_JSON] = safeConfig.encode()
+        }
+    }
+
+    suspend fun applyCustomTheme(config: CustomThemeConfig) {
+        setCustomTheme(config)
+        setThemeMode(ThemeMode.CUSTOM)
+    }
+
+    suspend fun setCustomThemeLibrary(library: CustomThemeLibrary, activate: Boolean) {
+        context.dataStore.edit { prefs ->
+            if (prefs[PRO_UNLOCKED] != true) return@edit
+            val safe = library.sanitized()
+            prefs[CUSTOM_THEME_LIBRARY_JSON] = safe.encode()
+            val activeConfig = safe.activeTheme()?.config
+            if (activeConfig != null) {
+                prefs[CUSTOM_THEME_JSON] = activeConfig.encode()
+            } else {
+                prefs.remove(CUSTOM_THEME_JSON)
+                if (readThemeMode(prefs) == ThemeMode.CUSTOM) {
+                    prefs[THEME_MODE] = 0
+                }
+            }
+            if (activate && activeConfig != null) {
+                prefs[THEME_MODE] = 4
+            }
+        }
+    }
+
+    suspend fun setCustomTouchControls(library: CustomTouchControlLibrary) {
+        context.dataStore.edit { prefs ->
+            if (prefs[PRO_UNLOCKED] != true) return@edit
+            prefs[CUSTOM_TOUCH_CONTROLS_JSON] = library.sanitized().encode()
         }
     }
 
@@ -889,7 +970,7 @@ class AppPreferences(private val context: Context) {
     suspend fun setProUnlocked(unlocked: Boolean) {
         context.dataStore.edit { prefs ->
             prefs[PRO_UNLOCKED] = unlocked
-            if (!unlocked && prefs[THEME_MODE] == 3) {
+            if (!unlocked && prefs[THEME_MODE] in setOf(3, 4)) {
                 prefs[THEME_MODE] = 0
             }
         }
@@ -1370,6 +1451,12 @@ class AppPreferences(private val context: Context) {
             val gpuHardwareProfile = resolveGpuHardwareProfile()
             SettingsSnapshot(
                 themeMode = readThemeMode(prefs),
+                customTheme = readCustomThemeLibrary(prefs).activeTheme()?.config
+                    ?: CustomThemeConfig.Default,
+                customThemeLibrary = readCustomThemeLibrary(prefs),
+                customTouchControls = CustomTouchControlLibrary.decode(
+                    prefs[CUSTOM_TOUCH_CONTROLS_JSON]
+                ),
                 appFontChoice = AppFontChoice.fromPreference(prefs[APP_FONT_CHOICE]),
                 appFontScale = (prefs[APP_FONT_SCALE] ?: DEFAULT_APP_FONT_SCALE)
                     .coerceIn(MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE),
@@ -3257,6 +3344,16 @@ class AppPreferences(private val context: Context) {
         val gpuHardwareProfile = resolveGpuHardwareProfile()
         return JSONObject().apply {
             put("themeMode", prefs[THEME_MODE] ?: 0)
+            val customThemeLibrary = readCustomThemeLibrary(prefs)
+            put(
+                "customTheme",
+                (customThemeLibrary.activeTheme()?.config ?: CustomThemeConfig.Default).encode()
+            )
+            put("customThemeLibrary", customThemeLibrary.encode())
+            put(
+                "customTouchControls",
+                CustomTouchControlLibrary.decode(prefs[CUSTOM_TOUCH_CONTROLS_JSON]).encode()
+            )
             put("tvInterfaceMode", TvInterfaceMode.fromPreference(prefs[TV_INTERFACE_MODE]).preferenceValue)
             put("appFontChoice", prefs[APP_FONT_CHOICE] ?: AppFontChoice.SYSTEM.preferenceValue)
             put("appFontScale", (prefs[APP_FONT_SCALE] ?: DEFAULT_APP_FONT_SCALE).toDouble())
@@ -3505,7 +3602,17 @@ class AppPreferences(private val context: Context) {
         val languageTag = json.optString("languageTag").takeIf { it.isNotBlank() }
         localePrefs.edit().putString("language_tag", languageTag).apply()
         context.dataStore.edit { prefs ->
-            prefs[THEME_MODE] = json.optInt("themeMode", 0)
+            prefs[THEME_MODE] = json.optInt("themeMode", 0).takeIf { it in 0..4 } ?: 0
+            val importedLibrary = CustomThemeLibrary.decode(
+                raw = json.optString("customThemeLibrary").takeIf(String::isNotBlank),
+                legacyThemeRaw = json.optString("customTheme").takeIf(String::isNotBlank)
+            )
+            prefs[CUSTOM_THEME_LIBRARY_JSON] = importedLibrary.encode()
+            val customTheme = importedLibrary.activeTheme()?.config ?: CustomThemeConfig.Default
+            prefs[CUSTOM_THEME_JSON] = customTheme.encode()
+            prefs[CUSTOM_TOUCH_CONTROLS_JSON] = CustomTouchControlLibrary.decode(
+                json.optString("customTouchControls").takeIf(String::isNotBlank)
+            ).encode()
             prefs[TV_INTERFACE_MODE] = TvInterfaceMode.fromPreference(
                 json.optInt("tvInterfaceMode", TvInterfaceMode.AUTO.preferenceValue)
             ).preferenceValue

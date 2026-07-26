@@ -94,7 +94,6 @@ enum class DriverBug : u8
 	BrokenSubpassFeedback,
 	BrokenColorWriteMaskWithDepthTest,
 	BrokenDepthStencilDiscard,
-	BrokenD32FClear,
 	BrokenReversedDepthRange,
 	SlowCachedReadbackMemory,
 	SlowOptimalImageToBufferCopy,
@@ -116,36 +115,20 @@ enum class DriverBug : u8
 
 enum class DriverWorkaround : u8
 {
-	OrphanBufferOnUpload,
 	RewriteBooleanNegation,
 	ScalarizeVectorBitwiseAnd,
 	StoreBitwiseNegationInTemporary,
-	DisablePrimitiveRestart,
 	UseDescriptorSets,
 	DisableProvokingVertex,
 	DisableAttachmentFeedbackLoopLayout,
-	UseCopyForFeedbackLoop,
 	EmulateColorWriteMask,
-	PreserveDepthStencilAttachment,
-	UseD24S8Depth,
-	AvoidReversedDepthRange,
 	PreferCoherentReadback,
 	UseStagingImageForReadback,
 	AvoidClearLoadOpRenderPass,
-	Avoid16BitTextureFormats,
 	GenerateMipmapManuallyForTallTextures,
-	TransitionEmptyClearViaGeneral,
-	RewriteConstantLoads,
 	RewriteUniformIndexing,
 	ForceFifoPresent,
-	SerializeShaderCompilation,
-	DisableDynamicRendering,
-	DisableImagelessFramebuffer,
-	DisableExtendedDynamicState,
-	DisablePrimitiveTopologyDynamicState,
-	DisableGraphicsPipelineLibrary,
 	AlignSwapchainWidthTo32,
-	UseExplicitBarrierSubresourceCounts,
 	Count,
 };
 
@@ -155,7 +138,7 @@ struct MobileDriverVersion
 	u16 major = 0;
 	u16 minor = 0;
 	u16 patch = 0;
-	u16 build = 0;
+	u32 build = 0;
 	bool known = false;
 	bool legacy_hash = false;
 };

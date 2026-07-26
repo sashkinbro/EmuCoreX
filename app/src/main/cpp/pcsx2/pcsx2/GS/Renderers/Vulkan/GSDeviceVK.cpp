@@ -1216,20 +1216,6 @@ VkRenderPass GSDeviceVK::GetRenderPass(VkFormat color_format, VkFormat depth_for
 	VkAttachmentLoadOp stencil_load_op, VkAttachmentStoreOp stencil_store_op, bool color_feedback_loop,
 	bool depth_sampling)
 {
-	if (depth_format != VK_FORMAT_UNDEFINED &&
-		UsesMobileDriverWorkaround(DriverWorkaround::PreserveDepthStencilAttachment))
-	{
-		// Adreno 5xx can corrupt depth/stencil state when either aspect is discarded.
-		if (depth_load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-			depth_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-		if (depth_store_op == VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			depth_store_op = VK_ATTACHMENT_STORE_OP_STORE;
-		if (stencil_load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-			stencil_load_op = VK_ATTACHMENT_LOAD_OP_LOAD;
-		if (stencil_store_op == VK_ATTACHMENT_STORE_OP_DONT_CARE)
-			stencil_store_op = VK_ATTACHMENT_STORE_OP_STORE;
-	}
-
 	RenderPassCacheKey key = {};
 	key.color_format = color_format;
 	key.depth_format = depth_format;
@@ -2991,20 +2977,16 @@ bool GSDeviceVK::CheckFeatures()
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
 	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	// MediaTek's Mali Vulkan stacks across multiple GPU generations have been observed returning
-	// zero/stale destination color through ROAA (black or intermittently missing textures). Keep
-	// other Mali vendors on the tile-local fast path. G57 remains a model fallback for firmware
-	// which hides the SoC properties used by the MediaTek detector.
-	const bool is_mali_g57 = is_mali_vk &&
+	// zero/stale destination color through ROAA (black or intermittently missing textures).
+	const bool is_mediatek_mali_g57 = is_mali_vk && IsMediaTekSoC() &&
 		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
 			 GetMobileGPUIdentity().model_number == 57) ||
 			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
 	// All Mali and PowerVR GPUs have unreliable ROAA (framebuffer fetch).
 	// This causes black/stale textures. Disable fbfetch for all mobile GPUs except Adreno.
 	const bool unreliable_mali_fbfetch = is_mali_vk || is_powervr;
-	const bool force_copy_feedback =
-		UsesMobileDriverWorkaround(DriverWorkaround::UseCopyForFeedbackLoop);
 	const bool vendor_allows_fbfetch =
-		!unreliable_mali_fbfetch && !force_copy_feedback &&
+		!unreliable_mali_fbfetch &&
 		(is_mali_vk || GSConfig.EnableAdrenoFramebufferFetch);
 	bool framebuffer_fetch = vendor_allows_fbfetch &&
 		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
@@ -3012,9 +2994,6 @@ bool GSDeviceVK::CheckFeatures()
 	{
 		Console.Warning("VK: Disabled unreliable Mali framebuffer fetch; using texture-barrier feedback.");
 	}
-	if (force_copy_feedback && has_framebuffer_fetch_extension)
-		Console.Warning("VK: Disabled proprietary Adreno framebuffer fetch; using the GS feedback fallback.");
-
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 
 	// On MediaTek SoCs (Mali or PowerVR), framebuffer fetch is unreliable.
@@ -3037,7 +3016,7 @@ bool GSDeviceVK::CheckFeatures()
 	// The r13p0-class Mali-G57 driver can expose alternating top/bottom FastMAD banks
 	// instead of the reconstructed frame. Keep the workaround model-specific and leave
 	// the normal motion-adaptive path enabled for newer Mali devices and other backends.
-	m_features.broken_mad_deinterlace = is_mali_g57;
+	m_features.broken_mad_deinterlace = is_mediatek_mali_g57;
 #if defined(__ANDROID__)
 	const MobileGsTuning& mobile_gs_tuning = GetMobileGSTuning();
 #endif
@@ -3062,26 +3041,26 @@ bool GSDeviceVK::CheckFeatures()
 	if (!m_features.texture_barrier)
 		Console.Warning("VK: Texture buffers are disabled. This may break some graphical effects.");
 
-	// Qualcomm's proprietary Vulkan stack has shipped broken D32F clears. Prefer D24S8
-	// there, while retaining D32S8 as a capability-checked fallback.
+	// Keep the high-precision D32S8 path on every GPU which supports it. D24S8 is a
+	// capability fallback only; forcing it by GPU family can introduce visible
+	// z-fighting in closely layered geometry and decals.
 	{
-		const VkFormat preferred_format =
-			UsesMobileDriverWorkaround(DriverWorkaround::UseD24S8Depth) ?
-				VK_FORMAT_D24_UNORM_S8_UINT :
-				VK_FORMAT_D32_SFLOAT_S8_UINT;
 		constexpr VkFormatFeatureFlags required =
 			VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		VkFormatProperties props = {};
-		vkGetPhysicalDeviceFormatProperties(m_physical_device, preferred_format, &props);
-		if ((props.optimalTilingFeatures & required) == required)
+		static constexpr std::array<VkFormat, 3> candidates = {
+			VK_FORMAT_D32_SFLOAT_S8_UINT,
+			VK_FORMAT_D24_UNORM_S8_UINT,
+			VK_FORMAT_D32_SFLOAT,
+		};
+		for (const VkFormat candidate : candidates)
 		{
-			m_depth_format = preferred_format;
-		}
-		else if (preferred_format != VK_FORMAT_D32_SFLOAT_S8_UINT)
-		{
-			vkGetPhysicalDeviceFormatProperties(m_physical_device, VK_FORMAT_D32_SFLOAT_S8_UINT, &props);
+			VkFormatProperties props = {};
+			vkGetPhysicalDeviceFormatProperties(m_physical_device, candidate, &props);
 			if ((props.optimalTilingFeatures & required) == required)
-				m_depth_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+			{
+				m_depth_format = candidate;
+				break;
+			}
 		}
 		m_features.stencil_buffer = (m_depth_format != VK_FORMAT_D32_SFLOAT);
 	}
@@ -3092,10 +3071,8 @@ bool GSDeviceVK::CheckFeatures()
 	// Concurrent depth testing/sampling relies on the same feedback synchronization path.
 	m_features.test_and_sample_depth = m_features.texture_barrier;
 
-	// Use D32F depth instead of a stencil format when framebuffer fetch needs it, except
-	// on proprietary Adreno where D32F clears are the exact operation being avoided.
-	if (m_features.framebuffer_fetch &&
-		!UsesMobileDriverWorkaround(DriverWorkaround::UseD24S8Depth))
+	// Use D32F depth instead of a stencil format when framebuffer fetch needs it.
+	if (m_features.framebuffer_fetch)
 	{
 		m_features.stencil_buffer = false;
 		m_depth_format = VK_FORMAT_D32_SFLOAT;
@@ -3122,11 +3099,6 @@ bool GSDeviceVK::CheckFeatures()
 	}
 
 	m_features.depth_feedback = GetVKDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
-#ifdef __ANDROID__
-	// Android Vulkan drivers are still inconsistent with depth feedback loops. Avoid the PC-style
-	// direct depth feedback path here and let GSRendererHW use its established avoid/copy fallbacks.
-	m_features.depth_feedback = GSDevice::DepthFeedbackSupport::None;
-#endif
 
 	m_features.aa1 = GSConfig.HWAA1 && m_features.vs_expand &&
 		(m_features.texture_barrier || m_features.framebuffer_fetch);
@@ -3138,7 +3110,7 @@ bool GSDeviceVK::CheckFeatures()
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s model=%s arch=%s "
 		"roaa=%d fbfetch=%d fbfetchDenylisted=%d textureBarrier=%d inputAttachmentFeedback=%d "
-		"dualSrcBlend=%d fastMAD=%d madFallback=%s",
+		"dualSrcBlend=%d depthFormat=%u fastMAD=%d madFallback=%s",
 		m_device_properties.deviceName, m_device_properties.vendorID, m_device_properties.driverVersion,
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
 		IsMediaTekSoC() ? "MediaTek" : "other/unknown", GetMobileGPUIdentity().name.c_str(),
@@ -3147,6 +3119,7 @@ bool GSDeviceVK::CheckFeatures()
 		unreliable_mali_fbfetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
 		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? 1 : 0,
 		m_device_features.dualSrcBlend ? 1 : 0,
+		static_cast<unsigned>(m_depth_format),
 		m_features.broken_mad_deinterlace ? 0 : 1,
 		m_features.broken_mad_deinterlace ? "blend" : "none");
 #endif
@@ -4157,48 +4130,34 @@ static void AddShaderHeader(std::stringstream& ss)
 		dev->UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
 	AddMacro(ss, "DRIVER_REWRITE_UNIFORM_INDEXING",
 		dev->UsesMobileDriverWorkaround(DriverWorkaround::RewriteUniformIndexing) ? 1 : 0);
-	AddMacro(ss, "DRIVER_REWRITE_CONSTANT_LOADS",
-		dev->UsesMobileDriverWorkaround(DriverWorkaround::RewriteConstantLoads) ? 1 : 0);
 	ss << R"(
+#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec2(a.x & b.x, a.y & b.y);
-#else
-	return a & b;
-#endif
 }
 
 uvec3 gpu_bitwise_and(uvec3 a, uvec3 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec3(a.x & b.x, a.y & b.y, a.z & b.z);
-#else
-	return a & b;
-#endif
 }
 
 uvec4 gpu_bitwise_and(uvec4 a, uvec4 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return uvec4(a.x & b.x, a.y & b.y, a.z & b.z, a.w & b.w);
-#else
-	return a & b;
-#endif
 }
 
 ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
 {
-#if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 	return ivec3(a.x & b.x, a.y & b.y, a.z & b.z);
-#else
-	return a & b;
-#endif
 }
+#else
+#define gpu_bitwise_and(a, b) ((a) & (b))
+#endif
 
+#if DRIVER_REWRITE_UNIFORM_INDEXING
 float gpu_matrix_element(mat4 value, int column, int row)
 {
-#if DRIVER_REWRITE_UNIFORM_INDEXING
 	vec4 selected_column;
 	if (column == 0)
 		selected_column = value[0];
@@ -4216,19 +4175,10 @@ float gpu_matrix_element(mat4 value, int column, int row)
 	if (row == 2)
 		return selected_column[2];
 	return selected_column[3];
-#else
-	return value[column][row];
-#endif
 }
-
-float gpu_rewrite_constant_load(float value)
-{
-#if DRIVER_REWRITE_CONSTANT_LOADS
-	return value + 0.000001;
 #else
-	return value;
+#define gpu_matrix_element(value, column, row) ((value)[column][row])
 #endif
-}
 )";
 }
 
@@ -5959,16 +5909,6 @@ void GSDeviceVK::BeginClearRenderPass(VkRenderPass rp, const GSVector4i& rect, c
 {
 	if (m_current_render_pass != VK_NULL_HANDLE)
 		EndRenderPass();
-
-	if (m_current_render_target &&
-		UsesMobileDriverWorkaround(DriverWorkaround::TransitionEmptyClearViaGeneral))
-	{
-		// The exact Mali driver used by Galaxy S8/S9 can lose an otherwise empty clear-only
-		// render pass. ARM's published workaround is a GENERAL round-trip before the pass.
-		const GSTextureVK::Layout original_layout = m_current_render_target->GetLayout();
-		m_current_render_target->TransitionToLayout(GSTextureVK::Layout::General);
-		m_current_render_target->TransitionToLayout(original_layout);
-	}
 
 	m_current_render_pass = rp;
 	m_current_render_pass_area = rect;

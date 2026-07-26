@@ -78,6 +78,7 @@ import com.sbro.emucorex.feedback.FeedbackAttachmentInspector
 import com.sbro.emucorex.feedback.FeedbackLimits
 import com.sbro.emucorex.feedback.FeedbackUploadScheduler
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -236,7 +237,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
             .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(
             start = 8.dp,
-            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 6.dp,
+            top = appScreenTopPadding(),
             end = 8.dp,
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 18.dp
         ),

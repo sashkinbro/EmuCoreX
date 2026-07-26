@@ -287,7 +287,6 @@ const char* GpuProfileDetector::BugToString(DriverBug value)
 		case DriverBug::BrokenSubpassFeedback: return "BrokenSubpassFeedback";
 		case DriverBug::BrokenColorWriteMaskWithDepthTest: return "BrokenColorWriteMaskWithDepthTest";
 		case DriverBug::BrokenDepthStencilDiscard: return "BrokenDepthStencilDiscard";
-		case DriverBug::BrokenD32FClear: return "BrokenD32FClear";
 		case DriverBug::BrokenReversedDepthRange: return "BrokenReversedDepthRange";
 		case DriverBug::SlowCachedReadbackMemory: return "SlowCachedReadbackMemory";
 		case DriverBug::SlowOptimalImageToBufferCopy: return "SlowOptimalImageToBufferCopy";
@@ -313,36 +312,20 @@ const char* GpuProfileDetector::WorkaroundToString(DriverWorkaround value)
 {
 	switch (value)
 	{
-		case DriverWorkaround::OrphanBufferOnUpload: return "OrphanBufferOnUpload";
 		case DriverWorkaround::RewriteBooleanNegation: return "RewriteBooleanNegation";
 		case DriverWorkaround::ScalarizeVectorBitwiseAnd: return "ScalarizeVectorBitwiseAnd";
 		case DriverWorkaround::StoreBitwiseNegationInTemporary: return "StoreBitwiseNegationInTemporary";
-		case DriverWorkaround::DisablePrimitiveRestart: return "DisablePrimitiveRestart";
 		case DriverWorkaround::UseDescriptorSets: return "UseDescriptorSets";
 		case DriverWorkaround::DisableProvokingVertex: return "DisableProvokingVertex";
 		case DriverWorkaround::DisableAttachmentFeedbackLoopLayout: return "DisableAttachmentFeedbackLoopLayout";
-		case DriverWorkaround::UseCopyForFeedbackLoop: return "UseCopyForFeedbackLoop";
 		case DriverWorkaround::EmulateColorWriteMask: return "EmulateColorWriteMask";
-		case DriverWorkaround::PreserveDepthStencilAttachment: return "PreserveDepthStencilAttachment";
-		case DriverWorkaround::UseD24S8Depth: return "UseD24S8Depth";
-		case DriverWorkaround::AvoidReversedDepthRange: return "AvoidReversedDepthRange";
 		case DriverWorkaround::PreferCoherentReadback: return "PreferCoherentReadback";
 		case DriverWorkaround::UseStagingImageForReadback: return "UseStagingImageForReadback";
 		case DriverWorkaround::AvoidClearLoadOpRenderPass: return "AvoidClearLoadOpRenderPass";
-		case DriverWorkaround::Avoid16BitTextureFormats: return "Avoid16BitTextureFormats";
 		case DriverWorkaround::GenerateMipmapManuallyForTallTextures: return "GenerateMipmapManuallyForTallTextures";
-		case DriverWorkaround::TransitionEmptyClearViaGeneral: return "TransitionEmptyClearViaGeneral";
-		case DriverWorkaround::RewriteConstantLoads: return "RewriteConstantLoads";
 		case DriverWorkaround::RewriteUniformIndexing: return "RewriteUniformIndexing";
 		case DriverWorkaround::ForceFifoPresent: return "ForceFifoPresent";
-		case DriverWorkaround::SerializeShaderCompilation: return "SerializeShaderCompilation";
-		case DriverWorkaround::DisableDynamicRendering: return "DisableDynamicRendering";
-		case DriverWorkaround::DisableImagelessFramebuffer: return "DisableImagelessFramebuffer";
-		case DriverWorkaround::DisableExtendedDynamicState: return "DisableExtendedDynamicState";
-		case DriverWorkaround::DisablePrimitiveTopologyDynamicState: return "DisablePrimitiveTopologyDynamicState";
-		case DriverWorkaround::DisableGraphicsPipelineLibrary: return "DisableGraphicsPipelineLibrary";
 		case DriverWorkaround::AlignSwapchainWidthTo32: return "AlignSwapchainWidthTo32";
-		case DriverWorkaround::UseExplicitBarrierSubresourceCounts: return "UseExplicitBarrierSubresourceCounts";
 		case DriverWorkaround::Count:
 		default: return "Unknown";
 	}
@@ -384,6 +367,10 @@ GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value,
 #endif
 	selection.hints = BuildHints(gpu_vendor, gpu_renderer_or_name, effective_context);
 	const std::string lowered_hints = GpuProfileDetail::ToLowerASCII(selection.hints);
+	const std::string lowered_vendor = GpuProfileDetail::ToLowerASCII(gpu_vendor);
+	const std::string lowered_renderer = GpuProfileDetail::ToLowerASCII(gpu_renderer_or_name);
+	const std::string lowered_driver_identity = GpuProfileDetail::ToLowerASCII(
+		std::string(effective_context.driver_name) + " | " + std::string(effective_context.driver_info));
 	const std::string lowered_override = GpuProfileDetail::ToLowerASCII(override_value);
 	selection.is_mediatek_soc = (lowered_override == "mediatek") || LooksLikeMediaTekSoc(lowered_hints);
 	selection.gs_tuning = GpuProfileDetail::MakeConservativeMobileGsTuning();
@@ -410,15 +397,46 @@ GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value,
 		return finalize();
 	}
 
-	if (GpuProfileDetail::LooksLikeAdreno(lowered_hints))
+	// The renderer/device name is the strongest identity signal. Check it before GL_VENDOR and
+	// the broader Android property bag so a stale or conflicting property cannot select another
+	// GPU family's workarounds.
+	if (GpuProfileDetail::LooksLikeAdreno(lowered_renderer))
 	{
 		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
 	}
-	else if (GpuProfileDetail::LooksLikePowerVR(lowered_hints))
+	else if (GpuProfileDetail::LooksLikePowerVR(lowered_renderer))
 	{
 		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
 	}
-	else if (GpuProfileDetail::LooksLikeMali(lowered_hints))
+	else if (GpuProfileDetail::LooksLikeMali(lowered_renderer))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
+	}
+	else if (GpuProfileDetail::LooksLikeAdreno(lowered_vendor))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
+	}
+	else if (GpuProfileDetail::LooksLikePowerVR(lowered_vendor))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
+	}
+	else if (GpuProfileDetail::LooksLikeMali(lowered_vendor))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
+	}
+	// Driver identity is still useful when a backend does not expose a renderer string.
+	// Do not use the complete Android property bag for family selection: SoC/platform
+	// properties identify the chip vendor, not necessarily the GPU (notably MediaTek),
+	// and can leak the host GPU into synthetic/unknown detection contexts.
+	else if (GpuProfileDetail::LooksLikeAdreno(lowered_driver_identity))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
+	}
+	else if (GpuProfileDetail::LooksLikePowerVR(lowered_driver_identity))
+	{
+		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
+	}
+	else if (GpuProfileDetail::LooksLikeMali(lowered_driver_identity))
 	{
 		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
 	}

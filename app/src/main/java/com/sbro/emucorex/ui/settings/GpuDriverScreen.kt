@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -83,6 +82,7 @@ import com.sbro.emucorex.core.GpuDriverMatch
 import com.sbro.emucorex.core.RemoteGpuDriver
 import com.sbro.emucorex.core.SnapdragonGpuProfile
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.tvFocusGroup
@@ -106,7 +106,7 @@ fun GpuDriverScreen(
     val selectedDriver = remember(uiState.installedGpuDrivers, activeDriverPath) {
         uiState.installedGpuDrivers.firstOrNull { it.mainLibraryPath == activeDriverPath }
     }
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 16.dp
+    val topInset = appScreenTopPadding()
     val installFailedMessage = stringResource(R.string.settings_gpu_driver_install_failed)
     val installSuccessTemplate = stringResource(R.string.settings_gpu_driver_install_success, "%s")
     val backClick = rememberDebouncedClick(onClick = onBackClick)

@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ScrollState
@@ -96,6 +95,7 @@ import com.sbro.emucorex.data.DrawerItemId
 import com.sbro.emucorex.data.DrawerVisualStyle
 import com.sbro.emucorex.ui.common.ProvideGamepadMenuAction
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.appStatusBarTopPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -185,9 +185,7 @@ fun AdaptiveShell(
             onLaunchGame = onLaunchGame,
             onLaunchBios = onLaunchBios,
             selectedItemFocusRequester = if (tvUiEnabled) tvNavigationFocusRequester else null,
-            topInset = if (tvUiEnabled) 0.dp else WindowInsets.statusBarsIgnoringVisibility
-                .asPaddingValues()
-                .calculateTopPadding(),
+            topInset = if (tvUiEnabled) 0.dp else appStatusBarTopPadding(),
             onCloseDrawer = { }
         )
     }
@@ -299,7 +297,7 @@ private fun CompactAdaptiveShell(
     content: @Composable ((() -> Unit)?) -> Unit
 ) {
     val configuration = LocalConfiguration.current
-    val statusPadding = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val statusPadding = appStatusBarTopPadding()
     val isTabletClass = configuration.smallestScreenWidthDp >= 600
     val isLandscapeCompact = configuration.screenWidthDp > configuration.screenHeightDp
     val drawerWidthFraction = when {
@@ -314,8 +312,20 @@ private fun CompactAdaptiveShell(
     val selectedDrawerItemFocusRequester = remember { FocusRequester() }
     // A drawer should never be restored as open after a configuration change.
     // This is especially important for back-only destinations such as Feedback and Settings.
-    val drawerState = remember(selected) { DrawerState(initialValue = DrawerValue.Closed) }
-    var destinationSettled by remember(selected) { mutableStateOf(false) }
+    val drawerState = remember(
+        selected,
+        configuration.screenWidthDp,
+        configuration.screenHeightDp
+    ) {
+        DrawerState(initialValue = DrawerValue.Closed)
+    }
+    var destinationSettled by remember(
+        selected,
+        configuration.screenWidthDp,
+        configuration.screenHeightDp
+    ) {
+        mutableStateOf(false)
+    }
     val scope = rememberCoroutineScope()
     val inputModeManager = LocalInputModeManager.current
     val drawerScrollState = rememberScrollState()
@@ -498,7 +508,7 @@ private fun SideNavigation(
     onLaunchBios: (() -> Unit)?,
     selectedItemFocusRequester: FocusRequester? = null,
     wrapInSurface: Boolean = true,
-    topInset: androidx.compose.ui.unit.Dp = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding(),
+    topInset: androidx.compose.ui.unit.Dp = appStatusBarTopPadding(),
     scrollState: ScrollState = rememberScrollState(),
     onCloseDrawer: suspend () -> Unit
 ) {

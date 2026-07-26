@@ -25,7 +25,7 @@ constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age, bool prefe
 
 // Renderer names are stable (for example "Adreno (TM) 740"), while Snapdragon product names are not.
 // Keep one entry per shipping renderer model so adjacent parts are not silently treated as equivalent.
-static constexpr std::array<AdrenoSpec, 62> s_adreno_specs = {{
+static constexpr std::array<AdrenoSpec, 57> s_adreno_specs = {{
 	{200, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
 	{203, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
 	{205, 0, MobileGpuArchitecture::Adreno2xx, T(48, 4, 4)},
@@ -130,9 +130,30 @@ static bool ParseAdrenoModel(std::string_view hints, u16* model, char* suffix)
 			return false;
 	}
 
+	const char parsed_suffix = (pos < hints.size() && hints[pos] == 'l') ? 'l' : 0;
+	if (parsed_suffix)
+		pos++;
+	if (pos < hints.size() && std::isalnum(static_cast<unsigned char>(hints[pos])))
+		return false;
+
 	*model = static_cast<u16>(value);
-	*suffix = (pos < hints.size() && hints[pos] == 'l') ? 'l' : 0;
+	*suffix = parsed_suffix;
 	return true;
+}
+
+static bool ContainsAdrenoXToken(std::string_view hints, std::string_view token)
+{
+	for (size_t pos = hints.find(token); pos != std::string_view::npos;
+		pos = hints.find(token, pos + token.size()))
+	{
+		const size_t end = pos + token.size();
+		if ((pos == 0 || !std::isalnum(static_cast<unsigned char>(hints[pos - 1]))) &&
+			(end == hints.size() || !std::isalnum(static_cast<unsigned char>(hints[end]))))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 static MobileGpuArchitecture ArchitectureForUnknownAdreno(u16 model)
@@ -189,25 +210,29 @@ ResolvedGpuProfile ResolveAdrenoProfile(std::string_view lowered_hints)
 	resolved.tuning = MakeConservativeMobileGsTuning();
 
 	// Snapdragon X laptop parts occasionally appear through shared Android/ANGLE code paths.
-	if (ContainsAny(lowered_hints, {"adreno x2-85", "adreno x2 85"}))
+	if (ContainsAdrenoXToken(lowered_hints, "adreno x2-85") ||
+		ContainsAdrenoXToken(lowered_hints, "adreno x2 85"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 285, 0, true, "Adreno X2-85"};
 		resolved.tuning = T(160, 12, 8, true);
 		return resolved;
 	}
-	if (ContainsAny(lowered_hints, {"adreno x2-45", "adreno x2 45"}))
+	if (ContainsAdrenoXToken(lowered_hints, "adreno x2-45") ||
+		ContainsAdrenoXToken(lowered_hints, "adreno x2 45"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 245, 0, true, "Adreno X2-45"};
 		resolved.tuning = T(160, 12, 8, true);
 		return resolved;
 	}
-	if (ContainsAny(lowered_hints, {"adreno x1-85", "adreno x1 85"}))
+	if (ContainsAdrenoXToken(lowered_hints, "adreno x1-85") ||
+		ContainsAdrenoXToken(lowered_hints, "adreno x1 85"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 185, 0, true, "Adreno X1-85"};
 		resolved.tuning = T(160, 12, 8, true);
 		return resolved;
 	}
-	if (ContainsAny(lowered_hints, {"adreno x1-45", "adreno x1 45"}))
+	if (ContainsAdrenoXToken(lowered_hints, "adreno x1-45") ||
+		ContainsAdrenoXToken(lowered_hints, "adreno x1 45"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 145, 0, true, "Adreno X1-45"};
 		resolved.tuning = T(152, 11, 8, true);

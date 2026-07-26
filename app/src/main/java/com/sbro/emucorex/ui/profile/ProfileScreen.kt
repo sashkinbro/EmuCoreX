@@ -39,7 +39,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -114,6 +113,7 @@ import com.sbro.emucorex.data.PlayerRankInsights
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
@@ -145,7 +145,7 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding()
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val selectedTab = rememberSaveable { mutableIntStateOf(0) }
     var showProCustomization by rememberSaveable { mutableStateOf(false) }
@@ -221,7 +221,7 @@ fun ProfileScreen(
                         contentPadding = PaddingValues(
                             start = ScreenHorizontalPadding,
                             end = ScreenHorizontalPadding,
-                            top = topInset + 8.dp,
+                            top = topInset,
                             bottom = bottomInset + 110.dp
                         ),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -465,7 +465,7 @@ private fun AuthContent(
         contentPadding = PaddingValues(
             start = ScreenHorizontalPadding,
             end = ScreenHorizontalPadding,
-            top = topInset + 8.dp,
+            top = topInset,
             bottom = 28.dp
         ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -599,7 +599,7 @@ private fun ViewedPlayerProfile(
         contentPadding = PaddingValues(
             start = ScreenHorizontalPadding,
             end = ScreenHorizontalPadding,
-            top = topInset + 8.dp,
+            top = topInset,
             bottom = 18.dp
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp)

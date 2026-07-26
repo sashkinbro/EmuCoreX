@@ -79,7 +79,7 @@ void main()
 	#endif
 
 	#if VS_POINT_SIZE
-		gl_PointSize = gpu_rewrite_constant_load(PointSize.x);
+		gl_PointSize = PointSize.x;
 	#endif
 
 	vsOut.c = vec4(a_c);

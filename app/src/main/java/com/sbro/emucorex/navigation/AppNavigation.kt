@@ -55,6 +55,7 @@ import com.sbro.emucorex.ui.achievements.AchievementsHubScreen
 import com.sbro.emucorex.ui.achievements.GameAchievementsScreen
 import com.sbro.emucorex.ui.catalog.CatalogSearchScreen
 import com.sbro.emucorex.ui.cheats.CheatManagerScreen
+import com.sbro.emucorex.ui.controls.TouchControlCreatorScreen
 import com.sbro.emucorex.ui.detail.GameDetailScreen
 import com.sbro.emucorex.ui.emulation.EmulationScreen
 import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
@@ -71,6 +72,7 @@ import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import com.sbro.emucorex.ui.settings.SettingsViewModel
 import com.sbro.emucorex.ui.textures.TextureManagerScreen
+import com.sbro.emucorex.ui.theme.ThemeManagerScreen
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
 import com.sbro.emucorex.ui.common.ProvideGamepadUiNavigation
 import androidx.compose.foundation.layout.Arrangement
@@ -121,6 +123,12 @@ data class SettingsRoute(val tab: String = "general")
 
 @Serializable
 object LanguageSettingsRoute
+
+@Serializable
+object ThemeManagerRoute
+
+@Serializable
+object TouchControlCreatorRoute
 
 @Serializable
 object OnboardingRoute
@@ -701,6 +709,16 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenThemeManager = {
+                            navController.navigate(ThemeManagerRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenTouchControlCreator = {
+                            navController.navigate(TouchControlCreatorRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         viewModel = settingsViewModel
                     )
                 }
@@ -710,6 +728,57 @@ fun AppNavigation(
                 LanguageSettingsScreen(
                     onBackClick = { navController.popBackStack() }
                 )
+            }
+
+            composable<ThemeManagerRoute> {
+                if (!settingsUiState.isLoaded) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PremiumLoadingAnimation()
+                    }
+                } else {
+                    ThemeManagerScreen(
+                        initialLibrary = settingsUiState.customThemeLibrary,
+                        isProUnlocked = settingsUiState.isProUnlocked,
+                        onPurchasePro = {
+                            (context as? ComponentActivity)?.let(settingsViewModel::purchasePro)
+                        },
+                        onSave = { library ->
+                            settingsViewModel.saveCustomThemeLibrary(library, activate = false)
+                        },
+                        onApply = { library ->
+                            settingsViewModel.saveCustomThemeLibrary(library, activate = true)
+                        },
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
+            }
+
+            composable<TouchControlCreatorRoute> {
+                if (!settingsUiState.isLoaded) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        PremiumLoadingAnimation()
+                    }
+                } else {
+                    TouchControlCreatorScreen(
+                        initialLibrary = settingsUiState.customTouchControls,
+                        isProUnlocked = settingsUiState.isProUnlocked,
+                        onPurchasePro = {
+                            (context as? ComponentActivity)?.let(settingsViewModel::purchasePro)
+                        },
+                        onSave = settingsViewModel::saveCustomTouchControls,
+                        onBackClick = { navController.popBackStack() }
+                    )
+                }
             }
 
             composable<GpuDriverSettingsRoute> { backStackEntry ->

@@ -11,8 +11,10 @@ import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.runtime.mutableStateOf
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sbro.emucorex.ui.theme.EmuCoreXTheme
+import com.sbro.emucorex.ui.theme.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -81,6 +83,30 @@ class AdaptiveShellDrawerInstrumentedTest {
             .assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
+            .assertIsNotDisplayed()
+    }
+
+    @Test
+    fun changingThemeDoesNotOpenHomeDrawer() {
+        val themeMode = mutableStateOf(ThemeMode.DARK)
+        composeRule.setContent {
+            EmuCoreXTheme(themeMode = themeMode.value) {
+                TestShell(selected = PrimaryDestination.Home, onBackClick = null)
+            }
+        }
+
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
+            .assertIsNotDisplayed()
+
+        composeRule.runOnIdle { themeMode.value = ThemeMode.LIGHT }
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
+            .assertIsNotDisplayed()
+
+        composeRule.runOnIdle { themeMode.value = ThemeMode.CUSTOM }
         composeRule.mainClock.advanceTimeBy(500)
         composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
             .assertIsNotDisplayed()

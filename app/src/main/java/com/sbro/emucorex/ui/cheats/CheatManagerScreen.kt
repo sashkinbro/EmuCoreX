@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,6 +78,7 @@ import com.sbro.emucorex.data.SelectedGameIdentity
 import com.sbro.emucorex.ui.common.AppAlertDialog
 import com.sbro.emucorex.ui.common.LibraryGamePicker
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.cheatCatalogGameTitleKey
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.shimmer
@@ -102,7 +102,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
     val libraryRepository = remember(context) { ContentLibraryRepository(context) }
     val cheatWriteMutex = remember { Mutex() }
     val cheatsEnabled by preferences.enableCheats.collectAsState(initial = false)
-    val topInset = WindowInsets.statusBarsIgnoringVisibility.asPaddingValues().calculateTopPadding() + 8.dp
+    val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
 

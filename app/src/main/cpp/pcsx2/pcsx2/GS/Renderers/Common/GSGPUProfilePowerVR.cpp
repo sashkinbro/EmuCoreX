@@ -58,11 +58,61 @@ static const std::array<PowerVRSpec, 37> s_powervr_specs = {{
 	{"gm9624", MobileGpuArchitecture::PowerVRRogue, 9624, MakeMobileGsTuning(120, 9, 120, 7)},
 }};
 
+static bool ContainsPowerVRProductToken(std::string_view hints, std::string_view token)
+{
+	size_t digit = 0;
+	while (digit < token.size() && !std::isdigit(static_cast<unsigned char>(token[digit])))
+		digit++;
+	if (digit == 0 || digit == token.size())
+		return false;
+
+	const std::string_view family = token.substr(0, digit);
+	const std::string_view model = token.substr(digit);
+	for (size_t pos = hints.find(family); pos != std::string_view::npos;
+		pos = hints.find(family, pos + family.size()))
+	{
+		if (pos > 0 && std::isalnum(static_cast<unsigned char>(hints[pos - 1])))
+			continue;
+
+		size_t model_pos = pos + family.size();
+		while (model_pos < hints.size() &&
+			(std::isspace(static_cast<unsigned char>(hints[model_pos])) ||
+				hints[model_pos] == '-' || hints[model_pos] == '_'))
+			model_pos++;
+
+		if (hints.substr(model_pos, model.size()) != model)
+			continue;
+
+		const size_t end = model_pos + model.size();
+		if (end == hints.size() || !std::isalnum(static_cast<unsigned char>(hints[end])))
+			return true;
+
+		// SGX renderers can append an MP core-count suffix without a separator. Do not accept
+		// arbitrary suffixes on other families, or GE83200/GE8320foo would inherit GE8320.
+		if (family == "sgx" && hints.substr(end, 2) == "mp")
+		{
+			size_t suffix_end = end + 2;
+			while (suffix_end < hints.size() &&
+				std::isdigit(static_cast<unsigned char>(hints[suffix_end])))
+			{
+				suffix_end++;
+			}
+			if (suffix_end > end + 2 &&
+				(suffix_end == hints.size() ||
+					!std::isalnum(static_cast<unsigned char>(hints[suffix_end]))))
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 static const PowerVRSpec* FindPowerVRSpec(std::string_view lowered_hints)
 {
 	for (const PowerVRSpec& spec : s_powervr_specs)
 	{
-		if (lowered_hints.find(spec.token) != std::string_view::npos)
+		if (ContainsPowerVRProductToken(lowered_hints, spec.token))
 			return &spec;
 	}
 	return nullptr;
@@ -75,7 +125,7 @@ static bool ContainsPowerVRToken(std::string_view hints, std::string_view token)
 		return false;
 	const size_t end = pos + token.size();
 	return (pos == 0 || !std::isalnum(static_cast<unsigned char>(hints[pos - 1]))) &&
-		(end == hints.size() || !std::isalnum(static_cast<unsigned char>(hints[end])));
+		(end == hints.size() || !std::isalpha(static_cast<unsigned char>(hints[end])));
 }
 } // namespace
 

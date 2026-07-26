@@ -11,10 +11,6 @@ namespace GpuProfileDetail
 {
 namespace
 {
-constexpr u32 VENDOR_ARM = 0x13B5;
-constexpr u32 VENDOR_QUALCOMM = 0x5143;
-constexpr u32 VENDOR_IMAGINATION = 0x1010;
-
 // VkDriverId values. Duplicating the numeric ABI values keeps this portable file independent from
 // Vulkan headers and lets the same resolver serve OpenGL unit tests.
 constexpr u32 DRIVER_ID_IMAGINATION_PROPRIETARY = 7;
@@ -39,6 +35,7 @@ struct VersionBound
 	u16 major = 0;
 	u16 minor = 0;
 	u16 patch = 0;
+	u32 build = 0;
 };
 
 struct DriverRule
@@ -68,12 +65,14 @@ constexpr int CompareVersion(const MobileDriverVersion& lhs, VersionBound rhs)
 		return (lhs.minor < rhs.minor) ? -1 : 1;
 	if (lhs.patch != rhs.patch)
 		return (lhs.patch < rhs.patch) ? -1 : 1;
+	if (lhs.build != rhs.build)
+		return (lhs.build < rhs.build) ? -1 : 1;
 	return 0;
 }
 
 constexpr bool HasVersionBound(VersionBound bound)
 {
-	return bound.major != 0 || bound.minor != 0 || bound.patch != 0;
+	return bound.major != 0 || bound.minor != 0 || bound.patch != 0 || bound.build != 0;
 }
 
 static bool ParseUnsigned(std::string_view text, size_t start, u16* value, size_t* end)
@@ -91,6 +90,25 @@ static bool ParseUnsigned(std::string_view text, size_t start, u16* value, size_
 	}
 
 	*value = static_cast<u16>(parsed);
+	*end = pos;
+	return true;
+}
+
+static bool ParseUnsigned32(std::string_view text, size_t start, u32* value, size_t* end)
+{
+	if (start >= text.size() || !std::isdigit(static_cast<unsigned char>(text[start])))
+		return false;
+
+	u64 parsed = 0;
+	size_t pos = start;
+	while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos])))
+	{
+		parsed = parsed * 10 + static_cast<u32>(text[pos++] - '0');
+		if (parsed > std::numeric_limits<u32>::max())
+			return false;
+	}
+
+	*value = static_cast<u32>(parsed);
 	*end = pos;
 	return true;
 }
@@ -125,7 +143,39 @@ static MobileDriverVersion ParseOpenGLDriverVersion(std::string_view version_str
 		}
 	}
 
-	// Qualcomm strings commonly contain "V@0502"; PowerVR strings often expose "1.8@...".
+	// Imagination strings use the form "OpenGL ES 3.2 build 1.9@4850625". The branch and
+	// change ID, rather than the leading GLES version, are the ordered driver identity.
+	if (vendor == RuntimeGpuProfile::PowerVR)
+	{
+		const size_t marker = lowered.find("build ");
+		if (marker == std::string::npos)
+			return version;
+
+		size_t end = marker + 6;
+		u16 major = 0;
+		if (!ParseUnsigned(lowered, end, &major, &end) || end >= lowered.size() || lowered[end] != '.')
+			return version;
+
+		u16 minor = 0;
+		if (!ParseUnsigned(lowered, end + 1, &minor, &end))
+			return version;
+
+		u32 build = 0;
+		if (end < lowered.size() && lowered[end] == '@')
+		{
+			size_t build_end = end + 1;
+			if (!ParseUnsigned32(lowered, end + 1, &build, &build_end))
+				return version;
+		}
+
+		version.major = major;
+		version.minor = minor;
+		version.build = build;
+		version.known = true;
+		return version;
+	}
+
+	// Qualcomm strings commonly contain "V@0502".
 	size_t start = 0;
 	if (vendor == RuntimeGpuProfile::Adreno)
 	{
@@ -283,15 +333,15 @@ static bool RuleMatches(const DriverRule& rule, const GpuProfileSelection& selec
 	return true;
 }
 
-// Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. Rules here
-// intentionally describe driver mechanisms, not game-specific GS hacks.
-static constexpr std::array<DriverRule, 22> s_driver_rules = {{
+// Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. A known
+// driver bug is not automatically an active workaround: expensive renderer fallbacks stay disabled
+// until their PCSX2 integration has a bounded, tested condition.
+static constexpr std::array<DriverRule, 25> s_driver_rules = {{
 	{"gl-arm-buffer-stream", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenUnsynchronizedMapping) |
 			Bug(DriverBug::BrokenVectorBitwiseAnd) | Bug(DriverBug::BrokenVSync),
-		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
-			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
+		Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
 	{"gl-arm-g57-fifo", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
@@ -299,110 +349,96 @@ static constexpr std::array<DriverRule, 22> s_driver_rules = {{
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenNegatedBoolean) |
 			Bug(DriverBug::BrokenPrimitiveRestart),
-		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
-			Workaround(DriverWorkaround::RewriteBooleanNegation) |
-			Workaround(DriverWorkaround::DisablePrimitiveRestart)},
-	{"gl-powervr-compiler", MobileGpuApi::OpenGL, RuntimeGpuProfile::PowerVR,
+		Workaround(DriverWorkaround::RewriteBooleanNegation)},
+	{"gl-powervr-driver", MobileGpuApi::OpenGL, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
-		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenBitwiseOpNegation) |
-			Bug(DriverBug::BrokenGenerateMipmapTallTexture),
-		Workaround(DriverWorkaround::OrphanBufferOnUpload) |
-			Workaround(DriverWorkaround::StoreBitwiseNegationInTemporary) |
-			Workaround(DriverWorkaround::GenerateMipmapManuallyForTallTextures)},
+		Bug(DriverBug::BrokenBufferStreaming), 0},
+	{"gl-powervr-bitwise-before-1-8-4693462", MobileGpuApi::OpenGL, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0,
+		{}, {1, 8, 0, 4693462}, 0, 0, true,
+		Bug(DriverBug::BrokenBitwiseOpNegation),
+		Workaround(DriverWorkaround::StoreBitwiseNegationInTemporary)},
+	{"gl-powervr-sgx-tall-mipmap", MobileGpuApi::OpenGL, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::PowerVRSeries5, 500, 599, 0,
+		{}, {}, 0, 0, false, Bug(DriverBug::BrokenGenerateMipmapTallTexture),
+		Workaround(DriverWorkaround::GenerateMipmapManuallyForTallTextures)},
 	{"gl-android-shader-serialization", MobileGpuApi::OpenGL, RuntimeGpuProfile::Unknown,
 		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 1, 0, false,
-		Bug(DriverBug::BrokenMultithreadedShaderCompilation),
-		Workaround(DriverWorkaround::SerializeShaderCompilation)},
+		Bug(DriverBug::BrokenMultithreadedShaderCompilation), 0},
 	{"vk-android-shader-serialization", MobileGpuApi::Vulkan, RuntimeGpuProfile::Unknown,
 		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 1, 0, false,
-		Bug(DriverBug::BrokenMultithreadedShaderCompilation),
-		Workaround(DriverWorkaround::SerializeShaderCompilation)},
+		Bug(DriverBug::BrokenMultithreadedShaderCompilation), 0},
 	{"vk-arm-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenPushDescriptors) |
 			Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
 			Bug(DriverBug::SlowCachedReadbackMemory) | Bug(DriverBug::BrokenVectorBitwiseAnd),
-		Workaround(DriverWorkaround::DisablePrimitiveRestart) |
-			Workaround(DriverWorkaround::UseDescriptorSets) |
+		Workaround(DriverWorkaround::UseDescriptorSets) |
 			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
 			Workaround(DriverWorkaround::PreferCoherentReadback) |
 			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
-	{"vk-arm-hash-barriers", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
-		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
-		0, Workaround(DriverWorkaround::UseExplicitBarrierSubresourceCounts)},
 	{"vk-arm-empty-renderpass", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0xaa9c4b29u, {}, {}, 0, 0, false,
-		Bug(DriverBug::BrokenEmptyRenderPass), Workaround(DriverWorkaround::TransitionEmptyClearViaGeneral)},
+		Bug(DriverBug::BrokenEmptyRenderPass), 0},
 	{"vk-arm-constant-load-r32-r39", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {32, 0, 0}, {40, 0, 0},
-		0, 0, false, Bug(DriverBug::BrokenConstantLoad), Workaround(DriverWorkaround::RewriteConstantLoads)},
+		0, 0, false, Bug(DriverBug::BrokenConstantLoad), 0},
 	{"vk-arm-midgard-uniform-indexing", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::MaliMidgard, 830, 880, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenUniformIndexing), Workaround(DriverWorkaround::RewriteUniformIndexing)},
 	{"vk-arm-imageless-r38", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {38, 0, 0}, {38, 2, 0},
-		0, 0, false, Bug(DriverBug::BrokenImagelessFramebuffer),
-		Workaround(DriverWorkaround::DisableImagelessFramebuffer)},
+		0, 0, false, Bug(DriverBug::BrokenImagelessFramebuffer), 0},
 	{"vk-arm-extended-dynamic-before-r44p1", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {44, 1, 0},
-		0, 0, true, Bug(DriverBug::BrokenExtendedDynamicState),
-		Workaround(DriverWorkaround::DisableExtendedDynamicState)},
+		0, 0, true, Bug(DriverBug::BrokenExtendedDynamicState), 0},
 	{"vk-arm-dynamic-rendering-before-r52", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {52, 0, 0},
-		0, 0, true, Bug(DriverBug::BrokenDynamicRendering),
-		Workaround(DriverWorkaround::DisableDynamicRendering)},
+		0, 0, true, Bug(DriverBug::BrokenDynamicRendering), 0},
 	{"vk-qualcomm-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenProvokingVertex) |
-			Bug(DriverBug::BrokenSubpassFeedback) | Bug(DriverBug::BrokenD32FClear) |
+			Bug(DriverBug::BrokenSubpassFeedback) |
 			Bug(DriverBug::BrokenReversedDepthRange) | Bug(DriverBug::SlowCachedReadbackMemory) |
 			Bug(DriverBug::SlowOptimalImageToBufferCopy),
-		Workaround(DriverWorkaround::DisablePrimitiveRestart) |
-			Workaround(DriverWorkaround::DisableProvokingVertex) |
-			Workaround(DriverWorkaround::UseCopyForFeedbackLoop) |
-			Workaround(DriverWorkaround::UseD24S8Depth) |
-			Workaround(DriverWorkaround::AvoidReversedDepthRange) |
-			Workaround(DriverWorkaround::PreferCoherentReadback) |
-			Workaround(DriverWorkaround::UseStagingImageForReadback)},
+		Workaround(DriverWorkaround::DisableProvokingVertex) |
+			Workaround(DriverWorkaround::PreferCoherentReadback)},
+	{"vk-qualcomm-pre-adreno8-readback", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 200, 799, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::SlowOptimalImageToBufferCopy),
+		Workaround(DriverWorkaround::UseStagingImageForReadback)},
 	{"vk-adreno5xx-depth-stencil", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Adreno5xx, 500, 599, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenDepthStencilDiscard) | Bug(DriverBug::BrokenColorWriteMaskWithDepthTest),
-		Workaround(DriverWorkaround::PreserveDepthStencilAttachment) |
-			Workaround(DriverWorkaround::EmulateColorWriteMask)},
+		Workaround(DriverWorkaround::EmulateColorWriteMask)},
 	{"vk-qualcomm-dynamic-rendering-before-512-801", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {512, 801, 0},
-		0, 0, true, Bug(DriverBug::BrokenDynamicRendering),
-		Workaround(DriverWorkaround::DisableDynamicRendering)},
+		0, 0, true, Bug(DriverBug::BrokenDynamicRendering), 0},
 	{"vk-qualcomm-imageless-before-512-806", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {512, 806, 0},
-		0, 0, true, Bug(DriverBug::BrokenImagelessFramebuffer),
-		Workaround(DriverWorkaround::DisableImagelessFramebuffer)},
+		0, 0, true, Bug(DriverBug::BrokenImagelessFramebuffer), 0},
 	{"vk-powervr-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPushDescriptors) | Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
-			Bug(DriverBug::BrokenClearLoadOpRenderPass) | Bug(DriverBug::Broken16BitTextureFormats) |
+			Bug(DriverBug::Broken16BitTextureFormats) |
 			Bug(DriverBug::BrokenDynamicRendering) | Bug(DriverBug::BrokenImagelessFramebuffer) |
 			Bug(DriverBug::BrokenPrimitiveTopologyDynamicState) |
 			Bug(DriverBug::BrokenGraphicsPipelineLibrary),
 		Workaround(DriverWorkaround::UseDescriptorSets) |
-			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
-			Workaround(DriverWorkaround::AvoidClearLoadOpRenderPass) |
-			Workaround(DriverWorkaround::Avoid16BitTextureFormats) |
-			Workaround(DriverWorkaround::DisableDynamicRendering) |
-			Workaround(DriverWorkaround::DisableImagelessFramebuffer) |
-			Workaround(DriverWorkaround::DisablePrimitiveTopologyDynamicState) |
-			Workaround(DriverWorkaround::DisableGraphicsPipelineLibrary)},
+			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout)},
+	{"vk-powervr-clear-loadop-1-7-to-1-10", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0,
+		{1, 7, 0}, {1, 10, 0}, 0, 0, false, Bug(DriverBug::BrokenClearLoadOpRenderPass),
+		Workaround(DriverWorkaround::AvoidClearLoadOpRenderPass)},
 	{"vk-powervr-old-swapchain-width", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		0, Workaround(DriverWorkaround::AlignSwapchainWidthTo32)},
 	{"vk-powervr-primitive-topology", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
-		Bug(DriverBug::BrokenPrimitiveTopologyDynamicState),
-		Workaround(DriverWorkaround::DisablePrimitiveTopologyDynamicState)},
+		Bug(DriverBug::BrokenPrimitiveTopologyDynamicState), 0},
 	{"vk-arm-jm-r46-r50-extended-dynamic", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {46, 0, 0}, {51, 0, 0},
-		0, 0, false, Bug(DriverBug::BrokenExtendedDynamicState),
-		Workaround(DriverWorkaround::DisableExtendedDynamicState)},
+		0, 0, false, Bug(DriverBug::BrokenExtendedDynamicState), 0},
 }};
 } // namespace
 
@@ -428,10 +464,15 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 
 	for (const DriverRule& rule : s_driver_rules)
 	{
-		if (std::string_view(rule.id) == "vk-arm-hash-barriers" && !profile.version.legacy_hash)
-			continue;
 		if (std::string_view(rule.id) == "vk-powervr-old-swapchain-width" &&
 			(profile.version.raw == 0 || profile.version.raw >= 0x00582558u))
+		{
+			continue;
+		}
+		if (std::string_view(rule.id) == "vk-qualcomm-pre-adreno8-readback" &&
+			(selection.gpu.architecture == MobileGpuArchitecture::Adreno8xx ||
+				selection.gpu.architecture == MobileGpuArchitecture::AdrenoX ||
+				selection.gpu.architecture == MobileGpuArchitecture::Unknown))
 		{
 			continue;
 		}
