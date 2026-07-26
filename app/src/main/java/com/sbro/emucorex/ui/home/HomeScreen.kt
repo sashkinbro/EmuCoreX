@@ -221,16 +221,26 @@ fun HomeScreen(
         controller.hide(WindowInsetsCompat.Type.systemBars())
     }
 
-    DisposableEffect(context, isShelfView) {
-        val activity = context as? Activity
-        val window = activity?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+    fun applyStandardSystemBars() {
+        val activity = context as? Activity ?: return
+        val window = activity.window
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        controller.show(WindowInsetsCompat.Type.navigationBars())
+        controller.hide(WindowInsetsCompat.Type.statusBars())
+        window.decorView.post {
+            WindowCompat.getInsetsController(window, window.decorView)
+                .hide(WindowInsetsCompat.Type.statusBars())
+        }
+    }
 
+    DisposableEffect(context, isShelfView) {
         if (isShelfView) {
             applyShelfSystemBarsHidden()
         } else {
-            controller?.show(WindowInsetsCompat.Type.navigationBars())
-            controller?.hide(WindowInsetsCompat.Type.statusBars())
+            applyStandardSystemBars()
         }
 
         onDispose {
@@ -250,10 +260,17 @@ fun HomeScreen(
         }
     }
     LaunchedEffect(isShelfView, context) {
-        if (!isShelfView) return@LaunchedEffect
-        applyShelfSystemBarsHidden()
+        if (isShelfView) {
+            applyShelfSystemBarsHidden()
+        } else {
+            applyStandardSystemBars()
+        }
         delay(150.milliseconds)
-        applyShelfSystemBarsHidden()
+        if (isShelfView) {
+            applyShelfSystemBarsHidden()
+        } else {
+            applyStandardSystemBars()
+        }
     }
     LaunchedEffect(isShelfView) {
         onShelfModeChanged(isShelfView)

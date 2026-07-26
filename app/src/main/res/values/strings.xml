@@ -2079,7 +2079,7 @@
     <string name="touch_control_creator_title">Control Creator</string>
     <string name="touch_control_creator_settings_entry">Control Creator</string>
     <string name="touch_control_creator_settings_desc">Create additional on-screen buttons with their own action, label, shape, size, position, colors, and press behavior.</string>
-    <string name="touch_control_creator_open">Open creator</string>
+    <string name="touch_control_creator_open">Editor</string>
     <string name="touch_control_creator_preview_mode">Preview mode</string>
     <string name="touch_control_creator_pro_desc">Explore every option for free. PRO is required to create, save, duplicate, or enable custom controls in games.</string>
     <string name="touch_control_creator_unlock">Unlock PRO</string>

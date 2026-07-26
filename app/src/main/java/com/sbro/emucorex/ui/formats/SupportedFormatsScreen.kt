@@ -264,7 +264,8 @@ private fun FormatsTopBar(
             if (handleBackClick != null) {
                 ScreenTopBar(
                     title = stringResource(R.string.formats_title),
-                    onBackClick = handleBackClick
+                    onBackClick = handleBackClick,
+                    embedded = true
                 )
             } else {
                 Text(

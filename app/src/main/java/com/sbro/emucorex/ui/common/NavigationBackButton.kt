@@ -81,11 +81,70 @@ fun ScreenTopBar(
     modifier: Modifier = Modifier,
     backButtonModifier: Modifier = Modifier,
     subtitle: String? = null,
-    titleColor: Color = MaterialTheme.colorScheme.onBackground,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     backContentColor: Color = titleColor,
     titleMaxLines: Int = 1,
+    subtitleMaxLines: Int = 1,
+    embedded: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {}
+) {
+    if (embedded) {
+        ScreenTopBarContent(
+            title = title,
+            subtitle = subtitle,
+            onBackClick = onBackClick,
+            backButtonModifier = backButtonModifier,
+            titleColor = titleColor,
+            subtitleColor = subtitleColor,
+            backContentColor = backContentColor,
+            titleMaxLines = titleMaxLines,
+            subtitleMaxLines = subtitleMaxLines,
+            actions = actions
+        )
+        return
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+        )
+    ) {
+        ScreenTopBarContent(
+            title = title,
+            subtitle = subtitle,
+            onBackClick = onBackClick,
+            backButtonModifier = backButtonModifier,
+            titleColor = titleColor,
+            subtitleColor = subtitleColor,
+            backContentColor = backContentColor,
+            titleMaxLines = titleMaxLines,
+            subtitleMaxLines = subtitleMaxLines,
+            actions = actions,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ScreenTopBarContent(
+    title: String,
+    subtitle: String?,
+    onBackClick: () -> Unit,
+    backButtonModifier: Modifier,
+    titleColor: Color,
+    subtitleColor: Color,
+    backContentColor: Color,
+    titleMaxLines: Int,
+    subtitleMaxLines: Int,
+    actions: @Composable RowScope.() -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -94,7 +153,10 @@ fun ScreenTopBar(
         NavigationBackButton(
             onClick = onBackClick,
             modifier = backButtonModifier,
-            contentColor = backContentColor
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = backContentColor,
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
         )
         Spacer(modifier = Modifier.width(14.dp))
         Column(
@@ -114,7 +176,7 @@ fun ScreenTopBar(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = subtitleColor,
-                    maxLines = 1,
+                    maxLines = subtitleMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
             }

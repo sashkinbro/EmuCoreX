@@ -77,7 +77,7 @@ import com.sbro.emucorex.feedback.FeedbackAttachmentError
 import com.sbro.emucorex.feedback.FeedbackAttachmentInspector
 import com.sbro.emucorex.feedback.FeedbackLimits
 import com.sbro.emucorex.feedback.FeedbackUploadScheduler
-import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -245,36 +245,17 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
-            Row(
+            ScreenTopBar(
+                title = stringResource(R.string.feedback_title),
+                subtitle = stringResource(R.string.feedback_subtitle),
+                onBackClick = requestBack,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 760.dp)
                     .padding(top = 12.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                NavigationBackButton(
-                    onClick = requestBack,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.feedback_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = stringResource(R.string.feedback_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+                titleMaxLines = 2,
+                subtitleMaxLines = 2
+            )
         }
         if (!FeedbackUploadScheduler.isConfigured) {
             item { FeedbackConfigurationWarning(Modifier.widthIn(max = 760.dp)) }

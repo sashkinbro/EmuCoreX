@@ -171,6 +171,7 @@ import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.CoverArtRepository
+import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.TouchControlVisualStyle
@@ -1137,7 +1138,11 @@ private fun SettingsContent(
                             icon = Icons.Rounded.Palette,
                             label = stringResource(R.string.settings_theme_manager),
                             value = if (uiState.isProUnlocked) {
-                                uiState.customTheme.name
+                                if (uiState.customTheme.name == CustomThemeConfig.DEFAULT_NAME) {
+                                    stringResource(R.string.theme_manager_default_name)
+                                } else {
+                                    uiState.customTheme.name
+                                }
                             } else {
                                 stringResource(R.string.settings_theme_manager_locked)
                             },
