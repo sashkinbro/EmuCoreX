@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.EaseIn
+import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -344,22 +346,28 @@ fun HomeScreen(
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontalSystemBarPadding)
     ) {
-        if (!isShelfView && uiState.homeBackgroundType != HomeBackgroundType.NONE) {
-            HomeBackgroundMedia(
-                type = uiState.homeBackgroundType,
-                file = homeBackgroundRepository.existingFile(uiState.homeBackgroundType),
-                revision = uiState.homeBackgroundRevision,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        MaterialTheme.colorScheme.background.copy(
-                            alpha = uiState.homeBackgroundDim / 100f
+        AnimatedVisibility(
+            visible = !isShelfView && uiState.homeBackgroundType != HomeBackgroundType.NONE,
+            enter = fadeIn(animationSpec = tween(380, easing = EaseOut)),
+            exit = fadeOut(animationSpec = tween(280, easing = EaseIn))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                HomeBackgroundMedia(
+                    type = uiState.homeBackgroundType,
+                    file = homeBackgroundRepository.existingFile(uiState.homeBackgroundType),
+                    revision = uiState.homeBackgroundRevision,
+                    modifier = Modifier.fillMaxSize()
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            MaterialTheme.colorScheme.background.copy(
+                                alpha = uiState.homeBackgroundDim / 100f
+                            )
                         )
-                    )
-            )
+                )
+            }
         }
         if (uiState.isBootstrapping || uiState.isLoading) {
             LoadingState()
@@ -384,36 +392,48 @@ fun HomeScreen(
                     if (targetState) {
                         (
                             slideInHorizontally(
-                                initialOffsetX = { it / 10 },
-                                animationSpec = tween(360)
+                                initialOffsetX = { it / 5 },
+                                animationSpec = tween(440, easing = EaseOut)
                             ) +
-                                fadeIn(animationSpec = tween(320)) +
-                                scaleIn(initialScale = 0.94f, animationSpec = tween(360))
+                                fadeIn(animationSpec = tween(360, easing = EaseOut)) +
+                                scaleIn(
+                                    initialScale = 0.97f,
+                                    animationSpec = tween(440, easing = EaseOut)
+                                )
                             ) togetherWith
                             (
                                 slideOutHorizontally(
-                                    targetOffsetX = { -it / 14 },
-                                    animationSpec = tween(240)
+                                    targetOffsetX = { -it / 8 },
+                                    animationSpec = tween(300, easing = EaseIn)
                                 ) +
-                                    fadeOut(animationSpec = tween(210)) +
-                                    scaleOut(targetScale = 1.02f, animationSpec = tween(240))
+                                    fadeOut(animationSpec = tween(260, easing = EaseIn)) +
+                                    scaleOut(
+                                        targetScale = 0.985f,
+                                        animationSpec = tween(300, easing = EaseIn)
+                                    )
                                 )
                     } else {
                         (
                             slideInHorizontally(
-                                initialOffsetX = { -it / 14 },
-                                animationSpec = tween(320)
+                                initialOffsetX = { -it / 5 },
+                                animationSpec = tween(420, easing = EaseOut)
                             ) +
-                                fadeIn(animationSpec = tween(260)) +
-                                scaleIn(initialScale = 1.02f, animationSpec = tween(320))
+                                fadeIn(animationSpec = tween(350, easing = EaseOut)) +
+                                scaleIn(
+                                    initialScale = 0.985f,
+                                    animationSpec = tween(420, easing = EaseOut)
+                                )
                             ) togetherWith
                             (
                                 slideOutHorizontally(
-                                    targetOffsetX = { it / 10 },
-                                    animationSpec = tween(260)
+                                    targetOffsetX = { it / 5 },
+                                    animationSpec = tween(340, easing = EaseIn)
                                 ) +
-                                    fadeOut(animationSpec = tween(200)) +
-                                    scaleOut(targetScale = 0.96f, animationSpec = tween(260))
+                                    fadeOut(animationSpec = tween(290, easing = EaseIn)) +
+                                    scaleOut(
+                                        targetScale = 0.97f,
+                                        animationSpec = tween(340, easing = EaseIn)
+                                    )
                                 )
                     }
                 },
@@ -424,8 +444,10 @@ fun HomeScreen(
                         games = uiState.games,
                         recentGames = uiState.recentGames,
                         isCoverArtDisabled = uiState.isCoverArtDisabled,
-                        topInset = topInset,
-                        bottomInset = bottomInset,
+                        // Keep the outgoing shelf edge-to-edge until its exit animation finishes.
+                        // The parent state already points at the standard Home layout at that time.
+                        topInset = 0.dp,
+                        bottomInset = 0.dp,
                         horizontalInset = horizontalInset,
                         modifier = Modifier.fillMaxSize(),
                         onExitShelfMode = viewModel::toggleShelfMode,

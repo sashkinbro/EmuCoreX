@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -38,16 +39,16 @@ import com.sbro.emucorex.core.LocalTvUiEnvironment
 fun NavigationBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
     contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    tonalElevation: Dp = 3.dp,
-    shadowElevation: Dp = 5.dp
+    tonalElevation: Dp = 0.dp,
+    shadowElevation: Dp = 0.dp
 ) {
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     Surface(
-        modifier = modifier.size(if (tvUiEnabled) 52.dp else 40.dp),
+        modifier = modifier.size(if (tvUiEnabled) 52.dp else 44.dp),
         shape = RoundedCornerShape(14.dp),
         color = containerColor,
         tonalElevation = tonalElevation,
@@ -55,20 +56,23 @@ fun NavigationBackButton(
         border = if (tvUiEnabled && isFocused) {
             BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         } else {
-            null
+            BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)
+            )
         },
         interactionSource = interactionSource,
         onClick = rememberDebouncedClick(onClick = onClick)
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = stringResource(R.string.back),
                 tint = contentColor,
-                modifier = Modifier.size(if (tvUiEnabled) 22.dp else 18.dp)
+                modifier = Modifier.size(if (tvUiEnabled) 22.dp else 19.dp)
             )
         }
     }
@@ -83,7 +87,7 @@ fun ScreenTopBar(
     subtitle: String? = null,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    backContentColor: Color = titleColor,
+    backContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     titleMaxLines: Int = 1,
     subtitleMaxLines: Int = 1,
     embedded: Boolean = false,
@@ -108,12 +112,12 @@ fun ScreenTopBar(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp,
         border = BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
         )
     ) {
         ScreenTopBarContent(
@@ -127,7 +131,7 @@ fun ScreenTopBar(
             titleMaxLines = titleMaxLines,
             subtitleMaxLines = subtitleMaxLines,
             actions = actions,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
         )
     }
 }
@@ -153,10 +157,7 @@ private fun ScreenTopBarContent(
         NavigationBackButton(
             onClick = onBackClick,
             modifier = backButtonModifier,
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = backContentColor,
-            tonalElevation = 0.dp,
-            shadowElevation = 0.dp
+            contentColor = backContentColor
         )
         Spacer(modifier = Modifier.width(14.dp))
         Column(

@@ -322,72 +322,74 @@ fun PerGameSettingsManagerScreen(
                 title = stringResource(R.string.game_settings_manager_title),
                 onBackClick = onBackClick,
                 actions = {
-                    IconButton(onClick = { showTopBarMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Rounded.MoreVert,
-                            contentDescription = stringResource(R.string.settings_more_options)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showTopBarMenu,
-                        onDismissRequest = { showTopBarMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.game_settings_manager_export_title)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Save,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                showTopBarMenu = false
-                                exportLauncher.launch("emucorex-game-settings.json")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.game_settings_manager_import_title)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.FolderOpen,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = {
-                                showTopBarMenu = false
-                                importLauncher.launch(arrayOf("application/json", "*/*"))
-                            }
-                        )
-                        selectedProfile?.let { profile ->
+                    Box {
+                        IconButton(onClick = { showTopBarMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.settings_more_options)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showTopBarMenu,
+                            onDismissRequest = { showTopBarMenu = false }
+                        ) {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.delete)) },
+                                text = { Text(stringResource(R.string.game_settings_manager_export_title)) },
                                 leadingIcon = {
                                     Icon(
-                                        imageVector = Icons.Rounded.DeleteOutline,
+                                        imageVector = Icons.Rounded.Save,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    showTopBarMenu = false
+                                    exportLauncher.launch("emucorex-game-settings.json")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.game_settings_manager_import_title)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.FolderOpen,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    showTopBarMenu = false
+                                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                                }
+                            )
+                            selectedProfile?.let { profile ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.DeleteOutline,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = {
+                                        showTopBarMenu = false
+                                        pendingDeleteProfile.value = profile
+                                    }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.game_settings_manager_reset_all_title)) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Restore,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 },
                                 onClick = {
                                     showTopBarMenu = false
-                                    pendingDeleteProfile.value = profile
+                                    showResetAllDialog.value = true
                                 }
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.game_settings_manager_reset_all_title)) },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Restore,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            },
-                            onClick = {
-                                showTopBarMenu = false
-                                showResetAllDialog.value = true
-                            }
-                        )
                     }
                 }
             )

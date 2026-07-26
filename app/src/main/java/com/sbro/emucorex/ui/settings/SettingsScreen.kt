@@ -172,6 +172,8 @@ import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CustomThemeConfig
+import com.sbro.emucorex.data.CustomThemeLibrary
+import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.TouchControlVisualStyle
@@ -883,21 +885,24 @@ private fun SettingsCompactTopBar(
                 top = topInset,
                 bottom = 4.dp
             ),
-        shape = RoundedCornerShape(26.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f)
+        )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBackClick != null) {
                 NavigationBackButton(
-                    onClick = onBackClick,
-                    contentColor = MaterialTheme.colorScheme.onSurface
+                    onClick = onBackClick
                 )
             } else {
                 Spacer(modifier = Modifier.width(12.dp))
@@ -939,7 +944,7 @@ private fun SettingsCompactTopBar(
                 Icon(
                     imageVector = if (searchEnabled) Icons.Rounded.Close else Icons.Rounded.Search,
                     contentDescription = stringResource(R.string.settings_search),
-                    tint = MaterialTheme.colorScheme.onSurface
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Box {
@@ -947,7 +952,7 @@ private fun SettingsCompactTopBar(
                     Icon(
                         imageVector = Icons.Rounded.MoreVert,
                         contentDescription = stringResource(R.string.settings_more_options),
-                        tint = MaterialTheme.colorScheme.onSurface
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 DropdownMenu(
@@ -1129,7 +1134,14 @@ private fun SettingsContent(
                         ThemeSelector(
                             selected = uiState.themeMode,
                             isProUnlocked = uiState.isProUnlocked,
+                            customThemeLibrary = uiState.customThemeLibrary,
                             onSelected = viewModel::setThemeMode,
+                            onCustomThemeSelected = { themeId ->
+                                viewModel.saveCustomThemeLibrary(
+                                    uiState.customThemeLibrary.copy(activeThemeId = themeId),
+                                    activate = true
+                                )
+                            },
                             onProLockedSelected = {
                                 (context as? Activity)?.let(viewModel::purchasePro)
                             }
@@ -1147,7 +1159,11 @@ private fun SettingsContent(
                                 stringResource(R.string.settings_theme_manager_locked)
                             },
                             onClick = { onOpenThemeManager?.invoke() },
-                            helpText = stringResource(R.string.settings_theme_manager_desc)
+                            helpText = stringResource(R.string.settings_theme_manager_desc),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                            )
                         )
                         ToggleItem(
                             icon = Icons.Rounded.StayPrimaryPortrait,
@@ -3335,6 +3351,24 @@ private fun CustomizationSettingsTab(
             helpText = stringResource(R.string.settings_customization_touch_press_effect_help),
             onResetToDefault = { viewModel.setTouchControlPressEffect(TouchControlPressEffect.GROW) }
         )
+        if (uiState.customTouchControls.controls.isNotEmpty()) {
+            CustomControlsQuickSelector(
+                library = uiState.customTouchControls,
+                onEnabledChange = { controlId, enabled ->
+                    viewModel.saveCustomTouchControls(
+                        uiState.customTouchControls.copy(
+                            controls = uiState.customTouchControls.controls.map { control ->
+                                if (control.id == controlId) {
+                                    control.copy(enabled = enabled)
+                                } else {
+                                    control
+                                }
+                            }
+                        )
+                    )
+                }
+            )
+        }
         ActionItem(
             icon = Icons.Rounded.Gamepad,
             title = stringResource(R.string.touch_control_creator_settings_entry),
@@ -4627,32 +4661,49 @@ private fun normalizeSettingsSearchToken(value: String): String {
 private fun ThemeSelector(
     selected: ThemeMode,
     isProUnlocked: Boolean,
+    customThemeLibrary: CustomThemeLibrary,
     onSelected: (ThemeMode) -> Unit,
+    onCustomThemeSelected: (String) -> Unit,
     onProLockedSelected: () -> Unit
 ) {
-    ChoiceSection(
-        title = stringResource(R.string.settings_theme),
-        options = listOf(
-            0 to stringResource(R.string.settings_theme_system),
-            1 to stringResource(R.string.settings_theme_light),
-            2 to stringResource(R.string.settings_theme_dark),
+    val customThemes = customThemeLibrary.sanitized().themes
+    val customThemeOptionStart = 100
+    val defaultThemeName = stringResource(R.string.theme_manager_default_name)
+    val options = buildList {
+        add(0 to stringResource(R.string.settings_theme_system))
+        add(1 to stringResource(R.string.settings_theme_light))
+        add(2 to stringResource(R.string.settings_theme_dark))
+        add(
             3 to if (isProUnlocked) {
                 stringResource(R.string.settings_theme_pro)
             } else {
                 stringResource(R.string.settings_theme_pro_locked)
-            },
-            4 to if (isProUnlocked) {
-                stringResource(R.string.settings_theme_custom)
-            } else {
-                stringResource(R.string.settings_theme_custom_locked)
             }
-        ),
+        )
+        customThemes.forEachIndexed { index, savedTheme ->
+            val name = savedTheme.config.name
+                .takeUnless { it == CustomThemeConfig.DEFAULT_NAME }
+                ?: defaultThemeName
+            add((customThemeOptionStart + index) to name)
+        }
+    }
+    val activeCustomThemeIndex = customThemes.indexOfFirst {
+        it.id == customThemeLibrary.activeThemeId
+    }
+
+    ChoiceSection(
+        title = stringResource(R.string.settings_theme),
+        options = options,
         selectedValue = when (selected) {
             ThemeMode.SYSTEM -> 0
             ThemeMode.LIGHT -> 1
             ThemeMode.DARK -> 2
             ThemeMode.PRO -> 3
-            ThemeMode.CUSTOM -> 4
+            ThemeMode.CUSTOM -> if (activeCustomThemeIndex >= 0) {
+                customThemeOptionStart + activeCustomThemeIndex
+            } else {
+                -1
+            }
         },
         onResetToDefault = { onSelected(ThemeMode.SYSTEM) },
         onSelect = { value ->
@@ -4660,11 +4711,65 @@ private fun ThemeSelector(
                 1 -> onSelected(ThemeMode.LIGHT)
                 2 -> onSelected(ThemeMode.DARK)
                 3 -> if (isProUnlocked) onSelected(ThemeMode.PRO) else onProLockedSelected()
-                4 -> if (isProUnlocked) onSelected(ThemeMode.CUSTOM) else onProLockedSelected()
+                in customThemeOptionStart until customThemeOptionStart + customThemes.size -> {
+                    if (isProUnlocked) {
+                        onCustomThemeSelected(customThemes[value - customThemeOptionStart].id)
+                    } else {
+                        onProLockedSelected()
+                    }
+                }
                 else -> onSelected(ThemeMode.SYSTEM)
             }
         }
     )
+}
+
+@Composable
+private fun CustomControlsQuickSelector(
+    library: CustomTouchControlLibrary,
+    onEnabledChange: (controlId: String, enabled: Boolean) -> Unit
+) {
+    val controls = library.sanitized().controls
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.touch_control_creator_library),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvFocusGroup(),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(
+                items = controls,
+                key = { it.id }
+            ) { control ->
+                val interactionSource = remember { MutableInteractionSource() }
+                FilterChip(
+                    modifier = Modifier.tvGamepadFocusableCard(
+                        shape = RoundedCornerShape(16.dp),
+                        interactionSource = interactionSource,
+                        addFocusTarget = false
+                    ),
+                    selected = control.enabled,
+                    onClick = { onEnabledChange(control.id, !control.enabled) },
+                    interactionSource = interactionSource,
+                    colors = premiumFilterChipColors(),
+                    label = {
+                        Text(
+                            text = control.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -4702,7 +4807,8 @@ private fun SettingsItem(
     label: String,
     value: String,
     onClick: () -> Unit,
-    helpText: String? = null
+    helpText: String? = null,
+    border: BorderStroke? = null
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -4730,6 +4836,7 @@ private fun SettingsItem(
             ),
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        border = border,
         interactionSource = interactionSource,
         onClick = debouncedClick
     ) {
