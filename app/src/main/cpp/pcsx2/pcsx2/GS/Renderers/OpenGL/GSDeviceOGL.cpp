@@ -1000,13 +1000,6 @@ bool GSDeviceOGL::CheckFeatures()
 #if defined(__ANDROID__)
 	const MobileGsTuning& mobile_gs_tuning = GetMobileGSTuning();
 	m_features.prefer_new_textures &= mobile_gs_tuning.prefer_new_textures;
-	if (mobile_gs_tuning.force_partial_texture_preloading && GSConfig.TexturePreloading == TexturePreloadingLevel::Full)
-	{
-		GSConfig.TexturePreloading = TexturePreloadingLevel::Partial;
-		Console.Warning("GL: Mobile GS %s/%s profile lowered texture preloading to partial.",
-			GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-			gpu_profile_selection.gpu.name.c_str());
-	}
 #endif
 	m_features.stencil_buffer = true;
 

@@ -2976,35 +2976,31 @@ bool GSDeviceVK::CheckFeatures()
 	// Adreno/other mobile implementations remain opt-in because support varies by driver stack.
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
 	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
-	// MediaTek's Mali Vulkan stacks across multiple GPU generations have been observed returning
-	// zero/stale destination color through ROAA (black or intermittently missing textures).
-	const bool is_mediatek_mali_g57 = is_mali_vk && IsMediaTekSoC() &&
+	const MobileGpuDriver mobile_driver = GetMobileDriverProfile().driver;
+	const bool is_arm_proprietary = (mobile_driver == MobileGpuDriver::ArmProprietary);
+	const bool is_imagination_proprietary =
+		(mobile_driver == MobileGpuDriver::ImaginationProprietary);
+	const bool is_mali_g57 = is_mali_vk &&
 		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
 			 GetMobileGPUIdentity().model_number == 57) ||
 			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
-	// All Mali and PowerVR GPUs have unreliable ROAA (framebuffer fetch).
-	// This causes black/stale textures. Disable fbfetch for all mobile GPUs except Adreno.
-	const bool unreliable_mali_fbfetch = is_mali_vk || is_powervr;
+	// The affected MediaTek Mali-G57 stack has been observed returning zero/stale destination
+	// color through ROAA. PowerVR proprietary drivers have the same class of feedback issue.
+	// Do not extend those fallbacks to newer MediaTek Mali, Samsung Mali, PanVK, or Mesa PowerVR:
+	// they keep the capability-gated tile-local path when their driver exposes it.
+	const bool unreliable_mobile_fbfetch =
+		(is_arm_proprietary && IsMediaTekSoC() && is_mali_g57) ||
+		(is_imagination_proprietary && is_powervr);
 	const bool vendor_allows_fbfetch =
-		!unreliable_mali_fbfetch &&
-		(is_mali_vk || GSConfig.EnableAdrenoFramebufferFetch);
+		!unreliable_mobile_fbfetch &&
+		(is_mali_vk || is_powervr || GSConfig.EnableAdrenoFramebufferFetch);
 	bool framebuffer_fetch = vendor_allows_fbfetch &&
 		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
-	if (unreliable_mali_fbfetch && has_framebuffer_fetch_extension)
+	if (unreliable_mobile_fbfetch && has_framebuffer_fetch_extension)
 	{
-		Console.Warning("VK: Disabled unreliable Mali framebuffer fetch; using texture-barrier feedback.");
+		Console.Warning("VK: Disabled unreliable proprietary mobile framebuffer fetch; using texture-barrier feedback.");
 	}
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
-
-	// On MediaTek SoCs (Mali or PowerVR), framebuffer fetch is unreliable.
-	// If fbfetch is disabled, force texture_barrier ON to ensure we have at least
-	// one feedback mechanism. Without this, games requiring accurate blending
-	// will crash or render incorrectly.
-	if (IsMediaTekSoC() && !framebuffer_fetch && !texture_barrier)
-	{
-		texture_barrier = true;
-		Console.Warning("VK: MediaTek SoC detected without fbfetch — forcing texture_barrier ON for feedback support.");
-	}
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
@@ -3016,7 +3012,8 @@ bool GSDeviceVK::CheckFeatures()
 	// The r13p0-class Mali-G57 driver can expose alternating top/bottom FastMAD banks
 	// instead of the reconstructed frame. Keep the workaround model-specific and leave
 	// the normal motion-adaptive path enabled for newer Mali devices and other backends.
-	m_features.broken_mad_deinterlace = is_mediatek_mali_g57;
+	m_features.broken_mad_deinterlace =
+		is_arm_proprietary && IsMediaTekSoC() && is_mali_g57;
 #if defined(__ANDROID__)
 	const MobileGsTuning& mobile_gs_tuning = GetMobileGSTuning();
 #endif
@@ -3027,13 +3024,6 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.prefer_new_textures = true;
 #if defined(__ANDROID__)
 	m_features.prefer_new_textures = mobile_gs_tuning.prefer_new_textures;
-	if (mobile_gs_tuning.force_partial_texture_preloading && GSConfig.TexturePreloading == TexturePreloadingLevel::Full)
-	{
-		GSConfig.TexturePreloading = TexturePreloadingLevel::Partial;
-		Console.Warning("VK: Mobile GS %s/%s profile lowered texture preloading to partial.",
-			GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-			GetMobileGPUIdentity().name.c_str());
-	}
 #endif
 	m_features.provoking_vertex_last = m_optional_extensions.vk_ext_provoking_vertex;
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
@@ -3116,7 +3106,7 @@ bool GSDeviceVK::CheckFeatures()
 		IsMediaTekSoC() ? "MediaTek" : "other/unknown", GetMobileGPUIdentity().name.c_str(),
 		GpuProfileDetector::ArchitectureToString(GetMobileGPUIdentity().architecture),
 		has_framebuffer_fetch_extension ? 1 : 0, m_features.framebuffer_fetch ? 1 : 0,
-		unreliable_mali_fbfetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
+		unreliable_mobile_fbfetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
 		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? 1 : 0,
 		m_device_features.dualSrcBlend ? 1 : 0,
 		static_cast<unsigned>(m_depth_format),

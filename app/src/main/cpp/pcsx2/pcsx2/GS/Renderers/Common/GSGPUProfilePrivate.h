@@ -20,8 +20,8 @@ struct ResolvedGpuProfile
 std::string ToLowerASCII(std::string_view value);
 bool ContainsAny(std::string_view haystack, std::initializer_list<const char*> needles);
 
-MobileGsTuning MakeMobileGsTuning(u32 pooled_targets, u32 target_age, u32 pooled_textures, u32 texture_age,
-	bool prefer_new_textures = false);
+MobileGsTuning MakeMobileGsTuning(
+	u32 pooled_targets, u32 target_age, u32 pooled_textures, u32 texture_age);
 MobileGsTuning MakeConservativeMobileGsTuning();
 
 bool LooksLikeAdreno(std::string_view lowered_hints);

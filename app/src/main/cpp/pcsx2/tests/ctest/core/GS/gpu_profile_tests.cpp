@@ -33,9 +33,7 @@ static void ExpectTuningInvariants(const GpuProfileSelection& profile)
 	EXPECT_LE(profile.gs_tuning.pooled_targets, 160u);
 	EXPECT_EQ(profile.gs_tuning.pooled_targets, profile.gs_tuning.pooled_textures);
 	EXPECT_EQ(profile.gs_tuning.constrained, profile.gs_tuning.pooled_targets < 128u);
-	EXPECT_EQ(profile.gs_tuning.force_partial_texture_preloading, profile.gs_tuning.constrained);
-	if (profile.gs_tuning.constrained)
-		EXPECT_FALSE(profile.gs_tuning.prefer_new_textures);
+	EXPECT_TRUE(profile.gs_tuning.prefer_new_textures);
 }
 
 static MobileDriverContext MakeOpenGLContext(RuntimeGpuProfile vendor, bool angle)
@@ -119,7 +117,7 @@ static u64 ExpectedOpenGLWorkarounds(
 }
 
 static u64 ExpectedVulkanWorkarounds(
-	RuntimeGpuProfile vendor, MobileGpuArchitecture architecture)
+	RuntimeGpuProfile vendor, MobileGpuArchitecture architecture, u16 model)
 {
 	switch (vendor)
 	{
@@ -129,13 +127,6 @@ static u64 ExpectedVulkanWorkarounds(
 				DriverWorkaround::DisableProvokingVertex,
 				DriverWorkaround::PreferCoherentReadback,
 			});
-			if (architecture >= MobileGpuArchitecture::Adreno2xx &&
-				architecture <= MobileGpuArchitecture::Adreno7xx)
-			{
-				mask |= WorkaroundMask({
-					DriverWorkaround::UseStagingImageForReadback,
-				});
-			}
 			if (architecture == MobileGpuArchitecture::Adreno5xx)
 			{
 				mask |= WorkaroundMask({
@@ -145,12 +136,17 @@ static u64 ExpectedVulkanWorkarounds(
 			return mask;
 		}
 		case RuntimeGpuProfile::Mali:
-			return WorkaroundMask({
+		{
+			u64 mask = WorkaroundMask({
 				DriverWorkaround::UseDescriptorSets,
 				DriverWorkaround::DisableAttachmentFeedbackLoopLayout,
 				DriverWorkaround::PreferCoherentReadback,
 				DriverWorkaround::ScalarizeVectorBitwiseAnd,
 			});
+			if (model == 57)
+				mask |= WorkaroundMask({DriverWorkaround::ForceFifoPresent});
+			return mask;
+		}
 		case RuntimeGpuProfile::PowerVR:
 			return WorkaroundMask({
 				DriverWorkaround::UseDescriptorSets,
@@ -186,7 +182,8 @@ static void VerifyModelAndDriverIsolation(const ModelCase& test_case, const char
 
 	const GpuProfileSelection vk = GpuProfileDetector::Resolve(
 		"auto", vendor_hint, test_case.renderer, MakeVulkanContext(vendor, false));
-	EXPECT_EQ(vk.driver.workarounds, ExpectedVulkanWorkarounds(vendor, test_case.architecture));
+	EXPECT_EQ(vk.driver.workarounds,
+		ExpectedVulkanWorkarounds(vendor, test_case.architecture, test_case.model));
 
 	const GpuProfileSelection mesa = GpuProfileDetector::Resolve(
 		"auto", vendor_hint, test_case.renderer, MakeVulkanContext(vendor, true));
@@ -375,7 +372,6 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenProvokingVertex));
 	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenDynamicRendering));
 	EXPECT_TRUE(stock.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
-	EXPECT_TRUE(stock.driver.UsesWorkaround(DriverWorkaround::UseStagingImageForReadback));
 
 	MobileDriverContext turnip = proprietary;
 	turnip.driver_id = 18;
@@ -562,7 +558,7 @@ TEST(GpuDriverProfile, KeepsOpenGLFastStreamingAndBoundsCompilerWorkarounds)
 	EXPECT_TRUE(legacy_powervr.driver.UsesWorkaround(DriverWorkaround::GenerateMipmapManuallyForTallTextures));
 }
 
-TEST(GpuDriverProfile, KeepsAdreno8xxOffLegacyReadbackCopy)
+TEST(GpuDriverProfile, KeepsEveryAdrenoGenerationOnDirectReadbackPath)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
@@ -571,16 +567,37 @@ TEST(GpuDriverProfile, KeepsAdreno8xxOffLegacyReadbackCopy)
 	proprietary.driver_version = (512u << 22) | (900u << 12);
 	proprietary.android_sdk = 35;
 
-	const GpuProfileSelection adreno740 =
-		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 740", proprietary);
-	EXPECT_TRUE(adreno740.driver.HasBug(DriverBug::SlowOptimalImageToBufferCopy));
-	EXPECT_TRUE(adreno740.driver.UsesWorkaround(DriverWorkaround::UseStagingImageForReadback));
+	for (const char* renderer : {
+			 "Adreno (TM) 530", "Adreno (TM) 650", "Adreno (TM) 740", "Adreno (TM) 840"})
+	{
+		SCOPED_TRACE(renderer);
+		const GpuProfileSelection profile =
+			GpuProfileDetector::Resolve("auto", "Qualcomm", renderer, proprietary);
+		EXPECT_TRUE(profile.driver.HasBug(DriverBug::SlowOptimalImageToBufferCopy));
+		EXPECT_TRUE(profile.driver.UsesWorkaround(DriverWorkaround::PreferCoherentReadback));
+		EXPECT_EQ(profile.driver.workarounds,
+			ExpectedVulkanWorkarounds(
+				RuntimeGpuProfile::Adreno, profile.gpu.architecture, profile.gpu.model_number));
+	}
+}
 
-	const GpuProfileSelection adreno840 =
-		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 840", proprietary);
-	EXPECT_TRUE(adreno840.driver.HasBug(DriverBug::SlowOptimalImageToBufferCopy));
-	EXPECT_FALSE(adreno840.driver.UsesWorkaround(DriverWorkaround::UseStagingImageForReadback));
-	EXPECT_TRUE(adreno840.driver.UsesWorkaround(DriverWorkaround::PreferCoherentReadback));
+TEST(GpuDriverProfile, ScopesVulkanMaliG57FifoToArmProprietaryDriver)
+{
+	MobileDriverContext proprietary = MakeVulkanContext(RuntimeGpuProfile::Mali, false);
+	const GpuProfileSelection stock =
+		GpuProfileDetector::Resolve("auto", "ARM Mali", "Mali-G57 MC4", proprietary);
+	EXPECT_EQ(stock.driver.driver, MobileGpuDriver::ArmProprietary);
+	EXPECT_TRUE(stock.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext panvk = MakeVulkanContext(RuntimeGpuProfile::Mali, true);
+	const GpuProfileSelection mesa =
+		GpuProfileDetector::Resolve("auto", "ARM Mali", "Mali-G57 MC4", panvk);
+	EXPECT_EQ(mesa.driver.driver, MobileGpuDriver::MesaPanVK);
+	EXPECT_FALSE(mesa.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	const GpuProfileSelection g68 =
+		GpuProfileDetector::Resolve("auto", "ARM Mali", "Mali-G68 MC4", proprietary);
+	EXPECT_FALSE(g68.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
 }
 
 TEST(GpuDriverProfile, BoundsPowerVRClearLoadOpFallbackToAffectedDriverRange)
@@ -669,7 +686,6 @@ TEST(GpuProfileMatrix, KeepsModernMediaTekMaliOnItsFastResourcePolicy)
 	EXPECT_EQ(flagship.gpu.model_number, 925);
 	EXPECT_FALSE(flagship.gs_tuning.constrained);
 	EXPECT_TRUE(flagship.gs_tuning.prefer_new_textures);
-	EXPECT_FALSE(flagship.gs_tuning.force_partial_texture_preloading);
 	EXPECT_FALSE(flagship.driver.HasBug(DriverBug::BrokenDynamicRendering));
 	EXPECT_FALSE(flagship.driver.HasBug(DriverBug::BrokenExtendedDynamicState));
 
@@ -678,14 +694,12 @@ TEST(GpuProfileMatrix, KeepsModernMediaTekMaliOnItsFastResourcePolicy)
 	EXPECT_EQ(g710.gpu.architecture, MobileGpuArchitecture::MaliValhall2);
 	EXPECT_FALSE(g710.gs_tuning.constrained);
 	EXPECT_TRUE(g710.gs_tuning.prefer_new_textures);
-	EXPECT_FALSE(g710.gs_tuning.force_partial_texture_preloading);
 
 	const GpuProfileSelection g715 =
 		GpuProfileDetector::Resolve("mediatek", "ARM", "Immortalis-G715 MC11", current);
 	EXPECT_EQ(g715.gpu.architecture, MobileGpuArchitecture::MaliValhall3);
 	EXPECT_FALSE(g715.gs_tuning.constrained);
 	EXPECT_TRUE(g715.gs_tuning.prefer_new_textures);
-	EXPECT_FALSE(g715.gs_tuning.force_partial_texture_preloading);
 
 	const GpuProfileSelection midrange =
 		GpuProfileDetector::Resolve("mediatek", "ARM", "Mali-G720 MC7", current);
@@ -693,7 +707,6 @@ TEST(GpuProfileMatrix, KeepsModernMediaTekMaliOnItsFastResourcePolicy)
 	EXPECT_EQ(midrange.gpu.architecture, MobileGpuArchitecture::MaliFifthGen);
 	EXPECT_FALSE(midrange.gs_tuning.constrained);
 	EXPECT_TRUE(midrange.gs_tuning.prefer_new_textures);
-	EXPECT_FALSE(midrange.gs_tuning.force_partial_texture_preloading);
 
 	MobileDriverContext powervr = current;
 	powervr.driver_id = 7; // VK_DRIVER_ID_IMAGINATION_PROPRIETARY
@@ -776,11 +789,34 @@ TEST(GpuProfileMatrix, RejectsAdjacentAndSyntheticModelsWithoutLeakingWorkaround
 
 	const GpuProfileSelection adreno_x = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno X2-85", MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
-	EXPECT_FALSE(adreno_x.driver.UsesWorkaround(DriverWorkaround::UseStagingImageForReadback));
+	EXPECT_EQ(adreno_x.driver.workarounds,
+		ExpectedVulkanWorkarounds(
+			RuntimeGpuProfile::Adreno, adreno_x.gpu.architecture, adreno_x.gpu.model_number));
 
 	const GpuProfileSelection unknown_adreno = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 9999", MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
-	EXPECT_FALSE(unknown_adreno.driver.UsesWorkaround(DriverWorkaround::UseStagingImageForReadback));
+	EXPECT_EQ(unknown_adreno.driver.workarounds,
+		ExpectedVulkanWorkarounds(RuntimeGpuProfile::Adreno,
+			unknown_adreno.gpu.architecture, unknown_adreno.gpu.model_number));
+}
+
+TEST(GpuProfileMatrix, KeepsFastTextureAllocationWithBoundedPools)
+{
+	for (const std::array<const char*, 3>& gpu : {
+			 std::array<const char*, 3>{"Qualcomm", "Adreno (TM) 605", "Adreno"},
+			 std::array<const char*, 3>{"ARM Mali", "Mali-G52 MC2", "Mali"},
+			 std::array<const char*, 3>{"Imagination Technologies", "PowerVR GE8320", "PowerVR"}})
+	{
+		SCOPED_TRACE(gpu[2]);
+		const GpuProfileSelection profile = GpuProfileDetector::Resolve("auto", gpu[0], gpu[1]);
+		EXPECT_TRUE(profile.gs_tuning.constrained);
+		EXPECT_LT(profile.gs_tuning.pooled_textures, 128u);
+		EXPECT_TRUE(profile.gs_tuning.prefer_new_textures);
+	}
+
+	const GpuProfileSelection unknown = GpuProfileDetector::Resolve("auto", "", "");
+	EXPECT_TRUE(unknown.gs_tuning.constrained);
+	EXPECT_TRUE(unknown.gs_tuning.prefer_new_textures);
 }
 
 TEST(GpuProfileMatrix, RendererIdentityWinsOverConflictingVendorHints)

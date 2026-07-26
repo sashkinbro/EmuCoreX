@@ -19,9 +19,9 @@ struct MaliSpec
 	MobileGsTuning tuning;
 };
 
-constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age, bool prefer_new = false)
+constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age)
 {
-	return MobileGsTuning{pool < 128, prefer_new, pool < 128, pool, target_age, pool, texture_age};
+	return MobileGsTuning{pool < 128, true, pool, target_age, pool, texture_age};
 }
 
 // Arm's public product families. Performance still depends heavily on MC/MP core count, which is applied below.
@@ -57,15 +57,15 @@ static constexpr std::array<MaliSpec, 40> s_mali_specs = {{
 	{'G', 310, MobileGpuArchitecture::MaliValhall2, T(64, 5, 5)},
 	{'G', 510, MobileGpuArchitecture::MaliValhall2, T(80, 6, 5)},
 	{'G', 610, MobileGpuArchitecture::MaliValhall2, T(104, 8, 7)},
-	{'G', 710, MobileGpuArchitecture::MaliValhall2, T(136, 10, 8, true)},
+	{'G', 710, MobileGpuArchitecture::MaliValhall2, T(136, 10, 8)},
 	{'G', 615, MobileGpuArchitecture::MaliValhall3, T(112, 8, 7)},
-	{'G', 715, MobileGpuArchitecture::MaliValhall3, T(144, 10, 8, true)},
+	{'G', 715, MobileGpuArchitecture::MaliValhall3, T(144, 10, 8)},
 	{'G', 620, MobileGpuArchitecture::MaliFifthGen, T(104, 8, 7)},
-	{'G', 720, MobileGpuArchitecture::MaliFifthGen, T(140, 10, 8, true)},
+	{'G', 720, MobileGpuArchitecture::MaliFifthGen, T(140, 10, 8)},
 	{'G', 625, MobileGpuArchitecture::MaliFifthGen, T(112, 8, 7)},
-	{'G', 725, MobileGpuArchitecture::MaliFifthGen, T(144, 10, 8, true)},
-	{'G', 925, MobileGpuArchitecture::MaliFifthGen, T(160, 12, 8, true)},
-	{'G', 1, MobileGpuArchitecture::MaliG1, T(144, 10, 8, true)},
+	{'G', 725, MobileGpuArchitecture::MaliFifthGen, T(144, 10, 8)},
+	{'G', 925, MobileGpuArchitecture::MaliFifthGen, T(160, 12, 8)},
+	{'G', 1, MobileGpuArchitecture::MaliG1, T(144, 10, 8)},
 }};
 
 static bool ParseUnsigned(std::string_view text, size_t pos, u16* value, size_t* end)
@@ -224,9 +224,9 @@ static MobileGsTuning FallbackTuningForMali(MobileGpuArchitecture architecture)
 		case MobileGpuArchitecture::MaliBifrost: return T(72, 6, 5);
 		case MobileGpuArchitecture::MaliValhall1: return T(88, 7, 6);
 		case MobileGpuArchitecture::MaliValhall2: return T(104, 8, 7);
-		case MobileGpuArchitecture::MaliValhall3: return T(128, 9, 7, true);
-		case MobileGpuArchitecture::MaliFifthGen: return T(136, 10, 8, true);
-		case MobileGpuArchitecture::MaliG1: return T(144, 10, 8, true);
+		case MobileGpuArchitecture::MaliValhall3: return T(128, 9, 7);
+		case MobileGpuArchitecture::MaliFifthGen: return T(136, 10, 8);
+		case MobileGpuArchitecture::MaliG1: return T(144, 10, 8);
 		default: return MakeConservativeMobileGsTuning();
 	}
 }
@@ -269,8 +269,7 @@ static void ApplyCoreCountLimits(MobileGsTuning* tuning, u8 core_count)
 	tuning->target_age = std::min(tuning->target_age, target_age_cap);
 	tuning->texture_age = std::min(tuning->texture_age, texture_age_cap);
 	tuning->constrained = (tuning->pooled_targets < 128 || tuning->pooled_textures < 128);
-	tuning->prefer_new_textures &= !tuning->constrained;
-	tuning->force_partial_texture_preloading = tuning->constrained;
+	tuning->prefer_new_textures = true;
 }
 } // namespace
 

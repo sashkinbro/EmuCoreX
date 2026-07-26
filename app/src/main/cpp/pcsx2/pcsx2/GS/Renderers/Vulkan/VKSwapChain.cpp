@@ -292,10 +292,11 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 	// r54p1 on Mali-G57 can run the producer ahead of Android's BufferQueue in
 	// MAILBOX/IMMEDIATE modes, eventually returning NO_BUFFER_AVAILABLE. FIFO is
 	// guaranteed on Android and provides the required producer-side backpressure.
+	// Keep this behind the proprietary-driver profile so PanVK and other stacks
+	// retain the present mode requested by the user.
 	const GSDeviceVK* const device = GSDeviceVK::GetInstance();
-	const MobileGpuIdentity& gpu = device->GetMobileGPUIdentity();
-	const bool force_fifo = device->IsMaliGPUProfile() &&
-		(gpu.model_number == 57 || gpu.name.find("Mali-G57") != std::string::npos);
+	const bool force_fifo =
+		device->UsesMobileDriverWorkaround(DriverWorkaround::ForceFifoPresent);
 	if (force_fifo)
 	{
 		if (*vsync_mode != GSVSyncMode::FIFO)

@@ -39,8 +39,8 @@ bool ContainsAny(std::string_view haystack, std::initializer_list<const char*> n
 	return false;
 }
 
-MobileGsTuning MakeMobileGsTuning(u32 pooled_targets, u32 target_age, u32 pooled_textures, u32 texture_age,
-	bool prefer_new_textures)
+MobileGsTuning MakeMobileGsTuning(
+	u32 pooled_targets, u32 target_age, u32 pooled_textures, u32 texture_age)
 {
 	MobileGsTuning tuning;
 	tuning.pooled_targets = pooled_targets;
@@ -48,14 +48,15 @@ MobileGsTuning MakeMobileGsTuning(u32 pooled_targets, u32 target_age, u32 pooled
 	tuning.pooled_textures = pooled_textures;
 	tuning.texture_age = texture_age;
 	tuning.constrained = (pooled_targets < 128 || pooled_textures < 128);
-	tuning.prefer_new_textures = prefer_new_textures;
-	tuning.force_partial_texture_preloading = tuning.constrained;
+	// Avoid recycling a texture which was already used in the current frame. The pool limits
+	// still bound memory use per profile, while this keeps the no-render-pass-restart fast path.
+	tuning.prefer_new_textures = true;
 	return tuning;
 }
 
 MobileGsTuning MakeConservativeMobileGsTuning()
 {
-	return MakeMobileGsTuning(96, 8, 96, 6, false);
+	return MakeMobileGsTuning(96, 8, 96, 6);
 }
 } // namespace GpuProfileDetail
 
@@ -320,7 +321,6 @@ const char* GpuProfileDetector::WorkaroundToString(DriverWorkaround value)
 		case DriverWorkaround::DisableAttachmentFeedbackLoopLayout: return "DisableAttachmentFeedbackLoopLayout";
 		case DriverWorkaround::EmulateColorWriteMask: return "EmulateColorWriteMask";
 		case DriverWorkaround::PreferCoherentReadback: return "PreferCoherentReadback";
-		case DriverWorkaround::UseStagingImageForReadback: return "UseStagingImageForReadback";
 		case DriverWorkaround::AvoidClearLoadOpRenderPass: return "AvoidClearLoadOpRenderPass";
 		case DriverWorkaround::GenerateMipmapManuallyForTallTextures: return "GenerateMipmapManuallyForTallTextures";
 		case DriverWorkaround::RewriteUniformIndexing: return "RewriteUniformIndexing";

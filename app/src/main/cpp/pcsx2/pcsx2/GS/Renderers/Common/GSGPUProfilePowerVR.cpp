@@ -158,14 +158,14 @@ ResolvedGpuProfile ResolvePowerVRProfile(std::string_view lowered_hints)
 		resolved.gpu.architecture = MobileGpuArchitecture::PowerVRVolcanic;
 		resolved.gpu.recognized = true;
 		resolved.gpu.name = "PowerVR D-Series";
-		resolved.tuning = MakeMobileGsTuning(144, 10, 144, 8, true);
+		resolved.tuning = MakeMobileGsTuning(144, 10, 144, 8);
 	}
 	else if (ContainsAny(lowered_hints, {"c-series", "cxt", "cxtp", "cxm"}))
 	{
 		resolved.gpu.architecture = MobileGpuArchitecture::PowerVRVolcanic;
 		resolved.gpu.recognized = true;
 		resolved.gpu.name = "PowerVR C-Series";
-		resolved.tuning = MakeMobileGsTuning(128, 9, 128, 7, true);
+		resolved.tuning = MakeMobileGsTuning(128, 9, 128, 7);
 	}
 	else if (ContainsAny(lowered_hints, {"b-series", "bxs", "bxe", "bxm", "bxt"}))
 	{

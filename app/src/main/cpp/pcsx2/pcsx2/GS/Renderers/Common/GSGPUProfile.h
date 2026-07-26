@@ -123,7 +123,6 @@ enum class DriverWorkaround : u8
 	DisableAttachmentFeedbackLoopLayout,
 	EmulateColorWriteMask,
 	PreferCoherentReadback,
-	UseStagingImageForReadback,
 	AvoidClearLoadOpRenderPass,
 	GenerateMipmapManuallyForTallTextures,
 	RewriteUniformIndexing,
@@ -189,8 +188,7 @@ static_assert(static_cast<u8>(DriverWorkaround::Count) <= 64);
 struct MobileGsTuning
 {
 	bool constrained = true;
-	bool prefer_new_textures = false;
-	bool force_partial_texture_preloading = true;
+	bool prefer_new_textures = true;
 	u32 pooled_targets = 96;
 	u32 target_age = 8;
 	u32 pooled_textures = 96;

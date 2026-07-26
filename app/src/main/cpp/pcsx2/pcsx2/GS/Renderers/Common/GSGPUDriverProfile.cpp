@@ -377,6 +377,9 @@ static constexpr std::array<DriverRule, 25> s_driver_rules = {{
 			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
 			Workaround(DriverWorkaround::PreferCoherentReadback) |
 			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
+	{"vk-arm-g57-fifo", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
 	{"vk-arm-empty-renderpass", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0xaa9c4b29u, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenEmptyRenderPass), 0},
@@ -403,10 +406,6 @@ static constexpr std::array<DriverRule, 25> s_driver_rules = {{
 			Bug(DriverBug::SlowOptimalImageToBufferCopy),
 		Workaround(DriverWorkaround::DisableProvokingVertex) |
 			Workaround(DriverWorkaround::PreferCoherentReadback)},
-	{"vk-qualcomm-pre-adreno8-readback", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
-		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 200, 799, 0, {}, {}, 0, 0, false,
-		Bug(DriverBug::SlowOptimalImageToBufferCopy),
-		Workaround(DriverWorkaround::UseStagingImageForReadback)},
 	{"vk-adreno5xx-depth-stencil", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Adreno5xx, 500, 599, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenDepthStencilDiscard) | Bug(DriverBug::BrokenColorWriteMaskWithDepthTest),
@@ -466,13 +465,6 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 	{
 		if (std::string_view(rule.id) == "vk-powervr-old-swapchain-width" &&
 			(profile.version.raw == 0 || profile.version.raw >= 0x00582558u))
-		{
-			continue;
-		}
-		if (std::string_view(rule.id) == "vk-qualcomm-pre-adreno8-readback" &&
-			(selection.gpu.architecture == MobileGpuArchitecture::Adreno8xx ||
-				selection.gpu.architecture == MobileGpuArchitecture::AdrenoX ||
-				selection.gpu.architecture == MobileGpuArchitecture::Unknown))
 		{
 			continue;
 		}

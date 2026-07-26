@@ -18,9 +18,9 @@ struct AdrenoSpec
 	MobileGsTuning tuning;
 };
 
-constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age, bool prefer_new = false)
+constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age)
 {
-	return MobileGsTuning{pool < 128, prefer_new, pool < 128, pool, target_age, pool, texture_age};
+	return MobileGsTuning{pool < 128, true, pool, target_age, pool, texture_age};
 }
 
 // Renderer names are stable (for example "Adreno (TM) 740"), while Snapdragon product names are not.
@@ -66,48 +66,48 @@ static constexpr std::array<AdrenoSpec, 57> s_adreno_specs = {{
 	{619, 'l', MobileGpuArchitecture::Adreno6xx, T(84, 7, 5)},
 	{619, 0, MobileGpuArchitecture::Adreno6xx, T(96, 8, 6)},
 	{620, 0, MobileGpuArchitecture::Adreno6xx, T(112, 8, 7)},
-	{630, 0, MobileGpuArchitecture::Adreno6xx, T(128, 9, 7, true)},
-	{640, 0, MobileGpuArchitecture::Adreno6xx, T(140, 10, 8, true)},
+	{630, 0, MobileGpuArchitecture::Adreno6xx, T(128, 9, 7)},
+	{640, 0, MobileGpuArchitecture::Adreno6xx, T(140, 10, 8)},
 	{642, 'l', MobileGpuArchitecture::Adreno6xx, T(112, 8, 7)},
 	{642, 0, MobileGpuArchitecture::Adreno6xx, T(124, 9, 7)},
-	{643, 0, MobileGpuArchitecture::Adreno6xx, T(128, 9, 7, true)},
-	{644, 0, MobileGpuArchitecture::Adreno6xx, T(132, 9, 7, true)},
-	{650, 0, MobileGpuArchitecture::Adreno6xx, T(144, 10, 8, true)},
-	{660, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8, true)},
+	{643, 0, MobileGpuArchitecture::Adreno6xx, T(128, 9, 7)},
+	{644, 0, MobileGpuArchitecture::Adreno6xx, T(132, 9, 7)},
+	{650, 0, MobileGpuArchitecture::Adreno6xx, T(144, 10, 8)},
+	{660, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8)},
 	{663, 0, MobileGpuArchitecture::Adreno6xx, T(100, 8, 6)},
-	{675, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8, true)},
-	{680, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8, true)},
-	{685, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8, true)},
-	{690, 0, MobileGpuArchitecture::Adreno6xx, T(160, 12, 8, true)},
-	{695, 0, MobileGpuArchitecture::Adreno6xx, T(160, 12, 8, true)},
+	{675, 0, MobileGpuArchitecture::Adreno6xx, T(152, 11, 8)},
+	{680, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8)},
+	{685, 0, MobileGpuArchitecture::Adreno6xx, T(156, 11, 8)},
+	{690, 0, MobileGpuArchitecture::Adreno6xx, T(160, 12, 8)},
+	{695, 0, MobileGpuArchitecture::Adreno6xx, T(160, 12, 8)},
 	{702, 0, MobileGpuArchitecture::Adreno7xx, T(88, 7, 6)},
 	{710, 0, MobileGpuArchitecture::Adreno7xx, T(104, 8, 7)},
-	{720, 0, MobileGpuArchitecture::Adreno7xx, T(128, 9, 7, true)},
+	{720, 0, MobileGpuArchitecture::Adreno7xx, T(128, 9, 7)},
 }};
 
 // Later 7xx/8xx models are kept separate because they use materially different renderer generations,
 // even though their current GS pool ceiling is the same.
 static constexpr std::array<AdrenoSpec, 20> s_recent_adreno_specs = {{
-	{722, 0, MobileGpuArchitecture::Adreno7xx, T(128, 9, 7, true)},
-	{725, 0, MobileGpuArchitecture::Adreno7xx, T(140, 10, 8, true)},
-	{730, 0, MobileGpuArchitecture::Adreno7xx, T(144, 10, 8, true)},
-	{732, 0, MobileGpuArchitecture::Adreno7xx, T(148, 10, 8, true)},
-	{735, 0, MobileGpuArchitecture::Adreno7xx, T(152, 11, 8, true)},
-	{740, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
-	{750, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
-	{760, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
-	{765, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
-	{775, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8, true)},
-	{810, 0, MobileGpuArchitecture::Adreno8xx, T(128, 9, 7, true)},
-	{820, 0, MobileGpuArchitecture::Adreno8xx, T(140, 10, 8, true)},
-	{825, 0, MobileGpuArchitecture::Adreno8xx, T(148, 10, 8, true)},
-	{829, 0, MobileGpuArchitecture::Adreno8xx, T(156, 11, 8, true)},
-	{830, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
-	{840, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
-	{845, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
-	{850, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
-	{860, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
-	{870, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8, true)},
+	{722, 0, MobileGpuArchitecture::Adreno7xx, T(128, 9, 7)},
+	{725, 0, MobileGpuArchitecture::Adreno7xx, T(140, 10, 8)},
+	{730, 0, MobileGpuArchitecture::Adreno7xx, T(144, 10, 8)},
+	{732, 0, MobileGpuArchitecture::Adreno7xx, T(148, 10, 8)},
+	{735, 0, MobileGpuArchitecture::Adreno7xx, T(152, 11, 8)},
+	{740, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8)},
+	{750, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8)},
+	{760, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8)},
+	{765, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8)},
+	{775, 0, MobileGpuArchitecture::Adreno7xx, T(160, 12, 8)},
+	{810, 0, MobileGpuArchitecture::Adreno8xx, T(128, 9, 7)},
+	{820, 0, MobileGpuArchitecture::Adreno8xx, T(140, 10, 8)},
+	{825, 0, MobileGpuArchitecture::Adreno8xx, T(148, 10, 8)},
+	{829, 0, MobileGpuArchitecture::Adreno8xx, T(156, 11, 8)},
+	{830, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
+	{840, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
+	{845, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
+	{850, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
+	{860, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
+	{870, 0, MobileGpuArchitecture::Adreno8xx, T(160, 12, 8)},
 }};
 
 static bool ParseAdrenoModel(std::string_view hints, u16* model, char* suffix)
@@ -180,8 +180,8 @@ static MobileGsTuning FallbackTuningForAdreno(u16 model)
 		case 4: return T(68, 5, 5);
 		case 5: return T(80, 6, 5);
 		case 6: return T(96, 8, 6);
-		case 7: return T(128, 9, 7, true);
-		case 8: return T(144, 10, 8, true);
+		case 7: return T(128, 9, 7);
+		case 8: return T(144, 10, 8);
 		default: return MakeConservativeMobileGsTuning();
 	}
 }
@@ -214,28 +214,28 @@ ResolvedGpuProfile ResolveAdrenoProfile(std::string_view lowered_hints)
 		ContainsAdrenoXToken(lowered_hints, "adreno x2 85"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 285, 0, true, "Adreno X2-85"};
-		resolved.tuning = T(160, 12, 8, true);
+		resolved.tuning = T(160, 12, 8);
 		return resolved;
 	}
 	if (ContainsAdrenoXToken(lowered_hints, "adreno x2-45") ||
 		ContainsAdrenoXToken(lowered_hints, "adreno x2 45"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 245, 0, true, "Adreno X2-45"};
-		resolved.tuning = T(160, 12, 8, true);
+		resolved.tuning = T(160, 12, 8);
 		return resolved;
 	}
 	if (ContainsAdrenoXToken(lowered_hints, "adreno x1-85") ||
 		ContainsAdrenoXToken(lowered_hints, "adreno x1 85"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 185, 0, true, "Adreno X1-85"};
-		resolved.tuning = T(160, 12, 8, true);
+		resolved.tuning = T(160, 12, 8);
 		return resolved;
 	}
 	if (ContainsAdrenoXToken(lowered_hints, "adreno x1-45") ||
 		ContainsAdrenoXToken(lowered_hints, "adreno x1 45"))
 	{
 		resolved.gpu = {MobileGpuArchitecture::AdrenoX, 145, 0, true, "Adreno X1-45"};
-		resolved.tuning = T(152, 11, 8, true);
+		resolved.tuning = T(152, 11, 8);
 		return resolved;
 	}
 
