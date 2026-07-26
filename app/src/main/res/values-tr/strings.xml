@@ -2106,4 +2106,5 @@
     <string name="touch_control_creator_default_name">Özel buton %1$d</string>
     <string name="touch_control_creator_delete_title">Bu kontrol silinsin mi?</string>
     <string name="touch_control_creator_delete_message">“%1$s” kayıtlı kontrollerinizden kaldırılacak.</string>
+    <string name="theme_manager_default_name">Temam</string>
 </resources>

@@ -2108,4 +2108,5 @@
     <string name="touch_control_creator_default_name">Botão personalizado %1$d</string>
     <string name="touch_control_creator_delete_title">Excluir este controle?</string>
     <string name="touch_control_creator_delete_message">“%1$s” será removido dos seus controles salvos.</string>
+    <string name="theme_manager_default_name">Meu tema</string>
 </resources>

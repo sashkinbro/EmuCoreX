@@ -90,17 +90,32 @@ fun ThemeManagerScreen(
     onApply: (CustomThemeLibrary) -> Unit,
     onBackClick: () -> Unit
 ) {
-    val seedLibrary = remember {
-        initialLibrary.sanitized().takeIf { it.themes.isNotEmpty() } ?: run {
-            val now = System.currentTimeMillis()
-            val first = SavedCustomTheme(
-                id = UUID.randomUUID().toString(),
-                config = CustomThemeConfig.Default,
-                createdAtMillis = now,
-                updatedAtMillis = now
+    val localizedDefaultName = stringResource(R.string.theme_manager_default_name)
+    val localizedDefaultTheme = remember(localizedDefaultName) {
+        CustomThemeConfig.Default.copy(name = localizedDefaultName)
+    }
+    val seedLibrary = remember(initialLibrary, localizedDefaultName) {
+        val safeInitial = initialLibrary.sanitized()
+        safeInitial
+            .copy(
+                themes = safeInitial.themes.map { saved ->
+                    if (saved.config.name == CustomThemeConfig.DEFAULT_NAME) {
+                        saved.copy(config = saved.config.copy(name = localizedDefaultName))
+                    } else {
+                        saved
+                    }
+                }
             )
-            CustomThemeLibrary(activeThemeId = null, themes = listOf(first))
-        }
+            .takeIf { it.themes.isNotEmpty() } ?: run {
+                val now = System.currentTimeMillis()
+                val first = SavedCustomTheme(
+                    id = UUID.randomUUID().toString(),
+                    config = localizedDefaultTheme,
+                    createdAtMillis = now,
+                    updatedAtMillis = now
+                )
+                CustomThemeLibrary(activeThemeId = null, themes = listOf(first))
+            }
     }
     var library by remember { mutableStateOf(seedLibrary) }
     var selectedThemeId by remember {
@@ -138,7 +153,7 @@ fun ThemeManagerScreen(
         ).sanitized()
     }
 
-    fun createTheme(source: CustomThemeConfig = CustomThemeConfig.Default) {
+    fun createTheme(source: CustomThemeConfig? = null) {
         if (!isProUnlocked) {
             onPurchasePro()
             return
@@ -146,12 +161,14 @@ fun ThemeManagerScreen(
         if (library.themes.size >= CustomThemeLibrary.MAX_THEMES) return
         library = libraryWithDraft()
         val now = System.currentTimeMillis()
+        val sourceTheme = source ?: localizedDefaultTheme
         val newTheme = SavedCustomTheme(
             id = UUID.randomUUID().toString(),
-            config = source.copy(
+            config = sourceTheme.copy(
                 name = uniqueThemeName(
-                    base = source.name,
-                    existing = library.themes.map { it.config.name }
+                    base = sourceTheme.name,
+                    existing = library.themes.map { it.config.name },
+                    fallback = localizedDefaultName
                 )
             ).sanitized(),
             createdAtMillis = now,
@@ -167,7 +184,7 @@ fun ThemeManagerScreen(
             val now = System.currentTimeMillis()
             val replacement = SavedCustomTheme(
                 id = UUID.randomUUID().toString(),
-                config = CustomThemeConfig.Default,
+                config = localizedDefaultTheme,
                 createdAtMillis = now,
                 updatedAtMillis = now
             )
@@ -234,13 +251,16 @@ fun ThemeManagerScreen(
         item {
             ScreenTopBar(
                 title = stringResource(R.string.theme_manager_title),
-                onBackClick = onBackClick
+                onBackClick = onBackClick,
+                modifier = Modifier.testTag("theme_manager_top_bar")
             )
         }
         if (!isProUnlocked) {
             item {
                 Surface(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("theme_manager_preview_banner"),
                     shape = ManagerControlShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -442,7 +462,9 @@ fun ThemeManagerScreen(
         item {
             ThemeSection(title = stringResource(R.string.theme_manager_studio)) {
                 LazyRow(
-                    modifier = Modifier.themeSectionHorizontalViewport(),
+                    modifier = Modifier
+                        .themeSectionHorizontalViewport()
+                        .testTag("theme_manager_categories"),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 2.dp)
                 ) {
@@ -883,7 +905,9 @@ private fun ColorEditor(
     LaunchedEffect(value) { hexDraft = value.toRgbHex() }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("theme_manager_color_${role.name.lowercase()}"),
         shape = ManagerControlShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -953,7 +977,9 @@ private fun ColorEditor(
                         enabled = enabled,
                         singleLine = true,
                         shape = ManagerControlShape,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("theme_manager_hex_${role.name.lowercase()}")
                     )
                     RgbSlider("R", rgb[0], enabled) { channel ->
                         onValueChange(AndroidColor.rgb(channel, rgb[1], rgb[2]))
@@ -1565,8 +1591,8 @@ private fun String.parseRgbHex(): Int? {
     return normalized.toLongOrNull(16)?.let { (it or 0xFF000000L).toInt() }
 }
 
-private fun uniqueThemeName(base: String, existing: List<String>): String {
-    val safeBase = base.trim().ifBlank { "My Theme" }
+private fun uniqueThemeName(base: String, existing: List<String>, fallback: String): String {
+    val safeBase = base.trim().ifBlank { fallback }
         .take(CustomThemeConfig.MAX_NAME_LENGTH)
     val used = existing.map { it.trim().lowercase() }.toSet()
     if (safeBase.lowercase() !in used) return safeBase

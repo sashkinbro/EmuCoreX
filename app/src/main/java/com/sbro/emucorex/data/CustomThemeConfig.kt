@@ -9,7 +9,7 @@ import kotlin.math.pow
 @Serializable
 data class CustomThemeConfig(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
-    val name: String = "My Theme",
+    val name: String = DEFAULT_NAME,
     val dark: Boolean = true,
     val primary: Int = 0xFF4F7DFF.toInt(),
     val onPrimary: Int = 0xFFFFFFFF.toInt(),
@@ -42,7 +42,7 @@ data class CustomThemeConfig(
     fun sanitized(): CustomThemeConfig {
         val opaque = copy(
             schemaVersion = CURRENT_SCHEMA_VERSION,
-            name = name.trim().take(MAX_NAME_LENGTH).ifBlank { "My Theme" },
+            name = name.trim().take(MAX_NAME_LENGTH).ifBlank { DEFAULT_NAME },
             primary = primary.forceOpaque(),
             onPrimary = onPrimary.forceOpaque(),
             secondary = secondary.forceOpaque(),
@@ -105,6 +105,7 @@ data class CustomThemeConfig(
 
     companion object {
         const val CURRENT_SCHEMA_VERSION = 3
+        const val DEFAULT_NAME = "My Theme"
         const val MAX_NAME_LENGTH = 40
         const val MIN_CORNER_DP = 0f
         const val MAX_SMALL_CORNER_DP = 20f

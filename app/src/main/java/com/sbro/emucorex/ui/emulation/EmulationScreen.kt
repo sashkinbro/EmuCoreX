@@ -170,6 +170,7 @@ import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.CustomTouchControl
+import com.sbro.emucorex.data.CustomTouchControlPressMode
 import com.sbro.emucorex.data.GameMenuTabId
 import com.sbro.emucorex.data.GameMenuSectionId
 import com.sbro.emucorex.data.GameMenuLayoutStyle
@@ -1977,6 +1978,10 @@ private fun OnScreenControls(
                 val height = control.heightDp.dp
                 val travelX = (maxWidth - safeLeft - safeRight - width).coerceAtLeast(0.dp)
                 val travelY = (maxHeight - safeTop - safeBottom - height).coerceAtLeast(0.dp)
+                val pressHandlers = listOfNotNull(
+                    buttonPressHandler(control.actionId),
+                    control.secondaryActionId?.let(::buttonPressHandler)
+                )
                 TouchButtonSpec(
                     id = "custom:${control.id}",
                     width = width,
@@ -1986,7 +1991,12 @@ private fun OnScreenControls(
                     shape = control.composeShape(),
                     customControl = control,
                     haptics = control.haptics,
-                    onPressChange = buttonPressHandler(control.actionId)
+                    onPressChange = if (pressHandlers.isNotEmpty()) {
+                        { pressed -> pressHandlers.forEach { handler -> handler(pressed) } }
+                    } else {
+                        null
+                    },
+                    tapToHold = control.pressMode == CustomTouchControlPressMode.TOGGLE
                 )
             }
             .toList()

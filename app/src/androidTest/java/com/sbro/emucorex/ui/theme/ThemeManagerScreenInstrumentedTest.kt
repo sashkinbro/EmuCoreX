@@ -3,12 +3,9 @@ package com.sbro.emucorex.ui.theme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
@@ -52,10 +49,10 @@ class ThemeManagerScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithText("Theme Manager").assertIsDisplayed()
+        composeRule.onNodeWithTag("theme_manager_top_bar").assertIsDisplayed()
         composeRule.onNodeWithTag("theme_manager_list")
-            .performScrollToNode(hasText("Theme studio"))
-        composeRule.onNodeWithText("Theme studio").assertIsDisplayed()
+            .performScrollToNode(hasTestTag("theme_manager_categories"))
+        composeRule.onNodeWithTag("theme_manager_categories").assertIsDisplayed()
         composeRule.onNodeWithTag("theme_manager_list")
             .performScrollToNode(hasTestTag("theme_manager_apply"))
         composeRule.onNodeWithTag("theme_manager_apply").performClick()
@@ -84,8 +81,8 @@ class ThemeManagerScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithText("Theme Manager").assertIsDisplayed()
-        composeRule.onNodeWithText("Preview mode").assertIsDisplayed()
+        composeRule.onNodeWithTag("theme_manager_top_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("theme_manager_preview_banner").assertIsDisplayed()
         composeRule.onNodeWithTag("theme_manager_list")
             .performScrollToNode(hasTestTag("theme_manager_apply"))
         composeRule.onNodeWithTag("theme_manager_apply").assertIsNotEnabled()
@@ -116,9 +113,9 @@ class ThemeManagerScreenInstrumentedTest {
         }
 
         composeRule.onNodeWithTag("theme_manager_list")
-            .performScrollToNode(hasText("Text on primary"))
-        composeRule.onNodeWithText("Text on primary").performClick()
-        val hexField = hasSetTextAction() and hasText("Hex color")
+            .performScrollToNode(hasTestTag("theme_manager_color_on_primary"))
+        composeRule.onNodeWithTag("theme_manager_color_on_primary").performClick()
+        val hexField = hasTestTag("theme_manager_hex_on_primary")
         composeRule.onNodeWithTag("theme_manager_list")
             .performScrollToNode(hexField)
         composeRule.onNode(hexField).performTextReplacement("#808080")

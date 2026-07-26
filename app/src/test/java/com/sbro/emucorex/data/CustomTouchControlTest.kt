@@ -10,7 +10,16 @@ class CustomTouchControlTest {
     fun libraryRoundTripPreservesMultipleControls() {
         val library = CustomTouchControlLibrary(
             controls = listOf(
-                CustomTouchControl(id = "jump", name = "Jump", actionId = "cross"),
+                CustomTouchControl(
+                    id = "jump",
+                    name = "Jump",
+                    actionId = "cross",
+                    secondaryActionId = "l1",
+                    pressMode = CustomTouchControlPressMode.TOGGLE,
+                    rotationDegrees = 24,
+                    contentScalePercent = 135,
+                    shadowElevationDp = 8f
+                ),
                 CustomTouchControl(id = "brake", name = "Brake", actionId = "l2")
             )
         )
@@ -18,6 +27,11 @@ class CustomTouchControlTest {
         val decoded = CustomTouchControlLibrary.decode(library.encode())
 
         assertEquals(2, decoded.controls.size)
+        assertEquals("l1", decoded.controls.first().secondaryActionId)
+        assertEquals(CustomTouchControlPressMode.TOGGLE, decoded.controls.first().pressMode)
+        assertEquals(24, decoded.controls.first().rotationDegrees)
+        assertEquals(135, decoded.controls.first().contentScalePercent)
+        assertEquals(8f, decoded.controls.first().shadowElevationDp)
         assertEquals("l2", decoded.controls[1].actionId)
     }
 
@@ -31,7 +45,11 @@ class CustomTouchControlTest {
             widthDp = 1,
             heightDp = 9_999,
             opacity = 0,
-            borderWidthDp = Float.POSITIVE_INFINITY
+            borderWidthDp = Float.POSITIVE_INFINITY,
+            secondaryActionId = CustomTouchControl.DEFAULT_ACTION_ID,
+            rotationDegrees = 999,
+            contentScalePercent = 1,
+            shadowElevationDp = Float.NaN
         ).sanitized()!!
 
         assertEquals(CustomTouchControl.DEFAULT_ACTION_ID, safe.actionId)
@@ -41,6 +59,10 @@ class CustomTouchControlTest {
         assertEquals(CustomTouchControl.MAX_SIZE_DP, safe.heightDp)
         assertEquals(CustomTouchControl.MIN_OPACITY, safe.opacity)
         assertEquals(0f, safe.borderWidthDp)
+        assertNull(safe.secondaryActionId)
+        assertEquals(CustomTouchControl.MAX_ROTATION_DEGREES, safe.rotationDegrees)
+        assertEquals(CustomTouchControl.MIN_CONTENT_SCALE_PERCENT, safe.contentScalePercent)
+        assertEquals(0f, safe.shadowElevationDp)
     }
 
     @Test

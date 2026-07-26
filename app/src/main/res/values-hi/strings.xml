@@ -2106,4 +2106,5 @@
     <string name="touch_control_creator_default_name">कस्टम बटन %1$d</string>
     <string name="touch_control_creator_delete_title">क्या यह नियंत्रण हटाएं?</string>
     <string name="touch_control_creator_delete_message">“%1$s” को आपके सहेजे गए नियंत्रणों से हटा दिया जाएगा।</string>
+    <string name="theme_manager_default_name">मेरी थीम</string>
 </resources>

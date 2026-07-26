@@ -2105,4 +2105,5 @@
     <string name="touch_control_creator_default_name">사용자 지정 버튼 %1$d</string>
     <string name="touch_control_creator_delete_title">이 컨트롤을 삭제하시겠습니까?</string>
     <string name="touch_control_creator_delete_message">"%1$s"이(가) 저장된 컨트롤에서 제거됩니다.</string>
+    <string name="theme_manager_default_name">내 테마</string>
 </resources>

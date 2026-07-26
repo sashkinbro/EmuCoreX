@@ -2105,4 +2105,5 @@
     <string name="touch_control_creator_default_name">カスタムボタン %1$d</string>
     <string name="touch_control_creator_delete_title">このコントロールを削除しますか？</string>
     <string name="touch_control_creator_delete_message">「%1$s」が保存されたコントロールから削除されます。</string>
+    <string name="theme_manager_default_name">マイテーマ</string>
 </resources>

@@ -3335,7 +3335,7 @@ private fun CustomizationSettingsTab(
             title = stringResource(R.string.touch_control_creator_settings_entry),
             subtitle = stringResource(R.string.touch_control_creator_settings_desc),
             actionIcon = Icons.Rounded.Tune,
-            actionLabel = stringResource(R.string.settings_edit_controls_action),
+            actionLabel = stringResource(R.string.touch_control_creator_open),
             onClick = { onOpenTouchControlCreator?.invoke() },
             enabled = onOpenTouchControlCreator != null
         )

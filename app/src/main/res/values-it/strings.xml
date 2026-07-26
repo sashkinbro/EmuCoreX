@@ -2106,4 +2106,5 @@
     <string name="touch_control_creator_default_name">Pulsante personalizzato %1$d</string>
     <string name="touch_control_creator_delete_title">Eliminare questo controllo?</string>
     <string name="touch_control_creator_delete_message">"%1$s" verrà rimosso dai tuoi controlli salvati.</string>
+    <string name="theme_manager_default_name">Il mio tema</string>
 </resources>

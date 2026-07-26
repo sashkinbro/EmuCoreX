@@ -2,8 +2,7 @@ package com.sbro.emucorex.ui.controls
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -39,10 +38,10 @@ class TouchControlCreatorScreenInstrumentedTest {
             }
         }
 
-        composeRule.onNodeWithText("Control Creator").assertIsDisplayed()
-        composeRule.onNodeWithText("Preview mode").assertIsDisplayed()
+        composeRule.onNodeWithTag("touch_control_creator_top_bar").assertIsDisplayed()
+        composeRule.onNodeWithTag("touch_control_creator_preview_banner").assertIsDisplayed()
         composeRule.onNodeWithTag("touch_control_creator_list")
-            .performScrollToNode(hasText("Save controls"))
+            .performScrollToNode(hasTestTag("touch_control_creator_save"))
         composeRule.onNodeWithTag("touch_control_creator_save").assertIsNotEnabled()
     }
 
@@ -67,17 +66,42 @@ class TouchControlCreatorScreenInstrumentedTest {
             }
         }
 
-        val nameField = hasSetTextAction() and hasText("Control name")
+        val nameField = hasTestTag("touch_control_creator_name")
         composeRule.onNodeWithTag("touch_control_creator_list")
             .performScrollToNode(nameField)
         composeRule.onNode(nameField).performTextReplacement("Jump turbo")
         composeRule.onNodeWithTag("touch_control_creator_list")
-            .performScrollToNode(hasText("Save controls"))
+            .performScrollToNode(hasTestTag("touch_control_creator_save"))
         composeRule.onNodeWithTag("touch_control_creator_save").performClick()
 
         composeRule.runOnIdle {
             assertEquals(2, saved.get()?.controls?.size)
             assertEquals("Jump turbo", saved.get()?.controls?.first()?.name)
         }
+    }
+
+    @Test
+    fun studioCategoriesKeepTheirOwnPreviewCloseToTheEditor() {
+        composeRule.setContent {
+            EmuCoreXTheme {
+                TouchControlCreatorScreen(
+                    initialLibrary = CustomTouchControlLibrary.Empty,
+                    isProUnlocked = false,
+                    onPurchasePro = {},
+                    onSave = {},
+                    onBackClick = {}
+                )
+            }
+        }
+
+        val appearance = hasTestTag("touch_control_creator_category_appearance")
+        composeRule.onNodeWithTag("touch_control_creator_list")
+            .performScrollToNode(hasTestTag("touch_control_creator_categories"))
+        composeRule.onNodeWithTag("touch_control_creator_categories")
+            .performScrollToNode(appearance)
+        composeRule.onNode(appearance).performClick()
+        composeRule.onNodeWithTag("touch_control_creator_list")
+            .performScrollToNode(hasTestTag("touch_control_creator_local_preview"))
+        composeRule.onNodeWithTag("touch_control_creator_local_preview").assertIsDisplayed()
     }
 }

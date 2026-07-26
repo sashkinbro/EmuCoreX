@@ -2120,4 +2120,5 @@
     <string name="touch_control_creator_default_name">Tombol kustom %1$d</string>
     <string name="touch_control_creator_delete_title">Hapus kontrol ini?</string>
     <string name="touch_control_creator_delete_message">"%1$s" akan dihapus dari kontrol tersimpan Anda.</string>
+    <string name="theme_manager_default_name">Tema Saya</string>
 </resources>

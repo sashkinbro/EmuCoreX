@@ -2110,4 +2110,5 @@
     <string name="touch_control_creator_default_name">Кастомная кнопка %1$d</string>
     <string name="touch_control_creator_delete_title">Удалить эту кнопку?</string>
     <string name="touch_control_creator_delete_message">«%1$s» будет удалена из ваших сохраненных кнопок.</string>
+    <string name="theme_manager_default_name">Моя тема</string>
 </resources>
