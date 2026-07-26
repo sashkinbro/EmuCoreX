@@ -20,7 +20,9 @@ import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
+import com.sbro.emucorex.core.ProProductOffer
 import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
@@ -91,6 +93,9 @@ data class SettingsUiState(
     val customizationMessageResId: Int? = null,
     val isProUnlocked: Boolean = false,
     val proPrice: String? = null,
+    val proProducts: List<ProProductOffer> = emptyList(),
+    val ownedProProductIds: Set<String> = emptySet(),
+    val isProPurchaseStatusVerified: Boolean = false,
     val isProProductLoading: Boolean = false,
     val isProProductAvailable: Boolean = false,
     val isProPurchaseInProgress: Boolean = false,
@@ -322,6 +327,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.value = _uiState.value.copy(
                     isProUnlocked = proState.isProUnlocked,
                     proPrice = proState.productPrice,
+                    proProducts = proState.products,
+                    ownedProProductIds = proState.ownedProductIds,
+                    isProPurchaseStatusVerified = proState.isPurchaseStatusVerified,
                     isProProductLoading = proState.isProductLoading,
                     isProProductAvailable = proState.isProductAvailable,
                     isProPurchaseInProgress = proState.isPurchaseInProgress,
@@ -559,13 +567,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (!_uiState.value.isProUnlocked) return@launch
         if (activate) preferences.applyCustomTheme(config) else preferences.setCustomTheme(config)
     }
-    fun saveCustomThemeLibrary(library: CustomThemeLibrary, activate: Boolean) = viewModelScope.launch {
-        if (!_uiState.value.isProUnlocked) return@launch
-        preferences.setCustomThemeLibrary(library, activate)
+    fun saveCustomThemeLibrary(library: CustomThemeLibrary, activate: Boolean) {
+        val current = _uiState.value
+        if (!current.isProUnlocked) return
+
+        val safeLibrary = library.sanitized()
+        val activeConfig = safeLibrary.activeTheme()?.config
+        val nextThemeMode = when {
+            activate && activeConfig != null -> ThemeMode.CUSTOM
+            current.themeMode == ThemeMode.CUSTOM && activeConfig == null -> ThemeMode.SYSTEM
+            else -> current.themeMode
+        }
+        _uiState.value = current.copy(
+            themeMode = nextThemeMode,
+            customTheme = activeConfig ?: CustomThemeConfig.Default,
+            customThemeLibrary = safeLibrary
+        )
+        viewModelScope.launch {
+            preferences.setCustomThemeLibrary(safeLibrary, activate)
+        }
     }
-    fun saveCustomTouchControls(library: CustomTouchControlLibrary) = viewModelScope.launch {
-        if (!_uiState.value.isProUnlocked) return@launch
-        preferences.setCustomTouchControls(library)
+
+    fun saveCustomTouchControls(library: CustomTouchControlLibrary) {
+        val current = _uiState.value
+        if (!current.isProUnlocked) return
+
+        val safeLibrary = library.sanitized()
+        _uiState.value = current.copy(customTouchControls = safeLibrary)
+        viewModelScope.launch {
+            preferences.setCustomTouchControls(safeLibrary)
+        }
     }
     fun setAppFontChoice(choice: AppFontChoice) = viewModelScope.launch {
         if (choice == AppFontChoice.CUSTOM && customFontRepository.installedFile() == null) return@launch
@@ -784,7 +815,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         if (value.length in 4..12) preferences.setDev9LocalLinkRoomCode(value)
     }
 
-    fun purchasePro(activity: Activity) { proPurchaseManager.purchase(activity) }
+    fun purchasePro(
+        activity: Activity,
+        tier: ProPurchaseTier = ProPurchaseTier.BASE
+    ) {
+        proPurchaseManager.purchase(activity, tier)
+    }
 
     fun restoreProPurchases() { proPurchaseManager.restorePurchases(showMessage = true) }
 

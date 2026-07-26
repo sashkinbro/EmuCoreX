@@ -12,7 +12,9 @@ import com.sbro.emucorex.core.EmulatorDataLocation
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.PerformanceProfiles
+import com.sbro.emucorex.core.ProProductOffer
 import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
@@ -39,6 +41,9 @@ data class OnboardingUiState(
     val totalPages: Int = 6,
     val isProUnlocked: Boolean = false,
     val proPrice: String? = null,
+    val proProducts: List<ProProductOffer> = emptyList(),
+    val ownedProProductIds: Set<String> = emptySet(),
+    val isProPurchaseStatusVerified: Boolean = false,
     val isProProductLoading: Boolean = false,
     val isProProductAvailable: Boolean = false,
     val isProPurchaseInProgress: Boolean = false,
@@ -59,6 +64,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     updateState(
                         isProUnlocked = proState.isProUnlocked,
                         proPrice = proState.productPrice,
+                        proProducts = proState.products,
+                        ownedProProductIds = proState.ownedProductIds,
+                        isProPurchaseStatusVerified = proState.isPurchaseStatusVerified,
                         isProProductLoading = proState.isProductLoading,
                         isProProductAvailable = proState.isProductAvailable,
                         isProPurchaseInProgress = proState.isPurchaseInProgress,
@@ -103,8 +111,11 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    fun purchasePro(activity: Activity) {
-        proPurchaseManager.purchase(activity)
+    fun purchasePro(
+        activity: Activity,
+        tier: ProPurchaseTier = ProPurchaseTier.BASE
+    ) {
+        proPurchaseManager.purchase(activity, tier)
     }
 
     fun clearProPurchaseMessage() {
@@ -224,6 +235,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
         currentPage: Int = _uiState.value.currentPage,
         isProUnlocked: Boolean = _uiState.value.isProUnlocked,
         proPrice: String? = _uiState.value.proPrice,
+        proProducts: List<ProProductOffer> = _uiState.value.proProducts,
+        ownedProProductIds: Set<String> = _uiState.value.ownedProProductIds,
+        isProPurchaseStatusVerified: Boolean = _uiState.value.isProPurchaseStatusVerified,
         isProProductLoading: Boolean = _uiState.value.isProProductLoading,
         isProProductAvailable: Boolean = _uiState.value.isProProductAvailable,
         isProPurchaseInProgress: Boolean = _uiState.value.isProPurchaseInProgress,
@@ -243,6 +257,9 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
             totalPages = 6,
             isProUnlocked = isProUnlocked,
             proPrice = proPrice,
+            proProducts = proProducts,
+            ownedProProductIds = ownedProProductIds,
+            isProPurchaseStatusVerified = isProPurchaseStatusVerified,
             isProProductLoading = isProProductLoading,
             isProProductAvailable = isProProductAvailable,
             isProPurchaseInProgress = isProPurchaseInProgress,

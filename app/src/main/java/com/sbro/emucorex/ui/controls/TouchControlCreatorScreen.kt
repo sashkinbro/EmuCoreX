@@ -249,6 +249,7 @@ fun TouchControlCreatorScreen(
         library = library.copy(controls = library.controls.filterNot { it.id == control.id }).sanitized()
         val replacement = library.controls.firstOrNull() ?: previewSeed
         select(replacement)
+        onSave(library)
     }
 
     fun moveSelectedControl(offset: Int) {
@@ -279,7 +280,8 @@ fun TouchControlCreatorScreen(
                     onClick = {
                         deleteControl(candidate)
                         deleteCandidate = null
-                    }
+                    },
+                    modifier = Modifier.testTag("touch_control_creator_confirm_delete")
                 ) {
                     Text(stringResource(R.string.touch_control_creator_delete))
                 }
@@ -317,7 +319,9 @@ fun TouchControlCreatorScreen(
         if (!isProUnlocked) {
             item {
                 Surface(
-                    modifier = Modifier.testTag("touch_control_creator_preview_banner"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("touch_control_creator_preview_banner"),
                     shape = CreatorCardShape,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -326,23 +330,35 @@ fun TouchControlCreatorScreen(
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
                     )
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Icon(Icons.Rounded.Lock, contentDescription = null)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.touch_control_creator_preview_mode),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                stringResource(R.string.touch_control_creator_pro_desc),
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.Lock, contentDescription = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.touch_control_creator_preview_mode),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    stringResource(R.string.touch_control_creator_pro_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                                )
+                            }
                         }
-                        TextButton(onClick = onPurchasePro) {
+                        Button(
+                            onClick = onPurchasePro,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("touch_control_creator_unlock_button"),
+                            shape = CreatorControlShape
+                        ) {
                             Text(stringResource(R.string.touch_control_creator_unlock))
                         }
                     }
@@ -430,7 +446,9 @@ fun TouchControlCreatorScreen(
                         onClick = { deleteCandidate = draft },
                         enabled = isProUnlocked && draft.id != previewSeed.id,
                         shape = CreatorControlShape,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("touch_control_creator_delete_selected")
                     ) {
                         Icon(Icons.Rounded.Delete, contentDescription = null)
                         Spacer(Modifier.size(8.dp))

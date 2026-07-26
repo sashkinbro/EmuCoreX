@@ -155,6 +155,8 @@ import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.PerformanceProfiles
+import com.sbro.emucorex.core.ProPurchaseTier
+import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.TvUiPolicy
@@ -163,6 +165,7 @@ import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
+import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
 import com.sbro.emucorex.data.AppPreferences
@@ -2942,6 +2945,11 @@ private fun SettingsContent(
                     ProSettingsTab(
                         uiState = uiState,
                         onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                        onPurchaseTier = { tier ->
+                            (context as? Activity)?.let { activity ->
+                                viewModel.purchasePro(activity, tier)
+                            }
+                        },
                         onRestore = viewModel::restoreProPurchases,
                         onApplyCrimson = { viewModel.setThemeMode(ThemeMode.PRO) }
                     )
@@ -4308,9 +4316,32 @@ private fun isPrivateIpv4(value: String): Boolean {
 private fun ProSettingsTab(
     uiState: SettingsUiState,
     onPurchase: () -> Unit,
+    onPurchaseTier: (ProPurchaseTier) -> Unit,
     onRestore: () -> Unit,
     onApplyCrimson: () -> Unit
 ) {
+    var showSupportOptions by rememberSaveable { mutableStateOf(false) }
+    val supportOffers = if (uiState.isProUnlocked && !uiState.isProPurchaseStatusVerified) {
+        emptyList()
+    } else {
+        availableProSupportOffers(
+            offers = uiState.proProducts,
+            ownedProductIds = uiState.ownedProProductIds
+        )
+    }
+
+    if (showSupportOptions) {
+        ProSupportOptionsDialog(
+            offers = supportOffers,
+            purchaseInProgress = uiState.isProPurchaseInProgress,
+            onPurchase = { tier ->
+                showSupportOptions = false
+                onPurchaseTier(tier)
+            },
+            onDismiss = { showSupportOptions = false }
+        )
+    }
+
     SettingsSection(title = stringResource(R.string.settings_pro_title)) {
         ProStatusCard(
             isUnlocked = uiState.isProUnlocked,
@@ -4322,6 +4353,11 @@ private fun ProSettingsTab(
             },
             purchaseInProgress = uiState.isProPurchaseInProgress,
             onPurchase = onPurchase,
+            onShowSupportOptions = if (supportOffers.isNotEmpty()) {
+                { showSupportOptions = true }
+            } else {
+                null
+            },
             onRestore = onRestore,
             onApplyCrimson = onApplyCrimson
         )
@@ -4382,6 +4418,7 @@ private fun ProStatusCard(
     price: String,
     purchaseInProgress: Boolean,
     onPurchase: () -> Unit,
+    onShowSupportOptions: (() -> Unit)?,
     onRestore: () -> Unit,
     onApplyCrimson: () -> Unit
 ) {
@@ -4501,6 +4538,25 @@ private fun ProStatusCard(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
+            }
+            if (onShowSupportOptions != null) {
+                TextButton(
+                    onClick = onShowSupportOptions,
+                    enabled = !purchaseInProgress,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_pro_support_more),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

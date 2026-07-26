@@ -121,4 +121,80 @@ class ThemeManagerScreenInstrumentedTest {
         composeRule.onNode(hexField).performTextReplacement("#808080")
         composeRule.onNode(hexField).assertTextContains("#808080")
     }
+
+    @Test
+    fun deletingThemeImmediatelyPersistsLibraryWithoutDeletedEntry() {
+        val saved = AtomicReference<CustomThemeLibrary?>()
+        val initial = CustomThemeLibrary(
+            activeThemeId = "first",
+            themes = listOf(
+                SavedCustomTheme(
+                    id = "first",
+                    config = CustomThemeConfig(name = "First")
+                ),
+                SavedCustomTheme(
+                    id = "second",
+                    config = CustomThemeConfig(name = "Second")
+                )
+            )
+        )
+        composeRule.setContent {
+            EmuCoreXTheme {
+                ThemeManagerScreen(
+                    initialLibrary = initial,
+                    isProUnlocked = true,
+                    onPurchasePro = {},
+                    onSave = saved::set,
+                    onApply = {},
+                    onBackClick = {}
+                )
+            }
+        }
+
+        val deleteButton = hasTestTag("theme_manager_delete_selected")
+        composeRule.onNodeWithTag("theme_manager_list").performScrollToNode(deleteButton)
+        composeRule.onNode(deleteButton).performClick()
+        composeRule.onNodeWithTag("theme_manager_confirm_delete").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(listOf("second"), saved.get()?.themes?.map { it.id })
+            assertEquals(null, saved.get()?.activeThemeId)
+        }
+    }
+
+    @Test
+    fun deletingLastThemePersistsEmptyLibraryInsteadOfReplacementDraft() {
+        val saved = AtomicReference<CustomThemeLibrary?>()
+        val initial = CustomThemeLibrary(
+            activeThemeId = "only",
+            themes = listOf(
+                SavedCustomTheme(
+                    id = "only",
+                    config = CustomThemeConfig(name = "Only")
+                )
+            )
+        )
+        composeRule.setContent {
+            EmuCoreXTheme {
+                ThemeManagerScreen(
+                    initialLibrary = initial,
+                    isProUnlocked = true,
+                    onPurchasePro = {},
+                    onSave = saved::set,
+                    onApply = {},
+                    onBackClick = {}
+                )
+            }
+        }
+
+        val deleteButton = hasTestTag("theme_manager_delete_selected")
+        composeRule.onNodeWithTag("theme_manager_list").performScrollToNode(deleteButton)
+        composeRule.onNode(deleteButton).performClick()
+        composeRule.onNodeWithTag("theme_manager_confirm_delete").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(emptyList<SavedCustomTheme>(), saved.get()?.themes)
+            assertEquals(null, saved.get()?.activeThemeId)
+        }
+    }
 }

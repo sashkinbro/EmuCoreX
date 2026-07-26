@@ -69,6 +69,7 @@ import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewCarousel
@@ -129,12 +130,14 @@ import com.sbro.emucorex.R
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvUiMetrics
+import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.data.CustomGameCoverRepository
 import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
+import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
@@ -169,6 +172,20 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showWelcomeSupportOptions by remember { mutableStateOf(false) }
+    val supportOffers = if (uiState.isProUnlocked && !uiState.isProPurchaseStatusVerified) {
+        emptyList()
+    } else {
+        availableProSupportOffers(
+            offers = uiState.proProducts,
+            ownedProductIds = uiState.ownedProProductIds
+        )
+    }
+    LaunchedEffect(showWelcomeSupportOptions, supportOffers) {
+        if (showWelcomeSupportOptions && supportOffers.isEmpty()) {
+            showWelcomeSupportOptions = false
+        }
+    }
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
@@ -672,7 +689,26 @@ fun HomeScreen(
     val canShowWelcomeDialog = !uiState.isBootstrapping &&
         !uiState.isLoading &&
         !uiState.isRefreshing
-    if (uiState.showWelcomeDialog && canShowWelcomeDialog && !isShelfView) {
+    if (showWelcomeSupportOptions && supportOffers.isNotEmpty()) {
+        ProSupportOptionsDialog(
+            offers = supportOffers,
+            purchaseInProgress = uiState.isProPurchaseInProgress,
+            onPurchase = { tier ->
+                showWelcomeSupportOptions = false
+                viewModel.dismissWelcomeDialog()
+                (context as? Activity)?.let { activity ->
+                    viewModel.purchasePro(activity, tier)
+                }
+            },
+            onDismiss = { showWelcomeSupportOptions = false }
+        )
+    }
+    if (
+        uiState.showWelcomeDialog &&
+        canShowWelcomeDialog &&
+        !isShelfView &&
+        !showWelcomeSupportOptions
+    ) {
         WelcomeProDialog(
             isProUnlocked = uiState.isProUnlocked,
             proPrice = uiState.proPrice,
@@ -682,6 +718,11 @@ fun HomeScreen(
             onPurchase = {
                 viewModel.dismissWelcomeDialog()
                 (context as? Activity)?.let(viewModel::purchasePro)
+            },
+            onShowSupportOptions = if (supportOffers.isNotEmpty()) {
+                { showWelcomeSupportOptions = true }
+            } else {
+                null
             }
         )
     }
@@ -705,7 +746,8 @@ private fun WelcomeProDialog(
     isProductLoading: Boolean,
     isPurchaseInProgress: Boolean,
     onDismiss: () -> Unit,
-    onPurchase: () -> Unit
+    onPurchase: () -> Unit,
+    onShowSupportOptions: (() -> Unit)?
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -739,6 +781,21 @@ private fun WelcomeProDialog(
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
+                if (onShowSupportOptions != null) {
+                    TextButton(
+                        onClick = onShowSupportOptions,
+                        enabled = !isPurchaseInProgress && !isProductLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = stringResource(R.string.settings_pro_support_more))
+                    }
+                }
             }
         },
         confirmButton = {

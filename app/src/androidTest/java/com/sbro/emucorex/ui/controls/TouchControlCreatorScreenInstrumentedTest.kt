@@ -104,4 +104,65 @@ class TouchControlCreatorScreenInstrumentedTest {
             .performScrollToNode(hasTestTag("touch_control_creator_local_preview"))
         composeRule.onNodeWithTag("touch_control_creator_local_preview").assertIsDisplayed()
     }
+
+    @Test
+    fun deletingControlImmediatelyPersistsLibraryWithoutDeletedEntry() {
+        val saved = AtomicReference<CustomTouchControlLibrary?>()
+        val initial = CustomTouchControlLibrary(
+            controls = listOf(
+                CustomTouchControl(id = "jump", name = "Jump", actionId = "cross"),
+                CustomTouchControl(id = "brake", name = "Brake", actionId = "l2")
+            )
+        )
+        composeRule.setContent {
+            EmuCoreXTheme {
+                TouchControlCreatorScreen(
+                    initialLibrary = initial,
+                    isProUnlocked = true,
+                    onPurchasePro = {},
+                    onSave = saved::set,
+                    onBackClick = {}
+                )
+            }
+        }
+
+        val deleteButton = hasTestTag("touch_control_creator_delete_selected")
+        composeRule.onNodeWithTag("touch_control_creator_list").performScrollToNode(deleteButton)
+        composeRule.onNode(deleteButton).performClick()
+        composeRule.onNodeWithTag("touch_control_creator_confirm_delete").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(listOf("brake"), saved.get()?.controls?.map { it.id })
+        }
+    }
+
+    @Test
+    fun deletingLastControlImmediatelyPersistsEmptyLibrary() {
+        val saved = AtomicReference<CustomTouchControlLibrary?>()
+        val initial = CustomTouchControlLibrary(
+            controls = listOf(
+                CustomTouchControl(id = "jump", name = "Jump", actionId = "cross")
+            )
+        )
+        composeRule.setContent {
+            EmuCoreXTheme {
+                TouchControlCreatorScreen(
+                    initialLibrary = initial,
+                    isProUnlocked = true,
+                    onPurchasePro = {},
+                    onSave = saved::set,
+                    onBackClick = {}
+                )
+            }
+        }
+
+        val deleteButton = hasTestTag("touch_control_creator_delete_selected")
+        composeRule.onNodeWithTag("touch_control_creator_list").performScrollToNode(deleteButton)
+        composeRule.onNode(deleteButton).performClick()
+        composeRule.onNodeWithTag("touch_control_creator_confirm_delete").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(emptyList<CustomTouchControl>(), saved.get()?.controls)
+        }
+    }
 }

@@ -190,6 +190,9 @@ fun ThemeManagerScreen(
             )
             library = CustomThemeLibrary(themes = listOf(replacement))
             selectTheme(replacement.id)
+            // Keep a fresh draft available in the editor, but do not silently
+            // recreate a saved theme after the user deleted the last one.
+            onSave(CustomThemeLibrary.Empty)
             return
         }
         library = library.copy(
@@ -199,6 +202,7 @@ fun ThemeManagerScreen(
         if (selectedThemeId == id) {
             selectTheme(remaining.first().id)
         }
+        onSave(library)
     }
 
     deleteCandidateId?.let { id ->
@@ -221,7 +225,8 @@ fun ThemeManagerScreen(
                         onClick = {
                             deleteTheme(id)
                             deleteCandidateId = null
-                        }
+                        },
+                        modifier = Modifier.testTag("theme_manager_confirm_delete")
                     ) {
                         Text(stringResource(R.string.theme_manager_delete))
                     }
@@ -265,24 +270,35 @@ fun ThemeManagerScreen(
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Icon(Icons.Rounded.Palette, contentDescription = null)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.theme_manager_preview_mode),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                stringResource(R.string.theme_manager_preview_mode_desc),
-                                style = MaterialTheme.typography.bodySmall
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(Icons.Rounded.Palette, contentDescription = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    stringResource(R.string.theme_manager_preview_mode),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    stringResource(R.string.theme_manager_preview_mode_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                                )
+                            }
                         }
-                        Button(onClick = onPurchasePro, shape = ManagerSmallShape) {
+                        Button(
+                            onClick = onPurchasePro,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("theme_manager_unlock_button"),
+                            shape = ManagerSmallShape
+                        ) {
                             Text(stringResource(R.string.theme_manager_unlock))
                         }
                     }
@@ -355,7 +371,9 @@ fun ThemeManagerScreen(
                         onClick = { deleteCandidateId = selectedThemeId },
                         enabled = isProUnlocked,
                         shape = ManagerControlShape,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("theme_manager_delete_selected")
                     ) {
                         Icon(Icons.Rounded.Delete, contentDescription = null)
                         Spacer(Modifier.size(8.dp))

@@ -8,7 +8,9 @@ import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.SetupValidator
+import com.sbro.emucorex.core.ProProductOffer
 import com.sbro.emucorex.core.ProPurchaseManager
+import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.HomeBackgroundRepository
@@ -77,6 +79,9 @@ data class HomeUiState(
     val showWelcomeDialog: Boolean = false,
     val isProUnlocked: Boolean = false,
     val proPrice: String? = null,
+    val proProducts: List<ProProductOffer> = emptyList(),
+    val ownedProProductIds: Set<String> = emptySet(),
+    val isProPurchaseStatusVerified: Boolean = false,
     val isProProductLoading: Boolean = false,
     val isProProductAvailable: Boolean = false,
     val isProPurchaseInProgress: Boolean = false,
@@ -159,6 +164,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.value = _uiState.value.copy(
                     isProUnlocked = proState.isProUnlocked,
                     proPrice = proState.productPrice,
+                    proProducts = proState.products,
+                    ownedProProductIds = proState.ownedProductIds,
+                    isProPurchaseStatusVerified = proState.isPurchaseStatusVerified,
                     isProProductLoading = proState.isProductLoading,
                     isProProductAvailable = proState.isProductAvailable,
                     isProPurchaseInProgress = proState.isPurchaseInProgress,
@@ -666,8 +674,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { preferences.setWelcomeDialogShown(true) }
     }
 
-    fun purchasePro(activity: Activity) {
-        proPurchaseManager.purchase(activity)
+    fun purchasePro(
+        activity: Activity,
+        tier: ProPurchaseTier = ProPurchaseTier.BASE
+    ) {
+        proPurchaseManager.purchase(activity, tier)
     }
 
     fun clearProPurchaseMessage() {

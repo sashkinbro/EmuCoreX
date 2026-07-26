@@ -108,10 +108,12 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvUiMetrics
+import com.sbro.emucorex.core.availableProSupportOffers
 
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.GamepadFocusHighlightMode
+import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
@@ -181,6 +183,20 @@ fun OnboardingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    var showProSupportOptions by remember { mutableStateOf(false) }
+    val supportOffers = if (uiState.isProUnlocked && !uiState.isProPurchaseStatusVerified) {
+        emptyList()
+    } else {
+        availableProSupportOffers(
+            offers = uiState.proProducts,
+            ownedProductIds = uiState.ownedProProductIds
+        )
+    }
+    LaunchedEffect(showProSupportOptions, supportOffers) {
+        if (showProSupportOptions && supportOffers.isEmpty()) {
+            showProSupportOptions = false
+        }
+    }
     val configuration = LocalConfiguration.current
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
 
@@ -285,6 +301,19 @@ fun OnboardingScreen(
         val message = proPurchaseMessage ?: return@LaunchedEffect
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         viewModel.clearProPurchaseMessage()
+    }
+    if (showProSupportOptions && supportOffers.isNotEmpty()) {
+        ProSupportOptionsDialog(
+            offers = supportOffers,
+            purchaseInProgress = uiState.isProPurchaseInProgress,
+            onPurchase = { tier ->
+                showProSupportOptions = false
+                (context as? Activity)?.let { activity ->
+                    viewModel.purchasePro(activity, tier)
+                }
+            },
+            onDismiss = { showProSupportOptions = false }
+        )
     }
 
     
@@ -502,6 +531,11 @@ fun OnboardingScreen(
                                     isProductLoading = uiState.isProProductLoading,
                                     isPurchaseInProgress = uiState.isProPurchaseInProgress,
                                     onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                                    onShowSupportOptions = if (supportOffers.isNotEmpty()) {
+                                        { showProSupportOptions = true }
+                                    } else {
+                                        null
+                                    },
                                     requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
                                     contentFocusRequester = pageContentFocusRequesters[page],
                                     modifier = Modifier.padding(horizontal = 32.dp)
@@ -647,6 +681,11 @@ fun OnboardingScreen(
                                     isProductLoading = uiState.isProProductLoading,
                                     isPurchaseInProgress = uiState.isProPurchaseInProgress,
                                     onPurchase = { (context as? Activity)?.let(viewModel::purchasePro) },
+                                    onShowSupportOptions = if (supportOffers.isNotEmpty()) {
+                                        { showProSupportOptions = true }
+                                    } else {
+                                        null
+                                    },
                                     requestInitialFocus = tvUiEnabled && pagerState.currentPage == page,
                                     contentFocusRequester = pageContentFocusRequesters[page]
                                 )
@@ -917,6 +956,7 @@ private fun OnboardingProContent(
     isProductLoading: Boolean,
     isPurchaseInProgress: Boolean,
     onPurchase: () -> Unit,
+    onShowSupportOptions: (() -> Unit)?,
     requestInitialFocus: Boolean = false,
     contentFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier
@@ -991,6 +1031,21 @@ private fun OnboardingProContent(
                             stringResource(R.string.settings_pro_buy)
                         }
                     )
+                }
+            }
+            if (onShowSupportOptions != null) {
+                TextButton(
+                    onClick = onShowSupportOptions,
+                    enabled = !isPurchaseInProgress && !isProductLoading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = stringResource(R.string.settings_pro_support_more))
                 }
             }
         }
