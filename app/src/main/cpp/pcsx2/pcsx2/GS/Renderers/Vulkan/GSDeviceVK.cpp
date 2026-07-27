@@ -2971,26 +2971,21 @@ bool GSDeviceVK::CheckFeatures()
 	//const bool isNVIDIA = (vendorID == 0x10DE);
 
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
-	// Mali benefits substantially from tile-local framebuffer fetch when ROAA is exposed. Keep it
-	// capability-gated, and handle missing dual-source blending independently in GSRendererHW.
-	// Adreno/other mobile implementations remain opt-in because support varies by driver stack.
+	// Keep ROAA capability-gated on driver stacks which are not denylisted below. Adreno remains
+	// opt-in because support varies by driver stack.
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
 	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	const MobileGpuDriver mobile_driver = GetMobileDriverProfile().driver;
 	const bool is_arm_proprietary = (mobile_driver == MobileGpuDriver::ArmProprietary);
-	const bool is_imagination_proprietary =
-		(mobile_driver == MobileGpuDriver::ImaginationProprietary);
 	const bool is_mali_g57 = is_mali_vk &&
 		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
 			 GetMobileGPUIdentity().model_number == 57) ||
 			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
-	// The affected MediaTek Mali-G57 stack has been observed returning zero/stale destination
-	// color through ROAA. PowerVR proprietary drivers have the same class of feedback issue.
-	// Do not extend those fallbacks to newer MediaTek Mali, Samsung Mali, PanVK, or Mesa PowerVR:
-	// they keep the capability-gated tile-local path when their driver exposes it.
-	const bool unreliable_mobile_fbfetch =
-		(is_arm_proprietary && IsMediaTekSoC() && is_mali_g57) ||
-		(is_imagination_proprietary && is_powervr);
+	// Proprietary Mali and PowerVR stacks can expose ROAA while returning zero or stale
+	// destination color. Keep the texture-barrier feedback path on those drivers. Mesa PanVK
+	// and Mesa PowerVR remain capability-gated and do not inherit proprietary workarounds.
+	const bool unreliable_mobile_fbfetch = UsesMobileDriverWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess);
 	const bool vendor_allows_fbfetch =
 		!unreliable_mobile_fbfetch &&
 		(is_mali_vk || is_powervr || GSConfig.EnableAdrenoFramebufferFetch);

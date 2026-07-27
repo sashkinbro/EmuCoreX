@@ -140,6 +140,7 @@ static u64 ExpectedVulkanWorkarounds(
 			u64 mask = WorkaroundMask({
 				DriverWorkaround::UseDescriptorSets,
 				DriverWorkaround::DisableAttachmentFeedbackLoopLayout,
+				DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
 				DriverWorkaround::PreferCoherentReadback,
 				DriverWorkaround::ScalarizeVectorBitwiseAnd,
 			});
@@ -151,6 +152,7 @@ static u64 ExpectedVulkanWorkarounds(
 			return WorkaroundMask({
 				DriverWorkaround::UseDescriptorSets,
 				DriverWorkaround::DisableAttachmentFeedbackLoopLayout,
+				DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
 			});
 		default:
 			return 0;
@@ -409,6 +411,48 @@ TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR GE8320", mesa_pvr);
 	EXPECT_EQ(powervr.driver.driver, MobileGpuDriver::MesaPowerVR);
 	EXPECT_FALSE(powervr.driver.UsesWorkaround(DriverWorkaround::AvoidClearLoadOpRenderPass));
+}
+
+TEST(GpuDriverProfile, DisablesROAAOnlyForProprietaryMaliAndPowerVRVulkan)
+{
+	const GpuProfileSelection mali_vulkan = GpuProfileDetector::Resolve(
+		"auto", "ARM", "Mali-G615 MC6", MakeVulkanContext(RuntimeGpuProfile::Mali, false));
+	EXPECT_TRUE(mali_vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection mali_panvk = GpuProfileDetector::Resolve(
+		"auto", "ARM", "Mali-G615 MC6", MakeVulkanContext(RuntimeGpuProfile::Mali, true));
+	EXPECT_FALSE(mali_panvk.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection mali_opengl = GpuProfileDetector::Resolve(
+		"auto", "ARM", "Mali-G615 MC6", MakeOpenGLContext(RuntimeGpuProfile::Mali, false));
+	EXPECT_FALSE(mali_opengl.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection powervr_vulkan = GpuProfileDetector::Resolve(
+		"auto", "Imagination Technologies", "PowerVR GE8320",
+		MakeVulkanContext(RuntimeGpuProfile::PowerVR, false));
+	EXPECT_TRUE(powervr_vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection powervr_mesa = GpuProfileDetector::Resolve(
+		"auto", "Imagination Technologies", "PowerVR GE8320",
+		MakeVulkanContext(RuntimeGpuProfile::PowerVR, true));
+	EXPECT_FALSE(powervr_mesa.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection powervr_opengl = GpuProfileDetector::Resolve(
+		"auto", "Imagination Technologies", "PowerVR GE8320",
+		MakeOpenGLContext(RuntimeGpuProfile::PowerVR, false));
+	EXPECT_FALSE(powervr_opengl.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection adreno_vulkan = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 840",
+		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
+	EXPECT_FALSE(adreno_vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 }
 
 TEST(GpuDriverProfile, AppliesVersionBoundedMaliRules)

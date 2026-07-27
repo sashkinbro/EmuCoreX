@@ -372,9 +372,11 @@ static constexpr std::array<DriverRule, 25> s_driver_rules = {{
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenPushDescriptors) |
 			Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
+			Bug(DriverBug::BrokenRasterizationOrderAttachmentAccess) |
 			Bug(DriverBug::SlowCachedReadbackMemory) | Bug(DriverBug::BrokenVectorBitwiseAnd),
 		Workaround(DriverWorkaround::UseDescriptorSets) |
 			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
+			Workaround(DriverWorkaround::DisableRasterizationOrderAttachmentAccess) |
 			Workaround(DriverWorkaround::PreferCoherentReadback) |
 			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
 	{"vk-arm-g57-fifo", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
@@ -419,12 +421,14 @@ static constexpr std::array<DriverRule, 25> s_driver_rules = {{
 	{"vk-powervr-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPushDescriptors) | Bug(DriverBug::BrokenAttachmentFeedbackLoopLayout) |
+			Bug(DriverBug::BrokenRasterizationOrderAttachmentAccess) |
 			Bug(DriverBug::Broken16BitTextureFormats) |
 			Bug(DriverBug::BrokenDynamicRendering) | Bug(DriverBug::BrokenImagelessFramebuffer) |
 			Bug(DriverBug::BrokenPrimitiveTopologyDynamicState) |
 			Bug(DriverBug::BrokenGraphicsPipelineLibrary),
 		Workaround(DriverWorkaround::UseDescriptorSets) |
-			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout)},
+			Workaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout) |
+			Workaround(DriverWorkaround::DisableRasterizationOrderAttachmentAccess)},
 	{"vk-powervr-clear-loadop-1-7-to-1-10", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0,
 		{1, 7, 0}, {1, 10, 0}, 0, 0, false, Bug(DriverBug::BrokenClearLoadOpRenderPass),

@@ -285,6 +285,7 @@ const char* GpuProfileDetector::BugToString(DriverBug value)
 		case DriverBug::BrokenPushDescriptors: return "BrokenPushDescriptors";
 		case DriverBug::BrokenProvokingVertex: return "BrokenProvokingVertex";
 		case DriverBug::BrokenAttachmentFeedbackLoopLayout: return "BrokenAttachmentFeedbackLoopLayout";
+		case DriverBug::BrokenRasterizationOrderAttachmentAccess: return "BrokenRasterizationOrderAttachmentAccess";
 		case DriverBug::BrokenSubpassFeedback: return "BrokenSubpassFeedback";
 		case DriverBug::BrokenColorWriteMaskWithDepthTest: return "BrokenColorWriteMaskWithDepthTest";
 		case DriverBug::BrokenDepthStencilDiscard: return "BrokenDepthStencilDiscard";
@@ -319,6 +320,8 @@ const char* GpuProfileDetector::WorkaroundToString(DriverWorkaround value)
 		case DriverWorkaround::UseDescriptorSets: return "UseDescriptorSets";
 		case DriverWorkaround::DisableProvokingVertex: return "DisableProvokingVertex";
 		case DriverWorkaround::DisableAttachmentFeedbackLoopLayout: return "DisableAttachmentFeedbackLoopLayout";
+		case DriverWorkaround::DisableRasterizationOrderAttachmentAccess:
+			return "DisableRasterizationOrderAttachmentAccess";
 		case DriverWorkaround::EmulateColorWriteMask: return "EmulateColorWriteMask";
 		case DriverWorkaround::PreferCoherentReadback: return "PreferCoherentReadback";
 		case DriverWorkaround::AvoidClearLoadOpRenderPass: return "AvoidClearLoadOpRenderPass";
