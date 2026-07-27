@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 enum class TextureDownloadStatus {
@@ -66,7 +67,8 @@ data class TextureDownloadTask(
     val etaSeconds: Long,
     val status: TextureDownloadStatus,
     val error: String,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val parts: List<RemoteTexturePart> = emptyList()
 ) {
     val progress: Float
         get() = if (totalBytes <= 0L) 0f
@@ -104,7 +106,7 @@ class TextureDownloadManager(context: Context) {
         val task = TextureDownloadStore.update(appContext, key) { current ->
             current.copy(
                 status = TextureDownloadStatus.QUEUED,
-                downloadedBytes = TextureDownloadStore.partialFile(appContext, key).length(),
+                downloadedBytes = TextureDownloadStore.downloadedBytes(appContext, current),
                 bytesPerSecond = 0L,
                 etaSeconds = 0L,
                 error = "",
@@ -172,24 +174,18 @@ class TextureDownloadWorker(
                 )
             }
             setForeground(foregroundInfo(task))
-            val part = download(task)
+            val parts = download(task)
 
             task = updateTask(task) {
                 it.copy(
                     status = TextureDownloadStatus.VERIFYING,
-                    downloadedBytes = part.length(),
+                    downloadedBytes = it.totalBytes,
                     bytesPerSecond = 0L,
                     etaSeconds = 0L
                 )
             }
             setForeground(foregroundInfo(task))
-            verify(part, task)
-            val archive = TextureDownloadStore.archiveFile(applicationContext, key)
-            if (archive.exists()) archive.delete()
-            if (!part.renameTo(archive)) {
-                part.copyTo(archive, overwrite = true)
-                part.delete()
-            }
+            val archive = assembleAndVerify(parts, task)
 
             task = updateTask(task) {
                 it.copy(status = TextureDownloadStatus.INSTALLING, bytesPerSecond = 0L, etaSeconds = 0L)
@@ -229,7 +225,7 @@ class TextureDownloadWorker(
                 TextureDownloadStore.update(applicationContext, key) {
                     it.copy(
                         status = TextureDownloadStatus.WAITING_NETWORK,
-                        downloadedBytes = TextureDownloadStore.partialFile(applicationContext, key).length(),
+                        downloadedBytes = TextureDownloadStore.downloadedBytes(applicationContext, it),
                         bytesPerSecond = 0L,
                         etaSeconds = 0L,
                         error = "",
@@ -244,13 +240,36 @@ class TextureDownloadWorker(
         }
     }
 
-    private suspend fun download(initialTask: TextureDownloadTask): File {
-        val part = TextureDownloadStore.partialFile(applicationContext, initialTask.key)
+    private suspend fun download(initialTask: TextureDownloadTask): List<File> {
+        val payloads = initialTask.parts.ifEmpty {
+            listOf(RemoteTexturePart(initialTask.downloadUrl, initialTask.totalBytes, initialTask.sha256))
+        }
+        val files = mutableListOf<File>()
+        var completedBytes = 0L
+        payloads.forEachIndexed { index, payload ->
+            val part = TextureDownloadStore.partialFile(
+                applicationContext,
+                initialTask.key,
+                index,
+                payloads.size
+            )
+            files += downloadPart(initialTask, payload, part, completedBytes)
+            completedBytes += payload.sizeBytes
+        }
+        return files
+    }
+
+    private suspend fun downloadPart(
+        initialTask: TextureDownloadTask,
+        payload: RemoteTexturePart,
+        part: File,
+        completedBytes: Long
+    ): File {
         part.parentFile?.mkdirs()
-        if (part.length() > initialTask.totalBytes) part.delete()
+        if (part.length() > payload.sizeBytes) part.delete()
         var offset = part.length()
-        if (offset == initialTask.totalBytes && offset > 0L) return part
-        val connection = openDownloadConnection(initialTask.downloadUrl, offset)
+        if (offset == payload.sizeBytes && offset > 0L) return part
+        val connection = openDownloadConnection(payload.downloadUrl, offset)
         try {
             val response = connection.responseCode
             val append = offset > 0L && response == HttpURLConnection.HTTP_PARTIAL
@@ -263,11 +282,12 @@ class TextureDownloadWorker(
                 offset = 0L
             }
             val responseBytes = connection.contentLengthLong
-            if (responseBytes > 0L && offset + responseBytes > initialTask.totalBytes) {
+            if (responseBytes > 0L && offset + responseBytes > payload.sizeBytes) {
                 throw PermanentDownloadException("Download is larger than the catalog entry")
             }
 
-            var downloaded = offset
+            var partDownloaded = offset
+            var downloaded = completedBytes + partDownloaded
             var smoothedSpeed = 0.0
             var lastSampleAt = SystemClock.elapsedRealtime()
             var lastSampleBytes = downloaded
@@ -296,8 +316,9 @@ class TextureDownloadWorker(
                         val read = input.read(buffer)
                         if (read < 0) break
                         output.write(buffer, 0, read)
-                        downloaded += read
-                        if (downloaded > task.totalBytes) {
+                        partDownloaded += read
+                        downloaded = completedBytes + partDownloaded
+                        if (partDownloaded > payload.sizeBytes) {
                             throw PermanentDownloadException("Download is larger than the catalog entry")
                         }
 
@@ -333,7 +354,7 @@ class TextureDownloadWorker(
                     }
                 }
             }
-            if (downloaded != task.totalBytes) throw IOException("Download ended before the expected size")
+            if (partDownloaded != payload.sizeBytes) throw IOException("Download ended before the expected size")
             return part
         } finally {
             connection.disconnect()
@@ -394,22 +415,49 @@ class TextureDownloadWorker(
         throw IOException("Could not open download")
     }
 
-    private fun verify(file: File, task: TextureDownloadTask) {
-        if (file.length() != task.totalBytes) {
-            throw PermanentDownloadException("Downloaded size does not match the catalog")
+    private fun assembleAndVerify(files: List<File>, task: TextureDownloadTask): File {
+        val payloads = task.parts.ifEmpty {
+            listOf(RemoteTexturePart(task.downloadUrl, task.totalBytes, task.sha256))
         }
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().buffered(VERIFY_BUFFER_BYTES).use { input ->
-            val buffer = ByteArray(VERIFY_BUFFER_BYTES)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                digest.update(buffer, 0, read)
+        if (files.size != payloads.size) throw PermanentDownloadException("Texture archive parts are incomplete")
+        val archive = TextureDownloadStore.archiveFile(applicationContext, task.key)
+        archive.delete()
+        val wholeDigest = MessageDigest.getInstance("SHA-256")
+        var assembledBytes = 0L
+        try {
+            archive.outputStream().buffered(VERIFY_BUFFER_BYTES).use { output ->
+                val buffer = ByteArray(VERIFY_BUFFER_BYTES)
+                files.zip(payloads).forEach { (file, payload) ->
+                    if (file.length() != payload.sizeBytes) {
+                        throw PermanentDownloadException("Downloaded part size does not match the catalog")
+                    }
+                    val partDigest = MessageDigest.getInstance("SHA-256")
+                    file.inputStream().buffered(VERIFY_BUFFER_BYTES).use { input ->
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            partDigest.update(buffer, 0, read)
+                            wholeDigest.update(buffer, 0, read)
+                            output.write(buffer, 0, read)
+                            assembledBytes += read
+                        }
+                    }
+                    val partHash = partDigest.digest().toHex()
+                    if (!partHash.equals(payload.sha256, ignoreCase = true)) {
+                        throw PermanentDownloadException("Downloaded part SHA-256 does not match the catalog")
+                    }
+                }
             }
-        }
-        val actual = digest.digest().joinToString("") { byte -> "%02X".format(byte.toInt() and 0xff) }
-        if (!actual.equals(task.sha256, ignoreCase = true)) {
-            throw PermanentDownloadException("Downloaded SHA-256 does not match the catalog")
+            if (assembledBytes != task.totalBytes) {
+                throw PermanentDownloadException("Downloaded size does not match the catalog")
+            }
+            if (!wholeDigest.digest().toHex().equals(task.sha256, ignoreCase = true)) {
+                throw PermanentDownloadException("Downloaded SHA-256 does not match the catalog")
+            }
+            return archive
+        } catch (error: Throwable) {
+            archive.delete()
+            throw error
         }
     }
 
@@ -426,7 +474,7 @@ class TextureDownloadWorker(
         TextureDownloadStore.update(applicationContext, key) {
             it.copy(
                 status = TextureDownloadStatus.FAILED,
-                downloadedBytes = TextureDownloadStore.partialFile(applicationContext, key).length(),
+                downloadedBytes = TextureDownloadStore.downloadedBytes(applicationContext, current),
                 bytesPerSecond = 0L,
                 etaSeconds = 0L,
                 error = message.take(240),
@@ -560,12 +608,18 @@ internal object TextureDownloadStore {
         val previous = readUnlocked(context, key)
         val samePayload = previous?.downloadUrl == pack.downloadUrl &&
             previous.sha256.equals(pack.sha256, ignoreCase = true) &&
-            previous.totalBytes == pack.sizeBytes
+            previous.totalBytes == pack.sizeBytes &&
+            previous.parts == pack.parts
         if (!samePayload) {
-            File(directory, PARTIAL).delete()
-            File(directory, ARCHIVE).delete()
+            directory.listFiles()
+                ?.filter { it.name == PARTIAL || it.name.startsWith("$PARTIAL.") || it.name == ARCHIVE }
+                ?.forEach(File::delete)
         }
-        val downloaded = File(directory, PARTIAL).length().coerceAtMost(pack.sizeBytes)
+        val downloaded = previous
+            ?.takeIf { samePayload }
+            ?.let { downloadedBytes(context, it) }
+            ?.coerceAtMost(pack.sizeBytes)
+            ?: 0L
         TextureDownloadTask(
             key = key,
             packId = pack.id,
@@ -580,7 +634,8 @@ internal object TextureDownloadStore {
             etaSeconds = 0L,
             status = TextureDownloadStatus.QUEUED,
             error = "",
-            updatedAt = System.currentTimeMillis()
+            updatedAt = System.currentTimeMillis(),
+            parts = pack.parts
         ).also { writeUnlocked(context, it) }
     }
 
@@ -607,11 +662,25 @@ internal object TextureDownloadStore {
         transform(current).also { writeUnlocked(context, it) }
     }
 
-    fun partialFile(context: Context, key: String): File = File(directory(context, key), PARTIAL)
+    fun partialFile(
+        context: Context,
+        key: String,
+        index: Int = 0,
+        partCount: Int = 1
+    ): File = File(directory(context, key), if (partCount == 1) PARTIAL else "$PARTIAL.${index + 1}")
     fun archiveFile(context: Context, key: String): File = File(directory(context, key), ARCHIVE)
 
+    fun downloadedBytes(context: Context, task: TextureDownloadTask): Long {
+        val partCount = task.parts.size.coerceAtLeast(1)
+        return (0 until partCount).sumOf { index ->
+            partialFile(context, task.key, index, partCount).length()
+        }.coerceAtMost(task.totalBytes)
+    }
+
     fun discardPayload(context: Context, key: String) = synchronized(lock) {
-        partialFile(context, key).delete()
+        directory(context, key).listFiles()
+            ?.filter { it.name == PARTIAL || it.name.startsWith("$PARTIAL.") }
+            ?.forEach(File::delete)
         archiveFile(context, key).delete()
     }
 
@@ -643,7 +712,17 @@ internal object TextureDownloadStore {
                 etaSeconds = json.optLong("etaSeconds", 0L),
                 status = TextureDownloadStatus.valueOf(json.getString("status")),
                 error = json.optString("error"),
-                updatedAt = json.optLong("updatedAt", 0L)
+                updatedAt = json.optLong("updatedAt", 0L),
+                parts = json.optJSONArray("parts")?.let { array ->
+                    (0 until array.length()).map { index ->
+                        val part = array.getJSONObject(index)
+                        RemoteTexturePart(
+                            downloadUrl = part.getString("downloadUrl"),
+                            sizeBytes = part.getLong("sizeBytes"),
+                            sha256 = part.getString("sha256")
+                        )
+                    }
+                }.orEmpty()
             )
         }.getOrNull()
     }
@@ -665,6 +744,19 @@ internal object TextureDownloadStore {
             .put("status", task.status.name)
             .put("error", task.error)
             .put("updatedAt", task.updatedAt)
+            .put(
+                "parts",
+                JSONArray().apply {
+                    task.parts.forEach { part ->
+                        put(
+                            JSONObject()
+                                .put("downloadUrl", part.downloadUrl)
+                                .put("sizeBytes", part.sizeBytes)
+                                .put("sha256", part.sha256)
+                        )
+                    }
+                }
+            )
         temporary.writeText(json.toString())
         if (!temporary.renameTo(target)) {
             temporary.copyTo(target, overwrite = true)
@@ -701,5 +793,8 @@ internal fun formatDownloadDuration(seconds: Long): String {
         else -> String.format(Locale.getDefault(), "%d:%02d", minutes, remainingSeconds)
     }
 }
+
+private fun ByteArray.toHex(): String =
+    joinToString("") { byte -> "%02X".format(byte.toInt() and 0xff) }
 
 private class PermanentDownloadException(message: String) : IOException(message)

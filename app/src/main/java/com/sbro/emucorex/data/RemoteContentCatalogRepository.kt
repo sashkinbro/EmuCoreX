@@ -15,6 +15,12 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 
+data class RemoteTexturePart(
+    val downloadUrl: String,
+    val sizeBytes: Long,
+    val sha256: String
+)
+
 data class RemoteTexturePack(
     val id: String,
     val name: String,
@@ -30,7 +36,8 @@ data class RemoteTexturePack(
     val sizeBytes: Long,
     val sha256: String,
     val fileCount: Int,
-    val previewUrls: List<String>
+    val previewUrls: List<String>,
+    val parts: List<RemoteTexturePart> = emptyList()
 )
 
 data class RemoteCheatPack(
@@ -78,17 +85,40 @@ class RemoteContentCatalogRepository(context: Context) {
         pack: RemoteTexturePack,
         onProgress: (Float) -> Unit = {}
     ): File {
-        require(pack.downloadUrl.isHttpsUrl()) { "Texture download must use HTTPS" }
         require(pack.sizeBytes in 1..MAX_TEXTURE_ARCHIVE_BYTES) { "Texture archive size is invalid" }
         val target = File(downloadDir, "${sanitizeFileName(pack.id)}-${UUID.randomUUID()}.zip")
-        return downloadFile(
-            url = pack.downloadUrl,
-            target = target,
-            expectedSize = pack.sizeBytes,
-            maxBytes = MAX_TEXTURE_ARCHIVE_BYTES,
-            expectedSha256 = pack.sha256,
-            onProgress = onProgress
-        )
+        val payloads = pack.parts.ifEmpty {
+            listOf(RemoteTexturePart(pack.downloadUrl, pack.sizeBytes, pack.sha256))
+        }
+        require(payloads.sumOf(RemoteTexturePart::sizeBytes) == pack.sizeBytes)
+        val temporaryParts = mutableListOf<File>()
+        try {
+            var completedBytes = 0L
+            payloads.forEachIndexed { index, part ->
+                require(part.downloadUrl.isHttpsUrl()) { "Texture download must use HTTPS" }
+                require(part.sizeBytes in 1..MAX_TEXTURE_PART_BYTES) { "Texture archive part size is invalid" }
+                val temporary = File(downloadDir, "${target.name}.part${index + 1}")
+                temporaryParts += downloadFile(
+                    url = part.downloadUrl,
+                    target = temporary,
+                    expectedSize = part.sizeBytes,
+                    maxBytes = MAX_TEXTURE_PART_BYTES,
+                    expectedSha256 = part.sha256
+                ) { partProgress ->
+                    val downloaded = completedBytes + (part.sizeBytes * partProgress).toLong()
+                    onProgress((downloaded.toDouble() / pack.sizeBytes).toFloat().coerceIn(0f, 1f))
+                }
+                completedBytes += part.sizeBytes
+            }
+            concatenateAndVerify(temporaryParts, target, pack.sizeBytes, pack.sha256)
+            onProgress(1f)
+            return target
+        } catch (error: Throwable) {
+            target.delete()
+            throw error
+        } finally {
+            temporaryParts.forEach(File::delete)
+        }
     }
 
     fun downloadCheatText(pack: RemoteCheatPack): String {
@@ -171,13 +201,26 @@ class RemoteContentCatalogRepository(context: Context) {
                     sizeBytes = item.long("sizeBytes"),
                     sha256 = item.requiredString("sha256").uppercase(Locale.US),
                     fileCount = item.int("fileCount"),
-                    previewUrls = item.stringList("previewUrls").filter(String::isHttpsUrl)
+                    previewUrls = item.stringList("previewUrls").filter(String::isHttpsUrl),
+                    parts = item.array("parts").map { partElement ->
+                        val part = partElement.jsonObject
+                        RemoteTexturePart(
+                            downloadUrl = part.requiredString("downloadUrl").requireHttps(),
+                            sizeBytes = part.long("sizeBytes"),
+                            sha256 = part.requiredString("sha256").uppercase(Locale.US)
+                        )
+                    }
                 ).also { pack ->
                     require(pack.serials.isNotEmpty())
                     require(pack.authors.isNotEmpty())
                     require(pack.sizeBytes in 1..MAX_TEXTURE_ARCHIVE_BYTES)
                     require(pack.sha256.matches(Regex("[0-9A-F]{64}")))
                     require(pack.fileCount > 0)
+                    require(pack.parts.isEmpty() || pack.parts.sumOf(RemoteTexturePart::sizeBytes) == pack.sizeBytes)
+                    pack.parts.forEach { part ->
+                        require(part.sizeBytes in 1..MAX_TEXTURE_PART_BYTES)
+                        require(part.sha256.matches(Regex("[0-9A-F]{64}")))
+                    }
                 }
             }.getOrNull()
         }.distinctBy(RemoteTexturePack::id)
@@ -289,6 +332,47 @@ class RemoteContentCatalogRepository(context: Context) {
         }
     }
 
+    private fun concatenateAndVerify(
+        parts: List<File>,
+        target: File,
+        expectedSize: Long,
+        expectedSha256: String
+    ) {
+        val temporary = File(target.parentFile, "${target.name}.assembling")
+        temporary.delete()
+        try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            var copied = 0L
+            temporary.outputStream().buffered().use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 4)
+                parts.forEach { part ->
+                    part.inputStream().buffered().use { input ->
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                            digest.update(buffer, 0, read)
+                            copied += read
+                        }
+                    }
+                }
+            }
+            if (copied != expectedSize) throw IOException("Downloaded size does not match the catalog")
+            val actualHash = digest.digest().joinToString("") { byte -> "%02X".format(byte) }
+            if (!actualHash.equals(expectedSha256, ignoreCase = true)) {
+                throw IOException("Downloaded SHA-256 does not match the catalog")
+            }
+            if (!temporary.renameTo(target)) {
+                temporary.copyTo(target, overwrite = true)
+                temporary.delete()
+            }
+        } catch (error: Throwable) {
+            temporary.delete()
+            target.delete()
+            throw error
+        }
+    }
+
     private fun openConnection(url: String): HttpURLConnection {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.connectTimeout = 15_000
@@ -321,7 +405,8 @@ class RemoteContentCatalogRepository(context: Context) {
     private companion object {
         const val MAX_CATALOG_BYTES = 8L * 1024L * 1024L
         const val MAX_CHEAT_BYTES = 2L * 1024L * 1024L
-        const val MAX_TEXTURE_ARCHIVE_BYTES = 4L * 1024L * 1024L * 1024L
+        const val MAX_TEXTURE_ARCHIVE_BYTES = 16L * 1024L * 1024L * 1024L
+        const val MAX_TEXTURE_PART_BYTES = 2L * 1024L * 1024L * 1024L
         const val CATALOG_CACHE_TTL_MS = 6L * 60L * 60L * 1000L
 
         val TEXTURE_CATALOG_URLS = listOf(
