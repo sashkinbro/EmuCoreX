@@ -7980,6 +7980,7 @@ SCKA-20090:
   region: "NTSC-K"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
 SCKA-20091:
@@ -11438,6 +11439,7 @@ SCUS-97177:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     autoFlush: 2 # Fixes speed effect intensity.
     minimumBlendingLevel: 2 # Fixes cloud depth rendering.
 SCUS-97178:
@@ -11996,6 +11998,7 @@ SCUS-97329:
   name: "Downhill Domination [Demo]"
   region: "NTSC-U"
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     autoFlush: 2 # Fixes speed effect intensity.
     minimumBlendingLevel: 2 # Fixes cloud depth rendering.
 SCUS-97330:
@@ -13967,6 +13970,7 @@ SLED-52325:
   name: "Downhill Domination [Demo]"
   region: "PAL-E"
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     autoFlush: 2 # Fixes speed effect intensity.
     minimumBlendingLevel: 2 # Fixes cloud depth rendering.
 SLED-52326:
@@ -14835,11 +14839,13 @@ SLES-50120:
   compat: 5
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes shadows car
+    hwDownloadMode: 4 # Fixes Sun Effect
 SLES-50121:
   name: "Rumble Racing"
   region: "PAL-Unk"
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes shadows car
+    hwDownloadMode: 4 # Fixes Sun Effect
 SLES-50126:
   name: "Quake III - Revolution"
   region: "PAL-M3"
@@ -19917,6 +19923,7 @@ SLES-52202:
   region: "PAL-M5"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     autoFlush: 2 # Fixes speed effect intensity.
     minimumBlendingLevel: 2 # Fixes cloud depth rendering.
 SLES-52203:
@@ -27106,6 +27113,7 @@ SLES-54490:
   region: "PAL-M5"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
 SLES-54492:
@@ -50690,6 +50698,7 @@ SLPM-66550:
   region: "NTSC-J"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
 SLPM-66551:
@@ -54344,6 +54353,7 @@ SLPM-74241:
   name-en: "God Hand [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
 SLPM-74242:
@@ -65137,6 +65147,7 @@ SLUS-20174:
   region: "NTSC-U"
   gsHWFixes:
     minimumBlendingLevel: 3 # Fixes Shadows car
+    hwDownloadMode: 4 # Fixes Sun Effect
 SLUS-20175:
   name: "Mobile Suit Gundam - Journey to Jaburo"
   region: "NTSC-U"
@@ -72970,6 +72981,7 @@ SLUS-21503:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    hwDownloadMode: 3 # Fixes Sun Effect
     halfPixelOffset: 2 # Depth of field effect aligned properly + Shifts buildings correctly.
     nativeScaling: 2 # Fixes post effects.
 SLUS-21536:
