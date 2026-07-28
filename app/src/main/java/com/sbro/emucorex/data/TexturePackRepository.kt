@@ -355,7 +355,7 @@ class TexturePackRepository(
     private companion object {
         const val MAX_ARCHIVE_ENTRIES = 50_000
         const val MAX_TEXTURE_FILE_BYTES = 512L * 1024L * 1024L
-        const val MAX_ARCHIVE_BYTES = 8L * 1024L * 1024L * 1024L
+        const val MAX_ARCHIVE_BYTES = 12L * 1024L * 1024L * 1024L
         const val MIN_FREE_SPACE_BYTES = 512L * 1024L * 1024L
         val githubCodeloadRootPattern = Regex(".+-[0-9a-fA-F]{40}")
     }
