@@ -14833,9 +14833,13 @@ SLES-50120:
   name: "Rumble Racing"
   region: "PAL-M3"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes shadows car
 SLES-50121:
   name: "Rumble Racing"
   region: "PAL-Unk"
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes shadows car
 SLES-50126:
   name: "Quake III - Revolution"
   region: "PAL-M3"
@@ -65131,6 +65135,8 @@ SLUS-20173:
 SLUS-20174:
   name: "Rumble Racing"
   region: "NTSC-U"
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes Shadows car
 SLUS-20175:
   name: "Mobile Suit Gundam - Journey to Jaburo"
   region: "NTSC-U"
@@ -73247,6 +73253,8 @@ SLUS-21588:
   name: "Avatar - The Last Airbender - The Burning Earth"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes missing lighting and skin color.
 SLUS-21589:
   name: "Pinball Hall of Fame - The Williams Collection"
   region: "NTSC-U"
@@ -74528,6 +74536,8 @@ SLUS-21804:
   name: "Avatar - The Last Airbender - Into the Inferno"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes missing lighting and skin color.
 SLUS-21805:
   name: "Hasbro Family Game Night"
   region: "NTSC-U"
