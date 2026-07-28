@@ -42,16 +42,16 @@ class MemoryCardRepository(
         val defaultSlot1 = DEFAULT_CARD_SLOT_1
         val defaultSlot2 = DEFAULT_CARD_SLOT_2
 
-        migrateLegacyDefaultCardIfNeeded(defaultSlot1, initialCards)
-        migrateLegacyDefaultCardIfNeeded(defaultSlot2, initialCards)
+        migrateDefaultCardToStandardFileIfNeeded(defaultSlot1, initialCards)
+        migrateDefaultCardToStandardFileIfNeeded(defaultSlot2, initialCards)
 
         val existingNames = listCards().map { it.name }.toSet()
 
         if (defaultSlot1 !in existingNames) {
-            createFolderCard(defaultSlot1)
+            createStandardDefaultCard(defaultSlot1)
         }
         if (defaultSlot2 !in existingNames) {
-            createFolderCard(defaultSlot2)
+            createStandardDefaultCard(defaultSlot2)
         }
 
         val refreshedNames = listCards().map { it.name }.toSet()
@@ -349,29 +349,98 @@ class MemoryCardRepository(
         return EmulatorStorage.memoryCardsDir(context, preferences.getEmulatorDataPathSync())
     }
 
-    private fun migrateLegacyDefaultCardIfNeeded(
+    private fun createStandardDefaultCard(cardName: String): Boolean {
+        return NativeApp.createMemoryCard(
+            cardName,
+            STANDARD_DEFAULT_MEMORY_CARD_SPEC.type,
+            STANDARD_DEFAULT_MEMORY_CARD_SPEC.fileType
+        )
+    }
+
+    private fun migrateDefaultCardToStandardFileIfNeeded(
         cardName: String,
         availableCards: List<MemoryCardInfo>
     ) {
         val existingCard = availableCards.firstOrNull { it.name.equals(cardName, ignoreCase = true) } ?: return
         val target = File(existingCard.path)
-        if (!target.exists() || !target.isFile || !existingCard.shouldRecreateDefaultCard(target)) {
+        val migration = existingCard.defaultCardMigration(target)
+        if (migration == DefaultCardMigration.None) {
             return
         }
 
-        runCatching {
-            if (target.delete()) {
-                NativeApp.createMemoryCard(cardName, MEMORY_CARD_TYPE_FOLDER, MEMORY_CARD_FILE_TYPE_UNKNOWN)
+        val preservedName = buildUniqueCardName(
+            when (migration) {
+                DefaultCardMigration.PreserveFolder -> "${cardName.removeSuffix(".ps2")} Folder"
+                DefaultCardMigration.ReplaceBrokenFile -> "${cardName.removeSuffix(".ps2")} Legacy"
+                DefaultCardMigration.None -> return
             }
+        )
+        val preservedCard = File(memoryCardsDir(), preservedName)
+
+        migrateDefaultCardStorage(
+            target = target,
+            preservedCard = preservedCard,
+            discardPreservedOnSuccess = migration == DefaultCardMigration.ReplaceBrokenFile
+        ) {
+            createStandardDefaultCard(cardName)
         }
     }
 }
 
-private const val MEMORY_CARD_TYPE_FILE = 1
+internal const val MEMORY_CARD_TYPE_FILE = 1
 private const val MEMORY_CARD_TYPE_FOLDER = 2
 private const val MEMORY_CARD_FILE_TYPE_UNKNOWN = 0
+internal const val MEMORY_CARD_FILE_TYPE_PS2_8_MB = 1
 private const val DEFAULT_CARD_SLOT_1 = "Mcd001.ps2"
 private const val DEFAULT_CARD_SLOT_2 = "Mcd002.ps2"
+
+internal data class MemoryCardCreationSpec(
+    val type: Int,
+    val fileType: Int
+)
+
+internal val STANDARD_DEFAULT_MEMORY_CARD_SPEC = MemoryCardCreationSpec(
+    type = MEMORY_CARD_TYPE_FILE,
+    fileType = MEMORY_CARD_FILE_TYPE_PS2_8_MB
+)
+
+internal enum class DefaultCardMigration {
+    None,
+    PreserveFolder,
+    ReplaceBrokenFile
+}
+
+internal fun migrateDefaultCardStorage(
+    target: File,
+    preservedCard: File,
+    discardPreservedOnSuccess: Boolean,
+    createStandardCard: () -> Boolean
+): Boolean {
+    val preserved = runCatching { target.renameTo(preservedCard) }.getOrDefault(false)
+    if (!preserved) {
+        return false
+    }
+
+    val created = runCatching(createStandardCard).getOrDefault(false)
+    if (created) {
+        if (discardPreservedOnSuccess) {
+            preservedCard.delete()
+        }
+        return true
+    }
+
+    // A failed native creation may leave a partial card behind. Remove only
+    // that newly-created target, then restore the user's original card.
+    runCatching {
+        if (target.isDirectory) {
+            target.deleteRecursively()
+        } else {
+            target.delete()
+        }
+        preservedCard.renameTo(target)
+    }
+    return false
+}
 
 private fun isDefaultMemoryCardName(name: String): Boolean {
     return name.equals(DEFAULT_CARD_SLOT_1, ignoreCase = true) ||
@@ -456,13 +525,21 @@ private fun File.looksLikeLegacyBlankPs2Card(): Boolean {
     }.getOrDefault(false)
 }
 
-private fun MemoryCardInfo.shouldRecreateDefaultCard(file: File): Boolean {
+internal fun MemoryCardInfo.defaultCardMigration(file: File): DefaultCardMigration {
     if (!isDefaultMemoryCardName(name)) {
-        return false
+        return DefaultCardMigration.None
+    }
+
+    if (isFolder && file.isDirectory) {
+        return DefaultCardMigration.PreserveFolder
+    }
+
+    if (!file.isFile) {
+        return DefaultCardMigration.None
     }
 
     if (file.looksLikeLegacyBlankPs2Card()) {
-        return true
+        return DefaultCardMigration.ReplaceBrokenFile
     }
 
     val looksLikeBrokenLegacyCard = type == 1 &&
@@ -470,7 +547,11 @@ private fun MemoryCardInfo.shouldRecreateDefaultCard(file: File): Boolean {
         !formatted &&
         sizeBytes in 8_000_000L..9_000_000L
 
-    return looksLikeBrokenLegacyCard
+    return if (looksLikeBrokenLegacyCard) {
+        DefaultCardMigration.ReplaceBrokenFile
+    } else {
+        DefaultCardMigration.None
+    }
 }
 
 private const val LEGACY_BLANK_SAMPLE_BYTES = 64 * 1024
