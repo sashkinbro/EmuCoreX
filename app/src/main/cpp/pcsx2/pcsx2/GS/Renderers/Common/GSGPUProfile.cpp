@@ -39,24 +39,20 @@ bool ContainsAny(std::string_view haystack, std::initializer_list<const char*> n
 	return false;
 }
 
-MobileGsTuning MakeMobileGsTuning(
-	u32 pooled_targets, u32 target_age, u32 pooled_textures, u32 texture_age)
+MobileGsTuning MakeMobileGsTuning(u32, u32, u32, u32)
 {
-	MobileGsTuning tuning;
-	tuning.pooled_targets = pooled_targets;
-	tuning.target_age = target_age;
-	tuning.pooled_textures = pooled_textures;
-	tuning.texture_age = texture_age;
-	tuning.constrained = (pooled_targets < 128 || pooled_textures < 128);
-	// Avoid recycling a texture which was already used in the current frame. The pool limits
-	// still bound memory use per profile, while this keeps the no-render-pass-restart fast path.
-	tuning.prefer_new_textures = true;
-	return tuning;
+	// Keep the legacy model-table call sites source-compatible, but do not let their old
+	// tier values change GS resource lifetime. Every call resolves to the full policy.
+	return MobileGsTuning{};
 }
 
 MobileGsTuning MakeConservativeMobileGsTuning()
 {
-	return MakeMobileGsTuning(96, 8, 96, 6);
+	// Keep the upstream GS retention policy on every mobile GPU. Capability and driver
+	// workarounds remain profile-specific, but shrinking these pools is not a safe way to
+	// classify a weaker GPU: it increases allocation churn and can discard intermediate
+	// render surfaces still needed by multi-pass effects.
+	return MakeMobileGsTuning(300, 20, 300, 10);
 }
 } // namespace GpuProfileDetail
 
@@ -339,7 +335,9 @@ static void ApplyResolvedProfile(GpuProfileSelection& selection, RuntimeGpuProfi
 {
 	selection.runtime_profile = runtime_profile;
 	selection.gpu = std::move(resolved.gpu);
-	selection.gs_tuning = resolved.tuning;
+	// Model tables identify the GPU and select narrowly-scoped driver workarounds. Do not
+	// turn device tiering into a different GS resource lifetime model.
+	selection.gs_tuning = GpuProfileDetail::MakeConservativeMobileGsTuning();
 }
 
 GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value, std::string_view gpu_vendor,

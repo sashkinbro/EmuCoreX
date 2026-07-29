@@ -584,7 +584,6 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, i
 	FastList<GSTexture*>& pool = m_pool[type != GSTexture::Type::Texture];
 
 	GSTexture* t = nullptr;
-	auto fallback = pool.end();
 
 	for (auto i = pool.begin(); i != pool.end(); ++i)
 	{
@@ -600,10 +599,6 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, i
 				pool.erase(i);
 				break;
 			}
-			else if (fallback == pool.end())
-			{
-				fallback = i;
-			}
 		}
 
 		t = nullptr;
@@ -611,37 +606,29 @@ GSTexture* GSDevice::FetchSurface(GSTexture::Type type, int width, int height, i
 
 	if (!t)
 	{
-		if (pool.size() >= GetPoolLimit(type == GSTexture::Type::Texture) &&
-			fallback != pool.end())
+		// A surface used earlier in this frame can still contain an intermediate pass result.
+		// Never overwrite it merely because the retained pool reached its soft limit.
+		t = CreateSurface(type, size.x, size.y, levels, format);
+		if (!t)
 		{
-			t = *fallback;
-			m_pool_memory_usage -= t->GetMemUsage();
-			pool.erase(fallback);
-		}
-		else
-		{
+			ERROR_LOG("GS: Memory allocation failure for {}x{} texture. Purging pool and retrying.", size.x, size.y);
+			PurgePool();
 			t = CreateSurface(type, size.x, size.y, levels, format);
 			if (!t)
 			{
-				ERROR_LOG("GS: Memory allocation failure for {}x{} texture. Purging pool and retrying.", size.x, size.y);
-				PurgePool();
-				t = CreateSurface(type, size.x, size.y, levels, format);
-				if (!t)
-				{
-					ERROR_LOG("GS: Memory allocation failure for {}x{} texture after purging pool.", size.x, size.y);
-					return nullptr;
-				}
+				ERROR_LOG("GS: Memory allocation failure for {}x{} texture after purging pool.", size.x, size.y);
+				return nullptr;
 			}
+		}
 
 #ifdef PCSX2_DEVBUILD
-			if (GSConfig.UseDebugDevice)
-			{
-				const TextureLabel label = GetTextureLabel(type, format);
-				const u32 id = ++s_texture_counts[static_cast<u32>(label)];
-				t->SetDebugName(TinyString::from_format("{} {}", TextureLabelString(label), id));
-			}
-#endif
+		if (GSConfig.UseDebugDevice)
+		{
+			const TextureLabel label = GetTextureLabel(type, format);
+			const u32 id = ++s_texture_counts[static_cast<u32>(label)];
+			t->SetDebugName(TinyString::from_format("{} {}", TextureLabelString(label), id));
 		}
+#endif
 	}
 
 	switch (type)

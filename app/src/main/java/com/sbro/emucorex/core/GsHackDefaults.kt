@@ -24,9 +24,12 @@ object GsHackDefaults {
     const val TEXTURE_PRELOADING_MAX = 2
     const val ANISOTROPIC_FILTERING_DEFAULT = 0
     const val HW_MIPMAPPING_DEFAULT = true
-    const val ANTI_BLUR_DEFAULT = false
-    // Balanced Android default: keeps GS ordering without forcing expensive GPU readbacks.
-    const val HW_DOWNLOAD_MODE_DEFAULT = 2
+    // Preserve the sharper PS2 output used before the mobile profile rollout.
+    const val ANTI_BLUR_DEFAULT = true
+    // Preserve the non-blocking Android path used before the mobile profile rollout.
+    // NoReadbacks still synchronizes EE/GS download requests before discarding the readback;
+    // Disabled avoids that otherwise pointless stall and remains user-overridable per game.
+    const val HW_DOWNLOAD_MODE_DEFAULT = 4
     const val HW_DOWNLOAD_MODE_MIN = 0
     const val HW_DOWNLOAD_MODE_MAX = 5
     const val FRAME_SKIP_DEFAULT = 0

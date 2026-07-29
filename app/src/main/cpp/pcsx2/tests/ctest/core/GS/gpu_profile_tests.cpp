@@ -29,10 +29,11 @@ static u64 WorkaroundMask(std::initializer_list<DriverWorkaround> workarounds)
 
 static void ExpectTuningInvariants(const GpuProfileSelection& profile)
 {
-	EXPECT_GE(profile.gs_tuning.pooled_targets, 40u);
-	EXPECT_LE(profile.gs_tuning.pooled_targets, 160u);
-	EXPECT_EQ(profile.gs_tuning.pooled_targets, profile.gs_tuning.pooled_textures);
-	EXPECT_EQ(profile.gs_tuning.constrained, profile.gs_tuning.pooled_targets < 128u);
+	EXPECT_EQ(profile.gs_tuning.pooled_targets, 300u);
+	EXPECT_EQ(profile.gs_tuning.target_age, 20u);
+	EXPECT_EQ(profile.gs_tuning.pooled_textures, 300u);
+	EXPECT_EQ(profile.gs_tuning.texture_age, 10u);
+	EXPECT_FALSE(profile.gs_tuning.constrained);
 	EXPECT_TRUE(profile.gs_tuning.prefer_new_textures);
 }
 
@@ -125,6 +126,7 @@ static u64 ExpectedVulkanWorkarounds(
 		{
 			u64 mask = WorkaroundMask({
 				DriverWorkaround::DisableProvokingVertex,
+				DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
 				DriverWorkaround::PreferCoherentReadback,
 			});
 			if (architecture == MobileGpuArchitecture::Adreno5xx)
@@ -189,7 +191,10 @@ static void VerifyModelAndDriverIsolation(const ModelCase& test_case, const char
 
 	const GpuProfileSelection mesa = GpuProfileDetector::Resolve(
 		"auto", vendor_hint, test_case.renderer, MakeVulkanContext(vendor, true));
-	EXPECT_EQ(mesa.driver.workarounds, 0u);
+	EXPECT_EQ(mesa.driver.workarounds,
+		vendor == RuntimeGpuProfile::Adreno ?
+			WorkaroundMask({DriverWorkaround::DisableRasterizationOrderAttachmentAccess}) :
+			0u);
 }
 
 static void VerifyAdrenoGeneration(
@@ -242,14 +247,13 @@ TEST(GpuProfile, ResolvesExactAdrenoModels)
 	EXPECT_EQ(flagship.gpu.architecture, MobileGpuArchitecture::Adreno7xx);
 	EXPECT_EQ(flagship.gpu.model_number, 740);
 	EXPECT_TRUE(flagship.gpu.recognized);
-	EXPECT_EQ(flagship.gs_tuning.pooled_targets, 160u);
+	ExpectTuningInvariants(flagship);
 
 	const GpuProfileSelection low_end =
 		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 619L");
 	EXPECT_EQ(low_end.gpu.name, "Adreno 619L");
 	EXPECT_TRUE(low_end.gpu.recognized);
-	EXPECT_TRUE(low_end.gs_tuning.constrained);
-	EXPECT_EQ(low_end.gs_tuning.pooled_targets, 84u);
+	ExpectTuningInvariants(low_end);
 }
 
 TEST(GpuProfile, KeepsUnknownAdrenoInsideItsGeneration)
@@ -260,7 +264,7 @@ TEST(GpuProfile, KeepsUnknownAdrenoInsideItsGeneration)
 	EXPECT_EQ(profile.gpu.architecture, MobileGpuArchitecture::Adreno7xx);
 	EXPECT_EQ(profile.gpu.model_number, 799);
 	EXPECT_FALSE(profile.gpu.recognized);
-	EXPECT_EQ(profile.gs_tuning.pooled_targets, 128u);
+	ExpectTuningInvariants(profile);
 }
 
 TEST(GpuProfile, ResolvesMaliArchitectureAndCoreCount)
@@ -271,13 +275,13 @@ TEST(GpuProfile, ResolvesMaliArchitectureAndCoreCount)
 	EXPECT_EQ(small.gpu.architecture, MobileGpuArchitecture::MaliValhall1);
 	EXPECT_EQ(small.gpu.core_count, 2);
 	EXPECT_TRUE(small.gpu.recognized);
-	EXPECT_EQ(small.gs_tuning.pooled_targets, 64u);
+	ExpectTuningInvariants(small);
 
 	const GpuProfileSelection mid =
 		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G710 MC6");
 	EXPECT_EQ(mid.gpu.architecture, MobileGpuArchitecture::MaliValhall2);
 	EXPECT_EQ(mid.gpu.core_count, 6);
-	EXPECT_EQ(mid.gs_tuning.pooled_targets, 112u);
+	ExpectTuningInvariants(mid);
 
 	const GpuProfileSelection legacy =
 		GpuProfileDetector::Resolve("auto", "ARM", "Mali-T880 MP12");
@@ -293,8 +297,7 @@ TEST(GpuProfile, ResolvesRecentImmortalisExactly)
 	EXPECT_EQ(profile.gpu.architecture, MobileGpuArchitecture::MaliFifthGen);
 	EXPECT_EQ(profile.gpu.name, "Immortalis-G925 MC12");
 	EXPECT_TRUE(profile.gpu.recognized);
-	EXPECT_FALSE(profile.gs_tuning.constrained);
-	EXPECT_EQ(profile.gs_tuning.pooled_targets, 160u);
+	ExpectTuningInvariants(profile);
 }
 
 TEST(GpuProfile, DoesNotInferGpuVendorFromSocVendorAlone)
@@ -320,7 +323,7 @@ TEST(GpuProfile, PreservesExplicitFamilyOverrideWithoutInventingAModel)
 	EXPECT_EQ(profile.runtime_profile, RuntimeGpuProfile::Mali);
 	EXPECT_FALSE(profile.gpu.recognized);
 	EXPECT_EQ(profile.gpu.name, "Unknown Mali");
-	EXPECT_TRUE(profile.gs_tuning.constrained);
+	ExpectTuningInvariants(profile);
 }
 
 TEST(GpuProfile, ResolvesPowerVRModelsAndArchitectures)
@@ -342,7 +345,7 @@ TEST(GpuProfile, ResolvesPowerVRModelsAndArchitectures)
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR GE8320");
 	EXPECT_EQ(ge8320.gpu.architecture, MobileGpuArchitecture::PowerVRRogue);
 	EXPECT_EQ(ge8320.gpu.model_number, 8320);
-	EXPECT_TRUE(ge8320.gs_tuning.constrained);
+	ExpectTuningInvariants(ge8320);
 
 	const GpuProfileSelection gm9446 =
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR GM9446");
@@ -352,7 +355,7 @@ TEST(GpuProfile, ResolvesPowerVRModelsAndArchitectures)
 	const GpuProfileSelection dxt =
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR DXT-48-1536");
 	EXPECT_EQ(dxt.gpu.architecture, MobileGpuArchitecture::PowerVRVolcanic);
-	EXPECT_FALSE(dxt.gs_tuning.constrained);
+	ExpectTuningInvariants(dxt);
 
 	const GpuProfileSelection b_series =
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR BXM-8-256");
@@ -392,6 +395,43 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 	EXPECT_FALSE(mesa_by_name.driver.HasBug(DriverBug::BrokenProvokingVertex));
 }
 
+TEST(GpuDriverProfile, KeepsAdreno650OnFastOpenGLAndVulkanPaths)
+{
+	const GpuProfileSelection opengl = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 650",
+		MakeOpenGLContext(RuntimeGpuProfile::Adreno, false));
+	EXPECT_EQ(opengl.gpu.architecture, MobileGpuArchitecture::Adreno6xx);
+	EXPECT_EQ(opengl.gpu.model_number, 650);
+	ExpectTuningInvariants(opengl);
+	EXPECT_EQ(opengl.driver.workarounds,
+		WorkaroundMask({DriverWorkaround::RewriteBooleanNegation}));
+
+	const GpuProfileSelection vulkan = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 650",
+		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
+	ExpectTuningInvariants(vulkan);
+	EXPECT_EQ(vulkan.driver.workarounds,
+		WorkaroundMask({
+			DriverWorkaround::DisableProvokingVertex,
+			DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
+			DriverWorkaround::PreferCoherentReadback,
+		}));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::UseDescriptorSets));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::RewriteUniformIndexing));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableAttachmentFeedbackLoopLayout));
+
+	const GpuProfileSelection turnip = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 650",
+		MakeVulkanContext(RuntimeGpuProfile::Adreno, true));
+	ExpectTuningInvariants(turnip);
+	EXPECT_EQ(turnip.driver.workarounds,
+		WorkaroundMask({DriverWorkaround::DisableRasterizationOrderAttachmentAccess}));
+}
+
 TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
 {
 	MobileDriverContext panvk;
@@ -413,7 +453,7 @@ TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
 	EXPECT_FALSE(powervr.driver.UsesWorkaround(DriverWorkaround::AvoidClearLoadOpRenderPass));
 }
 
-TEST(GpuDriverProfile, DisablesROAAOnlyForProprietaryMaliAndPowerVRVulkan)
+TEST(GpuDriverProfile, DisablesROAAForAdrenoAndAffectedProprietaryVulkanDrivers)
 {
 	const GpuProfileSelection mali_vulkan = GpuProfileDetector::Resolve(
 		"auto", "ARM", "Mali-G615 MC6", MakeVulkanContext(RuntimeGpuProfile::Mali, false));
@@ -451,7 +491,19 @@ TEST(GpuDriverProfile, DisablesROAAOnlyForProprietaryMaliAndPowerVRVulkan)
 	const GpuProfileSelection adreno_vulkan = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 840",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
-	EXPECT_FALSE(adreno_vulkan.driver.UsesWorkaround(
+	EXPECT_TRUE(adreno_vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection adreno_turnip = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 650",
+		MakeVulkanContext(RuntimeGpuProfile::Adreno, true));
+	EXPECT_TRUE(adreno_turnip.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection adreno_opengl = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 740",
+		MakeOpenGLContext(RuntimeGpuProfile::Adreno, false));
+	EXPECT_FALSE(adreno_opengl.driver.UsesWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 }
 
@@ -844,7 +896,7 @@ TEST(GpuProfileMatrix, RejectsAdjacentAndSyntheticModelsWithoutLeakingWorkaround
 			unknown_adreno.gpu.architecture, unknown_adreno.gpu.model_number));
 }
 
-TEST(GpuProfileMatrix, KeepsFastTextureAllocationWithBoundedPools)
+TEST(GpuProfileMatrix, KeepsTheFullGsResourcePolicyAcrossGpuTiers)
 {
 	for (const std::array<const char*, 3>& gpu : {
 			 std::array<const char*, 3>{"Qualcomm", "Adreno (TM) 605", "Adreno"},
@@ -853,14 +905,11 @@ TEST(GpuProfileMatrix, KeepsFastTextureAllocationWithBoundedPools)
 	{
 		SCOPED_TRACE(gpu[2]);
 		const GpuProfileSelection profile = GpuProfileDetector::Resolve("auto", gpu[0], gpu[1]);
-		EXPECT_TRUE(profile.gs_tuning.constrained);
-		EXPECT_LT(profile.gs_tuning.pooled_textures, 128u);
-		EXPECT_TRUE(profile.gs_tuning.prefer_new_textures);
+		ExpectTuningInvariants(profile);
 	}
 
 	const GpuProfileSelection unknown = GpuProfileDetector::Resolve("auto", "", "");
-	EXPECT_TRUE(unknown.gs_tuning.constrained);
-	EXPECT_TRUE(unknown.gs_tuning.prefer_new_textures);
+	ExpectTuningInvariants(unknown);
 }
 
 TEST(GpuProfileMatrix, RendererIdentityWinsOverConflictingVendorHints)

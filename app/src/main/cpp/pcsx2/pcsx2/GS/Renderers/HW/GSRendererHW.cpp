@@ -213,11 +213,11 @@ void GSRendererHW::VSync(u32 field, bool registers_written, bool idle_frame)
 		GL_INS("HW: No draws or transfers, not aging TC");
 	}
 
-#if defined(__ANDROID__)
-	static constexpr u64 HASH_CACHE_MEMORY_LIMIT = 384u * 1024u * 1024u;
-#else
 	static constexpr u64 HASH_CACHE_MEMORY_LIMIT = 1024u * 1024u * 1024u;
-#endif
+	// Keep the established GS cache budget on Android too. A smaller fixed budget is not a
+	// useful GPU-tier policy: at higher internal resolutions it repeatedly purges live cached
+	// textures, permanently drops preloading to Partial, and turns normal rendering into an
+	// upload/allocation loop. Allocation failure still performs the normal pool purge/retry.
 	const u64 total_hash_cache_memory = g_texture_cache->GetTotalHashCacheMemoryUsage();
 	if (total_hash_cache_memory > HASH_CACHE_MEMORY_LIMIT)
 	{

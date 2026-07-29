@@ -189,12 +189,14 @@ static_assert(static_cast<u8>(DriverWorkaround::Count) <= 64);
 
 struct MobileGsTuning
 {
-	bool constrained = true;
+	// Resource-pool sizing is a GS correctness/performance policy, not a GPU tier knob.
+	// Smaller per-model pools previously caused same-frame surface reuse and allocation churn.
+	bool constrained = false;
 	bool prefer_new_textures = true;
-	u32 pooled_targets = 96;
-	u32 target_age = 8;
-	u32 pooled_textures = 96;
-	u32 texture_age = 6;
+	u32 pooled_targets = 300;
+	u32 target_age = 20;
+	u32 pooled_textures = 300;
+	u32 texture_age = 10;
 };
 
 struct MobileGpuIdentity

@@ -2971,8 +2971,7 @@ bool GSDeviceVK::CheckFeatures()
 	//const bool isNVIDIA = (vendorID == 0x10DE);
 
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
-	// Keep ROAA capability-gated on driver stacks which are not denylisted below. Adreno remains
-	// opt-in because support varies by driver stack.
+	// Keep ROAA capability-gated on driver stacks which are not denylisted below.
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
 	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	const MobileGpuDriver mobile_driver = GetMobileDriverProfile().driver;
@@ -2981,9 +2980,8 @@ bool GSDeviceVK::CheckFeatures()
 		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
 			 GetMobileGPUIdentity().model_number == 57) ||
 			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
-	// Proprietary Mali and PowerVR stacks can expose ROAA while returning zero or stale
-	// destination color. Keep the texture-barrier feedback path on those drivers. Mesa PanVK
-	// and Mesa PowerVR remain capability-gated and do not inherit proprietary workarounds.
+	// Affected mobile stacks can expose ROAA while returning zero or stale destination color.
+	// Keep the texture-barrier feedback path when the explicit driver profile denies ROAA.
 	const bool unreliable_mobile_fbfetch = UsesMobileDriverWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess);
 	const bool vendor_allows_fbfetch =
@@ -2993,7 +2991,7 @@ bool GSDeviceVK::CheckFeatures()
 		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
 	if (unreliable_mobile_fbfetch && has_framebuffer_fetch_extension)
 	{
-		Console.Warning("VK: Disabled unreliable proprietary mobile framebuffer fetch; using texture-barrier feedback.");
+		Console.Warning("VK: Disabled unreliable mobile framebuffer fetch; using texture-barrier feedback.");
 	}
 	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 
