@@ -263,6 +263,24 @@ TEST(VulkanFeedbackPolicy, KeepsShaderDescriptorsAndRenderPassOnTheSamePath)
 		VulkanFeedbackPath::SampledImage);
 }
 
+TEST(VulkanFeedbackPolicy, DeclaresEverySampledAttachmentOnTheGraphicsPipeline)
+{
+	const VulkanFeedbackPath layout_path = VulkanFeedbackPath::AttachmentFeedbackLoopLayout;
+	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(layout_path, true, false),
+		VulkanFeedbackPipelineAspectColor);
+	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(layout_path, false, true),
+		VulkanFeedbackPipelineAspectDepthStencil);
+	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(layout_path, true, true),
+		VulkanFeedbackPipelineAspectColor | VulkanFeedbackPipelineAspectDepthStencil);
+
+	// Input attachments and copied sampled images do not use the attachment-feedback-loop
+	// pipeline-create flags.
+	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(VulkanFeedbackPath::InputAttachment, true, true),
+		VulkanFeedbackPipelineAspectNone);
+	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(VulkanFeedbackPath::SampledImage, true, true),
+		VulkanFeedbackPipelineAspectNone);
+}
+
 TEST(GpuProfile, ResolvesExactAdrenoModels)
 {
 	const GpuProfileSelection flagship =

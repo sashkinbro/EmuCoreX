@@ -136,6 +136,7 @@ namespace Vulkan
 
 		void SetMultisamples(VkSampleCountFlagBits samples);
 
+		void AddPipelineFlags(VkPipelineCreateFlags flags);
 		void SetPipelineLayout(VkPipelineLayout layout);
 		void SetRenderPass(VkRenderPass render_pass, u32 subpass);
 

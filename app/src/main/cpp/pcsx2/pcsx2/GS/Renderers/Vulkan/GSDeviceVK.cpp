@@ -5393,6 +5393,14 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 
 	// Common state
 	gpb.SetPipelineLayout(m_tfx_pipeline_layout);
+	const std::uint8_t feedback_aspects =
+		GetVulkanFeedbackPipelineAspects(GetFeedbackPath(), p.IsRTFeedbackLoop(), p.IsTestingAndSamplingDepth());
+	VkPipelineCreateFlags feedback_flags = 0;
+	if (feedback_aspects & VulkanFeedbackPipelineAspectColor)
+		feedback_flags |= VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+	if (feedback_aspects & VulkanFeedbackPipelineAspectDepthStencil)
+		feedback_flags |= VK_PIPELINE_CREATE_DEPTH_STENCIL_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
+	gpb.AddPipelineFlags(feedback_flags);
 	if (IsDATEModePrimIDInit(p.ps.date))
 	{
 		// DATE image prepass

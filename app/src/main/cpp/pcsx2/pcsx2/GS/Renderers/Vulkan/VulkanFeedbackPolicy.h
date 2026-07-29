@@ -12,6 +12,13 @@ enum class VulkanFeedbackPath : std::uint8_t
 	AttachmentFeedbackLoopLayout,
 };
 
+enum VulkanFeedbackPipelineAspect : std::uint8_t
+{
+	VulkanFeedbackPipelineAspectNone = 0,
+	VulkanFeedbackPipelineAspectColor = 1 << 0,
+	VulkanFeedbackPipelineAspectDepthStencil = 1 << 1,
+};
+
 // Keep the shader resource declaration, descriptor type, render-pass input attachments, and
 // image layout on one Vulkan feedback path. Mixing subpassInput with a sampled-image descriptor
 // is invalid and can surface as alternating stale attachment contents on tile-based GPUs.
@@ -27,4 +34,19 @@ constexpr VulkanFeedbackPath SelectVulkanFeedbackPath(
 		return VulkanFeedbackPath::InputAttachment;
 
 	return VulkanFeedbackPath::AttachmentFeedbackLoopLayout;
+}
+
+// Sampling an attachment through VK_EXT_attachment_feedback_loop_layout requires matching
+// pipeline-create flags for every attachment aspect involved in the feedback loop. The layout
+// and barriers alone are insufficient; omitting these flags makes the draw invalid Vulkan and
+// can surface as a device loss on strict mobile drivers.
+constexpr std::uint8_t GetVulkanFeedbackPipelineAspects(
+	VulkanFeedbackPath path, bool color_feedback, bool depth_stencil_feedback)
+{
+	if (path != VulkanFeedbackPath::AttachmentFeedbackLoopLayout)
+		return VulkanFeedbackPipelineAspectNone;
+
+	return static_cast<std::uint8_t>(
+		(color_feedback ? VulkanFeedbackPipelineAspectColor : 0) |
+		(depth_stencil_feedback ? VulkanFeedbackPipelineAspectDepthStencil : 0));
 }

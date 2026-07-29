@@ -553,6 +553,11 @@ void Vulkan::GraphicsPipelineBuilder::SetMultisamples(VkSampleCountFlagBits samp
 	m_ci.pMultisampleState = &m_multisample_state;
 }
 
+void Vulkan::GraphicsPipelineBuilder::AddPipelineFlags(VkPipelineCreateFlags flags)
+{
+	m_ci.flags |= flags;
+}
+
 void Vulkan::GraphicsPipelineBuilder::SetPipelineLayout(VkPipelineLayout layout)
 {
 	m_ci.layout = layout;
