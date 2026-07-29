@@ -8,6 +8,7 @@
 #include "GS/Renderers/Vulkan/GSTextureVK.h"
 #include "GS/Renderers/Vulkan/VKLoader.h"
 #include "GS/Renderers/Vulkan/VKStreamBuffer.h"
+#include "GS/Renderers/Vulkan/VulkanFeedbackPolicy.h"
 
 #include "common/HashCombine.h"
 #include "common/ReadbackSpinManager.h"
@@ -65,22 +66,21 @@ public:
 				m_optional_extensions.vk_ext_rasterization_order_attachment_access);
 	}
 
-	__fi bool PrefersInputAttachmentFeedbackPath() const
+	__fi VulkanFeedbackPath GetFeedbackPath() const
 	{
-		// The explicit input-attachment/subpass path is the most predictable Vulkan feedback route
-		// in this fork right now. Keep it as the default whenever we already rely on texture barriers
-		// instead of framebuffer-fetch, and only use attachment-feedback-loop layouts for a future
-		// revalidated path.
-		return (m_features.texture_barrier && !m_features.framebuffer_fetch);
+		return SelectVulkanFeedbackPath(m_features.texture_barrier,
+			UsesRasterizationOrderAttachmentAccessForFeedback(),
+			m_optional_extensions.vk_ext_attachment_feedback_loop_layout);
 	}
 
-	// Prefer the attachment-feedback-loop layout only for paths that have been explicitly
-	// revalidated. Otherwise stick to the input-attachment route.
 	__fi bool UseFeedbackLoopLayout() const
 	{
-		return (m_optional_extensions.vk_ext_attachment_feedback_loop_layout &&
-				!PrefersInputAttachmentFeedbackPath() &&
-				!UsesRasterizationOrderAttachmentAccessForFeedback());
+		return (GetFeedbackPath() == VulkanFeedbackPath::AttachmentFeedbackLoopLayout);
+	}
+
+	__fi bool UsesInputAttachmentFeedbackPath() const
+	{
+		return (GetFeedbackPath() == VulkanFeedbackPath::InputAttachment);
 	}
 
 	// Helpers for getting constants
@@ -290,7 +290,7 @@ private:
 	double m_spin_timestamp_offset = 0;
 	u32 m_spin_queue_family_index = 0;
 	u32 m_command_buffer_render_passes = 0;
-	u32 m_draws_since_submit = 0;
+	u32 m_draws_in_command_buffer = 0;
 	u32 m_spin_timer = 0;
 	bool m_spinning_supported = false;
 	bool m_spin_queue_is_graphics_queue = false;

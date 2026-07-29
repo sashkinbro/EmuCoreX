@@ -661,6 +661,7 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKShaderCache.h
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
+		GS/Renderers/Vulkan/VulkanFeedbackPolicy.h
 	)
 	if(ANDROID)
 		set(PCSX2_ANDROID_SHADERC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/shaderc")

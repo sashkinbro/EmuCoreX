@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Common/GSGPUProfile.h"
+#include "GS/Renderers/Vulkan/VulkanFeedbackPolicy.h"
 
 #include <gtest/gtest.h>
 
@@ -238,6 +239,29 @@ static void VerifyPowerVRGeneration(MobileGpuArchitecture architecture,
 	}
 }
 } // namespace
+
+TEST(VulkanFeedbackPolicy, KeepsShaderDescriptorsAndRenderPassOnTheSamePath)
+{
+	// Current Adreno path: ROAA is denylisted, so use the fast feedback-loop-layout route
+	// whenever the driver exposes it.
+	EXPECT_EQ(SelectVulkanFeedbackPath(true, false, true),
+		VulkanFeedbackPath::AttachmentFeedbackLoopLayout);
+
+	// Older Adreno plus proprietary Mali/PowerVR drivers without a trusted feedback-loop-layout
+	// implementation must use matching subpassInput/input-attachment descriptors.
+	EXPECT_EQ(SelectVulkanFeedbackPath(true, false, false),
+		VulkanFeedbackPath::InputAttachment);
+
+	// ROAA changes ordering guarantees but continues to use input attachments.
+	EXPECT_EQ(SelectVulkanFeedbackPath(true, true, true),
+		VulkanFeedbackPath::InputAttachment);
+
+	// Without texture barriers, the renderer uses the existing sampled-image copy fallback.
+	EXPECT_EQ(SelectVulkanFeedbackPath(false, false, true),
+		VulkanFeedbackPath::SampledImage);
+	EXPECT_EQ(SelectVulkanFeedbackPath(false, false, false),
+		VulkanFeedbackPath::SampledImage);
+}
 
 TEST(GpuProfile, ResolvesExactAdrenoModels)
 {

@@ -1408,6 +1408,14 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 {
 	FrameResources& resources = m_frame_resources[m_current_frame];
 
+	// This counter describes the command buffer being submitted, not the lifetime of
+	// the renderer. Present submissions come through this function directly rather
+	// than ExecuteCommandBuffer(), so resetting it there allowed the count to leak
+	// across frames. The 4000-draw safety kick would then split an otherwise small
+	// frame at a deterministic but arbitrary draw, which caused one-frame texture
+	// corruption on strict mobile Vulkan drivers.
+	m_draws_in_command_buffer = 0;
+
 	// End the current command buffer.
 	VkResult res;
 	if (resources.init_buffer_used)
@@ -1662,8 +1670,6 @@ void GSDeviceVK::ExecuteCommandBuffer(WaitType wait_for_completion)
 {
 	if (m_last_submit_failed)
 		return;
-
-	m_draws_since_submit = 0;
 
 	const u32 current_frame = m_current_frame;
 	SubmitCommandBuffer(nullptr);
@@ -3100,7 +3106,7 @@ bool GSDeviceVK::CheckFeatures()
 		GpuProfileDetector::ArchitectureToString(GetMobileGPUIdentity().architecture),
 		has_framebuffer_fetch_extension ? 1 : 0, m_features.framebuffer_fetch ? 1 : 0,
 		unreliable_mobile_fbfetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
-		(m_features.texture_barrier && !UseFeedbackLoopLayout()) ? 1 : 0,
+		UsesInputAttachmentFeedbackPath() ? 1 : 0,
 		m_device_features.dualSrcBlend ? 1 : 0,
 		static_cast<unsigned>(m_depth_format),
 		m_features.broken_mad_deinterlace ? 0 : 1,
@@ -4318,13 +4324,10 @@ bool GSDeviceVK::CreatePipelineLayouts()
 		dslb.SetPushFlag();
 	dslb.AddBinding(TFX_TEXTURE_TEXTURE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PALETTE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
-	// Mali needs real input-attachment descriptors for the subpass feedback path. Keep the
-	// long-standing sampled-image descriptor path on Adreno: switching Qualcomm to input
-	// attachments caused alternating stale destination colour in accurate blending draws.
-	// This is deliberately vendor-scoped so the MediaTek/Mali stale-tile fix remains intact.
-	const bool use_input_attachment_feedback_descriptors =
-		m_features.texture_barrier && !UseFeedbackLoopLayout() && m_device_properties.vendorID == 0x13B5u;
-	const VkDescriptorType feedback_descriptor_type = use_input_attachment_feedback_descriptors ?
+	// This must match both tfx.glsl and CreateCachedRenderPass(). Adreno uses the attachment
+	// feedback-loop layout when the driver exposes it; devices without that extension use a
+	// real input-attachment descriptor for the subpassInput shader path.
+	const VkDescriptorType feedback_descriptor_type = UsesInputAttachmentFeedbackPath() ?
 		VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	dslb.AddBinding(TFX_TEXTURE_RT, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PRIMID, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -6093,7 +6096,7 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		}
 		if (flags & DIRTY_FLAG_TFX_TEXTURE_RT)
 		{
-			if (m_features.texture_barrier && !UseFeedbackLoopLayout() && m_device_properties.vendorID == 0x13B5u)
+			if (UsesInputAttachmentFeedbackPath())
 			{
 				dsub.AddInputAttachmentDescriptorWrite(
 					VK_NULL_HANDLE, TFX_TEXTURE_RT, m_tfx_textures[TFX_TEXTURE_RT]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
@@ -6111,7 +6114,7 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		}
 		if (flags & DIRTY_FLAG_TFX_TEXTURE_DEPTH)
 		{
-			if (m_features.texture_barrier && !UseFeedbackLoopLayout() && m_device_properties.vendorID == 0x13B5u)
+			if (UsesInputAttachmentFeedbackPath())
 			{
 				dsub.AddInputAttachmentDescriptorWrite(
 					VK_NULL_HANDLE, TFX_TEXTURE_DEPTH, m_tfx_textures[TFX_TEXTURE_DEPTH]->GetView(), VK_IMAGE_LAYOUT_GENERAL);
@@ -6313,7 +6316,7 @@ GSTextureVK* GSDeviceVK::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config)
 void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 {
 
-	m_draws_since_submit++;
+	m_draws_in_command_buffer++;
 
 	// Mid-frame command-buffer kick.
 	// While a frame records, submit accumulated work to keep the GPU busy
@@ -6321,14 +6324,14 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	// when the readback fence-waits on it. This fixes massive slowdowns on tilers.
 	{
 		constexpr u32 kick_threshold = 4000;
-		if (m_draws_since_submit >= kick_threshold)
+		if (m_draws_in_command_buffer >= kick_threshold)
 		{
 			ScanForCommandBufferCompletion();
 			const u32 next_buffer = (m_current_frame + 1) % NUM_COMMAND_BUFFERS;
 			if (m_frame_resources[next_buffer].fence_counter <= m_completed_fence_counter)
 			{
 				ExecuteCommandBuffer(false);
-				m_draws_since_submit = 0;
+				m_draws_in_command_buffer = 0;
 			}
 		}
 	}
