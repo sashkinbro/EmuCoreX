@@ -4,6 +4,8 @@
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiManager.h"
 #include "GS/Renderers/Common/GSRenderer.h"
+#include "GS/Renderers/Common/GSInterlaceModePolicy.h"
+#include "GS/Renderers/Common/GSPresentationPolicy.h"
 #include "GS/GSCapture.h"
 #include "GS/GSDump.h"
 #include "GS/GSGL.h"
@@ -92,6 +94,7 @@ bool GSRenderer::Merge(int field)
 	float tex_scale[3] = { 0.0f, 0.0f, 0.0f };
 	int y_offset[3] = { 0, 0, 0 };
 	const bool feedback_merge = m_regs->EXTWRITE.WRITE == 1;
+	const bool really_interlaced = isReallyInterlaced();
 
 	if (!PCRTCDisplays.PCRTCDisplays[0].enabled && !PCRTCDisplays.PCRTCDisplays[1].enabled)
 	{
@@ -165,21 +168,15 @@ bool GSRenderer::Merge(int field)
 
 	// Use offset for bob deinterlacing always, extra offset added later for FFMD mode.
 	const bool scanmask_frame = m_scanmask_used && abs(PCRTCDisplays.PCRTCDisplays[0].displayRect.y - PCRTCDisplays.PCRTCDisplays[1].displayRect.y) != 1;
-	int field2 = 0;
-	int mode = 3; // If the game is manually deinterlacing then we need to bob (if we want to get away with no deinterlacing).
+	const GSInterlaceModeSelection interlace_selection = SelectGSInterlaceMode(
+		static_cast<int>(GSConfig.InterlaceMode),
+		GSConfig.InterlaceMode == GSInterlaceMode::Automatic,
+		game_deinterlacing,
+		m_regs->SMODE2.FFMD,
+		scanmask_frame);
+	const int field2 = interlace_selection.field_offset;
+	int mode = interlace_selection.shader_mode;
 	bool is_bob = GSConfig.InterlaceMode == GSInterlaceMode::BobTFF || GSConfig.InterlaceMode == GSInterlaceMode::BobBFF;
-
-	// FFMD (half frames) requires blend deinterlacing, so automatically use that. Same when SCANMSK is used but not blended in the merge circuit (Alpine Racer 3).
-	if (GSConfig.InterlaceMode != GSInterlaceMode::Automatic || (!game_deinterlacing && !m_regs->SMODE2.FFMD && !scanmask_frame))
-	{
-		field2 = ((static_cast<int>(GSConfig.InterlaceMode) - 2) & 1);
-		mode = ((static_cast<int>(GSConfig.InterlaceMode) - 2) >> 1);
-	}
-
-	// Clamp mode to valid range [0,3] - mode=-1 can happen with Automatic + no FFMD,
-	// which causes DoInterlace to be skipped entirely on OpenGL.
-	if (mode < 0 || mode > 3)
-		mode = 3;
 
 	// FastMAD stores four fields in a two-bank history target. Older Mali-G57 Vulkan drivers can
 	// expose stale/alternating banks during reconstruction. Bob is not a safe fallback here: its
@@ -207,7 +204,7 @@ bool GSRenderer::Merge(int field)
 		src_gs_read[i] = ((GSVector4(curCircuit.framebufferRect) + GSVector4(0, y_offset[i], 0, y_offset[i])) * scale) / GSVector4(tex[i]->GetSize()).xyxy();
 		
 		float interlace_offset = 0.0f;
-		if (isReallyInterlaced() && m_regs->SMODE2.FFMD && !is_bob && !stable_mad_fallback &&
+		if (really_interlaced && m_regs->SMODE2.FFMD && !is_bob && !stable_mad_fallback &&
 			!GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 		{
 			interlace_offset = (scale.y) * static_cast<float>(field ^ field2);
@@ -260,7 +257,7 @@ bool GSRenderer::Merge(int field)
 	const u32 c = (m_regs->BGCOLOR.U32[0] & 0x00FFFFFFu) | (m_regs->PMODE.ALP << 24);
 	g_gs_device->Merge(tex, src_gs_read, dst, fs, m_regs->PMODE, m_regs->EXTBUF, c);
 
-	if (isReallyInterlaced() && GSConfig.InterlaceMode != GSInterlaceMode::Off)
+	if (really_interlaced && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 	{
 		const float offset = is_bob ? (tex[1] ? tex_scale[1] : tex_scale[0]) : 0.0f;
 
@@ -806,15 +803,16 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 	m_last_transfer_n = s_transfer_n;
 
 #ifdef __ANDROID__
-	// Skip presenting blank frames to avoid flickering on Vulkan/OpenGL.
-	// This covers two cases:
-	// 1. Before game starts: blank_frame=true, current_tex=nullptr (no content yet)
-	// 2. Interlaced fields: blank_frame=true, current_tex!=nullptr (stale texture from prev frame)
-	// On software renderer this is not needed because there's no swapchain.
-	// To preserve GT3/GT4 fade effects (which produce consecutive blank frames),
-	// we only skip if the blank_frame is alternating (consecutive == 1).
+	// Suppress only startup blanks, before the GS has produced any output. Mid-game blank/fade
+	// frames must take the normal present path: explicit APIs such as Vulkan need that path to
+	// submit the recorded command buffer and finalize texture state for the following frame.
+	const bool skip_blank = ShouldSkipAndroidBlankFrame(
+		blank_frame,
+		g_gs_device->GetCurrent() != nullptr,
+		g_gs_device->GetRenderAPI() == RenderAPI::Vulkan,
+		m_consecutive_blank_frames);
 	const bool skip_present = (skip_frame || g_gs_device->ShouldSkipPresentingFrame()) ||
-		(blank_frame && m_consecutive_blank_frames == 1);
+		skip_blank;
 #else
 	const bool skip_present = skip_frame || g_gs_device->ShouldSkipPresentingFrame();
 #endif
