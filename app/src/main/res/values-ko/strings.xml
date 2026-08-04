@@ -2151,4 +2151,11 @@
     <string name="touch_control_creator_preset_minimal">미니멀</string>
     <string name="touch_control_creator_preset_neon">네온</string>
     <string name="touch_control_creator_preset_compact">콤팩트</string>
+    <string name="settings_clear_cover_cache">커버 캐시 지우기</string>
+    <string name="settings_clear_cover_cache_desc">임시로 다운로드한 커버를 삭제하고 실패한 다운로드를 다시 시도합니다.</string>
+    <string name="settings_clear_cover_cache_confirm_title">커버 캐시를 지울까요?</string>
+    <string name="settings_clear_cover_cache_confirm_body">다운로드한 커버를 삭제한 후 자동으로 다시 다운로드합니다. 사용자 지정 커버와 게임 파일은 변경되지 않습니다.</string>
+    <string name="settings_clear_cover_cache_action">지우기</string>
+    <string name="settings_clear_cover_cache_success">커버 캐시를 지웠습니다. 커버가 자동으로 다시 다운로드됩니다.</string>
+    <string name="settings_clear_cover_cache_partial">캐시된 일부 커버를 삭제하지 못했습니다. 현재 다운로드가 끝난 후 다시 시도하세요.</string>
 </resources>

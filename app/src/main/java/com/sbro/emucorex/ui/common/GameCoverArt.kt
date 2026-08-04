@@ -133,6 +133,12 @@ private val coverBitmapCache = object : LruCache<String, Bitmap>(100 * 1024 * 10
     override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 
+fun clearCoverImageMemoryCache() {
+    coverBitmapCache.evictAll()
+    // Let the next remote request prune/reconcile its freshly cleared disk directory again.
+    remoteCachePruned.set(false)
+}
+
 private fun getCachedBitmap(path: String): Bitmap? = coverBitmapCache.get(path)
 
 private fun putCachedBitmap(path: String, bitmap: Bitmap) {
@@ -217,32 +223,40 @@ private fun getOrCreateRemoteImageCacheFile(context: android.content.Context, ur
             .takeIf { it in setOf("jpg", "jpeg", "png", "webp") }
             ?: "img"
         val targetFile = File(cacheDir, "${candidateUrl.sha1()}.$extension")
-        if (targetFile.exists() && targetFile.length() > 0L) {
+        if (isDecodableCachedImage(targetFile)) {
             return targetFile
         }
+        if (targetFile.exists()) targetFile.delete()
 
-        val tempFile = File(cacheDir, "${targetFile.name}.tmp")
+        val tempFile = File.createTempFile("${targetFile.name}.", ".tmp", cacheDir)
         val downloaded = runCatching {
             val connection = URL(candidateUrl).openConnection() as HttpURLConnection
-            connection.connectTimeout = 8_000
-            connection.readTimeout = 12_000
-            connection.instanceFollowRedirects = true
-            if (connection.responseCode !in 200..299) {
-                if (connection.responseCode == HttpURLConnection.HTTP_NOT_FOUND) receivedNotFound = true
-                connection.disconnect()
-                return@runCatching null
-            }
-            connection.inputStream.use { input ->
-                tempFile.outputStream().use { output ->
-                    input.copyTo(output)
+            try {
+                connection.connectTimeout = 8_000
+                connection.readTimeout = 12_000
+                connection.instanceFollowRedirects = true
+                if (connection.responseCode !in 200..299) {
+                    if (connection.responseCode == HttpURLConnection.HTTP_NOT_FOUND) receivedNotFound = true
+                    return@runCatching null
                 }
+                connection.inputStream.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            } finally {
+                connection.disconnect()
             }
-            connection.disconnect()
-            if (targetFile.exists()) {
-                targetFile.delete()
+
+            if (!isDecodableCachedImage(tempFile)) return@runCatching null
+            synchronized(remoteCacheWriteLock) {
+                if (isDecodableCachedImage(targetFile)) {
+                    return@synchronized targetFile
+                }
+                if (targetFile.exists()) targetFile.delete()
+                if (!tempFile.renameTo(targetFile)) tempFile.copyTo(targetFile, overwrite = true)
+                targetFile.takeIf(::isDecodableCachedImage)
             }
-            tempFile.renameTo(targetFile)
-            targetFile.takeIf { it.exists() && it.length() > 0L }
         }.getOrNull()
 
         if (downloaded != null) {
@@ -260,6 +274,16 @@ private fun getOrCreateRemoteImageCacheFile(context: android.content.Context, ur
 private const val REMOTE_MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L
 private const val REMOTE_CACHE_MAX_BYTES = 256L * 1024L * 1024L
 private val remoteCachePruned = AtomicBoolean(false)
+private val remoteCacheWriteLock = Any()
+
+private fun isDecodableCachedImage(file: File): Boolean {
+    if (!file.isFile || file.length() <= 0L) return false
+    return runCatching {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, options)
+        options.outWidth > 0 && options.outHeight > 0
+    }.getOrDefault(false)
+}
 
 private fun pruneRemoteImageCacheOnce(cacheDir: File) {
     if (!remoteCachePruned.compareAndSet(false, true)) return

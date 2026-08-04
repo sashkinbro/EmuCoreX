@@ -343,7 +343,8 @@ static constexpr std::array<DriverRule, 26> s_driver_rules = {{
 			Bug(DriverBug::BrokenVectorBitwiseAnd) | Bug(DriverBug::BrokenVSync),
 		Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
 	{"gl-arm-g57-fifo", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
-		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0,
+		{54, 1, 0}, {54, 2, 0}, 0, 0, false,
 		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
 	{"gl-qualcomm-compiler", MobileGpuApi::OpenGL, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
@@ -384,7 +385,8 @@ static constexpr std::array<DriverRule, 26> s_driver_rules = {{
 			Workaround(DriverWorkaround::PreferCoherentReadback) |
 			Workaround(DriverWorkaround::ScalarizeVectorBitwiseAnd)},
 	{"vk-arm-g57-fifo", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
-		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0, {}, {}, 0, 0, false,
+		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 57, 57, 0,
+		{54, 1, 0}, {54, 2, 0}, 0, 0, false,
 		Bug(DriverBug::BrokenVSync), Workaround(DriverWorkaround::ForceFifoPresent)},
 	{"vk-arm-empty-renderpass", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0xaa9c4b29u, {}, {}, 0, 0, false,
@@ -410,8 +412,7 @@ static constexpr std::array<DriverRule, 26> s_driver_rules = {{
 			Bug(DriverBug::BrokenSubpassFeedback) |
 			Bug(DriverBug::BrokenReversedDepthRange) | Bug(DriverBug::SlowCachedReadbackMemory) |
 			Bug(DriverBug::SlowOptimalImageToBufferCopy),
-		Workaround(DriverWorkaround::DisableProvokingVertex) |
-			Workaround(DriverWorkaround::PreferCoherentReadback)},
+		Workaround(DriverWorkaround::PreferCoherentReadback)},
 	{"vk-adreno5xx-depth-stencil", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
 		MobileGpuDriver::QualcommProprietary, MobileGpuArchitecture::Adreno5xx, 500, 599, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenDepthStencilDiscard) | Bug(DriverBug::BrokenColorWriteMaskWithDepthTest),
@@ -437,8 +438,9 @@ static constexpr std::array<DriverRule, 26> s_driver_rules = {{
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0,
 		{1, 7, 0}, {1, 10, 0}, 0, 0, false, Bug(DriverBug::BrokenClearLoadOpRenderPass),
 		Workaround(DriverWorkaround::AvoidClearLoadOpRenderPass)},
-	{"vk-powervr-old-swapchain-width", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
-		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+	{"vk-powervr-swapchain-width-before-1-386-1368", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
+		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0,
+		{}, {1, 386, 1368}, 0, 0, false,
 		0, Workaround(DriverWorkaround::AlignSwapchainWidthTo32)},
 	{"vk-powervr-primitive-topology", MobileGpuApi::Vulkan, RuntimeGpuProfile::PowerVR,
 		MobileGpuDriver::ImaginationProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
@@ -471,11 +473,6 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 
 	for (const DriverRule& rule : s_driver_rules)
 	{
-		if (std::string_view(rule.id) == "vk-powervr-old-swapchain-width" &&
-			(profile.version.raw == 0 || profile.version.raw >= 0x00582558u))
-		{
-			continue;
-		}
 		if (std::string_view(rule.id) == "vk-arm-midgard-uniform-indexing" &&
 			(!profile.version.legacy_hash ||
 				(selection.gpu.model_number != 830 && selection.gpu.model_number != 860 &&

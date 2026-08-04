@@ -2154,4 +2154,11 @@
     <string name="touch_control_creator_preset_minimal">Minimal</string>
     <string name="touch_control_creator_preset_neon">Néon</string>
     <string name="touch_control_creator_preset_compact">Compact</string>
+    <string name="settings_clear_cover_cache">Vider le cache des jaquettes</string>
+    <string name="settings_clear_cover_cache_desc">Supprime les jaquettes téléchargées temporairement et relance les téléchargements échoués.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Vider le cache des jaquettes ?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Les jaquettes téléchargées seront supprimées puis téléchargées à nouveau automatiquement. Les jaquettes personnalisées et les fichiers de jeu ne seront pas modifiés.</string>
+    <string name="settings_clear_cover_cache_action">Vider</string>
+    <string name="settings_clear_cover_cache_success">Cache des jaquettes vidé. Les jaquettes seront téléchargées à nouveau automatiquement.</string>
+    <string name="settings_clear_cover_cache_partial">Certaines jaquettes en cache n’ont pas pu être supprimées. Réessayez après la fin des téléchargements en cours.</string>
 </resources>

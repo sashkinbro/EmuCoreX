@@ -2152,4 +2152,11 @@
     <string name="touch_control_creator_preset_minimal">मिनिमल</string>
     <string name="touch_control_creator_preset_neon">नियॉन</string>
     <string name="touch_control_creator_preset_compact">कॉम्पैक्ट</string>
+    <string name="settings_clear_cover_cache">कवर कैश साफ़ करें</string>
+    <string name="settings_clear_cover_cache_desc">अस्थायी रूप से डाउनलोड किए गए कवर हटाएँ और विफल डाउनलोड फिर से आज़माएँ।</string>
+    <string name="settings_clear_cover_cache_confirm_title">कवर कैश साफ़ करें?</string>
+    <string name="settings_clear_cover_cache_confirm_body">डाउनलोड किए गए कवर हटा दिए जाएँगे और अपने आप फिर डाउनलोड होंगे। कस्टम कवर और गेम फ़ाइलों में कोई बदलाव नहीं होगा।</string>
+    <string name="settings_clear_cover_cache_action">साफ़ करें</string>
+    <string name="settings_clear_cover_cache_success">कवर कैश साफ़ हो गया। कवर अपने आप फिर डाउनलोड होंगे।</string>
+    <string name="settings_clear_cover_cache_partial">कुछ कैश किए गए कवर हटाए नहीं जा सके। मौजूदा डाउनलोड पूरे होने के बाद फिर कोशिश करें।</string>
 </resources>

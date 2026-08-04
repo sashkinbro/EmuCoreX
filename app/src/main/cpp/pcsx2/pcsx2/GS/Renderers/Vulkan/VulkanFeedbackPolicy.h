@@ -50,3 +50,17 @@ constexpr std::uint8_t GetVulkanFeedbackPipelineAspects(
 		(color_feedback ? VulkanFeedbackPipelineAspectColor : 0) |
 		(depth_stencil_feedback ? VulkanFeedbackPipelineAspectDepthStencil : 0));
 }
+
+// A descriptor stores the image layout as well as the image view. Reusing the same texture
+// object is therefore not enough to skip a descriptor write when its Vulkan layout changed.
+constexpr bool ShouldRefreshVulkanTextureDescriptor(bool same_texture, bool layout_changed)
+{
+	return !same_texture || layout_changed;
+}
+
+// Entering an attachment feedback loop can change the layout of the same image bound through
+// the ordinary texture slot. Both descriptor slots must be refreshed in that aliasing case.
+constexpr bool ShouldDirtyVulkanAliasedTextureDescriptor(bool aliases_main_texture, bool layout_changed)
+{
+	return aliases_main_texture && layout_changed;
+}

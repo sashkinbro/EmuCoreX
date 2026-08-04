@@ -2152,4 +2152,11 @@
     <string name="touch_control_creator_preset_minimal">Minimale</string>
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Compatto</string>
+    <string name="settings_clear_cover_cache">Svuota cache copertine</string>
+    <string name="settings_clear_cover_cache_desc">Rimuove le copertine scaricate temporaneamente e riprova i download non riusciti.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Svuotare la cache delle copertine?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Le copertine scaricate verranno rimosse e scaricate di nuovo automaticamente. Le copertine personalizzate e i file dei giochi non verranno modificati.</string>
+    <string name="settings_clear_cover_cache_action">Svuota</string>
+    <string name="settings_clear_cover_cache_success">Cache delle copertine svuotata. Le copertine verranno scaricate di nuovo automaticamente.</string>
+    <string name="settings_clear_cover_cache_partial">Non è stato possibile rimuovere alcune copertine nella cache. Riprova al termine dei download in corso.</string>
 </resources>

@@ -2154,4 +2154,11 @@
     <string name="touch_control_creator_preset_minimal">Minimalista</string>
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Compacto</string>
+    <string name="settings_clear_cover_cache">Limpar cache de capas</string>
+    <string name="settings_clear_cover_cache_desc">Remove capas baixadas temporariamente e tenta novamente os downloads que falharam.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Limpar a cache de capas?</string>
+    <string name="settings_clear_cover_cache_confirm_body">As capas baixadas serão removidas e baixadas novamente de forma automática. Capas personalizadas e arquivos de jogos não serão alterados.</string>
+    <string name="settings_clear_cover_cache_action">Limpar</string>
+    <string name="settings_clear_cover_cache_success">Cache de capas limpa. As capas serão baixadas novamente de forma automática.</string>
+    <string name="settings_clear_cover_cache_partial">Não foi possível remover algumas capas em cache. Tente novamente após o término dos downloads atuais.</string>
 </resources>

@@ -128,7 +128,6 @@ static u64 ExpectedVulkanWorkarounds(
 		case RuntimeGpuProfile::Adreno:
 		{
 			u64 mask = WorkaroundMask({
-				DriverWorkaround::DisableProvokingVertex,
 				DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
 				DriverWorkaround::PreferCoherentReadback,
 			});
@@ -281,6 +280,17 @@ TEST(VulkanFeedbackPolicy, DeclaresEverySampledAttachmentOnTheGraphicsPipeline)
 		VulkanFeedbackPipelineAspectNone);
 	EXPECT_EQ(GetVulkanFeedbackPipelineAspects(VulkanFeedbackPath::SampledImage, true, true),
 		VulkanFeedbackPipelineAspectNone);
+}
+
+TEST(VulkanFeedbackPolicy, RefreshesDescriptorsWhenAnImageLayoutChanges)
+{
+	EXPECT_FALSE(ShouldRefreshVulkanTextureDescriptor(true, false));
+	EXPECT_TRUE(ShouldRefreshVulkanTextureDescriptor(true, true));
+	EXPECT_TRUE(ShouldRefreshVulkanTextureDescriptor(false, false));
+
+	EXPECT_TRUE(ShouldDirtyVulkanAliasedTextureDescriptor(true, true));
+	EXPECT_FALSE(ShouldDirtyVulkanAliasedTextureDescriptor(true, false));
+	EXPECT_FALSE(ShouldDirtyVulkanAliasedTextureDescriptor(false, true));
 }
 
 TEST(GSInterlaceModePolicy, AutomaticFullFrameOutputRemainsPassThrough)
@@ -480,7 +490,7 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 	EXPECT_EQ(stock.driver.driver, MobileGpuDriver::QualcommProprietary);
 	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenProvokingVertex));
 	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenDynamicRendering));
-	EXPECT_TRUE(stock.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
+	EXPECT_FALSE(stock.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
 
 	MobileDriverContext turnip = proprietary;
 	turnip.driver_id = 18;
@@ -516,10 +526,10 @@ TEST(GpuDriverProfile, KeepsAdreno650OnFastOpenGLAndVulkanPaths)
 	ExpectTuningInvariants(vulkan);
 	EXPECT_EQ(vulkan.driver.workarounds,
 		WorkaroundMask({
-			DriverWorkaround::DisableProvokingVertex,
 			DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
 			DriverWorkaround::PreferCoherentReadback,
 		}));
+	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::UseDescriptorSets));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
@@ -642,6 +652,43 @@ TEST(GpuDriverProfile, AppliesVersionBoundedMaliRules)
 	EXPECT_TRUE(current.driver.HasBug(DriverBug::BrokenPushDescriptors));
 }
 
+TEST(GpuDriverProfile, ForcesFifoOnlyOnMaliG57R54P1)
+{
+	MobileDriverContext gl_r54p1 = MakeOpenGLContext(RuntimeGpuProfile::Mali, false);
+	const GpuProfileSelection affected_gl =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", gl_r54p1);
+	EXPECT_TRUE(affected_gl.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext gl_r54p2 = gl_r54p1;
+	gl_r54p2.api_version_string = "OpenGL ES 3.2 v1.r54p2-01rel0";
+	const GpuProfileSelection fixed_gl =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", gl_r54p2);
+	EXPECT_FALSE(fixed_gl.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext gl_unknown = gl_r54p1;
+	gl_unknown.api_version_string = {};
+	const GpuProfileSelection unknown_gl =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", gl_unknown);
+	EXPECT_FALSE(unknown_gl.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext vk_r54p1 = MakeVulkanContext(RuntimeGpuProfile::Mali, false);
+	const GpuProfileSelection affected_vk =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", vk_r54p1);
+	EXPECT_TRUE(affected_vk.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext vk_r54p2 = vk_r54p1;
+	vk_r54p2.driver_version = (54u << 22) | (2u << 12);
+	const GpuProfileSelection fixed_vk =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", vk_r54p2);
+	EXPECT_FALSE(fixed_vk.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+
+	MobileDriverContext vk_unknown = vk_r54p1;
+	vk_unknown.driver_version = 0;
+	const GpuProfileSelection unknown_vk =
+		GpuProfileDetector::Resolve("auto", "ARM", "Mali-G57 MC4", vk_unknown);
+	EXPECT_FALSE(unknown_vk.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
+}
+
 TEST(GpuDriverProfile, RestrictsMaliJobManagerRuleToIndirectCountOne)
 {
 	MobileDriverContext jm;
@@ -689,6 +736,11 @@ TEST(GpuDriverProfile, RecognizesLegacyMaliAndPowerVRCutoffs)
 	const GpuProfileSelection fixed_powervr =
 		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR GE8320", powervr);
 	EXPECT_FALSE(fixed_powervr.driver.UsesWorkaround(DriverWorkaround::AlignSwapchainWidthTo32));
+
+	powervr.driver_version = 0;
+	const GpuProfileSelection unknown_powervr =
+		GpuProfileDetector::Resolve("auto", "Imagination Technologies", "PowerVR GE8320", powervr);
+	EXPECT_FALSE(unknown_powervr.driver.UsesWorkaround(DriverWorkaround::AlignSwapchainWidthTo32));
 }
 
 TEST(GpuDriverProfile, ScopesColorWriteMaskEmulationToProprietaryAdreno5xx)
@@ -1096,6 +1148,7 @@ TEST(GpuProfileMatrix, ExercisesEveryCataloguedBugAndActiveWorkaround)
 
 	const u64 all_bugs = (u64{1} << static_cast<u8>(DriverBug::Count)) - 1;
 	const u64 all_workarounds = (u64{1} << static_cast<u8>(DriverWorkaround::Count)) - 1;
+	const u64 inactive_workarounds = WorkaroundMask({DriverWorkaround::DisableProvokingVertex});
 	EXPECT_EQ(bugs, all_bugs);
-	EXPECT_EQ(workarounds, all_workarounds);
+	EXPECT_EQ(workarounds, all_workarounds & ~inactive_workarounds);
 }

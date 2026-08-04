@@ -2154,4 +2154,11 @@
     <string name="touch_control_creator_preset_minimal">Minimalistisch</string>
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Kompakt</string>
+    <string name="settings_clear_cover_cache">Cover-Cache leeren</string>
+    <string name="settings_clear_cover_cache_desc">Temporär heruntergeladene Cover entfernen und fehlgeschlagene Downloads wiederholen.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Cover-Cache leeren?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Heruntergeladene Cover werden entfernt und automatisch erneut geladen. Eigene Cover und Spieldateien bleiben unverändert.</string>
+    <string name="settings_clear_cover_cache_action">Leeren</string>
+    <string name="settings_clear_cover_cache_success">Cover-Cache geleert. Die Cover werden automatisch erneut geladen.</string>
+    <string name="settings_clear_cover_cache_partial">Einige zwischengespeicherte Cover konnten nicht entfernt werden. Versuche es nach Abschluss der aktuellen Downloads erneut.</string>
 </resources>

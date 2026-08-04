@@ -118,6 +118,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var titlesPreferenceInitialized = false
     private var coverArtStyleInitialized = false
     private var coverBaseUrlInitialized = false
+    private var coverCacheRevisionInitialized = false
     private var currentCoverArtStyle = AppPreferences.COVER_ART_STYLE_DEFAULT
     private var currentCoverDownloadBaseUrl: String? = null
     private val scanMutex = Mutex()
@@ -309,6 +310,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 coverBaseUrlInitialized = true
                 if (shouldRefreshLibrary) {
                     handleCoverSourceChanged()
+                }
+            }
+        }
+        viewModelScope.launch {
+            preferences.coverCacheRevision.collect {
+                if (coverCacheRevisionInitialized) {
+                    handleCoverCacheCleared()
+                } else {
+                    coverCacheRevisionInitialized = true
                 }
             }
         }
@@ -594,8 +604,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun shouldSkipAutoRescan(isInitialLoad: Boolean, cacheSnapshot: GameLibraryCacheSnapshot): Boolean {
         if (!isInitialLoad) return false
         if (cacheSnapshot.games.isEmpty()) return false
+        val coverRepository = CoverArtRepository(getApplication())
         if (currentCoverArtStyle != AppPreferences.COVER_ART_STYLE_DISABLED &&
-            cacheSnapshot.games.any { it.serial.isNullOrBlank() || it.coverArtPath.isNullOrBlank() }
+            cacheSnapshot.games.any {
+                it.serial.isNullOrBlank() || it.coverArtPath.isNullOrBlank() ||
+                    coverRepository.isMissingManagedCover(it.coverArtPath)
+            }
         ) {
             return false
         }
@@ -700,8 +714,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         coverSyncJob?.cancel()
         val context = getApplication<Application>()
         coverSyncJob = viewModelScope.launch(Dispatchers.IO) {
+            val coverRepository = CoverArtRepository(context)
+            var removedStalePaths = false
+            synchronized(this@HomeViewModel) {
+                allGames = allGames.map { game ->
+                    if (coverRepository.isMissingManagedCover(game.coverArtPath)) {
+                        removedStalePaths = true
+                        game.copy(coverArtPath = null)
+                    } else {
+                        game
+                    }
+                }
+            }
+            if (removedStalePaths) publishVisibleGames()
             val gamesToProcess = allGames.filter { it.coverArtPath == null || it.coverArtPath.startsWith("http") }
-            if (gamesToProcess.isEmpty()) return@launch
+            if (gamesToProcess.isEmpty()) {
+                if (removedStalePaths) {
+                    currentLibraryRoot?.let { rootPath ->
+                        libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
+                    }
+                }
+                return@launch
+            }
             val semaphore = kotlinx.coroutines.sync.Semaphore(3)
 
             val shouldReschedule = AtomicBoolean(false)
@@ -760,6 +794,28 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
 
         requestLibraryScan(currentLibraryPaths)
+    }
+
+    private fun handleCoverCacheCleared() {
+        if (EmulatorBridge.isVmActive()) {
+            deferredCoverSync = true
+            startDeferredWorkMonitor()
+            return
+        }
+        val rootPath = currentLibraryRoot ?: return
+        val coverRepository = CoverArtRepository(getApplication())
+        synchronized(this) {
+            allGames = allGames.map { game ->
+                if (coverRepository.isManagedCoverCachePath(game.coverArtPath)) {
+                    game.copy(coverArtPath = null)
+                } else {
+                    game
+                }
+            }
+        }
+        publishVisibleGames()
+        libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
+        syncMissingCovers()
     }
 
     private fun normalizeSearchToken(value: String?): String {

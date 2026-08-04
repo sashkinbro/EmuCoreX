@@ -441,6 +441,7 @@ class AppPreferences(private val context: Context) {
         private val HOME_BACKGROUND_TYPE = intPreferencesKey("home_background_type")
         private val HOME_BACKGROUND_REVISION = intPreferencesKey("home_background_revision")
         private val HOME_BACKGROUND_DIM = intPreferencesKey("home_background_dim")
+        private val COVER_CACHE_REVISION = intPreferencesKey("cover_cache_revision")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
         private val CUSTOM_TOUCH_CONTROLS_JSON = stringPreferencesKey("custom_touch_controls_json")
@@ -754,6 +755,10 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> (prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM).coerceIn(0, 85) }
         .distinctUntilChanged()
 
+    val coverCacheRevision: Flow<Int> = context.dataStore.data
+        .map { prefs -> (prefs[COVER_CACHE_REVISION] ?: 0).coerceAtLeast(0) }
+        .distinctUntilChanged()
+
     val touchControlVisualStyle: Flow<TouchControlVisualStyle> = context.dataStore.data
         .map { prefs -> TouchControlVisualStyle.fromPreference(prefs[TOUCH_CONTROL_VISUAL_STYLE]) }
         .distinctUntilChanged()
@@ -900,6 +905,12 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setHomeBackgroundDim(dim: Int) {
         context.dataStore.edit { it[HOME_BACKGROUND_DIM] = dim.coerceIn(0, 85) }
+    }
+
+    suspend fun notifyCoverCacheCleared() {
+        context.dataStore.edit { prefs ->
+            prefs[COVER_CACHE_REVISION] = (prefs[COVER_CACHE_REVISION] ?: 0) + 1
+        }
     }
 
     suspend fun setTouchControlVisualStyle(style: TouchControlVisualStyle) {

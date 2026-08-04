@@ -2153,4 +2153,11 @@
     <string name="touch_control_creator_preset_minimal">极简</string>
     <string name="touch_control_creator_preset_neon">霓虹</string>
     <string name="touch_control_creator_preset_compact">紧凑</string>
+    <string name="settings_clear_cover_cache">清除封面缓存</string>
+    <string name="settings_clear_cover_cache_desc">移除临时下载的封面，并重试失败的下载。</string>
+    <string name="settings_clear_cover_cache_confirm_title">清除封面缓存？</string>
+    <string name="settings_clear_cover_cache_confirm_body">已下载的封面将被移除并自动重新下载。自定义封面和游戏文件不会更改。</string>
+    <string name="settings_clear_cover_cache_action">清除</string>
+    <string name="settings_clear_cover_cache_success">封面缓存已清除。封面将自动重新下载。</string>
+    <string name="settings_clear_cover_cache_partial">部分缓存封面无法移除。请在当前下载完成后重试。</string>
 </resources>

@@ -2154,4 +2154,11 @@
     <string name="touch_control_creator_preset_minimal">Minimalista</string>
     <string name="touch_control_creator_preset_neon">Neón</string>
     <string name="touch_control_creator_preset_compact">Compacto</string>
+    <string name="settings_clear_cover_cache">Borrar caché de carátulas</string>
+    <string name="settings_clear_cover_cache_desc">Elimina las carátulas descargadas temporalmente y reintenta las descargas fallidas.</string>
+    <string name="settings_clear_cover_cache_confirm_title">¿Borrar la caché de carátulas?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Las carátulas descargadas se eliminarán y volverán a descargarse automáticamente. Las carátulas personalizadas y los archivos de juegos no cambiarán.</string>
+    <string name="settings_clear_cover_cache_action">Borrar</string>
+    <string name="settings_clear_cover_cache_success">Caché de carátulas borrada. Las carátulas volverán a descargarse automáticamente.</string>
+    <string name="settings_clear_cover_cache_partial">No se pudieron eliminar algunas carátulas almacenadas. Inténtalo de nuevo cuando terminen las descargas actuales.</string>
 </resources>

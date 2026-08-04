@@ -2156,4 +2156,11 @@
     <string name="touch_control_creator_preset_minimal">Минимализм</string>
     <string name="touch_control_creator_preset_neon">Неон</string>
     <string name="touch_control_creator_preset_compact">Компактный</string>
+    <string name="settings_clear_cover_cache">Очистить кеш обложек</string>
+    <string name="settings_clear_cover_cache_desc">Удалить временно загруженные обложки и повторить неудачные загрузки.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Очистить кеш обложек?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Загруженные обложки будут удалены и автоматически загружены снова. Пользовательские обложки и файлы игр не изменятся.</string>
+    <string name="settings_clear_cover_cache_action">Очистить</string>
+    <string name="settings_clear_cover_cache_success">Кеш обложек очищен. Обложки автоматически загрузятся снова.</string>
+    <string name="settings_clear_cover_cache_partial">Не все кешированные обложки удалось удалить. Повторите попытку после завершения текущих загрузок.</string>
 </resources>

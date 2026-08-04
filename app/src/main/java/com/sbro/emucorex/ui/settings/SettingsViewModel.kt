@@ -43,12 +43,14 @@ import com.sbro.emucorex.data.DefaultGameMenuTabOrder
 import com.sbro.emucorex.data.DefaultGameMenuSectionOrder
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CoverArtRepository
+import com.sbro.emucorex.data.CoverCacheClearResult
 import com.sbro.emucorex.data.CustomFontRepository
 import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
+import com.sbro.emucorex.ui.common.clearCoverImageMemoryCache
 import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -2079,6 +2081,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setCoverDownloadBaseUrl(url)
             CoverArtRepository(getApplication()).clearCache()
+            clearCoverImageMemoryCache()
         }
     }
 
@@ -2086,6 +2089,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setCoverArtStyle(style)
             CoverArtRepository(getApplication()).clearCache()
+            clearCoverImageMemoryCache()
+        }
+    }
+
+    fun clearCoverCache(onComplete: (CoverCacheClearResult) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = CoverArtRepository(getApplication()).clearAllTemporaryImageCaches()
+            clearCoverImageMemoryCache()
+            preferences.notifyCoverCacheCleared()
+            withContext(Dispatchers.Main) {
+                onComplete(result)
+            }
         }
     }
 

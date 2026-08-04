@@ -1332,9 +1332,6 @@ void GSDeviceOGL::EndPresent()
 	if (m_gpu_timing_enabled)
 		PopTimestampQuery();
 
-	// Ensure all rendering commands are submitted before swap to prevent stale frames on Android.
-	glFlush();
-
 	m_gl_context->SwapBuffers();
 
 	if (m_gpu_timing_enabled)

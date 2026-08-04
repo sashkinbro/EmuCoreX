@@ -248,6 +248,7 @@ fun SettingsScreen(
     var showBackupExportDialog by rememberSaveable { mutableStateOf(false) }
     var includeSaveStatesInBackup by rememberSaveable { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
+    var showClearCoverCacheDialog by rememberSaveable { mutableStateOf(false) }
     val showBiosDialog = remember { mutableStateOf(false) }
     var showEmulatorDataLocationDialog by remember { mutableStateOf(false) }
     val pendingCoverUrl = remember { mutableStateOf("") }
@@ -270,6 +271,8 @@ fun SettingsScreen(
     val backupRestoreFailureMessage = stringResource(R.string.settings_backup_restore_failed)
     val coverUrlCopiedMessage = stringResource(R.string.settings_cover_download_url_copied)
     val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
+    val coverCacheClearedMessage = stringResource(R.string.settings_clear_cover_cache_success)
+    val coverCachePartiallyClearedMessage = stringResource(R.string.settings_clear_cover_cache_partial)
     stringResource(R.string.settings_not_set)
     val settingsScrollState = rememberScrollState()
     val proPurchaseMessage = uiState.proPurchaseMessageResId?.let { stringResource(it) }
@@ -496,6 +499,7 @@ fun SettingsScreen(
                     pendingCoverUrl.value = uiState.coverDownloadBaseUrl.orEmpty()
                     showCoverUrlDialog.value = true
                 },
+                onClearCoverCache = { showClearCoverCacheDialog = true },
                 launchSettingsBackupExport = {
                     includeSaveStatesInBackup = false
                     showBackupExportDialog = true
@@ -608,6 +612,42 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetAllSettingsDialog.value = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showClearCoverCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCoverCacheDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text(stringResource(R.string.settings_clear_cover_cache_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_clear_cover_cache_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCoverCacheDialog = false
+                        viewModel.clearCoverCache { result ->
+                            Toast.makeText(
+                                context,
+                                if (result.fullyCleared) coverCacheClearedMessage else coverCachePartiallyClearedMessage,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_clear_cover_cache_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCoverCacheDialog = false }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             }
@@ -1061,6 +1101,7 @@ private fun SettingsContent(
     launchHomeBackgroundPicker: () -> Unit,
     launchCustomFontPicker: () -> Unit,
     onOpenCoverUrlEditor: () -> Unit,
+    onClearCoverCache: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
     openLanguageSheet: () -> Unit,
@@ -2176,6 +2217,12 @@ private fun SettingsContent(
                             value = coverUrlDisplay,
                             onClick = onOpenCoverUrlEditor,
                             helpText = stringResource(R.string.settings_help_cover_download_url)
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.DeleteOutline,
+                            label = stringResource(R.string.settings_clear_cover_cache),
+                            value = stringResource(R.string.settings_clear_cover_cache_desc),
+                            onClick = onClearCoverCache
                         )
                     }
 
@@ -5080,6 +5127,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Library, R.string.settings_memory_cards_tab),
         entry(SettingsTab.Library, R.string.settings_cover_art_style),
         entry(SettingsTab.Library, R.string.settings_cover_download_url),
+        entry(SettingsTab.Library, R.string.settings_clear_cover_cache),
         entry(SettingsTab.Library, R.string.settings_backup_export_title),
         entry(SettingsTab.Library, R.string.settings_backup_restore_title),
         entry(SettingsTab.Emulation, R.string.settings_show_fps),

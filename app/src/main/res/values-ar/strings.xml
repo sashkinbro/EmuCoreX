@@ -2156,4 +2156,11 @@
     <string name="touch_control_creator_preset_minimal">بسيط</string>
     <string name="touch_control_creator_preset_neon">نيون</string>
     <string name="touch_control_creator_preset_compact">مدمج</string>
+    <string name="settings_clear_cover_cache">مسح ذاكرة أغلفة الألعاب المؤقتة</string>
+    <string name="settings_clear_cover_cache_desc">إزالة الأغلفة المنزّلة مؤقتًا وإعادة محاولة التنزيلات التي فشلت.</string>
+    <string name="settings_clear_cover_cache_confirm_title">هل تريد مسح ذاكرة الأغلفة المؤقتة؟</string>
+    <string name="settings_clear_cover_cache_confirm_body">ستُحذف الأغلفة المنزّلة ويُعاد تنزيلها تلقائيًا. لن تتغير الأغلفة المخصصة أو ملفات الألعاب.</string>
+    <string name="settings_clear_cover_cache_action">مسح</string>
+    <string name="settings_clear_cover_cache_success">تم مسح ذاكرة الأغلفة المؤقتة. ستُنزّل الأغلفة تلقائيًا من جديد.</string>
+    <string name="settings_clear_cover_cache_partial">تعذرت إزالة بعض الأغلفة المؤقتة. حاول مجددًا بعد انتهاء التنزيلات الحالية.</string>
 </resources>

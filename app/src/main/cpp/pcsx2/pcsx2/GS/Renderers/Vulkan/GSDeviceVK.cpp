@@ -794,6 +794,21 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR};
 
+	// Do not disable provoking-vertex support for an entire vendor. Some drivers expose the
+	// extension and the required last-vertex mode correctly, and forcing the fallback can make
+	// flat-shaded draws rebuild their vertex data on the CPU. Query the capability before asking
+	// for it so drivers which only advertise the extension still remain on the safe fallback.
+	if (m_optional_extensions.vk_ext_provoking_vertex)
+	{
+		VkPhysicalDeviceFeatures2 supported_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+		VkPhysicalDeviceProvokingVertexFeaturesEXT supported_provoking_vertex = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT};
+		Vulkan::AddPointerToChain(&supported_features, &supported_provoking_vertex);
+		vkGetPhysicalDeviceFeatures2(m_physical_device, &supported_features);
+		m_optional_extensions.vk_ext_provoking_vertex =
+			(supported_provoking_vertex.provokingVertexLast == VK_TRUE);
+	}
+
 	if (m_optional_extensions.vk_ext_provoking_vertex)
 	{
 		provoking_vertex_feature.provokingVertexLast = VK_TRUE;
@@ -907,9 +922,6 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 	// confirm we actually support it
 	m_optional_extensions.vk_ext_provoking_vertex &= (provoking_vertex_features.provokingVertexLast == VK_TRUE);
-	if (m_optional_extensions.vk_ext_provoking_vertex && IsDeviceAdreno() &&
-		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
-		m_optional_extensions.vk_ext_provoking_vertex = false;
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access &=
 		(rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess == VK_TRUE);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
@@ -3994,6 +4006,9 @@ void GSDeviceVK::OMSetRenderTargets(
 				{
 					// need to update descriptors to reflect the new layout
 					m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_RT);
+					if (ShouldDirtyVulkanAliasedTextureDescriptor(
+							m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkRt, true))
+						m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE);
 					vkRt->TransitionToLayout(GSTextureVK::Layout::FeedbackLoop);
 				}
 			}
@@ -4016,6 +4031,9 @@ void GSDeviceVK::OMSetRenderTargets(
 				if (vkDs->GetLayout() != GSTextureVK::Layout::FeedbackLoop)
 				{
 					m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_DEPTH);
+					if (ShouldDirtyVulkanAliasedTextureDescriptor(
+							m_tfx_textures[TFX_TEXTURE_TEXTURE] == vkDs, true))
+						m_dirty_flags |= (DIRTY_FLAG_TFX_TEXTURE_0 << TFX_TEXTURE_TEXTURE);
 					vkDs->TransitionToLayout(GSTextureVK::Layout::FeedbackLoop);
 				}
 			}
@@ -5783,18 +5801,22 @@ void GSDeviceVK::SetLineWidth(float width)
 void GSDeviceVK::PSSetShaderResource(int i, GSTexture* sr, bool check_state)
 {
 	GSTextureVK* vkTex = static_cast<GSTextureVK*>(sr);
+	bool update_layout = false;
 	if (vkTex)
 	{
 		if (check_state)
 		{
-			if (vkTex->GetLayout() != GSTextureVK::Layout::ShaderReadOnly && InRenderPass())
-			{
-				GL_INS("Ending render pass due to resource transition");
-				EndRenderPass();
-			}
-
 			vkTex->CommitClear();
-			vkTex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+			if (vkTex->GetLayout() != GSTextureVK::Layout::ShaderReadOnly)
+			{
+				update_layout = true;
+				if (InRenderPass())
+				{
+					GL_INS("Ending render pass due to resource transition");
+					EndRenderPass();
+				}
+				vkTex->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+			}
 		}
 		vkTex->SetUseFenceCounter(GetCurrentFenceCounter());
 	}
@@ -5805,7 +5827,7 @@ void GSDeviceVK::PSSetShaderResource(int i, GSTexture* sr, bool check_state)
 			return; // Null texture creation failed — skip binding to avoid crash
 	}
 
-	if (m_tfx_textures[i] == vkTex)
+	if (!ShouldRefreshVulkanTextureDescriptor(m_tfx_textures[i] == vkTex, update_layout))
 		return;
 
 	m_tfx_textures[i] = vkTex;
@@ -6586,10 +6608,20 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		pxAssertMsg(m_features.texture_barrier, "Texture barriers enabled");
 		PSSetShaderResource(TFX_TEXTURE_RT, draw_rt, false);
 	}
+	else
+	{
+		// Drop the old feedback binding when the next draw no longer reads the render target.
+		// Keeping it around leaves a stale descriptor layout across feedback transitions.
+		PSSetShaderResource(TFX_TEXTURE_RT, nullptr, false);
+	}
 	if (pipe.IsDepthFeedbackLoop())
 	{
 		pxAssertMsg(m_features.texture_barrier, "Texture barriers enabled");
 		PSSetShaderResource(TFX_TEXTURE_DEPTH, draw_ds, false);
+	}
+	else
+	{
+		PSSetShaderResource(TFX_TEXTURE_DEPTH, nullptr, false);
 	}
 	// Begin render pass if new target or out of the area.
 	if (!InRenderPass())

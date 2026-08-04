@@ -2169,4 +2169,11 @@
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Compact</string>
     <string name="theme_manager_default_name">My Theme</string>
+    <string name="settings_clear_cover_cache">Clear cover cache</string>
+    <string name="settings_clear_cover_cache_desc">Remove temporary downloaded covers and retry failed downloads.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Clear cover cache?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Downloaded covers will be removed and downloaded again automatically. Custom covers and game files will not be changed.</string>
+    <string name="settings_clear_cover_cache_action">Clear</string>
+    <string name="settings_clear_cover_cache_success">Cover cache cleared. Covers will download again automatically.</string>
+    <string name="settings_clear_cover_cache_partial">Some cached covers could not be removed. Try again after current downloads finish.</string>
 </resources>

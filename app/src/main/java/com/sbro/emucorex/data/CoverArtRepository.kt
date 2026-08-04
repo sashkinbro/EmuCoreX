@@ -1,13 +1,23 @@
 package com.sbro.emucorex.data
 
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.util.Log
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
-class CoverArtRepository(private val context: Context) {
+data class CoverCacheClearResult(
+    val deletedFiles: Int,
+    val freedBytes: Long,
+    val failedFiles: Int
+) {
+    val fullyCleared: Boolean
+        get() = failedFiles == 0
+}
+
+class CoverArtRepository(context: Context) {
 
     companion object {
         private const val TAG = "CoverArtRepository"
@@ -18,18 +28,30 @@ class CoverArtRepository(private val context: Context) {
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
     }
 
+    private val context = context.applicationContext
+
+    private val coverCacheDirectory = File(this.context.cacheDir, "game-covers")
+    private val remoteImageCacheDirectory = File(this.context.cacheDir, "remote-image-cache")
+
     private val cacheDirectory by lazy {
-        File(context.cacheDir, "game-covers").apply {
+        coverCacheDirectory.apply {
             if (!exists()) mkdirs()
             Log.d(TAG, "Cover cache directory created: $absolutePath")
         }
     }
 
-    fun clearCache() {
-        cacheDirectory.listFiles().orEmpty().forEach { file ->
-            runCatching { file.delete() }
-        }
-    }
+    /** Clears only automatically downloaded covers. User-selected covers live in filesDir and are preserved. */
+    fun clearCache(): CoverCacheClearResult = clearDirectories(listOf(coverCacheDirectory))
+
+    /** Clears all temporary cover/image downloads without touching library metadata or custom artwork. */
+    fun clearAllTemporaryImageCaches(): CoverCacheClearResult =
+        clearDirectories(listOf(coverCacheDirectory, remoteImageCacheDirectory))
+
+    fun isManagedCoverCachePath(path: String?): Boolean =
+        CoverCachePolicy.isPathInside(path, coverCacheDirectory)
+
+    fun isMissingManagedCover(path: String?): Boolean =
+        isManagedCoverCachePath(path) && !path.isNullOrBlank() && !isUsableCoverFile(File(path))
 
     fun findCachedCoverPath(
         serial: String?,
@@ -56,7 +78,13 @@ class CoverArtRepository(private val context: Context) {
                 File(cacheDirectory, "$normalizedSerial.png")
             )
         }
-        val found = preferredFiles.firstOrNull(File::exists)
+        preferredFiles.filter(File::exists).forEach { file ->
+            if (!isUsableCoverFile(file)) {
+                Log.w(TAG, "Removing invalid cached cover: ${file.absolutePath}")
+                runCatching { file.delete() }
+            }
+        }
+        val found = preferredFiles.firstOrNull(::isUsableCoverFile)
         Log.d(TAG, "Cached cover for $normalizedSerial (style=$style): ${if (found != null) "FOUND" else "NOT FOUND"}")
         return found?.absolutePath
     }
@@ -94,11 +122,12 @@ class CoverArtRepository(private val context: Context) {
         Log.d(TAG, "Cover style: $style")
 
         val coverFile = File(cacheDirectory, cacheFileName(normalizedSerial, style, targetExtension))
-        if (coverFile.exists()) {
+        if (isUsableCoverFile(coverFile)) {
             Log.d(TAG, "Cover already exists: ${coverFile.absolutePath}")
             Log.d(TAG, "========== COVER DOWNLOAD END (CACHED) ==========")
             return coverFile.absolutePath
         }
+        if (coverFile.exists()) coverFile.delete()
 
         val missFile = File(cacheDirectory, cacheMissFileName(normalizedSerial, style))
         if (missFile.exists() && System.currentTimeMillis() - missFile.lastModified() < MISS_TTL_MS) {
@@ -129,9 +158,12 @@ class CoverArtRepository(private val context: Context) {
                         val finalFile = File(cacheDirectory, cacheFileName(normalizedSerial, style, extension))
                         if (altCoverFile.absolutePath != finalFile.absolutePath) {
                             if (finalFile.exists()) finalFile.delete()
-                            altCoverFile.renameTo(finalFile)
+                            if (!altCoverFile.renameTo(finalFile)) {
+                                runCatching { altCoverFile.copyTo(finalFile, overwrite = true) }
+                                altCoverFile.delete()
+                            }
                         }
-                        result = finalFile.absolutePath
+                        result = finalFile.takeIf(::isUsableCoverFile)?.absolutePath
                         break
                     }
                 }
@@ -164,9 +196,10 @@ class CoverArtRepository(private val context: Context) {
         missFile: File,
         sourceName: String
     ): String? {
-        if (coverFile.exists()) {
+        if (isUsableCoverFile(coverFile)) {
             return coverFile.absolutePath
         }
+        if (coverFile.exists()) coverFile.delete()
 
         val connection = (URL(urlString).openConnection() as? HttpURLConnection)
             ?: run {
@@ -196,33 +229,41 @@ class CoverArtRepository(private val context: Context) {
             val contentLength = connection.contentLength
             Log.d(TAG, "$sourceName: Content length: $contentLength bytes")
 
-            if (contentLength <= 0) {
+            // Chunked HTTP responses legitimately report -1. Only an explicitly empty body is invalid.
+            if (contentLength == 0) {
                 Log.w(TAG, "$sourceName: Invalid content length")
                 return null
             }
 
-            val tempFile = File(cacheDirectory, "${coverFile.name}.tmp")
-            connection.inputStream.use { input ->
-                tempFile.outputStream().use { output ->
-                    val copied = input.copyTo(output)
-                    Log.d(TAG, "$sourceName: Copied $copied bytes")
+            val tempFile = File.createTempFile("${coverFile.name}.", ".tmp", cacheDirectory)
+            try {
+                connection.inputStream.use { input ->
+                    tempFile.outputStream().use { output ->
+                        val copied = input.copyTo(output)
+                        Log.d(TAG, "$sourceName: Copied $copied bytes")
+                    }
                 }
-            }
 
-            if (tempFile.length() == 0L) {
-                Log.w(TAG, "$sourceName: Downloaded file is empty")
+                if (!isUsableCoverFile(tempFile)) {
+                    Log.w(TAG, "$sourceName: Downloaded file is not a valid image")
+                    return null
+                }
+
+                if (coverFile.exists()) coverFile.delete()
+                if (!tempFile.renameTo(coverFile)) {
+                    tempFile.copyTo(coverFile, overwrite = true)
+                }
+                if (!isUsableCoverFile(coverFile)) {
+                    coverFile.delete()
+                    return null
+                }
+                missFile.delete()
+
+                Log.d(TAG, "$sourceName: SUCCESS - ${coverFile.absolutePath}")
+                coverFile.absolutePath
+            } finally {
                 tempFile.delete()
-                return null
             }
-
-            if (coverFile.exists()) {
-                coverFile.delete()
-            }
-            tempFile.renameTo(coverFile)
-            missFile.delete()
-
-            Log.d(TAG, "$sourceName: SUCCESS - ${coverFile.absolutePath}")
-            coverFile.absolutePath
         } catch (e: Exception) {
             Log.e(TAG, "$sourceName: Error: ${e.message}", e)
             null
@@ -293,6 +334,50 @@ class CoverArtRepository(private val context: Context) {
         } else {
             "$serial.miss"
         }
+    }
+
+    private fun isUsableCoverFile(file: File): Boolean {
+        if (!file.isFile || file.length() <= 0L) return false
+        return runCatching {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, options)
+            options.outWidth > 0 && options.outHeight > 0
+        }.getOrDefault(false)
+    }
+
+    private fun clearDirectories(directories: List<File>): CoverCacheClearResult {
+        var deletedFiles = 0
+        var freedBytes = 0L
+        var failedFiles = 0
+
+        directories.distinctBy { it.absolutePath }.forEach { directory ->
+            if (!directory.exists()) return@forEach
+            val root = runCatching { directory.canonicalFile }.getOrNull() ?: run {
+                failedFiles++
+                return@forEach
+            }
+            directory.walkBottomUp().forEach { entry ->
+                if (entry == directory) return@forEach
+                val safeEntry = runCatching { entry.canonicalFile }.getOrNull()
+                if (safeEntry == null || !CoverCachePolicy.isFileInside(safeEntry, root)) {
+                    failedFiles++
+                    return@forEach
+                }
+                if (entry.isFile) {
+                    val size = entry.length()
+                    if (runCatching { entry.delete() }.getOrDefault(false)) {
+                        deletedFiles++
+                        freedBytes += size
+                    } else {
+                        failedFiles++
+                    }
+                } else if (entry.isDirectory) {
+                    // Remove only now-empty cache subdirectories; the two cache roots remain available.
+                    runCatching { entry.delete() }
+                }
+            }
+        }
+        return CoverCacheClearResult(deletedFiles, freedBytes, failedFiles)
     }
 
 }

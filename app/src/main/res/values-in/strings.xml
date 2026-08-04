@@ -2166,4 +2166,11 @@
     <string name="touch_control_creator_preset_minimal">Minimal</string>
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Kompak</string>
+    <string name="settings_clear_cover_cache">Hapus cache sampul</string>
+    <string name="settings_clear_cover_cache_desc">Hapus sampul unduhan sementara dan coba lagi unduhan yang gagal.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Hapus cache sampul?</string>
+    <string name="settings_clear_cover_cache_confirm_body">Sampul yang diunduh akan dihapus dan diunduh lagi secara otomatis. Sampul kustom dan file game tidak akan diubah.</string>
+    <string name="settings_clear_cover_cache_action">Hapus</string>
+    <string name="settings_clear_cover_cache_success">Cache sampul telah dihapus. Sampul akan diunduh lagi secara otomatis.</string>
+    <string name="settings_clear_cover_cache_partial">Beberapa sampul dalam cache tidak dapat dihapus. Coba lagi setelah unduhan saat ini selesai.</string>
 </resources>

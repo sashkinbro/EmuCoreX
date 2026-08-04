@@ -2151,4 +2151,11 @@
     <string name="touch_control_creator_preset_minimal">ミニマル</string>
     <string name="touch_control_creator_preset_neon">ネオン</string>
     <string name="touch_control_creator_preset_compact">コンパクト</string>
+    <string name="settings_clear_cover_cache">カバーのキャッシュを消去</string>
+    <string name="settings_clear_cover_cache_desc">一時的にダウンロードしたカバーを削除し、失敗したダウンロードを再試行します。</string>
+    <string name="settings_clear_cover_cache_confirm_title">カバーのキャッシュを消去しますか？</string>
+    <string name="settings_clear_cover_cache_confirm_body">ダウンロード済みのカバーを削除し、自動的に再ダウンロードします。カスタムカバーとゲームファイルは変更されません。</string>
+    <string name="settings_clear_cover_cache_action">消去</string>
+    <string name="settings_clear_cover_cache_success">カバーのキャッシュを消去しました。カバーは自動的に再ダウンロードされます。</string>
+    <string name="settings_clear_cover_cache_partial">一部のキャッシュ済みカバーを削除できませんでした。現在のダウンロードが完了してから再試行してください。</string>
 </resources>

@@ -2152,4 +2152,11 @@
     <string name="touch_control_creator_preset_minimal">Minimal</string>
     <string name="touch_control_creator_preset_neon">Neon</string>
     <string name="touch_control_creator_preset_compact">Kompakt</string>
+    <string name="settings_clear_cover_cache">Kapak önbelleğini temizle</string>
+    <string name="settings_clear_cover_cache_desc">Geçici olarak indirilen kapakları kaldırır ve başarısız indirmeleri yeniden dener.</string>
+    <string name="settings_clear_cover_cache_confirm_title">Kapak önbelleği temizlensin mi?</string>
+    <string name="settings_clear_cover_cache_confirm_body">İndirilen kapaklar kaldırılacak ve otomatik olarak yeniden indirilecektir. Özel kapaklar ve oyun dosyaları değiştirilmeyecektir.</string>
+    <string name="settings_clear_cover_cache_action">Temizle</string>
+    <string name="settings_clear_cover_cache_success">Kapak önbelleği temizlendi. Kapaklar otomatik olarak yeniden indirilecek.</string>
+    <string name="settings_clear_cover_cache_partial">Önbellekteki bazı kapaklar kaldırılamadı. Mevcut indirmeler tamamlandıktan sonra tekrar deneyin.</string>
 </resources>

@@ -2167,4 +2167,11 @@
     <string name="touch_control_creator_preset_minimal">مینیمال</string>
     <string name="touch_control_creator_preset_neon">نئون</string>
     <string name="touch_control_creator_preset_compact">فشرده</string>
+    <string name="settings_clear_cover_cache">پاک کردن حافظه نهان کاورها</string>
+    <string name="settings_clear_cover_cache_desc">کاورهای موقت دانلودشده را حذف می‌کند و دانلودهای ناموفق را دوباره انجام می‌دهد.</string>
+    <string name="settings_clear_cover_cache_confirm_title">حافظه نهان کاورها پاک شود؟</string>
+    <string name="settings_clear_cover_cache_confirm_body">کاورهای دانلودشده حذف و به‌طور خودکار دوباره دانلود می‌شوند. کاورهای سفارشی و فایل‌های بازی تغییر نمی‌کنند.</string>
+    <string name="settings_clear_cover_cache_action">پاک کردن</string>
+    <string name="settings_clear_cover_cache_success">حافظه نهان کاورها پاک شد. کاورها به‌طور خودکار دوباره دانلود می‌شوند.</string>
+    <string name="settings_clear_cover_cache_partial">برخی کاورهای ذخیره‌شده حذف نشدند. پس از پایان دانلودهای فعلی دوباره تلاش کنید.</string>
 </resources>

@@ -13,6 +13,7 @@
 namespace
 {
 constexpr const char* LOG_TAG = "EmuCoreX";
+constexpr int64_t STATE_CHANGE_TIMEOUT_NANOS = 500'000'000;
 
 class AndroidAAudioStream final : public AudioStream
 {
@@ -32,10 +33,24 @@ public:
 		if (m_paused == paused || !m_stream)
 			return;
 
+		// AAudio state changes are asynchronous. In particular, requestStart() is not valid while a
+		// preceding requestPause() is still in PAUSING. The in-game menu can be opened and closed in
+		// consecutive frames, so issuing both requests without completing the pause transition can
+		// leave the device paused while m_paused says it is running. Every later resume then becomes a
+		// no-op and audio remains silent until the VM is restarted.
+		if (!paused && !WaitForPendingPause())
+			return;
+
 		const aaudio_result_t result = paused ? AAudioStream_requestPause(m_stream) : AAudioStream_requestStart(m_stream);
 		if (result != AAUDIO_OK)
+		{
 			__android_log_print(ANDROID_LOG_WARN, LOG_TAG, "AAudio pause/start failed: %s", AAudio_convertResultToText(result));
+			return;
+		}
+
 		m_paused = paused;
+		if (paused)
+			WaitForPendingPause();
 	}
 
 	bool OpenDevice(bool stretch_enabled, Error* error)
@@ -114,6 +129,34 @@ public:
 	}
 
 private:
+	bool WaitForPendingPause()
+	{
+		aaudio_stream_state_t state = AAudioStream_getState(m_stream);
+		while (state == AAUDIO_STREAM_STATE_PAUSING)
+		{
+			aaudio_stream_state_t next_state = state;
+			const aaudio_result_t result = AAudioStream_waitForStateChange(
+				m_stream, state, &next_state, STATE_CHANGE_TIMEOUT_NANOS);
+			if (result != AAUDIO_OK)
+			{
+				__android_log_print(ANDROID_LOG_WARN, LOG_TAG,
+					"AAudio pause transition did not complete: %s", AAudio_convertResultToText(result));
+				return false;
+			}
+			state = next_state;
+		}
+
+		if (state == AAUDIO_STREAM_STATE_DISCONNECTED || state == AAUDIO_STREAM_STATE_CLOSING ||
+			state == AAUDIO_STREAM_STATE_CLOSED)
+		{
+			__android_log_print(ANDROID_LOG_WARN, LOG_TAG,
+				"AAudio cannot resume from stream state %d", static_cast<int>(state));
+			return false;
+		}
+
+		return true;
+	}
+
 	void CloseDevice()
 	{
 		if (!m_stream)
