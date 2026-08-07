@@ -595,11 +595,9 @@ bool GSRenderer::BeginPresentFrame(bool frame_skip)
 
 	Host::BeginPresentFrame();
 
-	DEBUG_GS_LOG(ANDROID_LOG_DEBUG, "BeginPresentFrame: calling BeginPresent(frame_skip=%d)", frame_skip ? 1 : 0);
 	const GSDevice::PresentResult res = g_gs_device->BeginPresent(frame_skip);
 	if (res == GSDevice::PresentResult::FrameSkipped)
 	{
-		DEBUG_GS_LOG(ANDROID_LOG_DEBUG, "BeginPresentFrame: FrameSkipped");
 #ifndef __ANDROID__
 		// If we're skipping a frame, we need to reset imgui's state, since
 		// we won't be calling EndPresentFrame().
