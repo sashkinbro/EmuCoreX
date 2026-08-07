@@ -19,6 +19,10 @@
 #include "JitProfiler.h"
 #include "HangTrace.h"
 
+#include "emucorex/debug_logcat.h"
+
+thread_local uint64_t s_ee_jit_exec_start = 0;
+
 #include "common/AlignedMalloc.h"
 #include "common/FastJmp.h"
 #include "common/HeapArray.h"
@@ -250,7 +254,32 @@ static const void* DispatchPageReset = nullptr;
 
 static void recEventTest()
 {
+	// End JIT timing (measures time spent in recompiled code since last event test)
+	if (::emucorex::IsProfilerLogcatEnabled())
+	{
+		uint64_t _end = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+		uint64_t _elapsed = _end - s_ee_jit_exec_start;
+		if (_elapsed > 0)
+		{
+			::emucorex::s_profiler_metrics.ee_jit_exec_total_us.fetch_add(_elapsed, std::memory_order_relaxed);
+			::emucorex::s_profiler_metrics.ee_jit_exec_count.fetch_add(1, std::memory_order_relaxed);
+			uint64_t _prev_max = ::emucorex::s_profiler_metrics.ee_jit_exec_max_us.load(std::memory_order_relaxed);
+			while (_elapsed > _prev_max &&
+				!::emucorex::s_profiler_metrics.ee_jit_exec_max_us.compare_exchange_weak(
+					_prev_max, _elapsed, std::memory_order_relaxed))
+				;
+		}
+	}
+
 	_cpuEventTest_Shared();
+
+	// Start JIT timing for next block
+	if (::emucorex::IsProfilerLogcatEnabled())
+	{
+		s_ee_jit_exec_start = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+	}
 
 	if (eeRecExitRequested)
 	{
@@ -620,6 +649,9 @@ static void recExecute()
 	if (!fastjmp_set(&m_SetJmp_StateCheck))
 	{
 		eeCpuExecuting = true;
+		if (::emucorex::IsProfilerLogcatEnabled())
+			s_ee_jit_exec_start = std::chrono::duration_cast<std::chrono::microseconds>(
+				std::chrono::steady_clock::now().time_since_epoch()).count();
 		((void (*)())EnterRecompiledCode)();
 
 		// Generally unreachable code here ...

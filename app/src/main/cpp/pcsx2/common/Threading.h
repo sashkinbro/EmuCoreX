@@ -148,14 +148,14 @@ namespace Threading
 	/// Usage:
 	/// - Processing thread loops on `WaitForWork()` followed by processing all work in the queue
 	/// - Threads adding work first add their work to the queue, then call `NotifyOfWork()`
-	class WorkSema
+	class alignas(__cachelinesize) WorkSema
 	{
 		/// Semaphore for sleeping the worker thread
 		KernelSemaphore m_sema;
 		/// Semaphore for sleeping thread waiting on worker queue empty
 		KernelSemaphore m_empty_sema;
 		/// Current state (see enum below)
-		std::atomic<s32> m_state{0};
+		alignas(__cachelinesize) std::atomic<s32> m_state{0};
 
 		// Expected call frequency is NotifyOfWork > WaitForWork > WaitForEmpty
 		// So optimize states for fast NotifyOfWork
@@ -222,10 +222,10 @@ namespace Threading
 	};
 
 	/// A semaphore that definitely has a fast userspace path
-	class UserspaceSemaphore
+	class alignas(__cachelinesize) UserspaceSemaphore
 	{
 		KernelSemaphore m_sema;
-		std::atomic<int32_t> m_counter{0};
+		alignas(__cachelinesize) std::atomic<int32_t> m_counter{0};
 
 	public:
 		UserspaceSemaphore() = default;

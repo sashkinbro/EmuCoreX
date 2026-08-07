@@ -48,7 +48,7 @@ cachedTlbs_t cachedTlbs;
 
 R5900cpu *Cpu = NULL;
 
-static constexpr uint eeWaitCycles = 3072;
+static constexpr uint eeWaitCycles = 4096;
 
 bool eeEventTestIsActive = false;
 EE_intProcessStatus eeRunInterruptScan = INT_NOT_RUNNING;
@@ -391,51 +391,39 @@ __fi void _cpuEventTest_Shared()
 		cpuException(mask, cpuRegs.branch);
 
 	// ---- IOP -------------
-	// * It's important to run a iopEventTest before calling ExecuteBlock. This
-	//   is because the IOP does not always perform branch tests before returning
-	//   (during the prev branch) and also so it can act on the state the EE has
-	//   given it before executing any code.
-	//
-	// * The IOP cannot always be run.  If we run IOP code every time through the
-	//   cpuEventTest, the IOP generally starts to run way ahead of the EE.
-
-	// It's also important to sync up the IOP before updating the timers, since gates will depend on starting/stopping in the right place!
 	EEsCycle += cpuRegs.cycle - EEoCycle;
 	EEoCycle = cpuRegs.cycle;
 
 	if (EEsCycle > 0)
 		iopEventAction = true;
 
+	DEBUG_PROF_TIMING_START(iop_exec);
 	if (iopEventAction)
 	{
-		DEBUG_PROF_TIMING_START(iop_exec);
 		EEsCycle = psxCpu->ExecuteBlock(EEsCycle);
-		DEBUG_PROF_TIMING_END(iop_exec, iop_exec);
-
 		iopEventAction = false;
 	}
+	DEBUG_PROF_TIMING_END(iop_exec, iop_exec);
 
+	DEBUG_PROF_TIMING_START(iop_event_test);
 	iopEventTest();
+	DEBUG_PROF_TIMING_END(iop_event_test, iop_event_test);
 
+	DEBUG_PROF_TIMING_START(rcnt_update);
 	if (cpuTestCycle(nextStartCounter, nextDeltaCounter))
 	{
+		DEBUG_PROF_TIMING_START(rcnt_core);
 		rcntUpdate();
+		DEBUG_PROF_TIMING_END(rcnt_core, rcnt_core);
 		_cpuTestPERF();
 	}
-
 	_cpuTestTIMR();
+	DEBUG_PROF_TIMING_END(rcnt_update, rcnt_update);
 
 	// ---- Interrupts -------------
-	// These are basically just DMAC-related events, which also piggy-back the same bits as
-	// the PS2's own DMA channel IRQs and IRQ Masks.
-
 	if (cpuRegs.interrupt)
 	{
 		DEBUG_PROF_TIMING_START(dma_interrupt);
-		// This is a BIOS hack because the coding in the BIOS is terrible but the bug is masked by Data Cache
-		// where a DMA buffer is overwritten without waiting for the transfer to end, which causes the fonts to get all messed up
-		// so to fix it, we run all the DMA's instantly when in the BIOS.
-		// Only use the lower 17 bits of the cpuRegs.interrupt as the upper bits are for VU0/1 sync which can't be done in a tight loop
 		if (CHECK_INSTANTDMAHACK && dmacRegs.ctrl.DMAE && !(psHu8(DMAC_ENABLER + 2) & 1) && (cpuRegs.interrupt & 0x1FFFF))
 		{
 			while ((cpuRegs.interrupt & 0x1FFFF) && _cpuTestInterrupts())
@@ -447,8 +435,6 @@ __fi void _cpuEventTest_Shared()
 	}
 
 	// ---- VU Sync -------------
-	// We're in a EventTest.  All dynarec registers are flushed
-	// so there is no need to freeze registers here.
 	DEBUG_PROF_TIMING_START(vu0_sync);
 	CpuVU0->ExecuteBlock();
 	DEBUG_PROF_TIMING_END(vu0_sync, vu0_sync);

@@ -2333,6 +2333,7 @@ void VMManager::Internal::Throttle()
 		return;
 
 	DEBUG_GS_TIMING_START(frame_throttle);
+	DEBUG_PROF_TIMING_START(frame_limiter);
 
 	const u64 uExpectedEnd =
 		s_limiter_frame_start +
@@ -2346,6 +2347,7 @@ void VMManager::Internal::Throttle()
 		// ... Fudge the next frame start over a bit. Prevents fast forward zoomies.
 		s_limiter_frame_start += (sDeltaTime / s_limiter_ticks_per_frame) * s_limiter_ticks_per_frame;
 		DEBUG_GS_TIMING_END_U64(frame_throttle, frame_throttle);
+		DEBUG_PROF_TIMING_END(frame_limiter, frame_limiter);
 		return;
 	}
 
@@ -2370,6 +2372,7 @@ void VMManager::Internal::Throttle()
 	s_limiter_frame_start = uExpectedEnd;
 
 	DEBUG_GS_TIMING_END_U64(frame_throttle, frame_throttle);
+	DEBUG_PROF_TIMING_END(frame_limiter, frame_limiter);
 }
 
 void VMManager::Internal::FrameRateChanged()

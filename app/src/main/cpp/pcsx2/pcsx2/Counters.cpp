@@ -18,6 +18,8 @@
 #include "SIO/Sio.h"
 #include "SPU2/spu2.h"
 #include "Recording/InputRecording.h"
+
+#include "emucorex/debug_logcat.h"
 #include "VMManager.h"
 #include "VUmicro.h"
 
@@ -486,18 +488,29 @@ static __fi void DoFMVSwitch()
 
 static __fi void VSyncStart(u32 sCycle)
 {
+	DEBUG_PROF_TIMING_START(vsync_start);
+	DEBUG_PROF_TIMING_START(vsync_cpu);
 	// End-of-frame tasks.
 	DoFMVSwitch();
 	VMManager::Internal::VSyncOnCPUThread();
+	DEBUG_PROF_TIMING_END(vsync_cpu, vsync_cpu);
 
 	// Don't bother throttling if we're going to pause.
 	if (!VMManager::Internal::IsExecutionInterrupted())
+	{
+		DEBUG_PROF_TIMING_START(vsync_throttle);
 		VMManager::Internal::Throttle();
+		DEBUG_PROF_TIMING_END(vsync_throttle, vsync_throttle);
+	}
 
+	DEBUG_PROF_TIMING_START(vsync_gs_post);
 	gsPostVsyncStart(); // MUST be after framelimit; doing so before causes funk with frame times!
+	DEBUG_PROF_TIMING_END(vsync_gs_post, vsync_gs_post);
 
 	// Poll input after MTGS frame push, just in case it has to stall to catch up.
+	DEBUG_PROF_TIMING_START(vsync_input);
 	VMManager::Internal::PollInputOnCPUThread();
+	DEBUG_PROF_TIMING_END(vsync_input, vsync_input);
 
 	EECNT_LOG("    ================  EE COUNTER VSYNC START (frame: %d)  ================", g_FrameCount);
 
@@ -508,10 +521,13 @@ static __fi void VSyncStart(u32 sCycle)
 
 	if (!GSSMODE1reg.SINT)
 	{
+		DEBUG_PROF_TIMING_START(vsync_irq);
 		hwIntcIrq(INTC_VBLANK_S);
 		rcntStartGate(true, sCycle); // Counters Start Gate code
 		psxVBlankStart();
+		DEBUG_PROF_TIMING_END(vsync_irq, vsync_irq);
 	}
+	DEBUG_PROF_TIMING_END(vsync_start, vsync_start);
 
 	// INTC - VB Blank Start Hack --
 	// Hack fix!  This corrects a freezeup in Granda 2 where it decides to spin
@@ -610,6 +626,25 @@ __fi void rcntUpdate_vSync()
 	{
 		vsyncCounter.startCycle += vSyncInfo.Render;
 		vsyncCounter.deltaCycles = vSyncInfo.GSBlank;
+
+		// Track frame delta (time between VSync starts)
+		if (::emucorex::IsProfilerLogcatEnabled())
+		{
+			uint64_t now = std::chrono::duration_cast<std::chrono::microseconds>(
+				std::chrono::steady_clock::now().time_since_epoch()).count();
+			uint64_t last = ::emucorex::s_profiler_metrics.last_vsync_start_time_us.exchange(now, std::memory_order_relaxed);
+			if (last > 0)
+			{
+				uint64_t delta = now - last;
+				::emucorex::s_profiler_metrics.frame_delta_total_us.fetch_add(delta, std::memory_order_relaxed);
+				::emucorex::s_profiler_metrics.frame_delta_count.fetch_add(1, std::memory_order_relaxed);
+				uint64_t prev_max = ::emucorex::s_profiler_metrics.frame_delta_max_us.load(std::memory_order_relaxed);
+				while (delta > prev_max &&
+					!::emucorex::s_profiler_metrics.frame_delta_max_us.compare_exchange_weak(
+						prev_max, delta, std::memory_order_relaxed))
+					;
+			}
+		}
 
 		VSyncStart(vsyncCounter.startCycle);
 

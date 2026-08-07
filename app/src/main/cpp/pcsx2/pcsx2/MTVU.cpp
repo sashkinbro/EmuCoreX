@@ -149,15 +149,6 @@ void VU_Thread::ExecuteRingBuffer()
 		if (m_shutdown_flag.load(std::memory_order_acquire))
 			break;
 
-		// Batch semaXGkick.Post() calls across the inner ring drain.
-		// Coalescing reduces futex syscalls compared to posting per-execute.
-		//
-		// Deadlock guard (FFX intro 3D scene hang): the VU JIT's XGKICK can
-		// fill the GIF path buffer mid-Execute, causing it to call
-		// `Gif_MTGS_Wait` which spins until MTGS drains the gsPackQueue.
-		// MTGS only drains after `semaXGkick.Wait()` returns. So we MUST
-		// have Posted any prior pending counts BEFORE entering Execute, or
-		// MTGS is stuck waiting and MTVU is stuck spinning.
 		int pending_xgkick_posts = 0;
 		constexpr s32 READ_POS_PUBLISH_BATCH_WORDS = _16kb / sizeof(u32);
 		u64 published_read_sequence = m_ato_read_sequence.load(std::memory_order_relaxed);
@@ -167,16 +158,15 @@ void VU_Thread::ExecuteRingBuffer()
 			u32 tag = Read();
 			switch (tag)
 			{
-				case MTVU_VU_EXECUTE:
+			case MTVU_VU_EXECUTE:
+			{
+				// Post prior packets before entering Execute so XGKICK can be drained.
+				if (pending_xgkick_posts)
 				{
-					// Pre-flush so MTGS can drain GIF buffer DURING this
-					// Execute (else XGKICK's Gif_MTGS_Wait deadlocks).
-					if (pending_xgkick_posts)
-					{
-						semaXGkick.Post(pending_xgkick_posts);
-						pending_xgkick_posts = 0;
-					}
-					VU1.cycle = 0;
+					semaXGkick.Post(pending_xgkick_posts);
+					pending_xgkick_posts = 0;
+				}
+				VU1.cycle = 0;
 					s32 addr = Read();
 					vifRegs.top = Read();
 					vifRegs.itop = Read();
@@ -187,10 +177,10 @@ void VU_Thread::ExecuteRingBuffer()
 
 					DEBUG_GS_TIMING_START(vu1_exec);
 					CpuVU1->Execute(vu1RunCycles);
-					DEBUG_GS_TIMING_END_U64(vu1_exec, vu1_exec);
+				DEBUG_GS_TIMING_END_U64(vu1_exec, vu1_exec);
 
-					gifUnit.gifPath[GIF_PATH_1].FinishGSPacketMTVU();
-					pending_xgkick_posts++; // Batched → flushed before NEXT execute or at loop end
+				gifUnit.gifPath[GIF_PATH_1].FinishGSPacketMTVU();
+				pending_xgkick_posts++;
 					vuCycles[vuCycleIdx].store(VU1.cycle, std::memory_order_release);
 					vuCycleIdx = (vuCycleIdx + 1) & 3;
 					break;
@@ -257,12 +247,8 @@ void VU_Thread::ExecuteRingBuffer()
 		if (published_read_sequence != m_read_sequence)
 			CommitReadPos();
 
-		// Drain any batched VU_EXECUTE Posts.
 		if (pending_xgkick_posts)
-		{
 			semaXGkick.Post(pending_xgkick_posts);
-			pending_xgkick_posts = 0;
-		}
 	}
 
 	semaEvent.Kill();

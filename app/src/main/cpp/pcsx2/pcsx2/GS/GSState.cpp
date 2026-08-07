@@ -210,9 +210,11 @@ void GSState::Reset(bool hardware_reset)
 	m_perfmon_frame.Reset();
 }
 
-template<bool auto_flush>
+template<bool auto_flush, bool sprites_only>
 void GSState::SetPrimHandlers()
 {
+	constexpr bool non_sprite_af = auto_flush && !sprites_only;
+
 #define SetHandlerXYZ(P, auto_flush) \
 	m_fpGIFPackedRegHandlerXYZ[P][0] = &GSState::GIFPackedRegHandlerXYZF2<P, 0, auto_flush>; \
 	m_fpGIFPackedRegHandlerXYZ[P][1] = &GSState::GIFPackedRegHandlerXYZF2<P, 1, auto_flush>; \
@@ -226,13 +228,13 @@ void GSState::SetPrimHandlers()
 	m_fpGIFPackedRegHandlerSTQRGBAXYZ2[P] = &GSState::GIFPackedRegHandlerSTQRGBAXYZ2<P, auto_flush>;
 
 	SetHandlerXYZ(GS_POINTLIST, true);
-	SetHandlerXYZ(GS_LINELIST, auto_flush);
-	SetHandlerXYZ(GS_LINESTRIP, auto_flush);
-	SetHandlerXYZ(GS_TRIANGLELIST, auto_flush);
-	SetHandlerXYZ(GS_TRIANGLESTRIP, auto_flush);
-	SetHandlerXYZ(GS_TRIANGLEFAN, auto_flush);
+	SetHandlerXYZ(GS_LINELIST, non_sprite_af);
+	SetHandlerXYZ(GS_LINESTRIP, non_sprite_af);
+	SetHandlerXYZ(GS_TRIANGLELIST, non_sprite_af);
+	SetHandlerXYZ(GS_TRIANGLESTRIP, non_sprite_af);
+	SetHandlerXYZ(GS_TRIANGLEFAN, non_sprite_af);
 	SetHandlerXYZ(GS_SPRITE, auto_flush);
-	SetHandlerXYZ(GS_INVALID, auto_flush);
+	SetHandlerXYZ(GS_INVALID, non_sprite_af);
 
 #undef SetHandlerXYZ
 }
@@ -254,9 +256,14 @@ void GSState::ResetHandlers()
 	m_fpGIFPackedRegHandlers[GIF_REG_NOP] = &GSState::GIFPackedRegHandlerNOP;
 
 	if (IsAutoFlushEnabled())
-		SetPrimHandlers<true>();
+	{
+		if (GSConfig.UserHacks_AutoFlush == GSHWAutoFlushLevel::SpritesOnly)
+			SetPrimHandlers<true, true>();
+		else
+			SetPrimHandlers<true, false>();
+	}
 	else
-		SetPrimHandlers<false>();
+		SetPrimHandlers<false, false>();
 
 	std::fill(std::begin(m_fpGIFRegHandlers), std::end(m_fpGIFRegHandlers), &GSState::GIFRegHandlerNull);
 
@@ -1832,6 +1839,7 @@ void GSState::GIFRegHandlerHWREG(const GIFReg* RESTRICT r)
 
 void GSState::Flush(GSFlushReason reason)
 {
+	DEBUG_PROF_TIMING_START(gs_flush);
 	FlushWrite();
 
 	if (m_index.tail > 0)
@@ -1863,7 +1871,10 @@ void GSState::Flush(GSFlushReason reason)
 			}
 
 			if (!needs_flush[0] && !needs_flush[1])
+			{
+				DEBUG_PROF_TIMING_END(gs_flush, gs_flush);
 				return;
+			}
 		}
 		m_state_flush_reason = reason;
 
@@ -1894,6 +1905,7 @@ void GSState::Flush(GSFlushReason reason)
 	}
 
 	m_state_flush_reason = GSFlushReason::UNKNOWN;
+	DEBUG_PROF_TIMING_END(gs_flush, gs_flush);
 }
 
 void GSState::FlushWrite()
@@ -3049,6 +3061,7 @@ void GSState::Transfer(const u8* mem, u32 size)
 			case GIF_FLG_IMAGE:
 			{
 				DEBUG_GS_TIMING_START(gs_image_transfer);
+				DEBUG_PROF_TIMING_START(gs_image);
 				const int len = (int)std::min(size, path.nloop);
 
 				switch (m_env.TRXDIR.XDIR)
@@ -3072,6 +3085,7 @@ void GSState::Transfer(const u8* mem, u32 size)
 				size -= len;
 
 				DEBUG_GS_TIMING_END_U64(gs_image_transfer, gs_image_transfer);
+				DEBUG_PROF_TIMING_END(gs_image, gs_image);
 				break;
 			}
 			default:

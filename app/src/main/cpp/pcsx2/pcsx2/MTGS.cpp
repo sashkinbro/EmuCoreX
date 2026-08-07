@@ -282,7 +282,9 @@ void MTGS::PostVsyncStart(bool registers_written)
 	s_VsyncSignalListener.store(true, std::memory_order_release);
 	//Console.WriteLn( Color_Blue, "(EEcore Sleep) Vsync\t\tringpos=0x%06x, writepos=0x%06x", m_ReadPos.load(), m_WritePos.load() );
 
+	DEBUG_PROF_TIMING_START(mtgs_vsync_wait);
 	s_sem_Vsync.WaitWithSpin();
+	DEBUG_PROF_TIMING_END(mtgs_vsync_wait, mtgs_vsync_wait);
 }
 
 void MTGS::InitAndReadFIFO(u8* mem, u32 qwc)
@@ -455,20 +457,27 @@ void MTGS::MainLoop()
 					u32 offset = tag.data[0];
 					u32 size = tag.data[1];
 					if (offset != ~0u)
+					{
+						DEBUG_PROF_TIMING_START(mtgs_transfer);
 						GSgifTransfer((u8*)&path.buffer[offset], size / 16);
+						DEBUG_PROF_TIMING_END(mtgs_transfer, mtgs_transfer);
+					}
 					path.readAmount.fetch_sub(size, std::memory_order_acq_rel);
 					break;
 				}
 
 		case Command::MTVUGSPacket:
 			{
+				DEBUG_PROF_TIMING_START(mtgs_mtvu_packet);
 				MTVU_LOG("MTGS - Waiting on semaXGkick!");
 				DEBUG_GS_TIMING_START(sema_xgkick_wait);
 				if (!vu1Thread.semaXGkick.TryWait())
 				{
 					mtvu_lock.unlock();
 					// Wait for MTVU to complete vu1 program
+					DEBUG_PROF_TIMING_START(mtgs_mtvu_wait);
 					vu1Thread.semaXGkick.WaitWithSpin();
+					DEBUG_PROF_TIMING_END(mtgs_mtvu_wait, mtgs_mtvu_wait);
 					mtvu_lock.lock();
 				}
 				DEBUG_GS_TIMING_END_U64(sema_xgkick_wait, sema_xgkick_wait);
@@ -551,12 +560,15 @@ void MTGS::MainLoop()
 						}
 						else
 						{
+							DEBUG_PROF_TIMING_START(mtgs_transfer);
 							GSgifTransfer((u8*)&path.buffer[gsPack.offset], gsPack.size / 16);
+							DEBUG_PROF_TIMING_END(mtgs_transfer, mtgs_transfer);
 						}
 					}
 					path.readAmount.fetch_sub(gsPack.size + gsPack.readAmount, std::memory_order_release);
 					path.PopGSPacketMTVU(); // Should be done last, for proper Gif_MTGS_Wait()
-					break;
+					DEBUG_PROF_TIMING_END(mtgs_mtvu_packet, mtgs_mtvu_packet);
+				break;
 				}
 
 				default:
@@ -581,7 +593,9 @@ void MTGS::MainLoop()
 							((GSRegSIGBLID&)RingBuffer.Regs[0x1080]) = (GSRegSIGBLID&)remainder[2];
 
 							// CSR & 0x2000; is the pageflip id.
+							DEBUG_PROF_TIMING_START(mtgs_vsync_process);
 							GSvsync((((u32&)RingBuffer.Regs[0x1000]) & 0x2000) ? 0 : 1, remainder[4] != 0);
+							DEBUG_PROF_TIMING_END(mtgs_vsync_process, mtgs_vsync_process);
 
 							s_QueuedFrameCount.fetch_sub(1);
 							if (s_VsyncSignalListener.exchange(false))
@@ -862,6 +876,7 @@ void MTGS::GenericStall(uint size)
 
 			DEBUG_GS_TIMING_START(ring_stall);
 			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
+			DEBUG_PROF_TIMING_START(mtgs_ring_stall);
 			while (true)
 			{
 				s_SignalRingEnable.store(true, std::memory_order_release);
@@ -879,6 +894,7 @@ void MTGS::GenericStall(uint size)
 					break;
 			}
 			DEBUG_GS_TIMING_END_U64(ring_stall, ring_buffer_stall);
+			DEBUG_PROF_TIMING_END(mtgs_ring_stall, mtgs_ring_stall);
 
 			pxAssertMsg(s_SignalRingPosition <= 0, "MTGS Thread Synchronization Error");
 		}
@@ -887,6 +903,7 @@ void MTGS::GenericStall(uint size)
 			//Console.WriteLn( Color_StrongGray, "(EEcore Spin) PrepDataPacket!" );
 			DEBUG_GS_TIMING_START(ring_spin);
 			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
+			DEBUG_PROF_TIMING_START(mtgs_ring_stall);
 			SetEvent();
 			u32 spin_count = 0;
 			while (true)
@@ -907,6 +924,7 @@ void MTGS::GenericStall(uint size)
 					std::this_thread::yield();
 			}
 			DEBUG_GS_TIMING_END_U64(ring_spin, ring_buffer_stall);
+			DEBUG_PROF_TIMING_END(mtgs_ring_stall, mtgs_ring_stall);
 		}
 	}
 }
