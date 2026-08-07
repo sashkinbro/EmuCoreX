@@ -162,6 +162,7 @@ data class EmulationUiState(
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
+    val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val pressureModifierAmount: Int = AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT,
     val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
@@ -420,6 +421,10 @@ private data class LiveRuntimeSnapshot(
     val gamepadRightStickUpToR2: Boolean,
     val gamepadRightStickDownToL2: Boolean,
     val gamepadButtonHaptics: Boolean,
+    val gamepadStickDeadzone: Int,
+    val gamepadLeftStickSensitivity: Int,
+    val gamepadRightStickSensitivity: Int,
+    val gamepadBindingsByPad: Map<Int, Map<String, Int>>,
     val pressureModifierAmount: Int,
     val autoSaveOnExit: Boolean,
     val autoLoadOnStart: Boolean,
@@ -1828,6 +1833,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gamepadRightStickUpToR2 = liveRuntime.gamepadRightStickUpToR2,
                     gamepadRightStickDownToL2 = liveRuntime.gamepadRightStickDownToL2,
                     gamepadButtonHaptics = liveRuntime.gamepadButtonHaptics,
+                    gamepadStickDeadzone = liveRuntime.gamepadStickDeadzone,
+                    gamepadLeftStickSensitivity = liveRuntime.gamepadLeftStickSensitivity,
+                    gamepadRightStickSensitivity = liveRuntime.gamepadRightStickSensitivity,
+                    gamepadBindingsByPad = liveRuntime.gamepadBindingsByPad,
                     pressureModifierAmount = liveRuntime.pressureModifierAmount,
                     autoSaveOnExit = liveRuntime.autoSaveOnExit,
                     autoLoadOnStart = liveRuntime.autoLoadOnStart,
@@ -1839,6 +1848,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 _uiState.value = currentTouchControlsLayoutProfile?.let { overlayState.withTouchControlsLayout(it) } ?: overlayState
                 syncNativePerformanceOverlayState(_uiState.value)
                 syncGamepadRuntimeSettings(_uiState.value)
+                if (_uiState.value.gameSettingsProfileActive) {
+                    val state = _uiState.value
+                    GamepadManager.applyPerGameOverrides(
+                        bindingsByPad = state.gamepadBindingsByPad,
+                        deadzone = state.gamepadStickDeadzone,
+                        leftSensitivity = state.gamepadLeftStickSensitivity,
+                        rightSensitivity = state.gamepadRightStickSensitivity
+                    )
+                }
                 updateCrashContext(
                     launchState = "starting",
                     launchPath = path
@@ -2250,6 +2268,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setGamepadRightStickDownToL2(enabled)
             }
             syncGamepadRightStickTriggerMapping(newState)
+        }
+    }
+
+    fun setGamepadBindingsByPad(bindingsByPad: Map<Int, Map<String, Int>>) {
+        viewModelScope.launch {
+            val newState = _uiState.value.copy(gamepadBindingsByPad = bindingsByPad)
+            _uiState.value = newState
+            GamepadManager.applyPerGameOverrides(
+                bindingsByPad = bindingsByPad,
+                deadzone = null,
+                leftSensitivity = null,
+                rightSensitivity = null
+            )
         }
     }
 
@@ -3524,7 +3555,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val gameKey = activePerGameKey() ?: return
         perGameSettingsRepository.delete(gameKey)
         currentTouchControlsLayoutProfile = null
-        _uiState.value = _uiState.value.copy(gameSettingsProfileActive = false)
+        GamepadManager.clearPerGameOverrides()
+        _uiState.value = _uiState.value.copy(gameSettingsProfileActive = false, gamepadBindingsByPad = emptyMap())
         viewModelScope.launch {
             val settings = preferences.settingsSnapshot.first()
             _uiState.value = _uiState.value
@@ -3532,7 +3564,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 .copy(
                     touchControlVisualStyle = settings.touchControlVisualStyle,
                     touchControlPressEffect = settings.touchControlPressEffect,
-                    gameSettingsProfileActive = false
+                    gameSettingsProfileActive = false,
+                    gamepadStickDeadzone = settings.gamepadStickDeadzone,
+                    gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
+                    gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity
                 )
         }
     }
@@ -3726,6 +3761,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadRightStickUpToR2 = settings.gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = settings.gamepadRightStickDownToL2,
             gamepadButtonHaptics = settings.gamepadButtonHaptics,
+            gamepadStickDeadzone = settings.gamepadStickDeadzone,
+            gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
+            gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity,
+            gamepadBindingsByPad = settings.gamepadBindingsByPad,
             pressureModifierAmount = settings.pressureModifierAmount,
             autoSaveOnExit = false,
             autoLoadOnStart = false,
@@ -3899,6 +3938,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2) { gamepadRightStickUpToR2 },
             gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2) { gamepadRightStickDownToL2 },
             gamepadButtonHaptics = pick("gamepadButtonHaptics", gamepadButtonHaptics) { gamepadButtonHaptics },
+            gamepadStickDeadzone = pick("gamepadStickDeadzone", gamepadStickDeadzone) { gamepadStickDeadzone },
+            gamepadLeftStickSensitivity = pick("gamepadLeftStickSensitivity", gamepadLeftStickSensitivity) { gamepadLeftStickSensitivity },
+            gamepadRightStickSensitivity = pick("gamepadRightStickSensitivity", gamepadRightStickSensitivity) { gamepadRightStickSensitivity },
+            gamepadBindingsByPad = if (profile.providedKeys == null || "gamepadBindingsByPad" in profile.providedKeys) profile.gamepadBindingsByPad else gamepadBindingsByPad,
             pressureModifierAmount = pick("pressureModifierAmount", pressureModifierAmount) { pressureModifierAmount },
             autoSaveOnExit = pick("autoSaveOnExit", autoSaveOnExit) { autoSaveOnExit },
             autoLoadOnStart = pick("autoLoadOnStart", autoLoadOnStart) { autoLoadOnStart },
@@ -4050,6 +4093,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
             gamepadButtonHaptics = gamepadButtonHaptics,
+            gamepadStickDeadzone = gamepadStickDeadzone,
+            gamepadLeftStickSensitivity = gamepadLeftStickSensitivity,
+            gamepadRightStickSensitivity = gamepadRightStickSensitivity,
+            gamepadBindingsByPad = gamepadBindingsByPad,
             pressureModifierAmount = pressureModifierAmount,
             autoSaveOnExit = autoSaveOnExit,
             autoLoadOnStart = autoLoadOnStart,
@@ -4141,6 +4188,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (gamepadRightStickUpToR2 != globalGamepadRightStickUpToR2) add("gamepadRightStickUpToR2")
             if (gamepadRightStickDownToL2 != globalGamepadRightStickDownToL2) add("gamepadRightStickDownToL2")
             if (gamepadButtonHaptics != globalGamepadButtonHaptics) add("gamepadButtonHaptics")
+            if (gamepadStickDeadzone != preferences.gamepadStickDeadzone.first()) add("gamepadStickDeadzone")
+            if (gamepadLeftStickSensitivity != preferences.gamepadLeftStickSensitivity.first()) add("gamepadLeftStickSensitivity")
+            if (gamepadRightStickSensitivity != preferences.gamepadRightStickSensitivity.first()) add("gamepadRightStickSensitivity")
+            if (gamepadBindingsByPad.isNotEmpty()) add("gamepadBindingsByPad")
             if (pressureModifierAmount != globalPressureModifierAmount) add("pressureModifierAmount")
             if (autoSaveOnExit) add("autoSaveOnExit")
             if (autoLoadOnStart) add("autoLoadOnStart")
@@ -4566,6 +4617,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 } catch (_: Exception) { }
                 try {
                     EmulatorBridge.resetKeyStatus()
+                } catch (_: Exception) { }
+                try {
+                    GamepadManager.clearPerGameOverrides()
                 } catch (_: Exception) { }
                 try {
                     if (_uiState.value.isHangTraceActive) {

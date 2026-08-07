@@ -406,6 +406,11 @@ fun EmulationScreen(
     val globalDefaults by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val overlayDefaults by preferences.overlayLayoutSnapshot.collectAsState(initial = OverlayLayoutSnapshot())
     val gamepadBindingsByPad by preferences.gamepadBindingsByPad.collectAsState(initial = emptyMap())
+    val effectiveGamepadBindingsByPad = if (uiState.gameSettingsProfileActive && uiState.gamepadBindingsByPad.isNotEmpty()) {
+        uiState.gamepadBindingsByPad
+    } else {
+        gamepadBindingsByPad
+    }
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val scope = rememberCoroutineScope()
     val rootCutoutPadding = WindowInsets.displayCutout.asPaddingValues()
@@ -766,7 +771,15 @@ fun EmulationScreen(
         if (actionId != null) {
             GamepadManager.startBindingCapture(pendingGamepadPadIndex) { keyCode ->
                 scope.launch {
-                    preferences.setGamepadBinding(pendingGamepadPadIndex, actionId, keyCode)
+                    if (uiState.gameSettingsProfileActive) {
+                        val currentBindings = uiState.gamepadBindingsByPad.toMutableMap()
+                        val padBindings = currentBindings[pendingGamepadPadIndex].orEmpty().toMutableMap()
+                        padBindings[actionId] = keyCode
+                        currentBindings[pendingGamepadPadIndex] = padBindings
+                        viewModel.setGamepadBindingsByPad(currentBindings)
+                    } else {
+                        preferences.setGamepadBinding(pendingGamepadPadIndex, actionId, keyCode)
+                    }
                 }
                 pendingGamepadActionId = null
             }
@@ -1557,7 +1570,7 @@ fun EmulationScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     val connectedControllerName = GamepadManager.connectedControllerName(selectedGamepadPadIndex)
-                    val selectedBindings = gamepadBindingsByPad[selectedGamepadPadIndex].orEmpty()
+                    val selectedBindings = effectiveGamepadBindingsByPad[selectedGamepadPadIndex].orEmpty()
                     Column(
                         modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1621,7 +1634,19 @@ fun EmulationScreen(
                                 onClearClick = if (isCustomBinding) {
                                     {
                                         scope.launch {
-                                            preferences.clearGamepadBinding(selectedGamepadPadIndex, action.id)
+                                            if (uiState.gameSettingsProfileActive) {
+                                                val currentBindings = uiState.gamepadBindingsByPad.toMutableMap()
+                                                val padBindings = currentBindings[selectedGamepadPadIndex].orEmpty().toMutableMap()
+                                                padBindings.remove(action.id)
+                                                if (padBindings.isEmpty()) {
+                                                    currentBindings.remove(selectedGamepadPadIndex)
+                                                } else {
+                                                    currentBindings[selectedGamepadPadIndex] = padBindings
+                                                }
+                                                viewModel.setGamepadBindingsByPad(currentBindings)
+                                            } else {
+                                                preferences.clearGamepadBinding(selectedGamepadPadIndex, action.id)
+                                            }
                                         }
                                     }
                                 } else {
@@ -1635,7 +1660,13 @@ fun EmulationScreen(
                                 text = stringResource(R.string.settings_gamepad_mapping_reset_title),
                                 onClick = {
                                     scope.launch {
-                                        preferences.resetGamepadBindingsForPad(selectedGamepadPadIndex)
+                                        if (uiState.gameSettingsProfileActive) {
+                                            val currentBindings = uiState.gamepadBindingsByPad.toMutableMap()
+                                            currentBindings.remove(selectedGamepadPadIndex)
+                                            viewModel.setGamepadBindingsByPad(currentBindings)
+                                        } else {
+                                            preferences.resetGamepadBindingsForPad(selectedGamepadPadIndex)
+                                        }
                                     }
                                 },
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)

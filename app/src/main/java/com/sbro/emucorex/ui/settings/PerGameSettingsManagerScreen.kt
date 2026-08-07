@@ -1350,6 +1350,36 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(gamepadButtonHaptics = defaultProfile.gamepadButtonHaptics)) }
                     )
                     SliderRow(
+                        title = stringResource(R.string.settings_gamepad_stick_deadzone),
+                        value = draft.gamepadStickDeadzone.toFloat(),
+                        valueLabel = "${draft.gamepadStickDeadzone}%",
+                        range = 0f..35f,
+                        steps = 34,
+                        onValueChange = { onDraftChange(draft.copy(gamepadStickDeadzone = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadStickDeadzone = defaultProfile.gamepadStickDeadzone)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_left_stick_sensitivity),
+                        value = draft.gamepadLeftStickSensitivity.toFloat(),
+                        valueLabel = "${draft.gamepadLeftStickSensitivity}%",
+                        range = 50f..200f,
+                        steps = 149,
+                        onValueChange = { onDraftChange(draft.copy(gamepadLeftStickSensitivity = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadLeftStickSensitivity = defaultProfile.gamepadLeftStickSensitivity)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_right_stick_sensitivity),
+                        value = draft.gamepadRightStickSensitivity.toFloat(),
+                        valueLabel = "${draft.gamepadRightStickSensitivity}%",
+                        range = 50f..200f,
+                        steps = 149,
+                        onValueChange = { onDraftChange(draft.copy(gamepadRightStickSensitivity = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadRightStickSensitivity = defaultProfile.gamepadRightStickSensitivity)) }
+                    )
+                    SliderRow(
                         title = stringResource(R.string.settings_pressure_modifier_amount),
                         value = draft.pressureModifierAmount.toFloat(),
                         valueLabel = "${draft.pressureModifierAmount}%",

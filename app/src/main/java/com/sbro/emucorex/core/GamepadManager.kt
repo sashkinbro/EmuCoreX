@@ -208,6 +208,17 @@ object GamepadManager {
     @Volatile
     private var singleGamepadReplacesTouch = true
 
+    @Volatile
+    private var perGameBindingsActive = false
+    @Volatile
+    private var savedGlobalBindingsByPad: Map<Int, Map<String, Int>> = emptyMap()
+    @Volatile
+    private var savedGlobalAnalogDeadzone: Float = analogDeadzone
+    @Volatile
+    private var savedGlobalLeftStickSensitivity: Float = leftStickSensitivity
+    @Volatile
+    private var savedGlobalRightStickSensitivity: Float = rightStickSensitivity
+
     private val connectionLock = Any()
     private var appContext: Context? = null
     private val deviceToPadIndex = linkedMapOf<Int, Int>()
@@ -486,6 +497,56 @@ object GamepadManager {
             AppPreferences.TOUCH_HAPTICS_PRESET_SOFT,
             AppPreferences.TOUCH_HAPTICS_PRESET_STRONG
         )
+    }
+
+    fun applyPerGameOverrides(
+        bindingsByPad: Map<Int, Map<String, Int>>?,
+        deadzone: Int?,
+        leftSensitivity: Int?,
+        rightSensitivity: Int?
+    ) {
+        if (!perGameBindingsActive) {
+            savedGlobalBindingsByPad = customBindingsByPad
+            savedGlobalAnalogDeadzone = analogDeadzone
+            savedGlobalLeftStickSensitivity = leftStickSensitivity
+            savedGlobalRightStickSensitivity = rightStickSensitivity
+            perGameBindingsActive = true
+        }
+        if (bindingsByPad != null && bindingsByPad.isNotEmpty()) {
+            val previousBindingsByPad = customBindingsByPad
+            customBindingsByPad = bindingsByPad
+            customShortcutBindingsByPadAndKeyCode = bindingsByPad.mapValues { (_, bindings) ->
+                bindings.entries.mapNotNull { (actionId, keyCode) ->
+                    actionId.takeIf { it in shortcutActionIds }?.let { keyCode to it }
+                }.toMap()
+            }
+            resetChangedBindingStates(previousBindingsByPad, bindingsByPad)
+        }
+        if (deadzone != null) {
+            analogDeadzone = deadzone.coerceIn(0, 35) / 100f
+        }
+        if (leftSensitivity != null) {
+            leftStickSensitivity = leftSensitivity.coerceIn(50, 200) / 100f
+        }
+        if (rightSensitivity != null) {
+            rightStickSensitivity = rightSensitivity.coerceIn(50, 200) / 100f
+        }
+    }
+
+    fun clearPerGameOverrides() {
+        if (!perGameBindingsActive) return
+        perGameBindingsActive = false
+        val previousBindingsByPad = customBindingsByPad
+        customBindingsByPad = savedGlobalBindingsByPad
+        customShortcutBindingsByPadAndKeyCode = savedGlobalBindingsByPad.mapValues { (_, bindings) ->
+            bindings.entries.mapNotNull { (actionId, keyCode) ->
+                actionId.takeIf { it in shortcutActionIds }?.let { keyCode to it }
+            }.toMap()
+        }
+        analogDeadzone = savedGlobalAnalogDeadzone
+        leftStickSensitivity = savedGlobalLeftStickSensitivity
+        rightStickSensitivity = savedGlobalRightStickSensitivity
+        resetChangedBindingStates(previousBindingsByPad, savedGlobalBindingsByPad)
     }
 
     fun isEmulationInputEnabled(): Boolean = emulationInputEnabled

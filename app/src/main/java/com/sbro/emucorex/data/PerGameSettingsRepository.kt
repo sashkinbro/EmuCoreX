@@ -35,6 +35,10 @@ data class PerGameSettings(
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
+    val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
+    val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val pressureModifierAmount: Int = AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT,
     val autoSaveOnExit: Boolean = false,
     val autoLoadOnStart: Boolean = false,
@@ -263,6 +267,13 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         gamepadRightStickUpToR2 = optBoolean("gamepadRightStickUpToR2", false),
         gamepadRightStickDownToL2 = optBoolean("gamepadRightStickDownToL2", false),
         gamepadButtonHaptics = optBoolean("gamepadButtonHaptics", false),
+        gamepadStickDeadzone = optInt("gamepadStickDeadzone", AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE)
+            .coerceIn(0, 35),
+        gamepadLeftStickSensitivity = optInt("gamepadLeftStickSensitivity", AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY)
+            .coerceIn(50, 200),
+        gamepadRightStickSensitivity = optInt("gamepadRightStickSensitivity", AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY)
+            .coerceIn(50, 200),
+        gamepadBindingsByPad = decodeGamepadBindingsByPerGameJson(optJSONObject("gamepadBindingsByPad")),
         pressureModifierAmount = optInt("pressureModifierAmount", AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT).coerceIn(1, 100),
         autoSaveOnExit = optBoolean("autoSaveOnExit", false),
         autoLoadOnStart = optBoolean("autoLoadOnStart", false),
@@ -412,6 +423,12 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("gamepadRightStickUpToR2")) put("gamepadRightStickUpToR2", gamepadRightStickUpToR2)
         if (shouldWrite("gamepadRightStickDownToL2")) put("gamepadRightStickDownToL2", gamepadRightStickDownToL2)
         if (shouldWrite("gamepadButtonHaptics")) put("gamepadButtonHaptics", gamepadButtonHaptics)
+        if (shouldWrite("gamepadStickDeadzone")) put("gamepadStickDeadzone", gamepadStickDeadzone.coerceIn(0, 35))
+        if (shouldWrite("gamepadLeftStickSensitivity")) put("gamepadLeftStickSensitivity", gamepadLeftStickSensitivity.coerceIn(50, 200))
+        if (shouldWrite("gamepadRightStickSensitivity")) put("gamepadRightStickSensitivity", gamepadRightStickSensitivity.coerceIn(50, 200))
+        if (shouldWrite("gamepadBindingsByPad") && gamepadBindingsByPad.isNotEmpty()) {
+            put("gamepadBindingsByPad", encodeGamepadBindingsPerGameJson(gamepadBindingsByPad))
+        }
         if (shouldWrite("pressureModifierAmount")) put("pressureModifierAmount", pressureModifierAmount.coerceIn(1, 100))
         if (shouldWrite("autoSaveOnExit")) put("autoSaveOnExit", autoSaveOnExit)
         if (shouldWrite("autoLoadOnStart")) put("autoLoadOnStart", autoLoadOnStart)
@@ -645,4 +662,38 @@ private fun isShadeBoostActive(
     gamma: Int
 ): Boolean {
     return brightness != 50 || contrast != 50 || saturation != 50 || gamma != 50
+}
+
+private fun decodeGamepadBindingsByPerGameJson(json: JSONObject?): Map<Int, Map<String, Int>> {
+    if (json == null) return emptyMap()
+    return runCatching {
+        val result = mutableMapOf<Int, Map<String, Int>>()
+        json.keys().forEach { key ->
+            val padIndex = key.toIntOrNull() ?: return@forEach
+            val bindingsObj = json.optJSONObject(key) ?: return@forEach
+            val bindings = mutableMapOf<String, Int>()
+            bindingsObj.keys().forEach { actionId ->
+                val keyCode = bindingsObj.optInt(actionId, Int.MIN_VALUE)
+                if (keyCode != Int.MIN_VALUE) bindings[actionId] = keyCode
+            }
+            if (bindings.isNotEmpty()) result[padIndex.coerceIn(0, 1)] = bindings
+        }
+        result
+    }.getOrDefault(emptyMap())
+}
+
+private fun encodeGamepadBindingsPerGameJson(bindingsByPad: Map<Int, Map<String, Int>>): JSONObject {
+    return JSONObject().apply {
+        bindingsByPad.toSortedMap().forEach { (padIndex, bindings) ->
+            if (bindings.isEmpty()) return@forEach
+            put(
+                padIndex.toString(),
+                JSONObject().apply {
+                    bindings.toSortedMap().forEach { (actionId, keyCode) ->
+                        put(actionId, keyCode)
+                    }
+                }
+            )
+        }
+    }
 }
