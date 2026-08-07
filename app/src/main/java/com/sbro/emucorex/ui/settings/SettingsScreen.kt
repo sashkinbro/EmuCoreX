@@ -1273,6 +1273,15 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setDebugLogcatGs(defaults.debugLogcatGs) }
                         )
                         ToggleItem(
+                            icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_profiler_logcat),
+                            subtitle = stringResource(R.string.settings_profiler_logcat_desc),
+                            checked = uiState.profilerLogcat,
+                            onCheckedChange = viewModel::setProfilerLogcat,
+                            helpText = stringResource(R.string.settings_help_profiler_logcat),
+                            onResetToDefault = { viewModel.setProfilerLogcat(defaults.profilerLogcat) }
+                        )
+                        ToggleItem(
                             icon = Icons.Rounded.Language,
                             title = stringResource(R.string.settings_prefer_english_game_titles),
                             subtitle = stringResource(R.string.settings_prefer_english_game_titles_desc),
@@ -5062,6 +5071,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_show_home_search),
         entry(SettingsTab.General, R.string.settings_prefer_english_game_titles),
         entry(SettingsTab.General, R.string.settings_debug_logcat_gs),
+        entry(SettingsTab.General, R.string.settings_profiler_logcat),
         entry(SettingsTab.Graphics, R.string.settings_renderer),
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver) else null,
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver_manager_title) else null,

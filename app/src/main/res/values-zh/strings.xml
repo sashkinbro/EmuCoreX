@@ -2160,4 +2160,7 @@
     <string name="settings_clear_cover_cache_action">清除</string>
     <string name="settings_clear_cover_cache_success">封面缓存已清除。封面将自动重新下载。</string>
     <string name="settings_clear_cover_cache_partial">部分缓存封面无法移除。请在当前下载完成后重试。</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU 性能分析器</string>
+    <string name="settings_profiler_logcat_desc">将 EE、IOP、VU0、VU1 的执行情况分析记录到 logcat（标签：Profiler）。</string>
+    <string name="settings_help_profiler_logcat">启用将 EE、IOP、VU0、VU1 的执行情况分析记录到 Android logcat 中。按标签“Profiler”进行过滤。显示事件测试、IOP 块、DMA 中断、VU 同步的计时信息。正常游玩时请保持此选项处于关闭状态。</string>
 </resources>

@@ -18,6 +18,8 @@
 #include "common/Console.h"
 #include "common/BitUtils.h"
 #include "common/Error.h"
+
+#include "emucorex/debug_logcat.h"
 #include "common/HostSys.h"
 #include "common/Path.h"
 #include "common/ScopedGuard.h"
@@ -1490,7 +1492,11 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 	}
 
 	if (spin_cycles != 0)
+	{
+		DEBUG_GS_TIMING_START(gpu_fence_wait);
 		WaitForSpinCompletion(m_current_frame);
+		DEBUG_GS_TIMING_END_U64(gpu_fence_wait, gpu_fence_wait);
+	}
 
 	if (spin_enabled && m_optional_extensions.vk_ext_calibrated_timestamps)
 		resources.submit_timestamp = GetCPUTimestamp();
@@ -1547,7 +1553,9 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 
 		present_swap_chain->ResetImageAcquireResult();
 
+		DEBUG_GS_TIMING_START(vk_present);
 		res = vkQueuePresentKHR(m_present_queue, &present_info);
+		DEBUG_GS_TIMING_END_U64(vk_present, vk_present);
 		if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 		{
 			// VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.

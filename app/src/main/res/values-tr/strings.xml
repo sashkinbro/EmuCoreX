@@ -2159,4 +2159,7 @@
     <string name="settings_clear_cover_cache_action">Temizle</string>
     <string name="settings_clear_cover_cache_success">Kapak önbelleği temizlendi. Kapaklar otomatik olarak yeniden indirilecek.</string>
     <string name="settings_clear_cover_cache_partial">Önbellekteki bazı kapaklar kaldırılamadı. Mevcut indirmeler tamamlandıktan sonra tekrar deneyin.</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU Profilleyici</string>
+    <string name="settings_profiler_logcat_desc">EE, IOP, VU0, VU1 yürütmesini logcat\'te profille (etiket: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Android logcat\'e EE, IOP, VU0, VU1 yürütme profillemesini etkinleştirir. \"Profiler\" etiketiyle filtreleyin. Olay testleri, IOP blokları, DMA kesintileri, VU senkronizasyonu için zamanlamayı gösterir. Normal oyun için bunu kapalı tutun.</string>
 </resources>

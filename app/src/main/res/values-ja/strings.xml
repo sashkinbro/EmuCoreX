@@ -2158,4 +2158,7 @@
     <string name="settings_clear_cover_cache_action">消去</string>
     <string name="settings_clear_cover_cache_success">カバーのキャッシュを消去しました。カバーは自動的に再ダウンロードされます。</string>
     <string name="settings_clear_cover_cache_partial">一部のキャッシュ済みカバーを削除できませんでした。現在のダウンロードが完了してから再試行してください。</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU プロファイラー</string>
+    <string name="settings_profiler_logcat_desc">EE、IOP、VU0、VU1の実行をlogcatにプロファイルします（タグ：Profiler）。</string>
+    <string name="settings_help_profiler_logcat">AndroidのlogcatへのEE、IOP、VU0、VU1の実行プロファイリングを有効にします。「Profiler」タグでフィルターしてください。イベントテスト、IOPブロック、DMA割り込み、VU同期のタイミングを表示します。通常のプレイではオフにしておいてください。</string>
 </resources>

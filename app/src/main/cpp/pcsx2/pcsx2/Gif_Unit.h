@@ -360,11 +360,20 @@ struct Gif_Path
 
 		// Track max GIF path buffer usage
 		if (idx == GIF_PATH_1)
+		{
 			DEBUG_GS_SET_MAX(gif_path1_max_used, curSize);
+			DEBUG_GS_SET_MAX(gif_path1_total, buffSize);
+		}
 		else if (idx == GIF_PATH_2)
+		{
 			DEBUG_GS_SET_MAX(gif_path2_max_used, curSize);
+			DEBUG_GS_SET_MAX(gif_path2_total, buffSize);
+		}
 		else if (idx == GIF_PATH_3)
+		{
 			DEBUG_GS_SET_MAX(gif_path3_max_used, curSize);
+			DEBUG_GS_SET_MAX(gif_path3_total, buffSize);
+		}
 	}
 
 	// If completed a GS packet (with EOP) then set done to true

@@ -2161,4 +2161,7 @@
     <string name="settings_clear_cover_cache_action">Borrar</string>
     <string name="settings_clear_cover_cache_success">Caché de carátulas borrada. Las carátulas volverán a descargarse automáticamente.</string>
     <string name="settings_clear_cover_cache_partial">No se pudieron eliminar algunas carátulas almacenadas. Inténtalo de nuevo cuando terminen las descargas actuales.</string>
+    <string name="settings_profiler_logcat">Analizador de rendimiento de EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">Analiza el rendimiento de la ejecución de EE, IOP, VU0 y VU1 en logcat (etiqueta: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Habilita el análisis de rendimiento de la ejecución de EE, IOP, VU0 y VU1 en Android logcat. Filtra por la etiqueta \"Profiler\". Muestra el tiempo para pruebas de eventos, bloques de IOP, interrupciones de DMA y sincronización de VU. Mantén esto desactivado para jugar de forma normal.</string>
 </resources>

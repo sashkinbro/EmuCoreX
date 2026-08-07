@@ -667,6 +667,8 @@
     <string name="settings_show_debug_options_desc">Show developer profiling tools in the in-game menu.</string>
     <string name="settings_debug_logcat_gs">Debug GS logcat</string>
     <string name="settings_debug_logcat_gs_desc">Log detailed Vulkan/OpenGL GS events to logcat (tag: DebugGS).</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU Profiler</string>
+    <string name="settings_profiler_logcat_desc">Profile EE, IOP, VU0, VU1 execution to logcat (tag: Profiler).</string>
     <string name="settings_prefer_english_game_titles">Prefer English game titles</string>
     <string name="settings_prefer_english_game_titles_desc">Use English names from the PCSX2 game database when they are available.</string>
     <string name="settings_help_content_description">Show setting details</string>
@@ -688,6 +690,7 @@
     <string name="settings_help_home_search">Shows the library search bar directly on the home screen. Leave it on for big libraries; turn it off if you prefer a cleaner layout and rarely search by name.</string>
     <string name="settings_help_debug_options">Shows extra diagnostic controls in the in-game menu, including the JIT profiler and hang trace recorder. Keep this off for normal play.</string>
     <string name="settings_help_debug_logcat_gs">Enables verbose Vulkan/OpenGL graphics synthesizer logging to Android logcat. Filter by tag "DebugGS". Useful only for diagnosing rendering crashes and GPU device lost errors. Keep this off for normal play.</string>
+    <string name="settings_help_profiler_logcat">Enables EE, IOP, VU0, VU1 execution profiling to Android logcat. Filter by tag "Profiler". Shows timing for event tests, IOP blocks, DMA interrupts, VU sync. Keep this off for normal play.</string>
     <string name="settings_help_prefer_english_game_titles">Uses English titles from PCSX2\'s GameIndex database for games that ship with Japanese or other regional names. This mainly helps imported releases read more clearly in the library, while games without an English database title keep their normal name.</string>
     <string name="settings_help_bios_path">Points EmuCoreX to your PS2 BIOS image file. A clean dump from your own console is the best choice. The app expects the main BIOS image, usually a .bin or .rom file, and keeps any generated NVRAM/MEC files beside the imported copy.</string>
     <string name="settings_help_game_path">Adds folders to the game library. EmuCoreX scans every selected folder recursively and merges the results without duplicate file paths. Tap a listed folder to remove it. Supported images include .iso, .bin, .img, .mdf, .gz, .cso, .zso, .chd, and .elf.</string>

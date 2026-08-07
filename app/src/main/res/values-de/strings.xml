@@ -2161,4 +2161,7 @@
     <string name="settings_clear_cover_cache_action">Leeren</string>
     <string name="settings_clear_cover_cache_success">Cover-Cache geleert. Die Cover werden automatisch erneut geladen.</string>
     <string name="settings_clear_cover_cache_partial">Einige zwischengespeicherte Cover konnten nicht entfernt werden. Versuche es nach Abschluss der aktuellen Downloads erneut.</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU-Profiler</string>
+    <string name="settings_profiler_logcat_desc">EE-, IOP-, VU0-, VU1-Ausführung in logcat profilieren (Tag: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Aktiviert die Profilerstellung für die EE-, IOP-, VU0- und VU1-Ausführung in Android logcat. Filtern Sie nach dem Tag \"Profiler\". Zeigt das Timing für Ereignistests, IOP-Blöcke, DMA-Interrupts und VU-Synchronisierung an. Lassen Sie dies für normales Spielen deaktiviert.</string>
 </resources>

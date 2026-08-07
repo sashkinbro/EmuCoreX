@@ -14,6 +14,7 @@ namespace emucorex
 	using u64 = uint64_t;
 
 	inline std::atomic<bool> s_debug_logcat_enabled{false};
+	inline std::atomic<bool> s_profiler_logcat_enabled{false};
 
 	inline bool IsDebugLogcatEnabled()
 	{
@@ -23,6 +24,16 @@ namespace emucorex
 	inline void SetDebugLogcatEnabled(bool enabled)
 	{
 		s_debug_logcat_enabled.store(enabled, std::memory_order_relaxed);
+	}
+
+	inline bool IsProfilerLogcatEnabled()
+	{
+		return s_profiler_logcat_enabled.load(std::memory_order_relaxed);
+	}
+
+	inline void SetProfilerLogcatEnabled(bool enabled)
+	{
+		s_profiler_logcat_enabled.store(enabled, std::memory_order_relaxed);
 	}
 
 	// Performance metrics collection for GS/VU1 optimization
@@ -46,8 +57,11 @@ namespace emucorex
 
 		// GIF path utilization (bytes used / total buffer)
 		std::atomic<u32> gif_path1_max_used{0};
+		std::atomic<u32> gif_path1_total{0};
 		std::atomic<u32> gif_path2_max_used{0};
+		std::atomic<u32> gif_path2_total{0};
 		std::atomic<u32> gif_path3_max_used{0};
+		std::atomic<u32> gif_path3_total{0};
 
 		// VU1 execution time tracking (microseconds)
 		std::atomic<u64> vu1_exec_total_us{0};
@@ -83,6 +97,21 @@ namespace emucorex
 		std::atomic<u64> gs_vsync_count{0};
 		std::atomic<u64> gs_vsync_max_us{0};
 
+		// GPU fence wait timing
+		std::atomic<u64> gpu_fence_wait_total_us{0};
+		std::atomic<u64> gpu_fence_wait_count{0};
+		std::atomic<u64> gpu_fence_wait_max_us{0};
+
+		// Vulkan present timing
+		std::atomic<u64> vk_present_total_us{0};
+		std::atomic<u64> vk_present_count{0};
+		std::atomic<u64> vk_present_max_us{0};
+
+		// Frame throttle timing
+		std::atomic<u64> frame_throttle_total_us{0};
+		std::atomic<u64> frame_throttle_count{0};
+		std::atomic<u64> frame_throttle_max_us{0};
+
 		void Reset()
 		{
 			xgkick_total_us.store(0, std::memory_order_relaxed);
@@ -96,8 +125,11 @@ namespace emucorex
 			sema_xgkick_wait_count.store(0, std::memory_order_relaxed);
 			sema_xgkick_wait_max_us.store(0, std::memory_order_relaxed);
 			gif_path1_max_used.store(0, std::memory_order_relaxed);
+			gif_path1_total.store(0, std::memory_order_relaxed);
 			gif_path2_max_used.store(0, std::memory_order_relaxed);
+			gif_path2_total.store(0, std::memory_order_relaxed);
 			gif_path3_max_used.store(0, std::memory_order_relaxed);
+			gif_path3_total.store(0, std::memory_order_relaxed);
 			vu1_exec_total_us.store(0, std::memory_order_relaxed);
 			vu1_exec_count.store(0, std::memory_order_relaxed);
 			vu1_exec_max_us.store(0, std::memory_order_relaxed);
@@ -118,6 +150,15 @@ namespace emucorex
 			gs_vsync_total_us.store(0, std::memory_order_relaxed);
 			gs_vsync_count.store(0, std::memory_order_relaxed);
 			gs_vsync_max_us.store(0, std::memory_order_relaxed);
+			gpu_fence_wait_total_us.store(0, std::memory_order_relaxed);
+			gpu_fence_wait_count.store(0, std::memory_order_relaxed);
+			gpu_fence_wait_max_us.store(0, std::memory_order_relaxed);
+			vk_present_total_us.store(0, std::memory_order_relaxed);
+			vk_present_count.store(0, std::memory_order_relaxed);
+			vk_present_max_us.store(0, std::memory_order_relaxed);
+			frame_throttle_total_us.store(0, std::memory_order_relaxed);
+			frame_throttle_count.store(0, std::memory_order_relaxed);
+			frame_throttle_max_us.store(0, std::memory_order_relaxed);
 		}
 
 		void DumpToLogcat()
@@ -130,6 +171,9 @@ namespace emucorex
 			const u64 gtc = gs_transfer_count.load(std::memory_order_relaxed);
 			const u64 gitc = gs_image_transfer_count.load(std::memory_order_relaxed);
 			const u64 gvc = gs_vsync_count.load(std::memory_order_relaxed);
+			const u64 gfc = gpu_fence_wait_count.load(std::memory_order_relaxed);
+			const u64 vpc = vk_present_count.load(std::memory_order_relaxed);
+			const u64 ftc = frame_throttle_count.load(std::memory_order_relaxed);
 
 			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
 				"=== GS Performance Metrics ===");
@@ -150,10 +194,13 @@ namespace emucorex
 				(unsigned long long)ring_buffer_stall_total_us.load(std::memory_order_relaxed),
 				(unsigned long long)ring_buffer_stall_max_us.load(std::memory_order_relaxed));
 			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
-				"GIF Path Max Used: P1=%u P2=%u P3=%u (of 9MB each)",
+				"GIF Path Max Used: P1=%u/%u (%u%%) P2=%u/%u (%u%%)",
 				(unsigned)gif_path1_max_used.load(std::memory_order_relaxed),
+				(unsigned)gif_path1_total.load(std::memory_order_relaxed),
+				(unsigned)(gif_path1_total.load(std::memory_order_relaxed) ? (gif_path1_max_used.load(std::memory_order_relaxed) * 100 / gif_path1_total.load(std::memory_order_relaxed)) : 0),
 				(unsigned)gif_path2_max_used.load(std::memory_order_relaxed),
-				(unsigned)gif_path3_max_used.load(std::memory_order_relaxed));
+				(unsigned)gif_path2_total.load(std::memory_order_relaxed),
+				(unsigned)(gif_path2_total.load(std::memory_order_relaxed) ? (gif_path2_max_used.load(std::memory_order_relaxed) * 100 / gif_path2_total.load(std::memory_order_relaxed)) : 0));
 			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
 				"VU1: count=%llu avg=%lluus max=%lluus",
 				(unsigned long long)vc,
@@ -183,6 +230,21 @@ namespace emucorex
 				(unsigned long long)gvc,
 				(unsigned long long)(gvc ? gs_vsync_total_us.load(std::memory_order_relaxed) / gvc : 0),
 				(unsigned long long)gs_vsync_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
+				"GPUFence: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)gfc,
+				(unsigned long long)(gfc ? gpu_fence_wait_total_us.load(std::memory_order_relaxed) / gfc : 0),
+				(unsigned long long)gpu_fence_wait_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
+				"VkPresent: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)vpc,
+				(unsigned long long)(vpc ? vk_present_total_us.load(std::memory_order_relaxed) / vpc : 0),
+				(unsigned long long)vk_present_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "DebugGS",
+				"Throttle: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)ftc,
+				(unsigned long long)(ftc ? frame_throttle_total_us.load(std::memory_order_relaxed) / ftc : 0),
+				(unsigned long long)frame_throttle_max_us.load(std::memory_order_relaxed));
 
 			// Reset after dump
 			Reset();
@@ -190,6 +252,101 @@ namespace emucorex
 	};
 
 	inline GSDebugMetrics s_gs_debug_metrics;
+
+	// Profiler metrics for EE/IOP/VU0/VU1
+	struct ProfilerMetrics
+	{
+		// EE event test shared
+		std::atomic<u64> ee_event_test_total_us{0};
+		std::atomic<u64> ee_event_test_count{0};
+		std::atomic<u64> ee_event_test_max_us{0};
+
+		// IOP execution block
+		std::atomic<u64> iop_exec_total_us{0};
+		std::atomic<u64> iop_exec_count{0};
+		std::atomic<u64> iop_exec_max_us{0};
+
+		// DMA interrupt processing
+		std::atomic<u64> dma_interrupt_total_us{0};
+		std::atomic<u64> dma_interrupt_count{0};
+		std::atomic<u64> dma_interrupt_max_us{0};
+
+		// VU0 sync
+		std::atomic<u64> vu0_sync_total_us{0};
+		std::atomic<u64> vu0_sync_count{0};
+		std::atomic<u64> vu0_sync_max_us{0};
+
+		// VU1 sync (ExecuteBlock from event test, different from MTVU Execute)
+		std::atomic<u64> vu1_sync_total_us{0};
+		std::atomic<u64> vu1_sync_count{0};
+		std::atomic<u64> vu1_sync_max_us{0};
+
+		// Counter/timer updates
+		std::atomic<u64> rcnt_update_total_us{0};
+		std::atomic<u64> rcnt_update_count{0};
+		std::atomic<u64> rcnt_update_max_us{0};
+
+		void Reset()
+		{
+			ee_event_test_total_us.store(0, std::memory_order_relaxed);
+			ee_event_test_count.store(0, std::memory_order_relaxed);
+			ee_event_test_max_us.store(0, std::memory_order_relaxed);
+			iop_exec_total_us.store(0, std::memory_order_relaxed);
+			iop_exec_count.store(0, std::memory_order_relaxed);
+			iop_exec_max_us.store(0, std::memory_order_relaxed);
+			dma_interrupt_total_us.store(0, std::memory_order_relaxed);
+			dma_interrupt_count.store(0, std::memory_order_relaxed);
+			dma_interrupt_max_us.store(0, std::memory_order_relaxed);
+			vu0_sync_total_us.store(0, std::memory_order_relaxed);
+			vu0_sync_count.store(0, std::memory_order_relaxed);
+			vu0_sync_max_us.store(0, std::memory_order_relaxed);
+			vu1_sync_total_us.store(0, std::memory_order_relaxed);
+			vu1_sync_count.store(0, std::memory_order_relaxed);
+			vu1_sync_max_us.store(0, std::memory_order_relaxed);
+			rcnt_update_total_us.store(0, std::memory_order_relaxed);
+			rcnt_update_count.store(0, std::memory_order_relaxed);
+			rcnt_update_max_us.store(0, std::memory_order_relaxed);
+		}
+
+		void DumpToLogcat()
+		{
+			const u64 eet = ee_event_test_count.load(std::memory_order_relaxed);
+			const u64 ipt = iop_exec_count.load(std::memory_order_relaxed);
+			const u64 dit = dma_interrupt_count.load(std::memory_order_relaxed);
+			const u64 v0t = vu0_sync_count.load(std::memory_order_relaxed);
+			const u64 v1t = vu1_sync_count.load(std::memory_order_relaxed);
+			const u64 rpt = rcnt_update_count.load(std::memory_order_relaxed);
+
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "=== EE/IOP/VU Profiler ===");
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "EEEventTest: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)eet,
+				(unsigned long long)(eet ? ee_event_test_total_us.load(std::memory_order_relaxed) / eet : 0),
+				(unsigned long long)ee_event_test_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "IOPExec: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)ipt,
+				(unsigned long long)(ipt ? iop_exec_total_us.load(std::memory_order_relaxed) / ipt : 0),
+				(unsigned long long)iop_exec_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "DMAIntr: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)dit,
+				(unsigned long long)(dit ? dma_interrupt_total_us.load(std::memory_order_relaxed) / dit : 0),
+				(unsigned long long)dma_interrupt_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "VU0Sync: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)v0t,
+				(unsigned long long)(v0t ? vu0_sync_total_us.load(std::memory_order_relaxed) / v0t : 0),
+				(unsigned long long)vu0_sync_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "VU1Sync: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)v1t,
+				(unsigned long long)(v1t ? vu1_sync_total_us.load(std::memory_order_relaxed) / v1t : 0),
+				(unsigned long long)vu1_sync_max_us.load(std::memory_order_relaxed));
+			__android_log_print(ANDROID_LOG_INFO, "Profiler", "RcntUpd: count=%llu avg=%lluus max=%lluus",
+				(unsigned long long)rpt,
+				(unsigned long long)(rpt ? rcnt_update_total_us.load(std::memory_order_relaxed) / rpt : 0),
+				(unsigned long long)rcnt_update_max_us.load(std::memory_order_relaxed));
+			Reset();
+		}
+	};
+
+	inline ProfilerMetrics s_profiler_metrics;
 }
 
 #define DEBUG_GS_LOG(level, ...) \
@@ -263,6 +420,43 @@ namespace emucorex
 			::emucorex::s_gs_debug_metrics.DumpToLogcat(); \
 	} while(0)
 
+// Profiler macros - separate toggle for EE/IOP/VU0/VU1 profiling
+#define DEBUG_PROF_LOG(level, ...) \
+	do { \
+		if (::emucorex::IsProfilerLogcatEnabled()) \
+			__android_log_print(level, "Profiler", __VA_ARGS__); \
+	} while(0)
+
+#define DEBUG_PROF_TIMING_START(var) \
+	uint64_t _prof_##var##_start = 0; \
+	do { \
+		if (::emucorex::IsProfilerLogcatEnabled()) \
+			_prof_##var##_start = std::chrono::duration_cast<std::chrono::microseconds>( \
+				std::chrono::steady_clock::now().time_since_epoch()).count(); \
+	} while(0)
+
+#define DEBUG_PROF_TIMING_END(var, counter) \
+	do { \
+		if (::emucorex::IsProfilerLogcatEnabled()) { \
+			uint64_t _end = std::chrono::duration_cast<std::chrono::microseconds>( \
+				std::chrono::steady_clock::now().time_since_epoch()).count(); \
+			uint64_t _elapsed = _end - _prof_##var##_start; \
+			::emucorex::s_profiler_metrics.counter##_total_us.fetch_add(_elapsed, std::memory_order_relaxed); \
+			::emucorex::s_profiler_metrics.counter##_count.fetch_add(1, std::memory_order_relaxed); \
+			uint64_t _prev_max = ::emucorex::s_profiler_metrics.counter##_max_us.load(std::memory_order_relaxed); \
+			while (_elapsed > _prev_max && \
+				!::emucorex::s_profiler_metrics.counter##_max_us.compare_exchange_weak( \
+					_prev_max, _elapsed, std::memory_order_relaxed)) \
+				; \
+		} \
+	} while(0)
+
+#define DEBUG_PROF_DUMP() \
+	do { \
+		if (::emucorex::IsProfilerLogcatEnabled()) \
+			::emucorex::s_profiler_metrics.DumpToLogcat(); \
+	} while(0)
+
 #else
 #define DEBUG_GS_LOG(level, ...) do {} while(0)
 #define DEBUG_GS_TIMING_START(var) do {} while(0)
@@ -271,4 +465,8 @@ namespace emucorex
 #define DEBUG_GS_SET_MAX(counter, val) do {} while(0)
 #define DEBUG_GS_INC_U64(counter, val) do {} while(0)
 #define DEBUG_GS_DUMP_METRICS() do {} while(0)
+#define DEBUG_PROF_LOG(level, ...) do {} while(0)
+#define DEBUG_PROF_TIMING_START(var) do {} while(0)
+#define DEBUG_PROF_TIMING_END(var, counter) do {} while(0)
+#define DEBUG_PROF_DUMP() do {} while(0)
 #endif

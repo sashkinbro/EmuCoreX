@@ -2174,4 +2174,7 @@
     <string name="settings_clear_cover_cache_action">پاک کردن</string>
     <string name="settings_clear_cover_cache_success">حافظه نهان کاورها پاک شد. کاورها به‌طور خودکار دوباره دانلود می‌شوند.</string>
     <string name="settings_clear_cover_cache_partial">برخی کاورهای ذخیره‌شده حذف نشدند. پس از پایان دانلودهای فعلی دوباره تلاش کنید.</string>
+    <string name="settings_profiler_logcat">نمایه ساز EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">نمایه‌سازی اجرای EE، IOP، VU0، VU1 در logcat (برچسب: Profiler).</string>
+    <string name="settings_help_profiler_logcat">نمایه‌سازی اجرای EE، IOP، VU0، VU1 را در Android logcat فعال می‌کند. با برچسب \"Profiler\" فیلتر کنید. زمان‌بندی تست‌های رویداد، بلوک‌های IOP، وقفه‌های DMA و همگام‌سازی VU را نشان می‌دهد. برای بازی عادی این را خاموش نگه دارید.</string>
 </resources>

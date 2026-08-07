@@ -217,6 +217,11 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		GetBoolSetting(config.settings, "EmuCoreX", "DebugLogcatGS", false));
 	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Debug GS logcat: %s",
 		emucorex::IsDebugLogcatEnabled() ? "enabled" : "disabled");
+
+	emucorex::SetProfilerLogcatEnabled(
+		GetBoolSetting(config.settings, "EmuCoreX", "ProfilerLogcat", false));
+	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Profiler logcat: %s",
+		emucorex::IsProfilerLogcatEnabled() ? "enabled" : "disabled");
 	si.SetIntValue("EmuCore/GS", "Renderer",
 		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
 	si.SetBoolValue("EmuCore/GS", "VsyncEnable",

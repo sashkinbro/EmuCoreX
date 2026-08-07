@@ -2163,4 +2163,7 @@
     <string name="settings_clear_cover_cache_action">مسح</string>
     <string name="settings_clear_cover_cache_success">تم مسح ذاكرة الأغلفة المؤقتة. ستُنزّل الأغلفة تلقائيًا من جديد.</string>
     <string name="settings_clear_cover_cache_partial">تعذرت إزالة بعض الأغلفة المؤقتة. حاول مجددًا بعد انتهاء التنزيلات الحالية.</string>
+    <string name="settings_profiler_logcat">ملف تعريف EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">إنشاء ملف تعريف لتنفيذ EE و IOP و VU0 و VU1 في logcat (العلامة: Profiler).</string>
+    <string name="settings_help_profiler_logcat">يمكّن ملف تعريف تنفيذ EE و IOP و VU0 و VU1 في Android logcat. قم بالتصفية حسب العلامة \"Profiler\". يعرض التوقيت لاختبارات الأحداث وكتل IOP ومقاطعات DMA ومزامنة VU. اترك هذا مغلقًا للعب العادي.</string>
 </resources>

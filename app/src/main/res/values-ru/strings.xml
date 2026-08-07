@@ -2163,4 +2163,7 @@
     <string name="settings_clear_cover_cache_action">Очистить</string>
     <string name="settings_clear_cover_cache_success">Кеш обложек очищен. Обложки автоматически загрузятся снова.</string>
     <string name="settings_clear_cover_cache_partial">Не все кешированные обложки удалось удалить. Повторите попытку после завершения текущих загрузок.</string>
+    <string name="settings_profiler_logcat">Профайлер EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">Профилировать выполнение EE, IOP, VU0, VU1 в logcat (тег: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Включает профилирование выполнения EE, IOP, VU0, VU1 в Android logcat. Фильтруйте по тегу «Profiler». Показывает тайминги для тестов событий, блоков IOP, прерываний DMA и синхронизации VU. Держите эту опцию выключенной для обычной игры.</string>
 </resources>

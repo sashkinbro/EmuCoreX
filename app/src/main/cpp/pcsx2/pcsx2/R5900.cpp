@@ -13,6 +13,8 @@
 #include "MTVU.h"
 #include "VMManager.h"
 
+#include "emucorex/debug_logcat.h"
+
 #include "Hardware.h"
 #include "IPU/IPUdma.h"
 
@@ -375,6 +377,7 @@ static bool cpuIntsEnabled(int Interrupt)
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
 {
+	DEBUG_PROF_TIMING_START(ee_event_test);
 	eeEventTestIsActive = true;
 	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
 	cpuRegs.lastEventCycle = cpuRegs.cycle;
@@ -405,7 +408,9 @@ __fi void _cpuEventTest_Shared()
 
 	if (iopEventAction)
 	{
+		DEBUG_PROF_TIMING_START(iop_exec);
 		EEsCycle = psxCpu->ExecuteBlock(EEsCycle);
+		DEBUG_PROF_TIMING_END(iop_exec, iop_exec);
 
 		iopEventAction = false;
 	}
@@ -426,6 +431,7 @@ __fi void _cpuEventTest_Shared()
 
 	if (cpuRegs.interrupt)
 	{
+		DEBUG_PROF_TIMING_START(dma_interrupt);
 		// This is a BIOS hack because the coding in the BIOS is terrible but the bug is masked by Data Cache
 		// where a DMA buffer is overwritten without waiting for the transfer to end, which causes the fonts to get all messed up
 		// so to fix it, we run all the DMA's instantly when in the BIOS.
@@ -437,13 +443,18 @@ __fi void _cpuEventTest_Shared()
 		}
 		else
 			_cpuTestInterrupts();
+		DEBUG_PROF_TIMING_END(dma_interrupt, dma_interrupt);
 	}
 
 	// ---- VU Sync -------------
 	// We're in a EventTest.  All dynarec registers are flushed
 	// so there is no need to freeze registers here.
+	DEBUG_PROF_TIMING_START(vu0_sync);
 	CpuVU0->ExecuteBlock();
+	DEBUG_PROF_TIMING_END(vu0_sync, vu0_sync);
+	DEBUG_PROF_TIMING_START(vu1_sync);
 	CpuVU1->ExecuteBlock();
+	DEBUG_PROF_TIMING_END(vu1_sync, vu1_sync);
 
     // ---- Schedule Next Event Test --------------
 #if defined(ANDROID)
@@ -472,6 +483,7 @@ __fi void _cpuEventTest_Shared()
 	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
 
 	eeEventTestIsActive = false;
+	DEBUG_PROF_TIMING_END(ee_event_test, ee_event_test);
 }
 
 __ri void cpuTestINTCInts()

@@ -593,6 +593,7 @@ void MTGS::MainLoop()
 							{
 								s_vsync_frame_counter = 0;
 								DEBUG_GS_DUMP_METRICS();
+								DEBUG_PROF_DUMP();
 							}
 
 							// Do not StateCheckInThread() here

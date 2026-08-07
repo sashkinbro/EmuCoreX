@@ -2158,4 +2158,7 @@
     <string name="settings_clear_cover_cache_action">지우기</string>
     <string name="settings_clear_cover_cache_success">커버 캐시를 지웠습니다. 커버가 자동으로 다시 다운로드됩니다.</string>
     <string name="settings_clear_cover_cache_partial">캐시된 일부 커버를 삭제하지 못했습니다. 현재 다운로드가 끝난 후 다시 시도하세요.</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU 프로파일러</string>
+    <string name="settings_profiler_logcat_desc">EE, IOP, VU0, VU1 실행을 logcat에 프로파일링합니다(태그: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Android logcat으로 EE, IOP, VU0, VU1 실행 프로파일링을 활성화합니다. \"Profiler\" 태그로 필터링하세요. 이벤트 테스트, IOP 블록, DMA 인터럽트, VU 동기화에 대한 타이밍을 표시합니다. 일반적인 게임 플레이 시에는 이 기능을 꺼두세요.</string>
 </resources>

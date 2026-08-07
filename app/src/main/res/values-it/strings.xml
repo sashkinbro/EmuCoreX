@@ -2159,4 +2159,7 @@
     <string name="settings_clear_cover_cache_action">Svuota</string>
     <string name="settings_clear_cover_cache_success">Cache delle copertine svuotata. Le copertine verranno scaricate di nuovo automaticamente.</string>
     <string name="settings_clear_cover_cache_partial">Non è stato possibile rimuovere alcune copertine nella cache. Riprova al termine dei download in corso.</string>
+    <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">Profila l\'esecuzione di EE, IOP, VU0, VU1 su logcat (tag: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Abilita la profilazione dell\'esecuzione di EE, IOP, VU0, VU1 su Android logcat. Filtra per tag \"Profiler\". Mostra le tempistiche per test degli eventi, blocchi IOP, interrupt DMA, sincronizzazione VU. Tieni questa opzione disattivata per il gioco normale.</string>
 </resources>

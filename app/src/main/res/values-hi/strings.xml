@@ -2159,4 +2159,7 @@
     <string name="settings_clear_cover_cache_action">साफ़ करें</string>
     <string name="settings_clear_cover_cache_success">कवर कैश साफ़ हो गया। कवर अपने आप फिर डाउनलोड होंगे।</string>
     <string name="settings_clear_cover_cache_partial">कुछ कैश किए गए कवर हटाए नहीं जा सके। मौजूदा डाउनलोड पूरे होने के बाद फिर कोशिश करें।</string>
+    <string name="settings_profiler_logcat">EE/IOP/VU प्रोफ़ाइलर</string>
+    <string name="settings_profiler_logcat_desc">logcat (टैग: Profiler) में EE, IOP, VU0, VU1 निष्पादन को प्रोफ़ाइल करें।</string>
+    <string name="settings_help_profiler_logcat">Android logcat में EE, IOP, VU0, VU1 निष्पादन प्रोफ़ाइलिंग को सक्षम करता है। \"Profiler\" टैग द्वारा फ़िल्टर करें। ईवेंट परीक्षणों, IOP ब्लॉक, DMA इंटरप्ट, VU सिंक के लिए समय दिखाता है। सामान्य खेल के लिए इसे बंद रखें。</string>
 </resources>

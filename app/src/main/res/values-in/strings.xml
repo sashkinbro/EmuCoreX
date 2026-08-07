@@ -2173,4 +2173,7 @@
     <string name="settings_clear_cover_cache_action">Hapus</string>
     <string name="settings_clear_cover_cache_success">Cache sampul telah dihapus. Sampul akan diunduh lagi secara otomatis.</string>
     <string name="settings_clear_cover_cache_partial">Beberapa sampul dalam cache tidak dapat dihapus. Coba lagi setelah unduhan saat ini selesai.</string>
+    <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
+    <string name="settings_profiler_logcat_desc">Profilkan eksekusi EE, IOP, VU0, VU1 ke logcat (tag: Profiler).</string>
+    <string name="settings_help_profiler_logcat">Mengaktifkan pembuatan profil eksekusi EE, IOP, VU0, VU1 ke Android logcat. Filter berdasarkan tag \"Profiler\". Menampilkan waktu untuk pengujian peristiwa, blok IOP, interupsi DMA, sinkronisasi VU. Biarkan ini nonaktif untuk permainan normal.</string>
 </resources>
