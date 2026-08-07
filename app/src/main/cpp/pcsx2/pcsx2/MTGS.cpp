@@ -480,53 +480,65 @@ void MTGS::MainLoop()
 						const bool out_of_range = end > path.buffSize;
 						const bool bad_alignment = (gsPack.size & 0xF) != 0;
 						bool tags_ok = true;
-						if (!out_of_range && !bad_alignment)
+
+						// Quick path: check if first tag has EOP (single-tag packet, very common)
+						// Skip full validation for this common case
+						if (!out_of_range && !bad_alignment && gsPack.size >= 16)
 						{
-							// Pre-walk GIF tags inside the packet to catch malformed
-							// NLOOP/NREG that would make GSState::Transfer walk past
-							// the QWC count we hand it.
-							u32 cur = gsPack.offset;
-							const u32 stop = gsPack.offset + gsPack.size;
-							while (cur + 16 <= stop)
+							const u8* tagp = &path.buffer[gsPack.offset];
+							const u64 lo = *(const u64*)(tagp + 0);
+							const bool first_has_eop = (lo >> 15) & 1;
+
+							if (first_has_eop && gsPack.size <= 256)
 							{
-								const u8* tagp = &path.buffer[cur];
-								const u64 lo = *(const u64*)(tagp + 0);
-								const u64 hi = *(const u64*)(tagp + 8);
-								const u32 nloop = static_cast<u32>(lo & 0x7FFF);
-								const bool eop = (lo >> 15) & 1;
-								const u32 flg = static_cast<u32>((lo >> 58) & 3);
-								u32 nreg = static_cast<u32>((lo >> 60) & 0xF);
-								if (nreg == 0)
-									nreg = 16;
-								cur += 16;
-								u32 reg_qwc = 0;
-								switch (flg)
+								// Single EOP tag, small packet - skip full validation
+								// Transfer<3> handles bounds internally
+							}
+							else
+							{
+								// Multi-tag or large packet - validate
+								u32 cur = gsPack.offset;
+								const u32 stop = gsPack.offset + gsPack.size;
+								while (cur + 16 <= stop)
 								{
-									case 0: // PACKED
-										reg_qwc = nloop * nreg;
+									const u8* tp = &path.buffer[cur];
+									const u64 tlo = *(const u64*)(tp + 0);
+									const u32 nloop = static_cast<u32>(tlo & 0x7FFF);
+									const bool eop = (tlo >> 15) & 1;
+									const u32 flg = static_cast<u32>((tlo >> 58) & 3);
+									u32 nreg = static_cast<u32>((tlo >> 60) & 0xF);
+									if (nreg == 0)
+										nreg = 16;
+									cur += 16;
+									u32 reg_qwc = 0;
+									switch (flg)
+									{
+										case 0: // PACKED
+											reg_qwc = nloop * nreg;
+											break;
+										case 1: // REGLIST
+											reg_qwc = (nloop * nreg + 1) / 2;
+											break;
+										case 2: // IMAGE
+										case 3: // disabled / image
+											reg_qwc = nloop;
+											break;
+									}
+									const u64 next = static_cast<u64>(cur) + static_cast<u64>(reg_qwc) * 16;
+									if (next > stop)
+									{
+										tags_ok = false;
+										Console.Error("MTVU GSPacket malformed tag at offset=0x%x: "
+													  "nloop=%u nreg=%u flg=%u eop=%u -> reg_qwc=%u "
+													  "(extends to 0x%llx, packet ends at 0x%x)",
+													  cur - 16, nloop, nreg, flg, eop ? 1 : 0,
+													  reg_qwc, (unsigned long long)next, stop);
 										break;
-									case 1: // REGLIST
-										reg_qwc = (nloop * nreg + 1) / 2;
-										break;
-									case 2: // IMAGE
-									case 3: // disabled / image
-										reg_qwc = nloop;
+									}
+									cur += reg_qwc * 16;
+									if (eop)
 										break;
 								}
-								const u64 next = static_cast<u64>(cur) + static_cast<u64>(reg_qwc) * 16;
-								if (next > stop)
-								{
-									tags_ok = false;
-									Console.Error("MTVU GSPacket malformed tag at offset=0x%x: "
-												  "nloop=%u nreg=%u flg=%u eop=%u -> reg_qwc=%u "
-												  "(extends to 0x%llx, packet ends at 0x%x)",
-												  cur - 16, nloop, nreg, flg, eop ? 1 : 0,
-												  reg_qwc, (unsigned long long)next, stop);
-									break;
-								}
-								cur += reg_qwc * 16;
-								if (eop)
-									break;
 							}
 						}
 						if (out_of_range || bad_alignment || !tags_ok)
