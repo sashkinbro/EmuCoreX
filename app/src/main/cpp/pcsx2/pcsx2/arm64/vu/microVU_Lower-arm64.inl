@@ -3042,12 +3042,17 @@ static void mVU_XITOP_emit(mP)
 
 void mVU_XGKICK_(u32 addr)
 {
+	DEBUG_GS_TIMING_START(xgkick);
+	DEBUG_GS_INC_U64(xgkick_count, 1);
 	addr = (addr & 0x3ff) * 16;
 	u32 diff = 0x4000 - addr;
 	u32 size = gifUnit.GetGSPacketSize(GIF_PATH_1, g_cpuRegistersPack.vuRegs[1].Mem, addr, ~0u, true);
 
 	if (!size)
+	{
+		DEBUG_GS_TIMING_END_U64(xgkick, xgkick);
 		return;
+	}
 
 	if (THREAD_VU1)
 	{
@@ -3062,7 +3067,10 @@ void mVU_XGKICK_(u32 addr)
 		size -= first;
 
 		if (!size)
+		{
+			DEBUG_GS_TIMING_END_U64(xgkick, xgkick);
 			return;
+		}
 	}
 
 	if (size > diff)
@@ -3074,10 +3082,13 @@ void mVU_XGKICK_(u32 addr)
 	{
 		gifUnit.TransferGSPacketData(GIF_TRANS_XGKICK, &g_cpuRegistersPack.vuRegs[1].Mem[addr], size, true);
 	}
+	DEBUG_GS_TIMING_END_U64(xgkick, xgkick);
 }
 
 void _vuXGKICKTransfermVU(bool flush)
 {
+	DEBUG_GS_TIMING_START(xgkick);
+	DEBUG_GS_INC_U64(xgkick_count, 1);
 	while (VU1.xgkickenable && (flush || VU1.xgkickcyclecount >= 2))
 	{
 		u32 transfersize = 0;
@@ -3145,6 +3156,7 @@ void _vuXGKICKTransfermVU(bool flush)
 			// Check if VIF is waiting for the GIF to not be busy
 		}
 	}
+	DEBUG_GS_TIMING_END_U64(xgkick, xgkick);
 }
 
 static __fi void mVU_XGKICK_backupNeededRegs_oaknut(mV)

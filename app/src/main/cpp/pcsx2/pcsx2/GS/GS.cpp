@@ -498,7 +498,9 @@ void GSReadLocalMemoryUnsync(u8* mem, u32 qwc, u64 BITBLITBUF, u64 TRXPOS, u64 T
 
 void GSgifTransfer(const u8* mem, u32 size)
 {
+	DEBUG_GS_TIMING_START(gs_transfer);
 	g_gs_renderer->Transfer<3>(mem, size);
+	DEBUG_GS_TIMING_END_U64(gs_transfer, gs_transfer);
 }
 
 void GSgifTransfer1(u8* mem, u32 addr)
@@ -518,6 +520,7 @@ void GSgifTransfer3(u8* mem, u32 size)
 
 void GSvsync(u32 field, bool registers_written)
 {
+	DEBUG_GS_TIMING_START(gs_vsync);
 	// Update this here because we need to check if the pending draw affects the current frame, so our regs need to be updated.
 	g_gs_renderer->PCRTCDisplays.SetVideoMode(g_gs_renderer->GetVideoMode());
 	g_gs_renderer->PCRTCDisplays.EnableDisplays(g_gs_renderer->m_regs->PMODE, g_gs_renderer->m_regs->SMODE2, g_gs_renderer->isReallyInterlaced());
@@ -531,6 +534,7 @@ void GSvsync(u32 field, bool registers_written)
 	// get cleared in HW VSync, and may be needed for a buffered draw (FFX FMVs).
 	g_gs_renderer->Flush(GSState::VSYNC);
 	g_gs_renderer->VSync(field, registers_written, g_gs_renderer->IsIdleFrame());
+	DEBUG_GS_TIMING_END_U64(gs_vsync, gs_vsync);
 }
 
 int GSfreeze(FreezeAction mode, freezeData* data)

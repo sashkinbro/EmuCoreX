@@ -3,6 +3,7 @@
 
 #pragma once
 #include <deque>
+#include <thread>
 #include "Gif.h"
 #include "Vif.h"
 #include "GS.h"
@@ -12,6 +13,8 @@
 // FIXME common path ?
 #include "common/boost_spsc_queue.hpp"
 #include "common/Console.h"
+
+#include "emucorex/debug_logcat.h"
 
 struct GS_Packet;
 extern void Gif_MTGS_Wait(bool isMTVU);
@@ -354,6 +357,14 @@ struct Gif_Path
 		pxAssertMsg(curSize + size <= buffSize, "Gif Path Buffer Overflow!");
 		memcpy(&buffer[curSize], pMem, size);
 		curSize += size;
+
+		// Track max GIF path buffer usage
+		if (idx == GIF_PATH_1)
+			DEBUG_GS_SET_MAX(gif_path1_max_used, curSize);
+		else if (idx == GIF_PATH_2)
+			DEBUG_GS_SET_MAX(gif_path2_max_used, curSize);
+		else if (idx == GIF_PATH_3)
+			DEBUG_GS_SET_MAX(gif_path3_max_used, curSize);
 	}
 
 	// If completed a GS packet (with EOP) then set done to true
@@ -513,8 +524,14 @@ struct Gif_Path
 		// Performance note: fetch_add atomic operation might create some stall for atomic
 		// operation in gsPack.push
 		readAmount.fetch_add(gsPack.size + gsPack.readAmount, std::memory_order_acq_rel);
+		u32 push_attempts = 0;
 		while (!mtvu.gsPackQueue.push(gsPack))
-			;
+		{
+			// Yield after 16 failed attempts to reduce CPU waste
+			// The SPSC queue is lock-free but needs the consumer to drain
+			if ((++push_attempts & 15) == 0)
+				std::this_thread::yield();
+		}
 
 		gsPack.Reset();
 		gsPack.offset = curOffset;

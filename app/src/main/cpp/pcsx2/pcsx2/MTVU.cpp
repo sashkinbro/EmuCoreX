@@ -8,7 +8,12 @@
 #include "Vif_Dynarec.h"
 #include "VU1Fingerprint.h"
 
+#include "emucorex/debug_logcat.h"
+
 #include <thread>
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 #define MTVU_ALWAYS_KICK 0
 #define MTVU_SYNC_MODE 0
@@ -132,6 +137,12 @@ void VU_Thread::ExecuteRingBuffer()
 {
 	Threading::SetNameOfCurrentThread("MTVU");
 
+	// Set VU1 thread to slightly higher priority for better performance
+#ifdef __linux__
+	// Use nice() to increase priority (negative value = higher priority)
+	nice(-2);
+#endif
+
 	for (;;)
 	{
 		semaEvent.WaitForWorkWithSpin();
@@ -173,7 +184,11 @@ void VU_Thread::ExecuteRingBuffer()
 					if (addr != -1)
 						VU1.VI[REG_TPC].UL = addr & 0x7FF;
 					CpuVU1->SetStartPC(VU1.VI[REG_TPC].UL << 3);
+
+					DEBUG_GS_TIMING_START(vu1_exec);
 					CpuVU1->Execute(vu1RunCycles);
+					DEBUG_GS_TIMING_END_U64(vu1_exec, vu1_exec);
+
 					gifUnit.gifPath[GIF_PATH_1].FinishGSPacketMTVU();
 					pending_xgkick_posts++; // Batched → flushed before NEXT execute or at loop end
 					vuCycles[vuCycleIdx].store(VU1.cycle, std::memory_order_release);

@@ -12,6 +12,8 @@
 #include "common/Path.h"
 #include "common/StringUtil.h"
 
+#include "emucorex/debug_logcat.h"
+
 #include <algorithm>
 #include <cfloat>
 #include <fstream>
@@ -3040,39 +3042,41 @@ void GSState::Transfer(const u8* mem, u32 size)
 					size /= 2;
 
 					break;
-				case GIF_FLG_IMAGE2:
-					// hmmm
-					// Fall through here fixes a crash in Wallace and Gromit Project Zoo
-					// and according to Pseudonym we shouldn't even land in this code. So hmm indeed. (rama)
-				case GIF_FLG_IMAGE:
+			case GIF_FLG_IMAGE2:
+				// hmmm
+				// Fall through here fixes a crash in Wallace and Gromit Project Zoo
+				// and according to Pseudonym we shouldn't even land in this code. So hmm indeed. (rama)
+			case GIF_FLG_IMAGE:
+			{
+				DEBUG_GS_TIMING_START(gs_image_transfer);
+				const int len = (int)std::min(size, path.nloop);
+
+				switch (m_env.TRXDIR.XDIR)
 				{
-					const int len = (int)std::min(size, path.nloop);
-
-					switch (m_env.TRXDIR.XDIR)
-					{
-					case 0:
-						Write(mem, len * 16);
-						break;
-					case 2:
-						Move();
-						break;
-					default: // 1 and 3
-						// 1 is invalid because downloads can only be done
-						// with a reverse fifo operation (vif)
-						// 3 is spec prohibited, it's behavior is not known
-						// lets do nothing for now
-						break;
-					}
-
-					mem += len * 16;
-					path.nloop -= len;
-					size -= len;
-
+				case 0:
+					Write(mem, len * 16);
+					break;
+				case 2:
+					Move();
+					break;
+				default: // 1 and 3
+					// 1 is invalid because downloads can only be done
+					// with a reverse fifo operation (vif)
+					// 3 is spec prohibited, its behavior is not known
+					// lets do nothing for now
 					break;
 				}
-				default:
-					ASSUME(0);
+
+				mem += len * 16;
+				path.nloop -= len;
+				size -= len;
+
+				DEBUG_GS_TIMING_END_U64(gs_image_transfer, gs_image_transfer);
+				break;
 			}
+			default:
+				ASSUME(0);
+		}
 		}
 
 		if (index == 0)

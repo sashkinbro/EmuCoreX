@@ -18,6 +18,12 @@
 #include <thread>
 #include <vector>
 
+#include "emucorex/debug_logcat.h"
+
+#ifdef __linux__
+#include <unistd.h>
+#endif
+
 // Uncomment this to enable profiling of the GS RingBufferCopy function.
 //#define PCSX2_GSRING_SAMPLING_STATS
 
@@ -135,6 +141,11 @@ void MTGS::ShutdownThread()
 void MTGS::ThreadEntryPoint()
 {
 	Threading::SetNameOfCurrentThread("GS");
+
+	// Set GS thread to normal priority (slightly lower than VU1)
+#ifdef __linux__
+	nice(0); // Default priority
+#endif
 
 	// GS can hit SMC write traps when executing InitAndReadFIFO
 	// As racey as it sounds, it should be safe, since InitAndReadFIFO is requested and immediately waited for,
@@ -262,7 +273,11 @@ void MTGS::PostVsyncStart(bool registers_written)
 	// (The Xenosaga engine is known to run into this, due to it throwing bulks of data in one frame followed by 2 empty frames.)
 
 	if ((s_QueuedFrameCount.fetch_add(1) < EmuConfig.GS.VsyncQueueSize) /*|| (!EmuConfig.GS.VsyncEnable && !EmuConfig.GS.FrameLimitEnable)*/)
+	{
+		// Track max queue depth
+		DEBUG_GS_SET_MAX(vsync_queue_depth_max, s_QueuedFrameCount.load(std::memory_order_relaxed));
 		return;
+	}
 
 	s_VsyncSignalListener.store(true, std::memory_order_release);
 	//Console.WriteLn( Color_Blue, "(EEcore Sleep) Vsync\t\tringpos=0x%06x, writepos=0x%06x", m_ReadPos.load(), m_WritePos.load() );
@@ -445,16 +460,18 @@ void MTGS::MainLoop()
 					break;
 				}
 
-			case Command::MTVUGSPacket:
+		case Command::MTVUGSPacket:
+			{
+				MTVU_LOG("MTGS - Waiting on semaXGkick!");
+				DEBUG_GS_TIMING_START(sema_xgkick_wait);
+				if (!vu1Thread.semaXGkick.TryWait())
 				{
-					MTVU_LOG("MTGS - Waiting on semaXGkick!");
-					if (!vu1Thread.semaXGkick.TryWait())
-					{
-						mtvu_lock.unlock();
-						// Wait for MTVU to complete vu1 program
-						vu1Thread.semaXGkick.WaitWithSpin();
-						mtvu_lock.lock();
-					}
+					mtvu_lock.unlock();
+					// Wait for MTVU to complete vu1 program
+					vu1Thread.semaXGkick.WaitWithSpin();
+					mtvu_lock.lock();
+				}
+				DEBUG_GS_TIMING_END_U64(sema_xgkick_wait, sema_xgkick_wait);
 					Gif_Path& path = gifUnit.gifPath[GIF_PATH_1];
 					GS_Packet gsPack = path.GetGSPacketMTVU(); // Get vu1 program's xgkick packet(s)
 					if (gsPack.size)
@@ -557,6 +574,14 @@ void MTGS::MainLoop()
 							s_QueuedFrameCount.fetch_sub(1);
 							if (s_VsyncSignalListener.exchange(false))
 								s_sem_Vsync.Post();
+
+							// Dump performance metrics every 500 frames when debug logcat is enabled
+							static u32 s_vsync_frame_counter = 0;
+							if (++s_vsync_frame_counter >= 500)
+							{
+								s_vsync_frame_counter = 0;
+								DEBUG_GS_DUMP_METRICS();
+							}
 
 							// Do not StateCheckInThread() here
 							// Otherwise we could pause while there's still data in the queue
@@ -690,14 +715,25 @@ void MTGS::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 		u32 startP1Packs = path.GetPendingGSPackets();
 		if (startP1Packs)
 		{
+			DEBUG_GS_TIMING_START(wait_gs);
+			DEBUG_GS_INC_U64(wait_gs_count, 1);
+			u64 spin_iterations = 0;
 			while (true)
 			{
 				// m_mtx_RingBufferBusy2.Wait();
 				s_mtx_RingBufferBusy2.lock();
 				s_mtx_RingBufferBusy2.unlock();
+				spin_iterations++;
 				if (path.GetPendingGSPackets() != startP1Packs)
 					break;
+				// Yield after 8 iterations to reduce CPU waste in spin-wait
+				// This reduces MTVU thread CPU usage while still being responsive
+				if ((spin_iterations & 7) == 0)
+					std::this_thread::yield();
 			}
+			DEBUG_GS_TIMING_END_U64(wait_gs, wait_gs);
+			DEBUG_GS_INC_U64(weak_wait_spin_total, spin_iterations);
+			DEBUG_GS_INC_U64(weak_wait_spin_count, 1);
 		}
 	}
 	else
@@ -783,6 +819,9 @@ void MTGS::GenericStall(uint size)
 	else
 		freeroom = RingBufferSize - (writepos - readpos);
 
+	// Track max ring buffer usage
+	DEBUG_GS_SET_MAX(ring_buffer_max_used, RingBufferSize - freeroom);
+
 	if (freeroom <= size)
 	{
 		// writepos will overlap readpos if we commit the data, so we need to wait until
@@ -808,6 +847,8 @@ void MTGS::GenericStall(uint size)
 
 			//Console.WriteLn( Color_Blue, "(EEcore Sleep) PrepDataPacker \tringpos=0x%06x, writepos=0x%06x, signalpos=0x%06x", readpos, writepos, m_SignalRingPosition );
 
+			DEBUG_GS_TIMING_START(ring_stall);
+			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
 			while (true)
 			{
 				s_SignalRingEnable.store(true, std::memory_order_release);
@@ -824,13 +865,17 @@ void MTGS::GenericStall(uint size)
 				if (freeroom > size)
 					break;
 			}
+			DEBUG_GS_TIMING_END_U64(ring_stall, ring_buffer_stall);
 
 			pxAssertMsg(s_SignalRingPosition <= 0, "MTGS Thread Synchronization Error");
 		}
 		else
 		{
 			//Console.WriteLn( Color_StrongGray, "(EEcore Spin) PrepDataPacket!" );
+			DEBUG_GS_TIMING_START(ring_spin);
+			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
 			SetEvent();
+			u32 spin_count = 0;
 			while (true)
 			{
 				Threading::SpinWait();
@@ -843,7 +888,12 @@ void MTGS::GenericStall(uint size)
 
 				if (freeroom > size)
 					break;
+				// Yield after 64 spin iterations to reduce CPU waste
+				// This is the FMV optimization path for small transfers
+				if ((++spin_count & 63) == 0)
+					std::this_thread::yield();
 			}
+			DEBUG_GS_TIMING_END_U64(ring_spin, ring_buffer_stall);
 		}
 	}
 }
