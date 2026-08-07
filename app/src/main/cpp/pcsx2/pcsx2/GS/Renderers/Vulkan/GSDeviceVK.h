@@ -533,6 +533,18 @@ public:
 	{
 		return m_tfx_render_pass[rt][ds][colclip][stencil][fbl][dsp][rt_op][ds_op];
 	}
+	__fi VkRenderPass GetTFXRenderPassWithStore(bool rt, bool ds, bool colclip, bool stencil, bool fbl, bool dsp,
+		VkAttachmentLoadOp rt_op, VkAttachmentLoadOp ds_op,
+		VkAttachmentStoreOp rt_store, VkAttachmentStoreOp ds_store)
+	{
+		if (rt_store == VK_ATTACHMENT_STORE_OP_STORE && ds_store == VK_ATTACHMENT_STORE_OP_STORE)
+			return m_tfx_render_pass[rt][ds][colclip][stencil][fbl][dsp][rt_op][ds_op];
+
+		const VkFormat rt_format = rt ? (colclip ? m_colclip_rt_format : m_rt_format) : VK_FORMAT_UNDEFINED;
+		const VkFormat ds_format = ds ? m_depth_format : VK_FORMAT_UNDEFINED;
+		return GetRenderPass(rt_format, ds_format, rt_op, rt_store, ds_op, ds_store,
+			VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, fbl, dsp);
+	}
 	__fi VkSampler GetPointSampler() const { return m_point_sampler; }
 	__fi VkSampler GetLinearSampler() const { return m_linear_sampler; }
 
@@ -716,6 +728,8 @@ private:
 	GSTextureVK* m_current_render_target = nullptr;
 	GSTextureVK* m_current_depth_target = nullptr;
 	VkFormat m_depth_format = VK_FORMAT_D32_SFLOAT;
+	VkFormat m_rt_format = VK_FORMAT_UNDEFINED;
+	VkFormat m_colclip_rt_format = VK_FORMAT_UNDEFINED;
 	VkFramebuffer m_current_framebuffer = VK_NULL_HANDLE;
 	VkRenderPass m_current_render_pass = VK_NULL_HANDLE;
 	GSVector4i m_current_render_pass_area = GSVector4i::zero();

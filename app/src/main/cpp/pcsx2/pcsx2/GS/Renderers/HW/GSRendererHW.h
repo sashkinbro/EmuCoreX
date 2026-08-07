@@ -313,6 +313,9 @@ private:
 
 	GSTextureCache::Target* m_last_rt;
 
+	GSTexture* m_cached_ds_as_rt = nullptr;
+	GSVector2i m_cached_ds_as_rt_size = GSVector2i(0, 0);
+
 	GIFRegFRAME m_split_clear_start = {};
 	GIFRegZBUF m_split_clear_start_Z = {};
 	u32 m_split_clear_pages = 0;

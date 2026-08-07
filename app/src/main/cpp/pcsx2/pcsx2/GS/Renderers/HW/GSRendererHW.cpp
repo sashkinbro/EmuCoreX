@@ -118,6 +118,8 @@ void GSRendererHW::SetTCOffset()
 
 GSRendererHW::~GSRendererHW()
 {
+	if (m_cached_ds_as_rt)
+		g_gs_device->Recycle(m_cached_ds_as_rt);
 	g_texture_cache.reset();
 }
 
@@ -160,6 +162,13 @@ void GSRendererHW::Reset(bool hardware_reset)
 
 	g_texture_cache->RemoveAll(true, true, true);
 	GSHwHack::ResetState();
+
+	if (m_cached_ds_as_rt)
+	{
+		g_gs_device->Recycle(m_cached_ds_as_rt);
+		m_cached_ds_as_rt = nullptr;
+		m_cached_ds_as_rt_size = GSVector2i(0, 0);
+	}
 
 	GSRenderer::Reset(hardware_reset);
 }
@@ -10138,7 +10147,16 @@ void GSRendererHW::StartDepthAsRTFeedback()
 		// Create a temporary RT and copy the area needed for the draw.
 		const int w = m_conf.ds->GetWidth();
 		const int h = m_conf.ds->GetHeight();
-		m_conf.ds_as_rt = g_gs_device->CreateRenderTarget(w, h, GSTexture::Format::Float32, false, true);
+
+		// Reuse cached ds_as_rt if size matches, avoiding per-draw allocation.
+		if (!m_cached_ds_as_rt || m_cached_ds_as_rt_size.x != w || m_cached_ds_as_rt_size.y != h)
+		{
+			if (m_cached_ds_as_rt)
+				g_gs_device->Recycle(m_cached_ds_as_rt);
+			m_cached_ds_as_rt = g_gs_device->CreateRenderTarget(w, h, GSTexture::Format::Float32, false, true);
+			m_cached_ds_as_rt_size = GSVector2i(w, h);
+		}
+		m_conf.ds_as_rt = m_cached_ds_as_rt;
 		const GSVector4 dRect(m_conf.drawarea);
 		const GSVector4 sRect(dRect.x / w, dRect.y / h, dRect.z / w, dRect.w / h);
 		g_gs_device->StretchRect(m_conf.ds, sRect, m_conf.ds_as_rt, dRect, ShaderConvert::FLOAT32_DEPTH_TO_COLOR, false);
@@ -10150,7 +10168,7 @@ void GSRendererHW::CleanupDepthAsRTFeedback()
 {
 	if (m_conf.ds_as_rt)
 	{
-		g_gs_device->Recycle(m_conf.ds_as_rt);
+		// Keep cached, don't recycle per-draw
 		m_conf.ds_as_rt = nullptr;
 	}
 }

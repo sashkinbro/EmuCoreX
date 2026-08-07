@@ -4386,6 +4386,9 @@ bool GSDeviceVK::CreateRenderPasses()
 	const VkFormat rt_format = LookupNativeFormat(GSTexture::Format::Color);
 	const VkFormat colclip_rt_format = LookupNativeFormat(GSTexture::Format::ColorClip);
 	const VkFormat depth_format = LookupNativeFormat(GSTexture::Format::DepthStencil);
+	m_rt_format = rt_format;
+	m_colclip_rt_format = colclip_rt_format;
+	m_depth_format = depth_format;
 
 	for (u32 rt = 0; rt < 2; rt++)
 	{
@@ -5548,28 +5551,132 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 
 void GSDeviceVK::WarmupCommonTFXPipelines()
 {
-	static constexpr std::array<u8, 3> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL}};
+	static constexpr std::array<u8, 5> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL, TFX_HIGHLIGHT, TFX_HIGHLIGHT2}};
+	static constexpr std::array<u8, 2> topologies = {{
+		static_cast<u8>(GSHWDrawConfig::Topology::Triangle),
+		static_cast<u8>(GSHWDrawConfig::Topology::Point),
+	}};
+	static constexpr std::array<u8, 2> ztst_values = {{ZTST_ALWAYS, ZTST_GEQUAL}};
+	static constexpr std::array<bool, 2> fst_values = {{true, false}};
+	static constexpr std::array<bool, 2> tcc_values = {{true, false}};
+	static constexpr std::array<bool, 2> ds_values = {{false, true}};
 
+	u32 warmed = 0;
 	for (const u8 tfx : tfx_modes)
 	{
-		PipelineSelector pipe = {};
-		pipe.topology = static_cast<u32>(GSHWDrawConfig::Topology::Triangle);
-		pipe.rt = true;
-		pipe.ds = false;
-		pipe.dss = GSHWDrawConfig::DepthStencilSelector::NoDepth();
-		pipe.cms = GSHWDrawConfig::ColorMaskSelector();
-		pipe.bs = GSHWDrawConfig::BlendState();
-		pipe.vs.iip = true;
-		pipe.vs.fst = true;
-		pipe.vs.tme = (tfx != TFX_NONE);
-		pipe.ps.iip = true;
-		pipe.ps.fst = true;
-		pipe.ps.tfx = tfx;
-		pipe.ps.tcc = (tfx != TFX_NONE);
-		GetTFXPipeline(pipe);
+		for (const u8 topo : topologies)
+		{
+			for (const bool fst : fst_values)
+			{
+				for (const bool tcc : tcc_values)
+				{
+					for (const bool ds : ds_values)
+					{
+						for (const u8 ztst : ztst_values)
+						{
+							PipelineSelector pipe = {};
+							pipe.topology = topo;
+							pipe.rt = true;
+							pipe.ds = ds;
+							pipe.vs.iip = true;
+							pipe.vs.fst = fst;
+							pipe.vs.tme = (tfx != TFX_NONE);
+							pipe.vs.expand = (topo == static_cast<u8>(GSHWDrawConfig::Topology::Point))
+								? GSHWDrawConfig::VSExpand::Point
+								: GSHWDrawConfig::VSExpand::None;
+							pipe.ps.iip = true;
+							pipe.ps.fst = fst;
+							pipe.ps.tfx = tfx;
+							pipe.ps.tcc = tcc;
+							pipe.ps.fog = 0;
+							pipe.ps.atst = GSHWDrawConfig::PS_ATST_NONE;
+							pipe.ps.afail = GSHWDrawConfig::PS_AFAIL_KEEP;
+							pipe.ps.date = 0;
+							pipe.ps.shuffle = 0;
+							pipe.ps.shuffle_same = 0;
+							pipe.ps.process_ba = 0;
+							pipe.ps.process_rg = 0;
+							pipe.ps.aem_fmt = 0;
+							pipe.ps.pal_fmt = 0;
+							pipe.ps.dst_fmt = 2;
+							pipe.ps.depth_fmt = ds ? 2u : 0u;
+							pipe.ps.wms = 0;
+							pipe.ps.wmt = 0;
+							pipe.ps.ltf = 0;
+							pipe.ps.write_rg = 1;
+							pipe.ps.fba = 0;
+							pipe.ps.aem = 0;
+							pipe.ps.real16src = 0;
+							pipe.dss = {};
+							pipe.dss.ztst = ztst;
+							pipe.dss.zwe = ds;
+							pipe.dss.date = false;
+							pipe.cms = GSHWDrawConfig::ColorMaskSelector();
+							pipe.bs = GSHWDrawConfig::BlendState();
+							GetTFXPipeline(pipe);
+							warmed++;
+						}
+					}
+				}
+			}
+		}
 	}
 
-	Console.WriteLn("VK: Warmed %zu common TFX pipelines.", tfx_modes.size());
+	// Warm blend-enabled variants for the most common TFX mode
+	for (const bool fst : fst_values)
+	{
+		for (const bool ds : ds_values)
+		{
+			PipelineSelector pipe = {};
+			pipe.topology = static_cast<u8>(GSHWDrawConfig::Topology::Triangle);
+			pipe.rt = true;
+			pipe.ds = ds;
+			pipe.vs.iip = true;
+			pipe.vs.fst = fst;
+			pipe.vs.tme = true;
+			pipe.vs.expand = GSHWDrawConfig::VSExpand::None;
+			pipe.ps.iip = true;
+			pipe.ps.fst = fst;
+			pipe.ps.tfx = TFX_MODULATE;
+			pipe.ps.tcc = true;
+			pipe.ps.fog = 0;
+			pipe.ps.atst = GSHWDrawConfig::PS_ATST_NONE;
+			pipe.ps.afail = GSHWDrawConfig::PS_AFAIL_KEEP;
+			pipe.ps.date = 0;
+			pipe.ps.shuffle = 0;
+			pipe.ps.shuffle_same = 0;
+			pipe.ps.process_ba = 0;
+			pipe.ps.process_rg = 0;
+			pipe.ps.aem_fmt = 0;
+			pipe.ps.pal_fmt = 0;
+			pipe.ps.dst_fmt = 2;
+			pipe.ps.depth_fmt = ds ? 2u : 0u;
+			pipe.ps.wms = 0;
+			pipe.ps.wmt = 0;
+			pipe.ps.ltf = 0;
+			pipe.ps.write_rg = 1;
+			pipe.ps.fba = 0;
+			pipe.ps.aem = 0;
+			pipe.ps.real16src = 0;
+			pipe.dss = {};
+			pipe.dss.ztst = ZTST_GEQUAL;
+			pipe.dss.zwe = ds;
+			pipe.dss.date = false;
+			pipe.cms = GSHWDrawConfig::ColorMaskSelector();
+			pipe.bs.enable = true;
+			pipe.bs.constant_enable = false;
+			pipe.bs.constant = 0;
+			pipe.bs.src_factor = SRC_ALPHA;
+			pipe.bs.dst_factor = INV_SRC_ALPHA;
+			pipe.bs.op = OP_ADD;
+			pipe.bs.src_factor_alpha = CONST_ONE;
+			pipe.bs.dst_factor_alpha = INV_SRC_ALPHA;
+			GetTFXPipeline(pipe);
+			warmed++;
+		}
+	}
+
+	Console.WriteLn("VK: Warmed %u common TFX pipelines.", warmed);
 }
 
 bool GSDeviceVK::BindDrawPipeline(const PipelineSelector& p)
@@ -6352,8 +6459,13 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	// While a frame records, submit accumulated work to keep the GPU busy
 	// so it runs concurrently with GS-thread recording instead of only starting
 	// when the readback fence-waits on it. This fixes massive slowdowns on tilers.
+	// On TBDR GPUs (Mali, Adreno, PowerVR), mid-frame submits are very expensive
+	// because they break tile binning. Use a much higher threshold on mobile.
 	{
-		constexpr u32 kick_threshold = 4000;
+		const bool is_tbdr = IsDeviceMali() || IsDeviceAdreno();
+		constexpr u32 kick_threshold_desktop = 4000;
+		constexpr u32 kick_threshold_mobile = 40000;
+		const u32 kick_threshold = is_tbdr ? kick_threshold_mobile : kick_threshold_desktop;
 		if (m_draws_in_command_buffer >= kick_threshold)
 		{
 			ScanForCommandBufferCompletion();

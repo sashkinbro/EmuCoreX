@@ -469,7 +469,7 @@ protected:
 		std::array<u64, GS_MAX_PAGES> page_generations = {};
 	};
 
-	static constexpr size_t MAX_PENDING_DOWNLOADS = 8;
+	static constexpr size_t MAX_PENDING_DOWNLOADS = 16;
 	std::deque<PendingDownload> m_pending_downloads;
 	std::vector<std::unique_ptr<GSDownloadTexture>> m_async_download_texture_pool;
 
