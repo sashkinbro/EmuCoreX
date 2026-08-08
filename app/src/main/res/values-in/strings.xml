@@ -2176,4 +2176,6 @@
     <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
     <string name="settings_profiler_logcat_desc">Profilkan eksekusi EE, IOP, VU0, VU1 ke logcat (tag: Profiler).</string>
     <string name="settings_help_profiler_logcat">Mengaktifkan pembuatan profil eksekusi EE, IOP, VU0, VU1 ke Android logcat. Filter berdasarkan tag \"Profiler\". Menampilkan waktu untuk pengujian peristiwa, blok IOP, interupsi DMA, sinkronisasi VU. Biarkan ini nonaktif untuk permainan normal.</string>
+    <string name="settings_language_polish">Polandia</string>
+    <string name="settings_language_native_polish">Polski</string>
 </resources>

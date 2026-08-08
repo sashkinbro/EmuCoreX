@@ -311,6 +311,8 @@
     <string name="settings_language_native_japanese">日本語</string>
     <string name="settings_language_native_korean">한국어</string>
     <string name="settings_language_native_turkish">Türkçe</string>
+    <string name="settings_language_polish">Polish</string>
+    <string name="settings_language_native_polish">Polski</string>
     <string name="settings_graphics">Video</string>
     <string name="settings_jit_section">JIT / Interpreter</string>
     <string name="settings_jit_section_note">Turn a recompiler off to force that block onto the interpreter. Use this for isolation and crash tracing, not for normal play.</string>

@@ -2164,4 +2164,6 @@
     <string name="settings_profiler_logcat">Profileur EE/IOP/VU</string>
     <string name="settings_profiler_logcat_desc">Profiler l\'exécution de EE, IOP, VU0, VU1 dans logcat (balise : Profiler).</string>
     <string name="settings_help_profiler_logcat">Active le profilage de l\'exécution de EE, IOP, VU0, VU1 dans Android logcat. Filtrez par la balise \"Profiler\". Affiche le temps pour les tests d\'événements, les blocs IOP, les interruptions DMA, la synchronisation VU. Laissez ceci désactivé pour une session de jeu normale.</string>
+    <string name="settings_language_polish">Polonais</string>
+    <string name="settings_language_native_polish">Polski</string>
 </resources>

@@ -2163,4 +2163,6 @@
     <string name="settings_profiler_logcat">EE/IOP/VU 性能分析器</string>
     <string name="settings_profiler_logcat_desc">将 EE、IOP、VU0、VU1 的执行情况分析记录到 logcat（标签：Profiler）。</string>
     <string name="settings_help_profiler_logcat">启用将 EE、IOP、VU0、VU1 的执行情况分析记录到 Android logcat 中。按标签“Profiler”进行过滤。显示事件测试、IOP 块、DMA 中断、VU 同步的计时信息。正常游玩时请保持此选项处于关闭状态。</string>
+    <string name="settings_language_polish">波兰语</string>
+    <string name="settings_language_native_polish">Polski</string>
 </resources>

@@ -6315,7 +6315,8 @@ private fun rememberLanguageOptions(): List<LanguageUiOption> {
             LanguageUiOption("fa", "FA", R.string.settings_language_persian, R.string.settings_language_native_persian),
             LanguageUiOption("ja", "JA", R.string.settings_language_japanese, R.string.settings_language_native_japanese),
             LanguageUiOption("ko", "KO", R.string.settings_language_korean, R.string.settings_language_native_korean),
-            LanguageUiOption("tr", "TR", R.string.settings_language_turkish, R.string.settings_language_native_turkish)
+            LanguageUiOption("tr", "TR", R.string.settings_language_turkish, R.string.settings_language_native_turkish),
+            LanguageUiOption("pl", "PL", R.string.settings_language_polish, R.string.settings_language_native_polish)
         )
     }
 }
@@ -6339,6 +6340,7 @@ private fun languageLabel(tag: String?): String {
         "ja" -> stringResource(R.string.settings_language_japanese)
         "ko" -> stringResource(R.string.settings_language_korean)
         "tr" -> stringResource(R.string.settings_language_turkish)
+        "pl" -> stringResource(R.string.settings_language_polish)
         else -> stringResource(R.string.settings_language_system)
     }
 }

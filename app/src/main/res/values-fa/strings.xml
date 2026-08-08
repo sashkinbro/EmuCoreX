@@ -2177,4 +2177,6 @@
     <string name="settings_profiler_logcat">نمایه ساز EE/IOP/VU</string>
     <string name="settings_profiler_logcat_desc">نمایه‌سازی اجرای EE، IOP، VU0، VU1 در logcat (برچسب: Profiler).</string>
     <string name="settings_help_profiler_logcat">نمایه‌سازی اجرای EE، IOP، VU0، VU1 را در Android logcat فعال می‌کند. با برچسب \"Profiler\" فیلتر کنید. زمان‌بندی تست‌های رویداد، بلوک‌های IOP، وقفه‌های DMA و همگام‌سازی VU را نشان می‌دهد. برای بازی عادی این را خاموش نگه دارید.</string>
+    <string name="settings_language_polish">لهستانی</string>
+    <string name="settings_language_native_polish">Polski</string>
 </resources>
