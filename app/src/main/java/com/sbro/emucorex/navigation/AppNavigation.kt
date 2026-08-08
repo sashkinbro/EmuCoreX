@@ -3,9 +3,11 @@ package com.sbro.emucorex.navigation
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
@@ -16,6 +18,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,12 +28,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -574,79 +582,101 @@ fun AppNavigation(
             }
 
             composable<HubRoute> {
-                AdaptiveShell(
-                    selected = PrimaryDestination.Hub,
-                    isProUnlocked = settingsUiState.isProUnlocked,
-                    onNavigateHome = {
-                        navController.navigate(HomeRoute) {
-                            launchSingleTop = true
-                            popUpTo(HomeRoute) { inclusive = false }
-                        }
-                    },
-                    onNavigateSearch = {
-                        navController.navigate(CatalogSearchRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateHub = { },
-                    onNavigateFormats = {
-                        navController.navigate(SupportedFormatsRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateSettings = {
-                        navController.navigate(SettingsRoute()) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateAchievements = {
-                        navController.navigate(AchievementsRoute) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateProfile = navigateProfile,
-                    onNavigateFeedback = navigateFeedback,
-                    onNavigateGameSettingsManager = navigateGameSettingsManager,
-                    onNavigateDataTransfer = navigateDataTransfer,
-                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
-                    onNavigateSaveManager = {
-                        navController.navigate(SaveManagerRoute()) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateMemoryCardManager = navigateMemoryCardManager,
-                    onNavigateTextureManager = navigateTextureManager,
-                    onNavigateCheatManager = navigateCheatManager,
-                    onBackClick = { navController.popBackStack() },
-                    onLaunchGame = launchGamePickerAction,
-                    onLaunchBios = {
-                        navController.navigate(EmulationRoute(bootBios = true)) {
-                            launchSingleTop = true
-                        }
-                    }
+                val detailBackStack = rememberSaveable(
+                    saver = listSaver(
+                        save = { it.toList() },
+                        restore = { it.toMutableStateList() }
+                    )
                 ) {
-                    HubScreen(
+                    mutableStateListOf<String>()
+                }
+                val closeDetail = {
+                    if (detailBackStack.isNotEmpty()) detailBackStack.removeAt(detailBackStack.lastIndex)
+                }
+                val openDetail: (String) -> Unit = { contentId ->
+                    if (detailBackStack.lastOrNull() != contentId) detailBackStack.add(contentId)
+                }
+
+                BackHandler(enabled = detailBackStack.isNotEmpty(), onBack = closeDetail)
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AdaptiveShell(
+                        selected = PrimaryDestination.Hub,
+                        isProUnlocked = settingsUiState.isProUnlocked,
+                        onNavigateHome = {
+                            navController.navigate(HomeRoute) {
+                                launchSingleTop = true
+                                popUpTo(HomeRoute) { inclusive = false }
+                            }
+                        },
+                        onNavigateSearch = {
+                            navController.navigate(CatalogSearchRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateHub = { },
+                        onNavigateFormats = {
+                            navController.navigate(SupportedFormatsRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateSettings = {
+                            navController.navigate(SettingsRoute()) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateAchievements = {
+                            navController.navigate(AchievementsRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateProfile = navigateProfile,
+                        onNavigateFeedback = navigateFeedback,
+                        onNavigateGameSettingsManager = navigateGameSettingsManager,
+                        onNavigateDataTransfer = navigateDataTransfer,
+                        onResetAllSettings = resetAllSettingsAndOpenOnboarding,
+                        onNavigateSaveManager = {
+                            navController.navigate(SaveManagerRoute()) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateMemoryCardManager = navigateMemoryCardManager,
+                        onNavigateTextureManager = navigateTextureManager,
+                        onNavigateCheatManager = navigateCheatManager,
                         onBackClick = { navController.popBackStack() },
-                        onOpenArticle = { contentId ->
-                            navController.navigate(HubDetailRoute(contentId)) {
+                        onLaunchGame = launchGamePickerAction,
+                        onLaunchBios = {
+                            navController.navigate(EmulationRoute(bootBios = true)) {
                                 launchSingleTop = true
                             }
                         }
-                    )
-                }
-            }
+                    ) {
+                        HubScreen(
+                            onBackClick = { navController.popBackStack() },
+                            onOpenArticle = openDetail
+                        )
+                    }
 
-            composable<HubDetailRoute> { backStackEntry ->
-                val route = backStackEntry.toRoute<HubDetailRoute>()
-                HubDetailScreen(
-                    contentId = route.contentId,
-                    onBackClick = { navController.popBackStack() },
-                    onOpenArticle = { contentId ->
-                        navController.navigate(HubDetailRoute(contentId)) {
-                            launchSingleTop = true
+                    AnimatedVisibility(
+                        visible = detailBackStack.isNotEmpty(),
+                        enter = slideInHorizontally(
+                            animationSpec = tween(durationMillis = 260, easing = EaseOut),
+                            initialOffsetX = { it / 5 }
+                        ) + fadeIn(animationSpec = tween(durationMillis = 180)),
+                        exit = slideOutHorizontally(
+                            animationSpec = tween(durationMillis = 220, easing = EaseIn),
+                            targetOffsetX = { it / 5 }
+                        ) + fadeOut(animationSpec = tween(durationMillis = 180))
+                    ) {
+                        detailBackStack.lastOrNull()?.let { contentId ->
+                            HubDetailScreen(
+                                contentId = contentId,
+                                onBackClick = closeDetail,
+                                onOpenArticle = openDetail
+                            )
                         }
                     }
-                )
+                }
             }
 
             composable<EmulationRoute> { backStackEntry ->
