@@ -2164,4 +2164,6 @@
     <string name="settings_help_profiler_logcat">Android logcat में EE, IOP, VU0, VU1 निष्पादन प्रोफ़ाइलिंग को सक्षम करता है। \"Profiler\" टैग द्वारा फ़िल्टर करें। ईवेंट परीक्षणों, IOP ब्लॉक, DMA इंटरप्ट, VU सिंक के लिए समय दिखाता है। सामान्य खेल के लिए इसे बंद रखें。</string>
     <string name="settings_language_polish">पोलिश</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">चेक</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>

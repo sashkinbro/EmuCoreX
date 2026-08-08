@@ -2163,4 +2163,6 @@
     <string name="settings_help_profiler_logcat">Android logcat으로 EE, IOP, VU0, VU1 실행 프로파일링을 활성화합니다. \"Profiler\" 태그로 필터링하세요. 이벤트 테스트, IOP 블록, DMA 인터럽트, VU 동기화에 대한 타이밍을 표시합니다. 일반적인 게임 플레이 시에는 이 기능을 꺼두세요.</string>
     <string name="settings_language_polish">폴란드어</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">체코어</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>

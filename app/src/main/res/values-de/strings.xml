@@ -2166,4 +2166,6 @@
     <string name="settings_help_profiler_logcat">Aktiviert die Profilerstellung für die EE-, IOP-, VU0- und VU1-Ausführung in Android logcat. Filtern Sie nach dem Tag \"Profiler\". Zeigt das Timing für Ereignistests, IOP-Blöcke, DMA-Interrupts und VU-Synchronisierung an. Lassen Sie dies für normales Spielen deaktiviert.</string>
     <string name="settings_language_polish">Polnisch</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">Tschechisch</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>

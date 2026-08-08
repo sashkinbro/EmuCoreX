@@ -2186,6 +2186,8 @@
     <string name="settings_clear_cover_cache_partial">Część zaklepanych zdjęć opatulonych okładkami przy systemowych opcjach blokad bądź trwającym pobraniu uwięzła z nożami od opcji czyścika (Było bez opcji utylizacji przez proces w błędy bądź zajęte okno na uśpieniu na chmurkach systemu ze zdarzeń wewnątrz o działaniach bądz system zajętościami błędu zrzucił obronę na blok bazy poboru.) Podejście drugie z opcją na wyrzut zalecane pod zamknięciem wszystkich kanałów u opcji na ściągnięcie grafik bazy. </string>
     <string name="settings_language_polish">Polski</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">Czeski</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>
 
 

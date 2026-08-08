@@ -2168,4 +2168,6 @@
     <string name="settings_help_profiler_logcat">يمكّن ملف تعريف تنفيذ EE و IOP و VU0 و VU1 في Android logcat. قم بالتصفية حسب العلامة \"Profiler\". يعرض التوقيت لاختبارات الأحداث وكتل IOP ومقاطعات DMA ومزامنة VU. اترك هذا مغلقًا للعب العادي.</string>
     <string name="settings_language_polish">البولندية</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">التشيكية</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>

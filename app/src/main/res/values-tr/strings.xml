@@ -2164,4 +2164,6 @@
     <string name="settings_help_profiler_logcat">Android logcat\'e EE, IOP, VU0, VU1 yürütme profillemesini etkinleştirir. \"Profiler\" etiketiyle filtreleyin. Olay testleri, IOP blokları, DMA kesintileri, VU senkronizasyonu için zamanlamayı gösterir. Normal oyun için bunu kapalı tutun.</string>
     <string name="settings_language_polish">Lehçe</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">Çekçe</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>

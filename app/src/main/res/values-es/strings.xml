@@ -2166,4 +2166,6 @@
     <string name="settings_help_profiler_logcat">Habilita el análisis de rendimiento de la ejecución de EE, IOP, VU0 y VU1 en Android logcat. Filtra por la etiqueta \"Profiler\". Muestra el tiempo para pruebas de eventos, bloques de IOP, interrupciones de DMA y sincronización de VU. Mantén esto desactivado para jugar de forma normal.</string>
     <string name="settings_language_polish">Polaco</string>
     <string name="settings_language_native_polish">Polski</string>
+    <string name="settings_language_czech">Checo</string>
+    <string name="settings_language_native_czech">Čeština</string>
 </resources>
