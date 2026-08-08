@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Refresh
@@ -101,7 +102,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class PrimaryDestination {
-    Home, Search, Formats, Achievements, Profile, Settings, Feedback
+    Home, Search, Hub, Formats, Achievements, Profile, Settings, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -133,6 +134,7 @@ fun AdaptiveShell(
     drawerEnabled: Boolean = true,
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
+    onNavigateHub: () -> Unit = {},
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
@@ -170,6 +172,7 @@ fun AdaptiveShell(
             drawerVisualStyle = drawerVisualStyle,
             onNavigateHome = onNavigateHome,
             onNavigateSearch = onNavigateSearch,
+            onNavigateHub = onNavigateHub,
             onNavigateFormats = onNavigateFormats,
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
@@ -248,6 +251,7 @@ fun AdaptiveShell(
             drawerEnabled = drawerEnabled,
             onNavigateHome = onNavigateHome,
             onNavigateSearch = onNavigateSearch,
+            onNavigateHub = onNavigateHub,
             onNavigateFormats = onNavigateFormats,
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
@@ -279,6 +283,7 @@ private fun CompactAdaptiveShell(
     drawerEnabled: Boolean,
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
+    onNavigateHub: () -> Unit,
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
@@ -458,6 +463,7 @@ private fun CompactAdaptiveShell(
                     drawerVisualStyle = drawerVisualStyle,
                     onNavigateHome = onNavigateHome,
                     onNavigateSearch = onNavigateSearch,
+                    onNavigateHub = onNavigateHub,
                     onNavigateFormats = onNavigateFormats,
                     onNavigateSettings = onNavigateSettings,
                     onNavigateAchievements = onNavigateAchievements,
@@ -492,6 +498,7 @@ private fun SideNavigation(
     drawerVisualStyle: DrawerVisualStyle,
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
+    onNavigateHub: () -> Unit,
     onNavigateFormats: () -> Unit,
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
@@ -593,6 +600,9 @@ private fun SideNavigation(
     val navigateSearch = rememberDebouncedClick {
         closeDrawerThen(onNavigateSearch)
     }
+    val navigateHub = rememberDebouncedClick {
+        closeDrawerThen(onNavigateHub)
+    }
     val launchGame = onLaunchGame?.let {
         rememberDebouncedClick {
             closeDrawerThen(it)
@@ -682,6 +692,17 @@ private fun SideNavigation(
                         Modifier.focusRequester(selectedItemFocusRequester)
                     } else Modifier,
                     onClick = navigateSearch
+                )
+            }
+            if (DrawerItemId.HUB !in hiddenDrawerItems) {
+                ShellItem(
+                    icon = Icons.Rounded.Newspaper,
+                    label = stringResource(R.string.hub_title),
+                    selected = selected == PrimaryDestination.Hub,
+                    modifier = if (selected == PrimaryDestination.Hub && selectedItemFocusRequester != null) {
+                        Modifier.focusRequester(selectedItemFocusRequester)
+                    } else Modifier,
+                    onClick = navigateHub
                 )
             }
             if (DrawerItemId.ACHIEVEMENTS !in hiddenDrawerItems) {

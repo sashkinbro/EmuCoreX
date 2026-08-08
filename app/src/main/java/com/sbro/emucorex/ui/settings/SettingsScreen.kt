@@ -66,6 +66,7 @@ import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Person
@@ -196,6 +197,7 @@ import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.home.calculateHomeGridColumnCount
 import com.sbro.emucorex.ui.common.NavigationBackButton
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
+import com.sbro.emucorex.ui.common.ScrollableFilterTabRow
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.SettingHelpButton
@@ -1020,73 +1022,15 @@ private fun SettingsTabRow(
     selectedTabFocusRequester: FocusRequester
 ) {
     val tabs = remember { SettingsTab.entries.toList() }
-    val listState = rememberLazyListState()
-    Box(modifier = Modifier.fillMaxWidth()) {
-        LaunchedEffect(selectedTab) {
-            val selectedIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)
-            var selectedItem = listState.layoutInfo.visibleItemsInfo
-                .firstOrNull { it.index == selectedIndex }
-            if (selectedItem == null) {
-                listState.scrollToItem(selectedIndex)
-                withFrameNanos { }
-                selectedItem = listState.layoutInfo.visibleItemsInfo
-                    .firstOrNull { it.index == selectedIndex }
-            }
-
-            selectedItem?.let { item ->
-                val layoutInfo = listState.layoutInfo
-                val delta = centeredTabScrollDelta(
-                    itemOffset = item.offset,
-                    itemSize = item.size,
-                    viewportStart = layoutInfo.viewportStartOffset,
-                    viewportEnd = layoutInfo.viewportEndOffset
-                )
-                if (kotlin.math.abs(delta) > 1f) {
-                    listState.animateScrollBy(delta)
-                }
-            }
-        }
-
-        LazyRow(
-            state = listState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .tvFocusGroup(),
-            contentPadding = PaddingValues(
-                start = ScreenHorizontalPadding,
-                end = ScreenHorizontalPadding
-            ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(items = tabs, key = { it.name }) { tab ->
-                val interactionSource = remember { MutableInteractionSource() }
-                FilterChip(
-                    modifier = (if (tab == selectedTab) {
-                        Modifier.focusRequester(selectedTabFocusRequester)
-                    } else {
-                        Modifier
-                    }).tvGamepadFocusableCard(
-                        shape = RoundedCornerShape(16.dp),
-                        interactionSource = interactionSource,
-                        addFocusTarget = false
-                    ),
-                    selected = selectedTab == tab,
-                    onClick = { onSelected(tab) },
-                    interactionSource = interactionSource,
-                    colors = premiumFilterChipColors(),
-                    label = { Text(tab.label()) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = tab.icon(),
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-            }
-        }
-    }
+    ScrollableFilterTabRow(
+        tabs = tabs,
+        selectedTab = selectedTab,
+        onSelected = onSelected,
+        key = SettingsTab::name,
+        label = SettingsTab::label,
+        icon = SettingsTab::icon,
+        selectedTabFocusRequester = selectedTabFocusRequester
+    )
 }
 
 @Composable
@@ -3296,6 +3240,7 @@ private fun CustomizationSettingsTab(
             stringResource(R.string.shell_quick_actions) to listOf(
                 DrawerItemId.LIBRARY,
                 DrawerItemId.CATALOG_SEARCH,
+                DrawerItemId.HUB,
                 DrawerItemId.ACHIEVEMENTS,
                 DrawerItemId.PROFILE
             ),
@@ -3936,6 +3881,7 @@ private fun DrawerItemEditorRow(
 private fun drawerItemIcon(item: DrawerItemId): ImageVector = when (item) {
     DrawerItemId.LIBRARY -> Icons.Rounded.Home
     DrawerItemId.CATALOG_SEARCH -> Icons.Rounded.Search
+    DrawerItemId.HUB -> Icons.Rounded.Newspaper
     DrawerItemId.ACHIEVEMENTS -> Icons.Rounded.Star
     DrawerItemId.PROFILE -> Icons.Rounded.Person
     DrawerItemId.LAUNCH_GAME, DrawerItemId.LAUNCH_BIOS -> Icons.Rounded.PlayArrow
@@ -3955,6 +3901,7 @@ private fun drawerItemIcon(item: DrawerItemId): ImageVector = when (item) {
 private fun drawerItemLabel(item: DrawerItemId): String = when (item) {
     DrawerItemId.LIBRARY -> stringResource(R.string.shell_library)
     DrawerItemId.CATALOG_SEARCH -> stringResource(R.string.shell_catalog_search)
+    DrawerItemId.HUB -> stringResource(R.string.hub_title)
     DrawerItemId.ACHIEVEMENTS -> stringResource(R.string.settings_achievements_tab)
     DrawerItemId.PROFILE -> stringResource(R.string.profile_title)
     DrawerItemId.LAUNCH_GAME -> stringResource(R.string.shell_launch_game)
@@ -6366,7 +6313,6 @@ private fun SettingsTab.label(): String {
     }
 }
 
-@Composable
 private fun SettingsTab.icon(): ImageVector {
     return when (this) {
         SettingsTab.General -> Icons.Rounded.Tune

@@ -89,6 +89,7 @@ enum class GameMenuTabId {
 enum class DrawerItemId(val required: Boolean = false) {
     LIBRARY(required = true),
     CATALOG_SEARCH,
+    HUB,
     ACHIEVEMENTS,
     PROFILE,
     LAUNCH_GAME,

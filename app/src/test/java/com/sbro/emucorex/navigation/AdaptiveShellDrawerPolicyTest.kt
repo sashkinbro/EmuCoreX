@@ -28,6 +28,17 @@ class AdaptiveShellDrawerPolicyTest {
     }
 
     @Test
+    fun hubUsesStandardBackNavigationInsteadOfReopeningTheDrawer() {
+        assertFalse(
+            shouldUseCompactModalDrawer(
+                drawerEnabled = true,
+                selected = PrimaryDestination.Hub,
+                hasBackClick = true
+            )
+        )
+    }
+
+    @Test
     fun homeKeepsModalDrawer() {
         assertTrue(
             shouldUseCompactModalDrawer(

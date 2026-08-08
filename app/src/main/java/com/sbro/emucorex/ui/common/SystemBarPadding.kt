@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-
-val AppScreenTopSpacing = 6.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -29,7 +26,7 @@ fun appStatusBarTopPadding(): Dp {
 }
 
 @Composable
-fun appScreenTopPadding(): Dp = appStatusBarTopPadding() + AppScreenTopSpacing
+fun appScreenTopPadding(): Dp = appStatusBarTopPadding()
 
 @Composable
 fun navigationBarsHorizontalPaddingValues(): PaddingValues {

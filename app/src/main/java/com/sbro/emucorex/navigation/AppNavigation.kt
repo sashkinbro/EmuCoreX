@@ -62,6 +62,8 @@ import com.sbro.emucorex.ui.formats.SupportedFormatsScreen
 import com.sbro.emucorex.ui.feedback.FeedbackScreen
 import com.sbro.emucorex.ui.gamedb.GameDbBrowserScreen
 import com.sbro.emucorex.ui.home.HomeScreen
+import com.sbro.emucorex.ui.hub.HubScreen
+import com.sbro.emucorex.ui.hub.detail.HubDetailScreen
 import com.sbro.emucorex.ui.memorycards.MemoryCardManagerScreen
 import com.sbro.emucorex.ui.onboarding.OnboardingScreen
 import com.sbro.emucorex.ui.profile.ProfileScreen
@@ -135,6 +137,12 @@ object OnboardingRoute
 
 @Serializable
 object CatalogSearchRoute
+
+@Serializable
+object HubRoute
+
+@Serializable
+data class HubDetailRoute(val contentId: String)
 
 @Serializable
 object SupportedFormatsRoute
@@ -351,6 +359,11 @@ fun AppNavigation(
             launchSingleTop = true
         }
     }
+    val navigateHub: () -> Unit = {
+        navController.navigate(HubRoute) {
+            launchSingleTop = true
+        }
+    }
     val launchGamePickerAction: () -> Unit = {
         launchGamePicker.launch(arrayOf("*/*"))
     }
@@ -405,6 +418,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Home,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     drawerEnabled = homeDrawerEnabled,
                     onNavigateHome = { },
                     onNavigateSearch = {
@@ -509,6 +523,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Search,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
@@ -558,6 +573,82 @@ fun AppNavigation(
                 }
             }
 
+            composable<HubRoute> {
+                AdaptiveShell(
+                    selected = PrimaryDestination.Hub,
+                    isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHome = {
+                        navController.navigate(HomeRoute) {
+                            launchSingleTop = true
+                            popUpTo(HomeRoute) { inclusive = false }
+                        }
+                    },
+                    onNavigateSearch = {
+                        navController.navigate(CatalogSearchRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateHub = { },
+                    onNavigateFormats = {
+                        navController.navigate(SupportedFormatsRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateSettings = {
+                        navController.navigate(SettingsRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateAchievements = {
+                        navController.navigate(AchievementsRoute) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateProfile = navigateProfile,
+                    onNavigateFeedback = navigateFeedback,
+                    onNavigateGameSettingsManager = navigateGameSettingsManager,
+                    onNavigateDataTransfer = navigateDataTransfer,
+                    onResetAllSettings = resetAllSettingsAndOpenOnboarding,
+                    onNavigateSaveManager = {
+                        navController.navigate(SaveManagerRoute()) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onNavigateMemoryCardManager = navigateMemoryCardManager,
+                    onNavigateTextureManager = navigateTextureManager,
+                    onNavigateCheatManager = navigateCheatManager,
+                    onBackClick = { navController.popBackStack() },
+                    onLaunchGame = launchGamePickerAction,
+                    onLaunchBios = {
+                        navController.navigate(EmulationRoute(bootBios = true)) {
+                            launchSingleTop = true
+                        }
+                    }
+                ) {
+                    HubScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onOpenArticle = { contentId ->
+                            navController.navigate(HubDetailRoute(contentId)) {
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                }
+            }
+
+            composable<HubDetailRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<HubDetailRoute>()
+                HubDetailScreen(
+                    contentId = route.contentId,
+                    onBackClick = { navController.popBackStack() },
+                    onOpenArticle = { contentId ->
+                        navController.navigate(HubDetailRoute(contentId)) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
             composable<EmulationRoute> { backStackEntry ->
                 val route = backStackEntry.toRoute<EmulationRoute>()
                 EmulationScreen(
@@ -598,6 +689,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Formats,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
@@ -647,6 +739,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Settings,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
@@ -863,6 +956,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Achievements,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
@@ -921,6 +1015,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Profile,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
@@ -989,6 +1084,7 @@ fun AppNavigation(
                 AdaptiveShell(
                     selected = PrimaryDestination.Feedback,
                     isProUnlocked = settingsUiState.isProUnlocked,
+                    onNavigateHub = navigateHub,
                     onNavigateHome = {
                         navController.navigate(HomeRoute) {
                             launchSingleTop = true
