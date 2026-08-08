@@ -81,7 +81,7 @@ fun <T> ScrollableFilterTabRow(
             }
             FilterChip(
                 modifier = focusModifier
-                    .heightIn(min = if (compact) 34.dp else 38.dp)
+                    .then(if (compact) Modifier.heightIn(min = 34.dp) else Modifier)
                     .tvGamepadFocusableCard(
                         shape = RoundedCornerShape(16.dp),
                         interactionSource = interactionSource,
@@ -109,7 +109,7 @@ fun <T> ScrollableFilterTabRow(
                     Icon(
                         imageVector = icon(tab),
                         contentDescription = null,
-                        modifier = Modifier.size(if (compact) 16.dp else 17.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             )
