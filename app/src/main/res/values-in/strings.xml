@@ -2227,4 +2227,23 @@
     <string name="hub_image_counter">%1$d dari %2$d</string>
     <string name="hub_callout_info">Informasi</string>
     <string name="hub_callout_warning">Penting</string>
+    <string name="hub_sort_and_filter">Urutkan dan filter</string>
+    <string name="hub_sort_by">Urutkan berdasarkan</string>
+    <string name="hub_filter_by">Filter berdasarkan</string>
+    <string name="hub_featured_only">Hanya unggulan</string>
+    <string name="hub_sort_newest">Terbaru lebih dulu</string>
+    <string name="hub_sort_oldest">Terlama lebih dulu</string>
+    <string name="hub_sort_title">Judul A–Z</string>
+    <string name="hub_filter_all_topics">Semua topik</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 dan PCSX2</string>
+    <string name="hub_filter_other_emulators">Emulator lainnya</string>
+    <string name="hub_clear_filters">Hapus filter</string>
+    <string name="hub_scroll_to_top">Gulir ke atas</string>
+    <string name="hub_reading_time">%1$d mnt baca</string>
+    <string name="hub_no_filter_results">Tidak ada konten yang cocok dengan filter saat ini.</string>
+    <string name="hub_empty_state_title">Belum ada apa pun di sini</string>
+    <string name="hub_no_matches">Tidak ada kecocokan</string>
+    <string name="hub_clear_search">Hapus pencarian</string>
 </resources>

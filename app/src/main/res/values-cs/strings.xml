@@ -2233,5 +2233,24 @@
     <string name="hub_image_counter">%1$d z %2$d</string>
     <string name="hub_callout_info">Informace</string>
     <string name="hub_callout_warning">Důležité</string>
+    <string name="hub_sort_and_filter">Řazení a filtry</string>
+    <string name="hub_sort_by">Seřadit podle</string>
+    <string name="hub_filter_by">Filtrovat podle</string>
+    <string name="hub_featured_only">Pouze doporučené</string>
+    <string name="hub_sort_newest">Nejnovější první</string>
+    <string name="hub_sort_oldest">Nejstarší první</string>
+    <string name="hub_sort_title">Název A–Z</string>
+    <string name="hub_filter_all_topics">Všechna témata</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 a PCSX2</string>
+    <string name="hub_filter_other_emulators">Ostatní emulátory</string>
+    <string name="hub_clear_filters">Vymazat filtry</string>
+    <string name="hub_scroll_to_top">Posunout nahoru</string>
+    <string name="hub_reading_time">Čtení na %1$d min</string>
+    <string name="hub_no_filter_results">Aktuálním filtrům neodpovídá žádný obsah.</string>
+    <string name="hub_empty_state_title">Zatím tu nic není</string>
+    <string name="hub_no_matches">Žádné výsledky</string>
+    <string name="hub_clear_search">Vymazat hledání</string>
 </resources>
 

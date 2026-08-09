@@ -2212,4 +2212,23 @@
     <string name="hub_image_counter">%2$d개 중 %1$d개</string>
     <string name="hub_callout_info">정보</string>
     <string name="hub_callout_warning">중요</string>
+    <string name="hub_sort_and_filter">정렬 및 필터</string>
+    <string name="hub_sort_by">정렬 기준</string>
+    <string name="hub_filter_by">필터 기준</string>
+    <string name="hub_featured_only">추천 항목만</string>
+    <string name="hub_sort_newest">최신순</string>
+    <string name="hub_sort_oldest">오래된순</string>
+    <string name="hub_sort_title">제목 A–Z</string>
+    <string name="hub_filter_all_topics">모든 주제</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 및 PCSX2</string>
+    <string name="hub_filter_other_emulators">기타 에뮬레이터</string>
+    <string name="hub_clear_filters">필터 지우기</string>
+    <string name="hub_scroll_to_top">맨 위로 이동</string>
+    <string name="hub_reading_time">읽는 시간 %1$d분</string>
+    <string name="hub_no_filter_results">현재 필터와 일치하는 콘텐츠가 없습니다.</string>
+    <string name="hub_empty_state_title">아직 표시할 내용이 없습니다</string>
+    <string name="hub_no_matches">일치하는 항목 없음</string>
+    <string name="hub_clear_search">검색어 지우기</string>
 </resources>

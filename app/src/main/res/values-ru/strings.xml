@@ -2217,4 +2217,23 @@
     <string name="hub_image_counter">%1$d из %2$d</string>
     <string name="hub_callout_info">Информация</string>
     <string name="hub_callout_warning">Важно</string>
+    <string name="hub_sort_and_filter">Сортировка и фильтры</string>
+    <string name="hub_sort_by">Сортировать по</string>
+    <string name="hub_filter_by">Фильтровать по</string>
+    <string name="hub_featured_only">Только рекомендуемое</string>
+    <string name="hub_sort_newest">Сначала новые</string>
+    <string name="hub_sort_oldest">Сначала старые</string>
+    <string name="hub_sort_title">Название А–Я</string>
+    <string name="hub_filter_all_topics">Все темы</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 и PCSX2</string>
+    <string name="hub_filter_other_emulators">Другие эмуляторы</string>
+    <string name="hub_clear_filters">Сбросить фильтры</string>
+    <string name="hub_scroll_to_top">Прокрутить вверх</string>
+    <string name="hub_reading_time">Чтение: %1$d мин</string>
+    <string name="hub_no_filter_results">Нет материалов, соответствующих текущим фильтрам.</string>
+    <string name="hub_empty_state_title">Здесь пока ничего нет</string>
+    <string name="hub_no_matches">Совпадений нет</string>
+    <string name="hub_clear_search">Очистить поиск</string>
 </resources>

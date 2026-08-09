@@ -4,9 +4,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +45,9 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.HistoryEdu
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -50,6 +55,9 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -57,15 +65,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -101,6 +113,7 @@ import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -125,6 +138,7 @@ fun HubScreen(
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val compact = LocalConfiguration.current.screenWidthDp < 600
     val horizontalPadding = if (compact) 12.dp else ScreenHorizontalPadding
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel, minimumSkeletonVisible) {
         if (minimumSkeletonVisible) {
@@ -157,11 +171,17 @@ fun HubScreen(
             .padding(navigationBarsHorizontalPaddingValues())
     ) {
         val gridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
-        var lastTabName by rememberSaveable { mutableStateOf(uiState.selectedTab.name) }
-        LaunchedEffect(uiState.selectedTab) {
-            if (lastTabName != uiState.selectedTab.name) {
+        val listMode = "${uiState.selectedTab.name}:${uiState.sortOrder.name}:${uiState.productFilter.name}:${uiState.featuredOnly}"
+        var lastListMode by rememberSaveable { mutableStateOf(listMode) }
+        val showScrollToTop by remember {
+            derivedStateOf {
+                gridState.firstVisibleItemIndex > 2 || gridState.firstVisibleItemScrollOffset > 900
+            }
+        }
+        LaunchedEffect(listMode) {
+            if (lastListMode != listMode) {
                 gridState.scrollToItem(0)
-                lastTabName = uiState.selectedTab.name
+                lastListMode = listMode
             }
         }
         PullToRefreshBox(
@@ -190,7 +210,15 @@ fun HubScreen(
                             if (!searchVisible) viewModel.clearSearch()
                         },
                         onRefresh = { viewModel.refresh(force = true) },
-                        refreshing = uiState.isRefreshing
+                        refreshing = uiState.isRefreshing,
+                        sortOrder = uiState.sortOrder,
+                        productFilter = uiState.productFilter,
+                        featuredOnly = uiState.featuredOnly,
+                        hasActiveFilters = uiState.hasActiveFilters,
+                        onSortOrderSelected = viewModel::setSortOrder,
+                        onProductFilterSelected = viewModel::setProductFilter,
+                        onFeaturedOnlyChanged = viewModel::setFeaturedOnly,
+                        onClearFilters = viewModel::clearFilters
                     )
                 }
                 item(key = "hub-navigation", span = { GridItemSpan(maxLineSpan) }) {
@@ -276,7 +304,13 @@ fun HubScreen(
                     }
                     uiState.visibleItems.isEmpty() -> {
                         item(key = "hub-empty", span = { GridItemSpan(maxLineSpan) }) {
-                            HubEmptyState(uiState.selectedTab, uiState.searchQuery.isNotBlank())
+                            HubEmptyState(
+                                tab = uiState.selectedTab,
+                                searchActive = uiState.searchQuery.isNotBlank(),
+                                filterActive = uiState.hasActiveFilters,
+                                onClearSearch = viewModel::clearSearch,
+                                onClearFilters = viewModel::clearFilters
+                            )
                         }
                     }
                     else -> {
@@ -294,6 +328,16 @@ fun HubScreen(
                     }
                 }
             }
+
+            HubScrollToTopButton(
+                visible = showScrollToTop,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp + bottomInset),
+                onClick = {
+                    scope.launch { gridState.animateScrollToItem(0) }
+                }
+            )
         }
     }
 
@@ -312,7 +356,15 @@ private fun HubTopBar(
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
     onRefresh: () -> Unit,
-    refreshing: Boolean
+    refreshing: Boolean,
+    sortOrder: HubSortOrder,
+    productFilter: HubProductFilter,
+    featuredOnly: Boolean,
+    hasActiveFilters: Boolean,
+    onSortOrderSelected: (HubSortOrder) -> Unit,
+    onProductFilterSelected: (HubProductFilter) -> Unit,
+    onFeaturedOnlyChanged: (Boolean) -> Unit,
+    onClearFilters: () -> Unit
 ) {
     com.sbro.emucorex.ui.common.ScreenTopBar(
         title = stringResource(R.string.hub_title),
@@ -331,6 +383,16 @@ private fun HubTopBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            HubFilterMenu(
+                sortOrder = sortOrder,
+                productFilter = productFilter,
+                featuredOnly = featuredOnly,
+                hasActiveFilters = hasActiveFilters,
+                onSortOrderSelected = onSortOrderSelected,
+                onProductFilterSelected = onProductFilterSelected,
+                onFeaturedOnlyChanged = onFeaturedOnlyChanged,
+                onClearFilters = onClearFilters
+            )
             IconButton(onClick = onRefresh, enabled = !refreshing) {
                 Icon(
                     Icons.Rounded.Refresh,
@@ -340,6 +402,157 @@ private fun HubTopBar(
             }
         }
     )
+}
+
+@Composable
+private fun HubFilterMenu(
+    sortOrder: HubSortOrder,
+    productFilter: HubProductFilter,
+    featuredOnly: Boolean,
+    hasActiveFilters: Boolean,
+    onSortOrderSelected: (HubSortOrder) -> Unit,
+    onProductFilterSelected: (HubProductFilter) -> Unit,
+    onFeaturedOnlyChanged: (Boolean) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Box {
+                Icon(
+                    imageVector = Icons.Rounded.FilterList,
+                    contentDescription = stringResource(R.string.hub_sort_and_filter),
+                    tint = if (hasActiveFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (hasActiveFilters) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(7.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                }
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.widthIn(min = 280.dp),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.hub_sort_and_filter),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = stringResource(R.string.hub_sort_by),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            HubSortOrder.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label()) },
+                    leadingIcon = {
+                        RadioButton(selected = sortOrder == option, onClick = null)
+                    },
+                    onClick = { onSortOrderSelected(option) }
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Text(
+                text = stringResource(R.string.hub_filter_by),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.hub_featured_only)) },
+                leadingIcon = { Checkbox(checked = featuredOnly, onCheckedChange = null) },
+                onClick = { onFeaturedOnlyChanged(!featuredOnly) }
+            )
+            HubProductFilter.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option.label()) },
+                    leadingIcon = {
+                        RadioButton(selected = productFilter == option, onClick = null)
+                    },
+                    onClick = { onProductFilterSelected(option) }
+                )
+            }
+            if (hasActiveFilters) {
+                HorizontalDivider(modifier = Modifier.padding(top = 4.dp))
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(R.string.hub_clear_filters),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    onClick = onClearFilters
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HubSortOrder.label(): String = when (this) {
+    HubSortOrder.NEWEST_FIRST -> stringResource(R.string.hub_sort_newest)
+    HubSortOrder.OLDEST_FIRST -> stringResource(R.string.hub_sort_oldest)
+    HubSortOrder.TITLE_ASCENDING -> stringResource(R.string.hub_sort_title)
+}
+
+@Composable
+private fun HubProductFilter.label(): String = when (this) {
+    HubProductFilter.ALL -> stringResource(R.string.hub_filter_all_topics)
+    HubProductFilter.EMUCOREX -> stringResource(R.string.hub_filter_emucorex)
+    HubProductFilter.EMUCOREV -> stringResource(R.string.hub_filter_emucorev)
+    HubProductFilter.PLAYSTATION_2 -> stringResource(R.string.hub_filter_ps2)
+    HubProductFilter.OTHER_EMULATORS -> stringResource(R.string.hub_filter_other_emulators)
+}
+
+@Composable
+internal fun HubScrollToTopButton(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(180)) + scaleIn(tween(180)),
+        exit = fadeOut(tween(140)) + scaleOut(tween(140)),
+        modifier = modifier
+    ) {
+        val shape = RoundedCornerShape(18.dp)
+        val interactionSource = remember { MutableInteractionSource() }
+        Box(
+            modifier = Modifier
+                .gamepadFocusableCard(
+                    shape = shape,
+                    interactionSource = interactionSource,
+                    addFocusTarget = false
+                )
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f), shape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.hub_scroll_to_top),
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -539,26 +752,79 @@ private fun HubErrorState(onRetry: () -> Unit) {
 }
 
 @Composable
-private fun HubEmptyState(tab: HubTab, searchActive: Boolean) {
-    val text = if (searchActive) stringResource(R.string.hub_no_search_results) else when (tab) {
+private fun HubEmptyState(
+    tab: HubTab,
+    searchActive: Boolean,
+    filterActive: Boolean,
+    onClearSearch: () -> Unit,
+    onClearFilters: () -> Unit
+) {
+    val text = when {
+        searchActive -> stringResource(R.string.hub_no_search_results)
+        filterActive -> stringResource(R.string.hub_no_filter_results)
+        else -> when (tab) {
         HubTab.NEWS -> stringResource(R.string.hub_empty_news)
         HubTab.VIDEOS -> stringResource(R.string.hub_empty_videos)
         HubTab.HISTORY -> stringResource(R.string.hub_empty_history)
         HubTab.MANUALS -> stringResource(R.string.hub_empty_manuals)
         HubTab.FAVORITES -> stringResource(R.string.hub_empty_favorites)
+        }
     }
-    Column(
-        modifier = Modifier.fillMaxWidth().height(360.dp).padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    val icon = when {
+        searchActive -> Icons.Rounded.Search
+        filterActive -> Icons.Rounded.FilterList
+        tab == HubTab.NEWS -> Icons.Rounded.Newspaper
+        tab == HubTab.VIDEOS -> Icons.Rounded.VideoLibrary
+        tab == HubTab.HISTORY -> Icons.Rounded.HistoryEdu
+        tab == HubTab.MANUALS -> Icons.AutoMirrored.Rounded.MenuBook
+        else -> Icons.Rounded.BookmarkBorder
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(340.dp)
+            .padding(vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp
     ) {
-        Icon(
-            imageVector = if (tab == HubTab.FAVORITES) Icons.Rounded.Favorite else Icons.Rounded.Newspaper,
-            contentDescription = null,
-            modifier = Modifier.size(54.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-        )
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 14.dp))
+        Column(
+            modifier = Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Box(modifier = Modifier.size(74.dp), contentAlignment = Alignment.Center) {
+                    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(34.dp))
+                }
+            }
+            Text(
+                text = stringResource(if (searchActive || filterActive) R.string.hub_no_matches else R.string.hub_empty_state_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 18.dp)
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+                maxLines = 3
+            )
+            when {
+                searchActive -> TextButton(onClick = onClearSearch, modifier = Modifier.padding(top = 10.dp)) {
+                    Text(stringResource(R.string.hub_clear_search))
+                }
+                filterActive -> TextButton(onClick = onClearFilters, modifier = Modifier.padding(top = 10.dp)) {
+                    Text(stringResource(R.string.hub_clear_filters))
+                }
+            }
+        }
     }
 }
 
@@ -598,7 +864,7 @@ private fun HubKind.label(): String = when (this) {
     HubKind.MANUALS -> stringResource(R.string.hub_tab_manuals)
 }
 
-private fun HubItem.displayDate(): String = runCatching {
+internal fun HubItem.displayDate(): String = runCatching {
     when {
         kind == HubKind.HISTORY && datePrecision == "year" -> eventDate.orEmpty()
         kind == HubKind.HISTORY && datePrecision == "month" -> YearMonth.parse(eventDate).format(DateTimeFormatter.ofPattern("LLLL yyyy"))

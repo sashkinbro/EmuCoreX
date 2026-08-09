@@ -2217,4 +2217,23 @@
     <string name="hub_image_counter">%1$d з %2$d</string>
     <string name="hub_callout_info">Інформація</string>
     <string name="hub_callout_warning">Важливо</string>
+    <string name="hub_sort_and_filter">Сортування й фільтри</string>
+    <string name="hub_sort_by">Сортувати за</string>
+    <string name="hub_filter_by">Фільтрувати за</string>
+    <string name="hub_featured_only">Лише рекомендоване</string>
+    <string name="hub_sort_newest">Спочатку найновіші</string>
+    <string name="hub_sort_oldest">Спочатку найстаріші</string>
+    <string name="hub_sort_title">Назва А–Я</string>
+    <string name="hub_filter_all_topics">Усі теми</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 і PCSX2</string>
+    <string name="hub_filter_other_emulators">Інші емулятори</string>
+    <string name="hub_clear_filters">Скинути фільтри</string>
+    <string name="hub_scroll_to_top">Прокрутити вгору</string>
+    <string name="hub_reading_time">Читання: %1$d хв</string>
+    <string name="hub_no_filter_results">Немає матеріалів, що відповідають поточним фільтрам.</string>
+    <string name="hub_empty_state_title">Тут поки нічого немає</string>
+    <string name="hub_no_matches">Збігів немає</string>
+    <string name="hub_clear_search">Очистити пошук</string>
 </resources>

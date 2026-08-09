@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -71,6 +77,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFram
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.hub.HubRepository
+import com.sbro.emucorex.ui.common.appScreenTopPadding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -249,8 +256,13 @@ fun HubVideoPlayer(
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
+    val layoutDirection = LocalLayoutDirection.current
     val activity = remember(context) { context.findActivity() }
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val topInset = appScreenTopPadding()
+    val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
+    val cutoutStart = cutoutPadding.calculateStartPadding(layoutDirection)
+    val cutoutEnd = cutoutPadding.calculateEndPadding(layoutDirection)
     val normalizedYoutubeId = remember(youtubeId) {
         youtubeId.trim().let { value ->
             when {
@@ -342,7 +354,12 @@ fun HubVideoPlayer(
             }
             if (isLandscape) {
                 Surface(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(
+                            top = topInset + 8.dp,
+                            end = cutoutEnd + 16.dp
+                        ),
                     shape = androidx.compose.foundation.shape.CircleShape,
                     color = Color.Black.copy(alpha = 0.48f),
                     onClick = onDismiss
@@ -353,7 +370,15 @@ fun HubVideoPlayer(
                 }
             } else {
                 Surface(
-                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(
+                            start = cutoutStart + 12.dp,
+                            top = topInset + 8.dp,
+                            end = cutoutEnd + 12.dp
+                        )
+                        .fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
                     color = Color.Black.copy(alpha = 0.72f)
                 ) {
                     Row(

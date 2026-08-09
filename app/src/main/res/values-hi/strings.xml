@@ -2213,4 +2213,23 @@
     <string name="hub_image_counter">%2$d में से %1$d</string>
     <string name="hub_callout_info">जानकारी</string>
     <string name="hub_callout_warning">महत्वपूर्ण</string>
+    <string name="hub_sort_and_filter">क्रमबद्ध करें और फ़िल्टर करें</string>
+    <string name="hub_sort_by">क्रमबद्ध करें</string>
+    <string name="hub_filter_by">फ़िल्टर करें</string>
+    <string name="hub_featured_only">केवल चुनिंदा</string>
+    <string name="hub_sort_newest">नवीनतम पहले</string>
+    <string name="hub_sort_oldest">सबसे पुराने पहले</string>
+    <string name="hub_sort_title">शीर्षक A–Z</string>
+    <string name="hub_filter_all_topics">सभी विषय</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 और PCSX2</string>
+    <string name="hub_filter_other_emulators">अन्य एमुलेटर</string>
+    <string name="hub_clear_filters">फ़िल्टर साफ़ करें</string>
+    <string name="hub_scroll_to_top">ऊपर जाएँ</string>
+    <string name="hub_reading_time">%1$d मिनट पढ़ने का समय</string>
+    <string name="hub_no_filter_results">मौजूदा फ़िल्टर से कोई सामग्री मेल नहीं खाती।</string>
+    <string name="hub_empty_state_title">अभी यहाँ कुछ नहीं है</string>
+    <string name="hub_no_matches">कोई मेल नहीं</string>
+    <string name="hub_clear_search">खोज साफ़ करें</string>
 </resources>

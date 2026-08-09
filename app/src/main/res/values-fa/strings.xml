@@ -2228,4 +2228,23 @@
     <string name="hub_image_counter">%1$d از %2$d</string>
     <string name="hub_callout_info">اطلاعات</string>
     <string name="hub_callout_warning">مهم</string>
+    <string name="hub_sort_and_filter">مرتب‌سازی و فیلتر</string>
+    <string name="hub_sort_by">مرتب‌سازی بر اساس</string>
+    <string name="hub_filter_by">فیلتر بر اساس</string>
+    <string name="hub_featured_only">فقط برگزیده‌ها</string>
+    <string name="hub_sort_newest">جدیدترین ابتدا</string>
+    <string name="hub_sort_oldest">قدیمی‌ترین ابتدا</string>
+    <string name="hub_sort_title">عنوان الف تا ی</string>
+    <string name="hub_filter_all_topics">همه موضوع‌ها</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 و PCSX2</string>
+    <string name="hub_filter_other_emulators">شبیه‌سازهای دیگر</string>
+    <string name="hub_clear_filters">پاک کردن فیلترها</string>
+    <string name="hub_scroll_to_top">رفتن به بالا</string>
+    <string name="hub_reading_time">%1$d دقیقه مطالعه</string>
+    <string name="hub_no_filter_results">هیچ محتوایی با فیلترهای فعلی مطابقت ندارد.</string>
+    <string name="hub_empty_state_title">هنوز چیزی اینجا نیست</string>
+    <string name="hub_no_matches">نتیجه‌ای پیدا نشد</string>
+    <string name="hub_clear_search">پاک کردن جست‌وجو</string>
 </resources>

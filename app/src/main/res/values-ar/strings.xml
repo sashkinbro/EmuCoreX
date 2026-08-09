@@ -2217,4 +2217,23 @@
     <string name="hub_image_counter">%1$d من %2$d</string>
     <string name="hub_callout_info">معلومات</string>
     <string name="hub_callout_warning">هام</string>
+    <string name="hub_sort_and_filter">الفرز والتصفية</string>
+    <string name="hub_sort_by">الفرز حسب</string>
+    <string name="hub_filter_by">التصفية حسب</string>
+    <string name="hub_featured_only">المميز فقط</string>
+    <string name="hub_sort_newest">الأحدث أولاً</string>
+    <string name="hub_sort_oldest">الأقدم أولاً</string>
+    <string name="hub_sort_title">العنوان أ–ي</string>
+    <string name="hub_filter_all_topics">كل الموضوعات</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 وPCXS2</string>
+    <string name="hub_filter_other_emulators">محاكيات أخرى</string>
+    <string name="hub_clear_filters">مسح عوامل التصفية</string>
+    <string name="hub_scroll_to_top">التمرير إلى الأعلى</string>
+    <string name="hub_reading_time">قراءة %1$d دقيقة</string>
+    <string name="hub_no_filter_results">لا يوجد محتوى يطابق عوامل التصفية الحالية.</string>
+    <string name="hub_empty_state_title">لا يوجد شيء هنا بعد</string>
+    <string name="hub_no_matches">لا توجد نتائج مطابقة</string>
+    <string name="hub_clear_search">مسح البحث</string>
 </resources>

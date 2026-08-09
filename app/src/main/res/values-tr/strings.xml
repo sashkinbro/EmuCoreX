@@ -2213,4 +2213,23 @@
     <string name="hub_image_counter">%1$d / %2$d</string>
     <string name="hub_callout_info">Bilgi</string>
     <string name="hub_callout_warning">Önemli</string>
+    <string name="hub_sort_and_filter">Sırala ve filtrele</string>
+    <string name="hub_sort_by">Sıralama ölçütü</string>
+    <string name="hub_filter_by">Filtreleme ölçütü</string>
+    <string name="hub_featured_only">Yalnızca öne çıkanlar</string>
+    <string name="hub_sort_newest">Önce en yeniler</string>
+    <string name="hub_sort_oldest">Önce en eskiler</string>
+    <string name="hub_sort_title">Başlık A–Z</string>
+    <string name="hub_filter_all_topics">Tüm konular</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 ve PCSX2</string>
+    <string name="hub_filter_other_emulators">Diğer emülatörler</string>
+    <string name="hub_clear_filters">Filtreleri temizle</string>
+    <string name="hub_scroll_to_top">Başa dön</string>
+    <string name="hub_reading_time">%1$d dk okuma</string>
+    <string name="hub_no_filter_results">Geçerli filtrelerle eşleşen içerik yok.</string>
+    <string name="hub_empty_state_title">Burada henüz bir şey yok</string>
+    <string name="hub_no_matches">Eşleşme yok</string>
+    <string name="hub_clear_search">Aramayı temizle</string>
 </resources>

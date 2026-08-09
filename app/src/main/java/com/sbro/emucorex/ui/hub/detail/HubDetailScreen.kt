@@ -1,7 +1,6 @@
 package com.sbro.emucorex.ui.hub.detail
 
 import android.app.Application
-import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,13 +32,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FormatQuote
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -51,14 +53,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -66,6 +73,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.hub.HubArticle
@@ -78,15 +86,20 @@ import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.hub.HubImage
 import com.sbro.emucorex.ui.hub.HubImageSpec
 import com.sbro.emucorex.ui.hub.HubImageViewer
+import com.sbro.emucorex.ui.hub.HubScrollToTopButton
 import com.sbro.emucorex.ui.hub.HubVideoPlayer
+import com.sbro.emucorex.ui.hub.displayDate
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun HubDetailScreen(
@@ -134,7 +147,6 @@ fun HubDetailScreen(
                 topInset = topInset,
                 bottomInset = bottomInset,
                 onBackClick = onBackClick,
-                onShare = { shareArticle(context, uiState.article!!.item) },
                 onToggleFavorite = viewModel::toggleFavorite,
                 isUpdatingFavorite = uiState.isUpdatingFavorite,
                 relatedItems = uiState.relatedItems,
@@ -152,7 +164,6 @@ private fun HubArticleContent(
     topInset: androidx.compose.ui.unit.Dp,
     bottomInset: androidx.compose.ui.unit.Dp,
     onBackClick: () -> Unit,
-    onShare: () -> Unit,
     onToggleFavorite: () -> Unit,
     isUpdatingFavorite: Boolean,
     relatedItems: List<HubItem>,
@@ -160,23 +171,33 @@ private fun HubArticleContent(
 ) {
     val uriHandler = LocalUriHandler.current
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val showScrollToTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 2 || listState.firstVisibleItemScrollOffset > 900
+        }
+    }
     val imageSpecs = remember(article) {
         article.assets.values.mapNotNull { asset -> asset.toDisplaySpec(article.document.heroAlt) }
+    }
+    val readingMinutes = remember(article.document.blocks) {
+        estimateReadingMinutes(article.document.blocks)
     }
     var viewerIndex by rememberSaveable { mutableIntStateOf(-1) }
     var videoId by rememberSaveable { mutableStateOf<String?>(null) }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = ScreenHorizontalPadding,
-            top = topInset,
-            end = ScreenHorizontalPadding,
-            bottom = bottomInset + 24.dp
-        ),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = ScreenHorizontalPadding,
+                top = topInset,
+                end = ScreenHorizontalPadding,
+                bottom = bottomInset + 24.dp
+            ),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
         item(key = "top-bar") {
             ScreenTopBar(
                 title = stringResource(R.string.hub_title),
@@ -187,13 +208,6 @@ private fun HubArticleContent(
                     .widthIn(max = 920.dp)
                     .padding(bottom = 8.dp),
                 actions = {
-                    IconButton(onClick = onShare) {
-                        Icon(
-                            Icons.Rounded.Share,
-                            contentDescription = stringResource(R.string.hub_share),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     IconButton(onClick = onToggleFavorite, enabled = !isUpdatingFavorite) {
                         Icon(
                             if (article.item.isFavorite) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
@@ -223,36 +237,80 @@ private fun HubArticleContent(
                     )
                 }
                 if (heroSpec != null) {
-                    Column(
-                        modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(7.dp)
+                    Box(
+                        modifier = Modifier
+                            .widthIn(max = 760.dp)
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(26.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .clickable {
+                                viewerIndex = imageSpecs.indexOfFirst { it.url == heroSpec.url }.coerceAtLeast(0)
+                            }
                     ) {
                         HubImage(
                             spec = heroSpec,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16f / 9f)
-                                .clickable {
-                                    viewerIndex = imageSpecs.indexOfFirst { it.url == heroSpec.url }.coerceAtLeast(0)
-                                },
+                            modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        0f to Color.Transparent,
+                                        0.68f to Color.Transparent,
+                                        1f to Color.Black.copy(alpha = 0.62f)
+                                    )
+                                )
+                        )
+                        article.item.categories
+                            .mapNotNull(article.document.categoryLabels::get)
+                            .firstOrNull()
+                            ?.let { category ->
+                                Surface(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(14.dp),
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = Color.Black.copy(alpha = 0.62f),
+                                    contentColor = Color.White
+                                ) {
+                                    Text(
+                                        text = category,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
                     }
                 }
-                Text(
-                    text = article.document.title,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    article.item.categories.mapNotNull(article.document.categoryLabels::get).forEach { label ->
-                        HubTag(label)
+                Column(
+                    modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = article.document.title,
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    HubArticleMetaRow(article.item, readingMinutes)
+                    val categoryLabels = article.item.categories
+                        .mapNotNull(article.document.categoryLabels::get)
+                        .drop(if (heroSpec != null) 1 else 0)
+                    if (categoryLabels.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            categoryLabels.forEach { label -> HubTag(label) }
+                        }
                     }
-                    article.item.year?.let { year -> HubTag(stringResource(R.string.hub_history_year, year)) }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             }
         }
 
@@ -330,6 +388,15 @@ private fun HubArticleContent(
                 )
             }
         }
+        }
+
+        HubScrollToTopButton(
+            visible = showScrollToTop,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp + bottomInset),
+            onClick = { scope.launch { listState.animateScrollToItem(0) } }
+        )
     }
 
     if (viewerIndex >= 0 && imageSpecs.isNotEmpty()) {
@@ -375,7 +442,10 @@ private fun HubRelatedMaterialCard(
                         contentDescription = item.title,
                         downloadAllowed = false
                     ),
-                    modifier = Modifier.width(128.dp).aspectRatio(16f / 9f),
+                    modifier = Modifier
+                        .width(128.dp)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(13.dp)),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -412,7 +482,7 @@ private fun HubArticleBlock(
     when (block.type()) {
         "paragraph" -> Text(
             text = block.string("text"),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 28.sp),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp)
         )
@@ -466,11 +536,20 @@ private fun HubArticleBlock(
             val asset = article.assets[assetId]
             if (asset != null) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    HubImage(
-                        spec = asset.toDisplaySpec(block.stringOrNull("alt")),
-                        modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clickable { onOpenImage(assetId) },
-                        contentScale = ContentScale.Fit
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(16f / 9f)
+                            .clickable { onOpenImage(assetId) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                    ) {
+                        HubImage(
+                            spec = asset.toDisplaySpec(block.stringOrNull("alt")),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                     (block.stringOrNull("caption") ?: block.stringOrNull("text"))?.let { caption ->
                         Text(caption, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -483,13 +562,24 @@ private fun HubArticleBlock(
         "gallery" -> {
             val ids = block.array("assetIds").map { it.jsonPrimitive.content }
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ids.forEach { assetId ->
-                    article.assets[assetId]?.let { asset ->
-                        HubImage(
-                            spec = asset.toDisplaySpec(null),
-                            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clickable { onOpenImage(assetId) },
-                            contentScale = ContentScale.Crop
-                        )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(ids, key = { it }) { assetId ->
+                        article.assets[assetId]?.let { asset ->
+                            Surface(
+                                modifier = Modifier
+                                    .width(300.dp)
+                                    .aspectRatio(16f / 9f)
+                                    .clickable { onOpenImage(assetId) },
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ) {
+                                HubImage(
+                                    spec = asset.toDisplaySpec(null),
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
                     }
                 }
                 block.stringOrNull("text")?.let { caption ->
@@ -538,6 +628,68 @@ private fun HubTag(text: String) {
     ) {
         Text(text, modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
     }
+}
+
+@Composable
+private fun HubArticleMetaRow(item: HubItem, readingMinutes: Int) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        HubMetaPill(
+            icon = Icons.Rounded.CalendarMonth,
+            text = item.displayDate()
+        )
+        HubMetaPill(
+            icon = Icons.Rounded.Schedule,
+            text = stringResource(R.string.hub_reading_time, readingMinutes)
+        )
+        if (item.sources.isNotEmpty()) {
+            HubMetaPill(
+                icon = Icons.Rounded.Link,
+                text = stringResource(R.string.hub_source_count, item.sources.size)
+            )
+        }
+        if (item.featured) {
+            HubMetaPill(
+                icon = Icons.Rounded.Star,
+                text = stringResource(R.string.hub_featured)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HubMetaPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(15.dp))
+            Text(text, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+private fun estimateReadingMinutes(blocks: List<JsonObject>): Int {
+    val words = blocks.sumOf(JsonElement::wordCount)
+    return ((words + 219) / 220).coerceAtLeast(1)
+}
+
+private fun JsonElement.wordCount(): Int = when (this) {
+    is JsonObject -> values.sumOf(JsonElement::wordCount)
+    is JsonArray -> sumOf(JsonElement::wordCount)
+    is JsonPrimitive -> contentOrNull
+        ?.trim()
+        ?.split(Regex("\\s+"))
+        ?.count(String::isNotBlank)
+        ?: 0
 }
 
 @Composable
@@ -619,13 +771,3 @@ private fun JsonObject.string(key: String): String = get(key)?.jsonPrimitive?.co
 private fun JsonObject.stringOrNull(key: String): String? = string(key).takeIf(String::isNotBlank)
 private fun JsonObject.int(key: String): Int = get(key)?.jsonPrimitive?.intOrNull ?: 0
 private fun JsonObject.array(key: String): JsonArray = get(key)?.jsonArray ?: JsonArray(emptyList())
-
-private fun shareArticle(context: android.content.Context, item: HubItem) {
-    val text = "${context.getString(R.string.hub_title)}\n\n${item.title}\n${item.canonicalUrl}"
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, item.title)
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.hub_share)))
-}

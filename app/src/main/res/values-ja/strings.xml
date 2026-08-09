@@ -2212,4 +2212,23 @@
     <string name="hub_image_counter">%2$d 件中 %1$d 件目</string>
     <string name="hub_callout_info">情報</string>
     <string name="hub_callout_warning">重要</string>
+    <string name="hub_sort_and_filter">並べ替えとフィルター</string>
+    <string name="hub_sort_by">並べ替え</string>
+    <string name="hub_filter_by">フィルター</string>
+    <string name="hub_featured_only">おすすめのみ</string>
+    <string name="hub_sort_newest">新しい順</string>
+    <string name="hub_sort_oldest">古い順</string>
+    <string name="hub_sort_title">タイトル A～Z</string>
+    <string name="hub_filter_all_topics">すべてのトピック</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 と PCSX2</string>
+    <string name="hub_filter_other_emulators">その他のエミュレーター</string>
+    <string name="hub_clear_filters">フィルターを解除</string>
+    <string name="hub_scroll_to_top">先頭へ移動</string>
+    <string name="hub_reading_time">読了 %1$d 分</string>
+    <string name="hub_no_filter_results">現在のフィルターに一致するコンテンツはありません。</string>
+    <string name="hub_empty_state_title">まだコンテンツはありません</string>
+    <string name="hub_no_matches">一致する項目はありません</string>
+    <string name="hub_clear_search">検索をクリア</string>
 </resources>

@@ -2235,6 +2235,25 @@
     <string name="hub_image_counter">%1$d z %2$d</string>
     <string name="hub_callout_info">Informacja</string>
     <string name="hub_callout_warning">Ważne</string>
+    <string name="hub_sort_and_filter">Sortowanie i filtry</string>
+    <string name="hub_sort_by">Sortuj według</string>
+    <string name="hub_filter_by">Filtruj według</string>
+    <string name="hub_featured_only">Tylko polecane</string>
+    <string name="hub_sort_newest">Najnowsze najpierw</string>
+    <string name="hub_sort_oldest">Najstarsze najpierw</string>
+    <string name="hub_sort_title">Tytuł A–Z</string>
+    <string name="hub_filter_all_topics">Wszystkie tematy</string>
+    <string name="hub_filter_emucorex">EmuCoreX</string>
+    <string name="hub_filter_emucorev">EmuCoreV</string>
+    <string name="hub_filter_ps2">PS2 i PCSX2</string>
+    <string name="hub_filter_other_emulators">Inne emulatory</string>
+    <string name="hub_clear_filters">Wyczyść filtry</string>
+    <string name="hub_scroll_to_top">Przewiń na górę</string>
+    <string name="hub_reading_time">%1$d min czytania</string>
+    <string name="hub_no_filter_results">Żadna zawartość nie pasuje do bieżących filtrów.</string>
+    <string name="hub_empty_state_title">Jeszcze nic tu nie ma</string>
+    <string name="hub_no_matches">Brak wyników</string>
+    <string name="hub_clear_search">Wyczyść wyszukiwanie</string>
 </resources>
 
 
