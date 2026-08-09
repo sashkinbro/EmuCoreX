@@ -185,7 +185,7 @@ fun HubScreen(
             }
         }
         PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
+            isRefreshing = uiState.showRefreshIndicator,
             onRefresh = { viewModel.refresh(force = true) },
             modifier = Modifier.fillMaxSize()
         ) {

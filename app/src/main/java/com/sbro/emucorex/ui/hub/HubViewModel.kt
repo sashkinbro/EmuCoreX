@@ -48,6 +48,7 @@ data class HubUiState(
     val featuredOnly: Boolean = false,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
+    val showRefreshIndicator: Boolean = false,
     val isOffline: Boolean = false,
     val error: Throwable? = null,
     val fallbackLocale: String? = null
@@ -102,7 +103,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         observeItems()
-        refresh(force = false)
+        refresh(force = false, showIndicator = false)
     }
 
     fun selectTab(tab: HubTab) {
@@ -146,16 +147,23 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
         hasShownInitialSkeleton = true
     }
 
-    fun refresh(force: Boolean = true) {
+    fun refresh(force: Boolean = true, showIndicator: Boolean = true) {
         if (_uiState.value.isRefreshing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true, error = null) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = true,
+                    showRefreshIndicator = showIndicator,
+                    error = null
+                )
+            }
             runCatching { repository.sync(locale, forceRefresh = force) }
                 .onSuccess { result ->
                     _uiState.update {
                         it.copy(
                             isInitialLoading = false,
                             isRefreshing = false,
+                            showRefreshIndicator = false,
                             isOffline = false,
                             error = null,
                             fallbackLocale = result.fallbackLocale
@@ -167,6 +175,7 @@ class HubViewModel(application: Application) : AndroidViewModel(application) {
                         it.copy(
                             isInitialLoading = false,
                             isRefreshing = false,
+                            showRefreshIndicator = false,
                             isOffline = it.items.isNotEmpty(),
                             error = error
                         )
