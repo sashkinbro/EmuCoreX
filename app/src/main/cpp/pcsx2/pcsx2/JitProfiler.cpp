@@ -39,6 +39,8 @@
 #include <unordered_map>
 #include <vector>
 
+#if !defined(NDEBUG) || defined(PCSX2_DEVBUILD)
+
 #if defined(__ANDROID__) && defined(__aarch64__)
 #include <dlfcn.h>
 #include <pthread.h>
@@ -2274,3 +2276,5 @@ void Stop()
 	s_opcode_range_buffer.reset();
 }
 } // namespace JitProfiler
+
+#endif

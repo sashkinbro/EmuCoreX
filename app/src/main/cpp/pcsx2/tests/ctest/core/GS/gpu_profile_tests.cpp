@@ -102,7 +102,7 @@ static u64 ExpectedOpenGLWorkarounds(
 	switch (vendor)
 	{
 		case RuntimeGpuProfile::Adreno:
-			return WorkaroundMask({DriverWorkaround::RewriteBooleanNegation});
+			return 0;
 		case RuntimeGpuProfile::Mali:
 			return WorkaroundMask(model == 57 ?
 				std::initializer_list<DriverWorkaround>{
@@ -126,19 +126,7 @@ static u64 ExpectedVulkanWorkarounds(
 	switch (vendor)
 	{
 		case RuntimeGpuProfile::Adreno:
-		{
-			u64 mask = WorkaroundMask({
-				DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
-				DriverWorkaround::PreferCoherentReadback,
-			});
-			if (architecture == MobileGpuArchitecture::Adreno5xx)
-			{
-				mask |= WorkaroundMask({
-					DriverWorkaround::EmulateColorWriteMask,
-				});
-			}
-			return mask;
-		}
+			return 0;
 		case RuntimeGpuProfile::Mali:
 		{
 			u64 mask = WorkaroundMask({
@@ -193,10 +181,7 @@ static void VerifyModelAndDriverIsolation(const ModelCase& test_case, const char
 
 	const GpuProfileSelection mesa = GpuProfileDetector::Resolve(
 		"auto", vendor_hint, test_case.renderer, MakeVulkanContext(vendor, true));
-	EXPECT_EQ(mesa.driver.workarounds,
-		vendor == RuntimeGpuProfile::Adreno ?
-			WorkaroundMask({DriverWorkaround::DisableRasterizationOrderAttachmentAccess}) :
-			0u);
+	EXPECT_EQ(mesa.driver.workarounds, 0u);
 }
 
 static void VerifyAdrenoGeneration(
@@ -488,9 +473,8 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 	const GpuProfileSelection stock =
 		GpuProfileDetector::Resolve("auto", "Qualcomm Adreno", "Adreno (TM) 740", proprietary);
 	EXPECT_EQ(stock.driver.driver, MobileGpuDriver::QualcommProprietary);
-	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenProvokingVertex));
-	EXPECT_TRUE(stock.driver.HasBug(DriverBug::BrokenDynamicRendering));
-	EXPECT_FALSE(stock.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
+	EXPECT_EQ(stock.driver.bugs, 0u);
+	EXPECT_EQ(stock.driver.workarounds, 0u);
 
 	MobileDriverContext turnip = proprietary;
 	turnip.driver_id = 18;
@@ -498,15 +482,14 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 	const GpuProfileSelection mesa =
 		GpuProfileDetector::Resolve("auto", "Qualcomm Adreno", "Adreno (TM) 740", turnip);
 	EXPECT_EQ(mesa.driver.driver, MobileGpuDriver::MesaTurnip);
-	EXPECT_FALSE(mesa.driver.HasBug(DriverBug::BrokenProvokingVertex));
-	EXPECT_FALSE(mesa.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
+	EXPECT_EQ(mesa.driver.workarounds, 0u);
 
 	turnip.driver_id = 0;
 	turnip.driver_name = "Mesa 25.1.0 Turnip";
 	const GpuProfileSelection mesa_by_name =
 		GpuProfileDetector::Resolve("auto", "Qualcomm Adreno", "Adreno (TM) 740", turnip);
 	EXPECT_EQ(mesa_by_name.driver.driver, MobileGpuDriver::MesaTurnip);
-	EXPECT_FALSE(mesa_by_name.driver.HasBug(DriverBug::BrokenProvokingVertex));
+	EXPECT_EQ(mesa_by_name.driver.workarounds, 0u);
 }
 
 TEST(GpuDriverProfile, KeepsAdreno650OnFastOpenGLAndVulkanPaths)
@@ -517,22 +500,15 @@ TEST(GpuDriverProfile, KeepsAdreno650OnFastOpenGLAndVulkanPaths)
 	EXPECT_EQ(opengl.gpu.architecture, MobileGpuArchitecture::Adreno6xx);
 	EXPECT_EQ(opengl.gpu.model_number, 650);
 	ExpectTuningInvariants(opengl);
-	EXPECT_EQ(opengl.driver.workarounds,
-		WorkaroundMask({DriverWorkaround::RewriteBooleanNegation}));
+	EXPECT_EQ(opengl.driver.workarounds, 0u);
 
 	const GpuProfileSelection vulkan = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 650",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
 	ExpectTuningInvariants(vulkan);
-	EXPECT_EQ(vulkan.driver.workarounds,
-		WorkaroundMask({
-			DriverWorkaround::DisableRasterizationOrderAttachmentAccess,
-			DriverWorkaround::PreferCoherentReadback,
-		}));
-	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::DisableProvokingVertex));
+	EXPECT_EQ(vulkan.driver.workarounds, 0u);
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::UseDescriptorSets));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::ForceFifoPresent));
-	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(DriverWorkaround::RewriteUniformIndexing));
 	EXPECT_FALSE(vulkan.driver.UsesWorkaround(
@@ -542,8 +518,7 @@ TEST(GpuDriverProfile, KeepsAdreno650OnFastOpenGLAndVulkanPaths)
 		"auto", "Qualcomm", "Adreno (TM) 650",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, true));
 	ExpectTuningInvariants(turnip);
-	EXPECT_EQ(turnip.driver.workarounds,
-		WorkaroundMask({DriverWorkaround::DisableRasterizationOrderAttachmentAccess}));
+	EXPECT_EQ(turnip.driver.workarounds, 0u);
 }
 
 TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
@@ -567,7 +542,7 @@ TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
 	EXPECT_FALSE(powervr.driver.UsesWorkaround(DriverWorkaround::AvoidClearLoadOpRenderPass));
 }
 
-TEST(GpuDriverProfile, DisablesROAAForAdrenoAndAffectedProprietaryVulkanDrivers)
+TEST(GpuDriverProfile, DisablesROAAOnlyForAffectedProprietaryVulkanDrivers)
 {
 	const GpuProfileSelection mali_vulkan = GpuProfileDetector::Resolve(
 		"auto", "ARM", "Mali-G615 MC6", MakeVulkanContext(RuntimeGpuProfile::Mali, false));
@@ -605,13 +580,13 @@ TEST(GpuDriverProfile, DisablesROAAForAdrenoAndAffectedProprietaryVulkanDrivers)
 	const GpuProfileSelection adreno_vulkan = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 840",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
-	EXPECT_TRUE(adreno_vulkan.driver.UsesWorkaround(
+	EXPECT_FALSE(adreno_vulkan.driver.UsesWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 
 	const GpuProfileSelection adreno_turnip = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 650",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, true));
-	EXPECT_TRUE(adreno_turnip.driver.UsesWorkaround(
+	EXPECT_FALSE(adreno_turnip.driver.UsesWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 
 	const GpuProfileSelection adreno_opengl = GpuProfileDetector::Resolve(
@@ -743,7 +718,7 @@ TEST(GpuDriverProfile, RecognizesLegacyMaliAndPowerVRCutoffs)
 	EXPECT_FALSE(unknown_powervr.driver.UsesWorkaround(DriverWorkaround::AlignSwapchainWidthTo32));
 }
 
-TEST(GpuDriverProfile, ScopesColorWriteMaskEmulationToProprietaryAdreno5xx)
+TEST(GpuDriverProfile, KeepsAllAdrenoGenerationsFreeOfDriverWorkarounds)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
@@ -752,17 +727,17 @@ TEST(GpuDriverProfile, ScopesColorWriteMaskEmulationToProprietaryAdreno5xx)
 
 	const GpuProfileSelection adreno530 =
 		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 530", proprietary);
-	EXPECT_TRUE(adreno530.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
+	EXPECT_EQ(adreno530.driver.workarounds, 0u);
 
 	const GpuProfileSelection adreno740 =
 		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 740", proprietary);
-	EXPECT_FALSE(adreno740.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
+	EXPECT_EQ(adreno740.driver.workarounds, 0u);
 
 	proprietary.driver_id = 18;
 	proprietary.driver_name = "Mesa Turnip";
 	const GpuProfileSelection turnip530 =
 		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 530", proprietary);
-	EXPECT_FALSE(turnip530.driver.UsesWorkaround(DriverWorkaround::EmulateColorWriteMask));
+	EXPECT_EQ(turnip530.driver.workarounds, 0u);
 }
 
 TEST(GpuDriverProfile, ParsesOpenGLMaliReleaseAndUsesModelRule)
@@ -791,7 +766,7 @@ TEST(GpuDriverProfile, KeepsOpenGLFastStreamingAndBoundsCompilerWorkarounds)
 	const GpuProfileSelection adreno =
 		GpuProfileDetector::Resolve("auto", "Qualcomm", "Adreno (TM) 840", gl);
 	EXPECT_EQ(adreno.driver.driver, MobileGpuDriver::QualcommProprietary);
-	EXPECT_TRUE(adreno.driver.UsesWorkaround(DriverWorkaround::RewriteBooleanNegation));
+	EXPECT_EQ(adreno.driver.workarounds, 0u);
 
 	gl.api_version_string = "OpenGL ES 3.2 build 1.9@4850625";
 	const GpuProfileSelection powervr =
@@ -810,7 +785,7 @@ TEST(GpuDriverProfile, KeepsOpenGLFastStreamingAndBoundsCompilerWorkarounds)
 	EXPECT_TRUE(legacy_powervr.driver.UsesWorkaround(DriverWorkaround::GenerateMipmapManuallyForTallTextures));
 }
 
-TEST(GpuDriverProfile, KeepsEveryAdrenoGenerationOnDirectReadbackPath)
+TEST(GpuDriverProfile, KeepsEveryAdrenoGenerationOnCapabilityPaths)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
@@ -825,11 +800,8 @@ TEST(GpuDriverProfile, KeepsEveryAdrenoGenerationOnDirectReadbackPath)
 		SCOPED_TRACE(renderer);
 		const GpuProfileSelection profile =
 			GpuProfileDetector::Resolve("auto", "Qualcomm", renderer, proprietary);
-		EXPECT_TRUE(profile.driver.HasBug(DriverBug::SlowOptimalImageToBufferCopy));
-		EXPECT_TRUE(profile.driver.UsesWorkaround(DriverWorkaround::PreferCoherentReadback));
-		EXPECT_EQ(profile.driver.workarounds,
-			ExpectedVulkanWorkarounds(
-				RuntimeGpuProfile::Adreno, profile.gpu.architecture, profile.gpu.model_number));
+		EXPECT_EQ(profile.driver.bugs, 0u);
+		EXPECT_EQ(profile.driver.workarounds, 0u);
 	}
 }
 
@@ -1084,8 +1056,7 @@ TEST(GpuProfileMatrix, RendererIdentityWinsOverConflictingVendorHints)
 		"auto", "ARM Mali", "Adreno (TM) 840", MakeOpenGLContext(RuntimeGpuProfile::Adreno, false));
 	EXPECT_EQ(adreno.runtime_profile, RuntimeGpuProfile::Adreno);
 	EXPECT_EQ(adreno.gpu.model_number, 840);
-	EXPECT_EQ(adreno.driver.workarounds,
-		WorkaroundMask({DriverWorkaround::RewriteBooleanNegation}));
+	EXPECT_EQ(adreno.driver.workarounds, 0u);
 
 	const GpuProfileSelection powervr = GpuProfileDetector::Resolve(
 		"auto", "ARM Mali", "PowerVR GE8320",
@@ -1148,7 +1119,6 @@ TEST(GpuProfileMatrix, ExercisesEveryCataloguedBugAndActiveWorkaround)
 
 	const u64 all_bugs = (u64{1} << static_cast<u8>(DriverBug::Count)) - 1;
 	const u64 all_workarounds = (u64{1} << static_cast<u8>(DriverWorkaround::Count)) - 1;
-	const u64 inactive_workarounds = WorkaroundMask({DriverWorkaround::DisableProvokingVertex});
 	EXPECT_EQ(bugs, all_bugs);
-	EXPECT_EQ(workarounds, all_workarounds & ~inactive_workarounds);
+	EXPECT_EQ(workarounds, all_workarounds);
 }

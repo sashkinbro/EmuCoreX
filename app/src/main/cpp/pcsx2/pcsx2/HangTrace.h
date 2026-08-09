@@ -12,6 +12,15 @@ namespace HangTrace
 		CPU_VU1 = 3,
 	};
 
+#if defined(NDEBUG) && !defined(PCSX2_DEVBUILD)
+	inline constexpr bool IsActive() { return false; }
+	inline constexpr void Start() {}
+	inline constexpr void Stop() {}
+	inline constexpr const char* GetLastReportPath() { return ""; }
+	inline constexpr void RecordInterpreter(CpuType, u32, u32) {}
+	inline constexpr void RecordJitBlock(u32, u32, u32) {}
+	inline constexpr void EmitBlockTrace(CpuType, u32, u32) {}
+#else
 	bool IsActive();
 	void Start();
 	void Stop();
@@ -20,4 +29,5 @@ namespace HangTrace
 	void RecordInterpreter(CpuType cpu, u32 pc, u32 code);
 	void RecordJitBlock(u32 cpu, u32 pc, u32 code);
 	void EmitBlockTrace(CpuType cpu, u32 pc, u32 code);
+#endif
 }

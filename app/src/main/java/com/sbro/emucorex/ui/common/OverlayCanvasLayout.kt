@@ -88,7 +88,8 @@ fun buildOverlayCanvasLayout(
     rbtnOffset: Pair<Float, Float>,
     centerOffset: Pair<Float, Float>,
     controlLayouts: Map<String, OverlayControlLayout>,
-    safeHorizontalInset: Dp,
+    safeLeftInset: Dp,
+    safeRightInset: Dp,
     safeTopInset: Dp,
     safeBottomInset: Dp,
     previewMode: Boolean = false
@@ -96,17 +97,49 @@ fun buildOverlayCanvasLayout(
     fun pxToDp(value: Float): Dp = with(density) { value.toDp() }
 
     val isLandscape = canvasWidth >= canvasHeight
-    val dpadSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val actionSize = ((if (isLandscape) 130 else 150) * scaleFactor).dp
-    val analogSize = ((if (isLandscape) 120 else 140) * scaleFactor * stickScaleFactor).dp
-    val shoulderW = ((if (isLandscape) 65 else 72) * scaleFactor).dp
-    val shoulderH = ((if (isLandscape) 32 else 36) * scaleFactor).dp
-    val centerW = ((if (isLandscape) 60 else 68) * scaleFactor).dp
-    val centerH = ((if (isLandscape) 26 else 30) * scaleFactor).dp
+
+    fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
+        return controlLayouts[id]
+            ?: AppPreferences.defaultOverlayControlLayouts(defaultScale)[id]
+            ?: OverlayControlLayout(scale = defaultScale)
+    }
+
+    val leftStickLayout = layoutFor("left_stick", (stickScaleFactor * 100f).toInt())
+    val rightStickLayout = layoutFor("right_stick", (stickScaleFactor * 100f).toInt())
+    val responsiveScale = calculateOverlayResponsiveScale(
+        canvasWidth = canvasWidth,
+        canvasHeight = canvasHeight,
+        safeLeftInset = safeLeftInset,
+        safeRightInset = safeRightInset,
+        safeTopInset = safeTopInset,
+        safeBottomInset = safeBottomInset,
+        requestedScale = scaleFactor,
+        stickScale = stickScaleFactor,
+        leftStickVisible = leftStickLayout.visible,
+        leftStickFootprintScale = if (leftStickLayout.surfaceOnly) {
+            (leftStickLayout.widthScale / 100f).coerceAtLeast(1f)
+        } else {
+            1f
+        },
+        rightStickVisible = rightStickLayout.visible,
+        rightStickFootprintScale = if (rightStickLayout.surfaceOnly) {
+            (rightStickLayout.widthScale / 100f).coerceAtLeast(1f)
+        } else {
+            1f
+        },
+        isLandscape = isLandscape
+    )
+    val dpadSize = ((if (isLandscape) 130 else 150) * responsiveScale).dp
+    val actionSize = ((if (isLandscape) 130 else 150) * responsiveScale).dp
+    val analogSize = ((if (isLandscape) 120 else 140) * responsiveScale * stickScaleFactor).dp
+    val shoulderW = ((if (isLandscape) 65 else 72) * responsiveScale).dp
+    val shoulderH = ((if (isLandscape) 32 else 36) * responsiveScale).dp
+    val centerW = ((if (isLandscape) 60 else 68) * responsiveScale).dp
+    val centerH = ((if (isLandscape) 26 else 30) * responsiveScale).dp
     val wideCenterW = centerW * 1.2f
-    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * scaleFactor
-    val clusterGap = if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait
-    val actionGap = if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait
+    val centerInlineGap = (if (isLandscape) OverlayCenterInlineGapLandscape else OverlayCenterInlineGapPortrait) * responsiveScale
+    val clusterGap = (if (isLandscape) OverlayClusterGapLandscape else OverlayClusterGapPortrait) * responsiveScale
+    val actionGap = (if (isLandscape) OverlayActionGapLandscape else OverlayActionGapPortrait) * responsiveScale
     val dpadButtonSize = dpadSize / 3f
     val actionButtonSize = actionSize / 3.1f
     val dpadStep = overlayClusterStep(dpadButtonSize, clusterGap)
@@ -115,18 +148,57 @@ fun buildOverlayCanvasLayout(
     val actionClusterExtent = actionStep + actionButtonSize
     val dpadCenterOffset = (dpadClusterExtent - dpadButtonSize) / 2f
     val actionCenterOffset = (actionClusterExtent - actionButtonSize) / 2f
-    val baseEdgePad = if (isLandscape) 28.dp else 12.dp
-    val baseBottomPad = if (isLandscape) 24.dp else 36.dp
-    val edgePadStart = baseEdgePad + safeHorizontalInset
-    val edgePadEnd = baseEdgePad + safeHorizontalInset
-    val edgePadTop = maxOf(OverlayShoulderTopPadding, safeTopInset + 4.dp)
-    val bottomPad = baseBottomPad + safeBottomInset
+    val edgePadding = (if (isLandscape) 16.dp else 10.dp) * responsiveScale
+    val verticalPadding = 8.dp * responsiveScale
+    val edgePadStart = safeLeftInset + edgePadding
+    val edgePadEnd = safeRightInset + edgePadding
+    val edgePadTop = safeTopInset + verticalPadding
+    val contentBottom = canvasHeight - safeBottomInset - verticalPadding
+    val shoulderGap = 8.dp * responsiveScale
+    val sectionGap = 12.dp * responsiveScale
 
-    fun layoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
-        return controlLayouts[id]
-            ?: AppPreferences.defaultOverlayControlLayouts(defaultScale)[id]
-            ?: OverlayControlLayout(scale = defaultScale)
-    }
+    fun customOffset(
+        offset: Pair<Float, Float>,
+        defaultX: Float,
+        defaultY: Float
+    ): Pair<Dp, Dp> =
+        pxToDp(offset.first - defaultX) to pxToDp(offset.second - defaultY)
+
+    val dpadAdjustment = customOffset(
+        dpadOffset,
+        AppPreferences.DEFAULT_DPAD_OFFSET_X,
+        AppPreferences.DEFAULT_DPAD_OFFSET_Y
+    )
+    val leftStickAdjustment = customOffset(
+        lstickOffset,
+        AppPreferences.DEFAULT_LSTICK_OFFSET_X,
+        AppPreferences.DEFAULT_LSTICK_OFFSET_Y
+    )
+    val rightStickAdjustment = customOffset(
+        rstickOffset,
+        AppPreferences.DEFAULT_RSTICK_OFFSET_X,
+        AppPreferences.DEFAULT_RSTICK_OFFSET_Y
+    )
+    val actionAdjustment = customOffset(
+        actionOffset,
+        AppPreferences.DEFAULT_ACTION_OFFSET_X,
+        AppPreferences.DEFAULT_ACTION_OFFSET_Y
+    )
+    val leftShoulderAdjustment = customOffset(
+        lbtnOffset,
+        AppPreferences.DEFAULT_LBTN_OFFSET_X,
+        AppPreferences.DEFAULT_LBTN_OFFSET_Y
+    )
+    val rightShoulderAdjustment = customOffset(
+        rbtnOffset,
+        AppPreferences.DEFAULT_RBTN_OFFSET_X,
+        AppPreferences.DEFAULT_RBTN_OFFSET_Y
+    )
+    val centerAdjustment = customOffset(
+        centerOffset,
+        AppPreferences.DEFAULT_CENTER_OFFSET_X,
+        AppPreferences.DEFAULT_CENTER_OFFSET_Y
+    )
 
     fun buttonSpec(
         id: String,
@@ -159,8 +231,8 @@ fun buildOverlayCanvasLayout(
         )
     }
 
-    val leftShoulderBaseX = edgePadStart + pxToDp(lbtnOffset.first)
-    val leftShoulderBaseY = edgePadTop + pxToDp(lbtnOffset.second)
+    val leftShoulderBaseX = edgePadStart + leftShoulderAdjustment.first
+    val leftShoulderBaseY = edgePadTop + leftShoulderAdjustment.second
     val leftShoulders = listOf(
         buttonSpec(
             id = "l2",
@@ -176,14 +248,14 @@ fun buildOverlayCanvasLayout(
             width = shoulderW,
             height = shoulderH,
             baseX = leftShoulderBaseX,
-            baseY = leftShoulderBaseY + OverlayShoulderVerticalGap,
+            baseY = leftShoulderBaseY + shoulderH + shoulderGap,
             shape = RoundedCornerShape(10.dp),
             visible = true
         )
     )
 
-    val rightShoulderColumnBaseX = canvasWidth - edgePadEnd + pxToDp(rbtnOffset.first) - shoulderW
-    val rightShoulderBaseY = edgePadTop + pxToDp(rbtnOffset.second)
+    val rightShoulderColumnBaseX = canvasWidth - edgePadEnd + rightShoulderAdjustment.first - shoulderW
+    val rightShoulderBaseY = edgePadTop + rightShoulderAdjustment.second
     val rightShoulders = listOf(
         buttonSpec(
             id = "r2",
@@ -199,30 +271,37 @@ fun buildOverlayCanvasLayout(
             width = shoulderW,
             height = shoulderH,
             baseX = rightShoulderColumnBaseX,
-            baseY = rightShoulderBaseY + OverlayRightShoulderGapOffset,
+            baseY = rightShoulderBaseY + shoulderH + shoulderGap,
             shape = RoundedCornerShape(10.dp),
             visible = true
         )
     )
 
-    val leftStickLayout = layoutFor("left_stick", (stickScaleFactor * 100f).toInt())
     val leftStickSize = analogSize * (leftStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
-    val leftStickBase = (dpadSize - leftStickSize) / 2f
+    val leftStickPanelWidth = if (leftStickLayout.surfaceOnly) {
+        leftStickSize * (leftStickLayout.widthScale / 100f).coerceAtLeast(1f)
+    } else {
+        leftStickSize
+    }
+    val primaryExtent = maxOf(dpadClusterExtent, actionClusterExtent, leftStickSize)
+    val centerBaseY = contentBottom - centerH + centerAdjustment.second
+    val primaryTop = centerBaseY - sectionGap - primaryExtent
+    val leftStickBase = (primaryExtent - leftStickSize) / 2f
     val leftStick = OverlayCanvasStickSpec(
         id = "left_stick",
         size = leftStickSize,
         widthScale = leftStickLayout.widthScale,
-        baseX = edgePadStart + pxToDp(lstickOffset.first) + leftStickBase,
-        baseY = canvasHeight - bottomPad + pxToDp(lstickOffset.second) - dpadSize + leftStickBase,
-        x = edgePadStart + pxToDp(lstickOffset.first) + leftStickBase + pxToDp(leftStickLayout.offset.first),
-        y = canvasHeight - bottomPad + pxToDp(lstickOffset.second) - dpadSize + leftStickBase + pxToDp(leftStickLayout.offset.second),
+        baseX = edgePadStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first,
+        baseY = primaryTop + leftStickBase + leftStickAdjustment.second,
+        x = edgePadStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first + pxToDp(leftStickLayout.offset.first),
+        y = primaryTop + leftStickBase + leftStickAdjustment.second + pxToDp(leftStickLayout.offset.second),
         opacity = leftStickLayout.opacity,
         visible = leftStickLayout.visible
     )
 
     val showDpad = !leftStickLayout.visible
-    val dpadClusterLeft = edgePadStart + pxToDp(dpadOffset.first)
-    val dpadClusterTop = canvasHeight - bottomPad + pxToDp(dpadOffset.second) - dpadClusterExtent
+    val dpadClusterLeft = edgePadStart + dpadAdjustment.first
+    val dpadClusterTop = primaryTop + (primaryExtent - dpadClusterExtent) / 2f + dpadAdjustment.second
     val dpadButtons = listOf(
         buttonSpec(
             id = "dpad_up",
@@ -265,8 +344,8 @@ fun buildOverlayCanvasLayout(
     val extraDpadLayout = layoutFor("dpad_cluster")
     val extraDpadSize = dpadClusterExtent * (extraDpadLayout.scale / 100f)
     val extraDpadBaseY = maxOf(
-        edgePadTop + shoulderH + 16.dp,
-        dpadClusterTop - extraDpadSize - 14.dp
+        edgePadTop + shoulderH * 2f + shoulderGap + sectionGap,
+        dpadClusterTop - extraDpadSize - sectionGap
     )
     val dpadCluster = OverlayCanvasDpadClusterSpec(
         id = "dpad_cluster",
@@ -279,8 +358,8 @@ fun buildOverlayCanvasLayout(
         visible = extraDpadLayout.visible
     )
 
-    val actionClusterLeft = canvasWidth - edgePadEnd + pxToDp(actionOffset.first) - actionClusterExtent
-    val actionClusterTop = canvasHeight - bottomPad + pxToDp(actionOffset.second) - actionClusterExtent
+    val actionClusterLeft = canvasWidth - edgePadEnd - actionClusterExtent + actionAdjustment.first
+    val actionClusterTop = primaryTop + (primaryExtent - actionClusterExtent) / 2f + actionAdjustment.second
     val actionButtons = listOf(
         buttonSpec(
             id = "triangle",
@@ -320,11 +399,7 @@ fun buildOverlayCanvasLayout(
         )
     )
 
-    val centerAnchorX = canvasWidth / 2f + OverlayCenterBaseShiftX + pxToDp(centerOffset.first)
-    val centerBaseY = canvasHeight -
-        (bottomPad + (OverlayCenterBottomPadding - OverlayBottomAnchorPadding)) -
-        centerH +
-        pxToDp(centerOffset.second)
+    val centerAnchorX = (safeLeftInset + canvasWidth - safeRightInset) / 2f + centerAdjustment.first
 
     val l3Layout = layoutFor("l3")
     val selectLayout = layoutFor("select")
@@ -456,14 +531,27 @@ fun buildOverlayCanvasLayout(
         )
     )
 
-    val rightStickLayout = layoutFor("right_stick", (stickScaleFactor * 100f).toInt())
     val rightStickSize = analogSize * (rightStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
-    val rightStickGap = 18.dp
-    val rightStickPreferredX = actionClusterLeft - rightStickGap - rightStickSize
-    val rightStickMinX = centerAnchorX + 28.dp
-    val defaultRightStickBaseX = maxOf(rightStickMinX, rightStickPreferredX)
-    val rightStickBaseX = defaultRightStickBaseX + pxToDp(rstickOffset.first)
-    val rightStickBaseY = canvasHeight - bottomPad + pxToDp(rstickOffset.second) - rightStickSize - OverlayRightStickBaseLift
+    val rightStickPanelWidth = if (rightStickLayout.surfaceOnly) {
+        rightStickSize * (rightStickLayout.widthScale / 100f).coerceAtLeast(1f)
+    } else {
+        rightStickSize
+    }
+    val rightStickGap = 18.dp * responsiveScale
+    val horizontalRightStick = isLandscape
+    val defaultRightStickPanelX = if (horizontalRightStick) {
+        actionClusterLeft - rightStickGap - rightStickPanelWidth
+    } else {
+        actionClusterLeft + (actionClusterExtent - rightStickPanelWidth) / 2f
+    }
+    val defaultRightStickBaseX = defaultRightStickPanelX + (rightStickPanelWidth - rightStickSize) / 2f
+    val defaultRightStickBaseY = if (horizontalRightStick) {
+        primaryTop + primaryExtent - rightStickSize
+    } else {
+        primaryTop - rightStickGap - rightStickSize
+    }
+    val rightStickBaseX = defaultRightStickBaseX + rightStickAdjustment.first
+    val rightStickBaseY = defaultRightStickBaseY + rightStickAdjustment.second
     val rightStick = OverlayCanvasStickSpec(
         id = "right_stick",
         size = rightStickSize,

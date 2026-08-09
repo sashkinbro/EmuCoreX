@@ -1,6 +1,7 @@
 add_pcsx2_test(core_test
 	patch_tests.cpp
 	GS/gpu_profile_tests.cpp
+	GS/perfmon_tests.cpp
 	MockMemoryInterface.h
 	StubHost.cpp
 )

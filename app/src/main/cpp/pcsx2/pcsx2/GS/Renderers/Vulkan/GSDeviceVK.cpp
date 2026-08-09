@@ -743,8 +743,6 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	SetMobileDriverProfile(gpu_profile_selection.driver);
 	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
 
-	m_optional_extensions.vk_ext_provoking_vertex &=
-		!UsesMobileDriverWorkaround(DriverWorkaround::DisableProvokingVertex);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
 		!UsesMobileDriverWorkaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout);
 
@@ -796,19 +794,33 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	VkPhysicalDeviceSwapchainMaintenance1FeaturesKHR swapchain_maintenance1_feature = {
 		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR};
 
-	// Do not disable provoking-vertex support for an entire vendor. Some drivers expose the
-	// extension and the required last-vertex mode correctly, and forcing the fallback can make
-	// flat-shaded draws rebuild their vertex data on the CPU. Query the capability before asking
-	// for it so drivers which only advertise the extension still remain on the safe fallback.
-	if (m_optional_extensions.vk_ext_provoking_vertex)
+	// Do not disable optional fast paths for an entire vendor. Query the extension features before
+	// requesting them so drivers which only advertise an extension stay on the safe fallback rather
+	// than making logical-device creation fail.
+	if (m_optional_extensions.vk_ext_provoking_vertex ||
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access ||
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
 	{
 		VkPhysicalDeviceFeatures2 supported_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 		VkPhysicalDeviceProvokingVertexFeaturesEXT supported_provoking_vertex = {
 			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROVOKING_VERTEX_FEATURES_EXT};
-		Vulkan::AddPointerToChain(&supported_features, &supported_provoking_vertex);
+		VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT supported_rasterization_order_access = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_FEATURES_EXT};
+		VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT supported_attachment_feedback_loop = {
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_FEATURES_EXT};
+		if (m_optional_extensions.vk_ext_provoking_vertex)
+			Vulkan::AddPointerToChain(&supported_features, &supported_provoking_vertex);
+		if (m_optional_extensions.vk_ext_rasterization_order_attachment_access)
+			Vulkan::AddPointerToChain(&supported_features, &supported_rasterization_order_access);
+		if (m_optional_extensions.vk_ext_attachment_feedback_loop_layout)
+			Vulkan::AddPointerToChain(&supported_features, &supported_attachment_feedback_loop);
 		vkGetPhysicalDeviceFeatures2(m_physical_device, &supported_features);
-		m_optional_extensions.vk_ext_provoking_vertex =
+		m_optional_extensions.vk_ext_provoking_vertex &=
 			(supported_provoking_vertex.provokingVertexLast == VK_TRUE);
+		m_optional_extensions.vk_ext_rasterization_order_attachment_access &=
+			(supported_rasterization_order_access.rasterizationOrderColorAttachmentAccess == VK_TRUE);
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
+			(supported_attachment_feedback_loop.attachmentFeedbackLoopLayout == VK_TRUE);
 	}
 
 	if (m_optional_extensions.vk_ext_provoking_vertex)
@@ -960,10 +972,6 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	if (m_use_push_descriptors && (profile_disables_push_descriptors ||
 		properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
 #endif
-		m_use_push_descriptors = false;
-	if (m_use_push_descriptors && properties2.properties.vendorID == 0x5143u &&
-		m_device_driver_properties.driverID != VK_DRIVER_ID_QUALCOMM_PROPRIETARY &&
-		m_device_driver_properties.driverID != VK_DRIVER_ID_MESA_TURNIP)
 		m_use_push_descriptors = false;
 	if (!m_use_push_descriptors)
 		Console.Warning("VK: Using non-push-descriptor texture binding fallback.");
@@ -1880,23 +1888,21 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 				num_subpass_inputs++;
 			}
 
-			if (!m_features.framebuffer_fetch)
-			{
-				// don't need the framebuffer-local dependency when we have rasterization order attachment access
-				subpass_dependency[num_subpass_dependencies].srcSubpass = 0;
-				subpass_dependency[num_subpass_dependencies].dstSubpass = 0;
-				subpass_dependency[num_subpass_dependencies].srcStageMask =
-					VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-				subpass_dependency[num_subpass_dependencies].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-				subpass_dependency[num_subpass_dependencies].srcAccessMask =
-					VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-				subpass_dependency[num_subpass_dependencies].dstAccessMask =
-					UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-				subpass_dependency[num_subpass_dependencies].dependencyFlags =
-					UseFeedbackLoopLayout() ? (VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) :
-											  VK_DEPENDENCY_BY_REGION_BIT;
-				num_subpass_dependencies++;
-			}
+			// Color ROAA does not order depth/stencil accesses. Keep the depth self-dependency so
+			// explicit barriers inside the render pass remain valid and visible to the shader.
+			subpass_dependency[num_subpass_dependencies].srcSubpass = 0;
+			subpass_dependency[num_subpass_dependencies].dstSubpass = 0;
+			subpass_dependency[num_subpass_dependencies].srcStageMask =
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			subpass_dependency[num_subpass_dependencies].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+			subpass_dependency[num_subpass_dependencies].srcAccessMask =
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			subpass_dependency[num_subpass_dependencies].dstAccessMask =
+				UseFeedbackLoopLayout() ? VK_ACCESS_SHADER_READ_BIT : VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			subpass_dependency[num_subpass_dependencies].dependencyFlags =
+				UseFeedbackLoopLayout() ? (VK_DEPENDENCY_BY_REGION_BIT | VK_DEPENDENCY_FEEDBACK_LOOP_BIT_EXT) :
+										  VK_DEPENDENCY_BY_REGION_BIT;
+			num_subpass_dependencies++;
 		}
 
 		num_attachments++;
@@ -1907,9 +1913,6 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	{
 		if (key.color_feedback_loop)
 			subpass_flags |= VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_COLOR_ACCESS_BIT_EXT;
-		if (key.depth_sampling)
-			subpass_flags |= (VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_DEPTH_ACCESS_BIT_EXT |
-							  VK_SUBPASS_DESCRIPTION_RASTERIZATION_ORDER_ATTACHMENT_STENCIL_ACCESS_BIT_EXT);
 	}
 	const VkSubpassDescription subpass = {subpass_flags, VK_PIPELINE_BIND_POINT_GRAPHICS, num_subpass_inputs,
 		num_subpass_inputs ? input_reference.data() : nullptr, color_reference_ptr ? 1u : 0u,
@@ -2997,9 +3000,9 @@ bool GSDeviceVK::CheckFeatures()
 	//const bool isNVIDIA = (vendorID == 0x10DE);
 
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
-	// Keep ROAA capability-gated on driver stacks which are not denylisted below.
+	// ROAA is a device capability, not a GPU-vendor policy. Prefer it whenever the driver
+	// exposes the extension, except for narrowly identified broken driver stacks below.
 	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
-	const bool is_powervr = (m_device_properties.vendorID == 0x1010u);
 	const MobileGpuDriver mobile_driver = GetMobileDriverProfile().driver;
 	const bool is_arm_proprietary = (mobile_driver == MobileGpuDriver::ArmProprietary);
 	const bool is_mali_g57 = is_mali_vk &&
@@ -3010,11 +3013,8 @@ bool GSDeviceVK::CheckFeatures()
 	// Keep the texture-barrier feedback path when the explicit driver profile denies ROAA.
 	const bool unreliable_mobile_fbfetch = UsesMobileDriverWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess);
-	const bool vendor_allows_fbfetch =
-		!unreliable_mobile_fbfetch &&
-		(is_mali_vk || is_powervr || GSConfig.EnableAdrenoFramebufferFetch);
-	bool framebuffer_fetch = vendor_allows_fbfetch &&
-		has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
+	bool framebuffer_fetch = has_framebuffer_fetch_extension &&
+		!unreliable_mobile_fbfetch && !GSConfig.DisableFramebufferFetch;
 	if (unreliable_mobile_fbfetch && has_framebuffer_fetch_extension)
 	{
 		Console.Warning("VK: Disabled unreliable mobile framebuffer fetch; using texture-barrier feedback.");
@@ -5486,13 +5486,6 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 	}
 
 	// Blending
-	const bool emulate_masked_rgb =
-		UsesMobileDriverWorkaround(DriverWorkaround::EmulateColorWriteMask) &&
-		((p.cms.wrgba & 0x7) == 0) && (p.dss.ztst != ZTST_ALWAYS || p.dss.zwe);
-	const VkColorComponentFlags color_write_mask = emulate_masked_rgb ?
-		(VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-			VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT) :
-		static_cast<VkColorComponentFlags>(p.cms.wrgba);
 	if (IsDATEModePrimIDInit(p.ps.date))
 	{
 		// image DATE prepass
@@ -5513,18 +5506,9 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 		}};
 		// clang-format on
 
-		gpb.SetBlendAttachment(0, true,
-			emulate_masked_rgb ? VK_BLEND_FACTOR_ZERO : vk_blend_factors[pbs.src_factor],
-			emulate_masked_rgb ? VK_BLEND_FACTOR_ONE : vk_blend_factors[pbs.dst_factor],
+		gpb.SetBlendAttachment(0, true, vk_blend_factors[pbs.src_factor], vk_blend_factors[pbs.dst_factor],
 			vk_blend_ops[pbs.op], vk_blend_factors[pbs.src_factor_alpha], vk_blend_factors[pbs.dst_factor_alpha],
-			VK_BLEND_OP_ADD, color_write_mask);
-	}
-	else if (emulate_masked_rgb)
-	{
-		gpb.SetBlendAttachment(0, true, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ONE, VK_BLEND_OP_ADD,
-			p.cms.wa ? VK_BLEND_FACTOR_ONE : VK_BLEND_FACTOR_ZERO,
-			p.cms.wa ? VK_BLEND_FACTOR_ZERO : VK_BLEND_FACTOR_ONE,
-			VK_BLEND_OP_ADD, color_write_mask);
+			VK_BLEND_OP_ADD, p.cms.wrgba);
 	}
 	else
 	{

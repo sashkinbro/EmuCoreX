@@ -274,20 +274,13 @@ const char* GpuProfileDetector::BugToString(DriverBug value)
 	{
 		case DriverBug::BrokenBufferStreaming: return "BrokenBufferStreaming";
 		case DriverBug::BrokenUnsynchronizedMapping: return "BrokenUnsynchronizedMapping";
-		case DriverBug::BrokenNegatedBoolean: return "BrokenNegatedBoolean";
 		case DriverBug::BrokenVectorBitwiseAnd: return "BrokenVectorBitwiseAnd";
 		case DriverBug::BrokenBitwiseOpNegation: return "BrokenBitwiseOpNegation";
 		case DriverBug::BrokenPrimitiveRestart: return "BrokenPrimitiveRestart";
 		case DriverBug::BrokenPushDescriptors: return "BrokenPushDescriptors";
-		case DriverBug::BrokenProvokingVertex: return "BrokenProvokingVertex";
 		case DriverBug::BrokenAttachmentFeedbackLoopLayout: return "BrokenAttachmentFeedbackLoopLayout";
 		case DriverBug::BrokenRasterizationOrderAttachmentAccess: return "BrokenRasterizationOrderAttachmentAccess";
-		case DriverBug::BrokenSubpassFeedback: return "BrokenSubpassFeedback";
-		case DriverBug::BrokenColorWriteMaskWithDepthTest: return "BrokenColorWriteMaskWithDepthTest";
-		case DriverBug::BrokenDepthStencilDiscard: return "BrokenDepthStencilDiscard";
-		case DriverBug::BrokenReversedDepthRange: return "BrokenReversedDepthRange";
 		case DriverBug::SlowCachedReadbackMemory: return "SlowCachedReadbackMemory";
-		case DriverBug::SlowOptimalImageToBufferCopy: return "SlowOptimalImageToBufferCopy";
 		case DriverBug::BrokenClearLoadOpRenderPass: return "BrokenClearLoadOpRenderPass";
 		case DriverBug::Broken16BitTextureFormats: return "Broken16BitTextureFormats";
 		case DriverBug::BrokenGenerateMipmapTallTexture: return "BrokenGenerateMipmapTallTexture";
@@ -310,15 +303,12 @@ const char* GpuProfileDetector::WorkaroundToString(DriverWorkaround value)
 {
 	switch (value)
 	{
-		case DriverWorkaround::RewriteBooleanNegation: return "RewriteBooleanNegation";
 		case DriverWorkaround::ScalarizeVectorBitwiseAnd: return "ScalarizeVectorBitwiseAnd";
 		case DriverWorkaround::StoreBitwiseNegationInTemporary: return "StoreBitwiseNegationInTemporary";
 		case DriverWorkaround::UseDescriptorSets: return "UseDescriptorSets";
-		case DriverWorkaround::DisableProvokingVertex: return "DisableProvokingVertex";
 		case DriverWorkaround::DisableAttachmentFeedbackLoopLayout: return "DisableAttachmentFeedbackLoopLayout";
 		case DriverWorkaround::DisableRasterizationOrderAttachmentAccess:
 			return "DisableRasterizationOrderAttachmentAccess";
-		case DriverWorkaround::EmulateColorWriteMask: return "EmulateColorWriteMask";
 		case DriverWorkaround::PreferCoherentReadback: return "PreferCoherentReadback";
 		case DriverWorkaround::AvoidClearLoadOpRenderPass: return "AvoidClearLoadOpRenderPass";
 		case DriverWorkaround::GenerateMipmapManuallyForTallTextures: return "GenerateMipmapManuallyForTallTextures";

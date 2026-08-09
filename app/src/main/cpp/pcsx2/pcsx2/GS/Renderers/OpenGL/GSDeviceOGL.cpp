@@ -91,9 +91,11 @@ static constexpr bool HasOGLMultiDrawCopyFallback(const GSDevice::FeatureSupport
 }
 
 static constexpr bool ShouldIssueOGLHazardBarrier(const GSDevice::FeatureSupport& features,
-	bool framebuffer_optimization_needs_barrier, bool rt_hazard_barrier)
+	bool framebuffer_optimization_needs_barrier, bool broken_blend_coherency_barrier,
+	bool rt_hazard_barrier)
 {
-	return features.texture_barrier && framebuffer_optimization_needs_barrier && rt_hazard_barrier;
+	return features.texture_barrier &&
+		((framebuffer_optimization_needs_barrier && broken_blend_coherency_barrier) || rt_hazard_barrier);
 }
 
 static constexpr bool ShouldCloneOGLRenderTargetForFeedback(const GSDevice::FeatureSupport& features,
@@ -1099,7 +1101,7 @@ bool GSDeviceOGL::CheckFeatures()
 #ifdef __ANDROID__
 	const bool prefer_vertex_expansion_for_mobile = true;
 #else
-	const bool prefer_vertex_expansion_for_mobile = (vendor_id_adreno || vendor_id_mali);
+	const bool prefer_vertex_expansion_for_mobile = vendor_id_mali;
 #endif
 	if (prefer_vertex_expansion_for_mobile)
 	{
@@ -1737,8 +1739,6 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define GPU_PROFILE_POWERVR {}\n", IsPowerVRGPUProfile() ? 1 : 0);
 	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n",
 		UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
-	header += fmt::format("#define DRIVER_REWRITE_BOOLEAN_NEGATION {}\n",
-		UsesMobileDriverWorkaround(DriverWorkaround::RewriteBooleanNegation) ? 1 : 0);
 	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n",
 		UsesMobileDriverWorkaround(DriverWorkaround::StoreBitwiseNegationInTemporary) ? 1 : 0);
 #else
@@ -1746,18 +1746,10 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += "#define GPU_PROFILE_ADRENO 0\n";
 	header += "#define GPU_PROFILE_POWERVR 0\n";
 	header += "#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND 0\n";
-	header += "#define DRIVER_REWRITE_BOOLEAN_NEGATION 0\n";
 	header += "#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY 0\n";
 #endif
 	header += R"(
-#if DRIVER_REWRITE_BOOLEAN_NEGATION
-bool gpu_boolean_not(bool value)
-{
-	return value == false;
-}
-#else
 #define gpu_boolean_not(value) (!(value))
-#endif
 
 #if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
@@ -3247,10 +3239,14 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 	// 2. Fullscreen sprite writes gray, rta hw blend blends based on dst alpha.
 	// On Nvidia, 2 seems to not pick up the data written by 1 unless we add a second barrier.
 	// Pretty sure GL is supposed to guarantee that the blend unit is coherent with previous pixel write out, so calling this a bug.
+	bool broken_blend_coherency_barrier = false;
 	if (m_bugs.broken_blend_coherency)
-		rt_hazard_barrier |= (psel.ps.IsFeedbackLoopRT() || psel.ps.blend_c == 1) && GLState::rt == config.rt;
+		broken_blend_coherency_barrier = (psel.ps.IsFeedbackLoopRT() || psel.ps.blend_c == 1) && GLState::rt == config.rt;
 	if (config.require_one_barrier || !m_features.texture_barrier)
+	{
 		rt_hazard_barrier = false; // Already in place or not available
+		broken_blend_coherency_barrier = false;
+	}
 
 	// additional non-pipeline config stuff
 	const bool point_size_enabled = config.vs.point_size;
@@ -3342,7 +3338,8 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 	}
 
 	// Be careful of the rt already being bound and the blend using the RT without a barrier.
-	if (ShouldIssueOGLHazardBarrier(m_features, fb_optimization_needs_barrier, rt_hazard_barrier))
+	if (ShouldIssueOGLHazardBarrier(m_features, fb_optimization_needs_barrier,
+		broken_blend_coherency_barrier, rt_hazard_barrier))
 	{
 		// Ensure all depth writes are finished before sampling
 		GL_INS("GL: Texture barrier to flush depth or rt before reading");

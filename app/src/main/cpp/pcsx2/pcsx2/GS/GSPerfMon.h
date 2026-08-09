@@ -40,6 +40,7 @@ protected:
 	clock_t m_lastframe = 0;
 	int m_count = 0;
 	int m_disp_fb_sprite_blits = 0;
+	bool m_counter_tracking_enabled = false;
 
 public:
 	GSPerfMon();
@@ -50,7 +51,13 @@ public:
 	int GetFrame() { return m_frame; }
 	void EndFrame(bool frame_only);
 
-	void Put(counter_t c, double val) { m_counters[c] += val; }
+	void SetCounterTrackingEnabled(bool enabled);
+	bool IsCounterTrackingEnabled() const { return m_counter_tracking_enabled; }
+	void Put(counter_t c, double val)
+	{
+		if (m_counter_tracking_enabled) [[unlikely]]
+			m_counters[c] += val;
+	}
 	double GetCounter(counter_t c) { return m_counters[c]; }
 	double Get(counter_t c) { return m_stats[c]; }
 	void Update();

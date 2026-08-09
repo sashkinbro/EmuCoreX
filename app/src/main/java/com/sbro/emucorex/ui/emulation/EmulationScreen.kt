@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -415,12 +416,15 @@ fun EmulationScreen(
     val scope = rememberCoroutineScope()
     val rootCutoutPadding = WindowInsets.displayCutout.asPaddingValues()
     val rootNavPadding = WindowInsets.navigationBars.asPaddingValues()
-    val overlayHorizontalSafeInset = maxOf(
+    val overlayLeftSafeInset = maxOf(
         rootCutoutPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+        rootNavPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+    )
+    val overlayRightSafeInset = maxOf(
         rootCutoutPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-        rootNavPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
         rootNavPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
     )
+    val overlayHorizontalSafeInset = maxOf(overlayLeftSafeInset, overlayRightSafeInset)
     val overlayTopSafeInset = maxOf(
         rootCutoutPadding.calculateTopPadding(),
         rootNavPadding.calculateTopPadding()
@@ -1236,7 +1240,8 @@ fun EmulationScreen(
                 state = uiState.toControlsEditorState(),
                 onBackClick = { showControlsEditor = false },
                 manageActivityOrientation = false,
-                overlayHorizontalSafeInset = overlayHorizontalSafeInset,
+                overlayLeftSafeInset = overlayLeftSafeInset,
+                overlayRightSafeInset = overlayRightSafeInset,
                 overlayTopSafeInset = overlayTopSafeInset,
                 overlayBottomSafeInset = overlayBottomSafeInset,
                 onUpdateControlOffset = viewModel::updateTouchControlOffset,
@@ -1812,13 +1817,11 @@ private fun OnScreenControls(
     onPadInput: (Int, Int, Boolean) -> Unit
 ) {
     val density = LocalDensity.current
-    val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
-    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-    val safeLeft = maxOf(cutoutPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr), navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr))
-    val safeRight = maxOf(cutoutPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr), navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr))
-    val safeTop = maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
-    val safeBottom = maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
-    val safeHorizontalInset = maxOf(safeLeft, safeRight)
+    val safeDrawingPadding = WindowInsets.safeDrawing.asPaddingValues()
+    val safeLeft = safeDrawingPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+    val safeRight = safeDrawingPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+    val safeTop = safeDrawingPadding.calculateTopPadding()
+    val safeBottom = safeDrawingPadding.calculateBottomPadding()
     val context = LocalContext.current
     val hapticView = LocalView.current
     val currentOnPadInput by rememberUpdatedState(onPadInput)
@@ -1921,7 +1924,8 @@ private fun OnScreenControls(
             rbtnOffset = rbtnOffset,
             centerOffset = centerOffset,
             controlLayouts = controlLayouts,
-            safeHorizontalInset = safeHorizontalInset,
+            safeLeftInset = safeLeft,
+            safeRightInset = safeRight,
             safeTopInset = safeTop,
             safeBottomInset = safeBottom
         )

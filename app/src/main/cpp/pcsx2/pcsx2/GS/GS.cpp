@@ -13,6 +13,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "GS/MultiISA.h"
+#include "GSDumpReplayer.h"
 #include "platform/host/Host.h"
 #include "Input/InputManager.h"
 #include "MTGS.h"
@@ -67,6 +68,14 @@
 #include <fstream>
 
 Pcsx2Config::GSOptions GSConfig;
+static bool s_external_perfmon_request = false;
+
+static bool ShouldTrackGSPerfMonCounters()
+{
+	return s_external_perfmon_request || GSConfig.OsdShowGSStats || GSDumpReplayer::IsRunner() ||
+		GSDumpReplayer::IsReplayingDump() ||
+		(GSConfig.DumpGSData && (GSConfig.SaveDrawStats || GSConfig.SaveFrameStats));
+}
 
 static GSRendererType GSCurrentRenderer;
 
@@ -286,6 +295,7 @@ static bool OpenGSRenderer(GSRendererType renderer, u8* basemem)
 	g_gs_renderer->ResetPCRTC();
 	g_gs_renderer->UpdateRenderFixes();
 	g_perfmon.Reset();
+	g_perfmon.SetCounterTrackingEnabled(ShouldTrackGSPerfMonCounters());
 	return true;
 }
 
@@ -879,6 +889,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 
 	Pcsx2Config::GSOptions old_config(std::move(GSConfig));
 	GSConfig = new_config;
+	g_perfmon.SetCounterTrackingEnabled(ShouldTrackGSPerfMonCounters());
 
 	if (!g_gs_renderer)
 		return;
@@ -979,6 +990,12 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 			GSConfig.OsdShowGPU = false;
 #endif
 	}
+}
+
+void GSSetPerformanceCountersEnabled(bool enabled)
+{
+	s_external_perfmon_request = enabled;
+	g_perfmon.SetCounterTrackingEnabled(ShouldTrackGSPerfMonCounters());
 }
 
 void GSSetSoftwareRendering(bool software_renderer, GSInterlaceMode new_interlace)

@@ -1,5 +1,7 @@
 #include "HangTrace.h"
 
+#if !defined(NDEBUG) || defined(PCSX2_DEVBUILD)
+
 #include "arm64/OaknutHelpers-arm64.h"
 #include "Config.h"
 #include "CDVD/CDVDcommon.h"
@@ -421,3 +423,5 @@ void EmitBlockTrace(CpuType cpu, u32 pc, u32 code)
 	oakEmitCall(reinterpret_cast<void*>(RecordJitBlock));
 }
 } // namespace HangTrace
+
+#endif

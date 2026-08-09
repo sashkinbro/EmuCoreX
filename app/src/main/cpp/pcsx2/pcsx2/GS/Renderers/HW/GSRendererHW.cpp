@@ -5958,10 +5958,7 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 	// Replace Ad with As, blend flags will be used from As since we are chaging the blend_index value.
 	// Must be done before index calculation, after blending equation optimizations
 	const bool blend_ad = m_conf.ps.blend_c == 1;
-	// On Vulkan without framebuffer fetch this path forces thousands of RT feedback reads in blend-heavy
-	// scenes. Keep it only where feedback is cheap, or where the fallback path already copies the RT.
-	const bool fast_ad_alpha_masked_feedback = features.framebuffer_fetch || !features.texture_barrier;
-	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa && fast_ad_alpha_masked_feedback;
+	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa;
 	const bool is_basic_blend = GSConfig.AccurateBlendingUnit != AccBlendLevel::Minimum;
 	if (blend_ad_alpha_masked && ((is_basic_blend || (COLCLAMP.CLAMP == 0) || m_conf.require_one_barrier)))
 	{

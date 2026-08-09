@@ -17,6 +17,27 @@ struct JitBlockProfile
 
 namespace JitProfiler
 {
+#if defined(NDEBUG) && !defined(PCSX2_DEVBUILD)
+	class BlockCompileScope
+	{
+	public:
+		constexpr BlockCompileScope(int, u32) {}
+		constexpr void Finish(u32, u32, const void*, const void*) {}
+	};
+
+	class OpcodeRangeScope
+	{
+	public:
+		constexpr OpcodeRangeScope() = default;
+		constexpr void Begin(int, u32, u32, u32 = 0) {}
+		constexpr void End() {}
+	};
+
+	inline constexpr bool IsActive() { return false; }
+	inline constexpr void Start() {}
+	inline constexpr void Stop() {}
+	inline constexpr void RecordCodeCacheReset(int, u64) {}
+#else
 	// Measures one completed JIT block compilation while profiling is active.
 	// Nested scopes subtract child time so aggregate exclusive time is not double-counted
 	// by microVU's recursive block compiler. In normal gameplay the constructor performs
@@ -67,4 +88,5 @@ namespace JitProfiler
 	void Start();
 	void Stop();
 	void RecordCodeCacheReset(int type, u64 discarded_host_bytes);
+#endif
 }

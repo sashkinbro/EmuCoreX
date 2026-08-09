@@ -17,11 +17,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -157,7 +156,8 @@ fun ControlsEditorScreen(
     onBackClick: () -> Unit,
     subtitle: String? = null,
     manageActivityOrientation: Boolean = true,
-    overlayHorizontalSafeInset: Dp? = null,
+    overlayLeftSafeInset: Dp? = null,
+    overlayRightSafeInset: Dp? = null,
     overlayTopSafeInset: Dp? = null,
     overlayBottomSafeInset: Dp? = null,
     onUpdateControlOffset: (String, Pair<Float, Float>) -> Unit,
@@ -301,7 +301,8 @@ fun ControlsEditorScreen(
             onSetControlOffset = ::setControlOffsetLocally,
             onCommitControlPosition = ::persistControlPosition,
             onCommitControlPositions = ::persistControlPositions,
-            overlayHorizontalSafeInset = overlayHorizontalSafeInset,
+            overlayLeftSafeInset = overlayLeftSafeInset,
+            overlayRightSafeInset = overlayRightSafeInset,
             overlayTopSafeInset = overlayTopSafeInset,
             overlayBottomSafeInset = overlayBottomSafeInset,
             modifier = Modifier.fillMaxSize()
@@ -615,26 +616,20 @@ private fun PreviewLayout(
     onCommitControlPosition: (String) -> Unit,
     onCommitControlPositions: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
-    overlayHorizontalSafeInset: Dp? = null,
+    overlayLeftSafeInset: Dp? = null,
+    overlayRightSafeInset: Dp? = null,
     overlayTopSafeInset: Dp? = null,
     overlayBottomSafeInset: Dp? = null
 ) {
     val density = LocalDensity.current
-    val cutoutPadding = WindowInsets.displayCutout.asPaddingValues()
-    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-    val safeHorizontalInset = overlayHorizontalSafeInset ?: maxOf(
-        maxOf(
-            cutoutPadding.calculateLeftPadding(LayoutDirection.Ltr),
-            cutoutPadding.calculateRightPadding(LayoutDirection.Ltr)
-        ),
-        maxOf(
-            navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-            navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-        )
-    )
+    val safeDrawingPadding = WindowInsets.safeDrawing.asPaddingValues()
+    val safeLeftInset = overlayLeftSafeInset
+        ?: safeDrawingPadding.calculateLeftPadding(LayoutDirection.Ltr)
+    val safeRightInset = overlayRightSafeInset
+        ?: safeDrawingPadding.calculateRightPadding(LayoutDirection.Ltr)
     val safeTop = overlayTopSafeInset
-        ?: maxOf(cutoutPadding.calculateTopPadding(), navBarPadding.calculateTopPadding())
-    val safeBottom = overlayBottomSafeInset ?: maxOf(cutoutPadding.calculateBottomPadding(), navBarPadding.calculateBottomPadding())
+        ?: safeDrawingPadding.calculateTopPadding()
+    val safeBottom = overlayBottomSafeInset ?: safeDrawingPadding.calculateBottomPadding()
     BoxWithConstraints(
         modifier = modifier.fillMaxSize()
     ) {
@@ -652,7 +647,8 @@ private fun PreviewLayout(
             rbtnOffset = state.rbtnOffset,
             centerOffset = state.centerOffset,
             controlLayouts = controlLayouts,
-            safeHorizontalInset = safeHorizontalInset,
+            safeLeftInset = safeLeftInset,
+            safeRightInset = safeRightInset,
             safeTopInset = safeTop,
             safeBottomInset = safeBottom,
             previewMode = true
@@ -681,8 +677,18 @@ private fun PreviewLayout(
             val heightPx = with(density) { height.toPx() }
             val canvasWidthPx = with(density) { maxWidth.toPx() }
             val canvasHeightPx = with(density) { maxHeight.toPx() }
-            val nextX = (currentX + delta.first).coerceIn(0f, (canvasWidthPx - widthPx).coerceAtLeast(0f))
-            val nextY = (currentY + delta.second).coerceIn(0f, (canvasHeightPx - heightPx).coerceAtLeast(0f))
+            val safeLeftPx = with(density) { safeLeftInset.toPx() }
+            val safeRightPx = with(density) { safeRightInset.toPx() }
+            val safeTopPx = with(density) { safeTop.toPx() }
+            val safeBottomPx = with(density) { safeBottom.toPx() }
+            val nextX = (currentX + delta.first).coerceIn(
+                safeLeftPx,
+                (canvasWidthPx - safeRightPx - widthPx).coerceAtLeast(safeLeftPx)
+            )
+            val nextY = (currentY + delta.second).coerceIn(
+                safeTopPx,
+                (canvasHeightPx - safeBottomPx - heightPx).coerceAtLeast(safeTopPx)
+            )
             return (nextX - baseXPx) to (nextY - baseYPx)
         }
 

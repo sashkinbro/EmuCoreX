@@ -23,6 +23,18 @@ namespace PerformanceMetrics
 	void Update(bool gs_register_write, bool fb_blit, bool is_skipping_present);
 	void OnGPUPresent(float gpu_time);
 
+	/// Enables per-thread CPU time sampling for non-native telemetry consumers.
+	/// Native OSD CPU metrics always override this gate while visible.
+	void SetCPUThreadUsageEnabled(bool enabled);
+
+	/// Enables min/average/max frame-time sampling for non-native telemetry consumers.
+	/// Native OSD GS/frame-time views always override this gate while visible.
+	void SetFrameTimeStatsEnabled(bool enabled);
+
+	/// Enables frame history sampling for non-native telemetry consumers.
+	/// Native OSD frame-time graphs always override this gate while visible.
+	void SetFrameTimeHistoryEnabled(bool enabled);
+
 	/// Sets the EE thread for CPU usage calculations.
 	void SetCPUThread(Threading::ThreadHandle thread);
 

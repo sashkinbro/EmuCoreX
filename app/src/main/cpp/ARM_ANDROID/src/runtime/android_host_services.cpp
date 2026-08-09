@@ -209,11 +209,18 @@ void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_
 {
 	s_performance_metrics_enabled.store(enabled, std::memory_order_relaxed);
 	s_performance_metrics_detailed.store(enabled && detailed, std::memory_order_relaxed);
+	PerformanceMetrics::SetCPUThreadUsageEnabled(enabled && detailed);
+	PerformanceMetrics::SetFrameTimeStatsEnabled(enabled && detailed);
+	// The Android overlay exposes interval frame-time stats, not the upstream history graph.
+	// Native OSD frame graphs still override this gate through GSConfig.OsdShowFrameTimes.
+	PerformanceMetrics::SetFrameTimeHistoryEnabled(false);
+	const bool request_gs_counters = enabled && detailed;
 	const bool request_gpu_timing = enabled && detailed && gpu_timing;
 	s_performance_gpu_timing_requested.store(request_gpu_timing, std::memory_order_relaxed);
 	if (MTGS::IsOpen())
 	{
-		Host::RunOnGSThread([request_gpu_timing]() {
+		Host::RunOnGSThread([request_gs_counters, request_gpu_timing]() {
+			GSSetPerformanceCountersEnabled(request_gs_counters);
 			bool timing_active = false;
 			std::string gpu_name;
 			if (g_gs_device)
@@ -227,6 +234,10 @@ void SetPerformanceMetricsCallbackEnabled(bool enabled, bool detailed, bool gpu_
 			GSConfig.OsdShowGPU = timing_active;
 			emucorex::android::SetPerformanceGpuState(std::move(gpu_name), timing_active);
 		});
+	}
+	else
+	{
+		GSSetPerformanceCountersEnabled(request_gs_counters);
 	}
 	if (!enabled)
 	{

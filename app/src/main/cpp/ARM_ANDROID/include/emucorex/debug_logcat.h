@@ -13,6 +13,15 @@ namespace emucorex
 	using u32 = uint32_t;
 	using u64 = uint64_t;
 
+#if defined(NDEBUG) && !defined(PCSX2_DEVBUILD)
+	// Diagnostic collection is intentionally unavailable in production builds.
+	// Keeping these compile-time constants in the public API also eliminates direct
+	// hot-path checks which do not go through the macros below.
+	inline constexpr bool IsDebugLogcatEnabled() { return false; }
+	inline constexpr void SetDebugLogcatEnabled(bool) {}
+	inline constexpr bool IsProfilerLogcatEnabled() { return false; }
+	inline constexpr void SetProfilerLogcatEnabled(bool) {}
+#else
 	inline std::atomic<bool> s_debug_logcat_enabled{false};
 	inline std::atomic<bool> s_profiler_logcat_enabled{false};
 
@@ -35,6 +44,7 @@ namespace emucorex
 	{
 		s_profiler_logcat_enabled.store(enabled, std::memory_order_relaxed);
 	}
+#endif
 
 	// Performance metrics collection for GS/VU1 optimization
 	struct GSDebugMetrics
@@ -568,6 +578,8 @@ namespace emucorex
 	inline ProfilerMetrics s_profiler_metrics;
 }
 
+#if !defined(NDEBUG) || defined(PCSX2_DEVBUILD)
+
 #define DEBUG_GS_LOG(level, ...) \
 	do { \
 		if (::emucorex::IsDebugLogcatEnabled()) \
@@ -677,6 +689,20 @@ namespace emucorex
 		if (::emucorex::IsProfilerLogcatEnabled()) \
 			::emucorex::s_profiler_metrics.DumpToLogcat(); \
 	} while(0)
+
+#else
+#define DEBUG_GS_LOG(level, ...) do {} while(0)
+#define DEBUG_GS_TIMING_START(var) do {} while(0)
+#define DEBUG_GS_TIMING_END(var, counter) do {} while(0)
+#define DEBUG_GS_TIMING_END_U64(var, counter) do {} while(0)
+#define DEBUG_GS_SET_MAX(counter, val) do {} while(0)
+#define DEBUG_GS_INC_U64(counter, val) do {} while(0)
+#define DEBUG_GS_DUMP_METRICS() do {} while(0)
+#define DEBUG_PROF_LOG(level, ...) do {} while(0)
+#define DEBUG_PROF_TIMING_START(var) do {} while(0)
+#define DEBUG_PROF_TIMING_END(var, counter) do {} while(0)
+#define DEBUG_PROF_DUMP() do {} while(0)
+#endif
 
 #else
 #define DEBUG_GS_LOG(level, ...) do {} while(0)

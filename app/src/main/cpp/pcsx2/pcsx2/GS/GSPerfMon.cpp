@@ -25,12 +25,26 @@ void GSPerfMon::EndFrame(bool frame_only)
 {
 	m_frame++;
 
-	if (!frame_only)
+	if (m_counter_tracking_enabled && !frame_only)
 		m_count++;
+}
+
+void GSPerfMon::SetCounterTrackingEnabled(bool enabled)
+{
+	if (m_counter_tracking_enabled == enabled)
+		return;
+
+	m_counter_tracking_enabled = enabled;
+	m_count = 0;
+	std::memset(m_counters, 0, sizeof(m_counters));
+	std::memset(m_stats, 0, sizeof(m_stats));
 }
 
 void GSPerfMon::Update()
 {
+	if (!m_counter_tracking_enabled)
+		return;
+
 	if (m_count > 0)
 	{
 		for (size_t i = 0; i < std::size(m_counters); i++)
