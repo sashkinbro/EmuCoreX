@@ -4462,7 +4462,7 @@ void GSTextureCache::ApplyPendingDownload(PendingDownload& download)
 	// A CPU upload or local-to-local move made after this GPU copy is authoritative.
 	// Do not let the delayed result roll those pages back to an older frame.
 	if (!g_gs_renderer->AreAsyncReadbackPagesCurrent(
-			download.page_generations, download.tex0, download.target_rect))
+			download.captured_generation, download.tex0, download.target_rect))
 	{
 		return;
 	}
@@ -7496,7 +7496,7 @@ void GSTextureCache::Read(Target* t, const GSVector4i& r, bool force_synchronous
 	{
 		m_pending_downloads.push_back(
 			{std::move(asynchronous_dltex), TEX0, drc, r, write_mask,
-				static_cast<u64>(g_perfmon.GetFrame()), g_gs_renderer->CaptureAsyncReadbackPageGenerations()});
+				static_cast<u64>(g_perfmon.GetFrame()), g_gs_renderer->CaptureAsyncReadbackGeneration()});
 		return;
 	}
 

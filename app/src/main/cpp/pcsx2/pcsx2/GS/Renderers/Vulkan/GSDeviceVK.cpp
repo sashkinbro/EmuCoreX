@@ -5160,6 +5160,8 @@ void GSDeviceVK::DestroyResources()
 	if (m_tfx_ubo_descriptor_set != VK_NULL_HANDLE)
 		FreePersistentDescriptorSet(m_tfx_ubo_descriptor_set);
 
+	m_last_tfx_pipeline_valid = false;
+	m_last_tfx_pipeline = VK_NULL_HANDLE;
 	for (auto& it : m_tfx_pipelines)
 		vkDestroyPipeline(m_device, it.second, nullptr);
 	for (auto& it : m_tfx_fragment_shaders)
@@ -5548,13 +5550,23 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 
 VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 {
+	if (m_last_tfx_pipeline_valid && m_last_tfx_pipeline_selector == p)
+		return m_last_tfx_pipeline;
+
 	const auto it = m_tfx_pipelines.find(p);
 	if (it != m_tfx_pipelines.end())
-		return it->second;
+	{
+		m_last_tfx_pipeline_selector = p;
+		m_last_tfx_pipeline = it->second;
+		m_last_tfx_pipeline_valid = true;
+		return m_last_tfx_pipeline;
+	}
 
-	VkPipeline pipeline = CreateTFXPipeline(p);
-	m_tfx_pipelines.emplace(p, pipeline);
-	return pipeline;
+	m_last_tfx_pipeline_selector = p;
+	m_last_tfx_pipeline = CreateTFXPipeline(p);
+	m_last_tfx_pipeline_valid = true;
+	m_tfx_pipelines.emplace(p, m_last_tfx_pipeline);
+	return m_last_tfx_pipeline;
 }
 
 void GSDeviceVK::WarmupCommonTFXPipelines()

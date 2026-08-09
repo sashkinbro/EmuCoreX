@@ -92,67 +92,64 @@ static u8* recBranchPatchpoint_emit_oaknut()
 template <int Process>
 static u8* recSetBranchEQExact_emit_oaknut()
 {
-	// TODO(Stenzek): This is suboptimal if the registers are in ARM64 vector regs.
-	// If the constant register is already in a host register, we don't need the immediate...
+	_eeFlushAllDirty();
 
+	// A scalar EE GPR can be cached in either an ARM64 GPR or the low 64 bits of
+	// a vector register. Flushing dirty state leaves both mappings valid, so use
+	// the existing mapping instead of freeing a vector and loading it back.
+	auto get_operand = [](int host_gpr, int host_xmm, int guest_gpr, const oak::XReg& scratch) {
+		if (host_gpr >= 0)
+			return oakXRegister(host_gpr);
+
+		if (host_xmm >= 0)
+			oakAsm->FMOV(scratch, oakDRegister(host_xmm));
+		else
+			oakLoad64(scratch, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[guest_gpr].UD[0]))});
+
+		return scratch;
+	};
+
+	recBeginOaknutEmit();
 	if constexpr ((Process & PROCESS_CONSTS) != 0)
 	{
-		_eeFlushAllDirty();
-
-		_deleteGPRtoXMMreg(_Rt_, DELETE_REG_FLUSH_AND_FREE);
 		const int regt = _checkX86reg(X86TYPE_GPR, _Rt_, MODE_READ);
-		recBeginOaknutEmit();
-		oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rs_].UD[0]);
-		if (regt >= 0)
-		{
-			oakAsm->CMP(oakXRegister(regt), OAK_XSCRATCH2);
-		}
+		const int regtxmm = (regt < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rt_, MODE_READ) : -1;
+		const int constsxmm = _checkXMMreg(XMMTYPE_GPRREG, _Rs_, MODE_READ);
+		if (constsxmm >= 0)
+			oakAsm->FMOV(OAK_XSCRATCH2, oakDRegister(constsxmm));
 		else
-		{
-			oakLoad64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[_Rt_].UD[0]))});
-			oakAsm->CMP(OAK_XSCRATCH, OAK_XSCRATCH2);
-		}
-		recEndOaknutEmit();
+			oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rs_].UD[0]);
+		oakAsm->CMP(get_operand(regt, regtxmm, _Rt_, OAK_XSCRATCH), OAK_XSCRATCH2);
 	}
 	else if constexpr ((Process & PROCESS_CONSTT) != 0)
 	{
-		_eeFlushAllDirty();
-
-		_deleteGPRtoXMMreg(_Rs_, DELETE_REG_FLUSH_AND_FREE);
 		const int regs = _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ);
-		recBeginOaknutEmit();
-		oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rt_].UD[0]);
-		if (regs >= 0)
-		{
-			oakAsm->CMP(oakXRegister(regs), OAK_XSCRATCH2);
-		}
+		const int regsxmm = (regs < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rs_, MODE_READ) : -1;
+		const int consttxmm = _checkXMMreg(XMMTYPE_GPRREG, _Rt_, MODE_READ);
+		if (consttxmm >= 0)
+			oakAsm->FMOV(OAK_XSCRATCH2, oakDRegister(consttxmm));
 		else
-		{
-			oakLoad64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[_Rs_].UD[0]))});
-			oakAsm->CMP(OAK_XSCRATCH, OAK_XSCRATCH2);
-		}
-		recEndOaknutEmit();
+			oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rt_].UD[0]);
+		oakAsm->CMP(get_operand(regs, regsxmm, _Rs_, OAK_XSCRATCH), OAK_XSCRATCH2);
 	}
 	else
 	{
-		// force S into register, since we need to load it, may as well cache.
-		_deleteGPRtoXMMreg(_Rt_, DELETE_REG_FLUSH_AND_FREE);
-		const int regs = _allocX86reg(X86TYPE_GPR, _Rs_, MODE_READ);
-		const int regt = _checkX86reg(X86TYPE_GPR, _Rt_, MODE_READ);
-		_eeFlushAllDirty();
-
-		recBeginOaknutEmit();
-		if (regt >= 0)
+		if (_Rs_ == _Rt_)
 		{
-			oakAsm->CMP(oakXRegister(regs), oakXRegister(regt));
+			oakAsm->CMP(oak::util::XZR, oak::util::XZR);
 		}
 		else
 		{
-			oakLoad64(OAK_XSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.GPR.r[_Rt_].UD[0]))});
-			oakAsm->CMP(oakXRegister(regs), OAK_XSCRATCH);
+			const int regs = _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ);
+			const int regsxmm = (regs < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rs_, MODE_READ) : -1;
+			const int regt = _checkX86reg(X86TYPE_GPR, _Rt_, MODE_READ);
+			const int regtxmm = (regt < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rt_, MODE_READ) : -1;
+			const oak::XReg lhs = get_operand(regs, regsxmm, _Rs_, OAK_XSCRATCH);
+			const oak::XReg rhs = get_operand(regt, regtxmm, _Rt_, OAK_XSCRATCH2);
+			oakAsm->CMP(lhs, rhs);
 		}
-		recEndOaknutEmit();
 	}
+	recEndOaknutEmit();
 
 	return recBranchPatchpoint_emit_oaknut();
 }

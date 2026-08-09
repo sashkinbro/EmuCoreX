@@ -495,8 +495,8 @@ public:
 	void ReadLocalMemoryUnsync(u8* mem, int qwc, GIFRegBITBLTBUF BITBLTBUF, GIFRegTRXPOS TRXPOS, GIFRegTRXREG TRXREG);
 	GSLocalMemory& GetAsyncReadbackMemory() { return m_async_readback_mem; }
 	std::mutex& GetAsyncReadbackMutex() { return m_async_readback_mutex; }
-	std::array<u64, GS_MAX_PAGES> CaptureAsyncReadbackPageGenerations();
-	bool AreAsyncReadbackPagesCurrent(const std::array<u64, GS_MAX_PAGES>& generations,
+	u64 CaptureAsyncReadbackGeneration();
+	bool AreAsyncReadbackPagesCurrent(u64 captured_generation,
 		const GIFRegTEX0& TEX0, const GSVector4i& rect);
 	void MarkAsyncReadbackPagesWrittenLocked(const GIFRegTEX0& TEX0, const GSVector4i& rect);
 	void SyncAsyncReadbackMemory();

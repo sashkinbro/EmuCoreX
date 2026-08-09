@@ -2917,21 +2917,23 @@ void GSState::MarkAsyncReadbackPagesWritten(const GSOffset& offset, const GSVect
 	});
 }
 
-std::array<u64, GS_MAX_PAGES> GSState::CaptureAsyncReadbackPageGenerations()
+u64 GSState::CaptureAsyncReadbackGeneration()
 {
 	const std::lock_guard lock(m_async_readback_mutex);
-	return m_async_readback_page_generations;
+	return m_async_readback_generation;
 }
 
-bool GSState::AreAsyncReadbackPagesCurrent(const std::array<u64, GS_MAX_PAGES>& generations,
+bool GSState::AreAsyncReadbackPagesCurrent(u64 captured_generation,
 	const GIFRegTEX0& TEX0, const GSVector4i& rect)
 {
 	const std::lock_guard lock(m_async_readback_mutex);
 	bool current = true;
+	// Page generations are assigned from the monotonically increasing global generation.
+	// A page is therefore stale for this download iff it was assigned after the capture.
 	m_async_readback_mem.GetOffset(TEX0.TBP0, TEX0.TBW, TEX0.PSM).loopPages(rect,
-		[this, &generations, &current](u32 page)
+		[this, captured_generation, &current](u32 page)
 		{
-			current &= (m_async_readback_page_generations[page] == generations[page]);
+			current &= (m_async_readback_page_generations[page] <= captured_generation);
 		});
 	return current;
 }

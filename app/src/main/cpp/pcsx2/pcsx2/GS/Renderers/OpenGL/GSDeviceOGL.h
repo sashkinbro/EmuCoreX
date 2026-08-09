@@ -221,6 +221,8 @@ private:
 	GLuint m_ps_ss[1 << 8];
 	GSDepthStencilOGL* m_om_dss[1 << 5] = {};
 	std::unordered_map<ProgramSelector, GLProgram, ProgramSelectorHash> m_programs;
+	ProgramSelector m_last_tfx_program_selector = {};
+	GLProgram* m_last_tfx_program = nullptr;
 	GLShaderCache m_shader_cache;
 
 	GLuint m_palette_ss = 0;

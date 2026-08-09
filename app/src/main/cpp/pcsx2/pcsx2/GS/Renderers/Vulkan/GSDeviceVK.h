@@ -445,6 +445,9 @@ private:
 	std::unordered_map<GSHWDrawConfig::PSSelector, VkShaderModule, GSHWDrawConfig::PSSelectorHash>
 		m_tfx_fragment_shaders;
 	std::unordered_map<PipelineSelector, VkPipeline, PipelineSelectorHash> m_tfx_pipelines;
+	PipelineSelector m_last_tfx_pipeline_selector = {};
+	VkPipeline m_last_tfx_pipeline = VK_NULL_HANDLE;
+	bool m_last_tfx_pipeline_valid = false;
 
 	VkRenderPass m_utility_color_render_pass_load = VK_NULL_HANDLE;
 	VkRenderPass m_utility_color_render_pass_clear = VK_NULL_HANDLE;

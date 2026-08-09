@@ -466,7 +466,7 @@ protected:
 		GSVector4i target_rect = {};
 		u32 write_mask = 0;
 		u64 queued_frame = 0;
-		std::array<u64, GS_MAX_PAGES> page_generations = {};
+		u64 captured_generation = 0;
 	};
 
 	static constexpr size_t MAX_PENDING_DOWNLOADS = 16;
