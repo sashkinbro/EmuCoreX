@@ -336,7 +336,7 @@ static bool RuleMatches(const DriverRule& rule, const GpuProfileSelection& selec
 // Sources and exact upstream revisions are mirrored in docs/gpu-driver-database.json. A known
 // driver bug is not automatically an active workaround: expensive renderer fallbacks stay disabled
 // until their PCSX2 integration has a bounded, tested condition.
-static constexpr std::array<DriverRule, 20> s_driver_rules = {{
+static constexpr std::array<DriverRule, 21> s_driver_rules = {{
 	{"gl-arm-buffer-stream", MobileGpuApi::OpenGL, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenBufferStreaming) | Bug(DriverBug::BrokenUnsynchronizedMapping) |
@@ -364,6 +364,14 @@ static constexpr std::array<DriverRule, 20> s_driver_rules = {{
 	{"vk-android-shader-serialization", MobileGpuApi::Vulkan, RuntimeGpuProfile::Unknown,
 		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 1, 0, false,
 		Bug(DriverBug::BrokenMultithreadedShaderCompilation), 0},
+	// Adreno drivers can advertise color ROAA while overlapping render-target reads still
+	// return the render-pass-start value instead of the latest color. This has been reproduced
+	// on proprietary Qualcomm and Turnip stacks, so keep all Vulkan Adreno devices on the
+	// explicit feedback path until a driver version passes an overlap conformance test.
+	{"vk-adreno-disable-roaa", MobileGpuApi::Vulkan, RuntimeGpuProfile::Adreno,
+		MobileGpuDriver::Unknown, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
+		Bug(DriverBug::BrokenRasterizationOrderAttachmentAccess),
+		Workaround(DriverWorkaround::DisableRasterizationOrderAttachmentAccess)},
 	{"vk-arm-proprietary", MobileGpuApi::Vulkan, RuntimeGpuProfile::Mali,
 		MobileGpuDriver::ArmProprietary, MobileGpuArchitecture::Unknown, 0, 0, 0, {}, {}, 0, 0, false,
 		Bug(DriverBug::BrokenPrimitiveRestart) | Bug(DriverBug::BrokenPushDescriptors) |

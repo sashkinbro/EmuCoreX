@@ -5958,7 +5958,11 @@ void GSRendererHW::EmulateBlending(int rt_alpha_min, int rt_alpha_max, DATEOptio
 	// Replace Ad with As, blend flags will be used from As since we are chaging the blend_index value.
 	// Must be done before index calculation, after blending equation optimizations
 	const bool blend_ad = m_conf.ps.blend_c == 1;
-	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa;
+	// Without framebuffer fetch this shortcut turns alpha-masked Ad blends into thousands of
+	// render-target feedback barriers in blend-heavy scenes. Keep it where feedback is ordered
+	// in tile memory, or where the backend already uses the copy-based fallback.
+	const bool fast_ad_alpha_masked_feedback = features.framebuffer_fetch || !features.texture_barrier;
+	bool blend_ad_alpha_masked = blend_ad && !m_conf.colormask.wa && fast_ad_alpha_masked_feedback;
 	const bool is_basic_blend = GSConfig.AccurateBlendingUnit != AccBlendLevel::Minimum;
 	if (blend_ad_alpha_masked && ((is_basic_blend || (COLCLAMP.CLAMP == 0) || m_conf.require_one_barrier)))
 	{

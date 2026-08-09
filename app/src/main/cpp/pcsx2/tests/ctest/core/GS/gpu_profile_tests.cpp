@@ -126,7 +126,7 @@ static u64 ExpectedVulkanWorkarounds(
 	switch (vendor)
 	{
 		case RuntimeGpuProfile::Adreno:
-			return 0;
+			return WorkaroundMask({DriverWorkaround::DisableRasterizationOrderAttachmentAccess});
 		case RuntimeGpuProfile::Mali:
 		{
 			u64 mask = WorkaroundMask({
@@ -228,8 +228,8 @@ static void VerifyPowerVRGeneration(MobileGpuArchitecture architecture,
 
 TEST(VulkanFeedbackPolicy, KeepsShaderDescriptorsAndRenderPassOnTheSamePath)
 {
-	// Current Adreno path: ROAA is denylisted, so use the fast feedback-loop-layout route
-	// whenever the driver exposes it.
+	// When ROAA is unavailable or driver-denied, keep shader and descriptor reads on the
+	// attachment-feedback-loop-layout route whenever that extension is usable.
 	EXPECT_EQ(SelectVulkanFeedbackPath(true, false, true),
 		VulkanFeedbackPath::AttachmentFeedbackLoopLayout);
 
@@ -542,7 +542,7 @@ TEST(GpuDriverProfile, KeepsMesaMaliAndPowerVRSeparateFromProprietaryDrivers)
 	EXPECT_FALSE(powervr.driver.UsesWorkaround(DriverWorkaround::AvoidClearLoadOpRenderPass));
 }
 
-TEST(GpuDriverProfile, DisablesROAAOnlyForAffectedProprietaryVulkanDrivers)
+TEST(GpuDriverProfile, DisablesROAAOnlyForAffectedVulkanDrivers)
 {
 	const GpuProfileSelection mali_vulkan = GpuProfileDetector::Resolve(
 		"auto", "ARM", "Mali-G615 MC6", MakeVulkanContext(RuntimeGpuProfile::Mali, false));
@@ -580,13 +580,19 @@ TEST(GpuDriverProfile, DisablesROAAOnlyForAffectedProprietaryVulkanDrivers)
 	const GpuProfileSelection adreno_vulkan = GpuProfileDetector::Resolve(
 		"auto", "Qualcomm", "Adreno (TM) 840",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
-	EXPECT_FALSE(adreno_vulkan.driver.UsesWorkaround(
+	EXPECT_TRUE(adreno_vulkan.driver.UsesWorkaround(
+		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
+
+	const GpuProfileSelection adreno_7xx_vulkan = GpuProfileDetector::Resolve(
+		"auto", "Qualcomm", "Adreno (TM) 750",
+		MakeVulkanContext(RuntimeGpuProfile::Adreno, false));
+	EXPECT_TRUE(adreno_7xx_vulkan.driver.UsesWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 
 	const GpuProfileSelection adreno_turnip = GpuProfileDetector::Resolve(
-		"auto", "Qualcomm", "Adreno (TM) 650",
+		"auto", "Qualcomm", "Adreno (TM) 840",
 		MakeVulkanContext(RuntimeGpuProfile::Adreno, true));
-	EXPECT_FALSE(adreno_turnip.driver.UsesWorkaround(
+	EXPECT_TRUE(adreno_turnip.driver.UsesWorkaround(
 		DriverWorkaround::DisableRasterizationOrderAttachmentAccess));
 
 	const GpuProfileSelection adreno_opengl = GpuProfileDetector::Resolve(
