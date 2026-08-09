@@ -65,15 +65,11 @@ static void recSetBranchZeroCompare_emit_oaknut(int regs)
 static void recSetBranchSignXmmCompare_emit_oaknut(int regsxmm)
 {
 	recBeginOaknutEmit();
-	oakAsm->MOV(OAK_XSCRATCH, 0x0000000200000001ULL);
-	oakAsm->INS(OAK_QSCRATCH2.Delem()[0], OAK_XSCRATCH);
-	oakAsm->MOV(OAK_XSCRATCH, 0x0000000800000004ULL);
-	oakAsm->INS(OAK_QSCRATCH2.Delem()[1], OAK_XSCRATCH);
-	oakAsm->SSHR(OAK_QSCRATCH.S4(), oakQRegister(regsxmm).S4(), 31);
-	oakAsm->AND(OAK_QSCRATCH.B16(), OAK_QSCRATCH2.B16(), OAK_QSCRATCH.B16());
-	oakAsm->ADDV(OAK_SSCRATCH, OAK_QSCRATCH.S4());
-	oakAsm->FMOV(OAK_WSCRATCH, OAK_SSCRATCH);
-	oakAsm->TST(OAK_WSCRATCH, 2);
+	// EE scalar branches only inspect the signed low 64 bits of the guest GPR.
+	// Move that lane to a GPR and let CMP set N/Z directly instead of reducing
+	// four SIMD sign lanes through a mask and horizontal add.
+	oakAsm->FMOV(OAK_XSCRATCH, oakDRegister(regsxmm));
+	oakAsm->CMP(OAK_XSCRATCH, 0);
 	recEndOaknutEmit();
 }
 
@@ -172,7 +168,7 @@ static RecBranchPatchpoint recSetBranchSignExact_emit_oaknut()
 	if (regsxmm >= 0)
 	{
 		recSetBranchSignXmmCompare_emit_oaknut(regsxmm);
-		return {recBranchPatchpoint_emit_oaknut(), BranchOnLessThanZero ? oak::Cond::EQ : oak::Cond::NE};
+		return {recBranchPatchpoint_emit_oaknut(), BranchOnLessThanZero ? oak::Cond::GE : oak::Cond::LT};
 	}
 
 	recBeginOaknutEmit();

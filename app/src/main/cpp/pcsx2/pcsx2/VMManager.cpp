@@ -2351,19 +2351,16 @@ void VMManager::Internal::Throttle()
 		return;
 	}
 
-	// Conversion of delta from CPU ticks (microseconds) to milliseconds
-	const s32 msec = static_cast<s32>((sDeltaTime * -1000) / static_cast<s64>(GetTickFrequency()));
+	// Sleep against the absolute deadline, retaining only a short tail for precise pacing.
+	// The old millisecond conversion intentionally left up to almost 2 ms to busy-spin,
+	// repeatedly querying the host clock.  That is a substantial amount of wasted CPU on
+	// high-resolution monotonic clocks, particularly on mobile devices.
+	constexpr u64 SPIN_TAIL_NS = 200'000;
+	const u64 spin_tail_ticks = std::max<u64>(1, GetTickFrequency() / (1'000'000'000ULL / SPIN_TAIL_NS));
+	if (iEnd + spin_tail_ticks < uExpectedEnd)
+		Threading::SleepUntil(uExpectedEnd - spin_tail_ticks);
 
-	// If any integer value of milliseconds exists, sleep it off.
-	// Prior comments suggested that 1-2 ms sleeps were inaccurate on some OSes;
-	// further testing suggests instead that this was utter bullshit.
-	if (msec > 1)
-	{
-		Threading::Sleep(msec - 1);
-	}
-
-	// Conversion to milliseconds loses some precision; after sleeping off whole milliseconds,
-	// spin the thread without sleeping until we finally reach our expected end time.
+	// Finish the final fraction of the frame without relying on scheduler wake-up precision.
 	while (GetCPUTicks() < uExpectedEnd)
 	{
 	}

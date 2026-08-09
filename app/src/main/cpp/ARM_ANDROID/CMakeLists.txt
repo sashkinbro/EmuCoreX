@@ -310,6 +310,10 @@ set_target_properties(emucore PROPERTIES OUTPUT_NAME "${EMUCOREX_NATIVE_LIBRARY_
 target_link_options(emucore PRIVATE
 	"LINKER:-z,max-page-size=16384"
 	"LINKER:-z,common-page-size=16384"
+	# The Android core is a self-contained JNI library and does not support ELF
+	# function interposition. Bind calls to definitions in this DSO directly so
+	# hot PCSX2 paths avoid PLT indirection and ThinLTO can keep them local.
+	"LINKER:-Bsymbolic-functions"
 )
 
 target_compile_features(emucore PRIVATE cxx_std_20)
