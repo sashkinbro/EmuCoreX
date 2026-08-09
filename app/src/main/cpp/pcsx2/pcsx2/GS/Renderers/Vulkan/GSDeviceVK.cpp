@@ -7019,38 +7019,35 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 	if ((one_barrier || full_barrier) && !(m_pipeline_selector.ps.IsFeedbackLoopRT() || m_pipeline_selector.ps.IsFeedbackLoopDepth())) [[unlikely]]
 		Console.Warning("VK: Possible unnecessary barrier detected.");
 #endif
-	VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
+	const VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
 
-	std::array<VkImageMemoryBarrier, 2> barriers;
+	std::array<VkImageMemoryBarrier, 2> barriers = {};
 	u32 n_barriers = 0;
+	VkPipelineStageFlags barrier_src_stages = 0;
+	VkPipelineStageFlags barrier_dst_stages = 0;
 	if (full_barrier || one_barrier)
 	{
 		if (draw_rt)
 		{
-			barriers[0] = GetColorBufferFeedbackBarrier(draw_rt);
-			n_barriers++;
+			barriers[n_barriers++] = GetColorBufferFeedbackBarrier(draw_rt);
+			barrier_src_stages |= VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			barrier_dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		}
 		if (draw_ds)
 		{
-			barriers[1] = GetDepthStencilBufferFeedbackBarrier(draw_ds);
-			n_barriers++;
+			barriers[n_barriers++] = GetDepthStencilBufferFeedbackBarrier(draw_ds);
+			barrier_src_stages |=
+				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+			barrier_dst_stages |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 		}
 	}
 
 	const auto IssueBarriers = [&]() {
+		if (n_barriers == 0)
+			return;
 
-		if (draw_rt)
-		{
-			vkCmdPipelineBarrier(GetCurrentCommandBuffer(),
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, barrier_flags, 0, nullptr, 0, nullptr, 1, &barriers[0]);
-		}
-		if (draw_ds)
-		{
-			vkCmdPipelineBarrier(GetCurrentCommandBuffer(),
-				VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, barrier_flags, 0, nullptr, 0, nullptr, 1, &barriers[1]);
-		}
+		vkCmdPipelineBarrier(GetCurrentCommandBuffer(), barrier_src_stages, barrier_dst_stages, barrier_flags, 0,
+			nullptr, 0, nullptr, n_barriers, barriers.data());
 	};
 
 	if (full_barrier)

@@ -9,8 +9,6 @@
 #include "cpuinfo.h"
 #endif
 
-static u32 PAUSE_TIME = 0;
-
 static void MultiPause()
 {
 #ifdef ARCH_X86
@@ -23,23 +21,23 @@ static void MultiPause()
 	_mm_pause();
 	_mm_pause();
 #elif defined(ARCH_ARM64) && defined(_MSC_VER)
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
-	__isb(_ARM64_BARRIER_SY);
+	__yield();
+	__yield();
+	__yield();
+	__yield();
+	__yield();
+	__yield();
+	__yield();
+	__yield();
 #elif defined(ARCH_ARM64)
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
-	__asm__ __volatile__("isb");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
+	__asm__ __volatile__("yield" ::: "memory");
 #else
 #error Unknown architecture.
 #endif
@@ -67,28 +65,28 @@ static u32 MeasurePauseTime()
 	}
 }
 
-__noinline static void UpdatePauseTime()
+__noinline static u32 InitializePauseTime()
 {
+#if !defined(ARCH_ARM64)
 	u64 wait = GetCPUTicks() + GetTickFrequency() / 100; // Wake up processor (spin for 10ms)
 	while (GetCPUTicks() < wait)
 		;
+#endif
 	u32 pause = MeasurePauseTime();
 	// Take a few measurements in case something weird happens during one
 	// (e.g. OS interrupt)
 	for (int i = 0; i < 4; i++)
 		pause = std::min(pause, MeasurePauseTime());
-	PAUSE_TIME = pause;
 	DevCon.WriteLn("MultiPause time: %uns", pause);
+	return pause;
 }
 
 u32 ShortSpin()
 {
-	u32 inc = PAUSE_TIME;
-	if (inc == 0) [[unlikely]]
-	{
-		UpdatePauseTime();
-		inc = PAUSE_TIME;
-	}
+	// Function-local static initialization is thread-safe, unlike the old global
+	// load/store pair when multiple worker threads reached ShortSpin together.
+	static const u32 pause_time = InitializePauseTime();
+	const u32 inc = pause_time;
 
 	u32 time = 0;
 	// Sleep for approximately 500ns

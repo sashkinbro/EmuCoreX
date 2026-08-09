@@ -152,21 +152,27 @@ void VU_Thread::ExecuteRingBuffer()
 		int pending_xgkick_posts = 0;
 		constexpr s32 READ_POS_PUBLISH_BATCH_WORDS = _16kb / sizeof(u32);
 		u64 published_read_sequence = m_ato_read_sequence.load(std::memory_order_relaxed);
-		while (m_read_pos != GetWritePos())
+		s32 committed_write_pos = GetWritePos();
+		for (;;)
 		{
-			const s32 packet_read_pos = m_read_pos;
-			u32 tag = Read();
-			switch (tag)
+			// The acquire which captured committed_write_pos makes every packet up to
+			// that position visible. Drain the snapshot without reloading the producer's
+			// cache line for every packet, then acquire a new snapshot before sleeping.
+			while (m_read_pos != committed_write_pos)
 			{
-			case MTVU_VU_EXECUTE:
-			{
-				// Post prior packets before entering Execute so XGKICK can be drained.
-				if (pending_xgkick_posts)
+				const s32 packet_read_pos = m_read_pos;
+				u32 tag = Read();
+				switch (tag)
 				{
-					semaXGkick.Post(pending_xgkick_posts);
-					pending_xgkick_posts = 0;
-				}
-				VU1.cycle = 0;
+				case MTVU_VU_EXECUTE:
+				{
+					// Post prior packets before entering Execute so XGKICK can be drained.
+					if (pending_xgkick_posts)
+					{
+						semaXGkick.Post(pending_xgkick_posts);
+						pending_xgkick_posts = 0;
+					}
+					VU1.cycle = 0;
 					s32 addr = Read();
 					vifRegs.top = Read();
 					vifRegs.itop = Read();
@@ -177,10 +183,10 @@ void VU_Thread::ExecuteRingBuffer()
 
 					DEBUG_GS_TIMING_START(vu1_exec);
 					CpuVU1->Execute(vu1RunCycles);
-				DEBUG_GS_TIMING_END_U64(vu1_exec, vu1_exec);
+					DEBUG_GS_TIMING_END_U64(vu1_exec, vu1_exec);
 
-				gifUnit.gifPath[GIF_PATH_1].FinishGSPacketMTVU();
-				pending_xgkick_posts++;
+					gifUnit.gifPath[GIF_PATH_1].FinishGSPacketMTVU();
+					pending_xgkick_posts++;
 					vuCycles[vuCycleIdx].store(VU1.cycle, std::memory_order_release);
 					vuCycleIdx = (vuCycleIdx + 1) & 3;
 					break;
@@ -230,17 +236,23 @@ void VU_Thread::ExecuteRingBuffer()
 					m_read_pos = 0;
 					break;
 					jNO_DEFAULT;
+				}
+
+				const u64 packet_words = (m_read_pos >= packet_read_pos) ?
+					static_cast<u64>(m_read_pos - packet_read_pos) :
+					static_cast<u64>(buffer_size - packet_read_pos + m_read_pos);
+				m_read_sequence += packet_words;
+				if ((m_read_sequence - published_read_sequence) >= READ_POS_PUBLISH_BATCH_WORDS)
+				{
+					CommitReadPos();
+					published_read_sequence = m_read_sequence;
+				}
 			}
 
-			const u64 packet_words = (m_read_pos >= packet_read_pos) ?
-				static_cast<u64>(m_read_pos - packet_read_pos) :
-				static_cast<u64>(buffer_size - packet_read_pos + m_read_pos);
-			m_read_sequence += packet_words;
-			if ((m_read_sequence - published_read_sequence) >= READ_POS_PUBLISH_BATCH_WORDS)
-			{
-				CommitReadPos();
-				published_read_sequence = m_read_sequence;
-			}
+			const s32 next_committed_write_pos = GetWritePos();
+			if (next_committed_write_pos == committed_write_pos)
+				break;
+			committed_write_pos = next_committed_write_pos;
 		}
 
 		// Make IsDone()/WaitVU and the producer observe the exact final position.

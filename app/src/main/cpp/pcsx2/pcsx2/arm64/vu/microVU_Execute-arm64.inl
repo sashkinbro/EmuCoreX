@@ -41,6 +41,12 @@ static __fi void mVUExecuteOakLoadRuntimeBases()
 	oakMoveAddressToReg(OAK_XVUCLAMP, &g_cpuRegistersPack.mVUglob);
 }
 
+static __fi void mVUExecuteOakLoadMemoryBase(mV)
+{
+	oakLoad64(oakXRegister(VU_HOST_MEMBASE),
+		mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].Mem))));
+}
+
 static __fi void mVUExecuteOakLoadFpcr(OakMemOperand mem)
 {
 	oakLoad64(OAK_XSCRATCH, mem);
@@ -142,6 +148,10 @@ void mVUdispatcherAB(mV)
             oakEmitCall(reinterpret_cast<void*>(mVUexecuteVU1));
         }
 
+		// X0 contains the compiled entry returned by mVUexecuteVU*. Pin the VU data
+		// memory base without disturbing it; all standalone blocks share this ABI.
+		mVUExecuteOakLoadMemoryBase(mVU);
+
 		// Load VU's MXCSR state
 		if (mvuNeedsFPCRUpdate(mVU)) {
             const s64 vu_fpcr_offset = static_cast<s64>(isVU0 ? offsetof(cpuRegistersPack, Cpu.VU0FPCR.bitmask) : offsetof(cpuRegistersPack, Cpu.VU1FPCR.bitmask));
@@ -218,6 +228,7 @@ void mVUdispatcherCD(mV)
 	{
         mVUExecuteOakBeginStackFrame();
 		mVUExecuteOakLoadRuntimeBases();
+		mVUExecuteOakLoadMemoryBase(mVU);
 
         // Load VU's MXCSR state
         if (mvuNeedsFPCRUpdate(mVU)) {

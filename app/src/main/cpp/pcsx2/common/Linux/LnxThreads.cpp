@@ -44,7 +44,7 @@ __forceinline void Threading::SpinWait()
 #if defined(ARCH_X86)
 	__asm__("pause");
 #elif defined(ARCH_ARM64)
-	__asm__ __volatile__("isb");
+	__asm__ __volatile__("yield" ::: "memory");
 #endif
 }
 

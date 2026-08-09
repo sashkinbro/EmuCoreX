@@ -102,6 +102,9 @@ static constexpr int VU_HOST_F0 = 3;
 static constexpr int VU_HOST_F1 = 12;
 static constexpr int VU_HOST_F2 = 13;
 static constexpr int VU_HOST_F3 = 14;
+// Standalone microVU dispatchers pin the current VU data-memory base here.
+// X25 is callee-saved by AAPCS64 and is restored by the outer dispatcher frame.
+static constexpr int VU_HOST_MEMBASE = 25;
 
 // Function Params
 #define mP microVU& mVU, int recPass

@@ -520,6 +520,7 @@ public:
 			if (i == T1 || i == T2 || i == F0 || i == F1 || i == F2 || i == F3
                 || i == 4 //i == rsp.GetId()
                 || i == 16 || i == 17 || i == 18
+				|| i == VU_HOST_MEMBASE
                 || i >= iREGCNT_GPR
             ) {
 				continue;
