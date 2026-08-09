@@ -109,6 +109,17 @@ static void iopOakBeginStackFrame()
 {
 	using namespace oak::util;
 
+#if defined(__ANDROID__)
+	// X20-X23 are the only callee-saved registers available to the Android IOP
+	// allocator. X26/X27/X29 are pinned for RAM, CPU state, and the block LUT;
+	// X30 holds the native return address. The old frame also saved X19/X24/X25/X28,
+	// none of which can be modified by IOP-generated code.
+	oakAsm->SUB(SP, SP, 64);
+	oakAsm->STP(X20, X21, SP, oak::SOffset<10, 3>(0));
+	oakAsm->STP(X22, X23, SP, oak::SOffset<10, 3>(16));
+	oakAsm->STP(X26, X27, SP, oak::SOffset<10, 3>(32));
+	oakAsm->STP(X29, X30, SP, oak::SOffset<10, 3>(48));
+#else
 	oakAsm->SUB(SP, SP, 144);
 	oakAsm->STP(X19, X20, SP, oak::SOffset<10, 3>(32));
 	oakAsm->STP(X21, X22, SP, oak::SOffset<10, 3>(48));
@@ -116,12 +127,20 @@ static void iopOakBeginStackFrame()
 	oakAsm->STP(X25, X26, SP, oak::SOffset<10, 3>(80));
 	oakAsm->STP(X27, X28, SP, oak::SOffset<10, 3>(96));
 	oakAsm->STP(X29, X30, SP, oak::SOffset<10, 3>(112));
+#endif
 }
 
 static void iopOakEndStackFrame()
 {
 	using namespace oak::util;
 
+#if defined(__ANDROID__)
+	oakAsm->LDP(X29, X30, SP, oak::SOffset<10, 3>(48));
+	oakAsm->LDP(X26, X27, SP, oak::SOffset<10, 3>(32));
+	oakAsm->LDP(X22, X23, SP, oak::SOffset<10, 3>(16));
+	oakAsm->LDP(X20, X21, SP, oak::SOffset<10, 3>(0));
+	oakAsm->ADD(SP, SP, 64);
+#else
 	oakAsm->LDP(X29, X30, SP, oak::SOffset<10, 3>(112));
 	oakAsm->LDP(X27, X28, SP, oak::SOffset<10, 3>(96));
 	oakAsm->LDP(X25, X26, SP, oak::SOffset<10, 3>(80));
@@ -129,6 +148,7 @@ static void iopOakEndStackFrame()
 	oakAsm->LDP(X21, X22, SP, oak::SOffset<10, 3>(48));
 	oakAsm->LDP(X19, X20, SP, oak::SOffset<10, 3>(32));
 	oakAsm->ADD(SP, SP, 144);
+#endif
 }
 
 static void iopOakLoadCurrentPc()
@@ -1552,6 +1572,7 @@ static void iopRecRecompile(const u32 startpc)
 	pxAssert(recPtr < physical_end);
 	oakSetAsmPtr(recPtr, physical_end - recPtr);
 	recPtr = oakStartBlock();
+	JitProfiler::BlockCompileScope compile_scope(1, HWADDR(startpc));
 
 	s_pCurBlock = PSX_GETBLOCK(startpc);
 
@@ -1562,10 +1583,6 @@ static void iopRecRecompile(const u32 startpc)
 	if (!s_pCurBlockEx || s_pCurBlockEx->startpc != HWADDR(startpc))
 		s_pCurBlockEx = recBlocks.New(HWADDR(startpc), (uptr)recPtr);
 
-	if (JitProfiler::IsActive())
-	{
-		JitProfiler::EmitBlockIncrement(&s_pCurBlockEx->execution_count);
-	}
 	if (HangTrace::IsActive())
 	{
 		const u32 first_code = iopMemRead32(startpc);
@@ -1758,9 +1775,10 @@ StartRecomp:
 	s_pCurBlockEx->x86size = oakGetCurrentCodePointer() - recPtr;
 
 	Perf::iop.RegisterPC((void*)s_pCurBlockEx->fnptr, s_pCurBlockEx->x86size, s_pCurBlockEx->startpc);
-	JitProfiler::RecordBlockCompile(1, s_pCurBlockEx->startpc, s_pCurBlockEx->size, s_pCurBlockEx->x86size);
-
+	const u8* const compiled_host_end = oakGetCurrentCodePointer();
 	recPtr = oakEndBlock();
+	compile_scope.Finish(s_pCurBlockEx->size, s_pCurBlockEx->x86size,
+		reinterpret_cast<const void*>(s_pCurBlockEx->fnptr), compiled_host_end);
 
 	pxAssert((g_psxHasConstReg & g_psxFlushedConstReg) == g_psxHasConstReg);
 

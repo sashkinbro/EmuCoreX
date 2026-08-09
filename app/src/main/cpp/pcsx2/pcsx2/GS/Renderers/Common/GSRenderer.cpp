@@ -469,46 +469,16 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 	return ret;
 }
 
-static bool ShouldGuardPresentEdges()
-{
-#ifdef __ANDROID__
-	return true;
-#else
-	return GSConfig.LinearPresent != GSPostBilinearMode::Off;
-#endif
-}
-
-static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i real_size, bool guard_edges = false)
+static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i real_size)
 {
 	const GSVector2i size(src->GetSize());
 	const GSVector2 scale = (real_size.x > 0 && real_size.y > 0) ?
 		(GSVector2(size.x, size.y) / GSVector2(real_size.x, real_size.y)) : GSVector2(1.0f, 1.0f);
 	const float upscale = GSIsHardwareRenderer() ? GSConfig.UpscaleMultiplier : 1;
-	int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0] * scale.x) * upscale);
-	int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1] * scale.y) * upscale);
-	int right =  size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2] * scale.x) * upscale);
-	int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3] * scale.y) * upscale);
-
-#ifdef __ANDROID__
-	if (guard_edges)
-	{
-		// Treat this as a small implicit crop in native GS pixels. Some games
-		// leave stale VRAM around any edge of the active display area, and Android
-		// exposes it clearly after scaling to the swapchain.
-		constexpr float EDGE_GUARD_NATIVE_PIXELS = 5.0f;
-		const int edge_guard_x = std::max(1, static_cast<int>(std::ceil(EDGE_GUARD_NATIVE_PIXELS * upscale * std::max(scale.x, 1.0f))));
-		const int edge_guard_y = std::max(1, static_cast<int>(std::ceil(EDGE_GUARD_NATIVE_PIXELS * upscale * std::max(scale.y, 1.0f))));
-
-		if ((right - left) > (edge_guard_x * 2) && (bottom - top) > (edge_guard_y * 2))
-		{
-			left += edge_guard_x;
-			top += edge_guard_y;
-			right -= edge_guard_x;
-			bottom -= edge_guard_y;
-		}
-	}
-#endif
-
+	const int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0] * scale.x) * upscale);
+	const int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1] * scale.y) * upscale);
+	const int right =  size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2] * scale.x) * upscale);
+	const int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3] * scale.y) * upscale);
 	return GSVector4i(left, top, right, bottom);
 }
 
@@ -839,7 +809,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current && !blank_frame)
 		{
-			src_rect = CalculateDrawSrcRect(current, m_real_size, ShouldGuardPresentEdges());
+			src_rect = CalculateDrawSrcRect(current, m_real_size);
 			src_uv = GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy();
 			draw_rect = CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
@@ -1130,7 +1100,7 @@ void GSRenderer::PresentCurrentFrame()
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current)
 		{
-			const GSVector4i src_rect(CalculateDrawSrcRect(current, m_real_size, ShouldGuardPresentEdges()));
+			const GSVector4i src_rect(CalculateDrawSrcRect(current, m_real_size));
 			const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
 			const GSVector4 draw_rect(CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),

@@ -1367,8 +1367,80 @@ static void rpsxFinishLoad32_emit_oaknut(int rt)
 		oakStore32(OAK_WARG1, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 }
 
+enum class IopConstantRamLoad : u8
+{
+	Signed8,
+	Unsigned8,
+	Signed16,
+	Unsigned16,
+	Unsigned32,
+};
+
+static bool rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad load)
+{
+	if (!PSX_IS_CONST1(_Rs_))
+		return false;
+
+	// Match the generic path exactly: W-register addition wraps at 32 bits,
+	// bit 28 selects the direct IOP RAM path, and RAM mirrors wrap at 2 MiB.
+	const u32 effective_address = g_psxConstRegs[_Rs_] + static_cast<u32>(_Imm_);
+	if (effective_address & 0x10000000u)
+		return false;
+
+	// Direct RAM reads have no observable side effects, matching the generic
+	// fast path which skips the actual load when the destination is r0.
+	if (_Rt_ == 0)
+		return true;
+
+	PSX_DEL_CONST(_Rt_);
+	_deletePSXtoX86reg(_Rt_, DELETE_REG_FREE_NO_WRITEBACK);
+	const int rt = rpsxAllocRegIfUsed(_Rt_, MODE_WRITE);
+
+	// Keep the address in an allocator-owned callee-saved temporary. This avoids
+	// clobbering a live caller-saved register while preserving the rest of the
+	// IOP register cache across the direct RAM load.
+	const int address_temp = _allocX86reg(X86TYPE_TEMP, 0, MODE_CALLEESAVED);
+	const oak::WReg address = oakWRegister(address_temp);
+	const oak::WReg result = (rt < 0) ? address : oakWRegister(rt);
+
+	recBeginOaknutEmit();
+	oakAsm->MOV(address, effective_address & 0x1fffffu);
+	switch (load)
+	{
+		case IopConstantRamLoad::Signed8:
+			oakAsm->LDRSB(result, oak::util::X26, oakXRegister(address_temp));
+			break;
+
+		case IopConstantRamLoad::Unsigned8:
+			oakAsm->LDRB(result, oak::util::X26, oakXRegister(address_temp));
+			break;
+
+		case IopConstantRamLoad::Signed16:
+			oakAsm->LDRSH(result, oak::util::X26, oakXRegister(address_temp));
+			break;
+
+		case IopConstantRamLoad::Unsigned16:
+			oakAsm->LDRH(result, oak::util::X26, oakXRegister(address_temp));
+			break;
+
+		case IopConstantRamLoad::Unsigned32:
+			oakAsm->LDR(result, oak::util::X26, oakXRegister(address_temp));
+			break;
+	}
+
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
+	recEndOaknutEmit();
+
+	_freeX86reg(address_temp);
+	return true;
+}
+
 static void rpsxLB_emit_oaknut()
 {
+	if (rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad::Signed8))
+		return;
+
 	const int addr_temp = rpsxCaptureAddressOperand_emit_oaknut();
 	const int rt = rpsxPrepareLoadTarget_emit_oaknut();
 
@@ -1386,18 +1458,24 @@ static void rpsxLB_emit_oaknut()
 		_freeX86reg(addr_temp);
 		return;
 	}
+	rpsxFinishLoad8Signed_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
 	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
-	oakAsm->LDRB(OAK_WARG1, oak::util::X26, oak::util::X0);
+	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
+	oakAsm->LDRSB(result, oak::util::X26, oak::util::X0);
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 	oakAsm->l(done);
-	rpsxFinishLoad8Signed_emit_oaknut(rt);
 	recEndOaknutEmit();
 	_freeX86reg(addr_temp);
 }
 
 static void rpsxLBU_emit_oaknut()
 {
+	if (rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad::Unsigned8))
+		return;
+
 	const int addr_temp = rpsxCaptureAddressOperand_emit_oaknut();
 	const int rt = rpsxPrepareLoadTarget_emit_oaknut();
 
@@ -1415,18 +1493,24 @@ static void rpsxLBU_emit_oaknut()
 		_freeX86reg(addr_temp);
 		return;
 	}
+	rpsxFinishLoad8Unsigned_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
 	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
-	oakAsm->LDRB(OAK_WARG1, oak::util::X26, oak::util::X0);
+	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
+	oakAsm->LDRB(result, oak::util::X26, oak::util::X0);
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 	oakAsm->l(done);
-	rpsxFinishLoad8Unsigned_emit_oaknut(rt);
 	recEndOaknutEmit();
 	_freeX86reg(addr_temp);
 }
 
 static void rpsxLH_emit_oaknut()
 {
+	if (rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad::Signed16))
+		return;
+
 	const int addr_temp = rpsxCaptureAddressOperand_emit_oaknut();
 	const int rt = rpsxPrepareLoadTarget_emit_oaknut();
 
@@ -1444,18 +1528,24 @@ static void rpsxLH_emit_oaknut()
 		_freeX86reg(addr_temp);
 		return;
 	}
+	rpsxFinishLoad16Signed_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
 	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
-	oakAsm->LDRH(OAK_WARG1, oak::util::X26, oak::util::X0);
+	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
+	oakAsm->LDRSH(result, oak::util::X26, oak::util::X0);
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 	oakAsm->l(done);
-	rpsxFinishLoad16Signed_emit_oaknut(rt);
 	recEndOaknutEmit();
 	_freeX86reg(addr_temp);
 }
 
 static void rpsxLHU_emit_oaknut()
 {
+	if (rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad::Unsigned16))
+		return;
+
 	const int addr_temp = rpsxCaptureAddressOperand_emit_oaknut();
 	const int rt = rpsxPrepareLoadTarget_emit_oaknut();
 
@@ -1473,18 +1563,24 @@ static void rpsxLHU_emit_oaknut()
 		_freeX86reg(addr_temp);
 		return;
 	}
+	rpsxFinishLoad16Unsigned_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
 	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
-	oakAsm->LDRH(OAK_WARG1, oak::util::X26, oak::util::X0);
+	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
+	oakAsm->LDRH(result, oak::util::X26, oak::util::X0);
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 	oakAsm->l(done);
-	rpsxFinishLoad16Unsigned_emit_oaknut(rt);
 	recEndOaknutEmit();
 	_freeX86reg(addr_temp);
 }
 
 static void rpsxLW_emit_oaknut()
 {
+	if (rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad::Unsigned32))
+		return;
+
 	const int addr_temp = rpsxCaptureAddressOperand_emit_oaknut();
 	const int rt = rpsxPrepareLoadTarget_emit_oaknut();
 
@@ -1502,12 +1598,15 @@ static void rpsxLW_emit_oaknut()
 		_freeX86reg(addr_temp);
 		return;
 	}
+	rpsxFinishLoad32_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
 	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
-	oakAsm->LDR(OAK_WARG1, oak::util::X26, oak::util::X0);
+	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
+	oakAsm->LDR(result, oak::util::X26, oak::util::X0);
+	if (rt < 0)
+		oakStore32(result, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.GPR.r[_Rt_]))});
 	oakAsm->l(done);
-	rpsxFinishLoad32_emit_oaknut(rt);
 
 	recEndOaknutEmit();
 	_freeX86reg(addr_temp);

@@ -967,6 +967,15 @@ void GSState::GIFPackedRegHandlerXYZF2(const GIFPackedReg* RESTRICT r)
 	if (!skip || GSUtil::GetPrimClass(m_prev_env.PRIM.PRIM) != GSUtil::GetPrimClass(m_env.PRIM.PRIM) || (m_dirty_gs_regs & (1 << DIRTY_REG_XYOFFSET)))
 		CheckFlushes();
 
+#if defined(ARCH_ARM64)
+	// The packed GS register already exposes the exact scalar fields needed by
+	// GSVertex.  Loading the whole register and reshuffling it costs several
+	// NEON instructions on AArch64, while UV is intentionally preserved here.
+	m_v.XYZ.X = r->XYZF2.X;
+	m_v.XYZ.Y = r->XYZF2.Y;
+	m_v.XYZ.Z = r->XYZF2.Z;
+	m_v.FOG = r->XYZF2.F;
+#else
 	GSVector4i xy = GSVector4i::loadnt(r);
 	GSVector4i zf = xy.zwzw();
 
@@ -974,6 +983,7 @@ void GSState::GIFPackedRegHandlerXYZF2(const GIFPackedReg* RESTRICT r)
 	zf = zf.srl32<4>() & GSVector4i::x00ffffff().upl32(GSVector4i::x000000ff());
 
 	m_v.m[1] = xy.upl32(zf);
+#endif
 
 	VertexKick<prim, auto_flush>(skip);
 }
@@ -986,11 +996,19 @@ void GSState::GIFPackedRegHandlerXYZ2(const GIFPackedReg* RESTRICT r)
 	if (!skip || GSUtil::GetPrimClass(m_prev_env.PRIM.PRIM) != GSUtil::GetPrimClass(m_env.PRIM.PRIM) || (m_dirty_gs_regs & (1 << DIRTY_REG_XYOFFSET)))
 		CheckFlushes();
 
+#if defined(ARCH_ARM64)
+	// Preserve UV/FOG and write the three fields directly.  This is bit-identical
+	// to the vector unpack below and avoids its shuffle chain on AArch64.
+	m_v.XYZ.X = r->XYZ2.X;
+	m_v.XYZ.Y = r->XYZ2.Y;
+	m_v.XYZ.Z = r->XYZ2.Z;
+#else
 	const GSVector4i xy = GSVector4i::loadnt(r);
 	const GSVector4i z = xy.zzzz();
 	const GSVector4i xyz = xy.upl16(xy.srl<4>()).upl32(z);
 
 	m_v.m[1] = xyz.upl64(GSVector4i::loadl(&m_v.UV));
+#endif
 
 	VertexKick<prim, auto_flush>(skip);
 }
@@ -1028,12 +1046,19 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u3
 
 		m_v.m[0] = st.upl64(rgba.upl32(q)); // TODO: only store the last one
 
+#if defined(ARCH_ARM64)
+		m_v.XYZ.X = r[2].XYZF2.X;
+		m_v.XYZ.Y = r[2].XYZF2.Y;
+		m_v.XYZ.Z = r[2].XYZF2.Z;
+		m_v.FOG = r[2].XYZF2.F;
+#else
 		GSVector4i xy = GSVector4i::loadl(&r[2].U64[0]);
 		GSVector4i zf = GSVector4i::loadl(&r[2].U64[1]);
 		xy = xy.upl16(xy.srl<4>()).upl32(GSVector4i::load((int)m_v.UV));
 		zf = zf.srl32<4>() & GSVector4i::x00ffffff().upl32(GSVector4i::x000000ff());
 
 		m_v.m[1] = xy.upl32(zf); // TODO: only store the last one
+#endif
 
 		VertexKick<prim, auto_flush>(r[2].XYZF2.Skip());
 
@@ -1062,11 +1087,17 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZ2(const GIFPackedReg* RESTRICT r, u32
 
 		m_v.m[0] = st.upl64(rgba.upl32(q)); // TODO: only store the last one
 
+#if defined(ARCH_ARM64)
+		m_v.XYZ.X = r[2].XYZ2.X;
+		m_v.XYZ.Y = r[2].XYZ2.Y;
+		m_v.XYZ.Z = r[2].XYZ2.Z;
+#else
 		const GSVector4i xy = GSVector4i::loadl(&r[2].U64[0]);
 		const GSVector4i z = GSVector4i::loadl(&r[2].U64[1]);
 		const GSVector4i xyz = xy.upl16(xy.srl<4>()).upl32(z);
 
 		m_v.m[1] = xyz.upl64(GSVector4i::loadl(&m_v.UV)); // TODO: only store the last one
+#endif
 
 		VertexKick<prim, auto_flush>(r[2].XYZ2.Skip());
 
@@ -5127,11 +5158,15 @@ __forceinline void GSState::VertexKick(u32 skip)
 	u32 next = m_vertex.next;
 	u32 xy_tail = m_vertex.xy_tail;
 
-	if (GSIsHardwareRenderer() && GSLocalMemory::m_psm[m_context->ZBUF.PSM].bpp == 32)
+	// This hack is disabled by default. Check its cheap global selector before touching the
+	// renderer state, drawing context, and PSM table on every submitted vertex.
+	const GSLimit24BitDepth limit_24bit_depth = GSConfig.UserHacks_Limit24BitDepth;
+	if (limit_24bit_depth != GSLimit24BitDepth::Disabled && GSIsHardwareRenderer() &&
+		GSLocalMemory::m_psm[m_context->ZBUF.PSM].bpp == 32)
 	{
-		if (GSConfig.UserHacks_Limit24BitDepth == GSLimit24BitDepth::PrioritizeUpper)
+		if (limit_24bit_depth == GSLimit24BitDepth::PrioritizeUpper)
 			m_v.XYZ.Z = ((m_v.XYZ.Z >> 8) & ~0xFF) | (m_v.XYZ.Z & 0xFF);
-		else if (GSConfig.UserHacks_Limit24BitDepth == GSLimit24BitDepth::PrioritizeLower)
+		else if (limit_24bit_depth == GSLimit24BitDepth::PrioritizeLower)
 			m_v.XYZ.Z &= 0x00FFFFFF;
 	}
 

@@ -118,4 +118,5 @@ void SetPerformanceGpuState(std::string name, bool timing_active);
 std::string GetPerformanceMetricsSnapshot();
 void RequestCurrentVmStop();
 void ClearPendingHostCpuTasks();
+void PollPendingPadUpdatesOnCPUThread();
 }

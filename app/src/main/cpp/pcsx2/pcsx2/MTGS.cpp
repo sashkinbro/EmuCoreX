@@ -474,9 +474,12 @@ void MTGS::MainLoop()
 				if (!vu1Thread.semaXGkick.TryWait())
 				{
 					mtvu_lock.unlock();
-					// Wait for MTVU to complete vu1 program
+					// This command is queued before MTVU has completed the VU1 program, so this
+					// handoff is commonly not a short wait. Avoid burning the GS thread's full
+					// userspace spin budget while MTVU is still executing. The semaphore counter
+					// also makes a Post racing this call safe: Wait() consumes it without sleeping.
 					DEBUG_PROF_TIMING_START(mtgs_mtvu_wait);
-					vu1Thread.semaXGkick.WaitWithSpin();
+					vu1Thread.semaXGkick.Wait();
 					DEBUG_PROF_TIMING_END(mtgs_mtvu_wait, mtgs_mtvu_wait);
 					mtvu_lock.lock();
 				}
@@ -490,6 +493,11 @@ void MTGS::MainLoop()
 						const bool bad_alignment = (gsPack.size & 0xF) != 0;
 						bool tags_ok = true;
 
+						// GSgifTransfer() is strictly bounded by the packet QWC. Walking every GIF tag
+						// here duplicates its parsing and cache traffic on the MTGS hot path. Retain the
+						// detailed malformed-tag diagnostic in developer builds only; release builds
+						// still validate the packet's 64-bit range and QWC alignment before transfer.
+#if defined(PCSX2_DEVBUILD)
 						// Quick path: check if first tag has EOP (single-tag packet, very common)
 						// Skip full validation for this common case
 						if (!out_of_range && !bad_alignment && gsPack.size >= 16)
@@ -550,6 +558,7 @@ void MTGS::MainLoop()
 								}
 							}
 						}
+#endif
 						if (out_of_range || bad_alignment || !tags_ok)
 						{
 							Console.Error("MTVU GSPacket bad: offset=0x%x size=0x%x buffSize=0x%x "

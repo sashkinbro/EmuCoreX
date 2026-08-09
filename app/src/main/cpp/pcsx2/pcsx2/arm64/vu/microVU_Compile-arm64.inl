@@ -818,6 +818,7 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		thisPtr = oakStartBlock();
 		startedOakBlock = true;
 	}
+	JitProfiler::BlockCompileScope compile_scope(isVU1 ? 3 : 2, startPC);
 
 	const u32 endCount = (((microRegInfo*)pState)->blockType) ? 1 : (mVU.microMemSize >> 3); // mVU.microMemSize / 8
 
@@ -826,10 +827,6 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUsetupRange(mVU, startPC, 1); // Setup Program Bounds/Range
 	mVU.regAlloc->reset(false);          // Reset regAlloc
 	mVUinitFirstPass(mVU, pState, thisPtr);
-	if (JitProfiler::IsActive())
-	{
-		JitProfiler::EmitBlockIncrement(&mVUpBlock->execution_count);
-	}
 	if (HangTrace::IsActive())
 	{
 		u32 upper = 0;
@@ -1200,11 +1197,12 @@ perf_and_return:
 	{
 		compiledBlock->host_size = (u32)(oakGetCurrentCodePointer() - thisPtr);
 	}
-	if (compiledBlock)
-		JitProfiler::RecordBlockCompile(isVU1 ? 3 : 2, startPC, compiledBlock->guest_size, compiledBlock->host_size);
+	const u8* const compiledHostEnd = oakGetCurrentCodePointer();
 
 	if (startedOakBlock)
 		mVU.prog.x86ptr = oakEndBlock();
+	if (compiledBlock)
+		compile_scope.Finish(compiledBlock->guest_size, compiledBlock->host_size, thisPtr, compiledHostEnd);
 
 	return thisPtr;
 }

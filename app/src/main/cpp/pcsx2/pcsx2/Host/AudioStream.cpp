@@ -233,16 +233,25 @@ std::optional<AudioExpansionMode> AudioStream::ParseExpansionMode(const char* na
 	return std::nullopt;
 }
 
-u32 AudioStream::GetBufferedFramesRelaxed() const
+u32 AudioStream::GetBufferedFramesForConsumer() const
 {
 	const u32 rpos = m_rpos.load(std::memory_order_relaxed);
+	// Pair with the producer's release store before reading the published samples.
+	const u32 wpos = m_wpos.load(std::memory_order_acquire);
+	return (wpos + m_buffer_size - rpos) % m_buffer_size;
+}
+
+u32 AudioStream::GetBufferedFramesForProducer() const
+{
+	// Pair with the consumer's release store before reusing consumed buffer space.
+	const u32 rpos = m_rpos.load(std::memory_order_acquire);
 	const u32 wpos = m_wpos.load(std::memory_order_relaxed);
 	return (wpos + m_buffer_size - rpos) % m_buffer_size;
 }
 
 void AudioStream::ReadFrames(SampleType* samples, u32 num_frames)
 {
-	const u32 available_frames = GetBufferedFramesRelaxed();
+	const u32 available_frames = GetBufferedFramesForConsumer();
 	u32 frames_to_read = num_frames;
 	u32 silence_frames = 0;
 
@@ -275,7 +284,7 @@ void AudioStream::ReadFrames(SampleType* samples, u32 num_frames)
 
 	if (frames_to_read > 0)
 	{
-		u32 rpos = m_rpos.load(std::memory_order_acquire);
+		u32 rpos = m_rpos.load(std::memory_order_relaxed);
 
 		u32 end = m_buffer_size - rpos;
 		if (end > frames_to_read)
@@ -354,7 +363,7 @@ void AudioStream::StereoSampleReaderImpl(SampleType* dest, const SampleType* src
 
 void AudioStream::InternalWriteFrames(const SampleType* data, u32 num_frames)
 {
-	const u32 free = m_buffer_size - GetBufferedFramesRelaxed();
+	const u32 free = m_buffer_size - GetBufferedFramesForProducer();
 	if (free <= num_frames)
 	{
 		if (IsStretchEnabled())
@@ -368,7 +377,7 @@ void AudioStream::InternalWriteFrames(const SampleType* data, u32 num_frames)
 		}
 	}
 
-	u32 wpos = m_wpos.load(std::memory_order_acquire);
+	u32 wpos = m_wpos.load(std::memory_order_relaxed);
 
 	// wrapping around the end of the buffer?
 	if ((m_buffer_size - wpos) <= num_frames)
@@ -702,7 +711,7 @@ void AudioStream::UpdateStretchTempo()
 		m_dynamic_target_usage = base_target_usage;
 	}
 
-	const u32 ibuffer_usage = GetBufferedFramesRelaxed();
+	const u32 ibuffer_usage = GetBufferedFramesForProducer();
 	float buffer_usage = static_cast<float>(ibuffer_usage);
 	float tempo = buffer_usage / m_dynamic_target_usage;
 	tempo = AddAndGetAverageTempo(tempo);

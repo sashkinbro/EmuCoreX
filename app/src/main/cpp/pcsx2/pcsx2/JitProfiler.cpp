@@ -60,22 +60,28 @@ namespace
 	static std::chrono::steady_clock::time_point s_start_time;
 	static u64 s_start_frame = 0;
 	static std::mutex s_compile_mutex;
-	static std::mutex s_opcode_range_mutex;
+	static thread_local BlockCompileScope* s_current_compile_scope = nullptr;
 
 	struct OpcodeRangeEvent
 	{
 		uptr host_begin = 0;
 		uptr host_end = 0;
 		u32 first_sample = 0;
+		u32 cache_generation = 0;
 		u32 guest_pc = 0;
 		u32 opcode = 0;
 		u32 paired_opcode = 0;
 		int type = 0;
 	};
 
-	static std::vector<OpcodeRangeEvent> s_opcode_ranges;
-	static constexpr size_t OPCODE_RANGE_CAPACITY = 1u << 19;
+	static constexpr u32 OPCODE_RANGE_CAPACITY = 1u << 19;
+	static constexpr u32 OPCODE_RANGE_CHUNK_SIZE = 256;
+	static std::unique_ptr<OpcodeRangeEvent[]> s_opcode_range_buffer;
+	static OpcodeRangeEvent* s_opcode_ranges = nullptr;
+	static std::atomic<u32> s_opcode_range_write{0};
+	static std::atomic<u32> s_opcode_capture_generation{0};
 	static std::atomic<bool> s_opcode_range_limit_hit{false};
+	static std::array<std::atomic<u32>, 4> s_code_cache_generations{};
 
 	struct RawPcSample
 	{
@@ -108,8 +114,14 @@ namespace
 		u32 startpc = 0;
 		u32 guest_size = 0;
 		u32 host_size = 0;
+		uptr host_begin = 0;
+		uptr host_end = 0;
+		u32 first_sample = 0;
+		u32 cache_generation = 0;
 		u64 frame = 0;
 		double seconds = 0.0;
+		u64 inclusive_compile_ns = 0;
+		u64 exclusive_compile_ns = 0;
 	};
 
 	static std::vector<CompileEvent> s_compile_events;
@@ -192,9 +204,13 @@ namespace
 		u64 blocks = 0;
 		u64 guest_slots = 0;
 		u64 host_bytes = 0;
+		u64 inclusive_compile_ns = 0;
+		u64 exclusive_compile_ns = 0;
+		u64 max_exclusive_compile_ns = 0;
 		u64 frames = 0;
 		u64 peak_frame_blocks = 0;
 		u64 peak_frame_host_bytes = 0;
+		u64 peak_frame_compile_ns = 0;
 		u64 peak_frame = 0;
 	};
 
@@ -205,6 +221,9 @@ namespace
 		u64 blocks = 0;
 		u64 guest_slots = 0;
 		u64 host_bytes = 0;
+		u64 inclusive_compile_ns = 0;
+		u64 exclusive_compile_ns = 0;
+		u64 max_exclusive_compile_ns = 0;
 		u64 first_frame = std::numeric_limits<u64>::max();
 		u64 last_frame = 0;
 	};
@@ -214,7 +233,21 @@ namespace
 		u64 frame = 0;
 		u64 blocks = 0;
 		u64 host_bytes = 0;
+		u64 exclusive_compile_ns = 0;
 		std::array<u64, 4> cpu_blocks = {};
+		std::array<u64, 4> cpu_compile_ns = {};
+	};
+
+	struct TimeBlockStat
+	{
+		int type = 0;
+		u32 guest_pc = 0;
+		u32 guest_size = 0;
+		u32 host_size = 0;
+		u64 samples = 0;
+		u64 direct_samples = 0;
+		u64 helper_samples = 0;
+		u64 compiled_versions = 0;
 	};
 
 #if defined(__ANDROID__) && defined(__aarch64__)
@@ -313,31 +346,102 @@ namespace
 #endif
 	}
 
+	int NormalizeProfileType(int type)
+	{
+		if (type == 4)
+			return 2;
+		if (type == 5)
+			return 3;
+		return (type >= 0 && type < 4) ? type : 0;
+	}
+
+	u32 GetCodeCacheGeneration(int type)
+	{
+		return s_code_cache_generations[NormalizeProfileType(type)].load(std::memory_order_relaxed);
+	}
+
 	void RecordOpcodeRange(int type, u32 guest_pc, u32 opcode, u32 paired_opcode, uptr host_begin, uptr host_end)
 	{
-		if (host_end <= host_begin)
+		if (host_end <= host_begin || !s_opcode_ranges)
 			return;
+
+		// EE/IOP and MTVU compile on separate owning threads. Reserve a small range
+		// of unique slots per thread so the hot compile path pays one atomic RMW per
+		// chunk instead of one mutex/atomic RMW per guest opcode.
+		static thread_local u32 chunk_generation = 0;
+		static thread_local u32 chunk_next = 0;
+		static thread_local u32 chunk_end = 0;
+		const u32 generation = s_opcode_capture_generation.load(std::memory_order_relaxed);
+		if (chunk_generation != generation)
+		{
+			chunk_generation = generation;
+			chunk_next = 0;
+			chunk_end = 0;
+		}
+		if (chunk_next == chunk_end)
+		{
+			const u32 chunk_begin = s_opcode_range_write.fetch_add(OPCODE_RANGE_CHUNK_SIZE, std::memory_order_relaxed);
+			if (chunk_begin >= OPCODE_RANGE_CAPACITY)
+			{
+				// Continuing to sample without recording newer ranges would attribute reused
+				// JIT addresses to stale code after a cache reset.
+				s_opcode_range_limit_hit.store(true, std::memory_order_relaxed);
+				s_sampling_active.store(false, std::memory_order_release);
+				return;
+			}
+			chunk_next = chunk_begin;
+			chunk_end = std::min(chunk_begin + OPCODE_RANGE_CHUNK_SIZE, OPCODE_RANGE_CAPACITY);
+		}
+		const u32 index = chunk_next++;
+		if (index >= OPCODE_RANGE_CAPACITY)
+		{
+			s_opcode_range_limit_hit.store(true, std::memory_order_relaxed);
+			s_sampling_active.store(false, std::memory_order_release);
+			return;
+		}
 
 		OpcodeRangeEvent event;
 		event.host_begin = host_begin;
 		event.host_end = host_end;
 		event.first_sample = std::min(s_sample_write.load(std::memory_order_relaxed), SAMPLE_BUFFER_CAPACITY);
+		event.cache_generation = GetCodeCacheGeneration(type);
 		event.guest_pc = guest_pc;
 		event.opcode = opcode;
 		event.paired_opcode = paired_opcode;
 		event.type = type;
+		s_opcode_ranges[index] = event;
+	}
 
-		std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
-		if (s_opcode_ranges.size() >= OPCODE_RANGE_CAPACITY)
+	void RecordBlockCompileEvent(int type, u32 startpc, u32 guest_size, u32 host_size,
+		uptr host_begin, uptr host_end, u64 inclusive_compile_ns, u64 exclusive_compile_ns)
+	{
+		if (host_end <= host_begin)
+			return;
+
+		CompileEvent event;
+		event.type = type;
+		event.startpc = startpc;
+		event.guest_size = guest_size;
+		event.host_size = host_size;
+		event.host_begin = host_begin;
+		event.host_end = host_end;
+		event.first_sample = std::min(s_sample_write.load(std::memory_order_relaxed), SAMPLE_BUFFER_CAPACITY);
+		event.cache_generation = GetCodeCacheGeneration(type);
+		event.frame = PerformanceMetrics::GetFrameNumber() - s_start_frame;
+		event.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - s_start_time).count();
+		event.inclusive_compile_ns = inclusive_compile_ns;
+		event.exclusive_compile_ns = exclusive_compile_ns;
+
+		std::lock_guard<std::mutex> lock(s_compile_mutex);
+		if (s_compile_events.size() >= COMPILE_EVENT_CAPACITY)
 		{
-			// Stop the sampler at the same boundary. Continuing to sample without
-			// recording newer ranges would attribute reused JIT addresses to stale
-			// code after a cache reset.
-			s_opcode_range_limit_hit.store(true, std::memory_order_relaxed);
+			s_compile_events_dropped.fetch_add(1, std::memory_order_relaxed);
+			// Block ranges are also used for sampled hot-block attribution. Stop the
+			// sampler rather than mapping reused cache addresses to stale blocks.
 			s_sampling_active.store(false, std::memory_order_release);
 			return;
 		}
-		s_opcode_ranges.push_back(event);
+		s_compile_events.push_back(event);
 	}
 
 	const char* CpuName(int type)
@@ -881,12 +985,53 @@ namespace
 			if (range->first_sample > sample_index || host_pc < range->host_begin || host_pc >= range->host_end)
 				continue;
 
-			if (!best || range->first_sample > best->first_sample ||
-				(range->first_sample == best->first_sample &&
+			if (!best || range->cache_generation > best->cache_generation ||
+				(range->cache_generation == best->cache_generation && range->first_sample > best->first_sample) ||
+				(range->cache_generation == best->cache_generation && range->first_sample == best->first_sample &&
 					(range->host_end - range->host_begin) < (best->host_end - best->host_begin)))
 			{
 				best = range;
 			}
+		}
+		return best;
+	}
+
+	const CompileEvent* FindBlockSampleRange(
+		const std::unordered_map<uptr, std::vector<const CompileEvent*>>& page_map,
+		uptr host_pc,
+		u32 sample_index)
+	{
+		const auto page_it = page_map.find(host_pc >> 12);
+		if (page_it == page_map.end())
+			return nullptr;
+
+		const CompileEvent* best = nullptr;
+		for (const CompileEvent* range : page_it->second)
+		{
+			if (range->first_sample > sample_index || host_pc < range->host_begin || host_pc >= range->host_end)
+				continue;
+
+			if (!best)
+			{
+				best = range;
+				continue;
+			}
+			if (range->cache_generation != best->cache_generation)
+			{
+				if (range->cache_generation > best->cache_generation)
+					best = range;
+				continue;
+			}
+
+			// Recursive microVU compilation can create a child block physically inside
+			// its parent's emitted range. Prefer the narrower containing range there;
+			// otherwise prefer the newest range to handle code-cache address reuse.
+			const bool candidate_inside_best = range->host_begin >= best->host_begin && range->host_end <= best->host_end &&
+				(range->host_begin != best->host_begin || range->host_end != best->host_end);
+			const bool best_inside_candidate = best->host_begin >= range->host_begin && best->host_end <= range->host_end &&
+				(best->host_begin != range->host_begin || best->host_end != range->host_end);
+			if (candidate_inside_best || (!best_inside_candidate && range->first_sample > best->first_sample))
+				best = range;
 		}
 		return best;
 	}
@@ -1000,17 +1145,21 @@ namespace
 		return "<native-or-unmapped>";
 	}
 
-	void AppendSamplingHotspots(std::ostringstream& out)
+	void AppendSamplingHotspots(std::ostringstream& out, const std::vector<CompileEvent>& compile_events)
 	{
 		const u32 captured_samples = std::min(s_sample_write.load(std::memory_order_relaxed), SAMPLE_BUFFER_CAPACITY);
 		const u32 dropped_samples = s_sample_dropped.load(std::memory_order_relaxed);
 
 		std::vector<OpcodeRangeEvent> ranges;
+		const u32 captured_ranges = std::min(s_opcode_range_write.load(std::memory_order_relaxed), OPCODE_RANGE_CAPACITY);
+		if (s_opcode_ranges && captured_ranges > 0)
 		{
-			std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
-			// Sampling is stopped before report generation, so ownership can move
-			// into the report without temporarily duplicating tens of megabytes.
-			ranges.swap(s_opcode_ranges);
+			ranges.reserve(captured_ranges);
+			for (u32 i = 0; i < captured_ranges; i++)
+			{
+				if (s_opcode_ranges[i].host_end > s_opcode_ranges[i].host_begin)
+					ranges.push_back(s_opcode_ranges[i]);
+			}
 		}
 
 		std::unordered_map<uptr, std::vector<const OpcodeRangeEvent*>> page_map;
@@ -1020,6 +1169,28 @@ namespace
 			const uptr last_page = (range.host_end - 1) >> 12;
 			for (uptr page = first_page; page <= last_page; page++)
 				page_map[page].push_back(&range);
+		}
+
+		std::unordered_map<uptr, std::vector<const CompileEvent*>> block_page_map;
+		std::unordered_map<u64, TimeBlockStat> block_stats;
+		for (const CompileEvent& event : compile_events)
+		{
+			if (event.host_end <= event.host_begin)
+				continue;
+
+			const uptr first_page = event.host_begin >> 12;
+			const uptr last_page = (event.host_end - 1) >> 12;
+			for (uptr page = first_page; page <= last_page; page++)
+				block_page_map[page].push_back(&event);
+
+			const int type = (event.type >= 0 && event.type < 4) ? event.type : 0;
+			const u64 key = (static_cast<u64>(type) << 32) | event.startpc;
+			TimeBlockStat& stat = block_stats[key];
+			stat.type = type;
+			stat.guest_pc = event.startpc;
+			stat.guest_size = event.guest_size;
+			stat.host_size = event.host_size;
+			stat.compiled_versions++;
 		}
 
 		std::unordered_map<std::string, TimeSampleStat> opcode_stats;
@@ -1036,6 +1207,24 @@ namespace
 			const RawPcSample& sample = s_raw_samples[i];
 			cpu_thread_samples += (sample.thread_type == 1);
 			vu_thread_samples += (sample.thread_type == 2);
+
+			const CompileEvent* block = FindBlockSampleRange(block_page_map, sample.pc, i);
+			bool block_helper = false;
+			if (!block && sample.lr)
+			{
+				block = FindBlockSampleRange(block_page_map, sample.lr, i);
+				block_helper = (block != nullptr);
+			}
+			if (block)
+			{
+				const int type = (block->type >= 0 && block->type < 4) ? block->type : 0;
+				const u64 key = (static_cast<u64>(type) << 32) | block->startpc;
+				TimeBlockStat& stat = block_stats[key];
+				stat.samples++;
+				stat.helper_samples += block_helper;
+				stat.direct_samples += !block_helper;
+			}
+
 			const OpcodeRangeEvent* range = FindSampleRange(page_map, sample.pc, i);
 			bool helper = false;
 			if (!range && sample.lr)
@@ -1105,6 +1294,17 @@ namespace
 			return a.second > b.second;
 		});
 
+		std::vector<TimeBlockStat> sorted_blocks;
+		sorted_blocks.reserve(block_stats.size());
+		for (const auto& entry : block_stats)
+		{
+			if (entry.second.samples > 0)
+				sorted_blocks.push_back(entry.second);
+		}
+		std::sort(sorted_blocks.begin(), sorted_blocks.end(), [](const TimeBlockStat& a, const TimeBlockStat& b) {
+			return a.samples > b.samples;
+		});
+
 		out << "Statistical CPU Time Samples\n";
 		out << "----------------------------\n";
 		out << "Sampling interval: " << SAMPLE_INTERVAL_US << " us of consumed CPU time per target thread\n";
@@ -1116,8 +1316,23 @@ namespace
 		out << "Native/unmapped samples: " << native_samples << "\n";
 		out << "Dropped samples: " << dropped_samples << "\n";
 		out << "Recorded opcode host ranges: " << ranges.size() << "\n\n";
+		out << "Recorded block host ranges: " << compile_events.size() << "\n\n";
 		out << "Opcode range capture capped: "
 			<< (s_opcode_range_limit_hit.load(std::memory_order_relaxed) ? "yes" : "no") << "\n\n";
+
+		out << "Top JIT Blocks by Sampled CPU Time\n";
+		out << "-----------------------------------\n";
+		out << "CPU\tPC\tSamples\tDirect\tHelper\tSharePercent\tCompiledVersions\tGuestSlots\tHostBytes\n";
+		for (size_t i = 0; i < std::min<size_t>(sorted_blocks.size(), 120); i++)
+		{
+			const TimeBlockStat& stat = sorted_blocks[i];
+			const double share = captured_samples ? (static_cast<double>(stat.samples) * 100.0 / captured_samples) : 0.0;
+			out << CpuName(stat.type) << '\t' << Hex8(stat.guest_pc) << '\t'
+				<< stat.samples << '\t' << stat.direct_samples << '\t' << stat.helper_samples << '\t'
+				<< std::fixed << std::setprecision(3) << share << '\t'
+				<< stat.compiled_versions << '\t' << stat.guest_size << '\t' << stat.host_size << "\n";
+		}
+		out << "\n";
 
 		out << "Top Opcodes/Pairs by Sampled CPU Time\n";
 		out << "--------------------------------------\n";
@@ -1168,7 +1383,8 @@ namespace
 		out << "=========================================\n\n";
 		out << "Purpose: identify JIT opcodes and native helpers consuming real CPU time in a captured gameplay scene.\n";
 		out << "Method: periodic per-thread CPU-time PC sampling mapped back to guest opcodes through recorded ARM64 host ranges.\n";
-		out << "Note: sampling adds no instructions to generated JIT blocks; results are statistical and improve with longer captures.\n\n";
+		out << "Note: sampling adds no instructions to generated JIT blocks; results are statistical and improve with longer captures.\n";
+		out << "Compile timing: exclusive totals subtract nested compiler work; active opcode-range capture overhead remains, so compare like-for-like captures.\n\n";
 
 		out << "Game\n";
 		out << "----\n";
@@ -1195,18 +1411,9 @@ namespace
 		out << "Compiled profile records: " << profiles.size() << "\n\n";
 	}
 
-	void AppendCompilationHotspots(std::ostringstream& out)
+	void AppendCompilationHotspots(std::ostringstream& out, const std::vector<CompileEvent>& events,
+		const std::vector<CacheResetEvent>& reset_events)
 	{
-		std::vector<CompileEvent> events;
-		std::vector<CacheResetEvent> reset_events;
-		{
-			std::lock_guard<std::mutex> lock(s_compile_mutex);
-			// Report generation runs after collection has stopped. Transfer the
-			// backing allocations so they are released when this function returns.
-			events.swap(s_compile_events);
-			reset_events.swap(s_cache_reset_events);
-		}
-
 		out << "Compilation Hotspots\n";
 		out << "--------------------\n";
 		if (events.empty())
@@ -1226,6 +1433,9 @@ namespace
 			cpu.blocks++;
 			cpu.guest_slots += event.guest_size;
 			cpu.host_bytes += event.host_size;
+			cpu.inclusive_compile_ns += event.inclusive_compile_ns;
+			cpu.exclusive_compile_ns += event.exclusive_compile_ns;
+			cpu.max_exclusive_compile_ns = std::max(cpu.max_exclusive_compile_ns, event.exclusive_compile_ns);
 
 			const u64 pc_key = (static_cast<u64>(type) << 32) | event.startpc;
 			CompilePcAggregate& pc = pc_map[pc_key];
@@ -1234,6 +1444,9 @@ namespace
 			pc.blocks++;
 			pc.guest_slots += event.guest_size;
 			pc.host_bytes += event.host_size;
+			pc.inclusive_compile_ns += event.inclusive_compile_ns;
+			pc.exclusive_compile_ns += event.exclusive_compile_ns;
+			pc.max_exclusive_compile_ns = std::max(pc.max_exclusive_compile_ns, event.exclusive_compile_ns);
 			pc.first_frame = std::min(pc.first_frame, event.frame);
 			pc.last_frame = std::max(pc.last_frame, event.frame);
 
@@ -1241,7 +1454,9 @@ namespace
 			frame.frame = event.frame;
 			frame.blocks++;
 			frame.host_bytes += event.host_size;
+			frame.exclusive_compile_ns += event.exclusive_compile_ns;
 			frame.cpu_blocks[type]++;
+			frame.cpu_compile_ns[type] += event.exclusive_compile_ns;
 		}
 
 		for (const auto& [_, frame] : frame_map)
@@ -1251,27 +1466,32 @@ namespace
 				if (frame.cpu_blocks[type] == 0)
 					continue;
 				cpu_totals[type].frames++;
-				if (frame.cpu_blocks[type] > cpu_totals[type].peak_frame_blocks)
+				if (frame.cpu_compile_ns[type] > cpu_totals[type].peak_frame_compile_ns)
 				{
 					cpu_totals[type].peak_frame_blocks = frame.cpu_blocks[type];
 					cpu_totals[type].peak_frame_host_bytes = frame.host_bytes;
+					cpu_totals[type].peak_frame_compile_ns = frame.cpu_compile_ns[type];
 					cpu_totals[type].peak_frame = frame.frame;
 				}
 			}
 		}
 
-		out << "CPU   Blocks      Frames      GuestSlots      HostBytes       PeakFrame  PeakBlocks  PeakHostBytes\n";
+		out << "CPU   Blocks      Frames      GuestSlots      HostBytes       ExclusiveUs   InclusiveUs   AvgUs    MaxUs    PeakFrame PeakFrameUs\n";
 		for (size_t type = 0; type < cpu_totals.size(); type++)
 		{
 			const CompileCpuTotals& cpu = cpu_totals[type];
+			const double average_us = cpu.blocks ? (static_cast<double>(cpu.exclusive_compile_ns) / 1000.0 / cpu.blocks) : 0.0;
 			out << std::left << std::setw(5) << CpuName(static_cast<int>(type))
 				<< std::right << std::setw(12) << static_cast<unsigned long long>(cpu.blocks)
 				<< std::setw(12) << static_cast<unsigned long long>(cpu.frames)
 				<< std::setw(16) << static_cast<unsigned long long>(cpu.guest_slots)
 				<< std::setw(16) << static_cast<unsigned long long>(cpu.host_bytes)
+				<< std::setw(14) << std::fixed << std::setprecision(1) << (static_cast<double>(cpu.exclusive_compile_ns) / 1000.0)
+				<< std::setw(14) << (static_cast<double>(cpu.inclusive_compile_ns) / 1000.0)
+				<< std::setw(9) << average_us
+				<< std::setw(9) << (static_cast<double>(cpu.max_exclusive_compile_ns) / 1000.0)
 				<< std::setw(11) << static_cast<unsigned long long>(cpu.peak_frame)
-				<< std::setw(12) << static_cast<unsigned long long>(cpu.peak_frame_blocks)
-				<< std::setw(16) << static_cast<unsigned long long>(cpu.peak_frame_host_bytes)
+				<< std::setw(12) << (static_cast<double>(cpu.peak_frame_compile_ns) / 1000.0)
 				<< "\n";
 		}
 
@@ -1299,23 +1519,24 @@ namespace
 		for (const auto& [_, frame] : frame_map)
 			frames.push_back(frame);
 		std::sort(frames.begin(), frames.end(), [](const CompileFrameAggregate& a, const CompileFrameAggregate& b) {
-			if (a.blocks != b.blocks)
-				return a.blocks > b.blocks;
-			return a.host_bytes > b.host_bytes;
+			if (a.exclusive_compile_ns != b.exclusive_compile_ns)
+				return a.exclusive_compile_ns > b.exclusive_compile_ns;
+			return a.blocks > b.blocks;
 		});
 
 		out << "\nTop Compile Burst Frames\n";
-		out << "Frame      Blocks      HostBytes       EE     IOP    VU0    VU1\n";
+		out << "Frame      Blocks      HostBytes       CompileUs       EEUs    IOPUs    VU0Us    VU1Us\n";
 		for (size_t i = 0; i < std::min<size_t>(frames.size(), 24); i++)
 		{
 			const CompileFrameAggregate& frame = frames[i];
 			out << std::setw(10) << static_cast<unsigned long long>(frame.frame)
 				<< std::setw(12) << static_cast<unsigned long long>(frame.blocks)
 				<< std::setw(16) << static_cast<unsigned long long>(frame.host_bytes)
-				<< std::setw(7) << static_cast<unsigned long long>(frame.cpu_blocks[0])
-				<< std::setw(7) << static_cast<unsigned long long>(frame.cpu_blocks[1])
-				<< std::setw(7) << static_cast<unsigned long long>(frame.cpu_blocks[2])
-				<< std::setw(7) << static_cast<unsigned long long>(frame.cpu_blocks[3])
+				<< std::setw(16) << std::fixed << std::setprecision(1) << (static_cast<double>(frame.exclusive_compile_ns) / 1000.0)
+				<< std::setw(9) << (static_cast<double>(frame.cpu_compile_ns[0]) / 1000.0)
+				<< std::setw(9) << (static_cast<double>(frame.cpu_compile_ns[1]) / 1000.0)
+				<< std::setw(9) << (static_cast<double>(frame.cpu_compile_ns[2]) / 1000.0)
+				<< std::setw(9) << (static_cast<double>(frame.cpu_compile_ns[3]) / 1000.0)
 				<< "\n";
 		}
 
@@ -1324,13 +1545,13 @@ namespace
 		for (const auto& [_, pc] : pc_map)
 			pcs.push_back(pc);
 		std::sort(pcs.begin(), pcs.end(), [](const CompilePcAggregate& a, const CompilePcAggregate& b) {
-			if (a.blocks != b.blocks)
-				return a.blocks > b.blocks;
-			return a.host_bytes > b.host_bytes;
+			if (a.exclusive_compile_ns != b.exclusive_compile_ns)
+				return a.exclusive_compile_ns > b.exclusive_compile_ns;
+			return a.blocks > b.blocks;
 		});
 
 		out << "\nTop Compile PCs\n";
-		out << "CPU   PC          Blocks      GuestSlots      HostBytes       FirstFrame LastFrame\n";
+		out << "CPU   PC          Blocks      GuestSlots      HostBytes       ExclusiveUs   AvgUs    MaxUs    FirstFrame LastFrame\n";
 		for (size_t i = 0; i < std::min<size_t>(pcs.size(), 80); i++)
 		{
 			const CompilePcAggregate& pc = pcs[i];
@@ -1339,6 +1560,9 @@ namespace
 				<< std::setw(10) << static_cast<unsigned long long>(pc.blocks)
 				<< std::setw(16) << static_cast<unsigned long long>(pc.guest_slots)
 				<< std::setw(16) << static_cast<unsigned long long>(pc.host_bytes)
+				<< std::setw(14) << std::fixed << std::setprecision(1) << (static_cast<double>(pc.exclusive_compile_ns) / 1000.0)
+				<< std::setw(9) << (pc.blocks ? static_cast<double>(pc.exclusive_compile_ns) / 1000.0 / pc.blocks : 0.0)
+				<< std::setw(9) << (static_cast<double>(pc.max_exclusive_compile_ns) / 1000.0)
 				<< std::setw(11) << static_cast<unsigned long long>(pc.first_frame)
 				<< std::setw(10) << static_cast<unsigned long long>(pc.last_frame)
 				<< "\n";
@@ -1846,10 +2070,20 @@ namespace
 		VU0_JitGetBlockProfiles(profiles);
 		VU1_JitGetBlockProfiles(profiles);
 
+		std::vector<CompileEvent> compile_events;
+		std::vector<CacheResetEvent> reset_events;
+		{
+			std::lock_guard<std::mutex> lock(s_compile_mutex);
+			// Collection is stopped before report generation. Move the large buffers
+			// once and share the immutable snapshot between compile and sampling views.
+			compile_events.swap(s_compile_events);
+			reset_events.swap(s_cache_reset_events);
+		}
+
 		std::ostringstream report;
 		AppendHeader(report, profiles);
-		AppendCompilationHotspots(report);
-		AppendSamplingHotspots(report);
+		AppendCompilationHotspots(report, compile_events, reset_events);
+		AppendSamplingHotspots(report, compile_events);
 
 		const std::string profile_dir = Path::Combine(EmuFolders::DataRoot, "jit_profiles");
 		FileSystem::EnsureDirectoryExists(profile_dir.c_str(), false);
@@ -1868,6 +2102,58 @@ namespace
 bool IsActive()
 {
 	return s_active.load(std::memory_order_relaxed);
+}
+
+BlockCompileScope::BlockCompileScope(int type, u32 startpc)
+	: m_type(type)
+	, m_startpc(startpc)
+{
+	if (!s_collecting_runtime.load(std::memory_order_acquire))
+		return;
+
+	m_active = true;
+	m_parent = s_current_compile_scope;
+	s_current_compile_scope = this;
+	m_start_value = Common::Timer::GetCurrentValue();
+}
+
+BlockCompileScope::~BlockCompileScope()
+{
+	if (m_active)
+		Close();
+}
+
+void BlockCompileScope::Close()
+{
+	if (!m_active)
+		return;
+
+	const u64 end_value = Common::Timer::GetCurrentValue();
+	m_inclusive_value = end_value - m_start_value;
+	m_exclusive_value = m_inclusive_value - std::min(m_child_value, m_inclusive_value);
+	if (m_parent && m_parent->m_active)
+		m_parent->m_child_value += m_inclusive_value;
+
+	pxAssert(s_current_compile_scope == this);
+	s_current_compile_scope = m_parent;
+	m_active = false;
+}
+
+void BlockCompileScope::Finish(u32 guest_size, u32 host_size, const void* host_begin, const void* host_end)
+{
+	if (!m_active)
+		return;
+
+	Close();
+	const u64 record_start_value = Common::Timer::GetCurrentValue();
+	const u64 inclusive_ns = static_cast<u64>(Common::Timer::ConvertValueToNanoseconds(m_inclusive_value) + 0.5);
+	const u64 exclusive_ns = static_cast<u64>(Common::Timer::ConvertValueToNanoseconds(m_exclusive_value) + 0.5);
+	RecordBlockCompileEvent(m_type, m_startpc, guest_size, host_size,
+		reinterpret_cast<uptr>(host_begin), reinterpret_cast<uptr>(host_end), inclusive_ns, exclusive_ns);
+	// A nested microVU compile shares its parent's compiler scope. Do not charge
+	// profiler bookkeeping (including the event lock) to the parent's exclusive time.
+	if (m_parent && m_parent->m_active)
+		m_parent->m_child_value += Common::Timer::GetCurrentValue() - record_start_value;
 }
 
 void OpcodeRangeScope::Begin(int type, u32 guest_pc, u32 opcode, u32 paired_opcode)
@@ -1904,31 +2190,13 @@ void OpcodeRangeScope::End()
 		reinterpret_cast<uptr>(oakGetCurrentCodePointer()));
 }
 
-void RecordBlockCompile(int type, u32 startpc, u32 guest_size, u32 host_size)
-{
-	if (!IsActive())
-		return;
-
-	CompileEvent event;
-	event.type = type;
-	event.startpc = startpc;
-	event.guest_size = guest_size;
-	event.host_size = host_size;
-	event.frame = PerformanceMetrics::GetFrameNumber() - s_start_frame;
-	event.seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - s_start_time).count();
-
-	std::lock_guard<std::mutex> lock(s_compile_mutex);
-	if (s_compile_events.size() >= COMPILE_EVENT_CAPACITY)
-	{
-		s_compile_events_dropped.fetch_add(1, std::memory_order_relaxed);
-		return;
-	}
-	s_compile_events.push_back(event);
-}
-
 void RecordCodeCacheReset(int type, u64 discarded_host_bytes)
 {
-	if (!s_collecting_runtime.load(std::memory_order_acquire) || discarded_host_bytes == 0)
+	if (!s_collecting_runtime.load(std::memory_order_acquire))
+		return;
+
+	s_code_cache_generations[NormalizeProfileType(type)].fetch_add(1, std::memory_order_relaxed);
+	if (discarded_host_bytes == 0)
 		return;
 
 	CacheResetEvent event;
@@ -1938,12 +2206,6 @@ void RecordCodeCacheReset(int type, u64 discarded_host_bytes)
 
 	std::lock_guard<std::mutex> lock(s_compile_mutex);
 	s_cache_reset_events.push_back(event);
-}
-
-void EmitBlockIncrement(void* counter_ptr)
-{
-	// Statistical sampling must not perturb short blocks with runtime counter instructions.
-	(void)counter_ptr;
 }
 
 void Start()
@@ -1956,12 +2218,14 @@ void Start()
 		s_compile_events.clear();
 		s_cache_reset_events.clear();
 	}
-	{
-		std::lock_guard<std::mutex> lock(s_opcode_range_mutex);
-		s_opcode_ranges.clear();
-	}
+	s_opcode_range_buffer.reset(new (std::nothrow) OpcodeRangeEvent[OPCODE_RANGE_CAPACITY]);
+	s_opcode_ranges = s_opcode_range_buffer.get();
+	s_opcode_range_write.store(0, std::memory_order_relaxed);
+	s_opcode_capture_generation.fetch_add(1, std::memory_order_relaxed);
+	for (std::atomic<u32>& generation : s_code_cache_generations)
+		generation.store(0, std::memory_order_relaxed);
 	s_compile_events_dropped.store(0, std::memory_order_relaxed);
-	s_opcode_range_limit_hit.store(false, std::memory_order_relaxed);
+	s_opcode_range_limit_hit.store(!s_opcode_ranges, std::memory_order_relaxed);
 	s_collecting_runtime.store(false, std::memory_order_release);
 
 	Host::RunOnCPUThread([]() {
@@ -2006,5 +2270,7 @@ void Stop()
 
 	s_raw_samples = nullptr;
 	s_sample_buffer.reset();
+	s_opcode_ranges = nullptr;
+	s_opcode_range_buffer.reset();
 }
 } // namespace JitProfiler

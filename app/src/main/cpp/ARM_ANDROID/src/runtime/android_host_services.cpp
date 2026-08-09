@@ -599,8 +599,10 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block)
 
 	if (!block)
 	{
-		std::lock_guard lock(s_cpu_tasks_mutex);
-		s_cpu_tasks.push_back(std::move(function));
+		{
+			std::lock_guard lock(s_cpu_tasks_mutex);
+			s_cpu_tasks.push_back(std::move(function));
+		}
 		return;
 	}
 
@@ -624,7 +626,6 @@ void Host::RunOnCPUThread(std::function<void()> function, bool block)
 			completion->cv.notify_one();
 		});
 	}
-
 	std::unique_lock done_lock(completion->mutex);
 	if (!completion->cv.wait_for(done_lock, std::chrono::seconds(10), [&]() { return completion->done; }))
 		__android_log_write(ANDROID_LOG_ERROR, LOG_TAG, "Timed out waiting for CPU thread task");
@@ -702,6 +703,8 @@ void Host::PumpMessagesOnCPUThread()
 		if (task)
 			task();
 	}
+
+	emucorex::android::PollPendingPadUpdatesOnCPUThread();
 }
 
 s32 Host::Internal::GetTranslatedStringImpl(

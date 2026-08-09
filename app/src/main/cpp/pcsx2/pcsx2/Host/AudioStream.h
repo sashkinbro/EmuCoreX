@@ -69,7 +69,8 @@ public:
 	__fi bool IsStretchEnabled() const { return m_stretch_enabled; }
 	__fi bool IsPaused() const { return m_paused; }
 
-	u32 GetBufferedFramesRelaxed() const;
+	u32 GetBufferedFramesForConsumer() const;
+	u32 GetBufferedFramesForProducer() const;
 
 	/// Temporarily pauses the stream, preventing it from requesting data.
 	virtual void SetPaused(bool paused);
@@ -172,8 +173,11 @@ private:
 	std::unique_ptr<float[]> m_buffer;
 	SampleReader m_sample_reader = nullptr;
 
-	std::atomic<u32> m_rpos{0};
-	std::atomic<u32> m_wpos{0};
+	// The realtime audio callback owns rpos while the emulation/SPU thread owns
+	// wpos. Keep the two write-hot cursors on separate cache lines so every
+	// callback/chunk does not transfer the same line between CPU cores.
+	alignas(__cachelinesize) std::atomic<u32> m_rpos{0};
+	alignas(__cachelinesize) std::atomic<u32> m_wpos{0};
 
 	std::unique_ptr<soundtouch::SoundTouch> m_soundtouch;
 

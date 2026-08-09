@@ -250,10 +250,18 @@ bool PageFaultHandler::Install(Error* error)
 
 	struct sigaction sa = {};
 	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+	// Keep both synchronous memory-fault signals blocked while this handler is
+	// running. SA_NODEFER allowed a fault in HandlePageFault() (including a
+	// SIGBUS raised while handling SIGSEGV, or vice versa) to recursively enter
+	// code which mutates the same fastmem/JIT state. The first-level fault path
+	// is unchanged; a fault in the handler itself is not recoverable here.
+	sigaddset(&sa.sa_mask, SIGSEGV);
+	sigaddset(&sa.sa_mask, SIGBUS);
+	sa.sa_flags = SA_SIGINFO;
 	sa.sa_sigaction = SignalHandler;
 
-	if (sigaction(SIGSEGV, &sa, nullptr) != 0)
+	struct sigaction old_sigsegv = {};
+	if (sigaction(SIGSEGV, &sa, &old_sigsegv) != 0)
 	{
 		Error::SetErrno(error, "sigaction() for SIGSEGV failed: ", errno);
 		return false;
@@ -261,7 +269,12 @@ bool PageFaultHandler::Install(Error* error)
 
 	if (sigaction(SIGBUS, &sa, nullptr) != 0)
 	{
-		Error::SetErrno(error, "sigaction() for SIGBUS failed: ", errno);
+		const int install_errno = errno;
+		// Do not leave a half-installed page-fault handler behind. In particular,
+		// a later Install() attempt must not unexpectedly chain through this
+		// handler while s_installed is still false.
+		(void)sigaction(SIGSEGV, &old_sigsegv, nullptr);
+		Error::SetErrno(error, "sigaction() for SIGBUS failed: ", install_errno);
 		return false;
 	}
 

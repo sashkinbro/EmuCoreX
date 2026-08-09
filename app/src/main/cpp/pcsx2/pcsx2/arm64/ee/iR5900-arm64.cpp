@@ -2400,6 +2400,7 @@ static void recRecompile(const u32 startpc)
 	pxAssert(recPtr < physical_end);
 	oakSetAsmPtr(recPtr, physical_end - recPtr);
 	recPtr = oakStartBlock();
+	JitProfiler::BlockCompileScope compile_scope(0, HWADDR(startpc));
 
 	s_pCurBlock = PC_GETBLOCK(startpc);
 
@@ -2412,10 +2413,6 @@ static void recRecompile(const u32 startpc)
 
 	pxAssert(s_pCurBlockEx);
 
-	if (JitProfiler::IsActive())
-	{
-		JitProfiler::EmitBlockIncrement(&s_pCurBlockEx->execution_count);
-	}
 	if (HangTrace::IsActive())
 	{
 		const u32 first_code = memRead32(startpc);
@@ -2895,9 +2892,10 @@ StartRecomp:
 	}
 #endif
 	Perf::ee.RegisterPC((void*)s_pCurBlockEx->fnptr, s_pCurBlockEx->x86size, s_pCurBlockEx->startpc);
-	JitProfiler::RecordBlockCompile(0, s_pCurBlockEx->startpc, s_pCurBlockEx->size, s_pCurBlockEx->x86size);
-
+	const u8* const compiled_host_end = oakGetCurrentCodePointer();
 	recPtr = oakEndBlock();
+	compile_scope.Finish(s_pCurBlockEx->size, s_pCurBlockEx->x86size,
+		reinterpret_cast<const void*>(s_pCurBlockEx->fnptr), compiled_host_end);
 
 	pxAssert((g_cpuHasConstReg & g_cpuFlushedConstReg) == g_cpuHasConstReg);
 

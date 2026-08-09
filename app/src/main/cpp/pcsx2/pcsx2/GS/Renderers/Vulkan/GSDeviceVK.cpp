@@ -6470,7 +6470,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	// On TBDR GPUs (Mali, Adreno, PowerVR), mid-frame submits are very expensive
 	// because they break tile binning. Use a much higher threshold on mobile.
 	{
-		const bool is_tbdr = IsDeviceMali() || IsDeviceAdreno();
+		const bool is_tbdr = IsDeviceMali() || IsDeviceAdreno() || IsDevicePowerVR();
 		constexpr u32 kick_threshold_desktop = 4000;
 		constexpr u32 kick_threshold_mobile = 40000;
 		const u32 kick_threshold = is_tbdr ? kick_threshold_mobile : kick_threshold_desktop;

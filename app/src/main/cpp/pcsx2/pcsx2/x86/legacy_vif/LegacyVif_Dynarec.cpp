@@ -405,12 +405,17 @@ void VifUnpackSSE_Dynarec::CompileRoutine()
 
 static u16 dVifComputeLength(uint cl, uint wl, u8 num, bool isFill)
 {
-	uint length = (num > 0) ? (num * 16) : 4096; // 0 = 256
+	// The VIF NUM field encodes 256 vectors as zero. Use the decoded count for
+	// both the vector data and skip-block span; using raw num below made blocks
+	// zero and unsigned-wrapped (blocks - 1), which could under-estimate the
+	// destination range and incorrectly select the non-wrapping fast path.
+	const uint effective_num = num ? num : 256;
+	uint length = effective_num * 16;
 
 	if (!isFill)
 	{
 		const uint skipSize = (cl - wl) * 16;
-		const uint blocks   = (num + (wl - 1)) / wl; //Need to round up num's to calculate skip size correctly.
+		const uint blocks = (effective_num + (wl - 1)) / wl;
 		length += (blocks - 1) * skipSize;
 	}
 

@@ -23,6 +23,9 @@
 #include <android/native_window.h>
 
 #include <chrono>
+#include <array>
+#include <atomic>
+#include <bit>
 #include <cstdlib>
 #include <iomanip>
 #include <memory>
@@ -38,6 +41,42 @@ constexpr const char* LOG_TAG = "EmuCoreX";
 // reader. Keep them mutually exclusive so a library scan cannot close or replace the
 // reader while another thread is detecting a disc or while the VM is starting/stopping.
 std::mutex s_disc_access_mutex;
+
+// Android input callbacks run on UI/Binder threads while the emulated pad is
+// owned by the CPU thread. Publish only compact values here and consume them at
+// the CPU-thread input poll, avoiding both a C++ data race and a mutex/task
+// allocation for every touch/axis event.
+static_assert(PadDualshock2::LENGTH <= 32);
+using PendingPadValues = std::array<std::atomic<u32>, PadDualshock2::LENGTH>;
+std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_values{};
+std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_press_values{};
+// Lower 32 bits mark changed bindings; upper 32 bits latch a press edge. Publishing both
+// in one atomic word prevents the CPU poll from observing/clearing only half an event.
+std::array<std::atomic<u64>, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_events{};
+std::atomic<u32> s_pending_pressure_modifier{};
+std::atomic_bool s_pending_pressure_modifier_dirty{false};
+
+u32 FloatToBits(float value)
+{
+	return std::bit_cast<u32>(value);
+}
+
+float BitsToFloat(u32 value)
+{
+	return std::bit_cast<float>(value);
+}
+
+void PublishPadValue(u32 controller, u32 bind, float value, bool latch_press = false)
+{
+	u64 event = u64{1} << bind;
+	if (latch_press)
+	{
+		s_pending_pad_press_values[controller][bind].store(FloatToBits(value), std::memory_order_relaxed);
+		event |= u64{1} << (bind + 32);
+	}
+	s_pending_pad_values[controller][bind].store(FloatToBits(value), std::memory_order_relaxed);
+	s_pending_pad_events[controller].fetch_or(event, std::memory_order_release);
+}
 
 std::string SettingKey(const std::string& section, const std::string& key)
 {
@@ -312,7 +351,7 @@ void AndroidRuntime::EndSettingsBatch()
 		// next renderer/surface operation. MTGS::ApplySettings performs the matching GS-thread wait.
 		Host::RunOnCPUThread([config = std::move(config)]() {
 			ApplyRuntimeSettingsToUpstream(config);
-		}, true);
+		}, false);
 	}
 }
 
@@ -480,7 +519,7 @@ void AndroidRuntime::ClearSurface()
 				MTGS::UpdateDisplayWindow();
 				MTGS::WaitGS(false, false, false);
 			}
-		}, false);
+		}, true);
 		return;
 	}
 
@@ -819,7 +858,7 @@ void AndroidRuntime::SetPadButton(int pad_index, int index, int range, bool pres
 
 	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
 	const float value = PadValueFromAndroidRange(range, pressed);
-	Pad::SetControllerState(controller, bind.value(), value);
+	PublishPadValue(controller, bind.value(), value, pressed);
 }
 
 void AndroidRuntime::SetPadPressureModifierAmount(int amount_percent)
@@ -828,11 +867,8 @@ void AndroidRuntime::SetPadPressureModifierAmount(int amount_percent)
 		return;
 
 	const float amount = static_cast<float>(std::clamp(amount_percent, 1, 100)) / 100.0f;
-	for (u32 controller = 0; controller < Pad::NUM_CONTROLLER_PORTS; controller++)
-	{
-		if (PadBase* pad = Pad::GetPad(static_cast<u8>(controller)))
-			pad->SetPressureModifier(amount);
-	}
+	s_pending_pressure_modifier.store(FloatToBits(amount), std::memory_order_relaxed);
+	s_pending_pressure_modifier_dirty.store(true, std::memory_order_release);
 }
 
 void AndroidRuntime::ResetPadState(int pad_index)
@@ -841,14 +877,62 @@ void AndroidRuntime::ResetPadState(int pad_index)
 		return;
 
 	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
+	s_pending_pad_events[controller].store(0, std::memory_order_release);
 	for (u32 i = 0; i < PadDualshock2::LENGTH; i++)
-		Pad::SetControllerState(controller, i, 0.0f);
+		PublishPadValue(controller, i, 0.0f);
 }
 
 void AndroidRuntime::ResetKeyStatus()
 {
 	ResetPadState(0);
 	ResetPadState(1);
+}
+
+void PollPendingPadUpdatesOnCPUThread()
+{
+	if (!VMManager::HasValidVM())
+	{
+		for (std::atomic<u64>& events : s_pending_pad_events)
+			events.store(0, std::memory_order_relaxed);
+		s_pending_pressure_modifier_dirty.store(false, std::memory_order_relaxed);
+		return;
+	}
+
+	for (u32 controller = 0; controller < Pad::NUM_CONTROLLER_PORTS; controller++)
+	{
+		const u64 events = s_pending_pad_events[controller].exchange(0, std::memory_order_acquire);
+		u32 dirty = static_cast<u32>(events);
+		const u32 pressed = static_cast<u32>(events >> 32);
+		while (dirty != 0)
+		{
+			const u32 bind = static_cast<u32>(std::countr_zero(dirty));
+			dirty &= dirty - 1;
+			const u32 value = s_pending_pad_values[controller][bind].load(std::memory_order_relaxed);
+			if ((pressed & (1u << bind)) != 0 && value == FloatToBits(0.0f))
+			{
+				// A complete press/release arrived between CPU polls. Expose the press for
+				// this frame and republish the already-recorded release for the next poll.
+				const u32 press_value =
+					s_pending_pad_press_values[controller][bind].load(std::memory_order_relaxed);
+				Pad::SetControllerState(controller, bind, BitsToFloat(press_value));
+				s_pending_pad_events[controller].fetch_or(u64{1} << bind, std::memory_order_release);
+			}
+			else
+			{
+				Pad::SetControllerState(controller, bind, BitsToFloat(value));
+			}
+		}
+	}
+
+	if (s_pending_pressure_modifier_dirty.exchange(false, std::memory_order_acquire))
+	{
+		const float amount = BitsToFloat(s_pending_pressure_modifier.load(std::memory_order_relaxed));
+		for (u32 controller = 0; controller < Pad::NUM_CONTROLLER_PORTS; controller++)
+		{
+			if (PadBase* pad = Pad::GetPad(static_cast<u8>(controller)))
+				pad->SetPressureModifier(amount);
+		}
+	}
 }
 
 void AndroidRuntime::OnHostKeyEvent(int key_code, bool pressed)
