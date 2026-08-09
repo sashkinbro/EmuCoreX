@@ -118,7 +118,19 @@ data class HubCatalogStateEntity(
 
 @Dao
 interface HubDao {
-    @Query("SELECT * FROM hub_items WHERE locale = :locale ORDER BY featured DESC, priority DESC, publishedAt DESC, id ASC")
+    @Query(
+        """
+        SELECT * FROM hub_items
+        WHERE locale = :locale
+        ORDER BY
+            CASE
+                WHEN kind = 'history' AND eventDate IS NOT NULL AND eventDate != '' THEN eventDate
+                ELSE publishedAt
+            END DESC,
+            updatedAt DESC,
+            id ASC
+        """
+    )
     fun observeItems(locale: String): Flow<List<HubItemEntity>>
 
     @Query("SELECT * FROM hub_items WHERE locale = :locale")
