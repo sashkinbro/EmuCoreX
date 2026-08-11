@@ -3,6 +3,8 @@
 #include "../settings/SettingsStore.h"
 
 #include <QDesktopServices>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QSysInfo>
 #include <QUrl>
 
@@ -10,6 +12,13 @@ AppController::AppController(SettingsStore* settings, QObject* parent)
     : QObject(parent)
     , m_settings(settings)
 {
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+        this, &AppController::systemThemeChanged);
+}
+
+bool AppController::systemDark() const
+{
+    return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
 }
 
 QString AppController::platformName() const

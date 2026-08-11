@@ -45,8 +45,8 @@ Item {
                                 color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.15)
                                 AppIcon { anchors.centerIn: parent; width: 21; height: 21; name: modelData.icon || root.iconName; color: Theme.accentBright }
                             }
-                            Text { text: modelData.title; color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
-                            Text { Layout.fillWidth: true; text: modelData.description || ""; color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
+                            Text { text: modelData.title; color: Theme.text; font.pixelSize: Theme.sp(16); font.weight: Font.DemiBold }
+                            Text { Layout.fillWidth: true; text: modelData.description || ""; color: Theme.textMuted; font.pixelSize: Theme.sp(12); wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight }
                         }
                         onClicked: if (modelData.route) App.navigate(modelData.route)
                     }

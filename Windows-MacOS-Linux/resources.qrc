@@ -37,6 +37,7 @@
         <file alias="qml/screens/TextureManagerScreen.qml">qml/screens/TextureManagerScreen.qml</file>
         <file alias="qml/screens/CheatManagerScreen.qml">qml/screens/CheatManagerScreen.qml</file>
         <file alias="qml/screens/GameDetailScreen.qml">qml/screens/GameDetailScreen.qml</file>
+        <file alias="qml/screens/GamepadMappingScreen.qml">qml/screens/GamepadMappingScreen.qml</file>
         <file alias="qml/screens/UtilityScreen.qml">qml/screens/UtilityScreen.qml</file>
 
         <file alias="translations/strings_en.xml">translations/strings_en.xml</file>

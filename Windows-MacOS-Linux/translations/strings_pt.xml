@@ -1060,6 +1060,8 @@
     <string name="settings_updates_parallel_unavailable">O APK separado não está disponível para este lançamento.</string>
     <string name="common_close">Fechar</string>
     <string name="common_open">Abrir</string>
+    <string name="settings_library_click_details_title">Mostrar detalhes ao clicar</string>
+    <string name="settings_library_click_details_desc">Abre o painel de detalhes adaptável ao selecionar um jogo. Desative para iniciar os jogos imediatamente com um clique.</string>
     <string name="settings_language_arabic">Árabe</string>
     <string name="settings_language_japanese">Japonês</string>
     <string name="settings_language_korean">Coreano</string>

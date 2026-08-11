@@ -69,8 +69,8 @@ Item {
                     Layout.preferredWidth: 220
                     Layout.preferredHeight: 314
                     Layout.alignment: Qt.AlignBottom
-                    source: root.localGame.path ? GameCatalog.coverUrlForSerial(root.localGame.serial, Preferences.coverArtStyle) : (root.details.coverUrl || "")
-                    coverStyle: root.localGame.path ? Preferences.coverArtStyle : 1
+                    source: CoverArtProvider.urlForSerial(root.localGame.path ? root.localGame.serial : (root.details.primarySerial || ""), Preferences.coverArtStyle)
+                    coverStyle: Preferences.coverArtStyle
                     cornerRadius: 24
                 }
 
@@ -83,7 +83,7 @@ Item {
                         Layout.fillWidth: true
                         text: root.details.name || I18n.get("detail_no_data_title")
                         color: Theme.text
-                        font.pixelSize: 38
+                        font.pixelSize: Theme.sp(38)
                         font.weight: Font.Bold
                         wrapMode: Text.WordWrap
                     }
@@ -91,7 +91,7 @@ Item {
                         Layout.fillWidth: true
                         text: [root.details.genres || "", root.details.year || ""].filter(Boolean).join("  ·  ")
                         color: Theme.textMuted
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.sp(14)
                     }
 
                     RowLayout {
@@ -107,7 +107,7 @@ Item {
                                 anchors.centerIn: parent
                                 spacing: 7
                                 AppIcon { width: 16; height: 16; name: "star"; color: Theme.warning }
-                                Text { text: Math.round(Number(root.details.rating || 0)) + "%"; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                Text { text: Math.round(Number(root.details.rating || 0)) + "%"; color: Theme.text; font.pixelSize: Theme.sp(13); font.weight: Font.DemiBold }
                             }
                         }
                         Repeater {
@@ -120,7 +120,7 @@ Item {
                                 color: Theme.surface
                                 border.width: 1
                                 border.color: Theme.border
-                                Text { id: serialLabel; anchors.centerIn: parent; text: modelData; color: Theme.textMuted; font.pixelSize: 12 }
+                                Text { id: serialLabel; anchors.centerIn: parent; text: modelData; color: Theme.textMuted; font.pixelSize: Theme.sp(12) }
                             }
                         }
                     }
@@ -156,7 +156,7 @@ Item {
                         Layout.fillWidth: true
                         text: I18n.get("detail_catalog_preview_only")
                         color: Theme.textMuted
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.sp(13)
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -170,12 +170,12 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 21
                     spacing: 12
-                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: Theme.sp(18); font.weight: Font.Bold }
                     Text {
                         Layout.fillWidth: true
                         text: root.details.summary || I18n.get("detail_no_data_body")
                         color: Theme.textMuted
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.sp(14)
                         lineHeight: 1.35
                         wrapMode: Text.WordWrap
                     }
@@ -184,7 +184,7 @@ Item {
                         Layout.fillWidth: true
                         text: root.details.storyline || ""
                         color: Theme.textDim
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.sp(13)
                         lineHeight: 1.3
                         wrapMode: Text.WordWrap
                     }
@@ -195,7 +195,7 @@ Item {
                 visible: (root.details.screenshots || []).length > 0
                 text: I18n.get("detail_screenshots")
                 color: Theme.text
-                font.pixelSize: 20
+                font.pixelSize: Theme.sp(20)
                 font.weight: Font.Bold
             }
             ListView {
@@ -221,7 +221,7 @@ Item {
                 visible: (root.details.videos || []).length > 0
                 text: I18n.get("detail_videos")
                 color: Theme.text
-                font.pixelSize: 20
+                font.pixelSize: Theme.sp(20)
                 font.weight: Font.Bold
             }
             ListView {
@@ -251,7 +251,7 @@ Item {
                 Layout.fillWidth: true
                 text: I18n.get("detail_igdb_source_note")
                 color: Theme.textDim
-                font.pixelSize: 11
+                font.pixelSize: Theme.sp(11)
                 wrapMode: Text.WordWrap
             }
         }

@@ -17,21 +17,21 @@ RowLayout {
             visible: root.eyebrow.length > 0
             text: root.eyebrow.toUpperCase()
             color: Theme.accentBright
-            font.pixelSize: 11
+            font.pixelSize: Theme.sp(11)
             font.weight: Font.Bold
             font.letterSpacing: 1.2
         }
         Text {
             text: root.title
             color: Theme.text
-            font.pixelSize: 28
+            font.pixelSize: Theme.sp(28)
             font.weight: Font.Bold
         }
         Text {
             visible: root.subtitle.length > 0
             text: root.subtitle
             color: Theme.textMuted
-            font.pixelSize: 14
+            font.pixelSize: Theme.sp(14)
             wrapMode: Text.WordWrap
             Layout.maximumWidth: 760
         }

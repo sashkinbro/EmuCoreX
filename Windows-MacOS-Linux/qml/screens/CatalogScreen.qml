@@ -107,7 +107,7 @@ Item {
                         visible: searchField.text.length > 0
                         icon.name: "edit-clear"
                         text: "×"
-                        font.pixelSize: 22
+                        font.pixelSize: Theme.sp(22)
                         onClicked: searchField.clear()
                         contentItem: Text {
                             text: parent.text
@@ -203,8 +203,8 @@ Item {
                                         Layout.fillHeight: true
                                         Layout.margins: 7
                                         Layout.bottomMargin: 0
-                                        source: delegateRoot.catalogCoverUrl
-                                        coverStyle: 1
+                                        source: CoverArtProvider.urlForSerial(delegateRoot.catalogPrimarySerial, Preferences.coverArtStyle)
+                                        coverStyle: Preferences.coverArtStyle
                                         cornerRadius: 16
                                     }
 
@@ -218,7 +218,7 @@ Item {
                                             Layout.fillWidth: true
                                             text: delegateRoot.catalogName
                                             color: Theme.text
-                                            font.pixelSize: 13
+                                            font.pixelSize: Theme.sp(13)
                                             font.weight: Font.DemiBold
                                             maximumLineCount: 2
                                             elide: Text.ElideRight
@@ -229,7 +229,7 @@ Item {
                                             text: [delegateRoot.catalogYear > 0 ? delegateRoot.catalogYear : "",
                                                 delegateRoot.catalogGenres.split(" · ")[0]].filter(Boolean).join("  ·  ")
                                             color: Theme.textMuted
-                                            font.pixelSize: 11
+                                            font.pixelSize: Theme.sp(11)
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -254,8 +254,8 @@ Item {
                         visible: GameCatalog.available && GameCatalog.count === 0
                         spacing: 14
                         AppIcon { Layout.alignment: Qt.AlignHCenter; width: 48; height: 48; name: "search"; color: Theme.textDim }
-                        Text { text: I18n.get("detail_no_data_title"); color: Theme.text; font.pixelSize: 20; font.weight: Font.Bold }
-                        Text { text: I18n.get("detail_no_data_body"); color: Theme.textMuted; font.pixelSize: 13 }
+                        Text { text: I18n.get("detail_no_data_title"); color: Theme.text; font.pixelSize: Theme.sp(20); font.weight: Font.Bold }
+                        Text { text: I18n.get("detail_no_data_body"); color: Theme.textMuted; font.pixelSize: Theme.sp(13) }
                     }
                 }
 
@@ -322,8 +322,8 @@ Item {
                                 Layout.preferredWidth: 116
                                 Layout.preferredHeight: 168
                                 Layout.alignment: Qt.AlignHCenter
-                                source: root.selectedCover
-                                coverStyle: 1
+                                source: CoverArtProvider.urlForSerial(root.selectedSerial, Preferences.coverArtStyle)
+                                coverStyle: Preferences.coverArtStyle
                                 cornerRadius: 18
                             }
                             Text {
@@ -331,7 +331,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: root.selectedName
                                 color: Theme.text
-                                font.pixelSize: 23
+                                font.pixelSize: Theme.sp(23)
                                 font.weight: Font.Bold
                                 wrapMode: Text.WordWrap
                                 horizontalAlignment: Text.AlignHCenter
@@ -350,7 +350,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: [root.selectedGenres, root.selectedYear > 0 ? root.selectedYear : ""].filter(Boolean).join("  ·  ")
                                 color: Theme.textMuted
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.sp(12)
                                 elide: Text.ElideRight
                                 horizontalAlignment: Text.AlignHCenter
                             }
@@ -367,7 +367,7 @@ Item {
                                     anchors.centerIn: parent
                                     spacing: 7
                                     AppIcon { width: 15; height: 15; name: "star"; color: Theme.warning }
-                                    Text { text: Math.round(root.selectedRating) + "%"; color: Theme.text; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                    Text { text: Math.round(root.selectedRating) + "%"; color: Theme.text; font.pixelSize: Theme.sp(12); font.weight: Font.DemiBold }
                                 }
                             }
 
@@ -387,12 +387,12 @@ Item {
                                     anchors.leftMargin: 18
                                     anchors.rightMargin: 18
                                     spacing: 9
-                                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: 15; font.weight: Font.Bold }
+                                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: Theme.sp(15); font.weight: Font.Bold }
                                     Text {
                                         Layout.fillWidth: true
                                         text: root.selectedSummary.length > 0 ? root.selectedSummary : I18n.get("detail_no_data_body")
                                         color: Theme.textMuted
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.sp(12)
                                         lineHeight: 1.28
                                         wrapMode: Text.WordWrap
                                     }
@@ -404,7 +404,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: I18n.get("detail_igdb_source_note")
                                 color: Theme.textDim
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.sp(10)
                                 wrapMode: Text.WordWrap
                             }
                             Item { Layout.preferredHeight: 12 }

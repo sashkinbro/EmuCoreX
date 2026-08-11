@@ -165,7 +165,7 @@ Item {
         contentItem: Text {
             text: root.memoryCards ? I18n.format("memory_card_delete_confirm_body", [root.selectedName]) : root.selectedName
             color: Theme.textMuted
-            font.pixelSize: 13
+            font.pixelSize: Theme.sp(13)
             wrapMode: Text.WordWrap
         }
     }
@@ -228,8 +228,8 @@ Item {
                     color: Theme.accentContainer
                     AppIcon { anchors.centerIn: parent; width: 34; height: 34; name: root.iconName; color: Theme.accentBright }
                 }
-                Text { Layout.fillWidth: true; text: root.emptyTitle; color: Theme.text; font.pixelSize: 22; font.weight: Font.Bold; horizontalAlignment: Text.AlignHCenter }
-                Text { Layout.fillWidth: true; text: root.emptyBody; color: Theme.textMuted; font.pixelSize: 13; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
+                Text { Layout.fillWidth: true; text: root.emptyTitle; color: Theme.text; font.pixelSize: Theme.sp(22); font.weight: Font.Bold; horizontalAlignment: Text.AlignHCenter }
+                Text { Layout.fillWidth: true; text: root.emptyBody; color: Theme.textMuted; font.pixelSize: Theme.sp(13); wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter }
             }
 
             GridView {
@@ -275,8 +275,8 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 3
-                                    Text { Layout.fillWidth: true; text: entryDelegate.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideMiddle }
-                                    Text { Layout.fillWidth: true; text: [root.formatSize(entryDelegate.modelData.size), entryDelegate.modelData.modified.substring(0, 10)].filter(Boolean).join("  ·  "); color: Theme.textMuted; font.pixelSize: 11 }
+                                    Text { Layout.fillWidth: true; text: entryDelegate.modelData.name; color: Theme.text; font.pixelSize: Theme.sp(14); font.weight: Font.DemiBold; elide: Text.ElideMiddle }
+                                    Text { Layout.fillWidth: true; text: [root.formatSize(entryDelegate.modelData.size), entryDelegate.modelData.modified.substring(0, 10)].filter(Boolean).join("  ·  "); color: Theme.textMuted; font.pixelSize: Theme.sp(11) }
                                 }
                             }
 
@@ -371,7 +371,7 @@ Item {
                 border.color: Theme.borderStrong
                 visible: root.notice.length > 0
                 opacity: visible ? 1 : 0
-                Text { id: noticeText; anchors.centerIn: parent; text: root.notice; color: Theme.text; font.pixelSize: 12 }
+                Text { id: noticeText; anchors.centerIn: parent; text: root.notice; color: Theme.text; font.pixelSize: Theme.sp(12) }
                 Behavior on opacity { NumberAnimation { duration: Theme.duration } }
             }
         }

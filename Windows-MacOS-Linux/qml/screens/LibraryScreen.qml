@@ -59,8 +59,7 @@ Item {
     }
 
     function coverFor(serial) {
-        const url = GameCatalog.coverUrlForSerial(serial, Preferences.coverArtStyle)
-        return url.length > 0 ? url + "?v=" + GameLibrary.coverRevision : ""
+        return CoverArtProvider.urlForSerial(serial, Preferences.coverArtStyle)
     }
 
     FolderDialog {
@@ -106,14 +105,14 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                     text: I18n.get("home_empty_title")
                     color: Theme.text
-                    font.pixelSize: 22
+                    font.pixelSize: Theme.sp(22)
                     font.weight: Font.Bold
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     text: I18n.get("home_empty_subtitle")
                     color: Theme.textMuted
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.sp(14)
                 }
                 AppButton {
                     Layout.alignment: Qt.AlignHCenter
@@ -146,50 +145,69 @@ Item {
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 7 }
 
                     header: Item {
+                        id: libraryHeader
+                        readonly property bool stacked: width < 820
                         width: grid.width
-                        height: 152
+                        height: stacked ? 166 : 112
 
-                        ColumnLayout {
-                            anchors.fill: parent
+                        Column {
+                            id: libraryHeading
+                            anchors.left: parent.left
                             anchors.leftMargin: 28
+                            anchors.top: parent.top
+                            anchors.topMargin: 14
+                            width: libraryHeader.stacked
+                                ? parent.width - 56
+                                : Math.max(260, parent.width - headerActions.width - 92)
+                            spacing: 5
+
+                            Text {
+                                width: parent.width
+                                text: I18n.get("home_title")
+                                color: Theme.text
+                                font.pixelSize: Theme.sp(28)
+                                font.weight: Font.Bold
+                            }
+                            Text {
+                                width: parent.width
+                                text: I18n.get("home_library_desc")
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.sp(14)
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                text: I18n.format("home_game_count", [GameLibrary.count])
+                                color: Theme.textDim
+                                font.pixelSize: Theme.sp(12)
+                            }
+                        }
+
+                        Row {
+                            id: headerActions
+                            anchors.right: parent.right
                             anchors.rightMargin: 28
-                            anchors.topMargin: 22
-                            anchors.bottomMargin: 16
+                            anchors.top: parent.top
+                            anchors.topMargin: libraryHeader.stacked ? 108 : 17
                             spacing: 10
 
-                            PageHeader {
-                                Layout.fillWidth: true
-                                title: I18n.get("home_title")
-                                subtitle: I18n.get("home_library_desc")
-                                AppButton {
-                                    iconName: "refresh"
-                                    text: I18n.get("home_refresh")
-                                    enabled: !GameLibrary.scanning
-                                    onClicked: GameLibrary.refresh()
-                                }
-                                AppButton {
-                                    primary: true
-                                    iconName: "folder"
-                                    text: I18n.get("home_add_folder")
-                                    onClicked: folderDialog.open()
-                                }
+                            BusyIndicator {
+                                visible: GameLibrary.scanning
+                                running: visible
+                                width: 42
+                                height: 42
                             }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 10
-                                Text {
-                                    text: I18n.format("home_game_count", [GameLibrary.count])
-                                    color: Theme.textMuted
-                                    font.pixelSize: 12
-                                }
-                                Item { Layout.fillWidth: true }
-                                BusyIndicator {
-                                    visible: GameLibrary.scanning
-                                    running: visible
-                                    Layout.preferredWidth: 22
-                                    Layout.preferredHeight: 22
-                                }
+                            AppButton {
+                                iconName: "refresh"
+                                text: I18n.get("home_refresh")
+                                enabled: !GameLibrary.scanning
+                                onClicked: GameLibrary.refresh()
+                            }
+                            AppButton {
+                                primary: true
+                                iconName: "folder"
+                                text: I18n.get("home_add_folder")
+                                onClicked: folderDialog.open()
                             }
                         }
 
@@ -290,7 +308,7 @@ Item {
                                         Layout.fillWidth: true
                                         text: delegateRoot.title
                                         color: Theme.text
-                                        font.pixelSize: 13
+                                        font.pixelSize: Theme.sp(13)
                                         font.weight: Font.DemiBold
                                         maximumLineCount: 2
                                         elide: Text.ElideRight
@@ -300,7 +318,7 @@ Item {
                                         Layout.fillWidth: true
                                         text: [delegateRoot.year > 0 ? delegateRoot.year : "", delegateRoot.region].filter(Boolean).join("  ·  ")
                                         color: Theme.textMuted
-                                        font.pixelSize: 10
+                                        font.pixelSize: Theme.sp(10)
                                         elide: Text.ElideRight
                                     }
                                 }
@@ -309,11 +327,21 @@ Item {
                             HoverHandler { id: cardHover }
                             TapHandler {
                                 id: cardTap
-                                onTapped: root.selectGame(delegateRoot.index, delegateRoot.title, delegateRoot.path,
-                                    delegateRoot.serial, delegateRoot.region, delegateRoot.summary,
-                                    delegateRoot.genres, delegateRoot.heroUrl, delegateRoot.year,
-                                    delegateRoot.rating, delegateRoot.fileSize)
-                                onDoubleTapped: if (Emulator.bootGame(delegateRoot.path)) App.navigate("emulation")
+                                onTapped: {
+                                    if (!Preferences.value("library/showDetailsOnClick", true)) {
+                                        if (Emulator.bootGame(delegateRoot.path)) App.navigate("emulation")
+                                        return
+                                    }
+                                    root.selectGame(delegateRoot.index, delegateRoot.title, delegateRoot.path,
+                                        delegateRoot.serial, delegateRoot.region, delegateRoot.summary,
+                                        delegateRoot.genres, delegateRoot.heroUrl, delegateRoot.year,
+                                        delegateRoot.rating, delegateRoot.fileSize)
+                                }
+                                onDoubleTapped: {
+                                    if (Preferences.value("library/showDetailsOnClick", true)
+                                            && Emulator.bootGame(delegateRoot.path))
+                                        App.navigate("emulation")
+                                }
                             }
                         }
                     }
@@ -393,7 +421,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: root.selectedTitle
                                 color: Theme.text
-                                font.pixelSize: 22
+                                font.pixelSize: Theme.sp(22)
                                 font.weight: Font.Bold
                                 wrapMode: Text.WordWrap
                                 horizontalAlignment: Text.AlignHCenter
@@ -403,7 +431,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: [root.selectedGenres, root.selectedYear > 0 ? root.selectedYear : ""].filter(Boolean).join("  ·  ")
                                 color: Theme.textMuted
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.sp(11)
                                 elide: Text.ElideRight
                                 horizontalAlignment: Text.AlignHCenter
                             }
@@ -433,27 +461,27 @@ Item {
                                     anchors.leftMargin: 17
                                     anchors.rightMargin: 17
                                     spacing: 10
-                                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: 15; font.weight: Font.Bold }
+                                    Text { text: I18n.get("detail_overview"); color: Theme.text; font.pixelSize: Theme.sp(15); font.weight: Font.Bold }
                                     Text {
                                         Layout.fillWidth: true
                                         text: root.selectedSummary.length > 0 ? root.selectedSummary : I18n.get("detail_no_data_body")
                                         color: Theme.textMuted
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.sp(12)
                                         lineHeight: 1.25
                                         wrapMode: Text.WordWrap
                                     }
                                     Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.border }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: I18n.get("detail_serial"); color: Theme.textMuted; font.pixelSize: 11 }
+                                        Text { text: I18n.get("detail_serial"); color: Theme.textMuted; font.pixelSize: Theme.sp(11) }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: root.selectedSerial; color: Theme.text; font.pixelSize: 11; font.weight: Font.DemiBold }
+                                        Text { text: root.selectedSerial; color: Theme.text; font.pixelSize: Theme.sp(11); font.weight: Font.DemiBold }
                                     }
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Text { text: I18n.get("detail_file_size"); color: Theme.textMuted; font.pixelSize: 11 }
+                                        Text { text: I18n.get("detail_file_size"); color: Theme.textMuted; font.pixelSize: Theme.sp(11) }
                                         Item { Layout.fillWidth: true }
-                                        Text { text: root.formatSize(root.selectedSize); color: Theme.text; font.pixelSize: 11; font.weight: Font.DemiBold }
+                                        Text { text: root.formatSize(root.selectedSize); color: Theme.text; font.pixelSize: Theme.sp(11); font.weight: Font.DemiBold }
                                     }
                                 }
                             }
@@ -462,7 +490,7 @@ Item {
                                 Layout.fillWidth: true
                                 text: root.selectedPath
                                 color: Theme.textDim
-                                font.pixelSize: 10
+                                font.pixelSize: Theme.sp(10)
                                 elide: Text.ElideMiddle
                             }
                             Item { Layout.preferredHeight: 10 }

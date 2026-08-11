@@ -46,7 +46,7 @@ Item {
                 Text {
                     text: "EmuCoreX"
                     color: Theme.text
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.sp(18)
                     font.weight: Font.Bold
                 }
                 Item { Layout.fillWidth: true }
@@ -271,8 +271,8 @@ Item {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 5
-                                Text { Layout.fillWidth: true; text: modelData.title; color: Theme.text; font.pixelSize: 16; font.weight: Font.Bold }
-                                Text { Layout.fillWidth: true; text: modelData.description; color: Theme.textMuted; font.pixelSize: 13; wrapMode: Text.WordWrap }
+                                Text { Layout.fillWidth: true; text: modelData.title; color: Theme.text; font.pixelSize: Theme.sp(16); font.weight: Font.Bold }
+                                Text { Layout.fillWidth: true; text: modelData.description; color: Theme.textMuted; font.pixelSize: Theme.sp(13); wrapMode: Text.WordWrap }
                             }
                             Rectangle {
                                 Layout.preferredWidth: 22; Layout.preferredHeight: 22
@@ -344,7 +344,7 @@ Item {
             Layout.maximumWidth: 760
             text: parent.title
             color: Theme.text
-            font.pixelSize: 38
+            font.pixelSize: Theme.sp(38)
             font.weight: Font.Bold
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -354,7 +354,7 @@ Item {
             Layout.maximumWidth: 720
             text: parent.subtitle
             color: Theme.textMuted
-            font.pixelSize: 16
+            font.pixelSize: Theme.sp(16)
             lineHeight: 1.38
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -383,13 +383,13 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 4
-                Text { Layout.fillWidth: true; text: parent.parent.parent.title; color: Theme.text; font.pixelSize: 16; font.weight: Font.Bold }
-                Text { Layout.fillWidth: true; text: parent.parent.parent.description; color: Theme.textMuted; font.pixelSize: 13; elide: Text.ElideMiddle }
+                Text { Layout.fillWidth: true; text: parent.parent.parent.title; color: Theme.text; font.pixelSize: Theme.sp(16); font.weight: Font.Bold }
+                Text { Layout.fillWidth: true; text: parent.parent.parent.description; color: Theme.textMuted; font.pixelSize: Theme.sp(13); elide: Text.ElideMiddle }
             }
             Text {
                 text: parent.parent.ready ? I18n.get("onboarding_status_ready") : I18n.get("onboarding_status_required")
                 color: parent.parent.ready ? Theme.success : Theme.warning
-                font.pixelSize: 12
+                font.pixelSize: Theme.sp(12)
                 font.weight: Font.Bold
             }
         }

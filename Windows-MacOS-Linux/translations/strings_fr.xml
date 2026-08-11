@@ -1060,6 +1060,8 @@
     <string name="settings_updates_parallel_unavailable">L\'APK séparé n\'est pas disponible pour cette version.</string>
     <string name="common_close">Fermer</string>
     <string name="common_open">Ouvrir</string>
+    <string name="settings_library_click_details_title">Afficher les détails au clic</string>
+    <string name="settings_library_click_details_desc">Ouvre le panneau de détails adaptatif lors de la sélection d’un jeu. Désactivez cette option pour lancer les jeux immédiatement d’un clic.</string>
     <string name="settings_language_arabic">Arabe</string>
     <string name="settings_language_japanese">Japonais</string>
     <string name="settings_language_korean">Coréen</string>

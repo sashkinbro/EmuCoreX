@@ -22,7 +22,7 @@ Rectangle {
     signal numberSelected(real value)
     signal actionTriggered()
 
-    implicitHeight: description.length > 0 ? 92 : 72
+    implicitHeight: Math.max(description.length > 0 ? 92 : 72, rowLayout.implicitHeight + 28)
     color: hover.hovered ? Theme.surfaceHover : Theme.surface
     radius: 22
     border.width: 1
@@ -31,6 +31,7 @@ Rectangle {
     Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
 
     RowLayout {
+        id: rowLayout
         anchors.fill: parent
         anchors.leftMargin: 14
         anchors.rightMargin: 14
@@ -44,12 +45,12 @@ Rectangle {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: 3
-            Text { text: root.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
+            Text { text: root.title; color: Theme.text; font.pixelSize: Theme.sp(14); font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
             Text {
                 visible: root.description.length > 0
                 text: root.description
                 color: Theme.textMuted
-                font.pixelSize: 12
+                font.pixelSize: Theme.sp(12)
                 Layout.fillWidth: true
                 maximumLineCount: 2
                 wrapMode: Text.WordWrap
@@ -106,7 +107,7 @@ Rectangle {
                 rightPadding: 38
                 text: comboControl.displayText
                 color: Theme.text
-                font.pixelSize: 13
+                font.pixelSize: Theme.sp(13)
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight
             }
@@ -135,7 +136,7 @@ Rectangle {
                 contentItem: Text {
                     text: modelData
                     color: Theme.text
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.sp(13)
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight
                     leftPadding: 10
@@ -230,7 +231,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: Math.round(sliderControl.value) + root.valueSuffix
                     color: Theme.text
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.sp(12)
                     font.weight: Font.DemiBold
                 }
             }

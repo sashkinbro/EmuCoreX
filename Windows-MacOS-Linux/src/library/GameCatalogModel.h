@@ -59,7 +59,6 @@ public:
     Q_INVOKABLE void refresh();
     Q_INVOKABLE QVariantMap detailsForId(qint64 id) const;
     Q_INVOKABLE QVariantMap matchGame(const QString& serial, const QString& title) const;
-    Q_INVOKABLE QString coverUrlForSerial(const QString& serial, int style) const;
     Q_INVOKABLE QString normalizedSerial(const QString& serial) const;
 
 signals:

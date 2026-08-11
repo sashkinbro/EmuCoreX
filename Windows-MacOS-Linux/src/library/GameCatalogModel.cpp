@@ -13,9 +13,6 @@
 #include <QUuid>
 
 namespace {
-constexpr auto kFlatCoverBase = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default";
-constexpr auto kThreeDimensionalCoverBase = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d";
-
 qint64 jsonIgdbId(const QJsonValue& value)
 {
     if (value.isDouble())
@@ -293,19 +290,6 @@ qint64 GameCatalogModel::findBestMatchId(const QString& serial, const QString& t
 QVariantMap GameCatalogModel::matchGame(const QString& serial, const QString& title) const
 {
     return detailsForId(findBestMatchId(serial, title));
-}
-
-QString GameCatalogModel::coverUrlForSerial(const QString& serial, int style) const
-{
-    if (style <= 0)
-        return {};
-    const QString normalized = normalizedSerial(serial);
-    if (normalized.isEmpty())
-        return {};
-    const bool is3d = style == 2;
-    return QStringLiteral("%1/%2.%3")
-        .arg(QString::fromLatin1(is3d ? kThreeDimensionalCoverBase : kFlatCoverBase), normalized,
-            is3d ? QStringLiteral("png") : QStringLiteral("jpg"));
 }
 
 QString GameCatalogModel::normalizedSerial(const QString& serial) const

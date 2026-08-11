@@ -3,8 +3,10 @@
 #include "core/EmulatorController.h"
 #include "data/DesktopDataService.h"
 #include "i18n/TranslationManager.h"
+#include "input/InputBindingService.h"
 #include "library/GameLibraryModel.h"
 #include "library/GameCatalogModel.h"
+#include "library/CoverArtService.h"
 #include "settings/SettingsStore.h"
 
 #include <QFontDatabase>
@@ -50,10 +52,28 @@ int main(int argc, char* argv[])
     if (!singleInstance.isPrimary())
         return 0;
 
-    QFontDatabase::addApplicationFont(":/fonts/Rubik.ttf");
-    app.setFont(QFont("Rubik", 10));
+    const QFont systemFont = app.font();
+    const int rubikFontId = QFontDatabase::addApplicationFont(":/fonts/Rubik.ttf");
+    const int exoFontId = QFontDatabase::addApplicationFont(":/fonts/Exo2.ttf");
+    const QString rubikFamily = QFontDatabase::applicationFontFamilies(rubikFontId).value(0, QStringLiteral("Rubik"));
+    const QString exoFamily = QFontDatabase::applicationFontFamilies(exoFontId).value(0, QStringLiteral("Exo 2"));
 
     SettingsStore settings;
+    const auto applyApplicationFont = [&] {
+        const QString selected = settings.value(QStringLiteral("appearance/font"), QStringLiteral("rubik")).toString();
+        QFont font = systemFont;
+        if (selected == QLatin1String("exo2"))
+            font.setFamily(exoFamily);
+        else if (selected != QLatin1String("system"))
+            font.setFamily(rubikFamily);
+        app.setFont(font);
+    };
+    applyApplicationFont();
+    QObject::connect(&settings, &SettingsStore::valueChanged, &app,
+        [&](const QString& key, const QVariant&) {
+            if (key == QLatin1String("appearance/font"))
+                applyApplicationFont();
+        });
     TranslationManager translations;
     translations.setCurrentLanguage(settings.language());
     QObject::connect(&settings, &SettingsStore::languageChanged, &translations, [&] {
@@ -63,8 +83,10 @@ int main(int argc, char* argv[])
     AppController appController(&settings);
     GameCatalogModel catalog;
     GameLibraryModel library(&catalog);
+    CoverArtService coverArt(&settings);
     EmulatorController emulator;
     DesktopDataService desktopData(&settings);
+    InputBindingService inputBindings;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("App", &appController);
@@ -72,8 +94,10 @@ int main(int argc, char* argv[])
     engine.rootContext()->setContextProperty("I18n", &translations);
     engine.rootContext()->setContextProperty("GameLibrary", &library);
     engine.rootContext()->setContextProperty("GameCatalog", &catalog);
+    engine.rootContext()->setContextProperty("CoverArtProvider", &coverArt);
     engine.rootContext()->setContextProperty("Emulator", &emulator);
     engine.rootContext()->setContextProperty("DesktopData", &desktopData);
+    engine.rootContext()->setContextProperty("InputBindings", &inputBindings);
 
     const QUrl mainUrl("qrc:/qml/Main.qml");
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,

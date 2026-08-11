@@ -1064,6 +1064,8 @@
     <string name="settings_updates_parallel_unavailable">Отдельный APK недоступен для этого релиза.</string>
     <string name="common_close">Закрыть</string>
     <string name="common_open">Открыть</string>
+    <string name="settings_library_click_details_title">Показывать сведения об игре по нажатию</string>
+    <string name="settings_library_click_details_desc">Открывает адаптивную панель сведений при выборе игры. Отключите, чтобы запускать игры сразу одним нажатием.</string>
     <string name="settings_language_arabic">Арабский</string>
     <string name="settings_language_japanese">Японский</string>
     <string name="settings_language_korean">Корейский</string>

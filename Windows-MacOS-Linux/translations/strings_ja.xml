@@ -298,6 +298,8 @@
     <string name="settings_updates_parallel_unavailable">このリリースには別のAPKは用意されていません。</string>
     <string name="common_close">閉じる</string>
     <string name="common_open">開く</string>
+    <string name="settings_library_click_details_title">クリック時にゲーム詳細を表示</string>
+    <string name="settings_library_click_details_desc">ゲームを選択すると適応型の詳細パネルを開きます。オフにすると、1回のクリックですぐにゲームを起動します。</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">サインインすると、サポートされているゲームのプレイ中に実績、ハードコアモード、リッチプレゼンスを追跡できます。</string>
     <string name="settings_ra_enabled">RetroAchievementsを有効にする</string>

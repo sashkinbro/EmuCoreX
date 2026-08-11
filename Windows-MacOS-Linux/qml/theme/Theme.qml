@@ -4,6 +4,7 @@ import QtQuick
 
 QtObject {
     readonly property bool light: Preferences.themeMode === "light"
+        || (Preferences.themeMode === "system" && !App.systemDark)
     readonly property color accent: Preferences.accentColor.length > 0 ? Preferences.accentColor : "#C4203A"
     readonly property color accentBright: Qt.lighter(accent, light ? 1.08 : 1.35)
     readonly property color accentContainer: light ? Qt.rgba(accent.r, accent.g, accent.b, 0.18) : Qt.rgba(accent.r, accent.g, accent.b, 0.24)
@@ -36,4 +37,8 @@ QtObject {
     readonly property int sidebarCompact: 78
     readonly property int topBarHeight: 72
     readonly property int contentMaxWidth: 1540
+
+    function sp(value) {
+        return Math.round(value * fontScale)
+    }
 }

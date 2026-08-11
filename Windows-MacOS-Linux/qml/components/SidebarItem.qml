@@ -33,7 +33,7 @@ Rectangle {
             Layout.fillWidth: true
             text: root.label
             color: root.selected ? Theme.text : Theme.textMuted
-            font.pixelSize: 13
+            font.pixelSize: Theme.sp(13)
             font.weight: root.selected ? Font.DemiBold : Font.Normal
             maximumLineCount: 2
             wrapMode: Text.WordWrap

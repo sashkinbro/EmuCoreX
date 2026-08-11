@@ -67,6 +67,12 @@ Item {
         return t("settings_cover_art_style_flat")
     }
 
+    function fontLabel(fontId) {
+        if (fontId === "system") return t("settings_customization_font_system")
+        if (fontId === "exo2") return t("settings_customization_font_exo2")
+        return t("settings_customization_font_rubik")
+    }
+
     function rows(tab) {
         switch (tab) {
         case "general":
@@ -105,7 +111,7 @@ Item {
             return [
                 action("settings_gamepad_mapping_title", "settings_gamepad_mapping_disconnected", "play", "controls/mapping", "settings_gamepad_mapping_auto_format"),
                 toggle("settings_pad_vibration", "settings_help_pad_vibration", "play", "controls/vibration", true),
-                range("settings_pad_vibration_strength", "settings_help_pad_vibration_strength", "tune", "controls/vibrationStrength", 100, 0, 150, 5, "%"),
+                range("settings_pad_vibration_strength", "settings_help_pad_vibration", "tune", "controls/vibrationStrength", 100, 0, 150, 5, "%"),
                 range("settings_gamepad_stick_deadzone", "settings_help_gamepad_stick_deadzone", "tune", "controls/deadzone", 10, 0, 40, 1, "%"),
                 range("settings_gamepad_left_stick_sensitivity", "settings_help_gamepad_left_stick_sensitivity", "tune", "controls/leftSensitivity", 100, 50, 200, 5, "%"),
                 range("settings_gamepad_right_stick_sensitivity", "settings_help_gamepad_right_stick_sensitivity", "tune", "controls/rightSensitivity", 100, 50, 200, 5, "%")
@@ -161,6 +167,7 @@ Item {
                 action("settings_game_path", "settings_help_game_path", "folder", "library/folders", "home_add_folder"),
                 action("emulator_data_location_title", "emulator_data_location_description", "folder", "library/data", "emulator_data_location_title"),
                 action("settings_memory_cards_tab", "settings_memory_cards_open_desc", "card", "library/memoryCards", "settings_memory_cards_open"),
+                toggle("settings_library_click_details_title", "settings_library_click_details_desc", "library", "library/showDetailsOnClick", true),
                 { title: t("settings_cover_art_style"), desc: t("settings_help_cover_art_style"), icon: "image", type: "combo",
                     key: "library/coverStyle", value: coverStyleLabel(Preferences.coverArtStyle),
                     options: [t("settings_cover_art_style_off"), t("settings_cover_art_style_flat"), t("settings_cover_art_style_3d")] },
@@ -170,8 +177,8 @@ Item {
             ]
         case "network":
             return [
-                toggle("settings_network_enable", "settings_network_enable_help", "hub", "network/enabled", false),
-                choice("settings_network_mode", "settings_network_mode_help", "hub", "network/mode", t("settings_network_mode_online"),
+                toggle("settings_network_enable", "settings_network_summary", "hub", "network/enabled", false),
+                choice("settings_network_mode", "settings_network_summary", "hub", "network/mode", t("settings_network_mode_online"),
                     [t("settings_network_mode_online"), t("settings_network_mode_local_host"), t("settings_network_mode_local_join")]),
                 choice("settings_network_api", "settings_network_summary", "tune", "network/api", t("settings_network_api_sockets"), [t("settings_network_api_sockets")]),
                 choice("settings_network_dns_preset", "settings_network_dns_preset_help", "hub", "network/dnsPreset", t("settings_network_dns_preset_system"),
@@ -192,10 +199,11 @@ Item {
                 action("settings_customization_remove_background", "settings_customization_remove_background_desc", "close", "appearance/removeBackground", "settings_customization_remove_background"),
                 range("settings_customization_grid_size", "settings_customization_grid_size_help", "library", "appearance/gridScale", Preferences.gridScale * 100, 65, 155, 5, "%"),
                 choice("settings_customization_drawer_style", "settings_customization_drawer_summary", "menu", "appearance/drawerStyle", t("settings_drawer_style_classic"),
-                    [t("settings_drawer_style_classic"), t("settings_drawer_style_compact"), t("settings_drawer_style_glass"), t("settings_drawer_style_console")]),
-                choice("settings_customization_font", "settings_customization_font_help", "file", "appearance/font", t("settings_customization_font_rubik"),
+                    [t("settings_drawer_style_classic"), t("settings_drawer_style_compact")]),
+                choice("settings_customization_font", "settings_customization_font_help", "file", "appearance/font",
+                    fontLabel(Preferences.value("appearance/font", "rubik")),
                     [t("settings_customization_font_system"), t("settings_customization_font_rubik"), t("settings_customization_font_exo2")]),
-                range("settings_customization_font_size", "settings_customization_font_size_help", "file", "appearance/fontScale", Preferences.fontScale * 100, 85, 130, 5, "%"),
+                range("settings_customization_font_size", "settings_customization_font_help", "file", "appearance/fontScale", Preferences.fontScale * 100, 85, 130, 5, "%"),
                 action("settings_customization_reset", "settings_customization_reset_desc", "refresh", "appearance/reset", "settings_customization_reset")
             ]
         case "game-menu":
@@ -217,12 +225,12 @@ Item {
             ]
         case "about":
             return [
-                action("settings_about_app", "settings_about_app_desc", "library", "about/app", "settings_about_app"),
+                action("settings_about_app", "onboarding_page_1_subtitle", "library", "about/app", "settings_about_app"),
                 action("settings_about_studio", "settings_about_studio_desc", "profile", "about/studio", "settings_about_studio"),
                 action("settings_about_website", "settings_about_website_desc", "hub", "about/website", "settings_about_website_link"),
                 action("settings_about_privacy_policy", "settings_about_privacy_policy_desc", "file", "about/privacy", "settings_about_privacy_policy_link"),
                 action("settings_about_app_source", "settings_about_app_source_desc", "code", "about/source", "settings_about_app_source_link"),
-                action("settings_about_core_source", "settings_about_core_source_desc", "chip", "about/core", "settings_about_core_source_link")
+                action("settings_about_core_source", "settings_about_core_source_link", "chip", "about/core", "settings_about_core_source_link")
             ]
         }
         return []
@@ -251,6 +259,9 @@ Item {
         } else if (key === "appearance/drawerStyle") {
             Preferences.compactSidebar = value === t("settings_drawer_style_compact")
             Preferences.setValue(key, value)
+        } else if (key === "appearance/font") {
+            Preferences.setValue(key, value === t("settings_customization_font_system") ? "system"
+                : (value === t("settings_customization_font_exo2") ? "exo2" : "rubik"))
         } else {
             Preferences.setValue(key, value)
         }
@@ -268,7 +279,10 @@ Item {
         else if (key === "library/folders") gameFolderDialog.open()
         else if (key === "library/data") dataFolderDialog.open()
         else if (key === "library/memoryCards") App.replaceRoute("memory-cards")
-        else if (key === "library/clearCovers") GameLibrary.invalidateCovers()
+        else if (key === "library/clearCovers") {
+            GameLibrary.invalidateCovers()
+            CoverArt.invalidate()
+        }
         else if (key === "controls/mapping") App.replaceRoute("gamepad-mapping")
         else if (key === "appearance/background") backgroundDialog.open()
         else if (key === "appearance/removeBackground") Preferences.backgroundPath = ""

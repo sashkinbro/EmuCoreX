@@ -298,6 +298,8 @@
     <string name="settings_updates_parallel_unavailable">이 릴리스에는 별도의 APK가 제공되지 않습니다.</string>
     <string name="common_close">닫기</string>
     <string name="common_open">열기</string>
+    <string name="settings_library_click_details_title">클릭할 때 게임 정보 표시</string>
+    <string name="settings_library_click_details_desc">게임을 선택하면 반응형 정보 패널을 엽니다. 한 번의 클릭으로 바로 실행하려면 끄세요.</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">로그인하여 지원되는 게임을 플레이하는 동안 업적, 하드코어 모드 및 활동 상태(Rich Presence)를 추적하세요.</string>
     <string name="settings_ra_enabled">RetroAchievements 활성화</string>

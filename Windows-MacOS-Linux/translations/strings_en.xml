@@ -489,6 +489,8 @@
     <string name="settings_updates_parallel_unavailable">Separate APK is not available for this release.</string>
     <string name="common_close">Close</string>
     <string name="common_open">Open</string>
+    <string name="settings_library_click_details_title">Show game details on click</string>
+    <string name="settings_library_click_details_desc">Opens the adaptive detail panel when you select a game. Turn it off to launch games immediately with one click.</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Sign in to track achievements, hardcore mode, and rich presence while you play supported games.</string>
     <string name="settings_ra_enabled">Enable RetroAchievements</string>

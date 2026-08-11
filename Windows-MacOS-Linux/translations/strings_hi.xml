@@ -1058,6 +1058,8 @@
     <string name="settings_updates_parallel_unavailable">इस रिलीज़ के लिए अलग APK उपलब्ध नहीं है।</string>
     <string name="common_close">बंद करें</string>
     <string name="common_open">खोलें</string>
+    <string name="settings_library_click_details_title">क्लिक पर गेम विवरण दिखाएँ</string>
+    <string name="settings_library_click_details_desc">गेम चुनने पर अनुकूलित विवरण पैनल खोलता है। एक क्लिक में गेम तुरंत शुरू करने के लिए इसे बंद करें।</string>
     <string name="settings_language_arabic">अरबी</string>
     <string name="settings_language_japanese">जापानी</string>
     <string name="settings_language_korean">कोरियाई</string>

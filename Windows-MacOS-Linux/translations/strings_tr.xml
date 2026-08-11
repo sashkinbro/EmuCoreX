@@ -298,6 +298,8 @@
     <string name="settings_updates_parallel_unavailable">Ayrı APK bu sürüm için mevcut değil.</string>
     <string name="common_close">Kapat</string>
     <string name="common_open">Aç</string>
+    <string name="settings_library_click_details_title">Tıklayınca oyun ayrıntılarını göster</string>
+    <string name="settings_library_click_details_desc">Bir oyun seçildiğinde uyarlanabilir ayrıntı panelini açar. Oyunları tek tıklamayla hemen başlatmak için kapatın.</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Desteklenen oyunları oynarken başarımları, zorlu (hardcore) modu ve zengin durumu izlemek için giriş yapın.</string>
     <string name="settings_ra_enabled">RetroAchievements\'i Etkinleştir</string>

@@ -10,7 +10,7 @@ Button {
     property string toolTipText: ""
     readonly property bool iconOnly: text.length === 0 && iconName.length > 0
 
-    implicitHeight: 44
+    implicitHeight: Math.max(44, Theme.sp(18) + 26)
     implicitWidth: iconOnly ? implicitHeight : Math.max(104, contentRow.implicitWidth + 34)
     leftPadding: iconOnly ? 0 : 17
     rightPadding: leftPadding
@@ -18,7 +18,7 @@ Button {
     bottomPadding: 0
     hoverEnabled: true
     focusPolicy: Qt.StrongFocus
-    font.pixelSize: 14
+    font.pixelSize: Theme.sp(14)
     font.weight: Font.DemiBold
 
     contentItem: Item {

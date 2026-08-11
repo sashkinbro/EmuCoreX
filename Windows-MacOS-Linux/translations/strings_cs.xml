@@ -487,6 +487,8 @@
     <string name="settings_updates_parallel_unavailable">Oddělený APK není pro toto vydání k dispozici.</string>
     <string name="common_close">Zavřít</string>
     <string name="common_open">Otevřít</string>
+    <string name="settings_library_click_details_title">Zobrazit podrobnosti po kliknutí</string>
+    <string name="settings_library_click_details_desc">Po výběru hry otevře přizpůsobivý panel podrobností. Vypnutím spustíte hru okamžitě jedním kliknutím.</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Přihlaste se ke sledování úspěchů, Hardcore režimu a zobrazení aktivity (Rich Presence), zatímco hrajete podporované hry.</string>
     <string name="settings_ra_enabled">Povolit RetroAchievements</string>

@@ -33,6 +33,7 @@ class GameLibraryModel final : public QAbstractListModel
 {
     Q_OBJECT
     Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+    Q_PROPERTY(int favoriteCount READ favoriteCount NOTIFY countChanged)
     Q_PROPERTY(QStringList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchQueryChanged)
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
@@ -67,6 +68,7 @@ public:
     QString searchQuery() const { return m_searchQuery; }
     bool scanning() const { return m_scanning; }
     int coverRevision() const { return m_coverRevision; }
+    int favoriteCount() const;
 
     Q_INVOKABLE void addFolder(const QUrl& folderUrl);
     Q_INVOKABLE void removeFolder(int index);

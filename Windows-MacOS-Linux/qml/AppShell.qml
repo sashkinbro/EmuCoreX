@@ -26,106 +26,108 @@ Item {
 
             Behavior on width { NumberAnimation { duration: Theme.duration; easing.type: Easing.OutCubic } }
 
-            ColumnLayout {
+            ScrollView {
+                id: sidebarScroll
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 7
+                clip: true
+                contentWidth: availableWidth
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AlwaysOff
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 52
-                    spacing: 12
-                    AppLogo {
-                        Layout.preferredWidth: 38; Layout.preferredHeight: 38
+                ColumnLayout {
+                    x: 12
+                    width: Math.max(0, sidebarScroll.availableWidth - 24)
+                    spacing: 7
+
+                    Item { Layout.preferredHeight: 5 }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 52
+                        spacing: 12
+                        AppLogo { Layout.preferredWidth: 38; Layout.preferredHeight: 38 }
+                        Text {
+                            visible: !root.compact
+                            Layout.fillWidth: true
+                            text: "EmuCoreX"
+                            color: Theme.text
+                            font.pixelSize: Theme.sp(16)
+                            font.weight: Font.Bold
+                        }
                     }
-                    ColumnLayout {
+
+                    Item { Layout.preferredHeight: 4 }
+                    Repeater {
+                        model: [
+                            { route: "library", icon: "library", label: I18n.get("shell_library") },
+                            { route: "catalog", icon: "search", label: I18n.get("shell_catalog_search") },
+                            { route: "hub", icon: "hub", label: I18n.get("hub_title") },
+                            { route: "achievements", icon: "star", label: I18n.get("settings_achievements_tab") },
+                            { route: "profile", icon: "profile", label: I18n.get("profile_title") }
+                        ]
+                        SidebarItem {
+                            Layout.fillWidth: true
+                            compact: root.compact
+                            iconName: modelData.icon
+                            label: modelData.label
+                            selected: App.currentRoute === modelData.route
+                            onClicked: App.replaceRoute(modelData.route)
+                        }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 6; Layout.bottomMargin: 3; color: Theme.border }
+                    Text {
                         visible: !root.compact
-                        Layout.fillWidth: true
-                        spacing: 0
-                        Text { text: "EmuCoreX"; color: Theme.text; font.pixelSize: 16; font.weight: Font.Bold }
+                        text: I18n.get("shell_tools_section").toUpperCase()
+                        color: Theme.textDim
+                        font.pixelSize: Theme.sp(9)
+                        font.weight: Font.Bold
+                        font.letterSpacing: 1.1
+                        Layout.leftMargin: 12
+                        Layout.bottomMargin: 2
                     }
-                }
 
-                Item { Layout.preferredHeight: 4 }
-
-                Repeater {
-                    model: [
-                        { route: "library", icon: "library", label: I18n.get("shell_library") },
-                        { route: "catalog", icon: "search", label: I18n.get("shell_catalog_search") },
-                        { route: "hub", icon: "hub", label: I18n.get("hub_title") },
-                        { route: "achievements", icon: "star", label: I18n.get("settings_achievements_tab") },
-                        { route: "profile", icon: "profile", label: I18n.get("profile_title") }
-                    ]
-                    SidebarItem {
-                        Layout.fillWidth: true
-                        compact: root.compact
-                        iconName: modelData.icon
-                        label: modelData.label
-                        selected: App.currentRoute === modelData.route
-                        onClicked: App.replaceRoute(modelData.route)
-                    }
-                }
-
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 6; Layout.bottomMargin: 3; color: Theme.border }
-                Text {
-                    visible: !root.compact
-                    text: I18n.get("shell_tools_section").toUpperCase()
-                    color: Theme.textDim
-                    font.pixelSize: 9; font.weight: Font.Bold; font.letterSpacing: 1.1
-                    Layout.leftMargin: 12; Layout.bottomMargin: 2
-                }
-
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    ScrollBar.vertical.policy: ScrollBar.AlwaysOff
-                    ColumnLayout {
-                        width: parent.width
-                        spacing: 5
-                        Repeater {
-                            model: [
-                                { route: "launch-game", icon: "play", label: I18n.get("shell_launch_game") },
-                                { route: "launch-bios", icon: "chip", label: I18n.get("shell_launch_bios") },
-                                { route: "game-manager", icon: "tune", label: I18n.get("shell_game_settings_manager") },
-                                { route: "save-manager", icon: "save", label: I18n.get("shell_save_states") },
-                                { route: "memory-cards", icon: "card", label: I18n.get("shell_memory_cards") },
-                                { route: "textures", icon: "image", label: I18n.get("shell_texture_manager") },
-                                { route: "cheats", icon: "code", label: I18n.get("shell_cheat_manager") }
-                            ]
-                            SidebarItem {
-                                Layout.fillWidth: true
-                                compact: root.compact
-                                iconName: modelData.icon
-                                label: modelData.label
-                                selected: App.currentRoute === modelData.route
-                                onClicked: {
-                                    if (modelData.route === "launch-game") gameFileDialog.open()
-                                    else if (modelData.route === "launch-bios") {
-                                        if (Emulator.bootBios()) App.navigate("emulation")
-                                    } else App.replaceRoute(modelData.route)
-                                }
+                    Repeater {
+                        model: [
+                            { route: "launch-game", icon: "play", label: I18n.get("shell_launch_game") },
+                            { route: "launch-bios", icon: "chip", label: I18n.get("shell_launch_bios") },
+                            { route: "game-manager", icon: "tune", label: I18n.get("shell_game_settings_manager") },
+                            { route: "save-manager", icon: "save", label: I18n.get("shell_save_states") },
+                            { route: "memory-cards", icon: "card", label: I18n.get("shell_memory_cards") },
+                            { route: "textures", icon: "image", label: I18n.get("shell_texture_manager") },
+                            { route: "cheats", icon: "code", label: I18n.get("shell_cheat_manager") }
+                        ]
+                        SidebarItem {
+                            Layout.fillWidth: true
+                            compact: root.compact
+                            iconName: modelData.icon
+                            label: modelData.label
+                            selected: App.currentRoute === modelData.route
+                            onClicked: {
+                                if (modelData.route === "launch-game") gameFileDialog.open()
+                                else if (modelData.route === "launch-bios") {
+                                    if (Emulator.bootBios()) App.navigate("emulation")
+                                } else App.replaceRoute(modelData.route)
                             }
                         }
                     }
-                }
 
-                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.border }
-                Repeater {
-                    model: [
-                        { route: "settings", icon: "settings", label: I18n.get("shell_app_settings") },
-                        { route: "formats", icon: "file", label: I18n.get("shell_supported_formats") },
-                        { route: "feedback", icon: "chat", label: I18n.get("feedback_title") }
-                    ]
-                    SidebarItem {
-                        Layout.fillWidth: true
-                        compact: root.compact
-                        iconName: modelData.icon
-                        label: modelData.label
-                        selected: App.currentRoute === modelData.route
-                        onClicked: App.replaceRoute(modelData.route)
+                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 3; Layout.bottomMargin: 3; color: Theme.border }
+                    Repeater {
+                        model: [
+                            { route: "settings", icon: "settings", label: I18n.get("shell_app_settings") },
+                            { route: "formats", icon: "file", label: I18n.get("shell_supported_formats") },
+                            { route: "feedback", icon: "chat", label: I18n.get("feedback_title") }
+                        ]
+                        SidebarItem {
+                            Layout.fillWidth: true
+                            compact: root.compact
+                            iconName: modelData.icon
+                            label: modelData.label
+                            selected: App.currentRoute === modelData.route
+                            onClicked: App.replaceRoute(modelData.route)
+                        }
                     }
+                    Item { Layout.preferredHeight: 5 }
                 }
             }
         }
@@ -218,6 +220,7 @@ Item {
                     case "memory-cards": return memoryCardsComponent
                     case "textures": return texturesComponent
                     case "cheats": return cheatsComponent
+                    case "gamepad-mapping": return gamepadMappingComponent
                     default: return featureComponent
                     }
                 }
@@ -248,6 +251,7 @@ Item {
     Component { id: memoryCardsComponent; Loader { source: "screens/MemoryCardManagerScreen.qml" } }
     Component { id: texturesComponent; Loader { source: "screens/TextureManagerScreen.qml" } }
     Component { id: cheatsComponent; Loader { source: "screens/CheatManagerScreen.qml" } }
+    Component { id: gamepadMappingComponent; Loader { source: "screens/GamepadMappingScreen.qml" } }
     Component {
         id: featureComponent
         Loader {

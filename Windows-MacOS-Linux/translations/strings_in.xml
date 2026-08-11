@@ -472,6 +472,8 @@
     <string name="settings_updates_parallel_unavailable">APK terpisah tidak tersedia untuk rilis ini.</string>
     <string name="common_close">Tutup</string>
     <string name="common_open">Buka</string>
+    <string name="settings_library_click_details_title">Tampilkan detail saat diklik</string>
+    <string name="settings_library_click_details_desc">Membuka panel detail adaptif saat memilih game. Nonaktifkan untuk langsung menjalankan game dengan sekali klik.</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Masuk untuk melacak pencapaian, mode hardcore, dan rich presence (status kehadiran kaya) saat Anda memainkan game yang didukung.</string>
     <string name="settings_ra_enabled">Aktifkan RetroAchievements</string>

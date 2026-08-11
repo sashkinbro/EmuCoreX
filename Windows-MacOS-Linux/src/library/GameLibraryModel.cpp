@@ -25,6 +25,12 @@ int GameLibraryModel::rowCount(const QModelIndex& parent) const
     return parent.isValid() ? 0 : m_visibleGames.size();
 }
 
+int GameLibraryModel::favoriteCount() const
+{
+    return static_cast<int>(std::count_if(m_allGames.cbegin(), m_allGames.cend(),
+        [](const DesktopGame& game) { return game.favorite; }));
+}
+
 QVariant GameLibraryModel::data(const QModelIndex& index, int role) const
 {
     if (!index.isValid() || index.row() < 0 || index.row() >= m_visibleGames.size())
@@ -133,7 +139,6 @@ void GameLibraryModel::refresh()
                     if (game.serial.isEmpty())
                         game.serial = catalogMatch.value(QStringLiteral("primarySerial")).toString();
                 }
-                game.coverUrl = m_catalog->coverUrlForSerial(game.serial, 1);
             }
             games.append(std::move(game));
         }

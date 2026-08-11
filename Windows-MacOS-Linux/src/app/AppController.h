@@ -12,6 +12,7 @@ class AppController final : public QObject
     Q_PROPERTY(QString platformName READ platformName CONSTANT)
     Q_PROPERTY(QString hostArchitecture READ hostArchitecture CONSTANT)
     Q_PROPERTY(QString buildDescription READ buildDescription CONSTANT)
+    Q_PROPERTY(bool systemDark READ systemDark NOTIFY systemThemeChanged)
     Q_PROPERTY(bool canGoBack READ canGoBack NOTIFY currentRouteChanged)
     Q_PROPERTY(qint64 selectedCatalogGameId READ selectedCatalogGameId NOTIFY selectedGameChanged)
 
@@ -22,6 +23,7 @@ public:
     QString platformName() const;
     QString hostArchitecture() const;
     QString buildDescription() const;
+    bool systemDark() const;
     bool canGoBack() const { return m_routeStack.size() > 1; }
     qint64 selectedCatalogGameId() const { return m_selectedCatalogGameId; }
 
@@ -36,6 +38,7 @@ signals:
     void currentRouteChanged();
     void onboardingFinished();
     void selectedGameChanged();
+    void systemThemeChanged();
 
 private:
     static bool isKnownRoute(const QString& route);

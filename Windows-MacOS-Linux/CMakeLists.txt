@@ -63,8 +63,12 @@ qt_add_executable(EmuCoreXDesktop
     src/data/DesktopDataService.h
     src/i18n/TranslationManager.cpp
     src/i18n/TranslationManager.h
+    src/input/InputBindingService.cpp
+    src/input/InputBindingService.h
     src/library/GameLibraryModel.cpp
     src/library/GameLibraryModel.h
+    src/library/CoverArtService.cpp
+    src/library/CoverArtService.h
     src/library/GameCatalogModel.cpp
     src/library/GameCatalogModel.h
     src/settings/SettingsStore.cpp
