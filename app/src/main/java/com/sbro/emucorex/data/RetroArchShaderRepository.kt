@@ -11,6 +11,22 @@ import java.util.zip.ZipFile
 
 data class RetroArchShaderPreset(val label: String, val absolutePath: String)
 
+enum class ShaderPackInstallStage {
+    DOWNLOADING,
+    INSTALLING
+}
+
+data class ShaderPackInstallProgress(
+    val stage: ShaderPackInstallStage,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L
+) {
+    val fraction: Float?
+        get() = totalBytes.takeIf { it > 0L }?.let { total ->
+            (downloadedBytes.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+        }
+}
+
 /** Installs complete RetroArch shader packs while preserving their relative-path structure. */
 class RetroArchShaderRepository(private val context: Context) {
     companion object {
@@ -19,6 +35,7 @@ class RetroArchShaderRepository(private val context: Context) {
         private const val MAX_ARCHIVE_BYTES = 256L * 1024L * 1024L
         private const val MAX_EXTRACTED_BYTES = 768L * 1024L * 1024L
         private const val MAX_ENTRIES = 20_000
+        private const val PROGRESS_UPDATE_INTERVAL_NANOS = 100_000_000L
 
         internal fun commonArchiveRoot(paths: List<String>): String {
             if (paths.isEmpty()) return ""
@@ -57,7 +74,9 @@ class RetroArchShaderRepository(private val context: Context) {
 
     fun hasInstalledPack(): Boolean = containsPresetFiles(root)
 
-    fun downloadOfficialPack(): Result<Int> = runCatching {
+    fun downloadOfficialPack(
+        onProgress: (ShaderPackInstallProgress) -> Unit = {}
+    ): Result<Int> = runCatching {
         val archive = File(context.cacheDir, "retroarch-shaders-${UUID.randomUUID()}.zip")
         try {
             val connection = (URL(OFFICIAL_PACK_URL).openConnection() as HttpURLConnection).apply {
@@ -68,23 +87,53 @@ class RetroArchShaderRepository(private val context: Context) {
             }
             try {
                 require(connection.responseCode in 200..299) { "HTTP ${connection.responseCode}" }
+                val totalBytes = connection.contentLengthLong.coerceAtLeast(0L)
+                require(totalBytes == 0L || totalBytes <= MAX_ARCHIVE_BYTES) {
+                    "Shader archive is too large"
+                }
+                onProgress(
+                    ShaderPackInstallProgress(
+                        stage = ShaderPackInstallStage.DOWNLOADING,
+                        totalBytes = totalBytes
+                    )
+                )
                 connection.inputStream.use { input ->
                     FileOutputStream(archive).use { output ->
                         val buffer = ByteArray(64 * 1024)
                         var total = 0L
+                        var lastReportedAtNanos = 0L
                         while (true) {
                             val read = input.read(buffer)
                             if (read < 0) break
                             total += read
                             require(total <= MAX_ARCHIVE_BYTES) { "Shader archive is too large" }
                             output.write(buffer, 0, read)
+                            val now = System.nanoTime()
+                            if (now - lastReportedAtNanos >= PROGRESS_UPDATE_INTERVAL_NANOS) {
+                                onProgress(
+                                    ShaderPackInstallProgress(
+                                        stage = ShaderPackInstallStage.DOWNLOADING,
+                                        downloadedBytes = total,
+                                        totalBytes = totalBytes
+                                    )
+                                )
+                                lastReportedAtNanos = now
+                            }
                         }
                         output.fd.sync()
+                        onProgress(
+                            ShaderPackInstallProgress(
+                                stage = ShaderPackInstallStage.DOWNLOADING,
+                                downloadedBytes = total,
+                                totalBytes = totalBytes.takeIf { it > 0L } ?: total
+                            )
+                        )
                     }
                 }
             } finally {
                 connection.disconnect()
             }
+            onProgress(ShaderPackInstallProgress(stage = ShaderPackInstallStage.INSTALLING))
             installArchive(archive)
         } finally {
             archive.delete()

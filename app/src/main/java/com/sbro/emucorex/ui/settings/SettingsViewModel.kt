@@ -38,6 +38,8 @@ import com.sbro.emucorex.data.EmulationSideArtwork
 import com.sbro.emucorex.data.EmulationSideArtworkRepository
 import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.RetroArchShaderRepository
+import com.sbro.emucorex.data.ShaderPackInstallProgress
+import com.sbro.emucorex.data.ShaderPackInstallStage
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.GameMenuLayoutStyle
@@ -98,6 +100,7 @@ data class SettingsUiState(
     val shaderPresets: List<RetroArchShaderPreset> = emptyList(),
     val isShaderPackInstalled: Boolean = false,
     val isShaderPackBusy: Boolean = false,
+    val shaderPackProgress: ShaderPackInstallProgress? = null,
     val shaderPackMessageResId: Int? = null,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
@@ -835,22 +838,36 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun downloadOfficialShaderPack() {
         if (_uiState.value.isShaderPackInstalled) return
-        installShaderPack {
-            retroArchShaderRepository.downloadOfficialPack()
+        installShaderPack(
+            initialProgress = ShaderPackInstallProgress(ShaderPackInstallStage.DOWNLOADING)
+        ) { onProgress ->
+            retroArchShaderRepository.downloadOfficialPack(onProgress)
         }
     }
 
-    fun importShaderPack(uri: Uri) = installShaderPack {
+    fun importShaderPack(uri: Uri) = installShaderPack(
+        initialProgress = ShaderPackInstallProgress(ShaderPackInstallStage.INSTALLING)
+    ) {
         retroArchShaderRepository.importArchive(uri)
     }
 
-    private fun installShaderPack(block: () -> Result<Int>) = viewModelScope.launch(Dispatchers.IO) {
+    private fun installShaderPack(
+        initialProgress: ShaderPackInstallProgress,
+        block: ((ShaderPackInstallProgress) -> Unit) -> Result<Int>
+    ) = viewModelScope.launch(Dispatchers.IO) {
         if (_uiState.value.isShaderPackBusy) return@launch
-        _uiState.value = _uiState.value.copy(isShaderPackBusy = true, shaderPackMessageResId = null)
-        val result = block()
+        _uiState.value = _uiState.value.copy(
+            isShaderPackBusy = true,
+            shaderPackProgress = initialProgress,
+            shaderPackMessageResId = null
+        )
+        val result = block { progress ->
+            _uiState.value = _uiState.value.copy(shaderPackProgress = progress)
+        }
         val presets = retroArchShaderRepository.listPresets()
         _uiState.value = _uiState.value.copy(
             isShaderPackBusy = false,
+            shaderPackProgress = null,
             shaderPresets = presets,
             isShaderPackInstalled = retroArchShaderRepository.hasInstalledPack(),
             shaderPackMessageResId = if (result.isSuccess) {

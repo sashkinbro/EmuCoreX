@@ -112,6 +112,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -212,8 +213,10 @@ import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.RetroArchShaderPreset
+import com.sbro.emucorex.data.ShaderPackInstallStage
 import com.sbro.emucorex.data.SettingsBackupRepository
 import com.sbro.emucorex.data.SettingsSnapshot
+import com.sbro.emucorex.data.formatDownloadBytes
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.home.calculateHomeGridColumnCount
 import com.sbro.emucorex.ui.common.NavigationBackButton
@@ -1445,7 +1448,12 @@ private fun SettingsContent(
                                 Icons.Rounded.SystemUpdateAlt
                             },
                             label = stringResource(R.string.settings_shader_pack_download),
-                            value = if (uiState.isShaderPackBusy) {
+                            value = if (
+                                uiState.isShaderPackBusy &&
+                                uiState.shaderPackProgress?.stage == ShaderPackInstallStage.DOWNLOADING
+                            ) {
+                                stringResource(R.string.texture_download_status_downloading)
+                            } else if (uiState.isShaderPackBusy) {
                                 stringResource(R.string.settings_shader_pack_working)
                             } else if (uiState.isShaderPackInstalled) {
                                 stringResource(R.string.settings_shader_pack_installed)
@@ -1453,7 +1461,27 @@ private fun SettingsContent(
                                 stringResource(R.string.settings_shader_pack_download_desc)
                             },
                             onClick = viewModel::downloadOfficialShaderPack,
-                            enabled = !uiState.isShaderPackBusy && !uiState.isShaderPackInstalled
+                            enabled = !uiState.isShaderPackBusy && !uiState.isShaderPackInstalled,
+                            progressVisible = uiState.isShaderPackBusy,
+                            progress = uiState.shaderPackProgress?.fraction,
+                            progressLabel = uiState.shaderPackProgress
+                                ?.takeIf {
+                                    it.stage == ShaderPackInstallStage.DOWNLOADING &&
+                                        it.downloadedBytes > 0L
+                                }
+                                ?.let { progress ->
+                                    val downloaded = formatDownloadBytes(progress.downloadedBytes)
+                                    if (progress.totalBytes > 0L) {
+                                        val percent = ((progress.fraction ?: 0f) * 100f).roundToInt()
+                                        val status = stringResource(
+                                            R.string.content_downloading_percent,
+                                            percent
+                                        )
+                                        "$status · $downloaded / ${formatDownloadBytes(progress.totalBytes)}"
+                                    } else {
+                                        downloaded
+                                    }
+                                }
                         )
                         SettingsItem(
                             icon = Icons.Rounded.FolderOpen,
@@ -5222,7 +5250,10 @@ private fun SettingsItem(
     onClick: () -> Unit,
     helpText: String? = null,
     border: BorderStroke? = null,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    progressVisible: Boolean = false,
+    progress: Float? = null,
+    progressLabel: String? = null
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -5256,53 +5287,76 @@ private fun SettingsItem(
         enabled = enabled,
         onClick = debouncedClick
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)
-                    ),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f),
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        helpText?.let {
+                            SettingHelpButton(
+                                title = label,
+                                description = it,
+                                focusRequester = helpFocusRequester,
+                                returnFocusRequester = itemFocusRequester
+                            )
+                        }
+                    }
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.6f)
+                    )
+                }
+            }
+            if (progressVisible) {
+                if (progress != null) {
+                    LinearProgressIndicator(
+                        progress = { progress.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                progressLabel?.let { label ->
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f),
-                        modifier = Modifier.weight(1f, fill = false)
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
                     )
-                    helpText?.let {
-                        SettingHelpButton(
-                            title = label,
-                            description = it,
-                            focusRequester = helpFocusRequester,
-                            returnFocusRequester = itemFocusRequester
-                        )
-                    }
                 }
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.6f)
-                )
             }
         }
     }

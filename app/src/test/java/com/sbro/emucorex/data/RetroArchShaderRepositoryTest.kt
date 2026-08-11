@@ -4,10 +4,43 @@ import java.io.File
 import kotlin.io.path.createTempDirectory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RetroArchShaderRepositoryTest {
+    @Test
+    fun shaderPackProgressReportsKnownFraction() {
+        val progress = ShaderPackInstallProgress(
+            stage = ShaderPackInstallStage.DOWNLOADING,
+            downloadedBytes = 25L,
+            totalBytes = 100L
+        )
+
+        assertEquals(0.25f, progress.fraction!!, 0.001f)
+    }
+
+    @Test
+    fun shaderPackProgressIsIndeterminateWhenSizeIsUnknown() {
+        val progress = ShaderPackInstallProgress(
+            stage = ShaderPackInstallStage.DOWNLOADING,
+            downloadedBytes = 25L
+        )
+
+        assertNull(progress.fraction)
+    }
+
+    @Test
+    fun shaderPackProgressFractionIsClamped() {
+        val progress = ShaderPackInstallProgress(
+            stage = ShaderPackInstallStage.DOWNLOADING,
+            downloadedBytes = 125L,
+            totalBytes = 100L
+        )
+
+        assertEquals(1f, progress.fraction!!, 0.001f)
+    }
+
     @Test
     fun commonArchiveRootStripsGitHubWrapperOnlyWhenShared() {
         assertEquals(
