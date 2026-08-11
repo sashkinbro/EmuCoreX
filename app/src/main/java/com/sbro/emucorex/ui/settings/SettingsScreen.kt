@@ -10,6 +10,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -5973,6 +5974,7 @@ internal fun ShaderPresetSelector(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    var expandedCategoryKey by rememberSaveable { mutableStateOf<String?>(null) }
     val noneLabel = stringResource(R.string.settings_shader_preset_none)
     val selectedLabel = leadingOptions.firstOrNull { (path, _) -> path == selectedPath }?.second
         ?: presets
@@ -5988,23 +5990,23 @@ internal fun ShaderPresetSelector(
         onClick = {
             query = ""
             searchExpanded = false
+            expandedCategoryKey = null
             showDialog = true
         },
         helpText = helpText
     )
 
     if (showDialog) {
-        val options = remember(presets, noneLabel, leadingOptions, query) {
-            val allOptions = leadingOptions + listOf("" to noneLabel) +
-                presets.map { it.absolutePath to it.label }
-            val normalizedQuery = query.trim()
-            if (normalizedQuery.isEmpty()) {
-                allOptions
-            } else {
-                allOptions.filter { (_, label) -> label.contains(normalizedQuery, ignoreCase = true) }
-            }
+        val generalLabel = stringResource(R.string.settings_general_tab)
+        val groups = remember(presets, noneLabel, generalLabel, leadingOptions, query) {
+            buildShaderPresetDialogGroups(
+                presets = presets,
+                leadingOptions = leadingOptions,
+                noneLabel = noneLabel,
+                generalLabel = generalLabel,
+                query = query
+            )
         }
-        val listState = rememberLazyListState()
         val searchFocusRequester = remember { FocusRequester() }
         val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -6012,14 +6014,8 @@ internal fun ShaderPresetSelector(
             if (searchExpanded) searchFocusRequester.requestFocus()
         }
 
-        LaunchedEffect(query, selectedPath, options.size) {
-            if (options.isEmpty()) return@LaunchedEffect
-            val selectedIndex = if (query.isBlank()) {
-                options.indexOfFirst { (path, _) -> path == selectedPath }.coerceAtLeast(0)
-            } else {
-                0
-            }
-            listState.scrollToItem(selectedIndex)
+        LaunchedEffect(query) {
+            expandedCategoryKey = null
         }
 
         Dialog(
@@ -6152,7 +6148,7 @@ internal fun ShaderPresetSelector(
                             )
                         }
 
-                        if (options.isEmpty()) {
+                        if (groups.isEmpty()) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -6167,28 +6163,26 @@ internal fun ShaderPresetSelector(
                                 )
                             }
                         } else {
-                            LazyColumn(
-                                state = listState,
+                            AnimatedContent(
+                                targetState = expandedCategoryKey,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .weight(1f)
-                                    .tvFocusGroup(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(
-                                    start = 22.dp,
-                                    top = 0.dp,
-                                    end = 22.dp,
-                                    bottom = 10.dp
-                                )
-                            ) {
-                                items(
-                                    items = options,
-                                    key = { (path, _) -> path.ifEmpty { "shader-preset-none" } }
-                                ) { (path, label) ->
-                                    ShaderPresetDialogOption(
-                                        label = label,
-                                        selected = path == selectedPath,
-                                        onClick = {
+                                    .weight(1f),
+                                label = "shader-preset-category"
+                            ) { categoryKey ->
+                                val expandedGroup = groups.firstOrNull { it.key == categoryKey }
+                                if (expandedGroup == null) {
+                                    ShaderPresetCategoryList(
+                                        groups = groups,
+                                        selectedPath = selectedPath,
+                                        onOpenCategory = { expandedCategoryKey = it }
+                                    )
+                                } else {
+                                    ShaderPresetCategoryOptions(
+                                        group = expandedGroup,
+                                        selectedPath = selectedPath,
+                                        onCloseCategory = { expandedCategoryKey = null },
+                                        onSelect = { path ->
                                             onSelect(path)
                                             showDialog = false
                                         }
@@ -6213,6 +6207,216 @@ internal fun ShaderPresetSelector(
                     }
                 }
             }
+        }
+    }
+}
+
+internal data class ShaderPresetDialogGroup(
+    val key: String,
+    val title: String,
+    val options: List<Pair<String, String>>,
+    val stripsCategoryPrefix: Boolean
+)
+
+private const val SHADER_PRESET_GENERAL_GROUP_KEY = "__shader_preset_general__"
+
+internal fun buildShaderPresetDialogGroups(
+    presets: List<RetroArchShaderPreset>,
+    leadingOptions: List<Pair<String, String>>,
+    noneLabel: String,
+    generalLabel: String,
+    query: String
+): List<ShaderPresetDialogGroup> {
+    val rootPresets = presets
+        .filterNot { '/' in it.label }
+        .map { it.absolutePath to it.label }
+    val generalGroup = ShaderPresetDialogGroup(
+        key = SHADER_PRESET_GENERAL_GROUP_KEY,
+        title = generalLabel,
+        options = leadingOptions + listOf("" to noneLabel) + rootPresets,
+        stripsCategoryPrefix = false
+    )
+    val presetGroups = presets
+        .filter { '/' in it.label }
+        .groupBy { it.label.substringBefore('/') }
+        .map { (category, categoryPresets) ->
+            ShaderPresetDialogGroup(
+                key = category,
+                title = shaderPresetCategoryTitle(category),
+                options = categoryPresets
+                    .sortedBy { it.label.lowercase() }
+                    .map { it.absolutePath to it.label },
+                stripsCategoryPrefix = true
+            )
+        }
+        .sortedBy { it.title.lowercase() }
+
+    val normalizedQuery = query.trim()
+    return (listOf(generalGroup) + presetGroups).mapNotNull { group ->
+        if (normalizedQuery.isEmpty() || group.title.contains(normalizedQuery, ignoreCase = true)) {
+            group
+        } else {
+            group.copy(
+                options = group.options.filter { (_, label) ->
+                    label.contains(normalizedQuery, ignoreCase = true)
+                }
+            ).takeIf { it.options.isNotEmpty() }
+        }
+    }
+}
+
+internal fun shaderPresetCategoryTitle(category: String): String {
+    return category
+        .replace('-', ' ')
+        .replace('_', ' ')
+        .split(' ')
+        .filter(String::isNotBlank)
+        .joinToString(" ") { word ->
+            when (word.lowercase()) {
+                "crt", "gba", "gb", "lcd", "nes", "ntsc", "pal", "snes", "vhs" -> word.uppercase()
+                else -> word.replaceFirstChar { it.titlecase() }
+            }
+        }
+}
+
+@Composable
+private fun ShaderPresetCategoryList(
+    groups: List<ShaderPresetDialogGroup>,
+    selectedPath: String,
+    onOpenCategory: (String) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .tvFocusGroup(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 10.dp)
+    ) {
+        items(items = groups, key = ShaderPresetDialogGroup::key) { group ->
+            ShaderPresetCategoryCard(
+                group = group,
+                selected = group.options.any { (path, _) -> path == selectedPath },
+                onClick = { onOpenCategory(group.key) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ShaderPresetCategoryOptions(
+    group: ShaderPresetDialogGroup,
+    selectedPath: String,
+    onCloseCategory: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(group.key, selectedPath) {
+        val selectedIndex = group.options.indexOfFirst { (path, _) -> path == selectedPath }
+        if (selectedIndex >= 0) listState.scrollToItem(selectedIndex)
+    }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ShaderPresetCategoryCard(
+            group = group,
+            selected = group.options.any { (path, _) -> path == selectedPath },
+            expanded = true,
+            onClick = onCloseCategory,
+            modifier = Modifier.padding(horizontal = 22.dp)
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .tvFocusGroup(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(start = 22.dp, end = 22.dp, bottom = 10.dp)
+        ) {
+            items(
+                items = group.options,
+                key = { (path, _) -> path.ifEmpty { "shader-preset-none" } }
+            ) { (path, label) ->
+                ShaderPresetDialogOption(
+                    label = if (group.stripsCategoryPrefix) label.substringAfter('/') else label,
+                    selected = path == selectedPath,
+                    onClick = { onSelect(path) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShaderPresetCategoryCard(
+    group: ShaderPresetDialogGroup,
+    selected: Boolean,
+    expanded: Boolean = false,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
+        interactionSource = interactionSource,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (selected) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.FolderOpen,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = group.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
+            ) {
+                Text(
+                    text = group.options.size.toString(),
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }
