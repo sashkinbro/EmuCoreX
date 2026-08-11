@@ -171,6 +171,12 @@ void GameLibraryModel::toggleFavorite(int index)
     applyFilter();
 }
 
+void GameLibraryModel::invalidateCovers()
+{
+    ++m_coverRevision;
+    emit coverRevisionChanged();
+}
+
 void GameLibraryModel::setSearchQuery(const QString& query)
 {
     if (m_searchQuery == query)

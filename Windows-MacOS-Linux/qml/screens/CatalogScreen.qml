@@ -138,7 +138,7 @@ Item {
                         boundsBehavior: Flickable.StopAtBounds
                         readonly property real usableWidth: width - leftMargin - rightMargin
                         cellWidth: usableWidth / Math.max(2, Math.floor(usableWidth / 178))
-                        cellHeight: 294
+                        cellHeight: 326
                         highlightMoveDuration: Theme.duration
                         ScrollBar.vertical: ScrollBar {
                             policy: ScrollBar.AsNeeded
@@ -181,40 +181,14 @@ Item {
                                     anchors.fill: parent
                                     spacing: 0
 
-                                    Rectangle {
+                                    CoverArt {
                                         Layout.fillWidth: true
                                         Layout.fillHeight: true
                                         Layout.margins: 7
                                         Layout.bottomMargin: 0
-                                        radius: 16
-                                        color: Theme.backgroundRaised
-                                        clip: true
-
-                                        Image {
-                                            id: coverImage
-                                            anchors.fill: parent
-                                            source: delegateRoot.catalogCoverUrl
-                                            asynchronous: true
-                                            cache: true
-                                            fillMode: Image.PreserveAspectCrop
-                                            opacity: status === Image.Ready ? 1 : 0
-                                            Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
-                                        }
-                                        BusyIndicator {
-                                            anchors.centerIn: parent
-                                            width: 34
-                                            height: 34
-                                            running: coverImage.status === Image.Loading
-                                            visible: running
-                                        }
-                                        AppIcon {
-                                            anchors.centerIn: parent
-                                            width: 44
-                                            height: 44
-                                            name: "library"
-                                            color: Theme.borderStrong
-                                            visible: coverImage.status === Image.Error || delegateRoot.catalogCoverUrl.length === 0
-                                        }
+                                        source: delegateRoot.catalogCoverUrl
+                                        coverStyle: 1
+                                        cornerRadius: 16
                                     }
 
                                     ColumnLayout {
@@ -345,21 +319,14 @@ Item {
                                 }
                             }
 
-                            Rectangle {
+                            CoverArt {
                                 visible: root.selectedId !== 0
                                 Layout.preferredWidth: 116
-                                Layout.preferredHeight: 164
+                                Layout.preferredHeight: 168
                                 Layout.alignment: Qt.AlignHCenter
-                                radius: 18
-                                color: Theme.surface
-                                clip: true
-                                Image {
-                                    anchors.fill: parent
-                                    source: root.selectedCover
-                                    asynchronous: true
-                                    cache: true
-                                    fillMode: Image.PreserveAspectCrop
-                                }
+                                source: root.selectedCover
+                                coverStyle: 1
+                                cornerRadius: 18
                             }
                             Text {
                                 visible: root.selectedId !== 0

@@ -4,10 +4,11 @@ import QtQuick
 
 QtObject {
     readonly property bool light: Preferences.themeMode === "light"
-    readonly property color accent: light ? "#1F4E99" : "#C4203A"
-    readonly property color accentBright: light ? "#2F66BE" : "#E45B70"
-    readonly property color accentContainer: light ? "#BFD2F2" : "#3B0D18"
-    readonly property color onAccentContainer: light ? "#1F4E99" : "#FFE1E7"
+    readonly property color accent: Preferences.accentColor.length > 0 ? Preferences.accentColor : "#C4203A"
+    readonly property color accentBright: Qt.lighter(accent, light ? 1.08 : 1.35)
+    readonly property color accentContainer: light ? Qt.rgba(accent.r, accent.g, accent.b, 0.18) : Qt.rgba(accent.r, accent.g, accent.b, 0.24)
+    readonly property color onAccentContainer: light ? Qt.darker(accent, 1.35) : Qt.lighter(accent, 1.85)
+    readonly property real fontScale: Preferences.fontScale
     readonly property color background: light ? "#F6F6FA" : "#050506"
     readonly property color backgroundRaised: light ? "#FFFFFF" : "#08080A"
     readonly property color sidebar: light ? "#EEEEF4" : "#09090C"

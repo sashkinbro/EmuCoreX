@@ -151,15 +151,14 @@ Item {
 
                     AppButton {
                         visible: App.canGoBack
-                        implicitWidth: 42
                         text: ""
                         iconName: "back"
+                        toolTipText: I18n.get("onboarding_back")
                         onClicked: App.goBack()
                     }
                     AppButton {
-                        implicitWidth: 42
                         text: ""
-                        iconName: root.compact ? "menu" : "close"
+                        iconName: root.compact ? "menu" : "sidebar"
                         onClicked: Preferences.compactSidebar = !Preferences.compactSidebar
                     }
 

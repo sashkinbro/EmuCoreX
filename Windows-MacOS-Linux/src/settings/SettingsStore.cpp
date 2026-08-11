@@ -9,10 +9,13 @@ SettingsStore::SettingsStore(QObject* parent)
     , m_settings(QSettings::IniFormat, QSettings::UserScope,
           QCoreApplication::organizationName(), QCoreApplication::applicationName())
 {
+    const QString legacyAccent = m_settings.value("appearance/accent").toString().toUpper();
+    if (legacyAccent == QLatin1String("#8B5CF6") || legacyAccent == QLatin1String("#7C3AED"))
+        m_settings.setValue("appearance/accent", QStringLiteral("#C4203A"));
 }
 
 QString SettingsStore::themeMode() const { return m_settings.value("appearance/theme", "dark").toString(); }
-QString SettingsStore::accentColor() const { return m_settings.value("appearance/accent", "#8B5CF6").toString(); }
+QString SettingsStore::accentColor() const { return m_settings.value("appearance/accent", "#C4203A").toString(); }
 QString SettingsStore::language() const
 {
     const QString systemLanguage = QLocale::system().name().left(2);
@@ -27,6 +30,10 @@ QString SettingsStore::emulatorDataPath() const
 bool SettingsStore::compactSidebar() const { return m_settings.value("appearance/compactSidebar", false).toBool(); }
 int SettingsStore::coverArtStyle() const { return m_settings.value("library/coverArtStyle", 1).toInt(); }
 int SettingsStore::performanceProfile() const { return m_settings.value("emulation/performanceProfile", 0).toInt(); }
+double SettingsStore::gridScale() const { return m_settings.value("appearance/gridScale", 1.0).toDouble(); }
+double SettingsStore::fontScale() const { return m_settings.value("appearance/fontScale", 1.0).toDouble(); }
+QString SettingsStore::backgroundPath() const { return m_settings.value("appearance/backgroundPath").toString(); }
+int SettingsStore::backgroundDim() const { return m_settings.value("appearance/backgroundDim", 48).toInt(); }
 
 template <typename T>
 bool SettingsStore::update(const QString& key, const T& value, void (SettingsStore::*changedSignal)())
@@ -48,6 +55,10 @@ void SettingsStore::setEmulatorDataPath(const QString& value) { update("paths/da
 void SettingsStore::setCompactSidebar(bool value) { update("appearance/compactSidebar", value, &SettingsStore::compactSidebarChanged); }
 void SettingsStore::setCoverArtStyle(int value) { update("library/coverArtStyle", qBound(0, value, 2), &SettingsStore::coverArtStyleChanged); }
 void SettingsStore::setPerformanceProfile(int value) { update("emulation/performanceProfile", qBound(0, value, 1), &SettingsStore::performanceProfileChanged); }
+void SettingsStore::setGridScale(double value) { update("appearance/gridScale", qBound(0.65, value, 1.55), &SettingsStore::gridScaleChanged); }
+void SettingsStore::setFontScale(double value) { update("appearance/fontScale", qBound(0.85, value, 1.30), &SettingsStore::fontScaleChanged); }
+void SettingsStore::setBackgroundPath(const QString& value) { update("appearance/backgroundPath", value, &SettingsStore::backgroundPathChanged); }
+void SettingsStore::setBackgroundDim(int value) { update("appearance/backgroundDim", qBound(0, value, 85), &SettingsStore::backgroundDimChanged); }
 
 QVariant SettingsStore::value(const QString& key, const QVariant& fallback) const
 {
@@ -77,4 +88,8 @@ void SettingsStore::resetDesktopPreferences()
     emit compactSidebarChanged();
     emit coverArtStyleChanged();
     emit performanceProfileChanged();
+    emit gridScaleChanged();
+    emit fontScaleChanged();
+    emit backgroundPathChanged();
+    emit backgroundDimChanged();
 }

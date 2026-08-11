@@ -16,6 +16,10 @@ class SettingsStore final : public QObject
     Q_PROPERTY(bool compactSidebar READ compactSidebar WRITE setCompactSidebar NOTIFY compactSidebarChanged)
     Q_PROPERTY(int coverArtStyle READ coverArtStyle WRITE setCoverArtStyle NOTIFY coverArtStyleChanged)
     Q_PROPERTY(int performanceProfile READ performanceProfile WRITE setPerformanceProfile NOTIFY performanceProfileChanged)
+    Q_PROPERTY(double gridScale READ gridScale WRITE setGridScale NOTIFY gridScaleChanged)
+    Q_PROPERTY(double fontScale READ fontScale WRITE setFontScale NOTIFY fontScaleChanged)
+    Q_PROPERTY(QString backgroundPath READ backgroundPath WRITE setBackgroundPath NOTIFY backgroundPathChanged)
+    Q_PROPERTY(int backgroundDim READ backgroundDim WRITE setBackgroundDim NOTIFY backgroundDimChanged)
 
 public:
     explicit SettingsStore(QObject* parent = nullptr);
@@ -29,6 +33,10 @@ public:
     bool compactSidebar() const;
     int coverArtStyle() const;
     int performanceProfile() const;
+    double gridScale() const;
+    double fontScale() const;
+    QString backgroundPath() const;
+    int backgroundDim() const;
 
     void setThemeMode(const QString& value);
     void setAccentColor(const QString& value);
@@ -39,6 +47,10 @@ public:
     void setCompactSidebar(bool value);
     void setCoverArtStyle(int value);
     void setPerformanceProfile(int value);
+    void setGridScale(double value);
+    void setFontScale(double value);
+    void setBackgroundPath(const QString& value);
+    void setBackgroundDim(int value);
 
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& fallback = {}) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
@@ -54,6 +66,10 @@ signals:
     void compactSidebarChanged();
     void coverArtStyleChanged();
     void performanceProfileChanged();
+    void gridScaleChanged();
+    void fontScaleChanged();
+    void backgroundPathChanged();
+    void backgroundDimChanged();
     void valueChanged(const QString& key, const QVariant& value);
 
 private:

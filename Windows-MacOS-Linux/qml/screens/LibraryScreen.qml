@@ -41,7 +41,8 @@ Item {
     }
 
     function coverFor(serial) {
-        return GameCatalog.coverUrlForSerial(serial, Preferences.coverArtStyle)
+        const url = GameCatalog.coverUrlForSerial(serial, Preferences.coverArtStyle)
+        return url.length > 0 ? url + "?v=" + GameLibrary.coverRevision : ""
     }
 
     FolderDialog {
@@ -53,6 +54,19 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
+
+        Image {
+            parent: root
+            anchors.fill: parent
+            source: Preferences.backgroundPath
+            asynchronous: true
+            cache: true
+            fillMode: Image.PreserveAspectCrop
+            visible: Preferences.backgroundPath.length > 0 && status === Image.Ready
+            opacity: 1 - Preferences.backgroundDim / 100
+            z: -2
+            Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
+        }
 
         ColumnLayout {
             Layout.fillWidth: true
@@ -158,8 +172,8 @@ Item {
                     topMargin: 20
                     bottomMargin: 20
                     readonly property real usableWidth: width - leftMargin - rightMargin
-                    cellWidth: usableWidth / Math.max(2, Math.floor(usableWidth / 178))
-                    cellHeight: 292
+                    cellWidth: usableWidth / Math.max(2, Math.floor(usableWidth / (178 * Preferences.gridScale)))
+                    cellHeight: 326 * Preferences.gridScale
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 7 }
 
@@ -199,40 +213,18 @@ Item {
                                 anchors.fill: parent
                                 spacing: 0
 
-                                Rectangle {
+                                Item {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
                                     Layout.margins: 7
                                     Layout.bottomMargin: 0
-                                    radius: 16
-                                    color: Theme.backgroundRaised
-                                    clip: true
 
-                                    Image {
-                                        id: coverImage
+                                    CoverArt {
                                         anchors.fill: parent
-                                        anchors.margins: Preferences.coverArtStyle === 2 ? 8 : 0
                                         source: root.coverFor(delegateRoot.serial)
-                                        asynchronous: true
-                                        cache: true
-                                        fillMode: Preferences.coverArtStyle === 2 ? Image.PreserveAspectFit : Image.PreserveAspectCrop
-                                        opacity: status === Image.Ready ? 1 : 0
-                                        Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
-                                    }
-                                    BusyIndicator {
-                                        anchors.centerIn: parent
-                                        width: 32
-                                        height: 32
-                                        running: coverImage.status === Image.Loading
-                                        visible: running
-                                    }
-                                    AppIcon {
-                                        anchors.centerIn: parent
-                                        width: 44
-                                        height: 44
-                                        name: "play"
-                                        color: Theme.borderStrong
-                                        visible: coverImage.status === Image.Error || coverImage.source.toString().length === 0
+                                        coverStyle: Preferences.coverArtStyle
+                                        cornerRadius: 16
+                                        fallbackIcon: "play"
                                     }
                                     Rectangle {
                                         anchors.right: parent.right
@@ -376,22 +368,14 @@ Item {
                                 }
                             }
 
-                            Rectangle {
+                            CoverArt {
                                 visible: root.selectedPath.length > 0
                                 Layout.preferredWidth: 118
-                                Layout.preferredHeight: 166
+                                Layout.preferredHeight: 170
                                 Layout.alignment: Qt.AlignHCenter
-                                radius: 18
-                                color: Theme.surface
-                                clip: true
-                                Image {
-                                    anchors.fill: parent
-                                    anchors.margins: Preferences.coverArtStyle === 2 ? 6 : 0
-                                    source: root.coverFor(root.selectedSerial)
-                                    asynchronous: true
-                                    cache: true
-                                    fillMode: Preferences.coverArtStyle === 2 ? Image.PreserveAspectFit : Image.PreserveAspectCrop
-                                }
+                                source: root.coverFor(root.selectedSerial)
+                                coverStyle: Preferences.coverArtStyle
+                                cornerRadius: 18
                             }
                             Text {
                                 visible: root.selectedPath.length > 0

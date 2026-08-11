@@ -29,6 +29,7 @@ Item {
         case "palette": return "M12 3a9 9 0 0 0 0 18h1.5a2 2 0 0 0 0 0-4H12a2 2 0 0 1 0-4a9 9 0 0 0 4-14 M7 10h.01 M10 6.5h.01 M15 7h.01 M17 11h.01"
         case "back": return "M19 12H5 M11 6l-6 6l6 6"
         case "menu": return "M4 7h16 M4 12h16 M4 17h16"
+        case "sidebar": return "M4 4h16v16H4z M9 4v16 M6.5 8h0 M6.5 12h0 M6.5 16h0"
         case "refresh": return "M20 7v5h-5 M4 17v-5h5 M18 10a7 7 0 0 0-12-3l-2 5 M6 14a7 7 0 0 0 12 3l2-5"
         case "folder": return "M3 6h7l2 2h9v11H3z"
         case "close": return "M6 6l12 12 M18 6L6 18"

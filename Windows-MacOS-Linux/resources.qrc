@@ -17,6 +17,7 @@
         <file alias="qml/components/AppCard.qml">qml/components/AppCard.qml</file>
         <file alias="qml/components/AppIcon.qml">qml/components/AppIcon.qml</file>
         <file alias="qml/components/AppLogo.qml">qml/components/AppLogo.qml</file>
+        <file alias="qml/components/CoverArt.qml">qml/components/CoverArt.qml</file>
         <file alias="qml/components/FeaturePage.qml">qml/components/FeaturePage.qml</file>
         <file alias="qml/components/PageHeader.qml">qml/components/PageHeader.qml</file>
         <file alias="qml/components/SettingRow.qml">qml/components/SettingRow.qml</file>

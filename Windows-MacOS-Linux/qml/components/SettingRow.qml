@@ -12,11 +12,17 @@ Rectangle {
     property bool checked: false
     property var options: []
     property string currentValue: ""
+    property real numericValue: 0
+    property real from: 0
+    property real to: 100
+    property real stepSize: 1
+    property string valueSuffix: ""
     signal toggled(bool value)
     signal valueSelected(string value)
+    signal numberSelected(real value)
     signal actionTriggered()
 
-    implicitHeight: description.length > 0 ? 82 : 68
+    implicitHeight: description.length > 0 ? 92 : 72
     color: hover.hovered ? Theme.surfaceHover : Theme.surface
     radius: 22
     border.width: 1
@@ -39,7 +45,16 @@ Rectangle {
             Layout.fillWidth: true
             spacing: 3
             Text { text: root.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; Layout.fillWidth: true; elide: Text.ElideRight }
-            Text { visible: root.description.length > 0; text: root.description; color: Theme.textMuted; font.pixelSize: 12; Layout.fillWidth: true; elide: Text.ElideRight }
+            Text {
+                visible: root.description.length > 0
+                text: root.description
+                color: Theme.textMuted
+                font.pixelSize: 12
+                Layout.fillWidth: true
+                maximumLineCount: 2
+                wrapMode: Text.WordWrap
+                elide: Text.ElideRight
+            }
         }
         Switch {
             id: toggleControl
@@ -149,6 +164,82 @@ Rectangle {
                     color: Theme.backgroundRaised
                     border.width: 1
                     border.color: Theme.borderStrong
+                }
+            }
+        }
+        RowLayout {
+            visible: root.controlType === "slider"
+            Layout.preferredWidth: Math.min(310, Math.max(210, root.width * 0.3))
+            spacing: 10
+            Slider {
+                id: sliderControl
+                Layout.fillWidth: true
+                from: root.from
+                to: root.to
+                stepSize: root.stepSize
+                value: root.numericValue
+                live: true
+                onMoved: root.numberSelected(value)
+                background: Rectangle {
+                    x: sliderControl.leftPadding
+                    y: sliderControl.topPadding + sliderControl.availableHeight / 2 - height / 2
+                    width: sliderControl.availableWidth
+                    height: 5
+                    radius: 3
+                    color: Theme.surfaceVariant
+                    Rectangle {
+                        width: sliderControl.visualPosition * parent.width
+                        height: parent.height
+                        radius: parent.radius
+                        color: Theme.accent
+                    }
+                }
+                handle: Rectangle {
+                    x: sliderControl.leftPadding + sliderControl.visualPosition * (sliderControl.availableWidth - width)
+                    y: sliderControl.topPadding + sliderControl.availableHeight / 2 - height / 2
+                    implicitWidth: 20
+                    implicitHeight: 20
+                    radius: 10
+                    color: sliderControl.pressed ? Theme.accentBright : Theme.text
+                    border.width: 3
+                    border.color: Theme.accent
+                    scale: sliderControl.pressed ? 1.12 : 1
+                    Behavior on scale { NumberAnimation { duration: Theme.durationFast } }
+                }
+            }
+            Rectangle {
+                Layout.preferredWidth: 58
+                Layout.preferredHeight: 34
+                radius: 12
+                color: Theme.surfaceVariant
+                border.width: 1
+                border.color: Theme.border
+                Text {
+                    anchors.centerIn: parent
+                    text: Math.round(sliderControl.value) + root.valueSuffix
+                    color: Theme.text
+                    font.pixelSize: 12
+                    font.weight: Font.DemiBold
+                }
+            }
+        }
+        Row {
+            visible: root.controlType === "colors"
+            spacing: 9
+            Repeater {
+                model: root.options
+                Rectangle {
+                    required property string modelData
+                    width: 30
+                    height: 30
+                    radius: 15
+                    color: modelData
+                    border.width: root.currentValue.toUpperCase() === modelData.toUpperCase() ? 3 : 1
+                    border.color: root.currentValue.toUpperCase() === modelData.toUpperCase() ? Theme.text : Theme.border
+                    scale: colorTap.pressed ? 0.86 : (colorHover.hovered ? 1.08 : 1)
+                    Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Easing.OutCubic } }
+                    TapHandler { id: colorTap; onTapped: root.valueSelected(modelData) }
+                    HoverHandler { id: colorHover }
                 }
             }
         }

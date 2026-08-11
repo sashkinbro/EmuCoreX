@@ -8,7 +8,8 @@ import "../theme"
 Item {
     id: root
     property string currentTab: "general"
-    function openGameFolderPicker() { gameFolderDialog.open() }
+    property string pendingTab: "general"
+
     readonly property var tabs: [
         { key: "general", label: I18n.get("settings_general_tab") },
         { key: "video", label: I18n.get("settings_graphics_tab") },
@@ -24,24 +25,35 @@ Item {
         { key: "about", label: I18n.get("settings_about") }
     ]
 
-    function coverStyleLabel(style) {
-        if (style === 0) return I18n.get("settings_cover_art_style_off")
-        if (style === 2) return I18n.get("settings_cover_art_style_3d")
-        return I18n.get("settings_cover_art_style_flat")
+    function t(key) { return I18n.get(key) }
+    function toggle(title, description, icon, key, fallback) {
+        return { title: t(title), desc: t(description), icon: icon, type: "switch", key: key,
+            value: Preferences.value(key, fallback) }
+    }
+    function choice(title, description, icon, key, fallback, options) {
+        return { title: t(title), desc: t(description), icon: icon, type: "combo", key: key,
+            value: Preferences.value(key, fallback), options: options }
+    }
+    function range(title, description, icon, key, fallback, from, to, step, suffix) {
+        return { title: t(title), desc: t(description), icon: icon, type: "slider", key: key,
+            value: Number(Preferences.value(key, fallback)), from: from, to: to, step: step, suffix: suffix || "" }
+    }
+    function action(title, description, icon, key, label) {
+        return { title: t(title), desc: t(description), icon: icon, type: "action", key: key, action: t(label) }
     }
 
     function languageLabel(code) {
-        var suffixes = {
+        const suffixes = {
             "en": "english", "uk": "ukrainian", "ru": "russian", "es": "spanish",
             "fr": "french", "de": "german", "pt": "portuguese", "it": "italian",
             "in": "indonesian", "hi": "hindi", "zh": "traditional_chinese", "ar": "arabic",
             "fa": "persian", "ja": "japanese", "ko": "korean", "pl": "polish",
             "cs": "czech", "tr": "turkish"
         }
-        var suffix = suffixes[code]
+        const suffix = suffixes[code]
         if (!suffix) return I18n.nativeName(code)
-        var localized = I18n.get("settings_language_" + suffix)
-        var nativeLabel = I18n.get("settings_language_native_" + suffix)
+        const localized = t("settings_language_" + suffix)
+        const nativeLabel = t("settings_language_native_" + suffix)
         return localized === nativeLabel ? localized : localized + "  ·  " + nativeLabel
     }
 
@@ -49,121 +61,292 @@ Item {
         return I18n.availableLanguages.map(function(code) { return root.languageLabel(code) })
     }
 
+    function coverStyleLabel(style) {
+        if (style === 0) return t("settings_cover_art_style_off")
+        if (style === 2) return t("settings_cover_art_style_3d")
+        return t("settings_cover_art_style_flat")
+    }
+
     function rows(tab) {
         switch (tab) {
-        case "general": return [
-            { title: I18n.get("settings_language"), desc: I18n.get("settings_language_screen_subtitle"), icon: "hub", type: "combo", key: "general/language", value: root.languageLabel(Preferences.language), options: root.languageOptions() },
-            { title: "Confirm before closing a running game", desc: "Prevent accidental shutdown from keyboard shortcuts or window controls.", icon: "play", type: "switch", key: "general/confirmExit", value: Preferences.value("general/confirmExit", true) },
-            { title: "Start with the operating system", desc: "Launch EmuCoreX in the background after sign-in.", icon: "refresh", type: "switch", key: "general/autostart", value: Preferences.value("general/autostart", false) },
-            { title: "Discord Rich Presence", desc: "Show the current game and session status in Discord.", icon: "chat", type: "switch", key: "general/discord", value: Preferences.value("general/discord", true) }
-        ]
-        case "video": return [
-            { title: I18n.get("settings_renderer"), desc: I18n.get("settings_help_renderer"), icon: "chip", type: "combo", key: "video/renderer", value: Preferences.value("video/renderer", I18n.get("settings_renderer_auto")), options: [I18n.get("settings_renderer_auto"), I18n.get("settings_renderer_vulkan"), I18n.get("settings_renderer_d3d12"), I18n.get("settings_renderer_opengl"), I18n.get("settings_renderer_software")] },
-            { title: I18n.get("settings_upscale"), desc: I18n.get("settings_help_upscale"), icon: "image", type: "combo", key: "video/resolution", value: Preferences.value("video/resolution", I18n.get("settings_upscale_3x")), options: [I18n.get("settings_upscale_native"), I18n.get("settings_upscale_2x"), I18n.get("settings_upscale_3x"), I18n.get("settings_upscale_4x"), I18n.get("settings_upscale_6x")] },
-            { title: I18n.get("settings_aspect_ratio"), desc: I18n.get("settings_help_aspect_ratio"), icon: "image", type: "combo", key: "video/aspect", value: Preferences.value("video/aspect", I18n.get("settings_aspect_ratio_auto")), options: [I18n.get("settings_aspect_ratio_auto"), I18n.get("settings_aspect_ratio_43"), I18n.get("settings_aspect_ratio_169"), I18n.get("settings_aspect_ratio_107")] },
-            { title: I18n.get("settings_vsync"), desc: I18n.get("settings_vsync_desc"), icon: "refresh", type: "switch", key: "video/vsync", value: Preferences.value("video/vsync", true) },
-            { title: I18n.get("settings_fxaa"), desc: I18n.get("settings_fxaa_desc"), icon: "image", type: "switch", key: "video/fxaa", value: Preferences.value("video/fxaa", false) },
-            { title: I18n.get("settings_anisotropic_filtering"), desc: I18n.get("settings_help_anisotropic_filtering"), icon: "tune", type: "combo", key: "video/aniso", value: Preferences.value("video/aniso", "8x"), options: [I18n.get("common_off"), "2x", "4x", "8x", "16x"] }
-        ]
-        case "controls": return [
-            { title: "Controller port 1", desc: "Automatic SDL controller mapping and device selection.", icon: "play", type: "combo", key: "controls/port1", value: Preferences.value("controls/port1", "Automatic"), options: ["Automatic", "Keyboard", "Disconnected"] },
-            { title: "Controller vibration", desc: "Enable rumble on supported SDL gamepads.", icon: "refresh", type: "switch", key: "controls/vibration", value: Preferences.value("controls/vibration", true) },
-            { title: "Gamepad UI navigation", desc: "Navigate every desktop screen without a mouse.", icon: "library", type: "switch", key: "controls/uiGamepad", value: Preferences.value("controls/uiGamepad", true) },
-            { title: "Hotkeys", desc: "Configure pause, fullscreen, save-state and speed controls.", icon: "tune", type: "action", key: "controls/hotkeys", action: "Configure" }
-        ]
-        case "emulation": return [
-            { title: "EE recompiler", desc: "Dynamic recompilation for the Emotion Engine CPU.", icon: "chip", type: "switch", key: "emu/ee", value: Preferences.value("emu/ee", true) },
-            { title: "IOP recompiler", desc: "Dynamic recompilation for the PS2 I/O processor.", icon: "chip", type: "switch", key: "emu/iop", value: Preferences.value("emu/iop", true) },
-            { title: "VU recompilers", desc: "Use the architecture-specific vector-unit recompilers.", icon: "chip", type: "switch", key: "emu/vu", value: Preferences.value("emu/vu", true) },
-            { title: "Fast boot", desc: "Skip the BIOS intro when starting a game.", icon: "play", type: "switch", key: "emu/fastBoot", value: Preferences.value("emu/fastBoot", true) },
-            { title: "Enable cheats", desc: "Load active PNACH patches for the current game.", icon: "code", type: "switch", key: "emu/cheats", value: Preferences.value("emu/cheats", true) },
-            { title: "Enable host filesystem", desc: "Allow homebrew software to access configured host folders.", icon: "folder", type: "switch", key: "emu/hostFs", value: Preferences.value("emu/hostFs", false) }
-        ]
-        case "audio": return [
-            { title: I18n.get("settings_audio_backend"), desc: "Native desktop audio output backend.", icon: "play", type: "combo", key: "audio/backend", value: Preferences.value("audio/backend", "Automatic"), options: ["Automatic", "Cubeb", "SDL", "Null"] },
-            { title: I18n.get("settings_audio_sync_mode"), desc: "Keep audio synchronized when emulation speed changes.", icon: "refresh", type: "combo", key: "audio/sync", value: Preferences.value("audio/sync", "TimeStretch"), options: ["TimeStretch", "Async Mix", "None"] },
-            { title: I18n.get("settings_audio_mute"), desc: I18n.get("settings_audio_mute_desc"), icon: "close", type: "switch", key: "audio/mute", value: Preferences.value("audio/mute", false) },
-            { title: I18n.get("settings_audio_minimal_latency"), desc: I18n.get("settings_audio_minimal_latency_desc"), icon: "tune", type: "switch", key: "audio/minLatency", value: Preferences.value("audio/minLatency", false) }
-        ]
-        case "fixes": return [
-            { title: "Automatic game fixes", desc: "Apply PCSX2 GameIndex fixes for the detected serial.", icon: "tune", type: "switch", key: "fixes/auto", value: Preferences.value("fixes/auto", true) },
-            { title: "Widescreen patches", desc: "Load bundled widescreen patches when available.", icon: "image", type: "switch", key: "fixes/widescreen", value: Preferences.value("fixes/widescreen", false) },
-            { title: "No-interlacing patches", desc: "Prefer progressive output for supported games.", icon: "image", type: "switch", key: "fixes/noInterlace", value: Preferences.value("fixes/noInterlace", false) },
-            { title: "Manual game fixes", desc: "Advanced compatibility overrides for troubleshooting.", icon: "settings", type: "action", key: "fixes/manual", action: "Open" }
-        ]
-        case "library": return [
-            { title: I18n.get("settings_game_path"), desc: I18n.get("settings_game_path_desc"), icon: "folder", type: "action", key: "library/folders", action: I18n.get("home_add_folder") },
-            { title: I18n.get("settings_cover_art_style"), desc: I18n.get("settings_help_cover_art_style"), icon: "image", type: "combo", key: "library/coverStyle", value: root.coverStyleLabel(Preferences.coverArtStyle), options: [I18n.get("settings_cover_art_style_off"), I18n.get("settings_cover_art_style_flat"), I18n.get("settings_cover_art_style_3d")] },
-            { title: I18n.get("settings_prefer_english_game_titles"), desc: I18n.get("settings_prefer_english_game_titles_desc"), icon: "hub", type: "switch", key: "library/englishTitles", value: Preferences.value("library/englishTitles", false) },
-            { title: I18n.get("settings_clear_cover_cache"), desc: I18n.get("settings_clear_cover_cache_desc"), icon: "refresh", type: "action", key: "library/clearCovers", action: I18n.get("settings_clear_cover_cache_action") },
-            { title: I18n.get("home_refresh"), desc: I18n.get("home_library_desc"), icon: "refresh", type: "action", key: "library/refresh", action: I18n.get("home_refresh") }
-        ]
-        case "network": return [
-            { title: I18n.get("settings_network_enable"), desc: I18n.get("settings_network_enable_desc"), icon: "hub", type: "switch", key: "network/enabled", value: Preferences.value("network/enabled", false) },
-            { title: I18n.get("settings_network_api"), desc: "DEV9 Ethernet implementation.", icon: "tune", type: "combo", key: "network/api", value: Preferences.value("network/api", "Sockets"), options: ["Sockets"] },
-            { title: I18n.get("settings_network_dns_preset"), desc: I18n.get("settings_network_dns_preset_help"), icon: "hub", type: "combo", key: "network/dns", value: Preferences.value("network/dns", "System / automatic"), options: ["System / automatic", "PS2 Online", "PSRewired"] },
-            { title: I18n.get("settings_network_log_dns"), desc: I18n.get("settings_network_log_dns_desc"), icon: "file", type: "switch", key: "network/logDns", value: Preferences.value("network/logDns", false) }
-        ]
-        case "customization": return [
-            { title: I18n.get("settings_theme"), desc: "Use the dark, light or operating-system appearance.", icon: "palette", type: "combo", key: "appearance/theme", value: Preferences.themeMode, options: ["dark", "light", "system"] },
-            { title: "Accent color", desc: "Choose the primary highlight used across EmuCoreX.", icon: "palette", type: "combo", key: "appearance/accent", value: Preferences.accentColor, options: ["#8B5CF6", "#7C3AED", "#2563EB", "#0891B2", "#059669", "#DC2626"] },
-            { title: I18n.get("settings_customization_grid_size"), desc: I18n.get("settings_customization_grid_size_help"), icon: "library", type: "combo", key: "appearance/grid", value: Preferences.value("appearance/grid", "Medium"), options: ["Small", "Medium", "Large"] },
-            { title: I18n.get("settings_customization_drawer_style"), desc: I18n.get("settings_customization_drawer_summary"), icon: "menu", type: "combo", key: "appearance/sidebar", value: Preferences.compactSidebar ? "Compact" : "Expanded", options: ["Expanded", "Compact"] },
-            { title: I18n.get("settings_customization_font"), desc: I18n.get("settings_customization_font_help"), icon: "file", type: "combo", key: "appearance/font", value: Preferences.value("appearance/font", "Rubik"), options: ["Rubik", "Exo 2", "System default", "Custom font"] },
-            { title: I18n.get("settings_customization_background"), desc: I18n.get("settings_customization_background_help"), icon: "image", type: "action", key: "appearance/background", action: "Choose file" },
-            { title: I18n.get("settings_customization_reset"), desc: I18n.get("settings_customization_reset_desc"), icon: "refresh", type: "action", key: "appearance/reset", action: "Reset" }
-        ]
-        case "game-menu": return [
-            { title: I18n.get("settings_game_menu_layout_section"), desc: I18n.get("settings_game_menu_layout_help"), icon: "menu", type: "combo", key: "gameMenu/layout", value: Preferences.value("gameMenu/layout", "Dashboard"), options: ["Sidebar", "Dashboard", "Command center", "Compact"] },
-            { title: I18n.get("settings_game_menu_section_save_states"), desc: "Show save slots in the in-game overlay.", icon: "save", type: "switch", key: "gameMenu/saves", value: Preferences.value("gameMenu/saves", true) },
-            { title: I18n.get("settings_game_menu_section_game_profile"), desc: "Expose per-game settings during a session.", icon: "tune", type: "switch", key: "gameMenu/profile", value: Preferences.value("gameMenu/profile", true) },
-            { title: I18n.get("settings_game_menu_section_debug_tools"), desc: "Show performance and developer diagnostics.", icon: "code", type: "switch", key: "gameMenu/debug", value: Preferences.value("gameMenu/debug", false) }
-        ]
-        case "updates": return [
-            { title: "Automatic update checks", desc: I18n.get("settings_updates_source_body"), icon: "refresh", type: "switch", key: "updates/auto", value: Preferences.value("updates/auto", true) },
-            { title: "Update channel", desc: "Choose stable or preview desktop releases.", icon: "hub", type: "combo", key: "updates/channel", value: Preferences.value("updates/channel", "Stable"), options: ["Stable", "Preview"] },
-            { title: I18n.get("settings_updates_history_title"), desc: I18n.get("settings_updates_history_body"), icon: "file", type: "action", key: "updates/history", action: "Open" }
-        ]
-        case "about": return [
-            { title: I18n.get("settings_about_app"), desc: I18n.get("settings_about_app_desc"), icon: "library", type: "action", key: "about/app", action: App.buildDescription },
-            { title: I18n.get("settings_about_website"), desc: I18n.get("settings_about_website_desc"), icon: "hub", type: "action", key: "about/website", action: I18n.get("settings_about_website_link") },
-            { title: I18n.get("settings_about_app_source"), desc: I18n.get("settings_about_app_source_desc"), icon: "code", type: "action", key: "about/source", action: I18n.get("settings_about_app_source_link") },
-            { title: I18n.get("settings_about_core_source"), desc: I18n.get("settings_about_core_source_desc"), icon: "chip", type: "action", key: "about/core", action: I18n.get("settings_about_core_source_link") }
-        ]
+        case "general":
+            return [
+                { title: t("settings_language"), desc: t("settings_language_screen_subtitle"), icon: "hub",
+                    type: "combo", key: "general/language", value: languageLabel(Preferences.language), options: languageOptions() },
+                toggle("settings_confirm_save_load_actions", "settings_help_confirm_save_load_actions", "save", "general/confirmSaveLoad", true),
+                toggle("settings_show_recent_games", "settings_help_recent_games", "refresh", "general/showRecent", true),
+                toggle("settings_show_home_search", "settings_help_home_search", "search", "general/showSearch", true),
+                toggle("settings_prefer_english_game_titles", "settings_help_prefer_english_game_titles", "hub", "library/preferEnglish", true)
+            ]
+        case "video":
+            return [
+                choice("settings_renderer", "settings_help_renderer", "chip", "video/renderer", t("settings_renderer_auto"),
+                    [t("settings_renderer_auto"), t("settings_renderer_vulkan"), t("settings_renderer_d3d12"), t("settings_renderer_d3d11"), t("settings_renderer_opengl"), t("settings_renderer_software")]),
+                choice("settings_upscale", "settings_help_upscale", "image", "video/upscale", t("settings_upscale_3x"),
+                    [t("settings_upscale_native"), t("settings_upscale_2x"), t("settings_upscale_3x"), t("settings_upscale_4x"), t("settings_upscale_5x"), t("settings_upscale_6x")]),
+                choice("settings_aspect_ratio", "settings_help_aspect_ratio", "image", "video/aspect", t("settings_aspect_ratio_auto"),
+                    [t("settings_aspect_ratio_auto"), t("settings_aspect_ratio_43"), t("settings_aspect_ratio_169"), t("settings_aspect_ratio_107")]),
+                choice("settings_bilinear_filtering", "settings_help_bilinear_filtering", "image", "video/bilinear", t("settings_bilinear_filtering_ps2"),
+                    [t("settings_bilinear_filtering_nearest"), t("settings_bilinear_filtering_ps2"), t("settings_bilinear_filtering_forced"), t("settings_bilinear_filtering_no_sprite")]),
+                choice("settings_trilinear_filtering", "settings_help_trilinear_filtering", "image", "video/trilinear", t("settings_trilinear_filtering_auto"),
+                    [t("settings_trilinear_filtering_auto"), t("settings_trilinear_filtering_off"), t("settings_trilinear_filtering_ps2"), t("settings_trilinear_filtering_forced")]),
+                choice("settings_blending_accuracy", "settings_help_blending_accuracy", "tune", "video/blending", t("settings_blending_accuracy_basic"),
+                    [t("settings_blending_accuracy_minimum"), t("settings_blending_accuracy_basic"), t("settings_blending_accuracy_medium"), t("settings_blending_accuracy_high"), t("settings_blending_accuracy_full"), t("settings_blending_accuracy_maximum")]),
+                choice("settings_anisotropic_filtering", "settings_help_anisotropic_filtering", "tune", "video/aniso", "8x",
+                    [t("settings_dithering_off"), "2x", "4x", "8x", "16x"]),
+                toggle("settings_fxaa", "settings_help_fxaa", "image", "video/fxaa", false),
+                choice("settings_cas", "settings_help_cas", "image", "video/cas", t("settings_cas_mode_off"),
+                    [t("settings_cas_mode_off"), t("settings_cas_mode_sharpen_only"), t("settings_cas_mode_sharpen_resize")]),
+                choice("settings_texture_preloading", "settings_help_texture_preloading", "image", "video/preloading", t("settings_texture_preloading_partial"),
+                    [t("settings_texture_preloading_none"), t("settings_texture_preloading_partial"), t("settings_texture_preloading_full")]),
+                toggle("settings_hw_mipmapping", "settings_help_hw_mipmapping", "image", "video/mipmapping", true)
+            ]
+        case "controls":
+            return [
+                action("settings_gamepad_mapping_title", "settings_gamepad_mapping_disconnected", "play", "controls/mapping", "settings_gamepad_mapping_auto_format"),
+                toggle("settings_pad_vibration", "settings_help_pad_vibration", "play", "controls/vibration", true),
+                range("settings_pad_vibration_strength", "settings_help_pad_vibration_strength", "tune", "controls/vibrationStrength", 100, 0, 150, 5, "%"),
+                range("settings_gamepad_stick_deadzone", "settings_help_gamepad_stick_deadzone", "tune", "controls/deadzone", 10, 0, 40, 1, "%"),
+                range("settings_gamepad_left_stick_sensitivity", "settings_help_gamepad_left_stick_sensitivity", "tune", "controls/leftSensitivity", 100, 50, 200, 5, "%"),
+                range("settings_gamepad_right_stick_sensitivity", "settings_help_gamepad_right_stick_sensitivity", "tune", "controls/rightSensitivity", 100, 50, 200, 5, "%")
+            ]
+        case "emulation":
+            return [
+                toggle("settings_show_fps", "settings_show_fps_desc", "file", "emulation/showFps", false),
+                choice("settings_fps_overlay_mode", "settings_fps_overlay_metrics", "file", "emulation/fpsMode", t("settings_fps_overlay_mode_simple"),
+                    [t("settings_fps_overlay_mode_simple"), t("settings_fps_overlay_mode_detailed")]),
+                choice("settings_fps_overlay_position", "settings_fps_overlay_metrics", "file", "emulation/fpsPosition", t("settings_fps_overlay_corner_top_right"),
+                    [t("settings_fps_overlay_corner_top_left"), t("settings_fps_overlay_corner_top_right"), t("settings_fps_overlay_corner_bottom_left"), t("settings_fps_overlay_corner_bottom_right")]),
+                toggle("settings_enable_ee_recompiler", "settings_help_enable_ee_recompiler", "chip", "emulation/eeRecompiler", true),
+                toggle("settings_enable_iop_recompiler", "settings_help_enable_iop_recompiler", "chip", "emulation/iopRecompiler", true),
+                toggle("settings_enable_vu0_recompiler", "settings_help_enable_vu0_recompiler", "chip", "emulation/vu0Recompiler", true),
+                toggle("settings_enable_vu1_recompiler", "settings_help_enable_vu1_recompiler", "chip", "emulation/vu1Recompiler", true),
+                toggle("settings_enable_fastmem", "settings_help_enable_fastmem", "chip", "emulation/fastmem", true),
+                toggle("settings_game_fixes", "settings_game_fixes_desc", "tune", "emulation/gameFixes", true),
+                toggle("settings_frame_limiter", "settings_help_frame_limiter", "refresh", "emulation/frameLimiter", true),
+                choice("settings_fast_forward_speed", "settings_help_fast_forward_speed", "play", "emulation/fastForward", "2x", ["1.5x", "2x", "3x", "4x", "5x"]),
+                range("settings_target_fps", "settings_help_target_fps", "refresh", "emulation/targetFps", 60, 30, 240, 1, " FPS"),
+                toggle("settings_mtvu", "settings_help_mtvu", "chip", "emulation/mtvu", true),
+                toggle("settings_fast_cdvd", "settings_help_fast_cdvd", "play", "emulation/fastCdvd", false),
+                toggle("settings_enable_cheats", "settings_help_cheats", "code", "emulation/cheats", true)
+            ]
+        case "audio":
+            return [
+                range("settings_audio_volume", "settings_help_audio_volume", "play", "audio/volume", 100, 0, 100, 1, "%"),
+                range("settings_audio_fast_forward_volume", "settings_help_audio_fast_forward_volume", "play", "audio/fastForwardVolume", 100, 0, 100, 1, "%"),
+                toggle("settings_audio_mute", "settings_audio_mute_desc", "close", "audio/mute", false),
+                choice("settings_audio_interpolation", "settings_help_audio_interpolation", "tune", "audio/interpolation", t("settings_audio_interpolation_gaussian"),
+                    [t("settings_audio_interpolation_nearest"), t("settings_audio_interpolation_linear"), t("settings_audio_interpolation_gaussian"), t("settings_audio_interpolation_cubic")]),
+                choice("settings_audio_sync_mode", "settings_help_audio_sync_mode", "refresh", "audio/sync", t("settings_audio_sync_time_stretch"),
+                    [t("settings_audio_sync_time_stretch"), t("settings_audio_sync_disabled")]),
+                range("settings_audio_buffer_size", "settings_help_audio_buffer_size", "tune", "audio/buffer", 100, 20, 300, 5, " ms"),
+                toggle("settings_audio_minimal_latency", "settings_audio_minimal_latency_desc", "tune", "audio/minimalLatency", false),
+                range("settings_audio_output_latency", "settings_help_audio_output_latency", "tune", "audio/outputLatency", 40, 10, 200, 5, " ms")
+            ]
+        case "fixes":
+            return [
+                toggle("settings_widescreen_patches", "settings_help_widescreen_patches", "image", "fixes/widescreen", false),
+                toggle("settings_no_interlacing_patches", "settings_help_no_interlacing_patches", "image", "fixes/noInterlacing", false),
+                choice("settings_deinterlacing", "settings_help_deinterlacing", "image", "fixes/deinterlacing", t("settings_deinterlacing_automatic"),
+                    [t("settings_deinterlacing_automatic"), t("settings_deinterlacing_off"), t("settings_deinterlacing_adaptive_tff"), t("settings_deinterlacing_bob_tff"), t("settings_deinterlacing_blend_tff")]),
+                choice("settings_dithering", "settings_help_dithering", "image", "fixes/dithering", t("settings_dithering_unscaled"),
+                    [t("settings_dithering_off"), t("settings_dithering_scaled"), t("settings_dithering_unscaled"), t("settings_dithering_force_32bit")]),
+                toggle("settings_anti_blur", "settings_help_anti_blur", "image", "fixes/antiBlur", true),
+                choice("settings_bilinear_upscale", "settings_help_bilinear_upscale", "image", "fixes/bilinearUpscale", t("settings_bilinear_upscale_force_bilinear"),
+                    [t("settings_bilinear_upscale_force_bilinear"), t("settings_bilinear_upscale_force_nearest")])
+            ]
+        case "library":
+            return [
+                action("settings_bios_path", "settings_help_bios_path", "chip", "library/bios", "settings_bios_path"),
+                action("settings_game_path", "settings_help_game_path", "folder", "library/folders", "home_add_folder"),
+                action("emulator_data_location_title", "emulator_data_location_description", "folder", "library/data", "emulator_data_location_title"),
+                action("settings_memory_cards_tab", "settings_memory_cards_open_desc", "card", "library/memoryCards", "settings_memory_cards_open"),
+                { title: t("settings_cover_art_style"), desc: t("settings_help_cover_art_style"), icon: "image", type: "combo",
+                    key: "library/coverStyle", value: coverStyleLabel(Preferences.coverArtStyle),
+                    options: [t("settings_cover_art_style_off"), t("settings_cover_art_style_flat"), t("settings_cover_art_style_3d")] },
+                action("settings_clear_cover_cache", "settings_clear_cover_cache_desc", "refresh", "library/clearCovers", "settings_clear_cover_cache_action"),
+                action("settings_backup_export_title", "settings_backup_export_desc", "save", "library/export", "settings_backup_export_action"),
+                action("settings_backup_restore_title", "settings_backup_restore_desc", "refresh", "library/restore", "settings_backup_restore_title")
+            ]
+        case "network":
+            return [
+                toggle("settings_network_enable", "settings_network_enable_help", "hub", "network/enabled", false),
+                choice("settings_network_mode", "settings_network_mode_help", "hub", "network/mode", t("settings_network_mode_online"),
+                    [t("settings_network_mode_online"), t("settings_network_mode_local_host"), t("settings_network_mode_local_join")]),
+                choice("settings_network_api", "settings_network_summary", "tune", "network/api", t("settings_network_api_sockets"), [t("settings_network_api_sockets")]),
+                choice("settings_network_dns_preset", "settings_network_dns_preset_help", "hub", "network/dnsPreset", t("settings_network_dns_preset_system"),
+                    [t("settings_network_dns_preset_system"), t("settings_network_dns_preset_ps2online"), t("settings_network_dns_preset_psrewired")]),
+                toggle("settings_network_intercept_dhcp", "settings_network_intercept_dhcp_desc", "hub", "network/interceptDhcp", true),
+                toggle("settings_network_log_dhcp", "settings_network_log_dhcp_desc", "file", "network/logDhcp", false),
+                toggle("settings_network_log_dns", "settings_network_log_dns_desc", "file", "network/logDns", false)
+            ]
+        case "customization":
+            return [
+                choice("settings_theme", "theme_manager_preview_body", "palette", "appearance/theme", Preferences.themeMode,
+                    [t("settings_theme_dark"), t("settings_theme_light"), t("settings_theme_system")]),
+                { title: t("theme_manager_color_primary"), desc: t("theme_manager_usage_primary"), icon: "palette", type: "colors",
+                    key: "appearance/accent", value: Preferences.accentColor,
+                    options: ["#C4203A", "#2F66BE", "#8669D9", "#168A8A", "#2E8B57", "#B17B24"] },
+                action("settings_customization_background", "settings_customization_background_help", "image", "appearance/background", "settings_customization_background"),
+                range("settings_customization_background_dim", "settings_customization_background_help", "image", "appearance/backgroundDim", Preferences.backgroundDim, 0, 85, 5, "%"),
+                action("settings_customization_remove_background", "settings_customization_remove_background_desc", "close", "appearance/removeBackground", "settings_customization_remove_background"),
+                range("settings_customization_grid_size", "settings_customization_grid_size_help", "library", "appearance/gridScale", Preferences.gridScale * 100, 65, 155, 5, "%"),
+                choice("settings_customization_drawer_style", "settings_customization_drawer_summary", "menu", "appearance/drawerStyle", t("settings_drawer_style_classic"),
+                    [t("settings_drawer_style_classic"), t("settings_drawer_style_compact"), t("settings_drawer_style_glass"), t("settings_drawer_style_console")]),
+                choice("settings_customization_font", "settings_customization_font_help", "file", "appearance/font", t("settings_customization_font_rubik"),
+                    [t("settings_customization_font_system"), t("settings_customization_font_rubik"), t("settings_customization_font_exo2")]),
+                range("settings_customization_font_size", "settings_customization_font_size_help", "file", "appearance/fontScale", Preferences.fontScale * 100, 85, 130, 5, "%"),
+                action("settings_customization_reset", "settings_customization_reset_desc", "refresh", "appearance/reset", "settings_customization_reset")
+            ]
+        case "game-menu":
+            return [
+                choice("settings_game_menu_layout_section", "settings_game_menu_layout_help", "menu", "gameMenu/layout", t("settings_game_menu_layout_dashboard"),
+                    [t("settings_game_menu_layout_sidebar"), t("settings_game_menu_layout_dashboard"), t("settings_game_menu_layout_command_center"), t("settings_game_menu_layout_compact")]),
+                toggle("settings_game_menu_section_save_states", "settings_game_menu_content_summary", "save", "gameMenu/saveStates", true),
+                toggle("settings_game_menu_section_auto_save", "settings_game_menu_content_summary", "save", "gameMenu/autoSave", true),
+                toggle("settings_game_menu_section_quick_actions", "settings_game_menu_content_summary", "play", "gameMenu/quickActions", true),
+                toggle("settings_game_menu_section_automation", "settings_game_menu_content_summary", "refresh", "gameMenu/automation", true),
+                toggle("settings_game_menu_section_game_profile", "settings_game_menu_content_summary", "tune", "gameMenu/gameProfile", true),
+                toggle("settings_game_menu_section_debug_tools", "settings_game_menu_content_summary", "code", "gameMenu/debug", false),
+                action("settings_game_menu_reset", "settings_game_menu_reset_desc", "refresh", "gameMenu/reset", "settings_game_menu_reset")
+            ]
+        case "updates":
+            return [
+                action("settings_updates_history_title", "settings_updates_history_body", "refresh", "updates/history", "settings_updates_open_release"),
+                action("settings_updates_version_label", "settings_updates_source_body", "file", "updates/version", "settings_updates_version_label")
+            ]
+        case "about":
+            return [
+                action("settings_about_app", "settings_about_app_desc", "library", "about/app", "settings_about_app"),
+                action("settings_about_studio", "settings_about_studio_desc", "profile", "about/studio", "settings_about_studio"),
+                action("settings_about_website", "settings_about_website_desc", "hub", "about/website", "settings_about_website_link"),
+                action("settings_about_privacy_policy", "settings_about_privacy_policy_desc", "file", "about/privacy", "settings_about_privacy_policy_link"),
+                action("settings_about_app_source", "settings_about_app_source_desc", "code", "about/source", "settings_about_app_source_link"),
+                action("settings_about_core_source", "settings_about_core_source_desc", "chip", "about/core", "settings_about_core_source_link")
+            ]
         }
         return []
     }
 
+    function activateTab(key, item) {
+        tabFlick.centerTab(item)
+        if (currentTab === key) return
+        pendingTab = key
+        tabTransition.restart()
+    }
+
+    function applyChoice(key, value) {
+        if (key === "general/language") {
+            const index = languageOptions().indexOf(value)
+            if (index >= 0) Preferences.language = I18n.availableLanguages[index]
+        } else if (key === "appearance/theme") {
+            if (value === t("settings_theme_light")) Preferences.themeMode = "light"
+            else if (value === t("settings_theme_system")) Preferences.themeMode = "system"
+            else Preferences.themeMode = "dark"
+        } else if (key === "appearance/accent") {
+            Preferences.accentColor = value
+        } else if (key === "library/coverStyle") {
+            Preferences.coverArtStyle = value === t("settings_cover_art_style_off") ? 0
+                : (value === t("settings_cover_art_style_3d") ? 2 : 1)
+        } else if (key === "appearance/drawerStyle") {
+            Preferences.compactSidebar = value === t("settings_drawer_style_compact")
+            Preferences.setValue(key, value)
+        } else {
+            Preferences.setValue(key, value)
+        }
+    }
+
+    function applyNumber(key, value) {
+        if (key === "appearance/gridScale") Preferences.gridScale = value / 100
+        else if (key === "appearance/fontScale") Preferences.fontScale = value / 100
+        else if (key === "appearance/backgroundDim") Preferences.backgroundDim = value
+        else Preferences.setValue(key, value)
+    }
+
+    function handleAction(key) {
+        if (key === "library/bios") biosDialog.open()
+        else if (key === "library/folders") gameFolderDialog.open()
+        else if (key === "library/data") dataFolderDialog.open()
+        else if (key === "library/memoryCards") App.replaceRoute("memory-cards")
+        else if (key === "library/clearCovers") GameLibrary.invalidateCovers()
+        else if (key === "controls/mapping") App.replaceRoute("gamepad-mapping")
+        else if (key === "appearance/background") backgroundDialog.open()
+        else if (key === "appearance/removeBackground") Preferences.backgroundPath = ""
+        else if (key === "appearance/reset") Preferences.resetDesktopPreferences()
+        else if (key === "gameMenu/reset") {
+            Preferences.setValue("gameMenu/layout", t("settings_game_menu_layout_dashboard"))
+            Preferences.setValue("gameMenu/saveStates", true)
+            Preferences.setValue("gameMenu/autoSave", true)
+            Preferences.setValue("gameMenu/quickActions", true)
+            Preferences.setValue("gameMenu/automation", true)
+            Preferences.setValue("gameMenu/gameProfile", true)
+            Preferences.setValue("gameMenu/debug", false)
+        } else if (key === "updates/history") App.openExternalUrl(t("settings_about_app_source_url") + "/releases")
+        else if (key === "about/website") App.openExternalUrl(t("settings_about_website_url"))
+        else if (key === "about/privacy") App.openExternalUrl(t("settings_about_privacy_policy_url"))
+        else if (key === "about/source") App.openExternalUrl(t("settings_about_app_source_url"))
+        else if (key === "about/core") App.openExternalUrl(t("settings_about_core_source_url"))
+    }
+
     FolderDialog {
         id: gameFolderDialog
-        title: I18n.get("settings_game_path")
+        title: t("settings_game_path")
         onAccepted: GameLibrary.addFolder(selectedFolder)
+    }
+    FolderDialog {
+        id: dataFolderDialog
+        title: t("emulator_data_location_title")
+        onAccepted: Preferences.emulatorDataPath = selectedFolder.toString().replace(/^file:\/\//, "")
+    }
+    FileDialog {
+        id: biosDialog
+        title: t("settings_bios_path")
+        nameFilters: ["PlayStation 2 BIOS (*.bin *.rom *.nvm)", "All files (*)"]
+        onAccepted: Preferences.biosPath = selectedFile.toString().replace(/^file:\/\//, "")
+    }
+    FileDialog {
+        id: backgroundDialog
+        title: t("settings_customization_background")
+        nameFilters: ["Images (*.png *.jpg *.jpeg *.webp *.gif)", "All files (*)"]
+        onAccepted: Preferences.backgroundPath = selectedFile.toString()
+    }
+
+    SequentialAnimation {
+        id: tabTransition
+        NumberAnimation { target: settingsContent; property: "opacity"; to: 0; duration: Theme.durationFast }
+        ScriptAction { script: root.currentTab = root.pendingTab }
+        ParallelAnimation {
+            NumberAnimation { target: settingsContent; property: "opacity"; from: 0; to: 1; duration: Theme.duration }
+            NumberAnimation { target: settingsContent; property: "scale"; from: 0.985; to: 1; duration: Theme.duration; easing.type: Easing.OutCubic }
+        }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 16
+        spacing: 0
+
         PageHeader {
             Layout.fillWidth: true
-            Layout.leftMargin: 26
-            Layout.rightMargin: 26
-            Layout.topMargin: 26
-            title: I18n.get("settings_title")
+            Layout.leftMargin: 28
+            Layout.rightMargin: 28
+            Layout.topMargin: 24
+            Layout.bottomMargin: 16
+            title: t("settings_title")
             subtitle: ""
         }
 
         Flickable {
             id: tabFlick
             Layout.fillWidth: true
-            Layout.preferredHeight: 50
+            Layout.preferredHeight: 54
             clip: true
-            contentWidth: tabsRow.width + 52
+            contentWidth: tabsRow.width + 56
             contentHeight: height
             flickableDirection: Flickable.HorizontalFlick
             boundsBehavior: Flickable.StopAtBounds
 
             function centerTab(item) {
-                var centered = tabsRow.x + item.x + item.width / 2 - width / 2
+                const centered = tabsRow.x + item.x + item.width / 2 - width / 2
                 contentX = Math.max(0, Math.min(contentWidth - width, centered))
             }
 
@@ -174,69 +357,58 @@ Item {
 
             Row {
                 id: tabsRow
-                x: 26
-                spacing: 7
+                x: 28
+                spacing: 8
                 Repeater {
                     model: root.tabs
                     AppButton {
                         text: modelData.label
                         primary: root.currentTab === modelData.key
-                        onClicked: {
-                            root.currentTab = modelData.key
-                            tabFlick.centerTab(this)
-                        }
+                        onClicked: root.activateTab(modelData.key, this)
                     }
                 }
             }
         }
 
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.border }
+
         ScrollView {
+            id: settingsViewport
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.leftMargin: 26
-            Layout.rightMargin: 26
-            Layout.bottomMargin: 20
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
             ColumnLayout {
-                    width: Math.max(0, parent.width - 12)
-                    spacing: 10
-                    Repeater {
-                        model: root.rows(root.currentTab)
-                        SettingRow {
-                            Layout.fillWidth: true
-                            title: modelData.title
-                            description: modelData.desc || ""
-                            iconName: modelData.icon || "settings"
-                            controlType: modelData.type
-                            checked: Boolean(modelData.value)
-                            options: modelData.options || []
-                            currentValue: modelData.type === "action" ? modelData.action : String(modelData.value)
-                            onToggled: Preferences.setValue(modelData.key, value)
-                            onValueSelected: function(value) {
-                                if (modelData.key === "general/language") {
-                                    var languageIndex = root.languageOptions().indexOf(value)
-                                    if (languageIndex >= 0) Preferences.language = I18n.availableLanguages[languageIndex]
-                                }
-                                else if (modelData.key === "appearance/theme") Preferences.themeMode = value
-                                else if (modelData.key === "appearance/accent") Preferences.accentColor = value
-                                else if (modelData.key === "appearance/sidebar") Preferences.compactSidebar = value === "Compact"
-                                else if (modelData.key === "library/coverStyle") {
-                                    Preferences.coverArtStyle = value === I18n.get("settings_cover_art_style_off") ? 0 : (value === I18n.get("settings_cover_art_style_3d") ? 2 : 1)
-                                }
-                                else Preferences.setValue(modelData.key, value)
-                            }
-                            onActionTriggered: {
-                                if (modelData.key === "library/refresh") GameLibrary.refresh()
-                                else if (modelData.key === "library/folders") root.openGameFolderPicker()
-                                else if (modelData.key === "appearance/reset") Preferences.resetDesktopPreferences()
-                                else if (modelData.key === "about/website") App.openExternalUrl(I18n.get("settings_about_website_url"))
-                                else if (modelData.key === "about/source") App.openExternalUrl(I18n.get("settings_about_app_source_url"))
-                                else if (modelData.key === "about/core") App.openExternalUrl(I18n.get("settings_about_core_source_url"))
-                            }
-                        }
+                id: settingsContent
+                x: 28
+                width: Math.max(0, parent.width - 56)
+                spacing: 10
+
+                Item { Layout.preferredHeight: 10 }
+                Repeater {
+                    model: root.rows(root.currentTab)
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: modelData.title
+                        description: modelData.desc || ""
+                        iconName: modelData.icon || "settings"
+                        controlType: modelData.type
+                        checked: Boolean(modelData.value)
+                        options: modelData.options || []
+                        currentValue: modelData.type === "action" ? modelData.action : String(modelData.value)
+                        numericValue: Number(modelData.value || 0)
+                        from: Number(modelData.from || 0)
+                        to: Number(modelData.to || 100)
+                        stepSize: Number(modelData.step || 1)
+                        valueSuffix: modelData.suffix || ""
+                        onToggled: Preferences.setValue(modelData.key, value)
+                        onValueSelected: function(value) { root.applyChoice(modelData.key, value) }
+                        onNumberSelected: function(value) { root.applyNumber(modelData.key, value) }
+                        onActionTriggered: root.handleAction(modelData.key)
                     }
-                    Item { Layout.fillHeight: true; Layout.minimumHeight: 12 }
+                }
+                Item { Layout.preferredHeight: 18 }
             }
         }
     }

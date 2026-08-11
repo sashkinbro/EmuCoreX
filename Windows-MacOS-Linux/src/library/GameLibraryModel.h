@@ -35,6 +35,7 @@ class GameLibraryModel final : public QAbstractListModel
     Q_PROPERTY(QStringList folders READ folders NOTIFY foldersChanged)
     Q_PROPERTY(QString searchQuery READ searchQuery WRITE setSearchQuery NOTIFY searchQueryChanged)
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
+    Q_PROPERTY(int coverRevision READ coverRevision NOTIFY coverRevisionChanged)
 
 public:
     enum Role {
@@ -64,12 +65,14 @@ public:
     QStringList folders() const { return m_folders; }
     QString searchQuery() const { return m_searchQuery; }
     bool scanning() const { return m_scanning; }
+    int coverRevision() const { return m_coverRevision; }
 
     Q_INVOKABLE void addFolder(const QUrl& folderUrl);
     Q_INVOKABLE void removeFolder(int index);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE QString pathAt(int index) const;
     Q_INVOKABLE void toggleFavorite(int index);
+    Q_INVOKABLE void invalidateCovers();
     void setSearchQuery(const QString& query);
 
 signals:
@@ -77,6 +80,7 @@ signals:
     void foldersChanged();
     void searchQueryChanged();
     void scanningChanged();
+    void coverRevisionChanged();
 
 private:
     static bool isSupportedImage(const QString& path);
@@ -93,4 +97,5 @@ private:
     QSet<QString> m_favoritePaths;
     QString m_searchQuery;
     bool m_scanning = false;
+    int m_coverRevision = 0;
 };
