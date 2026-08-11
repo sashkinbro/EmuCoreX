@@ -7,27 +7,25 @@ import org.junit.Test
 
 class InAppReviewPolicyTest {
     @Test
-    fun reviewRequiresThreeMeaningfulSessionsAndThirtyMinutes() {
+    fun reviewRequiresOneFiveMinuteSession() {
         var progress = InAppReviewProgress()
-        repeat(2) {
-            progress = InAppReviewPolicy.recordSession(progress, 10 * 60_000L)
-        }
+        progress = InAppReviewPolicy.recordSession(progress, 5 * 60_000L - 1L)
 
-        assertEquals(2, progress.qualifyingSessionCount)
+        assertEquals(0, progress.qualifyingSessionCount)
         assertFalse(InAppReviewPolicy.canAttempt(progress, nowMs = 1_000L))
 
-        progress = InAppReviewPolicy.recordSession(progress, 10 * 60_000L)
+        progress = InAppReviewPolicy.recordSession(progress, 5 * 60_000L)
 
-        assertEquals(3, progress.qualifyingSessionCount)
-        assertEquals(30 * 60_000L, progress.totalActivePlayTimeMs)
+        assertEquals(1, progress.qualifyingSessionCount)
+        assertTrue(progress.totalActivePlayTimeMs >= 5 * 60_000L)
         assertTrue(InAppReviewPolicy.canAttempt(progress, nowMs = 1_000L))
     }
 
     @Test
     fun shortSessionsAccumulatePlayTimeButDoNotQualifyAsMeaningfulSessions() {
         var progress = InAppReviewProgress()
-        repeat(8) {
-            progress = InAppReviewPolicy.recordSession(progress, 4 * 60_000L)
+        repeat(2) {
+            progress = InAppReviewPolicy.recordSession(progress, 3 * 60_000L)
         }
 
         assertEquals(0, progress.qualifyingSessionCount)

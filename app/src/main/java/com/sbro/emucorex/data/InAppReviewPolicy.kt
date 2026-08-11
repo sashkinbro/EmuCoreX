@@ -8,9 +8,9 @@ internal data class InAppReviewProgress(
 )
 
 internal object InAppReviewPolicy {
-    const val MIN_QUALIFYING_SESSION_COUNT = 3
+    const val MIN_QUALIFYING_SESSION_COUNT = 1
     const val MIN_QUALIFYING_SESSION_DURATION_MS = 5 * 60_000L
-    const val MIN_TOTAL_ACTIVE_PLAY_TIME_MS = 30 * 60_000L
+    const val MIN_TOTAL_ACTIVE_PLAY_TIME_MS = 5 * 60_000L
     const val RETRY_COOLDOWN_MS = 24 * 60 * 60_000L
 
     fun recordSession(progress: InAppReviewProgress, activePlayTimeMs: Long): InAppReviewProgress {
