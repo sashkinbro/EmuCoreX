@@ -46,6 +46,30 @@ class OverlayCanvasResponsiveLayoutTest {
         val rightActionEdge = layout.actionButtons.maxOf { it.x + it.width }
         assertTrue(left.x >= screen.leftInset)
         assertTrue(rightActionEdge <= screen.width - screen.rightInset)
+        assertEquals(
+            "physical side margins must remain symmetric",
+            left.x.value,
+            (screen.width - rightActionEdge).value,
+            EPSILON
+        )
+
+        val leftShoulderEdge = layout.leftShoulders.minOf { it.x }
+        val rightShoulderEdge = layout.rightShoulders.maxOf { it.x + it.width }
+        assertEquals(
+            "shoulder margins must remain symmetric",
+            leftShoulderEdge.value,
+            (screen.width - rightShoulderEdge).value,
+            EPSILON
+        )
+
+        val centerLeft = layout.centerButtons.minOf { it.x }
+        val centerRight = layout.centerButtons.maxOf { it.x + it.width }
+        assertEquals(
+            "center controls must stay on the physical screen center",
+            screen.width.value / 2f,
+            ((centerLeft + centerRight) / 2f).value,
+            EPSILON
+        )
     }
 
     @Test

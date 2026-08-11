@@ -7,21 +7,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.EmulationSideArtwork
@@ -89,27 +88,29 @@ fun EmulationSideArtworkOverlay(
         val heightPx = with(density) { maxHeight.roundToPx() }
         val gutters = calculateSideArtworkGutters(widthPx, heightPx, aspectRatioMode, nativeDrawRect)
         if (!gutters.isVisible) return@BoxWithConstraints
-        val leftWidth = with(density) { gutters.leftPx.toDp() }
-        val rightWidth = with(density) { gutters.rightPx.toDp() }
-
-        ArtworkSlice(
+        Image(
             painter = painter,
-            width = leftWidth,
-            fullWidth = maxWidth,
-            fullHeight = maxHeight,
-            alignment = Alignment.CenterStart,
-            modifier = Modifier.align(Alignment.CenterStart)
-        )
-        ArtworkSlice(
-            painter = painter,
-            width = rightWidth,
-            fullWidth = maxWidth,
-            fullHeight = maxHeight,
-            alignment = Alignment.CenterEnd,
-            modifier = Modifier.align(Alignment.CenterEnd)
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    if (gutters.leftPx > 0) {
+                        clipRect(right = gutters.leftPx.toFloat()) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+                    if (gutters.rightPx > 0) {
+                        clipRect(left = size.width - gutters.rightPx) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+                },
+            contentScale = ContentScale.Crop
         )
 
         if (preview) {
+            val leftWidth = with(density) { gutters.leftPx.toDp() }
+            val rightWidth = with(density) { gutters.rightPx.toDp() }
             Box(
                 modifier = Modifier
                     .width(maxWidth - leftWidth - rightWidth)
@@ -117,31 +118,6 @@ fun EmulationSideArtworkOverlay(
                     .align(Alignment.Center)
             )
         }
-    }
-}
-
-@Composable
-private fun ArtworkSlice(
-    painter: Painter,
-    width: Dp,
-    fullWidth: Dp,
-    fullHeight: Dp,
-    alignment: Alignment,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .width(width)
-            .fillMaxHeight()
-            .clipToBounds(),
-        contentAlignment = alignment
-    ) {
-        Image(
-            painter = painter,
-            contentDescription = null,
-            modifier = Modifier.requiredSize(fullWidth, fullHeight),
-            contentScale = ContentScale.Crop
-        )
     }
 }
 

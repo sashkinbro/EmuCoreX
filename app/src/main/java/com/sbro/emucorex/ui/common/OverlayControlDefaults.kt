@@ -17,7 +17,7 @@ val OverlayCenterInlineGapLandscape = 10.dp
 val OverlayCenterInlineGapPortrait = 12.dp
 val OverlayCenterSelectOpticalNudgeX = (-2).dp
 val OverlayCenterToggleOpticalNudgeY = 0.dp
-val OverlayCenterStartOpticalNudgeX = 8.dp
+val OverlayCenterStartOpticalNudgeX = 2.dp
 val OverlayShoulderVerticalGap = 40.dp
 
 fun overlayInlineGroupOffset(

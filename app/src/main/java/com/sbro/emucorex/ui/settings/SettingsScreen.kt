@@ -10,6 +10,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +24,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -37,7 +43,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -102,6 +110,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -136,6 +145,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -144,6 +154,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
@@ -198,6 +210,7 @@ import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.PerGameSettingsRepository
+import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.SettingsBackupRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
@@ -1399,25 +1412,12 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_retroarch_shaders),
                             onResetToDefault = { viewModel.setShaderChainEnabled(false) }
                         )
-                        val shaderPresetOptions = listOf(
-                            0 to stringResource(R.string.settings_shader_preset_none)
-                        ) + uiState.shaderPresets.mapIndexed { index, preset ->
-                            (index + 1) to preset.label
-                        }
-                        val selectedShaderPreset = uiState.shaderPresets
-                            .indexOfFirst { it.absolutePath == uiState.shaderChainPreset }
-                            .let { if (it < 0) 0 else it + 1 }
-                        ChoiceSection(
+                        ShaderPresetSelector(
                             title = stringResource(R.string.settings_shader_preset),
-                            options = shaderPresetOptions,
-                            selectedValue = selectedShaderPreset,
-                            onSelect = { index ->
-                                viewModel.setShaderChainPreset(
-                                    uiState.shaderPresets.getOrNull(index - 1)?.absolutePath.orEmpty()
-                                )
-                            },
+                            presets = uiState.shaderPresets,
+                            selectedPath = uiState.shaderChainPreset,
+                            onSelect = viewModel::setShaderChainPreset,
                             helpText = stringResource(R.string.settings_help_shader_preset),
-                            onResetToDefault = { viewModel.setShaderChainPreset("") }
                         )
                         SettingsItem(
                             icon = if (uiState.isShaderPackInstalled) {
@@ -5900,6 +5900,317 @@ private fun SliderItem(
                 ),
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun ShaderPresetSelector(
+    title: String,
+    presets: List<RetroArchShaderPreset>,
+    selectedPath: String,
+    onSelect: (String) -> Unit,
+    helpText: String
+) {
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
+    val noneLabel = stringResource(R.string.settings_shader_preset_none)
+    val selectedLabel = presets
+        .firstOrNull { it.absolutePath == selectedPath }
+        ?.label
+        ?.substringAfterLast('/')
+        ?: noneLabel
+
+    SettingsItem(
+        icon = Icons.Rounded.AutoFixHigh,
+        label = title,
+        value = selectedLabel,
+        onClick = {
+            query = ""
+            searchExpanded = false
+            showDialog = true
+        },
+        helpText = helpText
+    )
+
+    if (showDialog) {
+        val options = remember(presets, noneLabel, query) {
+            val allOptions = listOf("" to noneLabel) + presets.map { it.absolutePath to it.label }
+            val normalizedQuery = query.trim()
+            if (normalizedQuery.isEmpty()) {
+                allOptions
+            } else {
+                allOptions.filter { (_, label) -> label.contains(normalizedQuery, ignoreCase = true) }
+            }
+        }
+        val listState = rememberLazyListState()
+        val searchFocusRequester = remember { FocusRequester() }
+        val keyboardController = LocalSoftwareKeyboardController.current
+
+        LaunchedEffect(searchExpanded) {
+            if (searchExpanded) searchFocusRequester.requestFocus()
+        }
+
+        LaunchedEffect(query, selectedPath, options.size) {
+            if (options.isEmpty()) return@LaunchedEffect
+            val selectedIndex = if (query.isBlank()) {
+                options.indexOfFirst { (path, _) -> path == selectedPath }.coerceAtLeast(0)
+            } else {
+                0
+            }
+            listState.scrollToItem(selectedIndex)
+        }
+
+        Dialog(
+            onDismissRequest = { showDialog = false },
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val isLandscape = maxWidth > maxHeight
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(if (isLandscape) 0.82f else 0.94f)
+                        .widthIn(max = if (isLandscape) 960.dp else 720.dp)
+                        .fillMaxHeight(if (isLandscape) 0.94f else 0.86f),
+                    shape = RoundedCornerShape(30.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+                    )
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(if (isLandscape) 50.dp else 56.dp),
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.AutoFixHigh,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(if (isLandscape) 27.dp else 30.dp)
+                                    )
+                                }
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.settings_retroarch_shaders),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    searchExpanded = !searchExpanded
+                                    if (!searchExpanded) {
+                                        query = ""
+                                        keyboardController?.hide()
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Search,
+                                    contentDescription = stringResource(R.string.settings_search),
+                                    tint = if (searchExpanded) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+                        )
+
+                        AnimatedVisibility(
+                            visible = searchExpanded,
+                            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                        ) {
+                            OutlinedTextField(
+                                value = query,
+                                onValueChange = { query = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = 22.dp,
+                                        top = 6.dp,
+                                        end = 22.dp,
+                                        bottom = 4.dp
+                                    )
+                                    .focusRequester(searchFocusRequester)
+                                    .skipGamepadTextFieldFocus(),
+                                label = { Text(title) },
+                                singleLine = true,
+                                leadingIcon = {
+                                    Icon(imageVector = Icons.Rounded.Search, contentDescription = null)
+                                },
+                                trailingIcon = {
+                                    IconButton(
+                                        onClick = {
+                                            query = ""
+                                            searchExpanded = false
+                                            keyboardController?.hide()
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.home_search_clear)
+                                        )
+                                    }
+                                },
+                                shape = RoundedCornerShape(18.dp)
+                            )
+                        }
+
+                        if (options.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_empty_search_title),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .tvFocusGroup(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(
+                                    start = 22.dp,
+                                    top = 0.dp,
+                                    end = 22.dp,
+                                    bottom = 10.dp
+                                )
+                            ) {
+                                items(
+                                    items = options,
+                                    key = { (path, _) -> path.ifEmpty { "shader-preset-none" } }
+                                ) { (path, label) ->
+                                    ShaderPresetDialogOption(
+                                        label = label,
+                                        selected = path == selectedPath,
+                                        onClick = {
+                                            onSelect(path)
+                                            showDialog = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { showDialog = false }) {
+                                Text(stringResource(R.string.close))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShaderPresetDialogOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .tvGamepadFocusableCard(
+                shape = shape,
+                interactionSource = interactionSource,
+                addFocusTarget = false
+            ),
+        shape = shape,
+        interactionSource = interactionSource,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (selected) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }
