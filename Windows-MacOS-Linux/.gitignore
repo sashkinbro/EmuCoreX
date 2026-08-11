@@ -1,6 +1,7 @@
 build*/
 out/
 dist/
+vcpkg_installed/
 CMakeUserPresets.json
 *.user
 *.log

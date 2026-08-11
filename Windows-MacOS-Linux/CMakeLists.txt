@@ -10,6 +10,8 @@ set(CMAKE_AUTORCC ON)
 
 option(EMUCOREX_WITH_PCSX2 "Build the embedded PCSX2 core adapter" OFF)
 option(EMUCOREX_CONSOLE "Keep a console attached for desktop diagnostics" OFF)
+set(EMUCOREX_PREBUILT_CORE_DIR "" CACHE PATH
+    "Directory containing the separately built EmuCoreX core and its runtime dependencies")
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS
     Core
@@ -57,6 +59,8 @@ qt_add_executable(EmuCoreXDesktop
     src/app/SingleInstanceGuard.h
     src/core/EmulatorController.cpp
     src/core/EmulatorController.h
+    src/core/CoreRuntime.cpp
+    src/core/CoreRuntime.h
     src/core/GameMetadataProvider.cpp
     src/core/GameMetadataProvider.h
     src/data/DesktopDataService.cpp
@@ -194,6 +198,35 @@ if(WIN32)
             VERBATIM
         )
     endforeach()
+
+    # The Windows UI uses the Qt toolchain while the upstream PCSX2 x64 core is
+    # built with MSVC. Keep that compiler boundary explicit through the stable
+    # C ABI and deploy the independently built core as a runtime module.
+    if(NOT EMUCOREX_PREBUILT_CORE_DIR)
+        set(_emucorex_default_core_dir
+            "${CMAKE_CURRENT_SOURCE_DIR}/build-core-x64-msvc-vcpkg/emucorex-core")
+        if(EXISTS "${_emucorex_default_core_dir}/EmuCoreXCore.dll")
+            set(EMUCOREX_PREBUILT_CORE_DIR "${_emucorex_default_core_dir}")
+        endif()
+    endif()
+
+    if(EMUCOREX_PREBUILT_CORE_DIR AND EXISTS "${EMUCOREX_PREBUILT_CORE_DIR}/EmuCoreXCore.dll")
+        file(GLOB EMUCOREX_PREBUILT_CORE_DLLS CONFIGURE_DEPENDS
+            "${EMUCOREX_PREBUILT_CORE_DIR}/*.dll")
+        add_custom_command(TARGET EmuCoreXDesktop POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:EmuCoreXDesktop>/cores/x64"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${EMUCOREX_PREBUILT_CORE_DLLS}
+                "$<TARGET_FILE_DIR:EmuCoreXDesktop>/cores/x64/"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${EMUCOREX_PREBUILT_CORE_DIR}/resources"
+                "$<TARGET_FILE_DIR:EmuCoreXDesktop>/cores/x64/resources"
+            COMMENT "Deploying the MSVC PCSX2 x64 core module"
+            COMMAND_EXPAND_LISTS
+            VERBATIM
+        )
+    endif()
 elseif(APPLE)
     set_target_properties(EmuCoreXDesktop PROPERTIES
         MACOSX_BUNDLE TRUE

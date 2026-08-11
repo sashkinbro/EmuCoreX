@@ -1,11 +1,8 @@
 #include "GameMetadataProvider.h"
+#include "CoreRuntime.h"
 
 #include <QFileInfo>
 #include <QRegularExpression>
-
-#ifdef EMUCOREX_WITH_PCSX2
-#include "pcsx2/GameList.h"
-#endif
 
 namespace {
 QString normalizeSerial(const QString& value)
@@ -24,17 +21,20 @@ QString normalizeSerial(const QString& value)
 GameImageMetadata GameMetadataProvider::inspect(const QString& path) const
 {
     GameImageMetadata metadata = fallbackMetadata(path);
-#ifdef EMUCOREX_WITH_PCSX2
-    GameList::Entry entry;
-    if (GameList::PopulateEntryFromPath(path.toStdString(), &entry)) {
-        const std::string& preferredTitle = entry.GetTitle(true).empty() ? entry.title : entry.GetTitle(true);
-        if (!preferredTitle.empty())
-            metadata.title = QString::fromStdString(preferredTitle);
-        if (!entry.serial.empty())
-            metadata.serial = QString::fromStdString(entry.serial);
-        metadata.region = QString::fromUtf8(GameList::RegionToString(entry.region, false));
+    EmuCoreXGameMetadata coreMetadata{};
+    if (m_core && m_core->inspectGame(path, &coreMetadata)) {
+        const QString coreTitle = QString::fromUtf8(coreMetadata.title).trimmed();
+        const QString coreSerial = QString::fromLatin1(coreMetadata.serial).trimmed();
+        const QString coreRegion = QString::fromUtf8(coreMetadata.region).trimmed();
+        if (!coreTitle.isEmpty())
+            metadata.title = coreTitle;
+        if (!coreSerial.isEmpty())
+            metadata.serial = coreSerial;
+        if (!coreRegion.isEmpty())
+            metadata.region = coreRegion;
+        metadata.totalSize = static_cast<qint64>(coreMetadata.total_size);
+        metadata.authoritative = true;
     }
-#endif
     if (metadata.region.isEmpty())
         metadata.region = regionForSerial(metadata.serial);
     return metadata;
@@ -53,7 +53,7 @@ GameImageMetadata GameMetadataProvider::fallbackMetadata(const QString& path)
     title = title.trimmed();
     if (title.isEmpty())
         title = QFileInfo(path).completeBaseName();
-    return {title, serial, regionForSerial(serial)};
+    return {title, serial, regionForSerial(serial), 0, false};
 }
 
 QString GameMetadataProvider::regionForSerial(const QString& serial)

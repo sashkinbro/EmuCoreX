@@ -8,12 +8,13 @@
 #include <QSet>
 #include <QUrl>
 
-GameLibraryModel::GameLibraryModel(GameCatalogModel* catalog, QObject* parent)
+GameLibraryModel::GameLibraryModel(GameCatalogModel* catalog, const CoreRuntime* core, QObject* parent)
     : QAbstractListModel(parent)
     , m_settings(QSettings::IniFormat, QSettings::UserScope,
           QCoreApplication::organizationName(), QCoreApplication::applicationName())
     , m_folders(m_settings.value("library/folders").toStringList())
     , m_catalog(catalog)
+    , m_metadataProvider(core)
 {
     const QStringList favorites = m_settings.value("library/favorites").toStringList();
     m_favoritePaths = QSet<QString>(favorites.cbegin(), favorites.cend());
@@ -122,7 +123,7 @@ void GameLibraryModel::refresh()
             game.path = canonical;
             game.serial = metadata.serial;
             game.region = metadata.region;
-            game.size = info.size();
+            game.size = metadata.totalSize > 0 ? metadata.totalSize : info.size();
             game.modified = info.lastModified();
             game.favorite = m_favoritePaths.contains(canonical);
 
@@ -130,7 +131,8 @@ void GameLibraryModel::refresh()
                 const QVariantMap catalogMatch = m_catalog->matchGame(game.serial, game.title);
                 if (!catalogMatch.isEmpty()) {
                     game.catalogId = catalogMatch.value(QStringLiteral("id")).toLongLong();
-                    game.title = catalogMatch.value(QStringLiteral("name"), game.title).toString();
+                    if (!metadata.authoritative)
+                        game.title = catalogMatch.value(QStringLiteral("name"), game.title).toString();
                     game.year = catalogMatch.value(QStringLiteral("year")).toInt();
                     game.rating = catalogMatch.value(QStringLiteral("rating")).toDouble();
                     game.summary = catalogMatch.value(QStringLiteral("summary")).toString();

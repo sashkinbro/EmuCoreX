@@ -10,6 +10,7 @@
 #include "../core/GameMetadataProvider.h"
 
 class GameCatalogModel;
+class CoreRuntime;
 
 struct DesktopGame
 {
@@ -58,7 +59,7 @@ public:
     };
     Q_ENUM(Role)
 
-    explicit GameLibraryModel(GameCatalogModel* catalog, QObject* parent = nullptr);
+    explicit GameLibraryModel(GameCatalogModel* catalog, const CoreRuntime* core, QObject* parent = nullptr);
 
     int rowCount(const QModelIndex& parent = {}) const override;
     QVariant data(const QModelIndex& index, int role) const override;

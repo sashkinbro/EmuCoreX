@@ -1,0 +1,18 @@
+{
+  "name": "emucorex-desktop-core-dependencies",
+  "version-string": "0.1.0",
+  "builtin-baseline": "15ba82e5c7bde5a274cd06047664cff308ec1292",
+  "dependencies": [
+    "freetype",
+    "libjpeg-turbo",
+    "libpng",
+    "libwebp",
+    "lz4",
+    "plutosvg",
+    "plutovg",
+    "sdl3",
+    "shaderc",
+    "zlib",
+    "zstd"
+  ]
+}

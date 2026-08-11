@@ -1,6 +1,7 @@
 #include "app/AppController.h"
 #include "app/SingleInstanceGuard.h"
 #include "core/EmulatorController.h"
+#include "core/CoreRuntime.h"
 #include "data/DesktopDataService.h"
 #include "i18n/TranslationManager.h"
 #include "input/InputBindingService.h"
@@ -82,7 +83,8 @@ int main(int argc, char* argv[])
 
     AppController appController(&settings);
     GameCatalogModel catalog;
-    GameLibraryModel library(&catalog);
+    CoreRuntime coreRuntime;
+    GameLibraryModel library(&catalog, &coreRuntime);
     CoverArtService coverArt(&settings);
     EmulatorController emulator;
     DesktopDataService desktopData(&settings);

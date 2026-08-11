@@ -1,0 +1,3 @@
+[submodule "Windows-MacOS-Linux/third_party/pcsx2-x64"]
+	path = Windows-MacOS-Linux/third_party/pcsx2-x64
+	url = https://github.com/PCSX2/pcsx2.git
