@@ -191,6 +191,11 @@ private fun EmulationSideArtwork.drawableResource(): Int? = when (this) {
     EmulationSideArtwork.NIGHT_RACING -> R.drawable.emulation_side_art_night_racing
     EmulationSideArtwork.JUNGLE -> R.drawable.emulation_side_art_jungle
     EmulationSideArtwork.COLOSSUS -> R.drawable.emulation_side_art_colossus
+    EmulationSideArtwork.GOTHIC -> R.drawable.emulation_side_art_gothic
+    EmulationSideArtwork.STEALTH -> R.drawable.emulation_side_art_stealth
+    EmulationSideArtwork.SAMURAI -> R.drawable.emulation_side_art_samurai
+    EmulationSideArtwork.WEST_COAST -> R.drawable.emulation_side_art_west_coast
+    EmulationSideArtwork.CRYSTAL -> R.drawable.emulation_side_art_crystal
     EmulationSideArtwork.NONE,
     EmulationSideArtwork.CUSTOM -> null
 }

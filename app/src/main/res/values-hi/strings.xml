@@ -2276,4 +2276,9 @@
     <string name="settings_customization_background_preset_west_coast">पश्चिमी तट का सूर्यास्त</string>
     <string name="settings_customization_background_preset_samurai_night">समुराई रात</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">क्रिस्टल यात्रा</string>
+    <string name="settings_customization_side_artwork_gothic">गॉथिक शिकार</string>
+    <string name="settings_customization_side_artwork_stealth">जंगल में घुसपैठ</string>
+    <string name="settings_customization_side_artwork_samurai">समुराई रात</string>
+    <string name="settings_customization_side_artwork_west_coast">पश्चिमी तट का सूर्यास्त</string>
+    <string name="settings_customization_side_artwork_crystal">क्रिस्टल यात्रा</string>
 </resources>

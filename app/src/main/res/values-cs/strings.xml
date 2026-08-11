@@ -2296,5 +2296,10 @@
     <string name="settings_customization_background_preset_west_coast">Západ slunce na pobřeží</string>
     <string name="settings_customization_background_preset_samurai_night">Samurajská noc</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Křišťálová pouť</string>
+    <string name="settings_customization_side_artwork_gothic">Gotický lov</string>
+    <string name="settings_customization_side_artwork_stealth">Průnik džunglí</string>
+    <string name="settings_customization_side_artwork_samurai">Samurajská noc</string>
+    <string name="settings_customization_side_artwork_west_coast">Západ slunce na pobřeží</string>
+    <string name="settings_customization_side_artwork_crystal">Křišťálová pouť</string>
 </resources>
 

@@ -2275,4 +2275,9 @@
     <string name="settings_customization_background_preset_west_coast">서부 해안의 노을</string>
     <string name="settings_customization_background_preset_samurai_night">사무라이의 밤</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">수정 순례</string>
+    <string name="settings_customization_side_artwork_gothic">고딕 사냥</string>
+    <string name="settings_customization_side_artwork_stealth">정글 잠입</string>
+    <string name="settings_customization_side_artwork_samurai">사무라이의 밤</string>
+    <string name="settings_customization_side_artwork_west_coast">서부 해안의 노을</string>
+    <string name="settings_customization_side_artwork_crystal">수정 순례</string>
 </resources>

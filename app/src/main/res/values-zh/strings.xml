@@ -2277,4 +2277,9 @@
     <string name="settings_customization_background_preset_west_coast">西海岸落日</string>
     <string name="settings_customization_background_preset_samurai_night">武士之夜</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">水晶朝圣</string>
+    <string name="settings_customization_side_artwork_gothic">哥特狩猎</string>
+    <string name="settings_customization_side_artwork_stealth">丛林潜入</string>
+    <string name="settings_customization_side_artwork_samurai">武士之夜</string>
+    <string name="settings_customization_side_artwork_west_coast">西海岸落日</string>
+    <string name="settings_customization_side_artwork_crystal">水晶朝圣</string>
 </resources>

@@ -2276,4 +2276,9 @@
     <string name="settings_customization_background_preset_west_coast">Tramonto sulla costa ovest</string>
     <string name="settings_customization_background_preset_samurai_night">Notte samurai</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Pellegrinaggio di cristallo</string>
+    <string name="settings_customization_side_artwork_gothic">Caccia gotica</string>
+    <string name="settings_customization_side_artwork_stealth">Infiltrazione nella giungla</string>
+    <string name="settings_customization_side_artwork_samurai">Notte samurai</string>
+    <string name="settings_customization_side_artwork_west_coast">Tramonto sulla costa ovest</string>
+    <string name="settings_customization_side_artwork_crystal">Pellegrinaggio di cristallo</string>
 </resources>

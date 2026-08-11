@@ -2280,4 +2280,9 @@
     <string name="settings_customization_background_preset_west_coast">Західне узбережжя</string>
     <string name="settings_customization_background_preset_samurai_night">Самурайська ніч</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Кришталева мандрівка</string>
+    <string name="settings_customization_side_artwork_gothic">Готичне полювання</string>
+    <string name="settings_customization_side_artwork_stealth">Проникнення в джунглі</string>
+    <string name="settings_customization_side_artwork_samurai">Самурайська ніч</string>
+    <string name="settings_customization_side_artwork_west_coast">Західне узбережжя</string>
+    <string name="settings_customization_side_artwork_crystal">Кришталева мандрівка</string>
 </resources>

@@ -50,7 +50,12 @@ enum class EmulationSideArtwork(val preferenceValue: Int) {
     NIGHT_RACING(2),
     JUNGLE(3),
     COLOSSUS(4),
-    CUSTOM(5);
+    CUSTOM(5),
+    GOTHIC(6),
+    STEALTH(7),
+    SAMURAI(8),
+    WEST_COAST(9),
+    CRYSTAL(10);
 
     companion object {
         fun fromPreference(value: Int?): EmulationSideArtwork =

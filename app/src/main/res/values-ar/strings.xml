@@ -2280,4 +2280,9 @@
     <string name="settings_customization_background_preset_west_coast">غروب الساحل الغربي</string>
     <string name="settings_customization_background_preset_samurai_night">ليلة الساموراي</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">رحلة الكريستال</string>
+    <string name="settings_customization_side_artwork_gothic">مطاردة قوطية</string>
+    <string name="settings_customization_side_artwork_stealth">تسلل الأدغال</string>
+    <string name="settings_customization_side_artwork_samurai">ليلة الساموراي</string>
+    <string name="settings_customization_side_artwork_west_coast">غروب الساحل الغربي</string>
+    <string name="settings_customization_side_artwork_crystal">رحلة الكريستال</string>
 </resources>

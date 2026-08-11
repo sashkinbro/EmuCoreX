@@ -2280,4 +2280,9 @@
     <string name="settings_customization_background_preset_west_coast">Закат западного побережья</string>
     <string name="settings_customization_background_preset_samurai_night">Ночь самурая</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Кристальное странствие</string>
+    <string name="settings_customization_side_artwork_gothic">Готическая охота</string>
+    <string name="settings_customization_side_artwork_stealth">Проникновение в джунгли</string>
+    <string name="settings_customization_side_artwork_samurai">Ночь самурая</string>
+    <string name="settings_customization_side_artwork_west_coast">Закат западного побережья</string>
+    <string name="settings_customization_side_artwork_crystal">Кристальное странствие</string>
 </resources>

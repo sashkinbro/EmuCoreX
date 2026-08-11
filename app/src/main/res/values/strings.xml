@@ -2293,4 +2293,9 @@
     <string name="settings_customization_background_preset_west_coast">West Coast Sunset</string>
     <string name="settings_customization_background_preset_samurai_night">Samurai Night</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Crystal Pilgrimage</string>
+    <string name="settings_customization_side_artwork_gothic">Gothic hunt</string>
+    <string name="settings_customization_side_artwork_stealth">Jungle infiltration</string>
+    <string name="settings_customization_side_artwork_samurai">Samurai night</string>
+    <string name="settings_customization_side_artwork_west_coast">West Coast sunset</string>
+    <string name="settings_customization_side_artwork_crystal">Crystal pilgrimage</string>
 </resources>

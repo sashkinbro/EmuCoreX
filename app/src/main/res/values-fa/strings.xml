@@ -2291,4 +2291,9 @@
     <string name="settings_customization_background_preset_west_coast">غروب ساحل غربی</string>
     <string name="settings_customization_background_preset_samurai_night">شب سامورایی</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">زیارت بلورین</string>
+    <string name="settings_customization_side_artwork_gothic">شکار گوتیک</string>
+    <string name="settings_customization_side_artwork_stealth">نفوذ در جنگل</string>
+    <string name="settings_customization_side_artwork_samurai">شب سامورایی</string>
+    <string name="settings_customization_side_artwork_west_coast">غروب ساحل غربی</string>
+    <string name="settings_customization_side_artwork_crystal">زیارت بلورین</string>
 </resources>

@@ -2298,6 +2298,11 @@
     <string name="settings_customization_background_preset_west_coast">Zachód słońca na zachodnim wybrzeżu</string>
     <string name="settings_customization_background_preset_samurai_night">Noc samuraja</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Kryształowa pielgrzymka</string>
+    <string name="settings_customization_side_artwork_gothic">Gotyckie łowy</string>
+    <string name="settings_customization_side_artwork_stealth">Infiltracja dżungli</string>
+    <string name="settings_customization_side_artwork_samurai">Noc samuraja</string>
+    <string name="settings_customization_side_artwork_west_coast">Zachód słońca na zachodnim wybrzeżu</string>
+    <string name="settings_customization_side_artwork_crystal">Kryształowa pielgrzymka</string>
 </resources>
 
 

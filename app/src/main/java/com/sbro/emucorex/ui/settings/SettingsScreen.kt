@@ -3145,7 +3145,12 @@ private fun CustomizationSettingsTab(
         EmulationSideArtwork.OLYMPUS.preferenceValue to stringResource(R.string.settings_customization_side_artwork_olympus),
         EmulationSideArtwork.NIGHT_RACING.preferenceValue to stringResource(R.string.settings_customization_side_artwork_night_racing),
         EmulationSideArtwork.JUNGLE.preferenceValue to stringResource(R.string.settings_customization_side_artwork_jungle),
-        EmulationSideArtwork.COLOSSUS.preferenceValue to stringResource(R.string.settings_customization_side_artwork_colossus)
+        EmulationSideArtwork.COLOSSUS.preferenceValue to stringResource(R.string.settings_customization_side_artwork_colossus),
+        EmulationSideArtwork.GOTHIC.preferenceValue to stringResource(R.string.settings_customization_side_artwork_gothic),
+        EmulationSideArtwork.STEALTH.preferenceValue to stringResource(R.string.settings_customization_side_artwork_stealth),
+        EmulationSideArtwork.SAMURAI.preferenceValue to stringResource(R.string.settings_customization_side_artwork_samurai),
+        EmulationSideArtwork.WEST_COAST.preferenceValue to stringResource(R.string.settings_customization_side_artwork_west_coast),
+        EmulationSideArtwork.CRYSTAL.preferenceValue to stringResource(R.string.settings_customization_side_artwork_crystal)
     ) + if (hasCustomSideArtwork) {
         listOf(EmulationSideArtwork.CUSTOM.preferenceValue to stringResource(R.string.settings_customization_side_artwork_custom))
     } else {

@@ -2276,4 +2276,9 @@
     <string name="settings_customization_background_preset_west_coast">Batı Yakası Gün Batımı</string>
     <string name="settings_customization_background_preset_samurai_night">Samuray Gecesi</string>
     <string name="settings_customization_background_preset_crystal_pilgrimage">Kristal Yolculuğu</string>
+    <string name="settings_customization_side_artwork_gothic">Gotik Av</string>
+    <string name="settings_customization_side_artwork_stealth">Orman Sızması</string>
+    <string name="settings_customization_side_artwork_samurai">Samuray Gecesi</string>
+    <string name="settings_customization_side_artwork_west_coast">Batı Yakası Gün Batımı</string>
+    <string name="settings_customization_side_artwork_crystal">Kristal Yolculuğu</string>
 </resources>

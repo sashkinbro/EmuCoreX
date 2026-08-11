@@ -35,6 +35,18 @@ class CustomizationPreferencesTest {
     }
 
     @Test
+    fun sideArtworkKeepsExistingValuesAndResolvesNewPresets() {
+        assertEquals(EmulationSideArtwork.NONE, EmulationSideArtwork.fromPreference(null))
+        assertEquals(EmulationSideArtwork.NONE, EmulationSideArtwork.fromPreference(99))
+        assertEquals(EmulationSideArtwork.CUSTOM, EmulationSideArtwork.fromPreference(5))
+        assertEquals(EmulationSideArtwork.GOTHIC, EmulationSideArtwork.fromPreference(6))
+        assertEquals(EmulationSideArtwork.STEALTH, EmulationSideArtwork.fromPreference(7))
+        assertEquals(EmulationSideArtwork.SAMURAI, EmulationSideArtwork.fromPreference(8))
+        assertEquals(EmulationSideArtwork.WEST_COAST, EmulationSideArtwork.fromPreference(9))
+        assertEquals(EmulationSideArtwork.CRYSTAL, EmulationSideArtwork.fromPreference(10))
+    }
+
+    @Test
     fun defaultsRemainInsideSupportedRanges() {
         assertTrue(AppPreferences.DEFAULT_APP_FONT_SCALE in AppPreferences.MIN_APP_FONT_SCALE..AppPreferences.MAX_APP_FONT_SCALE)
         assertTrue(AppPreferences.DEFAULT_HOME_GRID_SCALE in AppPreferences.MIN_HOME_GRID_SCALE..AppPreferences.MAX_HOME_GRID_SCALE)
