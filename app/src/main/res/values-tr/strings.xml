@@ -2281,4 +2281,15 @@
     <string name="settings_customization_side_artwork_samurai">Samuray Gecesi</string>
     <string name="settings_customization_side_artwork_west_coast">Batı Yakası Gün Batımı</string>
     <string name="settings_customization_side_artwork_crystal">Kristal Yolculuğu</string>
+    <string name="settings_display_crop">Ekran kenarı kırpma</string>
+    <string name="settings_display_crop_off">Kapalı</string>
+    <string name="settings_display_crop_thin">İnce kenarlar (2 px)</string>
+    <string name="settings_display_crop_safe">Güvenli kenarlar (4 px)</string>
+    <string name="settings_display_crop_custom">Özel</string>
+    <string name="settings_display_crop_left">Sol kenarı kırp</string>
+    <string name="settings_display_crop_top">Üst kenarı kırp</string>
+    <string name="settings_display_crop_right">Sağ kenarı kırp</string>
+    <string name="settings_display_crop_bottom">Alt kenarı kırp</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Kararsız overscan veya bozuk pikselleri işleyici kaynağında her kenardan kaldırır. Oyun gerektirmiyorsa tüm kenarları 0 bırakın; kırpma en-boy oranı ölçeklemesinden önce uygulanır.</string>
 </resources>

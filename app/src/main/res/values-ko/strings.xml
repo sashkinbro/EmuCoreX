@@ -2280,4 +2280,15 @@
     <string name="settings_customization_side_artwork_samurai">사무라이의 밤</string>
     <string name="settings_customization_side_artwork_west_coast">서부 해안의 노을</string>
     <string name="settings_customization_side_artwork_crystal">수정 순례</string>
+    <string name="settings_display_crop">화면 가장자리 자르기</string>
+    <string name="settings_display_crop_off">끄기</string>
+    <string name="settings_display_crop_thin">얇은 가장자리 (2 px)</string>
+    <string name="settings_display_crop_safe">안전 가장자리 (4 px)</string>
+    <string name="settings_display_crop_custom">사용자 지정</string>
+    <string name="settings_display_crop_left">왼쪽 가장자리 자르기</string>
+    <string name="settings_display_crop_top">위쪽 가장자리 자르기</string>
+    <string name="settings_display_crop_right">오른쪽 가장자리 자르기</string>
+    <string name="settings_display_crop_bottom">아래쪽 가장자리 자르기</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">렌더러 원본 단계에서 각 방향의 불안정한 오버스캔이나 깨진 픽셀을 제거합니다. 게임에 필요하지 않으면 모두 0으로 두세요. 자르기는 화면 비율 조정 전에 적용됩니다.</string>
 </resources>

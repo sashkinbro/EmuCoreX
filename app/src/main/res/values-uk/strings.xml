@@ -2285,4 +2285,15 @@
     <string name="settings_customization_side_artwork_samurai">Самурайська ніч</string>
     <string name="settings_customization_side_artwork_west_coast">Західне узбережжя</string>
     <string name="settings_customization_side_artwork_crystal">Кришталева мандрівка</string>
+    <string name="settings_display_crop">Кадрування країв екрана</string>
+    <string name="settings_display_crop_off">Вимкнено</string>
+    <string name="settings_display_crop_thin">Тонкі краї (2 пкс)</string>
+    <string name="settings_display_crop_safe">Безпечні краї (4 пкс)</string>
+    <string name="settings_display_crop_custom">Власне</string>
+    <string name="settings_display_crop_left">Обрізати лівий край</string>
+    <string name="settings_display_crop_top">Обрізати верхній край</string>
+    <string name="settings_display_crop_right">Обрізати правий край</string>
+    <string name="settings_display_crop_bottom">Обрізати нижній край</string>
+    <string name="settings_display_crop_pixels_unit">пкс</string>
+    <string name="settings_help_display_crop">Прибирає нестабільний overscan або сміттєві пікселі окремо з кожного боку на рівні рендера. Залишайте 0, якщо гра цього не потребує; кадрування застосовується до масштабування співвідношення сторін.</string>
 </resources>

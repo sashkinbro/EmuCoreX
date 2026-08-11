@@ -2281,4 +2281,15 @@
     <string name="settings_customization_side_artwork_samurai">समुराई रात</string>
     <string name="settings_customization_side_artwork_west_coast">पश्चिमी तट का सूर्यास्त</string>
     <string name="settings_customization_side_artwork_crystal">क्रिस्टल यात्रा</string>
+    <string name="settings_display_crop">स्क्रीन किनारे क्रॉप करें</string>
+    <string name="settings_display_crop_off">बंद</string>
+    <string name="settings_display_crop_thin">पतले किनारे (2 px)</string>
+    <string name="settings_display_crop_safe">सुरक्षित किनारे (4 px)</string>
+    <string name="settings_display_crop_custom">कस्टम</string>
+    <string name="settings_display_crop_left">बायाँ किनारा क्रॉप करें</string>
+    <string name="settings_display_crop_top">ऊपरी किनारा क्रॉप करें</string>
+    <string name="settings_display_crop_right">दायाँ किनारा क्रॉप करें</string>
+    <string name="settings_display_crop_bottom">निचला किनारा क्रॉप करें</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">रेंडरर स्रोत पर हर ओर से अस्थिर ओवरस्कैन या खराब पिक्सेल हटाता है। गेम को जरूरत न हो तो सभी ओर 0 रखें; क्रॉपिंग आस्पेक्ट रेशियो स्केलिंग से पहले लागू होती है।</string>
 </resources>

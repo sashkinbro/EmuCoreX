@@ -180,6 +180,7 @@ import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
+import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundPreset
 import com.sbro.emucorex.data.HomeBackgroundType
@@ -1343,6 +1344,51 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { viewModel.setAspectRatio(defaults.aspectRatio) }
                         )
+                        val crop = uiState.displayCrop
+                        val cropPreset = when (crop) {
+                            DisplayCrop.None -> 0
+                            DisplayCrop.ThinEdges -> 2
+                            DisplayCrop.SafeEdges -> 4
+                            else -> -1
+                        }
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_display_crop),
+                            options = listOf(
+                                0 to stringResource(R.string.settings_display_crop_off),
+                                2 to stringResource(R.string.settings_display_crop_thin),
+                                4 to stringResource(R.string.settings_display_crop_safe),
+                                -1 to stringResource(R.string.settings_display_crop_custom)
+                            ),
+                            selectedValue = cropPreset,
+                            onSelect = { preset ->
+                                when (preset) {
+                                    0 -> viewModel.setDisplayCrop(DisplayCrop.None)
+                                    2 -> viewModel.setDisplayCrop(DisplayCrop.ThinEdges)
+                                    4 -> viewModel.setDisplayCrop(DisplayCrop.SafeEdges)
+                                }
+                            },
+                            helpText = stringResource(R.string.settings_help_display_crop),
+                            onResetToDefault = { viewModel.setDisplayCrop(DisplayCrop.None) }
+                        )
+                        listOf(
+                            Triple(R.string.settings_display_crop_left, crop.left) { value: Int -> crop.copy(left = value) },
+                            Triple(R.string.settings_display_crop_top, crop.top) { value: Int -> crop.copy(top = value) },
+                            Triple(R.string.settings_display_crop_right, crop.right) { value: Int -> crop.copy(right = value) },
+                            Triple(R.string.settings_display_crop_bottom, crop.bottom) { value: Int -> crop.copy(bottom = value) }
+                        ).forEach { (titleRes, pixels, update) ->
+                            val pixelsUnit = stringResource(R.string.settings_display_crop_pixels_unit)
+                            SliderItem(
+                                icon = Icons.Rounded.Tune,
+                                title = stringResource(titleRes),
+                                subtitle = "$pixels $pixelsUnit",
+                                value = pixels.toFloat(),
+                                range = DisplayCrop.MIN_PIXELS.toFloat()..DisplayCrop.MAX_PIXELS.toFloat(),
+                                steps = DisplayCrop.MAX_PIXELS - DisplayCrop.MIN_PIXELS - 1,
+                                onValueChange = { viewModel.setDisplayCrop(update(it.roundToInt())) },
+                                valueLabel = { "${it.roundToInt()} $pixelsUnit" },
+                                onResetToDefault = { viewModel.setDisplayCrop(update(0)) }
+                            )
+                        }
                         ToggleItem(
                             icon = Icons.Rounded.AutoFixHigh,
                             title = stringResource(R.string.settings_retroarch_shaders),

@@ -5,6 +5,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.view.Surface
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -310,6 +311,7 @@ object EmulatorBridge {
         gpuHardwareProfile: Int = GpuHardwareProfiles.ADRENO,
         mediatekAngleOpenGl: Boolean = false,
         aspectRatio: Int = 1,
+        displayCrop: DisplayCrop = DisplayCrop.None,
         audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
         audioFastForwardVolume: Int = AudioDefaults.VOLUME_DEFAULT,
         audioMuted: Boolean = false,
@@ -529,6 +531,12 @@ object EmulatorBridge {
                 add(settingOp("Pad2", "PressureModifier", "float", pressureAmount.toString()))
                 add(upscaleOp(upscaleMultiplier))
                 add(aspectOp(aspectRatio))
+                displayCrop.sanitized().let { crop ->
+                    add(settingOp("EmuCore/GS", "CropLeft", "int", crop.left.toString()))
+                    add(settingOp("EmuCore/GS", "CropTop", "int", crop.top.toString()))
+                    add(settingOp("EmuCore/GS", "CropRight", "int", crop.right.toString()))
+                    add(settingOp("EmuCore/GS", "CropBottom", "int", crop.bottom.toString()))
+                }
                 add(settingOp("SPU2/Output", "StandardVolume", "int", AudioDefaults.coerceVolume(audioVolume).toString()))
                 add(settingOp("SPU2/Output", "FastForwardVolume", "int", AudioDefaults.coerceVolume(audioFastForwardVolume).toString()))
                 add(settingOp("SPU2/Output", "OutputMuted", "bool", audioMuted.toString()))
@@ -1150,6 +1158,20 @@ object EmulatorBridge {
         val value = aspectRatioSettingValues.getValue(normalizedType)
         settingsCache["EmuCore/GS:AspectRatio"] = value
         performRuntimeOps(listOf(aspectOp(normalizedType)))
+    }
+
+    suspend fun setDisplayCrop(value: DisplayCrop) {
+        val crop = value.sanitized()
+        val values = listOf(
+            "CropLeft" to crop.left,
+            "CropTop" to crop.top,
+            "CropRight" to crop.right,
+            "CropBottom" to crop.bottom
+        )
+        values.forEach { (key, pixels) -> settingsCache["EmuCore/GS:$key"] = pixels.toString() }
+        performRuntimeOps(values.map { (key, pixels) ->
+            settingOp("EmuCore/GS", key, "int", pixels.toString())
+        })
     }
 
     suspend fun setCustomDriverPath(path: String) {

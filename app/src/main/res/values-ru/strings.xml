@@ -2285,4 +2285,15 @@
     <string name="settings_customization_side_artwork_samurai">Ночь самурая</string>
     <string name="settings_customization_side_artwork_west_coast">Закат западного побережья</string>
     <string name="settings_customization_side_artwork_crystal">Кристальное странствие</string>
+    <string name="settings_display_crop">Кадрирование краёв экрана</string>
+    <string name="settings_display_crop_off">Выключено</string>
+    <string name="settings_display_crop_thin">Тонкие края (2 пкс)</string>
+    <string name="settings_display_crop_safe">Безопасные края (4 пкс)</string>
+    <string name="settings_display_crop_custom">Своё</string>
+    <string name="settings_display_crop_left">Обрезать левый край</string>
+    <string name="settings_display_crop_top">Обрезать верхний край</string>
+    <string name="settings_display_crop_right">Обрезать правый край</string>
+    <string name="settings_display_crop_bottom">Обрезать нижний край</string>
+    <string name="settings_display_crop_pixels_unit">пкс</string>
+    <string name="settings_help_display_crop">Убирает нестабильный overscan или мусорные пиксели отдельно с каждой стороны на уровне рендера. Оставляйте 0, если игре это не требуется; кадрирование применяется до масштабирования соотношения сторон.</string>
 </resources>

@@ -2298,4 +2298,15 @@
     <string name="settings_customization_side_artwork_samurai">Samurai night</string>
     <string name="settings_customization_side_artwork_west_coast">West Coast sunset</string>
     <string name="settings_customization_side_artwork_crystal">Crystal pilgrimage</string>
+    <string name="settings_display_crop">Screen edge crop</string>
+    <string name="settings_display_crop_off">Off</string>
+    <string name="settings_display_crop_thin">Thin edges (2 px)</string>
+    <string name="settings_display_crop_safe">Safe edges (4 px)</string>
+    <string name="settings_display_crop_custom">Custom</string>
+    <string name="settings_display_crop_left">Crop left edge</string>
+    <string name="settings_display_crop_top">Crop top edge</string>
+    <string name="settings_display_crop_right">Crop right edge</string>
+    <string name="settings_display_crop_bottom">Crop bottom edge</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Removes unstable overscan or garbage pixels from each side at the renderer source. Keep all sides at 0 unless a game needs it; cropping is applied before aspect-ratio scaling.</string>
 </resources>

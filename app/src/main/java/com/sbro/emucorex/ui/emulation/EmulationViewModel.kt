@@ -32,6 +32,7 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
+import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.CheatRepository
 import com.sbro.emucorex.data.GameRepository
@@ -181,6 +182,7 @@ data class EmulationUiState(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscale: Float = 1f,
     val aspectRatio: Int = 1,
+    val displayCrop: DisplayCrop = DisplayCrop.None,
     val performancePreset: Int = PerformancePresets.CUSTOM,
     val enableInstantVu1: Boolean = true,
     val enableMtvu: Boolean = true,
@@ -277,6 +279,7 @@ private data class EmulationLaunchConfig(
     val gpuHardwareProfile: Int,
     val mediatekAngleOpenGl: Boolean,
     val aspectRatio: Int,
+    val displayCrop: DisplayCrop,
     val audioVolume: Int,
     val audioFastForwardVolume: Int,
     val audioMuted: Boolean,
@@ -394,6 +397,7 @@ private data class LiveRuntimeSnapshot(
     val renderer: Int,
     val upscale: Float,
     val aspectRatio: Int,
+    val displayCrop: DisplayCrop,
     val performancePreset: Int,
     val enableInstantVu1: Boolean,
     val enableMtvu: Boolean,
@@ -863,6 +867,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.aspectRatio.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(aspectRatio = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.displayCrop.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(displayCrop = value) }
             }
         }
         viewModelScope.launch {
@@ -1526,6 +1535,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gpuHardwareProfile = config.gpuHardwareProfile,
                     mediatekAngleOpenGl = config.mediatekAngleOpenGl,
                     aspectRatio = config.aspectRatio,
+                    displayCrop = config.displayCrop,
                     audioVolume = config.audioVolume,
                     audioFastForwardVolume = config.audioFastForwardVolume,
                     audioMuted = config.audioMuted,
@@ -1758,6 +1768,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     renderer = liveRuntime.renderer,
                     upscale = liveRuntime.upscale,
                     aspectRatio = liveRuntime.aspectRatio,
+                    displayCrop = liveRuntime.displayCrop,
                     performancePreset = liveRuntime.performancePreset,
                     enableInstantVu1 = liveRuntime.enableInstantVu1,
                     enableMtvu = liveRuntime.enableMtvu,
@@ -2533,6 +2544,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setEnableMtvu(effectiveEnabled)
             }
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", effectiveEnabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setDisplayCrop(value: DisplayCrop) {
+        viewModelScope.launch {
+            val crop = value.sanitized()
+            persistRuntimeState(_uiState.value.copy(displayCrop = crop)) {
+                preferences.setDisplayCrop(crop)
+            }
+            EmulatorBridge.setDisplayCrop(crop)
             updateCrashContext()
         }
     }
@@ -3662,6 +3684,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gpuHardwareProfile = settings.gpuHardwareProfile,
             mediatekAngleOpenGl = settings.mediatekAngleOpenGl,
             aspectRatio = settings.aspectRatio,
+            displayCrop = settings.displayCrop,
             audioVolume = settings.audioVolume,
             audioFastForwardVolume = settings.audioFastForwardVolume,
             audioMuted = settings.audioMuted,
@@ -3792,6 +3815,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = settings.renderer,
             upscale = settings.upscaleMultiplier,
             aspectRatio = settings.aspectRatio,
+            displayCrop = settings.displayCrop,
             performancePreset = settings.performancePreset,
             enableInstantVu1 = settings.enableInstantVu1,
             enableMtvu = settings.enableMtvu,
@@ -3896,6 +3920,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl) { mediatekAngleOpenGl },
             upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             instantVu1 = pick("enableInstantVu1", instantVu1) { enableInstantVu1 },
             mtvu = pick("enableMtvu", mtvu) { enableMtvu },
             enableThreadPinning = pick("enableThreadPinning", enableThreadPinning) { enableThreadPinning },
@@ -4009,6 +4034,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = pick("renderer", renderer) { renderer },
             upscale = pick("upscaleMultiplier", upscale) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             enableInstantVu1 = pick("enableInstantVu1", enableInstantVu1) { enableInstantVu1 },
             enableMtvu = pick("enableMtvu", enableMtvu) { enableMtvu },
             enableThreadPinning = pick("enableThreadPinning", enableThreadPinning) { enableThreadPinning },
@@ -4125,6 +4151,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = renderer,
             upscaleMultiplier = upscale,
             aspectRatio = aspectRatio,
+            displayCrop = displayCrop,
             showFps = showFps,
             fpsOverlayMode = fpsOverlayMode,
             enableInstantVu1 = enableInstantVu1,
@@ -4218,6 +4245,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (renderer != preferences.renderer.first()) add("renderer")
             if (upscale != preferences.upscaleMultiplier.first()) add("upscaleMultiplier")
             if (aspectRatio != preferences.aspectRatio.first()) add("aspectRatio")
+            if (displayCrop != preferences.displayCrop.first()) add("displayCrop")
             if (showFps != globalShowFps) add("showFps")
             if (fpsOverlayMode != globalFpsOverlayMode) add("fpsOverlayMode")
             if (enableInstantVu1 != globalEnableInstantVu1) add("enableInstantVu1")
@@ -4750,6 +4778,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         })
         NativeApp.setCrashContextString("emu_upscale", state.upscale.toString())
         NativeApp.setCrashContextInt("emu_aspect_ratio", state.aspectRatio)
+        NativeApp.setCrashContextInt("emu_crop_left", state.displayCrop.left)
+        NativeApp.setCrashContextInt("emu_crop_top", state.displayCrop.top)
+        NativeApp.setCrashContextInt("emu_crop_right", state.displayCrop.right)
+        NativeApp.setCrashContextInt("emu_crop_bottom", state.displayCrop.bottom)
         NativeApp.setCrashContextBool("emu_mtvu", state.enableMtvu)
         NativeApp.setCrashContextBool("emu_thread_pinning", state.enableThreadPinning)
         NativeApp.setCrashContextBool("emu_fast_cdvd", state.enableFastCdvd)

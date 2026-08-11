@@ -20,6 +20,7 @@
 #include <SDL3/SDL_hints.h>
 #include <android/log.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
@@ -224,6 +225,14 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		emucorex::IsProfilerLogcatEnabled() ? "enabled" : "disabled");
 	si.SetIntValue("EmuCore/GS", "Renderer",
 		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
+	si.SetIntValue("EmuCore/GS", "CropLeft",
+		std::clamp(GetIntSetting(config.settings, "EmuCore/GS", "CropLeft", 0), 0, 64));
+	si.SetIntValue("EmuCore/GS", "CropTop",
+		std::clamp(GetIntSetting(config.settings, "EmuCore/GS", "CropTop", 0), 0, 64));
+	si.SetIntValue("EmuCore/GS", "CropRight",
+		std::clamp(GetIntSetting(config.settings, "EmuCore/GS", "CropRight", 0), 0, 64));
+	si.SetIntValue("EmuCore/GS", "CropBottom",
+		std::clamp(GetIntSetting(config.settings, "EmuCore/GS", "CropBottom", 0), 0, 64));
 	si.SetBoolValue("EmuCore/GS", "VsyncEnable",
 		GetBoolSetting(config.settings, "EmuCore/GS", "VsyncEnable", false));
 	const auto audio_backend_setting = config.settings.find("SPU2/Output\nBackend");

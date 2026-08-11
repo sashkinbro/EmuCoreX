@@ -2295,4 +2295,15 @@
     <string name="settings_customization_side_artwork_samurai">Malam Samurai</string>
     <string name="settings_customization_side_artwork_west_coast">Senja Pantai Barat</string>
     <string name="settings_customization_side_artwork_crystal">Ziarah Kristal</string>
+    <string name="settings_display_crop">Pangkas tepi layar</string>
+    <string name="settings_display_crop_off">Nonaktif</string>
+    <string name="settings_display_crop_thin">Tepi tipis (2 px)</string>
+    <string name="settings_display_crop_safe">Tepi aman (4 px)</string>
+    <string name="settings_display_crop_custom">Kustom</string>
+    <string name="settings_display_crop_left">Pangkas tepi kiri</string>
+    <string name="settings_display_crop_top">Pangkas tepi atas</string>
+    <string name="settings_display_crop_right">Pangkas tepi kanan</string>
+    <string name="settings_display_crop_bottom">Pangkas tepi bawah</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Menghapus overscan tidak stabil atau piksel rusak dari tiap sisi pada sumber perender. Biarkan semua sisi 0 kecuali diperlukan gim; pemangkasan diterapkan sebelum penskalaan rasio aspek.</string>
 </resources>

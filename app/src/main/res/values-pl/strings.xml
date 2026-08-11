@@ -2303,6 +2303,17 @@
     <string name="settings_customization_side_artwork_samurai">Noc samuraja</string>
     <string name="settings_customization_side_artwork_west_coast">Zachód słońca na zachodnim wybrzeżu</string>
     <string name="settings_customization_side_artwork_crystal">Kryształowa pielgrzymka</string>
+    <string name="settings_display_crop">Przycinanie krawędzi ekranu</string>
+    <string name="settings_display_crop_off">Wyłączone</string>
+    <string name="settings_display_crop_thin">Cienkie krawędzie (2 px)</string>
+    <string name="settings_display_crop_safe">Bezpieczne krawędzie (4 px)</string>
+    <string name="settings_display_crop_custom">Niestandardowe</string>
+    <string name="settings_display_crop_left">Przytnij lewą krawędź</string>
+    <string name="settings_display_crop_top">Przytnij górną krawędź</string>
+    <string name="settings_display_crop_right">Przytnij prawą krawędź</string>
+    <string name="settings_display_crop_bottom">Przytnij dolną krawędź</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Usuwa niestabilny overscan lub błędne piksele z każdej strony u źródła renderera. Pozostaw 0, jeśli gra tego nie wymaga; przycinanie następuje przed skalowaniem proporcji.</string>
 </resources>
 
 

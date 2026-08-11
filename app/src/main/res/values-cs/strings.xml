@@ -2301,5 +2301,16 @@
     <string name="settings_customization_side_artwork_samurai">Samurajská noc</string>
     <string name="settings_customization_side_artwork_west_coast">Západ slunce na pobřeží</string>
     <string name="settings_customization_side_artwork_crystal">Křišťálová pouť</string>
+    <string name="settings_display_crop">Ořezání okrajů obrazovky</string>
+    <string name="settings_display_crop_off">Vypnuto</string>
+    <string name="settings_display_crop_thin">Tenké okraje (2 px)</string>
+    <string name="settings_display_crop_safe">Bezpečné okraje (4 px)</string>
+    <string name="settings_display_crop_custom">Vlastní</string>
+    <string name="settings_display_crop_left">Oříznout levý okraj</string>
+    <string name="settings_display_crop_top">Oříznout horní okraj</string>
+    <string name="settings_display_crop_right">Oříznout pravý okraj</string>
+    <string name="settings_display_crop_bottom">Oříznout dolní okraj</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Odstraní nestabilní overscan nebo rušivé pixely na každé straně přímo ve zdroji rendereru. Ponechte 0, pokud to hra nepotřebuje; ořez se provede před škálováním poměru stran.</string>
 </resources>
 

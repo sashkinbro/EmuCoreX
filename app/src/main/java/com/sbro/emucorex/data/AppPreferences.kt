@@ -88,6 +88,7 @@ data class SettingsSnapshot(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val displayCrop: DisplayCrop = DisplayCrop.None,
     val shaderChainEnabled: Boolean = false,
     val shaderChainPreset: String = "",
     val audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
@@ -488,6 +489,10 @@ class AppPreferences(private val context: Context) {
         private val GPU_HARDWARE_PROFILE = intPreferencesKey("gpu_hardware_profile")
         private val LANGUAGE_TAG = stringPreferencesKey("language_tag")
         private val ASPECT_RATIO = intPreferencesKey("aspect_ratio")
+        private val DISPLAY_CROP_LEFT = intPreferencesKey("display_crop_left")
+        private val DISPLAY_CROP_TOP = intPreferencesKey("display_crop_top")
+        private val DISPLAY_CROP_RIGHT = intPreferencesKey("display_crop_right")
+        private val DISPLAY_CROP_BOTTOM = intPreferencesKey("display_crop_bottom")
         private val AUDIO_VOLUME = intPreferencesKey("audio_volume")
         private val AUDIO_FAST_FORWARD_VOLUME = intPreferencesKey("audio_fast_forward_volume")
         private val AUDIO_MUTED = booleanPreferencesKey("audio_muted")
@@ -1547,6 +1552,7 @@ class AppPreferences(private val context: Context) {
                 renderer = normalizeRendererPreference(prefs[RENDERER]),
                 upscaleMultiplier = readUpscale(prefs),
                 aspectRatio = normalizeAspectRatioPreference(prefs[ASPECT_RATIO]),
+                displayCrop = readDisplayCrop(prefs),
                 shaderChainEnabled = prefs[SHADER_CHAIN_ENABLED] ?: false,
                 shaderChainPreset = prefs[SHADER_CHAIN_PRESET].orEmpty(),
                 audioVolume = AudioDefaults.coerceVolume(
@@ -1905,6 +1911,27 @@ class AppPreferences(private val context: Context) {
     suspend fun setAspectRatio(value: Int) {
         context.dataStore.edit { it[ASPECT_RATIO] = normalizeAspectRatioPreference(value) }
     }
+
+    val displayCrop: Flow<DisplayCrop> = context.dataStore.data
+        .map(::readDisplayCrop)
+        .distinctUntilChanged()
+
+    suspend fun setDisplayCrop(value: DisplayCrop) {
+        val crop = value.sanitized()
+        context.dataStore.edit { prefs ->
+            prefs[DISPLAY_CROP_LEFT] = crop.left
+            prefs[DISPLAY_CROP_TOP] = crop.top
+            prefs[DISPLAY_CROP_RIGHT] = crop.right
+            prefs[DISPLAY_CROP_BOTTOM] = crop.bottom
+        }
+    }
+
+    private fun readDisplayCrop(prefs: Preferences): DisplayCrop = DisplayCrop(
+        left = prefs[DISPLAY_CROP_LEFT] ?: 0,
+        top = prefs[DISPLAY_CROP_TOP] ?: 0,
+        right = prefs[DISPLAY_CROP_RIGHT] ?: 0,
+        bottom = prefs[DISPLAY_CROP_BOTTOM] ?: 0
+    ).sanitized()
 
     val autoProgressiveScan: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[AUTO_PROGRESSIVE_SCAN] ?: false
@@ -3466,6 +3493,12 @@ class AppPreferences(private val context: Context) {
             put("onboardingCompleted", prefs[ONBOARDING_COMPLETED] ?: false)
             put("languageTag", prefs[LANGUAGE_TAG])
             put("aspectRatio", normalizeAspectRatioPreference(prefs[ASPECT_RATIO]))
+            readDisplayCrop(prefs).let { crop ->
+                put("displayCropLeft", crop.left)
+                put("displayCropTop", crop.top)
+                put("displayCropRight", crop.right)
+                put("displayCropBottom", crop.bottom)
+            }
             put("audioVolume", AudioDefaults.coerceVolume(prefs[AUDIO_VOLUME] ?: AudioDefaults.VOLUME_DEFAULT))
             put("audioFastForwardVolume", AudioDefaults.coerceVolume(prefs[AUDIO_FAST_FORWARD_VOLUME] ?: AudioDefaults.VOLUME_DEFAULT))
             put("audioMuted", prefs[AUDIO_MUTED] ?: false)
@@ -3788,6 +3821,17 @@ class AppPreferences(private val context: Context) {
             prefs[ONBOARDING_COMPLETED] = json.optBoolean("onboardingCompleted", false)
             languageTag?.let { prefs[LANGUAGE_TAG] = it } ?: prefs.remove(LANGUAGE_TAG)
             prefs[ASPECT_RATIO] = normalizeAspectRatioPreference(json.optInt("aspectRatio", 1))
+            DisplayCrop(
+                left = json.optInt("displayCropLeft", 0),
+                top = json.optInt("displayCropTop", 0),
+                right = json.optInt("displayCropRight", 0),
+                bottom = json.optInt("displayCropBottom", 0)
+            ).sanitized().let { crop ->
+                prefs[DISPLAY_CROP_LEFT] = crop.left
+                prefs[DISPLAY_CROP_TOP] = crop.top
+                prefs[DISPLAY_CROP_RIGHT] = crop.right
+                prefs[DISPLAY_CROP_BOTTOM] = crop.bottom
+            }
             prefs[AUDIO_VOLUME] = AudioDefaults.coerceVolume(json.optInt("audioVolume", AudioDefaults.VOLUME_DEFAULT))
             prefs[AUDIO_FAST_FORWARD_VOLUME] = AudioDefaults.coerceVolume(
                 json.optInt("audioFastForwardVolume", AudioDefaults.VOLUME_DEFAULT)

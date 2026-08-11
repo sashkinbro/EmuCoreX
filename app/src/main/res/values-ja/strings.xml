@@ -2280,4 +2280,15 @@
     <string name="settings_customization_side_artwork_samurai">侍の夜</string>
     <string name="settings_customization_side_artwork_west_coast">西海岸の夕暮れ</string>
     <string name="settings_customization_side_artwork_crystal">水晶の巡礼</string>
+    <string name="settings_display_crop">画面端のクロップ</string>
+    <string name="settings_display_crop_off">オフ</string>
+    <string name="settings_display_crop_thin">細い端 (2 px)</string>
+    <string name="settings_display_crop_safe">セーフ端 (4 px)</string>
+    <string name="settings_display_crop_custom">カスタム</string>
+    <string name="settings_display_crop_left">左端をクロップ</string>
+    <string name="settings_display_crop_top">上端をクロップ</string>
+    <string name="settings_display_crop_right">右端をクロップ</string>
+    <string name="settings_display_crop_bottom">下端をクロップ</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">不安定なオーバースキャンや乱れたピクセルをレンダラーの入力段階で各辺から除去します。必要がないゲームでは全辺を 0 のままにしてください。クロップはアスペクト比の拡大縮小前に適用されます。</string>
 </resources>

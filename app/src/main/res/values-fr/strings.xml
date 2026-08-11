@@ -2283,4 +2283,15 @@
     <string name="settings_customization_side_artwork_samurai">Nuit samouraï</string>
     <string name="settings_customization_side_artwork_west_coast">Crépuscule de la côte ouest</string>
     <string name="settings_customization_side_artwork_crystal">Pèlerinage de cristal</string>
+    <string name="settings_display_crop">Rognage des bords</string>
+    <string name="settings_display_crop_off">Désactivé</string>
+    <string name="settings_display_crop_thin">Bords fins (2 px)</string>
+    <string name="settings_display_crop_safe">Bords sûrs (4 px)</string>
+    <string name="settings_display_crop_custom">Personnalisé</string>
+    <string name="settings_display_crop_left">Rogner le bord gauche</string>
+    <string name="settings_display_crop_top">Rogner le bord supérieur</string>
+    <string name="settings_display_crop_right">Rogner le bord droit</string>
+    <string name="settings_display_crop_bottom">Rogner le bord inférieur</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Supprime l’overscan instable ou les pixels parasites de chaque côté à la source du rendu. Laissez 0 si le jeu n’en a pas besoin ; le rognage précède la mise à l’échelle du format.</string>
 </resources>

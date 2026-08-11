@@ -20,6 +20,7 @@ data class PerGameSettings(
     val mediatekAngleOpenGl: Boolean = false,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val displayCrop: DisplayCrop = DisplayCrop.None,
     val showFps: Boolean = false,
     val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
     val racingMode: Boolean = false,
@@ -242,6 +243,14 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         mediatekAngleOpenGl = optBoolean("mediatekAngleOpenGl", false),
         upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1).let(::sanitizeAspectRatioValue),
+        displayCrop = optJSONObject("displayCrop")?.let { crop ->
+            DisplayCrop(
+                left = crop.optInt("left", 0),
+                top = crop.optInt("top", 0),
+                right = crop.optInt("right", 0),
+                bottom = crop.optInt("bottom", 0)
+            ).sanitized()
+        } ?: DisplayCrop.None,
         showFps = optBoolean("showFps", false),
         fpsOverlayMode = optInt("fpsOverlayMode", AppPreferences.FPS_OVERLAY_MODE_DETAILED),
         racingMode = optBoolean("racingMode", false),
@@ -406,6 +415,13 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("mediatekAngleOpenGl")) put("mediatekAngleOpenGl", mediatekAngleOpenGl)
         if (shouldWrite("upscaleMultiplier")) put("upscaleMultiplier", upscaleMultiplier.toDouble())
         if (shouldWrite("aspectRatio")) put("aspectRatio", sanitizeAspectRatioValue(aspectRatio))
+        if (shouldWrite("displayCrop")) put("displayCrop", JSONObject().apply {
+            val crop = displayCrop.sanitized()
+            put("left", crop.left)
+            put("top", crop.top)
+            put("right", crop.right)
+            put("bottom", crop.bottom)
+        })
         if (shouldWrite("showFps")) put("showFps", showFps)
         if (shouldWrite("fpsOverlayMode")) put("fpsOverlayMode", fpsOverlayMode)
         if (shouldWrite("racingMode")) put("racingMode", racingMode)

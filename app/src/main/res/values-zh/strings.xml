@@ -2282,4 +2282,15 @@
     <string name="settings_customization_side_artwork_samurai">武士之夜</string>
     <string name="settings_customization_side_artwork_west_coast">西海岸落日</string>
     <string name="settings_customization_side_artwork_crystal">水晶朝圣</string>
+    <string name="settings_display_crop">屏幕边缘裁剪</string>
+    <string name="settings_display_crop_off">关闭</string>
+    <string name="settings_display_crop_thin">细边缘（2 px）</string>
+    <string name="settings_display_crop_safe">安全边缘（4 px）</string>
+    <string name="settings_display_crop_custom">自定义</string>
+    <string name="settings_display_crop_left">裁剪左边缘</string>
+    <string name="settings_display_crop_top">裁剪上边缘</string>
+    <string name="settings_display_crop_right">裁剪右边缘</string>
+    <string name="settings_display_crop_bottom">裁剪下边缘</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">在渲染源处分别移除各边不稳定的过扫描或杂乱像素。游戏不需要时请将所有边保持为 0；裁剪会在宽高比缩放之前应用。</string>
 </resources>

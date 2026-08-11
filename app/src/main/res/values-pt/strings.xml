@@ -2283,4 +2283,15 @@
     <string name="settings_customization_side_artwork_samurai">Noite samurai</string>
     <string name="settings_customization_side_artwork_west_coast">Pôr do sol na costa oeste</string>
     <string name="settings_customization_side_artwork_crystal">Peregrinação de cristal</string>
+    <string name="settings_display_crop">Recorte das bordas</string>
+    <string name="settings_display_crop_off">Desativado</string>
+    <string name="settings_display_crop_thin">Bordas finas (2 px)</string>
+    <string name="settings_display_crop_safe">Bordas seguras (4 px)</string>
+    <string name="settings_display_crop_custom">Personalizado</string>
+    <string name="settings_display_crop_left">Recortar borda esquerda</string>
+    <string name="settings_display_crop_top">Recortar borda superior</string>
+    <string name="settings_display_crop_right">Recortar borda direita</string>
+    <string name="settings_display_crop_bottom">Recortar borda inferior</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Remove overscan instável ou píxeis indesejados de cada lado na origem do renderizador. Mantenha todos os lados em 0 salvo se um jogo precisar; o recorte ocorre antes do ajuste da proporção.</string>
 </resources>

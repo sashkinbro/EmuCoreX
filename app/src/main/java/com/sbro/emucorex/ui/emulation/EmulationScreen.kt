@@ -165,6 +165,7 @@ import com.sbro.emucorex.core.utils.RetroAchievementsLiveStateManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
+import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
@@ -1369,6 +1370,7 @@ fun EmulationScreen(
                     onSetRenderer = { viewModel.setRenderer(it) },
                     onSetUpscale = { viewModel.setUpscale(it) },
                     onSetAspectRatio = { viewModel.setAspectRatio(it) },
+                    onSetDisplayCrop = { viewModel.setDisplayCrop(it) },
                     onSetMtvu = { viewModel.setMtvu(it) },
                     onSetThreadPinning = { viewModel.setThreadPinning(it) },
                     onSetFastCdvd = { viewModel.setFastCdvd(it) },
@@ -2662,6 +2664,7 @@ private fun EmulationSidebarMenu(
     onSetRenderer: (Int) -> Unit,
     onSetUpscale: (Float) -> Unit,
     onSetAspectRatio: (Int) -> Unit,
+    onSetDisplayCrop: (DisplayCrop) -> Unit,
     onSetMtvu: (Boolean) -> Unit,
     onSetThreadPinning: (Boolean) -> Unit,
     onSetFastCdvd: (Boolean) -> Unit,
@@ -3726,6 +3729,50 @@ private fun EmulationSidebarMenu(
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
                         )
+
+                        val crop = uiState.displayCrop
+                        val cropPreset = when (crop) {
+                            DisplayCrop.None -> 0
+                            DisplayCrop.ThinEdges -> 2
+                            DisplayCrop.SafeEdges -> 4
+                            else -> -1
+                        }
+                        LiveChipsSelectionRow(
+                            title = stringResource(R.string.settings_display_crop),
+                            options = listOf(
+                                0 to stringResource(R.string.settings_display_crop_off),
+                                2 to stringResource(R.string.settings_display_crop_thin),
+                                4 to stringResource(R.string.settings_display_crop_safe),
+                                -1 to stringResource(R.string.settings_display_crop_custom)
+                            ),
+                            currentValue = cropPreset,
+                            onValueChange = { preset ->
+                                when (preset) {
+                                    0 -> onSetDisplayCrop(DisplayCrop.None)
+                                    2 -> onSetDisplayCrop(DisplayCrop.ThinEdges)
+                                    4 -> onSetDisplayCrop(DisplayCrop.SafeEdges)
+                                }
+                            },
+                            helpText = stringResource(R.string.settings_help_display_crop),
+                            onResetToDefault = { onSetDisplayCrop(globalDefaults.displayCrop) }
+                        )
+                        val pixelsUnit = stringResource(R.string.settings_display_crop_pixels_unit)
+                        listOf(
+                            Triple(R.string.settings_display_crop_left, crop.left) { value: Int -> crop.copy(left = value) },
+                            Triple(R.string.settings_display_crop_top, crop.top) { value: Int -> crop.copy(top = value) },
+                            Triple(R.string.settings_display_crop_right, crop.right) { value: Int -> crop.copy(right = value) },
+                            Triple(R.string.settings_display_crop_bottom, crop.bottom) { value: Int -> crop.copy(bottom = value) }
+                        ).forEach { (titleRes, pixels, update) ->
+                            LiveSliderRow(
+                                title = stringResource(titleRes),
+                                valueLabelForValue = { "$it $pixelsUnit" },
+                                value = pixels.toFloat(),
+                                range = DisplayCrop.MIN_PIXELS.toFloat()..DisplayCrop.MAX_PIXELS.toFloat(),
+                                steps = DisplayCrop.MAX_PIXELS - DisplayCrop.MIN_PIXELS - 1,
+                                onValueChange = { onSetDisplayCrop(update(it.roundToInt())) },
+                                onResetToDefault = { onSetDisplayCrop(update(0)) }
+                            )
+                        }
 
                                     }
 

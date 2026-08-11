@@ -2296,4 +2296,15 @@
     <string name="settings_customization_side_artwork_samurai">شب سامورایی</string>
     <string name="settings_customization_side_artwork_west_coast">غروب ساحل غربی</string>
     <string name="settings_customization_side_artwork_crystal">زیارت بلورین</string>
+    <string name="settings_display_crop">برش لبه‌های صفحه</string>
+    <string name="settings_display_crop_off">خاموش</string>
+    <string name="settings_display_crop_thin">لبه‌های باریک (2 px)</string>
+    <string name="settings_display_crop_safe">لبه‌های امن (4 px)</string>
+    <string name="settings_display_crop_custom">سفارشی</string>
+    <string name="settings_display_crop_left">برش لبه چپ</string>
+    <string name="settings_display_crop_top">برش لبه بالا</string>
+    <string name="settings_display_crop_right">برش لبه راست</string>
+    <string name="settings_display_crop_bottom">برش لبه پایین</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">اوراسکن ناپایدار یا پیکسل‌های خراب را از هر سمت در منبع رندر حذف می‌کند. اگر بازی نیاز ندارد همه سمت‌ها را روی 0 بگذارید؛ برش پیش از مقیاس‌بندی نسبت تصویر اعمال می‌شود.</string>
 </resources>

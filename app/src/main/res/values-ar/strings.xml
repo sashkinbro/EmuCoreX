@@ -2285,4 +2285,15 @@
     <string name="settings_customization_side_artwork_samurai">ليلة الساموراي</string>
     <string name="settings_customization_side_artwork_west_coast">غروب الساحل الغربي</string>
     <string name="settings_customization_side_artwork_crystal">رحلة الكريستال</string>
+    <string name="settings_display_crop">اقتصاص حواف الشاشة</string>
+    <string name="settings_display_crop_off">إيقاف</string>
+    <string name="settings_display_crop_thin">حواف رفيعة (2 px)</string>
+    <string name="settings_display_crop_safe">حواف آمنة (4 px)</string>
+    <string name="settings_display_crop_custom">مخصص</string>
+    <string name="settings_display_crop_left">اقتصاص الحافة اليسرى</string>
+    <string name="settings_display_crop_top">اقتصاص الحافة العلوية</string>
+    <string name="settings_display_crop_right">اقتصاص الحافة اليمنى</string>
+    <string name="settings_display_crop_bottom">اقتصاص الحافة السفلية</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">يزيل تجاوز المسح غير المستقر أو البكسلات التالفة من كل جانب في مصدر التصيير. اترك كل الجوانب على 0 ما لم تحتج اللعبة إليه؛ يُطبق الاقتصاص قبل تحجيم نسبة العرض.</string>
 </resources>

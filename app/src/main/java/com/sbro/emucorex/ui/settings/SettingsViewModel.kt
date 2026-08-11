@@ -29,6 +29,7 @@ import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundPreset
@@ -121,6 +122,7 @@ data class SettingsUiState(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val displayCrop: DisplayCrop = DisplayCrop.None,
     val audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
     val audioFastForwardVolume: Int = AudioDefaults.VOLUME_DEFAULT,
     val audioMuted: Boolean = false,
@@ -399,6 +401,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             renderer = snapshot.renderer,
             upscaleMultiplier = snapshot.upscaleMultiplier,
             aspectRatio = snapshot.aspectRatio,
+            displayCrop = snapshot.displayCrop,
             audioVolume = snapshot.audioVolume,
             audioFastForwardVolume = snapshot.audioFastForwardVolume,
             audioMuted = snapshot.audioMuted,
@@ -1004,6 +1007,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setAspectRatio(value)
             EmulatorBridge.setAspectRatio(value)
+        }
+    }
+
+    fun setDisplayCrop(value: DisplayCrop) {
+        viewModelScope.launch {
+            val crop = value.sanitized()
+            preferences.setDisplayCrop(crop)
+            EmulatorBridge.setDisplayCrop(crop)
         }
     }
 

@@ -2281,4 +2281,15 @@
     <string name="settings_customization_side_artwork_samurai">Notte samurai</string>
     <string name="settings_customization_side_artwork_west_coast">Tramonto sulla costa ovest</string>
     <string name="settings_customization_side_artwork_crystal">Pellegrinaggio di cristallo</string>
+    <string name="settings_display_crop">Ritaglio bordi schermo</string>
+    <string name="settings_display_crop_off">Disattivato</string>
+    <string name="settings_display_crop_thin">Bordi sottili (2 px)</string>
+    <string name="settings_display_crop_safe">Bordi sicuri (4 px)</string>
+    <string name="settings_display_crop_custom">Personalizzato</string>
+    <string name="settings_display_crop_left">Ritaglia bordo sinistro</string>
+    <string name="settings_display_crop_top">Ritaglia bordo superiore</string>
+    <string name="settings_display_crop_right">Ritaglia bordo destro</string>
+    <string name="settings_display_crop_bottom">Ritaglia bordo inferiore</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Rimuove overscan instabile o pixel spuri da ogni lato alla sorgente del renderer. Lascia tutti i lati a 0 se il gioco non ne ha bisogno; il ritaglio precede il ridimensionamento delle proporzioni.</string>
 </resources>

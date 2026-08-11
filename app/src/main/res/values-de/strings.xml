@@ -2283,4 +2283,15 @@
     <string name="settings_customization_side_artwork_samurai">Samurai-Nacht</string>
     <string name="settings_customization_side_artwork_west_coast">Sonnenuntergang an der Westküste</string>
     <string name="settings_customization_side_artwork_crystal">Kristallpilgerreise</string>
+    <string name="settings_display_crop">Bildränder zuschneiden</string>
+    <string name="settings_display_crop_off">Aus</string>
+    <string name="settings_display_crop_thin">Schmale Ränder (2 px)</string>
+    <string name="settings_display_crop_safe">Sichere Ränder (4 px)</string>
+    <string name="settings_display_crop_custom">Benutzerdefiniert</string>
+    <string name="settings_display_crop_left">Linken Rand zuschneiden</string>
+    <string name="settings_display_crop_top">Oberen Rand zuschneiden</string>
+    <string name="settings_display_crop_right">Rechten Rand zuschneiden</string>
+    <string name="settings_display_crop_bottom">Unteren Rand zuschneiden</string>
+    <string name="settings_display_crop_pixels_unit">px</string>
+    <string name="settings_help_display_crop">Entfernt instabiles Overscan oder Störpixel an jeder Seite direkt im Renderer. Alle Seiten auf 0 lassen, wenn ein Spiel dies nicht benötigt; der Zuschnitt erfolgt vor der Seitenverhältnis-Skalierung.</string>
 </resources>
