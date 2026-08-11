@@ -3183,6 +3183,8 @@ private fun CustomizationSettingsTab(
         smallestScreenWidthDp = minOf(windowWidthDp, windowHeightDp),
         gridScale = uiState.homeGridScale
     )
+    val emulationPreviewAspect = maxOf(windowWidthDp, windowHeightDp).toFloat() /
+        minOf(windowWidthDp, windowHeightDp).toFloat()
     val backgroundRepository = remember(context) { HomeBackgroundRepository(context) }
     val sideArtworkRepository = remember(context) { EmulationSideArtworkRepository(context) }
     val backgroundFile = backgroundRepository.existingFile(uiState.homeBackgroundType)
@@ -3436,49 +3438,60 @@ private fun CustomizationSettingsTab(
     }
 
     SettingsSection(title = stringResource(R.string.settings_customization_side_artwork_section)) {
-        Surface(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .aspectRatio(16f / 9f),
-            shape = RoundedCornerShape(18.dp),
-            color = Color.Black,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                EmulationSideArtworkOverlay(
-                    artwork = uiState.emulationSideArtwork,
-                    revision = uiState.emulationSideArtworkRevision,
-                    aspectRatioMode = 2,
-                    modifier = Modifier.fillMaxSize(),
-                    preview = true
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(4f / 3f)
-                        .align(Alignment.Center)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_customization_side_artwork_preview),
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 210.dp * emulationPreviewAspect)
+                    .fillMaxWidth()
+                    .aspectRatio(emulationPreviewAspect),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Black,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    EmulationSideArtworkOverlay(
+                        artwork = uiState.emulationSideArtwork,
+                        revision = uiState.emulationSideArtworkRevision,
+                        aspectRatioMode = 2,
+                        modifier = Modifier.fillMaxSize(),
+                        preview = true
                     )
-                }
-                if (uiState.isSideArtworkImporting) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                            .fillMaxHeight()
+                            .aspectRatio(4f / 3f)
+                            .align(Alignment.Center)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        Text(
+                            text = stringResource(R.string.settings_customization_side_artwork_preview),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            textAlign = TextAlign.Center,
+                            color = Color.White.copy(alpha = 0.82f),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    if (uiState.isSideArtworkImporting) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
                 }
             }

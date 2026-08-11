@@ -38,7 +38,7 @@ data class SideArtworkGutters(
 
 /**
  * Calculates conservative side gutters for the renderer's aspect-ratio modes.
- * Auto uses a conservative 16:9 fallback until the renderer reports its exact draw rectangle.
+ * Auto starts at the PS2-standard 4:3 until the renderer reports its exact draw rectangle.
  */
 fun calculateSideArtworkGutters(
     widthPx: Int,
@@ -55,9 +55,9 @@ fun calculateSideArtworkGutters(
         return if (left + right >= 4) SideArtworkGutters(left, right) else SideArtworkGutters(0, 0)
     }
     val contentAspect = when (aspectRatioMode) {
-        // Until the renderer reports its exact Auto rectangle, use the widest possible
-        // auto aspect. This can briefly hide artwork but can never paint over gameplay.
-        1 -> 16f / 9f
+        // Prevent the previous SurfaceView frame from showing edge-to-edge while the new
+        // game starts. The renderer-provided rectangle replaces this as soon as it exists.
+        1 -> 4f / 3f
         2 -> 4f / 3f
         3 -> 16f / 9f
         4 -> 10f / 7f

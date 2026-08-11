@@ -34,8 +34,11 @@ class EmulationSideArtworkTest {
     }
 
     @Test
-    fun `auto fallback never covers a possible widescreen frame`() {
-        assertFalse(calculateSideArtworkGutters(1920, 1080, 1).isVisible)
+    fun `auto starts with four by three until renderer rectangle arrives`() {
+        val gutters = calculateSideArtworkGutters(2400, 1080, 1)
+
+        assertEquals(480, gutters.leftPx)
+        assertEquals(480, gutters.rightPx)
     }
 
     @Test

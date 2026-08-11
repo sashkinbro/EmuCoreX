@@ -862,8 +862,7 @@ fun EmulationScreen(
 
     val nativeDisplayDrawRect by produceState<FloatArray?>(
         initialValue = null,
-        key1 = uiState.isRunning,
-        key2 = uiState.aspectRatio
+        key1 = uiState.isRunning
     ) {
         if (!uiState.isRunning) return@produceState
         while (true) {
@@ -926,6 +925,16 @@ fun EmulationScreen(
                     false
                 }
         )
+
+        // SurfaceView can retain the previous game's final buffer across a fast restart.
+        // Keep it covered until the new renderer publishes its first authoritative draw rect.
+        if (nativeDisplayDrawRect == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+        }
 
         EmulationSideArtworkOverlay(
             artwork = globalDefaults.emulationSideArtwork,

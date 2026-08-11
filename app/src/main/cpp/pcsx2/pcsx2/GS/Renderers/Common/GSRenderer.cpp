@@ -71,7 +71,12 @@ GSRenderer::GSRenderer()
 	s_last_draw_rect = GSVector4::zero();
 }
 
-GSRenderer::~GSRenderer() = default;
+GSRenderer::~GSRenderer()
+{
+	// Android may reuse the same SurfaceView for the next VM. Do not expose the
+	// previous game's geometry while the replacement renderer produces its first frame.
+	s_last_draw_rect = GSVector4::zero();
+}
 
 GSVector4 GSRenderer::GetLastDrawRect()
 {
