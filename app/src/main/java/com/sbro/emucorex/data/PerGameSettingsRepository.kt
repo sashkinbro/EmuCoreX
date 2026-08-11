@@ -71,6 +71,8 @@ data class PerGameSettings(
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
     val texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+    val shaderChainOverrideEnabled: Boolean? = null,
+    val shaderChainPreset: String = "",
     val enableFxaa: Boolean = false,
     val casMode: Int = 0,
     val sgsrMode: Int = 0,
@@ -121,6 +123,27 @@ data class PerGameSettings(
     val providedKeys: Set<String>? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+internal data class ResolvedShaderChain(
+    val enabled: Boolean,
+    val preset: String
+)
+
+internal fun PerGameSettings.resolveShaderChain(
+    globalEnabled: Boolean,
+    globalPreset: String
+): ResolvedShaderChain {
+    val preset = when (shaderChainOverrideEnabled) {
+        null -> globalPreset
+        false -> ""
+        true -> shaderChainPreset
+    }.trim()
+    val requestedEnabled = shaderChainOverrideEnabled ?: globalEnabled
+    return ResolvedShaderChain(
+        enabled = requestedEnabled && preset.isNotEmpty(),
+        preset = preset.takeIf { requestedEnabled }.orEmpty()
+    )
+}
 
 data class TouchControlsLayoutProfile(
     val dpadOffset: Pair<Float, Float> = AppPreferences.DEFAULT_DPAD_OFFSET_X to AppPreferences.DEFAULT_DPAD_OFFSET_Y,
@@ -334,6 +357,12 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         texturePreloading = GsHackDefaults.coerceTexturePreloading(
             optInt("texturePreloading", GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
         ),
+        shaderChainOverrideEnabled = if (has("shaderChainOverrideEnabled")) {
+            optBoolean("shaderChainOverrideEnabled", false)
+        } else {
+            null
+        },
+        shaderChainPreset = optString("shaderChainPreset").trim(),
         enableFxaa = optBoolean("enableFxaa", false),
         casMode = optInt("casMode", 0),
         sgsrMode = optInt("sgsrMode", 0).coerceIn(0, 3),
@@ -483,6 +512,10 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("trilinearFiltering")) put("trilinearFiltering", GsHackDefaults.coerceTrilinearFiltering(trilinearFiltering))
         if (shouldWrite("blendingAccuracy")) put("blendingAccuracy", GsHackDefaults.coerceBlendingAccuracy(blendingAccuracy))
         if (shouldWrite("texturePreloading")) put("texturePreloading", GsHackDefaults.coerceTexturePreloading(texturePreloading))
+        shaderChainOverrideEnabled?.let { overrideEnabled ->
+            put("shaderChainOverrideEnabled", overrideEnabled)
+            put("shaderChainPreset", shaderChainPreset.trim())
+        }
         if (shouldWrite("enableFxaa")) put("enableFxaa", enableFxaa)
         if (shouldWrite("casMode")) put("casMode", casMode)
         if (shouldWrite("sgsrMode")) put("sgsrMode", sgsrMode.coerceIn(0, 3))

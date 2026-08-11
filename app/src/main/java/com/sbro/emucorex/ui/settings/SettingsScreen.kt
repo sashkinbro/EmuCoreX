@@ -5962,21 +5962,23 @@ private fun SliderItem(
 }
 
 @Composable
-private fun ShaderPresetSelector(
+internal fun ShaderPresetSelector(
     title: String,
     presets: List<RetroArchShaderPreset>,
     selectedPath: String,
     onSelect: (String) -> Unit,
-    helpText: String
+    helpText: String,
+    leadingOptions: List<Pair<String, String>> = emptyList()
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val noneLabel = stringResource(R.string.settings_shader_preset_none)
-    val selectedLabel = presets
-        .firstOrNull { it.absolutePath == selectedPath }
-        ?.label
-        ?.substringAfterLast('/')
+    val selectedLabel = leadingOptions.firstOrNull { (path, _) -> path == selectedPath }?.second
+        ?: presets
+            .firstOrNull { it.absolutePath == selectedPath }
+            ?.label
+            ?.substringAfterLast('/')
         ?: noneLabel
 
     SettingsItem(
@@ -5992,8 +5994,9 @@ private fun ShaderPresetSelector(
     )
 
     if (showDialog) {
-        val options = remember(presets, noneLabel, query) {
-            val allOptions = listOf("" to noneLabel) + presets.map { it.absolutePath to it.label }
+        val options = remember(presets, noneLabel, leadingOptions, query) {
+            val allOptions = leadingOptions + listOf("" to noneLabel) +
+                presets.map { it.absolutePath to it.label }
             val normalizedQuery = query.trim()
             if (normalizedQuery.isEmpty()) {
                 allOptions

@@ -41,6 +41,7 @@ import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
+import com.sbro.emucorex.data.resolveShaderChain
 import com.sbro.emucorex.data.TouchControlsLayoutProfile
 import com.sbro.emucorex.data.PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY
 import com.sbro.emucorex.data.saveTouchControlsLayout
@@ -330,6 +331,8 @@ private data class EmulationLaunchConfig(
     val trilinearFiltering: Int,
     val blendingAccuracy: Int,
     val texturePreloading: Int,
+    val shaderChainEnabled: Boolean,
+    val shaderChainPreset: String,
     val enableFxaa: Boolean,
     val casMode: Int,
     val sgsrMode: Int,
@@ -1593,6 +1596,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     trilinearFiltering = config.trilinearFiltering,
                     blendingAccuracy = config.blendingAccuracy,
                     texturePreloading = config.texturePreloading,
+                    shaderChainEnabled = config.shaderChainEnabled,
+                    shaderChainPreset = config.shaderChainPreset,
                     enableFxaa = config.enableFxaa,
                     casMode = config.casMode,
                     sgsrMode = config.sgsrMode,
@@ -3639,6 +3644,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gpuDriverType = existingProfile?.gpuDriverType ?: runtimeProfile.gpuDriverType,
                     customDriverPath = existingProfile?.customDriverPath ?: runtimeProfile.customDriverPath,
                     mediatekAngleOpenGl = existingProfile?.mediatekAngleOpenGl ?: runtimeProfile.mediatekAngleOpenGl,
+                    shaderChainOverrideEnabled = existingProfile?.shaderChainOverrideEnabled,
+                    shaderChainPreset = existingProfile?.shaderChainPreset.orEmpty(),
                     providedKeys = providedKeys
                 )
             )
@@ -3768,6 +3775,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             trilinearFiltering = settings.trilinearFiltering,
             blendingAccuracy = settings.blendingAccuracy,
             texturePreloading = settings.texturePreloading,
+            shaderChainEnabled = settings.shaderChainEnabled,
+            shaderChainPreset = settings.shaderChainPreset,
             enableFxaa = settings.enableFxaa,
             casMode = settings.casMode,
             sgsrMode = settings.sgsrMode,
@@ -3946,6 +3955,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun EmulationLaunchConfig.applyProfile(profile: PerGameSettings?): EmulationLaunchConfig {
         if (profile == null) return this
+        val resolvedShaderChain = profile.resolveShaderChain(
+            globalEnabled = shaderChainEnabled,
+            globalPreset = shaderChainPreset
+        )
         fun <T> pick(key: String, current: T, value: PerGameSettings.() -> T): T {
             val keys = profile.providedKeys
             return if (keys == null || key in keys) profile.value() else current
@@ -3986,6 +3999,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             trilinearFiltering = pick("trilinearFiltering", trilinearFiltering) { trilinearFiltering },
             blendingAccuracy = pick("blendingAccuracy", blendingAccuracy) { blendingAccuracy },
             texturePreloading = pick("texturePreloading", texturePreloading) { texturePreloading },
+            shaderChainEnabled = resolvedShaderChain.enabled,
+            shaderChainPreset = resolvedShaderChain.preset,
             enableFxaa = pick("enableFxaa", enableFxaa) { enableFxaa },
             casMode = pick("casMode", casMode) { casMode },
             sgsrMode = pick("sgsrMode", sgsrMode) { sgsrMode },

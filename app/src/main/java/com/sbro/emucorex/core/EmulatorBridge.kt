@@ -360,6 +360,8 @@ object EmulatorBridge {
         trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
         blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
         texturePreloading: Int = GsHackDefaults.TEXTURE_PRELOADING_DEFAULT,
+        shaderChainEnabled: Boolean = false,
+        shaderChainPreset: String = "",
         enableFxaa: Boolean = false,
         casMode: Int = 0,
         sgsrMode: Int = 0,
@@ -634,6 +636,8 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString()))
                 add(settingOp("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString()))
                 add(settingOp("EmuCore/GS", "texture_preloading", "int", texturePreloading.toString()))
+                add(settingOp("EmuCore/GS", "ShaderChainEnabled", "bool", (shaderChainEnabled && shaderChainPreset.isNotBlank()).toString()))
+                add(settingOp("EmuCore/GS", "ShaderChainPreset", "string", shaderChainPreset.trim()))
                 add(settingOp("EmuCore/GS", "LoadTextureReplacements", "bool", textureReplacementsEnabled.toString()))
                 add(settingOp("EmuCore/GS", "LoadTextureReplacementsAsync", "bool", textureReplacementsAsync.toString()))
                 add(settingOp("EmuCore/GS", "PrecacheTextureReplacements", "bool", textureReplacementsPrecache.toString()))

@@ -112,6 +112,8 @@ import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
+import com.sbro.emucorex.data.RetroArchShaderPreset
+import com.sbro.emucorex.data.RetroArchShaderRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.TouchControlVisualStyle
@@ -141,6 +143,7 @@ private enum class GameSettingsManagerTab {
 }
 
 private val GameSettingsSectionContentPadding = 16.dp
+private const val SHADER_PRESET_USE_GLOBAL = "__emucorex_use_global_shader__"
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -152,6 +155,7 @@ fun PerGameSettingsManagerScreen(
 ) {
     val context = LocalContext.current
     val repository = remember(context) { PerGameSettingsRepository(context) }
+    val shaderRepository = remember(context) { RetroArchShaderRepository(context) }
     val preferences = remember(context) { AppPreferences(context) }
     val libraryCacheRepository = remember(context) { GameLibraryCacheRepository(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
@@ -161,6 +165,7 @@ fun PerGameSettingsManagerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val profileMutationMutex = remember { Mutex() }
     var profiles by remember { mutableStateOf(emptyList<PerGameSettings>()) }
+    var shaderPresets by remember { mutableStateOf(emptyList<RetroArchShaderPreset>()) }
     var libraryGames by remember { mutableStateOf(emptyList<GameItem>()) }
     var selectedGamePath by rememberSaveable { mutableStateOf(initialGamePath) }
     var selectedTab by rememberSaveable { mutableStateOf(GameSettingsManagerTab.Graphics) }
@@ -208,6 +213,12 @@ fun PerGameSettingsManagerScreen(
     LaunchedEffect(repository) {
         profiles = withContext(Dispatchers.IO) {
             repository.getAll()
+        }
+    }
+
+    LaunchedEffect(shaderRepository) {
+        shaderPresets = withContext(Dispatchers.IO) {
+            shaderRepository.listPresets()
         }
     }
 
@@ -502,6 +513,7 @@ fun PerGameSettingsManagerScreen(
                         defaultProfile = defaultProfile,
                         selectedTab = selectedTab,
                         maxUpscaleMultiplier = maxUpscaleMultiplier,
+                        shaderPresets = shaderPresets,
                         onOpenGpuDriverManager = {
                             if (isOpeningGpuDriverManager) return@GameSettingsManagerEditorPanel
                             isOpeningGpuDriverManager = true
@@ -764,6 +776,7 @@ private fun GameSettingsManagerEditorPanel(
     defaultProfile: PerGameSettings,
     selectedTab: GameSettingsManagerTab,
     maxUpscaleMultiplier: Int,
+    shaderPresets: List<RetroArchShaderPreset>,
     onOpenGpuDriverManager: () -> Unit,
     onOpenControlsLayoutEditor: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
@@ -812,6 +825,7 @@ private fun GameSettingsManagerEditorPanel(
             defaultProfile = defaultProfile,
             selectedTab = selectedTab,
             maxUpscaleMultiplier = maxUpscaleMultiplier,
+            shaderPresets = shaderPresets,
             onOpenGpuDriverManager = onOpenGpuDriverManager,
             onDraftChange = onDraftChange
         )
@@ -824,6 +838,7 @@ private fun GameSettingsTabContent(
     defaultProfile: PerGameSettings,
     selectedTab: GameSettingsManagerTab,
     maxUpscaleMultiplier: Int,
+    shaderPresets: List<RetroArchShaderPreset>,
     onOpenGpuDriverManager: () -> Unit,
     onDraftChange: (PerGameSettings) -> Unit
 ) {
@@ -934,6 +949,37 @@ private fun GameSettingsTabContent(
                         onSelected = { onDraftChange(draft.copy(anisotropicFiltering = it)) },
                         helpText = stringResource(R.string.settings_help_anisotropic_filtering),
                         onResetToDefault = { onDraftChange(draft.copy(anisotropicFiltering = defaultProfile.anisotropicFiltering)) }
+                    )
+                    ShaderPresetSelector(
+                        title = stringResource(R.string.settings_shader_preset),
+                        presets = shaderPresets,
+                        selectedPath = when (draft.shaderChainOverrideEnabled) {
+                            null -> SHADER_PRESET_USE_GLOBAL
+                            false -> ""
+                            true -> draft.shaderChainPreset
+                        },
+                        onSelect = { selectedPath ->
+                            onDraftChange(
+                                when (selectedPath) {
+                                    SHADER_PRESET_USE_GLOBAL -> draft.copy(
+                                        shaderChainOverrideEnabled = null,
+                                        shaderChainPreset = ""
+                                    )
+                                    "" -> draft.copy(
+                                        shaderChainOverrideEnabled = false,
+                                        shaderChainPreset = ""
+                                    )
+                                    else -> draft.copy(
+                                        shaderChainOverrideEnabled = true,
+                                        shaderChainPreset = selectedPath
+                                    )
+                                }
+                            )
+                        },
+                        helpText = stringResource(R.string.settings_help_shader_preset),
+                        leadingOptions = listOf(
+                            SHADER_PRESET_USE_GLOBAL to stringResource(R.string.controls_editor_global_scope)
+                        )
                     )
                     ToggleRow(
                         title = stringResource(R.string.settings_fxaa),
@@ -3944,6 +3990,8 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         trilinearFiltering = pick("trilinearFiltering", trilinearFiltering, defaultProfile.trilinearFiltering),
         blendingAccuracy = pick("blendingAccuracy", blendingAccuracy, defaultProfile.blendingAccuracy),
         texturePreloading = pick("texturePreloading", texturePreloading, defaultProfile.texturePreloading),
+        shaderChainOverrideEnabled = shaderChainOverrideEnabled,
+        shaderChainPreset = shaderChainPreset,
         enableFxaa = pick("enableFxaa", enableFxaa, defaultProfile.enableFxaa),
         casMode = pick("casMode", casMode, defaultProfile.casMode),
         sgsrMode = pick("sgsrMode", sgsrMode, defaultProfile.sgsrMode),
