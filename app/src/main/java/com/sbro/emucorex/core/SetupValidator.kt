@@ -8,7 +8,8 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.File
 
 object SetupValidator {
-    private val supportedGameExtensions = setOf("iso", "bin", "img", "mdf", "gz", "cso", "zso", "chd", "elf", "acgame")
+    private val supportedDiscExtensions = setOf("iso", "bin", "img", "mdf", "gz", "cso", "zso", "chd")
+    private val supportedGameExtensions = supportedDiscExtensions + setOf("elf", "acgame")
     private const val MAX_GAME_READ_PROBE_FILES = 24
     private const val MAX_GAME_READ_PROBE_DIRECTORIES = 96
 
@@ -127,6 +128,9 @@ object SetupValidator {
         }
         return if (mimeType == null) DocumentEntryKind.UNKNOWN else DocumentEntryKind.OTHER
     }
+
+    internal fun isSupportedDiscImageName(displayName: String?): Boolean =
+        displayName.orEmpty().substringAfterLast('.', "").lowercase() in supportedDiscExtensions
 
     private fun isLaunchPathReadable(context: Context, rawGamePath: String): Boolean {
         if (rawGamePath.startsWith("content://")) {

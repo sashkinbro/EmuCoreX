@@ -2,9 +2,20 @@ package com.sbro.emucorex.core
 
 import android.provider.DocumentsContract
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SetupValidatorTest {
+
+    @Test
+    fun discSwapAcceptsOnlyMountableDiscImages() {
+        listOf("game.iso", "disc.BIN", "game.img", "game.mdf", "game.gz", "game.cso", "game.zso", "game.chd")
+            .forEach { name -> assertTrue(SetupValidator.isSupportedDiscImageName(name)) }
+
+        listOf("patch.elf", "arcade.acgame", "notes.txt", "disc.iso.zip", null)
+            .forEach { name -> assertFalse(SetupValidator.isSupportedDiscImageName(name)) }
+    }
     @Test
     fun directoryMimeTypeIsRecognizedWithoutDisplayName() {
         assertEquals(

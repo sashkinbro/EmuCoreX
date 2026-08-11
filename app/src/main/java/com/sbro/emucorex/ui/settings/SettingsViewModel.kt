@@ -31,6 +31,7 @@ import com.sbro.emucorex.core.normalizeUpscale
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.HomeBackgroundRepository
+import com.sbro.emucorex.data.HomeBackgroundPreset
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.EmulationSideArtwork
 import com.sbro.emucorex.data.EmulationSideArtworkRepository
@@ -84,6 +85,7 @@ data class SettingsUiState(
     val customFontRevision: Int = 0,
     val homeGridScale: Float = AppPreferences.DEFAULT_HOME_GRID_SCALE,
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
+    val homeBackgroundPreset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
     val homeBackgroundRevision: Int = 0,
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
     val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
@@ -375,6 +377,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             customFontRevision = snapshot.customFontRevision,
             homeGridScale = snapshot.homeGridScale,
             homeBackgroundType = snapshot.homeBackgroundType,
+            homeBackgroundPreset = snapshot.homeBackgroundPreset,
             homeBackgroundRevision = snapshot.homeBackgroundRevision,
             homeBackgroundDim = snapshot.homeBackgroundDim,
             emulationSideArtwork = snapshot.emulationSideArtwork,
@@ -749,6 +752,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 com.sbro.emucorex.R.string.settings_customization_background_failed
             }
         )
+    }
+
+    fun setHomeBackgroundPreset(preset: HomeBackgroundPreset) = viewModelScope.launch {
+        preferences.setHomeBackgroundPreset(preset)
     }
 
     fun clearHomeBackground() = viewModelScope.launch(Dispatchers.IO) {

@@ -2262,4 +2262,18 @@
     <string name="settings_shader_pack_import_desc"> .slangp ve .slang dosyaları içeren bir .zip seçin</string>
     <string name="settings_shader_pack_installed">Gölgelendirici paketi kuruldu</string>
     <string name="settings_shader_pack_failed">Gölgelendirici paketi kurulamadı</string>
+    <string name="emulation_swap_disc">Diski değiştir</string>
+    <string name="emulation_swap_disc_success">Disk başarıyla değiştirildi.</string>
+    <string name="emulation_swap_disc_failed">Disk değiştirilemedi. Önceki disk geri yüklendi.</string>
+    <string name="emulation_swap_disc_invalid">Desteklenen bir PS2 disk kalıbı seçin.</string>
+    <string name="settings_customization_background_presets">Yerleşik arka planlar</string>
+    <string name="settings_customization_background_preset_olympus">Olimpos Cehennemi</string>
+    <string name="settings_customization_background_preset_neon_racing">Neon Yarışı</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Tropik Harabeler</string>
+    <string name="settings_customization_background_preset_colossus_valley">Devler Vadisi</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Orman Sızması</string>
+    <string name="settings_customization_background_preset_gothic_city">Gotik Ay</string>
+    <string name="settings_customization_background_preset_west_coast">Batı Yakası Gün Batımı</string>
+    <string name="settings_customization_background_preset_samurai_night">Samuray Gecesi</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Kristal Yolculuğu</string>
 </resources>

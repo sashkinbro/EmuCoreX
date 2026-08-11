@@ -2276,4 +2276,18 @@
     <string name="settings_shader_pack_import_desc">Pilih .zip berisi file .slangp dan .slang</string>
     <string name="settings_shader_pack_installed">Paket shader terpasang</string>
     <string name="settings_shader_pack_failed">Paket shader tidak dapat dipasang</string>
+    <string name="emulation_swap_disc">Ganti disk</string>
+    <string name="emulation_swap_disc_success">Disk berhasil diganti.</string>
+    <string name="emulation_swap_disc_failed">Disk tidak dapat diganti. Disk sebelumnya telah dipulihkan.</string>
+    <string name="emulation_swap_disc_invalid">Pilih citra disk PS2 yang didukung.</string>
+    <string name="settings_customization_background_presets">Latar belakang bawaan</string>
+    <string name="settings_customization_background_preset_olympus">Neraka Olympus</string>
+    <string name="settings_customization_background_preset_neon_racing">Laju Neon</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Reruntuhan Tropis</string>
+    <string name="settings_customization_background_preset_colossus_valley">Lembah Raksasa</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Infiltrasi Hutan</string>
+    <string name="settings_customization_background_preset_gothic_city">Bulan Gotik</string>
+    <string name="settings_customization_background_preset_west_coast">Senja Pantai Barat</string>
+    <string name="settings_customization_background_preset_samurai_night">Malam Samurai</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Ziarah Kristal</string>
 </resources>

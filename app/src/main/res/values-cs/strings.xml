@@ -2282,5 +2282,19 @@
     <string name="settings_shader_pack_import_desc">Vyberte .zip se soubory .slangp a .slang</string>
     <string name="settings_shader_pack_installed">Balíček shaderů nainstalován</string>
     <string name="settings_shader_pack_failed">Balíček shaderů se nepodařilo nainstalovat</string>
+    <string name="emulation_swap_disc">Vyměnit disk</string>
+    <string name="emulation_swap_disc_success">Disk byl úspěšně vyměněn.</string>
+    <string name="emulation_swap_disc_failed">Disk se nepodařilo vyměnit. Předchozí disk byl obnoven.</string>
+    <string name="emulation_swap_disc_invalid">Vyberte podporovaný obraz disku PS2.</string>
+    <string name="settings_customization_background_presets">Vestavěná pozadí</string>
+    <string name="settings_customization_background_preset_olympus">Peklo Olympu</string>
+    <string name="settings_customization_background_preset_neon_racing">Neonový sprint</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Tropické ruiny</string>
+    <string name="settings_customization_background_preset_colossus_valley">Údolí obrů</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Průnik džunglí</string>
+    <string name="settings_customization_background_preset_gothic_city">Gotický měsíc</string>
+    <string name="settings_customization_background_preset_west_coast">Západ slunce na pobřeží</string>
+    <string name="settings_customization_background_preset_samurai_night">Samurajská noc</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Křišťálová pouť</string>
 </resources>
 

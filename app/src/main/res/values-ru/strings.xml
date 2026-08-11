@@ -2266,4 +2266,18 @@
     <string name="settings_shader_pack_import_desc">Выберите .zip с файлами .slangp и .slang</string>
     <string name="settings_shader_pack_installed">Пакет шейдеров установлен</string>
     <string name="settings_shader_pack_failed">Не удалось установить пакет шейдеров</string>
+    <string name="emulation_swap_disc">Сменить диск</string>
+    <string name="emulation_swap_disc_success">Диск успешно сменён.</string>
+    <string name="emulation_swap_disc_failed">Не удалось сменить диск. Предыдущий диск восстановлен.</string>
+    <string name="emulation_swap_disc_invalid">Выберите поддерживаемый образ диска PS2.</string>
+    <string name="settings_customization_background_presets">Встроенные фоны</string>
+    <string name="settings_customization_background_preset_olympus">Пламя Олимпа</string>
+    <string name="settings_customization_background_preset_neon_racing">Неоновый рывок</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Тропические руины</string>
+    <string name="settings_customization_background_preset_colossus_valley">Долина великанов</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Проникновение в джунгли</string>
+    <string name="settings_customization_background_preset_gothic_city">Готическая луна</string>
+    <string name="settings_customization_background_preset_west_coast">Закат западного побережья</string>
+    <string name="settings_customization_background_preset_samurai_night">Ночь самурая</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Кристальное странствие</string>
 </resources>

@@ -62,7 +62,7 @@ class HomeBackgroundRepository(context: Context) {
         File(backgroundDirectory, "$FILE_NAME.${type.fileExtension}")
 
     fun existingFile(type: HomeBackgroundType): File? =
-        fileFor(type).takeIf { type != HomeBackgroundType.NONE && it.isFile && it.length() > 0L }
+        fileFor(type).takeIf { type.isCustomMedia && it.isFile && it.length() > 0L }
 
     fun installedBackground(): Pair<HomeBackgroundType, File>? =
         listOf(HomeBackgroundType.IMAGE, HomeBackgroundType.GIF, HomeBackgroundType.VIDEO)
@@ -73,7 +73,7 @@ class HomeBackgroundRepository(context: Context) {
         input: InputStream
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            require(type != HomeBackgroundType.NONE) { "Invalid background backup type" }
+            require(type.isCustomMedia) { "Invalid background backup type" }
             backgroundDirectory.mkdirs()
             val temporaryFile = File(backgroundDirectory, "$FILE_NAME.restore.tmp")
             temporaryFile.delete()
@@ -169,7 +169,8 @@ class HomeBackgroundRepository(context: Context) {
                     retriever.release()
                 }
             }
-            HomeBackgroundType.NONE -> error("Unsupported background format")
+            HomeBackgroundType.NONE,
+            HomeBackgroundType.BUILT_IN -> error("Unsupported background format")
         }
     }
 
@@ -179,7 +180,13 @@ class HomeBackgroundRepository(context: Context) {
             HomeBackgroundType.GIF -> "gif"
             HomeBackgroundType.VIDEO -> "video"
             HomeBackgroundType.NONE -> "none"
+            HomeBackgroundType.BUILT_IN -> "built_in"
         }
+
+    private val HomeBackgroundType.isCustomMedia: Boolean
+        get() = this == HomeBackgroundType.IMAGE ||
+            this == HomeBackgroundType.GIF ||
+            this == HomeBackgroundType.VIDEO
 
     private companion object {
         const val DIRECTORY_NAME = "customization"

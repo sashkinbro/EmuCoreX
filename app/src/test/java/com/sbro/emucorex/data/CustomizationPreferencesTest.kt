@@ -21,6 +21,17 @@ class CustomizationPreferencesTest {
         assertEquals(HomeBackgroundType.IMAGE, HomeBackgroundType.fromPreference(1))
         assertEquals(HomeBackgroundType.GIF, HomeBackgroundType.fromPreference(2))
         assertEquals(HomeBackgroundType.VIDEO, HomeBackgroundType.fromPreference(3))
+        assertEquals(HomeBackgroundType.BUILT_IN, HomeBackgroundType.fromPreference(4))
+    }
+
+    @Test
+    fun backgroundPresetFallsBackSafelyAndKeepsStableValues() {
+        assertEquals(HomeBackgroundPreset.OLYMPUS, HomeBackgroundPreset.fromPreference(null))
+        assertEquals(HomeBackgroundPreset.OLYMPUS, HomeBackgroundPreset.fromPreference(99))
+        HomeBackgroundPreset.entries.forEachIndexed { index, preset ->
+            assertEquals(index, preset.preferenceValue)
+            assertEquals(preset, HomeBackgroundPreset.fromPreference(index))
+        }
     }
 
     @Test

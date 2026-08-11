@@ -2261,4 +2261,18 @@
     <string name="settings_shader_pack_import_desc">.slangp 및 .slang 파일이 포함된 .zip 선택</string>
     <string name="settings_shader_pack_installed">셰이더 팩을 설치했습니다</string>
     <string name="settings_shader_pack_failed">셰이더 팩을 설치할 수 없습니다</string>
+    <string name="emulation_swap_disc">디스크 교체</string>
+    <string name="emulation_swap_disc_success">디스크를 성공적으로 교체했습니다.</string>
+    <string name="emulation_swap_disc_failed">디스크를 교체하지 못했습니다. 이전 디스크로 복원했습니다.</string>
+    <string name="emulation_swap_disc_invalid">지원되는 PS2 디스크 이미지를 선택하세요.</string>
+    <string name="settings_customization_background_presets">내장 배경</string>
+    <string name="settings_customization_background_preset_olympus">올림포스의 불길</string>
+    <string name="settings_customization_background_preset_neon_racing">네온 러시</string>
+    <string name="settings_customization_background_preset_tropical_ruins">열대 유적</string>
+    <string name="settings_customization_background_preset_colossus_valley">거인의 계곡</string>
+    <string name="settings_customization_background_preset_stealth_jungle">정글 잠입</string>
+    <string name="settings_customization_background_preset_gothic_city">고딕 문</string>
+    <string name="settings_customization_background_preset_west_coast">서부 해안의 노을</string>
+    <string name="settings_customization_background_preset_samurai_night">사무라이의 밤</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">수정 순례</string>
 </resources>

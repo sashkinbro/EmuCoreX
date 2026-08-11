@@ -2266,4 +2266,18 @@
     <string name="settings_shader_pack_import_desc">اختر ملف .zip يحتوي على ملفات .slangp و.slang</string>
     <string name="settings_shader_pack_installed">تم تثبيت حزمة المظللات</string>
     <string name="settings_shader_pack_failed">تعذر تثبيت حزمة المظللات</string>
+    <string name="emulation_swap_disc">تبديل القرص</string>
+    <string name="emulation_swap_disc_success">تم تبديل القرص بنجاح.</string>
+    <string name="emulation_swap_disc_failed">تعذر تبديل القرص. تمت استعادة القرص السابق.</string>
+    <string name="emulation_swap_disc_invalid">اختر صورة قرص PS2 مدعومة.</string>
+    <string name="settings_customization_background_presets">خلفيات مدمجة</string>
+    <string name="settings_customization_background_preset_olympus">جحيم أوليمبوس</string>
+    <string name="settings_customization_background_preset_neon_racing">اندفاع النيون</string>
+    <string name="settings_customization_background_preset_tropical_ruins">الأطلال الاستوائية</string>
+    <string name="settings_customization_background_preset_colossus_valley">وادي العمالقة</string>
+    <string name="settings_customization_background_preset_stealth_jungle">تسلل الأدغال</string>
+    <string name="settings_customization_background_preset_gothic_city">القمر القوطي</string>
+    <string name="settings_customization_background_preset_west_coast">غروب الساحل الغربي</string>
+    <string name="settings_customization_background_preset_samurai_night">ليلة الساموراي</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">رحلة الكريستال</string>
 </resources>

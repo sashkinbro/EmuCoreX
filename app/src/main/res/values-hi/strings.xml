@@ -2262,4 +2262,18 @@
     <string name="settings_shader_pack_import_desc">.slangp और .slang फ़ाइलों वाला .zip चुनें</string>
     <string name="settings_shader_pack_installed">शेडर पैक इंस्टॉल हो गया</string>
     <string name="settings_shader_pack_failed">शेडर पैक इंस्टॉल नहीं हो सका</string>
+    <string name="emulation_swap_disc">डिस्क बदलें</string>
+    <string name="emulation_swap_disc_success">डिस्क सफलतापूर्वक बदल दी गई।</string>
+    <string name="emulation_swap_disc_failed">डिस्क नहीं बदली जा सकी। पिछली डिस्क पुनर्स्थापित कर दी गई है।</string>
+    <string name="emulation_swap_disc_invalid">समर्थित PS2 डिस्क इमेज चुनें।</string>
+    <string name="settings_customization_background_presets">पहले से शामिल बैकग्राउंड</string>
+    <string name="settings_customization_background_preset_olympus">ओलिंपस की ज्वाला</string>
+    <string name="settings_customization_background_preset_neon_racing">नियॉन रश</string>
+    <string name="settings_customization_background_preset_tropical_ruins">उष्णकटिबंधीय खंडहर</string>
+    <string name="settings_customization_background_preset_colossus_valley">दिग्गजों की घाटी</string>
+    <string name="settings_customization_background_preset_stealth_jungle">जंगल में घुसपैठ</string>
+    <string name="settings_customization_background_preset_gothic_city">गॉथिक चाँद</string>
+    <string name="settings_customization_background_preset_west_coast">पश्चिमी तट का सूर्यास्त</string>
+    <string name="settings_customization_background_preset_samurai_night">समुराई रात</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">क्रिस्टल यात्रा</string>
 </resources>

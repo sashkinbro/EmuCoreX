@@ -7,6 +7,7 @@
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
 #include "pcsx2/Achievements.h"
+#include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Config.h"
 #include "pcsx2/GameList.h"
 #include "pcsx2/R5900.h"
@@ -599,6 +600,42 @@ bool AndroidRuntime::StartVm(std::string path, bool boot_elf, int probe_steps, b
 
 		return startup_state_ == VmStartupState::Succeeded;
 	}
+}
+
+bool AndroidRuntime::ChangeDisc(std::string path)
+{
+	if (path.empty())
+		return false;
+
+	std::lock_guard disc_access_lock(s_disc_access_mutex);
+	{
+		std::lock_guard lock(mutex_);
+		if (!vm_active_)
+			return false;
+		// The caller resumes after the swap. Keeping a single resume authority avoids
+		// racing the Activity lifecycle and the in-game menu's paused state.
+		paused_ = true;
+	}
+
+	// Wake the CPU loop so it drains the blocking task even when it was executing
+	// recompiled guest code when Android delivered the picker result.
+	if (Cpu)
+		Cpu->ExitExecution();
+
+	auto result = std::make_shared<bool>(false);
+	Host::RunOnCPUThread([path, result]() mutable {
+		if (!VMManager::HasValidVM())
+			return;
+		VMManager::SetPaused(true);
+		*result = VMManager::ChangeDisc(CDVD_SourceType::Iso, std::move(path));
+	}, true);
+
+	if (*result)
+	{
+		std::lock_guard lock(mutex_);
+		current_path_ = std::move(path);
+	}
+	return *result;
 }
 
 void AndroidRuntime::Pause()

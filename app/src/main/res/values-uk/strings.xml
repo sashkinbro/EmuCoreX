@@ -2266,4 +2266,18 @@
     <string name="settings_shader_pack_import_desc">Виберіть .zip із файлами .slangp і .slang</string>
     <string name="settings_shader_pack_installed">Пакет шейдерів встановлено</string>
     <string name="settings_shader_pack_failed">Не вдалося встановити пакет шейдерів</string>
+    <string name="emulation_swap_disc">Змінити диск</string>
+    <string name="emulation_swap_disc_success">Диск успішно змінено.</string>
+    <string name="emulation_swap_disc_failed">Не вдалося змінити диск. Попередній диск відновлено.</string>
+    <string name="emulation_swap_disc_invalid">Виберіть підтримуваний образ диска PS2.</string>
+    <string name="settings_customization_background_presets">Вбудовані фони</string>
+    <string name="settings_customization_background_preset_olympus">Полум’я Олімпу</string>
+    <string name="settings_customization_background_preset_neon_racing">Неоновий ривок</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Тропічні руїни</string>
+    <string name="settings_customization_background_preset_colossus_valley">Долина велетнів</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Проникнення в джунглі</string>
+    <string name="settings_customization_background_preset_gothic_city">Готичний місяць</string>
+    <string name="settings_customization_background_preset_west_coast">Західне узбережжя</string>
+    <string name="settings_customization_background_preset_samurai_night">Самурайська ніч</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Кришталева мандрівка</string>
 </resources>

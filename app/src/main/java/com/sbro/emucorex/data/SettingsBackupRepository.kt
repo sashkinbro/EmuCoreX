@@ -56,8 +56,12 @@ class SettingsBackupRepository(
             if (includeSaveStates) {
                 zip.writeFlatDirectory("save-states", saveStatesDir(), ::isQuickSaveState)
             }
-            homeBackgroundRepository.installedBackground()?.let { (type, file) ->
-                zip.writeFileEntry("customization/home-background.${type.backupExtension}", file)
+            val activeBackgroundType = preferences.homeBackgroundType.first()
+            homeBackgroundRepository.existingFile(activeBackgroundType)?.let { file ->
+                zip.writeFileEntry(
+                    "customization/home-background.${activeBackgroundType.backupExtension}",
+                    file
+                )
             }
             customFontRepository.installedFile()?.let { file ->
                 zip.writeFileEntry(CustomFontRepository.BACKUP_ENTRY, file)
@@ -147,7 +151,8 @@ private val HomeBackgroundType.backupExtension: String
         HomeBackgroundType.IMAGE -> "image"
         HomeBackgroundType.GIF -> "gif"
         HomeBackgroundType.VIDEO -> "video"
-        HomeBackgroundType.NONE -> error("Default background has no backup file")
+        HomeBackgroundType.NONE,
+        HomeBackgroundType.BUILT_IN -> error("Bundled background has no backup file")
     }
 
 private fun String.toBackgroundBackupType(): HomeBackgroundType? = when (this) {

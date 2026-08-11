@@ -372,6 +372,7 @@ fun HomeScreen(
                 HomeBackgroundMedia(
                     type = uiState.homeBackgroundType,
                     file = homeBackgroundRepository.existingFile(uiState.homeBackgroundType),
+                    preset = uiState.homeBackgroundPreset,
                     revision = uiState.homeBackgroundRevision,
                     modifier = Modifier.fillMaxSize()
                 )

@@ -2261,4 +2261,18 @@
     <string name="settings_shader_pack_import_desc">.slangpと.slangを含む.zipを選択</string>
     <string name="settings_shader_pack_installed">シェーダーパックをインストールしました</string>
     <string name="settings_shader_pack_failed">シェーダーパックをインストールできませんでした</string>
+    <string name="emulation_swap_disc">ディスクを交換</string>
+    <string name="emulation_swap_disc_success">ディスクを交換しました。</string>
+    <string name="emulation_swap_disc_failed">ディスクを交換できませんでした。以前のディスクに戻しました。</string>
+    <string name="emulation_swap_disc_invalid">対応しているPS2ディスクイメージを選択してください。</string>
+    <string name="settings_customization_background_presets">内蔵背景</string>
+    <string name="settings_customization_background_preset_olympus">オリンポスの業火</string>
+    <string name="settings_customization_background_preset_neon_racing">ネオンラッシュ</string>
+    <string name="settings_customization_background_preset_tropical_ruins">熱帯の遺跡</string>
+    <string name="settings_customization_background_preset_colossus_valley">巨人の谷</string>
+    <string name="settings_customization_background_preset_stealth_jungle">ジャングル潜入</string>
+    <string name="settings_customization_background_preset_gothic_city">ゴシックムーン</string>
+    <string name="settings_customization_background_preset_west_coast">西海岸の夕暮れ</string>
+    <string name="settings_customization_background_preset_samurai_night">侍の夜</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">水晶の巡礼</string>
 </resources>

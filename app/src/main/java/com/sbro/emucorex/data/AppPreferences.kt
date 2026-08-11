@@ -66,6 +66,7 @@ data class SettingsSnapshot(
     val customFontRevision: Int = 0,
     val homeGridScale: Float = AppPreferences.DEFAULT_HOME_GRID_SCALE,
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
+    val homeBackgroundPreset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
     val homeBackgroundRevision: Int = 0,
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
     val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
@@ -444,6 +445,7 @@ class AppPreferences(private val context: Context) {
         private val CUSTOM_FONT_REVISION = intPreferencesKey("custom_font_revision")
         private val HOME_GRID_SCALE = floatPreferencesKey("home_grid_scale")
         private val HOME_BACKGROUND_TYPE = intPreferencesKey("home_background_type")
+        private val HOME_BACKGROUND_PRESET = intPreferencesKey("home_background_preset")
         private val HOME_BACKGROUND_REVISION = intPreferencesKey("home_background_revision")
         private val HOME_BACKGROUND_DIM = intPreferencesKey("home_background_dim")
         private val EMULATION_SIDE_ARTWORK = intPreferencesKey("emulation_side_artwork")
@@ -757,6 +759,10 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> HomeBackgroundType.fromPreference(prefs[HOME_BACKGROUND_TYPE]) }
         .distinctUntilChanged()
 
+    val homeBackgroundPreset: Flow<HomeBackgroundPreset> = context.dataStore.data
+        .map { prefs -> HomeBackgroundPreset.fromPreference(prefs[HOME_BACKGROUND_PRESET]) }
+        .distinctUntilChanged()
+
     val homeBackgroundRevision: Flow<Int> = context.dataStore.data
         .map { prefs -> (prefs[HOME_BACKGROUND_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
@@ -917,6 +923,14 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs[HOME_BACKGROUND_TYPE] = type.preferenceValue
             // A separate revision makes replacing a file with the same type/path observable.
+            prefs[HOME_BACKGROUND_REVISION] = (prefs[HOME_BACKGROUND_REVISION] ?: 0) + 1
+        }
+    }
+
+    suspend fun setHomeBackgroundPreset(preset: HomeBackgroundPreset) {
+        context.dataStore.edit { prefs ->
+            prefs[HOME_BACKGROUND_PRESET] = preset.preferenceValue
+            prefs[HOME_BACKGROUND_TYPE] = HomeBackgroundType.BUILT_IN.preferenceValue
             prefs[HOME_BACKGROUND_REVISION] = (prefs[HOME_BACKGROUND_REVISION] ?: 0) + 1
         }
     }
@@ -1509,6 +1523,7 @@ class AppPreferences(private val context: Context) {
                 homeGridScale = (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE)
                     .coerceIn(MIN_HOME_GRID_SCALE, MAX_HOME_GRID_SCALE),
                 homeBackgroundType = HomeBackgroundType.fromPreference(prefs[HOME_BACKGROUND_TYPE]),
+                homeBackgroundPreset = HomeBackgroundPreset.fromPreference(prefs[HOME_BACKGROUND_PRESET]),
                 homeBackgroundRevision = (prefs[HOME_BACKGROUND_REVISION] ?: 0).coerceAtLeast(0),
                 homeBackgroundDim = (prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM)
                     .coerceIn(0, 85),
@@ -3425,6 +3440,7 @@ class AppPreferences(private val context: Context) {
             put("homeGridScale", (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE).toDouble())
             put("homeBackgroundDim", prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM)
             put("homeBackgroundType", prefs[HOME_BACKGROUND_TYPE] ?: HomeBackgroundType.NONE.preferenceValue)
+            put("homeBackgroundPreset", prefs[HOME_BACKGROUND_PRESET] ?: HomeBackgroundPreset.OLYMPUS.preferenceValue)
             put("touchControlVisualStyle", prefs[TOUCH_CONTROL_VISUAL_STYLE] ?: TouchControlVisualStyle.CLASSIC.preferenceValue)
             put("touchControlPressEffect", prefs[TOUCH_CONTROL_PRESS_EFFECT] ?: TouchControlPressEffect.GROW.preferenceValue)
             put("gameMenuLayoutStyle", prefs[GAME_MENU_LAYOUT_STYLE] ?: GameMenuLayoutStyle.SIDEBAR.preferenceValue)
@@ -3697,6 +3713,9 @@ class AppPreferences(private val context: Context) {
                 .coerceIn(0, 85)
             prefs[HOME_BACKGROUND_TYPE] = HomeBackgroundType.fromPreference(
                 json.optInt("homeBackgroundType", HomeBackgroundType.NONE.preferenceValue)
+            ).preferenceValue
+            prefs[HOME_BACKGROUND_PRESET] = HomeBackgroundPreset.fromPreference(
+                json.optInt("homeBackgroundPreset", HomeBackgroundPreset.OLYMPUS.preferenceValue)
             ).preferenceValue
             prefs[TOUCH_CONTROL_VISUAL_STYLE] = TouchControlVisualStyle.fromPreference(
                 json.optInt("touchControlVisualStyle", TouchControlVisualStyle.CLASSIC.preferenceValue)

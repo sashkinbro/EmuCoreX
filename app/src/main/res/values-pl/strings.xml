@@ -2284,6 +2284,20 @@
     <string name="settings_shader_pack_import_desc">Wybierz .zip z plikami .slangp i .slang</string>
     <string name="settings_shader_pack_installed">Pakiet shaderów zainstalowany</string>
     <string name="settings_shader_pack_failed">Nie udało się zainstalować pakietu shaderów</string>
+    <string name="emulation_swap_disc">Zmień płytę</string>
+    <string name="emulation_swap_disc_success">Płyta została zmieniona.</string>
+    <string name="emulation_swap_disc_failed">Nie udało się zmienić płyty. Przywrócono poprzednią płytę.</string>
+    <string name="emulation_swap_disc_invalid">Wybierz obsługiwany obraz płyty PS2.</string>
+    <string name="settings_customization_background_presets">Wbudowane tła</string>
+    <string name="settings_customization_background_preset_olympus">Piekło Olimpu</string>
+    <string name="settings_customization_background_preset_neon_racing">Neonowy pęd</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Tropikalne ruiny</string>
+    <string name="settings_customization_background_preset_colossus_valley">Dolina olbrzymów</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Infiltracja dżungli</string>
+    <string name="settings_customization_background_preset_gothic_city">Gotycki księżyc</string>
+    <string name="settings_customization_background_preset_west_coast">Zachód słońca na zachodnim wybrzeżu</string>
+    <string name="settings_customization_background_preset_samurai_night">Noc samuraja</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Kryształowa pielgrzymka</string>
 </resources>
 
 

@@ -181,6 +181,7 @@ import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.HomeBackgroundRepository
+import com.sbro.emucorex.data.HomeBackgroundPreset
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.EmulationSideArtwork
 import com.sbro.emucorex.data.EmulationSideArtworkRepository
@@ -3094,6 +3095,21 @@ private fun SettingsContent(
 }
 
 @Composable
+private fun homeBackgroundPresetLabel(preset: HomeBackgroundPreset): String = stringResource(
+    when (preset) {
+        HomeBackgroundPreset.OLYMPUS -> R.string.settings_customization_background_preset_olympus
+        HomeBackgroundPreset.NEON_RACING -> R.string.settings_customization_background_preset_neon_racing
+        HomeBackgroundPreset.TROPICAL_RUINS -> R.string.settings_customization_background_preset_tropical_ruins
+        HomeBackgroundPreset.COLOSSUS_VALLEY -> R.string.settings_customization_background_preset_colossus_valley
+        HomeBackgroundPreset.STEALTH_JUNGLE -> R.string.settings_customization_background_preset_stealth_jungle
+        HomeBackgroundPreset.GOTHIC_CITY -> R.string.settings_customization_background_preset_gothic_city
+        HomeBackgroundPreset.WEST_COAST -> R.string.settings_customization_background_preset_west_coast
+        HomeBackgroundPreset.SAMURAI_NIGHT -> R.string.settings_customization_background_preset_samurai_night
+        HomeBackgroundPreset.CRYSTAL_PILGRIMAGE -> R.string.settings_customization_background_preset_crystal_pilgrimage
+    }
+)
+
+@Composable
 private fun CustomizationSettingsTab(
     uiState: SettingsUiState,
     onPickBackground: () -> Unit,
@@ -3121,6 +3137,7 @@ private fun CustomizationSettingsTab(
         HomeBackgroundType.IMAGE -> stringResource(R.string.settings_customization_background_image)
         HomeBackgroundType.GIF -> stringResource(R.string.settings_customization_background_gif)
         HomeBackgroundType.VIDEO -> stringResource(R.string.settings_customization_background_video)
+        HomeBackgroundType.BUILT_IN -> homeBackgroundPresetLabel(uiState.homeBackgroundPreset)
     }
     val hasCustomSideArtwork = sideArtworkRepository.existingCustomFile() != null
     val sideArtworkOptions = listOf(
@@ -3149,6 +3166,7 @@ private fun CustomizationSettingsTab(
                 HomeBackgroundMedia(
                     type = uiState.homeBackgroundType,
                     file = backgroundFile,
+                    preset = uiState.homeBackgroundPreset,
                     revision = uiState.homeBackgroundRevision,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -3270,6 +3288,64 @@ private fun CustomizationSettingsTab(
     }
 
     SettingsSection(title = stringResource(R.string.settings_customization_background_section)) {
+        Text(
+            text = stringResource(R.string.settings_customization_background_presets),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(HomeBackgroundPreset.entries, key = { it.preferenceValue }) { preset ->
+                val selected = uiState.homeBackgroundType == HomeBackgroundType.BUILT_IN &&
+                    uiState.homeBackgroundPreset == preset
+                Surface(
+                    modifier = Modifier
+                        .width(156.dp)
+                        .aspectRatio(16f / 9f)
+                        .clickable { viewModel.setHomeBackgroundPreset(preset) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant
+                    )
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        HomeBackgroundMedia(
+                            type = HomeBackgroundType.BUILT_IN,
+                            file = null,
+                            preset = preset,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.35f to Color.Transparent,
+                                        1f to Color.Black.copy(alpha = 0.82f)
+                                    )
+                                )
+                        )
+                        Text(
+                            text = homeBackgroundPresetLabel(preset),
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
         SettingsItem(
             icon = Icons.Rounded.Wallpaper,
             label = stringResource(R.string.settings_customization_background),

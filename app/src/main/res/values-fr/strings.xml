@@ -2264,4 +2264,18 @@
     <string name="settings_shader_pack_import_desc">Choisissez un .zip contenant des fichiers .slangp et .slang</string>
     <string name="settings_shader_pack_installed">Pack de shaders installé</string>
     <string name="settings_shader_pack_failed">Impossible d’installer le pack de shaders</string>
+    <string name="emulation_swap_disc">Changer de disque</string>
+    <string name="emulation_swap_disc_success">Le disque a été changé.</string>
+    <string name="emulation_swap_disc_failed">Impossible de changer le disque. Le disque précédent a été restauré.</string>
+    <string name="emulation_swap_disc_invalid">Sélectionnez une image de disque PS2 prise en charge.</string>
+    <string name="settings_customization_background_presets">Arrière-plans intégrés</string>
+    <string name="settings_customization_background_preset_olympus">Enfer de l’Olympe</string>
+    <string name="settings_customization_background_preset_neon_racing">Ruée néon</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Ruines tropicales</string>
+    <string name="settings_customization_background_preset_colossus_valley">Vallée des géants</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Infiltration dans la jungle</string>
+    <string name="settings_customization_background_preset_gothic_city">Lune gothique</string>
+    <string name="settings_customization_background_preset_west_coast">Crépuscule de la côte ouest</string>
+    <string name="settings_customization_background_preset_samurai_night">Nuit samouraï</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Pèlerinage de cristal</string>
 </resources>

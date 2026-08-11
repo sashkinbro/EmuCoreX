@@ -149,6 +149,8 @@ object NativeApp {
     @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int)
     @JvmStatic external fun onNativeSurfaceDestroyed()
     @JvmStatic external fun runVMThread(path: String): Boolean
+    /** Hot-swaps the mounted image on the CPU thread and leaves the VM paused for the caller to resume. */
+    @JvmStatic external fun changeDisc(path: String): Boolean
     @JvmStatic external fun runBootSmokeProbe(path: String, steps: Int): Int
     @JvmStatic external fun runJitExecutableMemorySmokeTest(): Boolean
     @JvmStatic external fun runEeFpuDivRoundingSelfTest(): String

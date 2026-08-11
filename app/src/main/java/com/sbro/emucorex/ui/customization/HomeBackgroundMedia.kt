@@ -7,6 +7,9 @@ import android.os.PowerManager
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.VideoView
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -14,11 +17,16 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.sbro.emucorex.R
+import com.sbro.emucorex.data.HomeBackgroundPreset
 import com.sbro.emucorex.data.HomeBackgroundType
 import java.io.File
 import kotlin.math.max
@@ -27,19 +35,59 @@ import kotlin.math.max
 fun HomeBackgroundMedia(
     type: HomeBackgroundType,
     file: File?,
+    preset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
     modifier: Modifier = Modifier,
     revision: Int = 0
 ) {
+    if (type == HomeBackgroundType.BUILT_IN) {
+        BoxWithConstraints(modifier = modifier) {
+            Image(
+                painter = painterResource(preset.drawableResource),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = if (maxHeight > maxWidth) preset.portraitFocus else Alignment.Center,
+                modifier = Modifier.matchParentSize()
+            )
+        }
+        return
+    }
     if (file == null || !file.isFile) return
     key(type, file.absolutePath, file.lastModified(), file.length(), revision) {
         when (type) {
             HomeBackgroundType.IMAGE,
             HomeBackgroundType.GIF -> ImageBackground(file = file, modifier = modifier)
             HomeBackgroundType.VIDEO -> VideoBackground(file = file, modifier = modifier)
-            HomeBackgroundType.NONE -> Unit
+            HomeBackgroundType.NONE,
+            HomeBackgroundType.BUILT_IN -> Unit
         }
     }
 }
+
+val HomeBackgroundPreset.drawableResource: Int
+    @DrawableRes get() = when (this) {
+        HomeBackgroundPreset.OLYMPUS -> R.drawable.home_background_olympus
+        HomeBackgroundPreset.NEON_RACING -> R.drawable.home_background_neon_racing
+        HomeBackgroundPreset.TROPICAL_RUINS -> R.drawable.home_background_tropical_ruins
+        HomeBackgroundPreset.COLOSSUS_VALLEY -> R.drawable.home_background_colossus_valley
+        HomeBackgroundPreset.STEALTH_JUNGLE -> R.drawable.home_background_stealth_jungle
+        HomeBackgroundPreset.GOTHIC_CITY -> R.drawable.home_background_gothic_city
+        HomeBackgroundPreset.WEST_COAST -> R.drawable.home_background_west_coast
+        HomeBackgroundPreset.SAMURAI_NIGHT -> R.drawable.home_background_samurai_night
+        HomeBackgroundPreset.CRYSTAL_PILGRIMAGE -> R.drawable.home_background_crystal_pilgrimage
+    }
+
+private val HomeBackgroundPreset.portraitFocus: Alignment
+    get() = when (this) {
+        HomeBackgroundPreset.OLYMPUS,
+        HomeBackgroundPreset.GOTHIC_CITY,
+        HomeBackgroundPreset.WEST_COAST,
+        HomeBackgroundPreset.SAMURAI_NIGHT -> Alignment.CenterStart
+        HomeBackgroundPreset.NEON_RACING,
+        HomeBackgroundPreset.TROPICAL_RUINS,
+        HomeBackgroundPreset.COLOSSUS_VALLEY,
+        HomeBackgroundPreset.STEALTH_JUNGLE,
+        HomeBackgroundPreset.CRYSTAL_PILGRIMAGE -> Alignment.CenterEnd
+    }
 
 @Composable
 private fun ImageBackground(file: File, modifier: Modifier) {

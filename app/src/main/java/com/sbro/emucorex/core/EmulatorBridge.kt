@@ -1112,6 +1112,23 @@ object EmulatorBridge {
         }
     }
 
+    /**
+     * Replaces the mounted PS2 disc without restarting the VM. Native code performs
+     * the CDVD mutation on the CPU thread and restores the previous image on failure.
+     */
+    suspend fun changeDisc(path: String): Boolean {
+        if (!isNativeLoaded || !isVmActive || path.isBlank()) return false
+        return runSerial {
+            try {
+                NativeApp.logCrashBreadcrumb("disc swap requested pathType=${path.substringBefore(':', "file")}")
+                NativeApp.changeDisc(path)
+            } catch (error: Exception) {
+                Log.e(TAG, "Disc swap failed", error)
+                false
+            }
+        }
+    }
+
     suspend fun setRenderer(gpuType: Int) {
         val resolvedRenderer = normalizeRenderer(gpuType)
         settingsCache["EmuCore/GS:Renderer"] = resolvedRenderer.toString()

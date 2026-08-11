@@ -1,6 +1,8 @@
 package com.sbro.emucorex.ui.emulation
 
 import android.app.Application
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -14,6 +16,7 @@ import com.sbro.emucorex.core.BiosValidator
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.RendererDefaults
+import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverManager
@@ -2086,6 +2089,64 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
         } else {
             closeMenu()
+        }
+    }
+
+    fun swapDisc(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = getApplication<Application>()
+            val displayName = DocumentPathResolver.getDisplayName(context, uri.toString())
+            val readable = runCatching {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { descriptor ->
+                    descriptor.statSize != 0L
+                } ?: false
+            }.getOrDefault(false)
+
+            if (!SetupValidator.isSupportedDiscImageName(displayName) || !readable) {
+                _uiState.value = _uiState.value.copy(toastMessage = "disc_swap_invalid")
+                delay(2500.milliseconds)
+                if (_uiState.value.toastMessage == "disc_swap_invalid") {
+                    _uiState.value = _uiState.value.copy(toastMessage = null)
+                }
+                return@launch
+            }
+
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isActionInProgress = true,
+                actionLabel = "swapping_disc"
+            )
+            val success = lifecycleMutex.withLock {
+                if (isShuttingDown || !_uiState.value.isRunning) {
+                    false
+                } else {
+                    EmulatorBridge.changeDisc(uri.toString())
+                }
+            }
+
+            // VMManager restores the old image when opening the selected image fails.
+            // Either way the tray cycle must continue, so close the menu and resume.
+            runCatching { EmulatorBridge.resume() }
+            pausedForBackground = false
+            _uiState.value = _uiState.value.copy(
+                isPaused = false,
+                showMenu = false,
+                isActionInProgress = false,
+                actionLabel = null,
+                toastMessage = if (success) "disc_swap_success" else "disc_swap_failed"
+            )
+            updateCrashContext(launchState = "running")
+            delay(3000.milliseconds)
+            val expectedToast = if (success) "disc_swap_success" else "disc_swap_failed"
+            if (_uiState.value.toastMessage == expectedToast) {
+                _uiState.value = _uiState.value.copy(toastMessage = null)
+            }
         }
     }
 

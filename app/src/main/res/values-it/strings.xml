@@ -2262,4 +2262,18 @@
     <string name="settings_shader_pack_import_desc">Scegli un .zip con file .slangp e .slang</string>
     <string name="settings_shader_pack_installed">Pacchetto shader installato</string>
     <string name="settings_shader_pack_failed">Impossibile installare il pacchetto shader</string>
+    <string name="emulation_swap_disc">Cambia disco</string>
+    <string name="emulation_swap_disc_success">Disco cambiato correttamente.</string>
+    <string name="emulation_swap_disc_failed">Impossibile cambiare il disco. È stato ripristinato il disco precedente.</string>
+    <string name="emulation_swap_disc_invalid">Seleziona un\'immagine disco PS2 supportata.</string>
+    <string name="settings_customization_background_presets">Sfondi inclusi</string>
+    <string name="settings_customization_background_preset_olympus">Inferno dell’Olimpo</string>
+    <string name="settings_customization_background_preset_neon_racing">Corsa al neon</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Rovine tropicali</string>
+    <string name="settings_customization_background_preset_colossus_valley">Valle dei giganti</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Infiltrazione nella giungla</string>
+    <string name="settings_customization_background_preset_gothic_city">Luna gotica</string>
+    <string name="settings_customization_background_preset_west_coast">Tramonto sulla costa ovest</string>
+    <string name="settings_customization_background_preset_samurai_night">Notte samurai</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Pellegrinaggio di cristallo</string>
 </resources>

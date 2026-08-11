@@ -16,11 +16,30 @@ enum class HomeBackgroundType(val preferenceValue: Int) {
     NONE(0),
     IMAGE(1),
     GIF(2),
-    VIDEO(3);
+    VIDEO(3),
+    BUILT_IN(4);
 
     companion object {
         fun fromPreference(value: Int?): HomeBackgroundType =
             entries.firstOrNull { it.preferenceValue == value } ?: NONE
+    }
+}
+
+/** Bundled artwork choices. Values are persisted, so append new entries instead of reordering. */
+enum class HomeBackgroundPreset(val preferenceValue: Int) {
+    OLYMPUS(0),
+    NEON_RACING(1),
+    TROPICAL_RUINS(2),
+    COLOSSUS_VALLEY(3),
+    STEALTH_JUNGLE(4),
+    GOTHIC_CITY(5),
+    WEST_COAST(6),
+    SAMURAI_NIGHT(7),
+    CRYSTAL_PILGRIMAGE(8);
+
+    companion object {
+        fun fromPreference(value: Int?): HomeBackgroundPreset =
+            entries.firstOrNull { it.preferenceValue == value } ?: OLYMPUS
     }
 }
 

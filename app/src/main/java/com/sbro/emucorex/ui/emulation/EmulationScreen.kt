@@ -8,6 +8,8 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -60,6 +62,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.LockOpen
@@ -206,6 +209,14 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
+
+private val DISC_SWAP_MIME_TYPES = arrayOf(
+    "application/octet-stream",
+    "application/x-iso9660-image",
+    "application/x-cd-image",
+    "application/x-chd",
+    "application/gzip"
+)
 
 private object PadKey {
     const val UP = 19
@@ -416,6 +427,11 @@ fun EmulationScreen(
     }
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val scope = rememberCoroutineScope()
+    val swapDiscPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let(viewModel::swapDisc)
+    }
     val rootCutoutPadding = WindowInsets.displayCutout.asPaddingValues()
     val rootNavPadding = WindowInsets.navigationBars.asPaddingValues()
     val overlayLeftSafeInset = maxOf(
@@ -999,6 +1015,7 @@ fun EmulationScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 48.dp, start = overlayHorizontalSafeInset, end = overlayHorizontalSafeInset)
+                .zIndex(40f)
         ) {
             val message = when (uiState.toastMessage) {
                 "saved" -> stringResource(R.string.emulation_saved)
@@ -1008,6 +1025,9 @@ fun EmulationScreen(
                 "bios_missing" -> stringResource(R.string.emulation_bios_missing)
                 "launch_failed" -> stringResource(R.string.emulation_launch_failed)
                 "launch_path_error" -> stringResource(R.string.emulation_launch_path_error)
+                "disc_swap_success" -> stringResource(R.string.emulation_swap_disc_success)
+                "disc_swap_failed" -> stringResource(R.string.emulation_swap_disc_failed)
+                "disc_swap_invalid" -> stringResource(R.string.emulation_swap_disc_invalid)
                 else -> ""
             }
             Box(
@@ -1309,6 +1329,7 @@ fun EmulationScreen(
                     overlayDefaults = overlayDefaults,
                     onClose = toggleMenuClick,
                     onPauseToggle = togglePauseClick,
+                    onSwapDisc = { swapDiscPicker.launch(DISC_SWAP_MIME_TYPES) },
                     onQuickSave = requestQuickSaveClick,
                     onQuickLoad = requestQuickLoadClick,
                     onLoadAutoSave = requestAutoSaveLoadClick,
@@ -2601,6 +2622,7 @@ private fun EmulationSidebarMenu(
     overlayDefaults: OverlayLayoutSnapshot,
     onClose: () -> Unit,
     onPauseToggle: () -> Unit,
+    onSwapDisc: () -> Unit,
     onQuickSave: () -> Unit,
     onQuickLoad: () -> Unit,
     onLoadAutoSave: () -> Unit,
@@ -2857,6 +2879,15 @@ private fun EmulationSidebarMenu(
                                 )
                             }
                         }
+
+                        MenuButton(
+                            icon = Icons.Rounded.Album,
+                            text = stringResource(R.string.emulation_swap_disc),
+                            onClick = onSwapDisc,
+                            enabled = !uiState.isActionInProgress,
+                            showProgress = uiState.actionLabel == "swapping_disc",
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
+                        )
 
                         val visibleSessionSections = gameMenuSectionsForTab(
                             GameMenuTabId.SESSION,

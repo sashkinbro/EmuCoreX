@@ -14,6 +14,7 @@ import com.sbro.emucorex.core.ProPurchaseTier
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.HomeBackgroundRepository
+import com.sbro.emucorex.data.HomeBackgroundPreset
 import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.CoverArtRepository
 import com.sbro.emucorex.data.CustomGameCoverRepository
@@ -69,6 +70,7 @@ data class HomeUiState(
     val showHomeSearch: Boolean = false,
     val homeGridScale: Float = AppPreferences.DEFAULT_HOME_GRID_SCALE,
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
+    val homeBackgroundPreset: HomeBackgroundPreset = HomeBackgroundPreset.OLYMPUS,
     val homeBackgroundRevision: Int = 0,
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
     val searchQuery: String = "",
@@ -137,12 +139,20 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             preferences.homeBackgroundType.collect { type ->
-                val availableType = if (homeBackgroundRepository.existingFile(type) != null) {
+                val availableType = if (
+                    type == HomeBackgroundType.BUILT_IN ||
+                    homeBackgroundRepository.existingFile(type) != null
+                ) {
                     type
                 } else {
                     HomeBackgroundType.NONE
                 }
                 _uiState.value = _uiState.value.copy(homeBackgroundType = availableType)
+            }
+        }
+        viewModelScope.launch {
+            preferences.homeBackgroundPreset.collect { preset ->
+                _uiState.value = _uiState.value.copy(homeBackgroundPreset = preset)
             }
         }
         viewModelScope.launch {

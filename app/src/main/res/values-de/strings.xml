@@ -2264,4 +2264,18 @@
     <string name="settings_shader_pack_import_desc">Wähle eine .zip-Datei mit .slangp- und .slang-Dateien</string>
     <string name="settings_shader_pack_installed">Shader-Paket installiert</string>
     <string name="settings_shader_pack_failed">Shader-Paket konnte nicht installiert werden</string>
+    <string name="emulation_swap_disc">Disc wechseln</string>
+    <string name="emulation_swap_disc_success">Disc wurde erfolgreich gewechselt.</string>
+    <string name="emulation_swap_disc_failed">Der Disc konnte nicht gewechselt werden. Der vorherige Disc wurde wiederhergestellt.</string>
+    <string name="emulation_swap_disc_invalid">Wähle ein unterstütztes PS2-Disc-Abbild.</string>
+    <string name="settings_customization_background_presets">Integrierte Hintergründe</string>
+    <string name="settings_customization_background_preset_olympus">Olymp-Inferno</string>
+    <string name="settings_customization_background_preset_neon_racing">Neon-Rausch</string>
+    <string name="settings_customization_background_preset_tropical_ruins">Tropische Ruinen</string>
+    <string name="settings_customization_background_preset_colossus_valley">Tal der Riesen</string>
+    <string name="settings_customization_background_preset_stealth_jungle">Dschungel-Infiltration</string>
+    <string name="settings_customization_background_preset_gothic_city">Gotischer Mond</string>
+    <string name="settings_customization_background_preset_west_coast">Sonnenuntergang an der Westküste</string>
+    <string name="settings_customization_background_preset_samurai_night">Samurai-Nacht</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">Kristallpilgerreise</string>
 </resources>

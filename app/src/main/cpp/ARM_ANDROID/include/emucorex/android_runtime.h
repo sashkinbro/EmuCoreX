@@ -48,6 +48,7 @@ public:
 	bool GetNativeSurface(void** window, int* width, int* height) const;
 
 	bool StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx = false);
+	bool ChangeDisc(std::string path);
 	void Pause();
 	void Resume();
 	void Shutdown();

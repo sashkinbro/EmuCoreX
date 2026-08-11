@@ -2277,4 +2277,18 @@
     <string name="settings_shader_pack_import_desc">یک .zip دارای فایل‌های .slangp و .slang انتخاب کنید</string>
     <string name="settings_shader_pack_installed">بسته سایه‌زن نصب شد</string>
     <string name="settings_shader_pack_failed">نصب بسته سایه‌زن انجام نشد</string>
+    <string name="emulation_swap_disc">تعویض دیسک</string>
+    <string name="emulation_swap_disc_success">دیسک با موفقیت تعویض شد.</string>
+    <string name="emulation_swap_disc_failed">تعویض دیسک انجام نشد. دیسک قبلی بازیابی شد.</string>
+    <string name="emulation_swap_disc_invalid">یک تصویر دیسک پشتیبانی‌شده PS2 انتخاب کنید.</string>
+    <string name="settings_customization_background_presets">پس‌زمینه‌های داخلی</string>
+    <string name="settings_customization_background_preset_olympus">دوزخ المپ</string>
+    <string name="settings_customization_background_preset_neon_racing">شتاب نئونی</string>
+    <string name="settings_customization_background_preset_tropical_ruins">ویرانه‌های گرمسیری</string>
+    <string name="settings_customization_background_preset_colossus_valley">دره غول‌ها</string>
+    <string name="settings_customization_background_preset_stealth_jungle">نفوذ در جنگل</string>
+    <string name="settings_customization_background_preset_gothic_city">ماه گوتیک</string>
+    <string name="settings_customization_background_preset_west_coast">غروب ساحل غربی</string>
+    <string name="settings_customization_background_preset_samurai_night">شب سامورایی</string>
+    <string name="settings_customization_background_preset_crystal_pilgrimage">زیارت بلورین</string>
 </resources>
