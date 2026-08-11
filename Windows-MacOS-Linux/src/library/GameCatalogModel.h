@@ -4,6 +4,7 @@
 #include <QHash>
 #include <QSqlDatabase>
 #include <QVariantMap>
+#include <QStringList>
 
 struct CatalogGame
 {
@@ -17,6 +18,9 @@ struct CatalogGame
     QString heroUrl;
     QString genres;
     QString primarySerial;
+    QStringList serials;
+    QStringList screenshots;
+    QStringList videos;
 };
 
 class GameCatalogModel final : public QAbstractListModel
@@ -68,6 +72,7 @@ private:
     void loadIdentityIndex();
     CatalogGame readGame(QSqlQuery& query) const;
     QVariantMap toMap(const CatalogGame& game) const;
+    void loadExtendedDetails(CatalogGame& game) const;
     qint64 findBestMatchId(const QString& serial, const QString& title) const;
     static QString normalizeTitle(QString title);
     static QString highResolutionImageUrl(QString url);

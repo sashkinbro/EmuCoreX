@@ -1059,6 +1059,7 @@
     <string name="settings_updates_parallel_download">下载</string>
     <string name="settings_updates_parallel_unavailable">此发布版本不提供独立 APK。</string>
     <string name="common_close">关闭</string>
+    <string name="common_open">打开</string>
     <string name="settings_language_arabic">阿拉伯语</string>
     <string name="settings_language_japanese">日语</string>
     <string name="settings_language_korean">韩语</string>

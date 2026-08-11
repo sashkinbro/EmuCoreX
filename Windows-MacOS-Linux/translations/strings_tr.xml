@@ -297,6 +297,7 @@
     <string name="settings_updates_parallel_download">İndir</string>
     <string name="settings_updates_parallel_unavailable">Ayrı APK bu sürüm için mevcut değil.</string>
     <string name="common_close">Kapat</string>
+    <string name="common_open">Aç</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Desteklenen oyunları oynarken başarımları, zorlu (hardcore) modu ve zengin durumu izlemek için giriş yapın.</string>
     <string name="settings_ra_enabled">RetroAchievements\'i Etkinleştir</string>

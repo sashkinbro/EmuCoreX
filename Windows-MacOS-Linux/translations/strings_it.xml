@@ -1057,6 +1057,7 @@
     <string name="settings_updates_parallel_download">Scarica</string>
     <string name="settings_updates_parallel_unavailable">L\'APK separato non è disponibile per questa versione.</string>
     <string name="common_close">Chiudi</string>
+    <string name="common_open">Apri</string>
     <string name="settings_language_arabic">Arabo</string>
     <string name="settings_language_japanese">Giapponese</string>
     <string name="settings_language_korean">Coreano</string>

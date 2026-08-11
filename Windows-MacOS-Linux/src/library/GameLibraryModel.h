@@ -5,6 +5,7 @@
 #include <QSettings>
 #include <QSet>
 #include <QUrl>
+#include <QVariantMap>
 
 #include "../core/GameMetadataProvider.h"
 
@@ -71,6 +72,8 @@ public:
     Q_INVOKABLE void removeFolder(int index);
     Q_INVOKABLE void refresh();
     Q_INVOKABLE QString pathAt(int index) const;
+    Q_INVOKABLE QVariantMap gameForCatalogId(qint64 catalogId) const;
+    Q_INVOKABLE bool toggleFavoritePath(const QString& path);
     Q_INVOKABLE void toggleFavorite(int index);
     Q_INVOKABLE void invalidateCovers();
     void setSearchQuery(const QString& query);

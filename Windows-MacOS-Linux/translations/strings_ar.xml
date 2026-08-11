@@ -297,6 +297,7 @@
     <string name="settings_updates_parallel_download">تنزيل</string>
     <string name="settings_updates_parallel_unavailable">ملف APK المنفصل غير متوفر لهذا الإصدار.</string>
     <string name="common_close">إغلاق</string>
+    <string name="common_open">فتح</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">سجل الدخول لتتبع الإنجازات، ووضع Hardcore، والحضور الثري أثناء لعبك للألعاب المدعومة.</string>
     <string name="settings_ra_enabled">تفعيل RetroAchievements</string>

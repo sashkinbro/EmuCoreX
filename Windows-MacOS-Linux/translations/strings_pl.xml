@@ -484,6 +484,7 @@
     <string name="settings_updates_parallel_download">Pobierz</string>
     <string name="settings_updates_parallel_unavailable">Oddzielne APK nie jest dostępne dla tego wydania.</string>
     <string name="common_close">Zamknij</string>
+    <string name="common_open">Otwórz</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">Zaloguj się, aby śledzić osiągnięcia, tryb hardcore i rich presence podczas grania w obsługiwane gry.</string>
     <string name="settings_ra_enabled">Włącz RetroAchievements</string>

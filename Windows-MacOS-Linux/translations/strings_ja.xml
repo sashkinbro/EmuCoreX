@@ -297,6 +297,7 @@
     <string name="settings_updates_parallel_download">ダウンロード</string>
     <string name="settings_updates_parallel_unavailable">このリリースには別のAPKは用意されていません。</string>
     <string name="common_close">閉じる</string>
+    <string name="common_open">開く</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">サインインすると、サポートされているゲームのプレイ中に実績、ハードコアモード、リッチプレゼンスを追跡できます。</string>
     <string name="settings_ra_enabled">RetroAchievementsを有効にする</string>

@@ -33,6 +33,10 @@ Item {
         case "refresh": return "M20 7v5h-5 M4 17v-5h5 M18 10a7 7 0 0 0-12-3l-2 5 M6 14a7 7 0 0 0 12 3l2-5"
         case "folder": return "M3 6h7l2 2h9v11H3z"
         case "close": return "M6 6l12 12 M18 6L6 18"
+        case "trash": return "M5 7h14 M9 7V4h6v3 M7 7l1 14h8l1-14 M10 11v6 M14 11v6"
+        case "copy": return "M8 8h12v12H8z M4 4h12v4 M4 4v12h4"
+        case "export": return "M12 15V3 M7 8l5-5l5 5 M5 13v7h14v-7"
+        case "check": return "M5 12l4 4L19 6"
         default: return "M5 5h14v14H5z"
         }
     }

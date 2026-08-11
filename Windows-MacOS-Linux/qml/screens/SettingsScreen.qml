@@ -382,7 +382,7 @@ Item {
             ColumnLayout {
                 id: settingsContent
                 x: 28
-                width: Math.max(0, parent.width - 56)
+                width: Math.max(0, settingsViewport.availableWidth - 56)
                 spacing: 10
 
                 Item { Layout.preferredHeight: 10 }

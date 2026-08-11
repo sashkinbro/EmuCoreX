@@ -11,7 +11,7 @@ Rectangle {
     property bool compact: false
     signal clicked()
 
-    implicitHeight: 44
+    implicitHeight: compact ? 44 : Math.max(44, labelText.implicitHeight + 18)
     radius: Theme.radius
     color: selected ? Theme.surfaceActive : (hover.hovered ? Theme.surfaceHover : "transparent")
     border.width: selected ? 1 : 0
@@ -28,13 +28,18 @@ Rectangle {
             color: root.selected ? Theme.accentBright : Theme.textMuted
         }
         Text {
+            id: labelText
             visible: !root.compact
             Layout.fillWidth: true
             text: root.label
             color: root.selected ? Theme.text : Theme.textMuted
             font.pixelSize: 13
             font.weight: root.selected ? Font.DemiBold : Font.Normal
+            maximumLineCount: 2
+            wrapMode: Text.WordWrap
             elide: Text.ElideRight
+            lineHeight: 1.08
+            verticalAlignment: Text.AlignVCenter
         }
     }
     HoverHandler { id: hover }

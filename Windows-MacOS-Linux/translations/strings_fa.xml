@@ -471,6 +471,7 @@
     <string name="settings_updates_parallel_download">دانلود</string>
     <string name="settings_updates_parallel_unavailable">APK مجزا برای این نسخه در دسترس نیست.</string>
     <string name="common_close">بستن</string>
+    <string name="common_open">باز کردن</string>
     <string name="settings_ra_overview">RetroAchievements</string>
     <string name="settings_ra_overview_desc">برای ردیابی دست‌آوردها، حالت hardcore، و rich presence در حین بازی کردن عناوین پشتیبانی‌شده وارد شوید.</string>
     <string name="settings_ra_enabled">فعال‌سازی RetroAchievements</string>

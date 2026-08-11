@@ -41,7 +41,8 @@ bool AppController::isKnownRoute(const QString& route)
     static const QStringList routes = {
         "library", "catalog", "hub", "achievements", "profile", "game-manager",
         "launch-game", "launch-bios", "save-manager", "memory-cards", "textures",
-        "cheats", "settings", "formats", "feedback", "emulation"
+        "cheats", "settings", "formats", "feedback", "emulation", "game-detail",
+        "gamepad-mapping"
     };
     return routes.contains(route);
 }
@@ -76,8 +77,18 @@ void AppController::finishOnboarding()
     emit onboardingFinished();
 }
 
+void AppController::openGameDetails(qint64 catalogGameId)
+{
+    if (catalogGameId <= 0)
+        return;
+    if (m_selectedCatalogGameId != catalogGameId) {
+        m_selectedCatalogGameId = catalogGameId;
+        emit selectedGameChanged();
+    }
+    navigate(QStringLiteral("game-detail"));
+}
+
 void AppController::openExternalUrl(const QString& url) const
 {
     QDesktopServices::openUrl(QUrl(url));
 }
-

@@ -218,7 +218,39 @@ QVariantMap GameCatalogModel::toMap(const CatalogGame& game) const
         {QStringLiteral("year"), game.year}, {QStringLiteral("rating"), game.rating},
         {QStringLiteral("summary"), game.summary}, {QStringLiteral("storyline"), game.storyline},
         {QStringLiteral("coverUrl"), game.coverUrl}, {QStringLiteral("heroUrl"), game.heroUrl},
-        {QStringLiteral("genres"), game.genres}, {QStringLiteral("primarySerial"), game.primarySerial}};
+        {QStringLiteral("genres"), game.genres}, {QStringLiteral("primarySerial"), game.primarySerial},
+        {QStringLiteral("serials"), game.serials}, {QStringLiteral("screenshots"), game.screenshots},
+        {QStringLiteral("videos"), game.videos}};
+}
+
+void GameCatalogModel::loadExtendedDetails(CatalogGame& game) const
+{
+    QSqlQuery query(m_database);
+    query.prepare(QStringLiteral("SELECT serial FROM game_serials WHERE igdb_id = :id ORDER BY serial"));
+    query.bindValue(QStringLiteral(":id"), game.id);
+    if (query.exec()) {
+        while (query.next())
+            game.serials.append(query.value(0).toString());
+    }
+    if (!game.primarySerial.isEmpty() && !game.serials.contains(game.primarySerial))
+        game.serials.prepend(game.primarySerial);
+
+    query.prepare(QStringLiteral("SELECT image_url FROM game_screenshots WHERE igdb_id = :id ORDER BY position"));
+    query.bindValue(QStringLiteral(":id"), game.id);
+    if (query.exec()) {
+        while (query.next()) {
+            QString image = query.value(0).toString();
+            image.replace(QStringLiteral("/t_screenshot_big/"), QStringLiteral("/t_1080p/"));
+            game.screenshots.append(image);
+        }
+    }
+
+    query.prepare(QStringLiteral("SELECT youtube_id FROM game_videos WHERE igdb_id = :id ORDER BY position"));
+    query.bindValue(QStringLiteral(":id"), game.id);
+    if (query.exec()) {
+        while (query.next())
+            game.videos.append(query.value(0).toString());
+    }
 }
 
 QVariantMap GameCatalogModel::detailsForId(qint64 id) const
@@ -235,7 +267,11 @@ QVariantMap GameCatalogModel::detailsForId(qint64 id) const
         FROM games g WHERE g.igdb_id = :id LIMIT 1
     )"));
     query.bindValue(QStringLiteral(":id"), id);
-    return (query.exec() && query.next()) ? toMap(readGame(query)) : QVariantMap{};
+    if (!query.exec() || !query.next())
+        return {};
+    CatalogGame game = readGame(query);
+    loadExtendedDetails(game);
+    return toMap(game);
 }
 
 qint64 GameCatalogModel::findBestMatchId(const QString& serial, const QString& title) const

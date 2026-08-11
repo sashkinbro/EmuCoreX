@@ -1,6 +1,7 @@
 #include "app/AppController.h"
 #include "app/SingleInstanceGuard.h"
 #include "core/EmulatorController.h"
+#include "data/DesktopDataService.h"
 #include "i18n/TranslationManager.h"
 #include "library/GameLibraryModel.h"
 #include "library/GameCatalogModel.h"
@@ -63,6 +64,7 @@ int main(int argc, char* argv[])
     GameCatalogModel catalog;
     GameLibraryModel library(&catalog);
     EmulatorController emulator;
+    DesktopDataService desktopData(&settings);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("App", &appController);
@@ -71,6 +73,7 @@ int main(int argc, char* argv[])
     engine.rootContext()->setContextProperty("GameLibrary", &library);
     engine.rootContext()->setContextProperty("GameCatalog", &catalog);
     engine.rootContext()->setContextProperty("Emulator", &emulator);
+    engine.rootContext()->setContextProperty("DesktopData", &desktopData);
 
     const QUrl mainUrl("qrc:/qml/Main.qml");
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, &app,

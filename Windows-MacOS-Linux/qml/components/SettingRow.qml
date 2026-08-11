@@ -59,24 +59,36 @@ Rectangle {
         Switch {
             id: toggleControl
             visible: root.controlType === "switch"
+            Layout.preferredWidth: 50
+            Layout.minimumWidth: 50
+            Layout.maximumWidth: 50
+            Layout.preferredHeight: 32
+            Layout.rightMargin: 4
+            leftPadding: 0
+            rightPadding: 0
+            topPadding: 0
+            bottomPadding: 0
             checked: root.checked
             onToggled: root.toggled(checked)
             indicator: Rectangle {
-                implicitWidth: 48
+                width: 48
                 implicitHeight: 28
-                x: toggleControl.leftPadding
-                y: parent.height / 2 - height / 2
+                x: 1
+                y: (toggleControl.height - height) / 2
                 radius: 14
                 color: toggleControl.checked ? Theme.accent : Theme.surfaceVariant
-                border.width: 1
-                border.color: toggleControl.checked ? Theme.accentBright : Theme.border
+                border.width: toggleControl.activeFocus ? 2 : 1
+                border.color: toggleControl.activeFocus ? Theme.text : (toggleControl.checked ? Theme.accentBright : Theme.border)
                 Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.durationFast } }
                 Rectangle {
                     width: 20; height: 20; radius: 10
                     y: 4
                     x: toggleControl.checked ? parent.width - width - 4 : 4
                     color: toggleControl.checked ? "white" : Theme.textMuted
+                    scale: toggleControl.down ? 0.88 : 1
                     Behavior on x { NumberAnimation { duration: Theme.duration; easing.type: Easing.OutBack } }
+                    Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Easing.OutCubic } }
                 }
             }
             contentItem: Item { }

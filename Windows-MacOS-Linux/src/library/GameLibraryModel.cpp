@@ -152,23 +152,46 @@ QString GameLibraryModel::pathAt(int index) const
     return (index >= 0 && index < m_visibleGames.size()) ? m_visibleGames.at(index).path : QString();
 }
 
+QVariantMap GameLibraryModel::gameForCatalogId(qint64 catalogId) const
+{
+    for (const DesktopGame& game : m_allGames) {
+        if (game.catalogId != catalogId)
+            continue;
+        return {{QStringLiteral("title"), game.title}, {QStringLiteral("path"), game.path},
+            {QStringLiteral("serial"), game.serial}, {QStringLiteral("region"), game.region},
+            {QStringLiteral("size"), game.size}, {QStringLiteral("favorite"), game.favorite}};
+    }
+    return {};
+}
+
+bool GameLibraryModel::toggleFavoritePath(const QString& path)
+{
+    bool changed = false;
+    bool favorite = false;
+    for (DesktopGame& game : m_allGames) {
+        if (game.path != path)
+            continue;
+        game.favorite = !game.favorite;
+        favorite = game.favorite;
+        changed = true;
+        break;
+    }
+    if (!changed)
+        return false;
+    if (favorite)
+        m_favoritePaths.insert(path);
+    else
+        m_favoritePaths.remove(path);
+    saveFavorites();
+    applyFilter();
+    return favorite;
+}
+
 void GameLibraryModel::toggleFavorite(int index)
 {
     if (index < 0 || index >= m_visibleGames.size())
         return;
-    const QString path = m_visibleGames.at(index).path;
-    for (DesktopGame& game : m_allGames) {
-        if (game.path == path) {
-            game.favorite = !game.favorite;
-            if (game.favorite)
-                m_favoritePaths.insert(path);
-            else
-                m_favoritePaths.remove(path);
-            break;
-        }
-    }
-    saveFavorites();
-    applyFilter();
+    toggleFavoritePath(m_visibleGames.at(index).path);
 }
 
 void GameLibraryModel::invalidateCovers()

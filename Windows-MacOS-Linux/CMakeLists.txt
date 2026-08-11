@@ -59,6 +59,8 @@ qt_add_executable(EmuCoreXDesktop
     src/core/EmulatorController.h
     src/core/GameMetadataProvider.cpp
     src/core/GameMetadataProvider.h
+    src/data/DesktopDataService.cpp
+    src/data/DesktopDataService.h
     src/i18n/TranslationManager.cpp
     src/i18n/TranslationManager.h
     src/library/GameLibraryModel.cpp

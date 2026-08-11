@@ -20,6 +20,10 @@ Item {
     property real selectedSize: 0
 
     function selectGame(index, title, path, serial, region, summary, genres, hero, year, rating, size) {
+        if (selectedPath === path) {
+            clearSelection()
+            return
+        }
         selectedIndex = index
         selectedTitle = title
         selectedPath = path
@@ -31,6 +35,20 @@ Item {
         selectedYear = year
         selectedRating = rating
         selectedSize = size
+    }
+
+    function clearSelection() {
+        selectedIndex = -1
+        selectedTitle = ""
+        selectedPath = ""
+        selectedSerial = ""
+        selectedRegion = ""
+        selectedSummary = ""
+        selectedGenres = ""
+        selectedHero = ""
+        selectedYear = 0
+        selectedRating = 0
+        selectedSize = 0
     }
 
     function formatSize(bytes) {
@@ -66,56 +84,6 @@ Item {
             opacity: 1 - Preferences.backgroundDim / 100
             z: -2
             Behavior on opacity { NumberAnimation { duration: Theme.durationSlow } }
-        }
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.leftMargin: 28
-            Layout.rightMargin: 28
-            Layout.topMargin: 24
-            Layout.bottomMargin: 18
-            spacing: 12
-
-            PageHeader {
-                Layout.fillWidth: true
-                title: I18n.get("home_title")
-                subtitle: I18n.get("home_library_desc")
-                AppButton {
-                    iconName: "refresh"
-                    text: I18n.get("home_refresh")
-                    enabled: !GameLibrary.scanning
-                    onClicked: GameLibrary.refresh()
-                }
-                AppButton {
-                    primary: true
-                    iconName: "folder"
-                    text: I18n.get("home_add_folder")
-                    onClicked: folderDialog.open()
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-                Text {
-                    text: I18n.format("home_game_count", [GameLibrary.count])
-                    color: Theme.textMuted
-                    font.pixelSize: 12
-                }
-                Item { Layout.fillWidth: true }
-                BusyIndicator {
-                    visible: GameLibrary.scanning
-                    running: visible
-                    Layout.preferredWidth: 22
-                    Layout.preferredHeight: 22
-                }
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: Theme.border
         }
 
         Item {
@@ -169,13 +137,70 @@ Item {
                     clip: true
                     leftMargin: 20
                     rightMargin: 20
-                    topMargin: 20
+                    topMargin: 0
                     bottomMargin: 20
                     readonly property real usableWidth: width - leftMargin - rightMargin
                     cellWidth: usableWidth / Math.max(2, Math.floor(usableWidth / (178 * Preferences.gridScale)))
                     cellHeight: 326 * Preferences.gridScale
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 7 }
+
+                    header: Item {
+                        width: grid.width
+                        height: 152
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 28
+                            anchors.rightMargin: 28
+                            anchors.topMargin: 22
+                            anchors.bottomMargin: 16
+                            spacing: 10
+
+                            PageHeader {
+                                Layout.fillWidth: true
+                                title: I18n.get("home_title")
+                                subtitle: I18n.get("home_library_desc")
+                                AppButton {
+                                    iconName: "refresh"
+                                    text: I18n.get("home_refresh")
+                                    enabled: !GameLibrary.scanning
+                                    onClicked: GameLibrary.refresh()
+                                }
+                                AppButton {
+                                    primary: true
+                                    iconName: "folder"
+                                    text: I18n.get("home_add_folder")
+                                    onClicked: folderDialog.open()
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                Text {
+                                    text: I18n.format("home_game_count", [GameLibrary.count])
+                                    color: Theme.textMuted
+                                    font.pixelSize: 12
+                                }
+                                Item { Layout.fillWidth: true }
+                                BusyIndicator {
+                                    visible: GameLibrary.scanning
+                                    running: visible
+                                    Layout.preferredWidth: 22
+                                    Layout.preferredHeight: 22
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: 1
+                            color: Theme.border
+                        }
+                    }
 
                     delegate: Item {
                         id: delegateRoot
@@ -245,6 +270,9 @@ Item {
                                         }
                                         scale: favoriteTap.pressed ? 0.86 : 1
                                         Behavior on scale { NumberAnimation { duration: Theme.durationFast } }
+                                        opacity: cardHover.hovered ? 1 : 0
+                                        enabled: opacity > 0.01
+                                        Behavior on opacity { NumberAnimation { duration: Theme.duration; easing.type: Easing.OutCubic } }
                                         TapHandler {
                                             id: favoriteTap
                                             onTapped: GameLibrary.toggleFavorite(delegateRoot.index)
@@ -292,13 +320,20 @@ Item {
                 }
 
                 Rectangle {
-                    visible: root.width >= 1080
-                    Layout.preferredWidth: Math.min(380, root.width * 0.31)
+                    id: detailPanel
+                    readonly property real openWidth: Math.max(360, Math.min(500, root.width * 0.31))
+                    visible: Layout.preferredWidth > 1
+                    Layout.preferredWidth: root.selectedPath.length > 0 && root.width >= 900 ? openWidth : 0
+                    Layout.minimumWidth: 0
                     Layout.fillHeight: true
                     color: Theme.backgroundRaised
                     border.width: 1
                     border.color: Theme.border
                     clip: true
+                    opacity: root.selectedPath.length > 0 ? 1 : 0
+
+                    Behavior on Layout.preferredWidth { NumberAnimation { duration: Theme.durationSlow; easing.type: Easing.OutCubic } }
+                    Behavior on opacity { NumberAnimation { duration: Theme.duration; easing.type: Easing.OutCubic } }
 
                     Image {
                         anchors.top: parent.top
@@ -323,50 +358,26 @@ Item {
                         }
                     }
 
+                    AppButton {
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.margins: 16
+                        z: 4
+                        text: ""
+                        iconName: "close"
+                        toolTipText: I18n.get("common_close")
+                        onClicked: root.clearSelection()
+                    }
+
                     ScrollView {
                         anchors.fill: parent
                         clip: true
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                         ColumnLayout {
                             x: 22
-                            width: parent.width - 44
+                            width: Math.max(0, detailPanel.width - 44)
                             spacing: 14
                             Item { Layout.preferredHeight: 8 }
-
-                            Item {
-                                visible: root.selectedPath.length === 0
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 430
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    width: Math.min(250, parent.width)
-                                    spacing: 12
-                                    Rectangle {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        Layout.preferredWidth: 66
-                                        Layout.preferredHeight: 66
-                                        radius: 22
-                                        color: Theme.accentContainer
-                                        AppIcon { anchors.centerIn: parent; width: 30; height: 30; name: "library"; color: Theme.accentBright }
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: I18n.get("home_title")
-                                        color: Theme.text
-                                        font.pixelSize: 19
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: I18n.get("home_library_desc")
-                                        color: Theme.textMuted
-                                        font.pixelSize: 13
-                                        wrapMode: Text.WordWrap
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                            }
 
                             CoverArt {
                                 visible: root.selectedPath.length > 0

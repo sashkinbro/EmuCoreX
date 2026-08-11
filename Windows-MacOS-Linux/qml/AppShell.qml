@@ -80,6 +80,7 @@ Item {
                     Layout.fillHeight: true
                     clip: true
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical.policy: ScrollBar.AlwaysOff
                     ColumnLayout {
                         width: parent.width
                         spacing: 5
@@ -212,6 +213,11 @@ Item {
                     case "profile": return profileComponent
                     case "settings": return settingsComponent
                     case "emulation": return emulationComponent
+                    case "game-detail": return gameDetailComponent
+                    case "save-manager": return saveManagerComponent
+                    case "memory-cards": return memoryCardsComponent
+                    case "textures": return texturesComponent
+                    case "cheats": return cheatsComponent
                     default: return featureComponent
                     }
                 }
@@ -237,6 +243,11 @@ Item {
     Component { id: profileComponent; Loader { source: "screens/ProfileScreen.qml" } }
     Component { id: settingsComponent; Loader { source: "screens/SettingsScreen.qml" } }
     Component { id: emulationComponent; Loader { source: "screens/EmulationScreen.qml" } }
+    Component { id: gameDetailComponent; Loader { source: "screens/GameDetailScreen.qml" } }
+    Component { id: saveManagerComponent; Loader { source: "screens/SaveManagerScreen.qml" } }
+    Component { id: memoryCardsComponent; Loader { source: "screens/MemoryCardManagerScreen.qml" } }
+    Component { id: texturesComponent; Loader { source: "screens/TextureManagerScreen.qml" } }
+    Component { id: cheatsComponent; Loader { source: "screens/CheatManagerScreen.qml" } }
     Component {
         id: featureComponent
         Loader {

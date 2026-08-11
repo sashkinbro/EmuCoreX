@@ -1063,6 +1063,7 @@
     <string name="settings_updates_parallel_download">Скачать</string>
     <string name="settings_updates_parallel_unavailable">Отдельный APK недоступен для этого релиза.</string>
     <string name="common_close">Закрыть</string>
+    <string name="common_open">Открыть</string>
     <string name="settings_language_arabic">Арабский</string>
     <string name="settings_language_japanese">Японский</string>
     <string name="settings_language_korean">Корейский</string>

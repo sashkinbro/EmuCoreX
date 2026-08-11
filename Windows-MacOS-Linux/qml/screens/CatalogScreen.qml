@@ -18,6 +18,10 @@ Item {
     property string selectedSerial: ""
 
     function selectGame(id, name, year, rating, summary, storyline, cover, hero, genres, serial) {
+        if (selectedId === id) {
+            clearSelection()
+            return
+        }
         selectedId = id
         selectedName = name
         selectedYear = year
@@ -28,6 +32,19 @@ Item {
         selectedHero = hero
         selectedGenres = genres
         selectedSerial = serial
+    }
+
+    function clearSelection() {
+        selectedId = 0
+        selectedName = ""
+        selectedYear = 0
+        selectedRating = 0
+        selectedSummary = ""
+        selectedStoryline = ""
+        selectedCover = ""
+        selectedHero = ""
+        selectedGenres = ""
+        selectedSerial = ""
     }
 
     Timer {
@@ -226,6 +243,7 @@ Item {
                                         delegateRoot.catalogSummary, delegateRoot.catalogStoryline,
                                         delegateRoot.catalogCoverUrl, delegateRoot.catalogHeroUrl,
                                         delegateRoot.catalogGenres, delegateRoot.catalogPrimarySerial)
+                                    onDoubleTapped: App.openGameDetails(delegateRoot.catalogId)
                                 }
                             }
                         }
@@ -242,13 +260,20 @@ Item {
                 }
 
                 Rectangle {
-                    visible: root.width >= 1120
-                    Layout.preferredWidth: Math.min(390, root.width * 0.31)
+                    id: detailPanel
+                    readonly property real openWidth: Math.max(360, Math.min(500, root.width * 0.31))
+                    property real animatedWidth: root.selectedId !== 0 && root.width >= 1120 ? openWidth : 0
+                    visible: animatedWidth > 1
+                    Layout.preferredWidth: animatedWidth
                     Layout.fillHeight: true
                     color: Theme.backgroundRaised
                     border.width: 1
                     border.color: Theme.border
                     clip: true
+
+                    Behavior on animatedWidth {
+                        NumberAnimation { duration: Theme.durationSlow; easing.type: Easing.OutCubic }
+                    }
 
                     Image {
                         anchors.top: parent.top
@@ -279,44 +304,17 @@ Item {
                         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
                         ColumnLayout {
                             x: 24
-                            width: parent.width - 48
+                            width: Math.max(0, detailPanel.width - 48)
                             spacing: 16
 
                             Item { Layout.preferredHeight: 8 }
 
-                            Item {
-                                visible: root.selectedId === 0
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 440
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    width: Math.min(260, parent.width)
-                                    spacing: 14
-                                    Rectangle {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        Layout.preferredWidth: 66
-                                        Layout.preferredHeight: 66
-                                        radius: 22
-                                        color: Theme.accentContainer
-                                        AppIcon { anchors.centerIn: parent; width: 30; height: 30; name: "library"; color: Theme.accentBright }
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: I18n.get("catalog_search_title")
-                                        color: Theme.text
-                                        font.pixelSize: 19
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: I18n.get("detail_catalog_preview_only")
-                                        color: Theme.textMuted
-                                        font.pixelSize: 13
-                                        wrapMode: Text.WordWrap
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
+                            AppButton {
+                                Layout.alignment: Qt.AlignRight
+                                iconName: "close"
+                                iconOnly: true
+                                accessibleName: I18n.get("common_close")
+                                onClicked: root.clearSelection()
                             }
 
                             CoverArt {
@@ -337,6 +335,15 @@ Item {
                                 font.weight: Font.Bold
                                 wrapMode: Text.WordWrap
                                 horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            AppButton {
+                                visible: root.selectedId !== 0
+                                Layout.fillWidth: true
+                                primary: true
+                                iconName: "library"
+                                text: I18n.get("common_open")
+                                onClicked: App.openGameDetails(root.selectedId)
                             }
                             Text {
                                 visible: root.selectedId !== 0

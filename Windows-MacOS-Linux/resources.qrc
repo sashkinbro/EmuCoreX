@@ -18,6 +18,8 @@
         <file alias="qml/components/AppIcon.qml">qml/components/AppIcon.qml</file>
         <file alias="qml/components/AppLogo.qml">qml/components/AppLogo.qml</file>
         <file alias="qml/components/CoverArt.qml">qml/components/CoverArt.qml</file>
+        <file alias="qml/components/ManagerPage.qml">qml/components/ManagerPage.qml</file>
+        <file alias="qml/components/RoundedImage.qml">qml/components/RoundedImage.qml</file>
         <file alias="qml/components/FeaturePage.qml">qml/components/FeaturePage.qml</file>
         <file alias="qml/components/PageHeader.qml">qml/components/PageHeader.qml</file>
         <file alias="qml/components/SettingRow.qml">qml/components/SettingRow.qml</file>
@@ -30,6 +32,11 @@
         <file alias="qml/screens/OnboardingScreen.qml">qml/screens/OnboardingScreen.qml</file>
         <file alias="qml/screens/ProfileScreen.qml">qml/screens/ProfileScreen.qml</file>
         <file alias="qml/screens/SettingsScreen.qml">qml/screens/SettingsScreen.qml</file>
+        <file alias="qml/screens/SaveManagerScreen.qml">qml/screens/SaveManagerScreen.qml</file>
+        <file alias="qml/screens/MemoryCardManagerScreen.qml">qml/screens/MemoryCardManagerScreen.qml</file>
+        <file alias="qml/screens/TextureManagerScreen.qml">qml/screens/TextureManagerScreen.qml</file>
+        <file alias="qml/screens/CheatManagerScreen.qml">qml/screens/CheatManagerScreen.qml</file>
+        <file alias="qml/screens/GameDetailScreen.qml">qml/screens/GameDetailScreen.qml</file>
         <file alias="qml/screens/UtilityScreen.qml">qml/screens/UtilityScreen.qml</file>
 
         <file alias="translations/strings_en.xml">translations/strings_en.xml</file>
