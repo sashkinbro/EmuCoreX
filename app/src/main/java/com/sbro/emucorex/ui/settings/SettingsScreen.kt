@@ -4204,7 +4204,7 @@ private fun drawerItemLabel(item: DrawerItemId): String = when (item) {
     DrawerItemId.APP_SETTINGS -> stringResource(R.string.shell_app_settings)
     DrawerItemId.SUPPORTED_FORMATS -> stringResource(R.string.shell_supported_formats)
     DrawerItemId.FEEDBACK -> stringResource(R.string.feedback_title)
-    DrawerItemId.DISCORD -> stringResource(R.string.shell_discord_server)
+    DrawerItemId.DISCORD -> stringResource(R.string.discord_title)
 }
 
 @Composable

@@ -27,7 +27,8 @@
 
 -keep,includedescriptorclasses class com.sbro.emucorex.core.NativeApp { *; }
 -keep,includedescriptorclasses class com.sbro.emucorex.core.utils.RetroAchievementsBridge { *; }
--keep,includedescriptorclasses class com.sbro.emucorex.core.utils.DiscordBridge { *; }
+-keep,includedescriptorclasses class com.sbro.emucorex.discord.DiscordNative { *; }
+-keep class com.discord.socialsdk.** { *; }
 -keep,includedescriptorclasses class com.sbro.emucorex.core.utils.SDLControllerManager { *; }
 -keep,includedescriptorclasses class com.sbro.emucorex.core.hid.HIDDeviceManager { *; }
 
@@ -56,10 +57,6 @@
     public static void notifyStateChanged(boolean, boolean, java.lang.String, java.lang.String, java.lang.String, int, int, int, boolean, boolean, boolean, java.lang.String, java.lang.String, java.lang.String, int, int, int, int, int, boolean, boolean, boolean);
     public static void notifyHardcoreModeChanged(boolean);
     public static void notifySettingsChanged(java.lang.String, java.lang.String, java.lang.String);
-}
-
--keepclassmembers,includedescriptorclasses class com.sbro.emucorex.core.utils.DiscordBridge {
-    public static void onStateChanged(int);
 }
 
 -keepclassmembers,includedescriptorclasses class com.sbro.emucorex.core.utils.SDLControllerManager {

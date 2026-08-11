@@ -81,7 +81,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,7 +101,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class PrimaryDestination {
-    Home, Search, Hub, Formats, Achievements, Profile, Settings, Feedback
+    Home, Search, Hub, Formats, Achievements, Profile, Discord, Settings, Feedback
 }
 
 private enum class MobileLeadingAction {
@@ -139,6 +138,7 @@ fun AdaptiveShell(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateProfile: (() -> Unit)? = null,
+    onNavigateDiscord: (() -> Unit)? = null,
     onNavigateFeedback: (() -> Unit)? = null,
     onNavigateGameSettingsManager: (() -> Unit)? = null,
     onNavigateDataTransfer: (() -> Unit)? = null,
@@ -177,6 +177,7 @@ fun AdaptiveShell(
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateProfile = onNavigateProfile,
+            onNavigateDiscord = onNavigateDiscord,
             onNavigateFeedback = onNavigateFeedback,
             onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateDataTransfer = onNavigateDataTransfer,
@@ -256,6 +257,7 @@ fun AdaptiveShell(
             onNavigateSettings = onNavigateSettings,
             onNavigateAchievements = onNavigateAchievements,
             onNavigateProfile = onNavigateProfile,
+            onNavigateDiscord = onNavigateDiscord,
             onNavigateFeedback = onNavigateFeedback,
             onNavigateGameSettingsManager = onNavigateGameSettingsManager,
             onNavigateDataTransfer = onNavigateDataTransfer,
@@ -288,6 +290,7 @@ private fun CompactAdaptiveShell(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateProfile: (() -> Unit)?,
+    onNavigateDiscord: (() -> Unit)?,
     onNavigateFeedback: (() -> Unit)?,
     onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
@@ -468,6 +471,7 @@ private fun CompactAdaptiveShell(
                     onNavigateSettings = onNavigateSettings,
                     onNavigateAchievements = onNavigateAchievements,
                     onNavigateProfile = onNavigateProfile,
+                    onNavigateDiscord = onNavigateDiscord,
                     onNavigateFeedback = onNavigateFeedback,
                     onNavigateGameSettingsManager = onNavigateGameSettingsManager,
                     onNavigateDataTransfer = onNavigateDataTransfer,
@@ -503,6 +507,7 @@ private fun SideNavigation(
     onNavigateSettings: () -> Unit,
     onNavigateAchievements: () -> Unit,
     onNavigateProfile: (() -> Unit)?,
+    onNavigateDiscord: (() -> Unit)?,
     onNavigateFeedback: (() -> Unit)?,
     onNavigateGameSettingsManager: (() -> Unit)?,
     onNavigateDataTransfer: (() -> Unit)?,
@@ -531,7 +536,6 @@ private fun SideNavigation(
     }
     val drawerBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val scope = rememberCoroutineScope()
-    val uriHandler = LocalUriHandler.current
     var showResetDialog by remember { mutableStateOf(false) }
     val closeDrawerThen: (() -> Unit) -> Unit = { action ->
         scope.launch {
@@ -613,9 +617,9 @@ private fun SideNavigation(
             closeDrawerThen(it)
         }
     }
-    val openDiscord = rememberDebouncedClick {
-        closeDrawerThen {
-            runCatching { uriHandler.openUri(DISCORD_INVITE_URL) }
+    val navigateDiscord = onNavigateDiscord?.let {
+        rememberDebouncedClick {
+            closeDrawerThen(it)
         }
     }
     val showExecutables =
@@ -725,6 +729,17 @@ private fun SideNavigation(
                         Modifier.focusRequester(selectedItemFocusRequester)
                     } else Modifier,
                     onClick = navigateProfile
+                )
+            }
+            if (navigateDiscord != null && DrawerItemId.DISCORD !in hiddenDrawerItems) {
+                ShellItem(
+                    icon = Icons.Rounded.Forum,
+                    label = stringResource(R.string.discord_title),
+                    selected = selected == PrimaryDestination.Discord,
+                    modifier = if (selected == PrimaryDestination.Discord && selectedItemFocusRequester != null) {
+                        Modifier.focusRequester(selectedItemFocusRequester)
+                    } else Modifier,
+                    onClick = navigateDiscord
                 )
             }
 
@@ -872,17 +887,6 @@ private fun SideNavigation(
                         Modifier.focusRequester(selectedItemFocusRequester)
                     } else Modifier,
                     onClick = navigateFeedback
-                )
-            }
-            if (DrawerItemId.DISCORD !in hiddenDrawerItems) {
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                )
-                ShellAction(
-                    icon = Icons.Rounded.Forum,
-                    label = stringResource(R.string.shell_discord_server),
-                    onClick = openDiscord
                 )
             }
         }
@@ -1114,5 +1118,3 @@ private fun Modifier.activateDrawerItemOnGamepad(onClick: () -> Unit): Modifier 
         }
     }
 }
-
-private const val DISCORD_INVITE_URL = "https://discord.gg/82hhArvYwC"

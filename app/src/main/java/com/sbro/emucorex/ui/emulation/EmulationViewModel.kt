@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.EmuCoreXApp
+import com.sbro.emucorex.discord.DiscordIntegration
 import com.sbro.emucorex.core.AndroidGamePerformance
 import com.sbro.emucorex.core.AndroidGamePhase
 import com.sbro.emucorex.core.AppAnalytics
@@ -1735,6 +1736,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         gameSettingsProfileActive = existingProfile != null
                     )
                     syncCurrentGameProfileMetadata()
+                    if (!bootSmokeProbe) {
+                        DiscordIntegration.setPlaying(
+                            title = currentGameTitle,
+                            serial = currentGameSerial.takeIf { it.isNotBlank() }
+                        )
+                    }
                 }
                 updateCrashContext(
                     launchState = "starting",
@@ -2073,6 +2080,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             isPaused = !isPaused,
             showMenu = if (isPaused) false else _uiState.value.showMenu
         )
+        DiscordIntegration.setPaused(!isPaused)
         updateCrashContext(launchState = if (!isPaused) "paused" else "running")
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -2092,6 +2100,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             EmulatorBridge.resetKeyStatus()
             refreshSaveStateMetadata()
             _uiState.value = _uiState.value.copy(showMenu = true, isPaused = true)
+            DiscordIntegration.setPaused(true)
             updateCrashContext(launchState = "paused")
             viewModelScope.launch(Dispatchers.IO) {
                 try {
@@ -2152,6 +2161,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 actionLabel = null,
                 toastMessage = if (success) "disc_swap_success" else "disc_swap_failed"
             )
+            DiscordIntegration.setPaused(false)
             updateCrashContext(launchState = "running")
             delay(3000.milliseconds)
             val expectedToast = if (success) "disc_swap_success" else "disc_swap_failed"
@@ -2164,6 +2174,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private fun closeMenu() {
         pausedForBackground = false
         _uiState.value = _uiState.value.copy(showMenu = false, isPaused = false)
+        DiscordIntegration.setPaused(false)
         updateCrashContext(launchState = "running")
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -4661,6 +4672,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     EmulatorBridge.pause()
                     pausedForBackground = true
                     _uiState.value = state.copy(isPaused = true)
+                    DiscordIntegration.setPaused(true)
                     syncPendingPlayTime(forceCloud = false)
                     updateCrashContext(launchState = "paused")
                 } catch (_: Exception) { }
@@ -4685,6 +4697,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     EmulatorBridge.resume()
                     pausedForBackground = false
                     _uiState.value = state.copy(isPaused = false)
+                    DiscordIntegration.setPaused(false)
                     updateCrashContext(launchState = "running")
                 } catch (_: Exception) { }
             }
@@ -4799,6 +4812,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private fun clearCrashContext() {
+        DiscordIntegration.clearGame()
         currentGameTitle = ""
         currentGamePath = null
         currentTouchControlsLayoutProfile = null
@@ -4827,6 +4841,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
+        DiscordIntegration.clearGame()
         androidGamePerformance.update(AndroidGamePhase.Idle)
         NativeApp.setPerformanceMetricsEnabled(visible = false, detailed = false, gpuTiming = false)
         fastForwardRequested = false

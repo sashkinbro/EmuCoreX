@@ -10,6 +10,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- The Social SDK AAR also contains voice features. EmuCoreX only uses account linking and
+         Rich Presence, so explicitly remove permissions that would otherwise be merged in. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:node="remove" />
 
     <!-- Keep touch devices supported while making the same APK eligible for Android TV. -->
     <uses-feature
@@ -20,6 +28,12 @@
         android:required="false" />
     <uses-feature
         android:name="android.hardware.faketouch"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
         android:required="false" />
 
     <application
@@ -74,6 +88,40 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Discord OAuth and SDK run only in the isolated :discord helper process. -->
+        <activity
+            android:name="com.discord.socialsdk.AuthenticationActivity"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="discord-1536775623287115786" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".discord.DiscordAuthActivity"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
+
+        <service
+            android:name=".discord.DiscordService"
+            android:process=":discord"
+            android:enabled="${discordSdkAvailable}"
+            android:exported="false" />
+
+        <service
+            android:name="com.discord.socialsdk.ForegroundService"
+            tools:node="remove" />
 
         <activity-alias
             android:name=".MainActivityDefault"

@@ -2314,6 +2314,41 @@
     <string name="settings_display_crop_bottom">Przytnij dolną krawędź</string>
     <string name="settings_display_crop_pixels_unit">px</string>
     <string name="settings_help_display_crop">Usuwa niestabilny overscan lub błędne piksele z każdej strony u źródła renderera. Pozostaw 0, jeśli gra tego nie wymaga; przycinanie następuje przed skalowaniem proporcji.</string>
+    <string name="discord_title">Discord</string>
+    <string name="discord_subtitle">Konto i aktywność w grze</string>
+    <string name="discord_rich_presence_title">Discord Rich Presence</string>
+    <string name="discord_intro">Połącz Discord, aby pokazywać grę przez EmuCoreX. To Ty decydujesz, które informacje o grze są udostępniane.</string>
+    <string name="discord_connected_account">Połączone konto</string>
+    <string name="discord_connect">Połącz Discord</string>
+    <string name="discord_disconnect">Rozłącz</string>
+    <string name="discord_open_server">Otwórz nasz serwer Discord</string>
+    <string name="discord_privacy_title">Aktywność i prywatność</string>
+    <string name="discord_enabled">Integracja z Discord</string>
+    <string name="discord_enabled_desc">Zezwól EmuCoreX na publikowanie aktywności w grze</string>
+    <string name="discord_share_title">Pokazuj tytuł gry</string>
+    <string name="discord_share_title_desc">Pokazuj bieżącą grę i okładkę w statusie Discord</string>
+    <string name="discord_share_serial">Pokazuj numer seryjny gry</string>
+    <string name="discord_preview_game_title">Tytuł gry</string>
+    <string name="discord_preview_serial">Numer seryjny</string>
+    <string name="discord_share_serial_desc">Dołącz numer seryjny płyty PS2, np. SLUS-12345</string>
+    <string name="discord_preview_title">Podgląd statusu</string>
+    <string name="discord_privacy_note">Logowanie używa Discord OAuth z PKCE. Token dostępu jest szyfrowany przez Android Keystore i nigdy nie jest wysyłany na serwery EmuCoreX.</string>
+    <string name="discord_status_disabled">Wyłączone</string>
+    <string name="discord_status_unavailable">SDK niedostępny w tej kompilacji</string>
+    <string name="discord_status_disconnected">Nie połączono</string>
+    <string name="discord_status_authorizing">Oczekiwanie na autoryzację</string>
+    <string name="discord_status_connecting">Łączenie…</string>
+    <string name="discord_status_connected">Połączono</string>
+    <string name="discord_status_failed">Połączenie nie powiodło się</string>
+    <string name="settings_discord_sdk_unavailable">Discord Social SDK nie jest dołączony do tej kompilacji.</string>
+    <string name="settings_discord_service_error">Nie udało się uruchomić usługi pomocniczej Discord.</string>
+    <string name="settings_discord_token_error">Nie udało się zabezpieczyć tokenu logowania Discord.</string>
+    <string name="discord_presence_library">Przegląda bibliotekę gier</string>
+    <string name="discord_presence_private_game">Gra w grę na PlayStation 2</string>
+    <string name="discord_presence_paused">Wstrzymano</string>
+    <string name="discord_presence_playing">Gra w %1$s</string>
+    <string name="discord_friends_title">Znajomi w EmuCoreX</string>
+    <string name="discord_friends_empty">Żaden z Twoich znajomych na Discordzie nie używa teraz EmuCoreX.</string>
 </resources>
 
 

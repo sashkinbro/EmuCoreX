@@ -29,13 +29,3 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_hid_HIDDeviceManag
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_hid_HIDDeviceManager_HIDDeviceDisconnected(JNIEnv*, jclass, jint) {}
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_hid_HIDDeviceManager_HIDDeviceInputReport(JNIEnv*, jclass, jint, jbyteArray) {}
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_hid_HIDDeviceManager_HIDDeviceReportResponse(JNIEnv*, jclass, jint, jbyteArray) {}
-
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeConfigure(JNIEnv*, jclass, jlong, jstring, jstring, jstring) { LogUnsupported("Discord native bridge"); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeProvideStoredToken(JNIEnv*, jclass, jstring, jstring, jstring, jlong, jstring) { LogUnsupported("Discord token bridge"); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeBeginAuthorize(JNIEnv*, jclass) { LogUnsupported("Discord authorize bridge"); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeSetAppForeground(JNIEnv*, jclass, jboolean) { LogUnsupported("Discord foreground bridge"); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativePollCallbacks(JNIEnv*, jclass) { LogUnsupported("Discord callback bridge"); }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeClearTokens(JNIEnv*, jclass) { LogUnsupported("Discord token-clear bridge"); }
-extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeIsLoggedIn(JNIEnv*, jclass) { return JNI_FALSE; }
-extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeIsClientReady(JNIEnv*, jclass) { return JNI_FALSE; }
-extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_utils_DiscordBridge_nativeConsumeLastError(JNIEnv*, jclass) { return nullptr; }
