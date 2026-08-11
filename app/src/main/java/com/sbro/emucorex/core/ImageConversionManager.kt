@@ -21,7 +21,7 @@ object ImageConversionManager {
     private const val IO_BUFFER_SIZE = 64 * 1024
     private const val MAP_ENTRY_BYTES = 4L
 
-    val libraryFormats = listOf("ISO", "BIN", "IMG", "MDF", "GZ", "CSO", "ZSO", "CHD", "ELF")
+    val libraryFormats = listOf("ISO", "BIN", "IMG", "MDF", "GZ", "CSO", "ZSO", "CHD", "ELF", "ACGAME")
     val recommendedFormats = listOf("ISO", "CHD", "BIN")
     val isoMimeTypes = arrayOf(
         "application/octet-stream",

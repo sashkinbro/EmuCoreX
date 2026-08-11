@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -129,6 +130,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
@@ -180,6 +182,8 @@ import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
+import com.sbro.emucorex.data.EmulationSideArtwork
+import com.sbro.emucorex.data.EmulationSideArtworkRepository
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.DrawerItemId
@@ -201,6 +205,7 @@ import com.sbro.emucorex.ui.common.ScrollableFilterTabRow
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
 import com.sbro.emucorex.ui.common.SettingsStyledDialog
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
@@ -289,6 +294,12 @@ fun SettingsScreen(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         viewModel.clearCustomizationMessage()
     }
+    val shaderPackMessage = uiState.shaderPackMessageResId?.let { stringResource(it) }
+    LaunchedEffect(shaderPackMessage) {
+        val message = shaderPackMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        viewModel.clearShaderPackMessage()
+    }
 
     if (!uiState.isLoaded) {
         Box(
@@ -318,9 +329,17 @@ fun SettingsScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::installHomeBackground) }
 
+    val sideArtworkPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> uri?.let(viewModel::installEmulationSideArtwork) }
+
     val customFontPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? -> uri?.let(viewModel::installCustomFont) }
+
+    val shaderPackPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> uri?.let(viewModel::importShaderPack) }
 
     var tvStorageRequest by remember { mutableStateOf<TvStorageRequest?>(null) }
     TvStoragePickerHost(
@@ -485,6 +504,9 @@ fun SettingsScreen(
                 launchHomeBackgroundPicker = {
                     homeBackgroundPicker.launch(arrayOf("image/*", "video/*"))
                 },
+                launchSideArtworkPicker = {
+                    sideArtworkPicker.launch(arrayOf("image/*"))
+                },
                 launchCustomFontPicker = {
                     customFontPicker.launch(
                         arrayOf(
@@ -496,6 +518,9 @@ fun SettingsScreen(
                             "application/octet-stream"
                         )
                     )
+                },
+                launchShaderPackPicker = {
+                    shaderPackPicker.launch(arrayOf("application/zip", "application/octet-stream"))
                 },
                 onOpenCoverUrlEditor = {
                     pendingCoverUrl.value = uiState.coverDownloadBaseUrl.orEmpty()
@@ -1043,7 +1068,9 @@ private fun SettingsContent(
     launchGamePicker: () -> Unit,
     openEmulatorDataLocationDialog: () -> Unit,
     launchHomeBackgroundPicker: () -> Unit,
+    launchSideArtworkPicker: () -> Unit,
     launchCustomFontPicker: () -> Unit,
+    launchShaderPackPicker: () -> Unit,
     onOpenCoverUrlEditor: () -> Unit,
     onClearCoverCache: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
@@ -1241,6 +1268,7 @@ private fun SettingsContent(
                     CustomizationSettingsTab(
                         uiState = uiState,
                         onPickBackground = launchHomeBackgroundPicker,
+                        onPickSideArtwork = launchSideArtworkPicker,
                         onPickCustomFont = launchCustomFontPicker,
                         onOpenTouchControlCreator = onOpenTouchControlCreator,
                         viewModel = viewModel
@@ -1313,6 +1341,51 @@ private fun SettingsContent(
                             onSelect = viewModel::setAspectRatio,
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { viewModel.setAspectRatio(defaults.aspectRatio) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.AutoFixHigh,
+                            title = stringResource(R.string.settings_retroarch_shaders),
+                            subtitle = stringResource(R.string.settings_retroarch_shaders_desc),
+                            checked = uiState.shaderChainEnabled,
+                            onCheckedChange = viewModel::setShaderChainEnabled,
+                            helpText = stringResource(R.string.settings_help_retroarch_shaders),
+                            onResetToDefault = { viewModel.setShaderChainEnabled(false) }
+                        )
+                        val shaderPresetOptions = listOf(
+                            0 to stringResource(R.string.settings_shader_preset_none)
+                        ) + uiState.shaderPresets.mapIndexed { index, preset ->
+                            (index + 1) to preset.label
+                        }
+                        val selectedShaderPreset = uiState.shaderPresets
+                            .indexOfFirst { it.absolutePath == uiState.shaderChainPreset }
+                            .let { if (it < 0) 0 else it + 1 }
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_shader_preset),
+                            options = shaderPresetOptions,
+                            selectedValue = selectedShaderPreset,
+                            onSelect = { index ->
+                                viewModel.setShaderChainPreset(
+                                    uiState.shaderPresets.getOrNull(index - 1)?.absolutePath.orEmpty()
+                                )
+                            },
+                            helpText = stringResource(R.string.settings_help_shader_preset),
+                            onResetToDefault = { viewModel.setShaderChainPreset("") }
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.SystemUpdateAlt,
+                            label = stringResource(R.string.settings_shader_pack_download),
+                            value = if (uiState.isShaderPackBusy) {
+                                stringResource(R.string.settings_shader_pack_working)
+                            } else {
+                                stringResource(R.string.settings_shader_pack_download_desc)
+                            },
+                            onClick = viewModel::downloadOfficialShaderPack
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.FolderOpen,
+                            label = stringResource(R.string.settings_shader_pack_import),
+                            value = stringResource(R.string.settings_shader_pack_import_desc),
+                            onClick = launchShaderPackPicker
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_anisotropic_filtering),
@@ -3024,6 +3097,7 @@ private fun SettingsContent(
 private fun CustomizationSettingsTab(
     uiState: SettingsUiState,
     onPickBackground: () -> Unit,
+    onPickSideArtwork: () -> Unit,
     onPickCustomFont: () -> Unit,
     onOpenTouchControlCreator: (() -> Unit)?,
     viewModel: SettingsViewModel
@@ -3040,12 +3114,25 @@ private fun CustomizationSettingsTab(
         gridScale = uiState.homeGridScale
     )
     val backgroundRepository = remember(context) { HomeBackgroundRepository(context) }
+    val sideArtworkRepository = remember(context) { EmulationSideArtworkRepository(context) }
     val backgroundFile = backgroundRepository.existingFile(uiState.homeBackgroundType)
     val backgroundLabel = when (uiState.homeBackgroundType) {
         HomeBackgroundType.NONE -> stringResource(R.string.settings_customization_background_none)
         HomeBackgroundType.IMAGE -> stringResource(R.string.settings_customization_background_image)
         HomeBackgroundType.GIF -> stringResource(R.string.settings_customization_background_gif)
         HomeBackgroundType.VIDEO -> stringResource(R.string.settings_customization_background_video)
+    }
+    val hasCustomSideArtwork = sideArtworkRepository.existingCustomFile() != null
+    val sideArtworkOptions = listOf(
+        EmulationSideArtwork.NONE.preferenceValue to stringResource(R.string.settings_customization_side_artwork_none),
+        EmulationSideArtwork.OLYMPUS.preferenceValue to stringResource(R.string.settings_customization_side_artwork_olympus),
+        EmulationSideArtwork.NIGHT_RACING.preferenceValue to stringResource(R.string.settings_customization_side_artwork_night_racing),
+        EmulationSideArtwork.JUNGLE.preferenceValue to stringResource(R.string.settings_customization_side_artwork_jungle),
+        EmulationSideArtwork.COLOSSUS.preferenceValue to stringResource(R.string.settings_customization_side_artwork_colossus)
+    ) + if (hasCustomSideArtwork) {
+        listOf(EmulationSideArtwork.CUSTOM.preferenceValue to stringResource(R.string.settings_customization_side_artwork_custom))
+    } else {
+        emptyList()
     }
 
     SettingsSection(title = stringResource(R.string.settings_customization_preview)) {
@@ -3209,6 +3296,80 @@ private fun CustomizationSettingsTab(
                 label = stringResource(R.string.settings_customization_remove_background),
                 value = stringResource(R.string.settings_customization_remove_background_desc),
                 onClick = viewModel::clearHomeBackground
+            )
+        }
+    }
+
+    SettingsSection(title = stringResource(R.string.settings_customization_side_artwork_section)) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .aspectRatio(16f / 9f),
+            shape = RoundedCornerShape(18.dp),
+            color = Color.Black,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                EmulationSideArtworkOverlay(
+                    artwork = uiState.emulationSideArtwork,
+                    revision = uiState.emulationSideArtworkRevision,
+                    aspectRatioMode = 2,
+                    modifier = Modifier.fillMaxSize(),
+                    preview = true
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(4f / 3f)
+                        .align(Alignment.Center)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_customization_side_artwork_preview),
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+                if (uiState.isSideArtworkImporting) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+        }
+        ChoiceSection(
+            title = stringResource(R.string.settings_customization_side_artwork),
+            options = sideArtworkOptions,
+            selectedValue = uiState.emulationSideArtwork.preferenceValue,
+            onSelect = { value ->
+                viewModel.setEmulationSideArtwork(EmulationSideArtwork.fromPreference(value))
+            },
+            helpText = stringResource(R.string.settings_customization_side_artwork_help),
+            onResetToDefault = { viewModel.setEmulationSideArtwork(EmulationSideArtwork.NONE) }
+        )
+        SettingsItem(
+            icon = Icons.Rounded.Wallpaper,
+            label = stringResource(R.string.settings_customization_side_artwork_import),
+            value = stringResource(R.string.settings_customization_side_artwork_import_desc),
+            onClick = onPickSideArtwork
+        )
+        if (hasCustomSideArtwork) {
+            SettingsItem(
+                icon = Icons.Rounded.DeleteOutline,
+                label = stringResource(R.string.settings_customization_side_artwork_remove),
+                value = stringResource(R.string.settings_customization_side_artwork_remove_desc),
+                onClick = viewModel::clearCustomEmulationSideArtwork
             )
         }
     }

@@ -21,6 +21,40 @@
 #include <algorithm>
 #include <ostream>
 #include <fstream>
+#include <atomic>
+#include <mutex>
+
+namespace
+{
+	std::mutex s_shader_param_mutex;
+	std::string s_shader_param_preset;
+	std::vector<std::pair<std::string, float>> s_shader_params;
+	std::atomic<u64> s_shader_param_generation{0};
+}
+
+void GSDevice::SetShaderChainParams(std::string preset, std::vector<std::pair<std::string, float>> params)
+{
+	{
+		std::unique_lock lock(s_shader_param_mutex);
+		s_shader_param_preset = std::move(preset);
+		s_shader_params = std::move(params);
+	}
+	s_shader_param_generation.fetch_add(1, std::memory_order_release);
+}
+
+u64 GSDevice::GetShaderChainParamGeneration()
+{
+	return s_shader_param_generation.load(std::memory_order_acquire);
+}
+
+bool GSDevice::GetShaderChainParams(const std::string& preset, std::vector<std::pair<std::string, float>>* out)
+{
+	std::unique_lock lock(s_shader_param_mutex);
+	if (s_shader_param_preset != preset || s_shader_params.empty())
+		return false;
+	*out = s_shader_params;
+	return true;
+}
 
 int SetDATMShader(SetDATM datm)
 {
@@ -930,6 +964,33 @@ void GSDevice::FXAA()
 		DoFXAA(m_current, dTex);
 		m_current = dTex;
 	}
+}
+
+bool GSDevice::ApplyShaderChain(const GSVector2i& output_size)
+{
+	// Guarded here rather than in the backends so a device that never overrides
+	// DoApplyShaderChain (software, or a build without librashader) costs nothing.
+	if (!GSConfig.ShaderChainEnabled || GSConfig.ShaderChainPreset.empty() || !m_current)
+		return false;
+
+	// A minimised or mid-resize window yields a degenerate rect; never build a 0-sized target.
+	if (output_size.x <= 0 || output_size.y <= 0)
+		return false;
+
+	// Same ping-pong as FXAA: the chain reads m_current, so it can't also write it. Unlike FXAA
+	// the target is sized to the caller's on-screen rect rather than to m_current — see the
+	// header for why that has to be the aspect-corrected rect and not the window.
+	GSTexture*& dTex = (m_current == m_target_tmp) ? m_merge : m_target_tmp;
+	if (!ResizeRenderTarget(&dTex, output_size.x, output_size.y, false, false))
+		return false;
+
+	// Only swap on success — a failed chain (bad preset, unsupported backend) must leave
+	// m_current pointing at the unshaded frame rather than at a target nothing rendered to.
+	if (!DoApplyShaderChain(m_current, dTex))
+		return false;
+
+	m_current = dTex;
+	return true;
 }
 
 void GSDevice::ShadeBoost()

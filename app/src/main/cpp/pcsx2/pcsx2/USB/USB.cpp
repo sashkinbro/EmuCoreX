@@ -20,7 +20,7 @@
 #include <stdexcept>
 #include <string>
 
-#define PSXCLK 36864000 /* 36.864 Mhz */
+#include "Common.h"
 
 namespace USB
 {

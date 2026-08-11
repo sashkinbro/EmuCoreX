@@ -13,6 +13,7 @@
 #include "USB/qemu-usb/desc.h"
 #include "USB/usb-lightgun/guncon2.h"
 #include "VMManager.h"
+#include "DEV9/ACJV.h"
 
 #include "common/Console.h"
 #include "common/StringUtil.h"
@@ -269,6 +270,23 @@ namespace usb_lightgun
 				{
 					const auto [pos_x, pos_y] = us->CalculatePosition();
 
+					// Forward mouse position to JVS: on-screen = coords, off-screen = (0,0), update sensor bit
+					// TODO: use CalculatePosition() result instead of raw mouse, so Relative Aiming (joystick) works for S246
+					if (!ACJV::GetGameId().empty() && ACJV::enabled)
+					{
+						const auto& [mx, my] = InputManager::GetPointerAbsolutePosition(0);
+						float dx, dy;
+						GSTranslateWindowToDisplayCoordinates(mx, my, &dx, &dy);
+						bool on_screen = (dx >= 0.0f && dy >= 0.0f);
+						if (on_screen)
+							ACJV::SetScreenPos(static_cast<u16>((1.0f - dx) * 0xFFFF), static_cast<u16>(dy * 0xFFFF));
+						else
+							ACJV::SetScreenPos(0, 0);
+						const auto& gm = ACJV::GetGunMapping();
+						if (gm.sensor)
+							ACJV::SetButtonState(0, gm.sensor, gm.sensor_active_high ? on_screen : !on_screen);
+					}
+
 					// Time Crisis games do a "calibration" by displaying a black frame for a single frame,
 					// waiting for the gun to report (0, 0), and then computing an offset on the first non-zero
 					// value. So, after the trigger is pulled, we wait for a few frames, then send the (0, 0)
@@ -480,6 +498,15 @@ namespace usb_lightgun
 		return nullptr;
 	}
 
+	// Send where the player is aiming (with a stick, not a mouse) to the arcade lightgun.
+	static void ForwardRelativeAimToJVS(GunCon2State* s)
+	{
+		const auto& [wx, wy] = s->GetAbsolutePositionFromRelativeAxes();
+		float dx, dy;
+		GSTranslateWindowToDisplayCoordinatesUnclamped(wx, wy, &dx, &dy);
+		ACJV::SetGunRelativeAim(s->port, dx, dy);
+	}
+
 	void GunCon2Device::UpdateSettings(USBDevice* dev, SettingsInterface& si) const
 	{
 		GunCon2State* s = USB_CONTAINER_OF(dev, GunCon2State, dev);
@@ -514,33 +541,56 @@ namespace usb_lightgun
 
 		const s32 prev_pointer_index = s->GetSoftwarePointerIndex();
 
-		s->has_relative_binds = (USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeLeft") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeRight") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeUp") ||
-			USB::ConfigKeyExists(si, s->port, TypeName(), "RelativeDown"));
+		s->has_relative_binds = (!USB::GetConfigString(si, s->port, TypeName(), "RelativeLeft").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeRight").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeUp").empty() ||
+			!USB::GetConfigString(si, s->port, TypeName(), "RelativeDown").empty()); // empty/cleared binds must not latch relative aim
+
+		// Arcade aim goes through ACJV; the Aim Device is either the mouse (Pointer-N) or a controller stick.
+		const bool joystick_aim = !pointer_binding.empty() && !StringUtil::StartsWithNoCase(pointer_binding, "Pointer-");
+		if (!ACJV::GetGameId().empty())
+			ACJV::SetGunAimSource(s->port, joystick_aim);
+		if (!ACJV::GetGameId().empty() && joystick_aim)
+			ForwardRelativeAimToJVS(s);
 
 		const s32 new_pointer_index = s->GetSoftwarePointerIndex();
 
-		if (prev_pointer_index != new_pointer_index || s->cursor_path != cursor_path ||
-			s->cursor_scale != cursor_scale || s->cursor_color != cursor_color)
-		{
-			if (prev_pointer_index != new_pointer_index)
-				ImGuiManager::ClearSoftwareCursor(prev_pointer_index);
+		const bool cursor_changed =
+			(prev_pointer_index != new_pointer_index ||
+				s->cursor_path != cursor_path ||
+				s->cursor_scale != cursor_scale ||
+				s->cursor_color != cursor_color);
 
-			// Pointer changed, so need to update software cursor.
+		if (cursor_changed)
+		{
+			const u32 other_port = s->port ^ 1u;
+			const bool other_aims_mouse = USB::GetConfigDevice(si, other_port) == TypeName() &&
+				StringUtil::StartsWithNoCase(USB::GetConfigString(si, other_port, TypeName(), "Pointer"), "Pointer-") &&
+				!USB::GetConfigString(si, other_port, TypeName(), "cursor_path").empty();
+			if (prev_pointer_index != new_pointer_index &&
+				(prev_pointer_index >= static_cast<s32>(InputManager::MAX_POINTER_DEVICES) || !other_aims_mouse))
+				ImGuiManager::ClearSoftwareCursor(prev_pointer_index); // shared slot 0: keep only while the other gun aims with it
+
 			const bool had_software_cursor = !s->cursor_path.empty();
+
 			s->cursor_path = std::move(cursor_path);
 			s->cursor_scale = cursor_scale;
 			s->cursor_color = cursor_color;
-			if (!s->cursor_path.empty())
+
+			if (s->cursor_path.empty())
 			{
-				ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
-				s->UpdateSoftwarePointerPosition();
+				if (had_software_cursor)
+					ImGuiManager::ClearSoftwareCursor(new_pointer_index);
 			}
-			else if (had_software_cursor)
-			{
-				ImGuiManager::ClearSoftwareCursor(new_pointer_index);
-			}
+		}
+
+		// Always re-assert the configured cursor.
+		// ImGui cursor state can be cleared during VM/device shutdown even when
+		// GunCon2 settings did not change between games.
+		if (!s->cursor_path.empty())
+		{
+			ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
+			s->UpdateSoftwarePointerPosition();
 		}
 	}
 
@@ -559,10 +609,56 @@ namespace usb_lightgun
 		if (bind_index < BID_RELATIVE_LEFT)
 		{
 			const u32 bit = 1u << bind_index;
+			const bool was_pressed = (s->button_state & bit) != 0;
 			if (value >= 0.5f)
 				s->button_state |= bit;
 			else
 				s->button_state &= ~bit;
+
+			// Forward GunCon2 USB buttons to JVS per-game mapping
+			if (!ACJV::GetGameId().empty() && ACJV::enabled)
+			{
+				const bool pressed = (value >= 0.5f);
+				const u32 player = s->port;
+				switch (bind_index)
+				{
+				// Trigger: P1 uses p1_trigger, P2 uses p2_trigger if defined (Vampire Night 2P)
+				case BID_TRIGGER:
+				{
+					const auto& mapping = ACJV::GetGunMapping();
+					if (player == 0)
+						ACJV::SetButtonState(0, mapping.p1_trigger, pressed);
+					else if (mapping.p2_trigger)
+						ACJV::SetButtonState(0, mapping.p2_trigger, pressed);
+					else
+						ACJV::SetButtonState(player, mapping.p1_trigger, pressed);
+					break;
+				}
+				// Foot pedal (cover/reload system: TC3, TC4, Cobra). Vampire Night has no pedal
+				// switch, so there the bind forces the camera-lost report = a manual reload.
+				case BID_A:
+					if (ACJV::GetGunMapping().board == GunBoardModel::CameraVN)
+						ACJV::SetGunForceOffscreen(pressed);
+					else
+						ACJV::SetButtonState(player, ACJV::GetGunMapping().pedal, pressed);
+					break;
+				// Start: P1 uses p1_start, P2 uses p2_start if defined (Vampire Night 2P)
+				case BID_START:
+				{
+					const auto& mapping = ACJV::GetGunMapping();
+					u16 startBit = mapping.p1_start ? mapping.p1_start : JVS_BTN_START;
+					if (player == 0)
+						ACJV::SetButtonState(0, startBit, pressed);
+					else if (mapping.p2_start)
+						ACJV::SetButtonState(0, mapping.p2_start, pressed);
+					else
+						ACJV::SetButtonState(player, startBit, pressed);
+					break;
+				}
+				// Coin insert (rising edge only — prevent double-count from repeated press events)
+				case BID_SELECT:  if (pressed && !was_pressed) ACJV::InsertCoin(player); break;
+				}
+			}
 		}
 		else if (bind_index <= BID_RELATIVE_DOWN)
 		{
@@ -571,6 +667,8 @@ namespace usb_lightgun
 			{
 				s->relative_pos[rel_index] = value;
 				s->UpdateSoftwarePointerPosition();
+				if (!ACJV::GetGameId().empty() && ACJV::enabled)
+					ForwardRelativeAimToJVS(s);
 			}
 		}
 	}

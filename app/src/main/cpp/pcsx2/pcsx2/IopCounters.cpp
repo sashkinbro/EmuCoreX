@@ -430,7 +430,7 @@ void psxVBlankStart()
 {
 	cdvdVsync();
 	iopIntcIrq(0);
-	
+
 	_psxCheckStartGate(1);
 	_psxCheckStartGate(3);
 

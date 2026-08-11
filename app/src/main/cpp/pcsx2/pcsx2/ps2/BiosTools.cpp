@@ -13,7 +13,7 @@
 #include "BiosTools.h"
 #include "Config.h"
 
-static constexpr u32 MIN_BIOS_SIZE = 4 * _1mb;
+static constexpr u32 MIN_BIOS_SIZE = 2 * _1mb;
 static constexpr u32 MAX_BIOS_SIZE = 8 * _1mb;
 static constexpr u32 DIRENTRY_SIZE = 16;
 
@@ -146,7 +146,11 @@ static bool LoadBiosVersion(std::FILE* fp, u32& version, std::string& descriptio
 			// case 'E': zone = "Russia"; region = 3;  break; // Not implemented
 			case 'C': zone = "China";  region = 6;  break;
 			// case 'A': zone = "Mexico"; region = 7;  break; // Not implemented
-			case 'T': zone = (romver[5]=='Z') ? "COH-H" : "T10K";   region = 8;  break;
+			case 'T': {
+				zone = (romver[5]=='Z') ? "COH-H" : "T10K";
+				region = (romver[5]=='Z') ? 11 : 8;
+				break;
+			}
 			case 'X': zone = "Test";   region = 9;  break;
 			case 'P': zone = "Free";   region = 10; break;
 			// clang-format on
@@ -168,15 +172,31 @@ static bool LoadBiosVersion(std::FILE* fp, u32& version, std::string& descriptio
 
 		char vermaj[3] = {romver[0], romver[1], 0};
 		char vermin[3] = {romver[2], romver[3], 0};
-		description = StringUtil::StdStringFromFormat("%-7s v%s.%s(%c%c/%c%c/%c%c%c%c)  %s %s",
-			zone.c_str(),
-			vermaj, vermin,
-			romver[12], romver[13], // day
-			romver[10], romver[11], // month
-			romver[6], romver[7], romver[8], romver[9], // year!
-			(romver[5] == 'C') ? "Console" : (romver[5] == 'D') ? "Devel" :
-																  "",
-			serial.c_str());
+
+		if (romver[4] == 'T' && romver[5] == 'Z')
+		{
+			// Sony did not update the version/date fields between COH-H arcade BIOSes,
+			// so identify those images by their EXTINFO serial instead.
+			std::string console_guess;
+			if (serial == "20040519-145634")
+				console_guess = "System 256";
+			else if (serial == "20021119-163841")
+				console_guess = "System 246 Rack C";
+			else if (serial == "20000901-114731")
+				console_guess = "COH-H Board (A-000-010)";
+
+			description = StringUtil::StdStringFromFormat("%-7s %s %s",
+				zone.c_str(), console_guess.c_str(), serial.c_str());
+		}
+		else
+		{
+			description = StringUtil::StdStringFromFormat("%-7s v%s.%s(%c%c/%c%c/%c%c%c%c)  %s %s",
+				zone.c_str(), vermaj, vermin,
+				romver[12], romver[13], romver[10], romver[11],
+				romver[6], romver[7], romver[8], romver[9],
+				(romver[5] == 'C') ? "Console" : (romver[5] == 'D') ? "Devel" : "",
+				serial.c_str());
+		}
 
 		version = static_cast<u32>(strtol(vermaj, (char**)NULL, 0) << 8);
 		version |= strtol(vermin, (char**)NULL, 0);
@@ -342,7 +362,9 @@ bool LoadBIOS()
 
 	LoadBiosVersion(fp.get(), BiosVersion, BiosDescription, BiosRegion, BiosZone, BiosSerial);
 
-	BiosRom.resize(Ps2MemSize::Rom);
+	// Arcade COH-H chip dumps are 2 MiB. Clear the complete 4 MiB ROM window before
+	// reading so its unused half cannot retain data from a previously loaded BIOS.
+	BiosRom.assign(Ps2MemSize::Rom, 0);
 
 	if (FileSystem::FSeek64(fp.get(), 0, SEEK_SET) ||
 		std::fread(BiosRom.data(), static_cast<size_t>(std::min<s64>(Ps2MemSize::Rom, filesize)), 1, fp.get()) != 1)

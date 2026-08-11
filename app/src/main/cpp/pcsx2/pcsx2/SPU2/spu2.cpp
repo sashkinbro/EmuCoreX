@@ -5,6 +5,7 @@
 #include "SPU2/defs.h"
 #include "SPU2/Debug.h"
 #include "SPU2/Dma.h"
+#include "Common.h"
 #include "Host/AudioStream.h"
 #include "Host.h"
 #include "GS/GSCapture.h"
@@ -44,7 +45,7 @@ float DCFilterIn[2], DCFilterOut[2];
 
 u32 SPU2::GetConsoleSampleRate()
 {
-	return s_psxmode ? PSX_SAMPLE_RATE : SAMPLE_RATE;
+	return s_psxmode ? PSX_SAMPLE_RATE : (PSXCLK / 768);
 }
 
 // --------------------------------------------------------------------------------------

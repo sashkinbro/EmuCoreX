@@ -8,6 +8,7 @@
 #include "R3000A.h"
 #include "IopHw.h"
 #include "Config.h"
+#include "DEV9/ACJV.h"
 
 static constexpr int CYCLES_PER_WORD = 24;
 
@@ -250,7 +251,11 @@ void V_Core::FinishDMAwrite()
 		DMA7LogWrite(DMAPtr, ReadSize << 1);
 #endif
 
-	u32 buff1end = ActiveTSA + std::min(ReadSize, (u32)0x100 + std::abs(DMAICounter / CYCLES_PER_WORD));
+	// S246/S256 completes the transfer immediately. Preserve the original deferred
+	// transfer timing for retail PS2 software.
+	const u32 transfer_size = !ACJV::GetGameId().empty() ?
+		ReadSize : std::min(ReadSize, (u32)0x100 + std::abs(DMAICounter / CYCLES_PER_WORD));
+	u32 buff1end = ActiveTSA + transfer_size;
 	u32 buff2end = 0;
 	if (buff1end > 0x100000)
 	{
@@ -346,6 +351,10 @@ void V_Core::FinishDMAwrite()
 	ReadSize -= TDA - ActiveTSA;
 
 	DMAICounter = (DMAICounter - ReadSize) * CYCLES_PER_WORD;
+
+	// Arcade transfers are all-at-once, so don't leave a stale IRQ delay behind.
+	if (!ACJV::GetGameId().empty() && ReadSize == 0 && DMAICounter > CYCLES_PER_WORD)
+		DMAICounter = CYCLES_PER_WORD;
 
 	CounterUpdate(DMAICounter);
 

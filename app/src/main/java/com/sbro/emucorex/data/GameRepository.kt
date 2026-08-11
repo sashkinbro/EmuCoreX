@@ -29,7 +29,7 @@ class GameRepository {
 
     companion object {
         private const val TAG = "GameRepository"
-        private val SUPPORTED_EXTENSIONS = setOf("iso", "bin", "img", "mdf", "gz", "cso", "zso", "chd", "elf")
+        private val SUPPORTED_EXTENSIONS = setOf("iso", "bin", "img", "mdf", "gz", "cso", "zso", "chd", "elf", "acgame")
         private val COVER_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp")
         private val COVER_DIRECTORY_NAMES = setOf("covers", "cover", "art", "artwork", "boxart", "box art")
         private const val MAX_DOCUMENT_SCAN_DEPTH = 32

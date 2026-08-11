@@ -2,6 +2,7 @@
 #include "emucorex/android_crash_diagnostics.h"
 
 #include "GS/GS.h"
+#include "GS/Renderers/Common/GSRenderer.h"
 #include "MTGS.h"
 #include "common/FileSystem.h"
 #include "common/HostSys.h"
@@ -358,6 +359,67 @@ bool DispatchRetroAchievementsSound(const char* path)
 
 }
 
+std::string ResolveArcadeAssetUriJNI(const char* manifest_uri, const char* relative_path)
+{
+	if (!manifest_uri || !relative_path)
+		return {};
+
+	JavaVM* java_vm = nullptr;
+	jclass native_app_class = nullptr;
+	{
+		std::lock_guard lock(s_callback_mutex);
+		java_vm = s_java_vm;
+		native_app_class = s_native_app_class;
+	}
+	if (!java_vm || !native_app_class)
+		return {};
+
+	JNIEnv* env = nullptr;
+	bool did_attach = false;
+	if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
+	{
+		if (java_vm->AttachCurrentThread(&env, nullptr) != JNI_OK || !env)
+			return {};
+		did_attach = true;
+	}
+
+	std::string result;
+	const jmethodID method = env->GetStaticMethodID(native_app_class, "resolveArcadeAssetUri",
+		"(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+	if (method)
+	{
+		jstring j_manifest = env->NewStringUTF(manifest_uri);
+		jstring j_relative = env->NewStringUTF(relative_path);
+		if (j_manifest && j_relative)
+		{
+			jstring j_result = static_cast<jstring>(
+				env->CallStaticObjectMethod(native_app_class, method, j_manifest, j_relative));
+			if (j_result)
+			{
+				const char* chars = env->GetStringUTFChars(j_result, nullptr);
+				if (chars)
+				{
+					result.assign(chars);
+					env->ReleaseStringUTFChars(j_result, chars);
+				}
+				env->DeleteLocalRef(j_result);
+			}
+		}
+		if (j_manifest)
+			env->DeleteLocalRef(j_manifest);
+		if (j_relative)
+			env->DeleteLocalRef(j_relative);
+	}
+	if (env->ExceptionCheck())
+	{
+		env->ExceptionClear();
+		result.clear();
+	}
+	if (did_attach)
+		java_vm->DetachCurrentThread();
+	return result;
+}
+
 int FileSystem::OpenFDFileContent(const char* filename)
 {
 	if (!filename)
@@ -442,6 +504,18 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPerfo
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getPerformanceMetricsSnapshot(JNIEnv* env, jclass)
 {
 	return StringToJString(env, emucorex::android::GetPerformanceMetricsSnapshot());
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL Java_com_sbro_emucorex_core_NativeApp_getDisplayDrawRect(JNIEnv* env, jclass)
+{
+	if (!AndroidRuntime::Instance().HasValidVm())
+		return nullptr;
+	const GSVector4 rect = GSRenderer::GetLastDrawRect();
+	const jfloat values[4] = {rect.x, rect.y, rect.z, rect.w};
+	jfloatArray result = env->NewFloatArray(4);
+	if (result)
+		env->SetFloatArrayRegion(result, 0, 4, values);
+	return result;
 }
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getCoreVersion(JNIEnv* env, jclass)
 {

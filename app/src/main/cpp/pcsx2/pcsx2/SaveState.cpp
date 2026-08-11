@@ -540,6 +540,87 @@ public:
 	uint GetDataSize() const override { return Ps2MemSize::ExposedIopRam; }
 };
 
+#include "DEV9/ACJV.h"
+class SavestateEntry_ACRAM final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_ACRAM() override = default;
+
+	const char* GetFilename() const override { return "ACRAM.bin"; }
+	u8* GetDataPtr() const override { return iopMem->ACRAM; }
+	uint GetDataSize() const override { return NamcoMemSize::ACRAM; }
+	bool IsRequired() const override { return false; }
+	bool FreezeOut(SaveStateBase& writer) const override
+	{
+		return ACJV::GetGameId().empty() || MemorySavestateEntry::FreezeOut(writer);
+	}
+	bool FreezeIn(zip_file_t* zf) const override
+	{
+		if (ACJV::GetGameId().empty())
+			return true;
+		if (!zf)
+		{
+			std::memset(GetDataPtr(), 0, GetDataSize());
+			return true;
+		}
+		return MemorySavestateEntry::FreezeIn(zf);
+	}
+};
+
+#include "DEV9/ACSRAM.h"
+class SavestateEntry_ACSRAM final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_ACSRAM() override = default;
+
+	const char* GetFilename() const override { return "ACSRAM.bin"; }
+	u8* GetDataPtr() const override { return ACSRAM::buffer; }
+	uint GetDataSize() const override { return ACSRAM_MAX_SIZE; }
+	bool IsRequired() const override { return false; }
+	bool FreezeOut(SaveStateBase& writer) const override
+	{
+		return ACJV::GetGameId().empty() || MemorySavestateEntry::FreezeOut(writer);
+	}
+	bool FreezeIn(zip_file_t* zf) const override
+	{
+		if (ACJV::GetGameId().empty())
+			return true;
+		if (!zf)
+		{
+			std::memset(GetDataPtr(), 0, GetDataSize());
+			return true;
+		}
+		return MemorySavestateEntry::FreezeIn(zf);
+	}
+};
+
+// lazy hack, if we ever need something else stored beyond coins count, move to `union {struct{...}; u8[]};` style
+class SavestateEntry_JVSSTATE final : public MemorySavestateEntry
+{
+public:
+	~SavestateEntry_JVSSTATE() override = default;
+
+	const char* GetFilename() const override { return "jvs_state.bin"; }
+	u8* GetDataPtr() const override { return (u8*)ACJV::coin; }
+	uint GetDataSize() const override { return sizeof(ACJV::coin); }
+	bool IsRequired() const override { return false; }
+	bool FreezeOut(SaveStateBase& writer) const override
+	{
+		return ACJV::GetGameId().empty() || MemorySavestateEntry::FreezeOut(writer);
+	}
+	bool FreezeIn(zip_file_t* zf) const override
+	{
+		if (ACJV::GetGameId().empty())
+			return true;
+		if (!zf)
+		{
+			std::memset(GetDataPtr(), 0, GetDataSize());
+			return true;
+		}
+		return MemorySavestateEntry::FreezeIn(zf);
+	}
+};
+
 class SavestateEntry_HwRegs final : public MemorySavestateEntry
 {
 public:
@@ -696,6 +777,9 @@ class SaveStateEntry_Achievements final : public BaseSavestateEntry
 static const std::unique_ptr<BaseSavestateEntry> SavestateEntries[] = {
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_EmotionMemory),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopMemory),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACRAM),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_ACSRAM),
+	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_JVSSTATE),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_HwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_IopHwRegs),
 	std::unique_ptr<BaseSavestateEntry>(new SavestateEntry_Scratchpad),

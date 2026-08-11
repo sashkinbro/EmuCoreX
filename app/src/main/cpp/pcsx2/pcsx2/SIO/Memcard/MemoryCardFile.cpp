@@ -916,9 +916,13 @@ std::vector<AvailableMcdInfo> FileMcd_GetAvailableCards(bool include_in_use_card
 		}
 
 		// We only want relevant file types.
-		if (!(fd.FileName.ends_with(".ps2") || fd.FileName.ends_with(".mcr") ||
-				fd.FileName.ends_with(".mcd") || fd.FileName.ends_with(".bin") ||
-				fd.FileName.ends_with(".mc2")))
+		static constexpr const char* card_extensions[] = {
+			".ps2", ".mcr", ".mcd",
+			".bin", ".mc2", ".conquestcard"
+		};
+		const bool found = std::any_of(std::begin(card_extensions), std::end(card_extensions),
+			[&fd](const char* extension) { return fd.FileName.ends_with(extension); });
+		if (!found)
 			continue;
 
 		if (fd.Attributes & FILESYSTEM_FILE_ATTRIBUTE_DIRECTORY)

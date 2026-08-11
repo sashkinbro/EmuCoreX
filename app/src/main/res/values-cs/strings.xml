@@ -2252,5 +2252,35 @@
     <string name="hub_empty_state_title">Zatím tu nic není</string>
     <string name="hub_no_matches">Žádné výsledky</string>
     <string name="hub_clear_search">Vymazat hledání</string>
+    <string name="settings_customization_side_artwork_section">Postranní grafika emulace</string>
+    <string name="settings_customization_side_artwork">Postranní grafika</string>
+    <string name="settings_customization_side_artwork_help">Vyplní pouze nevyužité postranní okraje kolem obrazu hry se zachovaným poměrem stran. Při roztažení nebo vyplnění celé obrazovky se skryje.</string>
+    <string name="settings_customization_side_artwork_none">Žádná</string>
+    <string name="settings_customization_side_artwork_olympus">Olymp</string>
+    <string name="settings_customization_side_artwork_night_racing">Noční závody</string>
+    <string name="settings_customization_side_artwork_jungle">Dobrodružství v džungli</string>
+    <string name="settings_customization_side_artwork_colossus">Starověký kolos</string>
+    <string name="settings_customization_side_artwork_custom">Vlastní</string>
+    <string name="settings_customization_side_artwork_preview">Náhled obrazu hry</string>
+    <string name="settings_customization_side_artwork_import">Vybrat vlastní grafiku</string>
+    <string name="settings_customization_side_artwork_import_desc">Vyberte široký obrázek z tohoto zařízení</string>
+    <string name="settings_customization_side_artwork_remove">Odebrat vlastní grafiku</string>
+    <string name="settings_customization_side_artwork_remove_desc">Odstranit importovaný obrázek</string>
+    <string name="settings_customization_side_artwork_applied">Postranní grafika byla použita</string>
+    <string name="settings_customization_side_artwork_failed">Tento obrázek nelze importovat</string>
+    <string name="settings_customization_side_artwork_removed">Vlastní postranní grafika byla odebrána</string>
+    <string name="settings_retroarch_shaders">Shadery RetroArch</string>
+    <string name="settings_retroarch_shaders_desc">Použije řetězce .slangp na výsledný obraz hry.</string>
+    <string name="settings_help_retroarch_shaders">Podporuje předvolby RetroArch Slang ve Vulkan a OpenGL ES. Složité předvolby mohou snížit výkon.</string>
+    <string name="settings_shader_preset">Předvolba shaderu</string>
+    <string name="settings_shader_preset_none">Žádná</string>
+    <string name="settings_help_shader_preset">Nainstalujte balíček a vyberte předvolbu .slangp. Související soubory zůstanou spolu.</string>
+    <string name="settings_shader_pack_download">Stáhnout oficiální balíček</string>
+    <string name="settings_shader_pack_download_desc">RetroArch Slang Shaders · asi 51 MB · doporučeno Wi‑Fi</string>
+    <string name="settings_shader_pack_working">Instalace balíčku shaderů…</string>
+    <string name="settings_shader_pack_import">Importovat balíček shaderů</string>
+    <string name="settings_shader_pack_import_desc">Vyberte .zip se soubory .slangp a .slang</string>
+    <string name="settings_shader_pack_installed">Balíček shaderů nainstalován</string>
+    <string name="settings_shader_pack_failed">Balíček shaderů se nepodařilo nainstalovat</string>
 </resources>
 

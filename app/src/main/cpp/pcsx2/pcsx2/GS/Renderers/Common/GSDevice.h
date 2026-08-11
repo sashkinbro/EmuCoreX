@@ -1048,6 +1048,10 @@ protected:
 	virtual void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, bool linear, const InterlaceConstantBuffer& cb) = 0;
 	virtual void DoFXAA(GSTexture* sTex, GSTexture* dTex) = 0;
 	virtual void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) = 0;
+	virtual bool DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex) { return false; }
+
+	static u64 GetShaderChainParamGeneration();
+	static bool GetShaderChainParams(const std::string& preset, std::vector<std::pair<std::string, float>>* out);
 
 	/// Resolves CAS shader includes for the specified source.
 	static bool GetCASShaderSource(std::string* source);
@@ -1077,6 +1081,9 @@ public:
 
 	/// Returns a string representing the specified API.
 	static const char* RenderAPIToString(RenderAPI api);
+
+	/// Queues RetroArch shader parameter overrides for consumption on the GS thread.
+	static void SetShaderChainParams(std::string preset, std::vector<std::pair<std::string, float>> params);
 
 	/// Parses the configured fullscreen mode into its components (width * height @ refresh hz)
 	static bool GetRequestedExclusiveFullscreenMode(u32* width, u32* height, float* refresh_rate);
@@ -1234,6 +1241,15 @@ public:
 	void Interlace(const GSVector2i& ds, int field, int mode, float yoffset);
 	void FXAA();
 	void ShadeBoost();
+	/// Runs the configured RetroArch (.slangp) shader chain over m_current, after
+	/// ShadeBoost/FXAA, rendering at `output_size` — the frame's ON-SCREEN size, so shaders
+	/// that generate detail per output pixel (CRT scanlines above all) run at display pixel
+	/// density instead of being generated at internal res and smeared by the presenter's
+	/// upscale. Pass the aspect-corrected draw rect, NOT the raw window: librashader maps the
+	/// whole input to the whole viewport, so a mismatched aspect stretches the picture.
+	/// Returns true if the chain ran and m_current now points at the shaded target. The chain
+	/// itself lives in DoApplyShaderChain, which only librashader-capable backends override.
+	bool ApplyShaderChain(const GSVector2i& output_size);
 	void Resize(int width, int height);
 
 	void CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect, bool sharpen_only);

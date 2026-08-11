@@ -883,6 +883,9 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(ScreenshotFormat) &&
 		OpEqu(ScreenshotQuality) &&
 
+		OpEqu(ShaderChainEnabled) &&
+		OpEqu(ShaderChainPreset) &&
+
 		OpEqu(CaptureContainer) &&
 		OpEqu(VideoCaptureCodec) &&
 		OpEqu(VideoCaptureFormat) &&
@@ -1113,6 +1116,9 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitfieldEx(SaveFrameStart, "SaveFrameStart");
 	SettingsWrapBitfieldEx(SaveFrameCount, "SaveFrameCount");
 	SettingsWrapBitfieldEx(SaveFrameBy, "SaveFrameBy");
+
+	SettingsWrapEntryEx(ShaderChainEnabled, "ShaderChainEnabled");
+	SettingsWrapEntryEx(ShaderChainPreset, "ShaderChainPreset");
 
 	SettingsWrapEntryEx(CaptureContainer, "CaptureContainer");
 	SettingsWrapEntryEx(VideoCaptureCodec, "VideoCaptureCodec");
@@ -2072,6 +2078,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	GS.LoadSave(wrap);
 	SPU2.LoadSave(wrap);
 	DEV9.LoadSave(wrap);
+	Arcade.LoadSave(wrap);
 	Gamefixes.LoadSave(wrap);
 	Profiler.LoadSave(wrap);
 	Savestate.LoadSave(wrap);
@@ -2450,4 +2457,26 @@ std::string EmuFolders::GetOverridableResourcePath(std::string_view name)
 	}
 
 	return upath;
+}
+
+void Pcsx2Config::ArcadeOptions::LoadSave(SettingsWrapper& wrap)
+{
+	SettingsWrapSection("Arcade");
+	SettingsWrapEntry(ATAVerboseReads);
+	SettingsWrapEntry(RAMVerboseReads);
+	SettingsWrapEntry(SRAMVerboseReads);
+	SettingsWrapEntry(UARTVerbose);
+}
+
+bool Pcsx2Config::ArcadeOptions::operator!=(const ArcadeOptions& right) const
+{
+	return !this->operator==(right);
+}
+
+bool Pcsx2Config::ArcadeOptions::operator==(const ArcadeOptions& right) const
+{
+	return OpEqu(ATAVerboseReads) &&
+		   OpEqu(RAMVerboseReads) &&
+		   OpEqu(UARTVerbose) &&
+		   OpEqu(SRAMVerboseReads);
 }

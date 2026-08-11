@@ -56,6 +56,10 @@ static GSVector4 s_last_draw_rect;
 // Screen alignment
 static GSDisplayAlignment s_display_alignment = GSDisplayAlignment::Center;
 
+static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i real_size);
+static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const GSVector4i& src_rect,
+	const GSVector2i& src_size, GSDisplayAlignment alignment, bool flip_y, bool is_progressive);
+
 static bool IsSGSRPresentActive()
 {
 	return GSConfig.SGSRMode != GSSGSRMode::Disabled;
@@ -68,6 +72,11 @@ GSRenderer::GSRenderer()
 }
 
 GSRenderer::~GSRenderer() = default;
+
+GSVector4 GSRenderer::GetLastDrawRect()
+{
+	return s_last_draw_rect;
+}
 
 void GSRenderer::Reset(bool hardware_reset)
 {
@@ -269,6 +278,40 @@ bool GSRenderer::Merge(int field)
 
 	if (GSConfig.FXAA)
 		g_gs_device->FXAA();
+
+	// RetroArch (.slangp) shader chain runs last in the post-process chain, so it sees the
+	// finished frame the way the user actually sees it (ShadeBoost/FXAA included).
+	//
+	// It renders at the frame's ON-SCREEN size, not the internal one. Shaders that generate
+	// detail per output pixel — CRT scanlines above all — must run at display pixel density:
+	// generated at 640x448 and then upscaled to a 1080p window, one scanline lands on ~2.4
+	// screen pixels, so the presenter's filtering smears them into the uneven, wrong-looking
+	// pattern reported on an AYN Thor. RetroArch itself renders the chain into the viewport
+	// for exactly this reason.
+	//
+	// The target MUST be the aspect-corrected draw rect, not the raw window. librashader maps
+	// the whole input to the whole viewport, so a 16:9 target for a 4:3 frame stretches the
+	// picture — and CalculateDrawDstRect derives its rect from the aspect-ratio SETTING, not
+	// from the texture, so it would then letterbox the already-stretched result instead of
+	// correcting it. Matching the draw rect keeps the final present a 1:1 blit.
+	//
+	// m_real_size is deliberately left alone: in CalculateDrawSrcRect it only scales user Crop
+	// values (with no crop the src rect is the whole texture either way), so holding it at the
+	// internal size keeps crop proportional to the frame rather than to the shaded target.
+	if (GSConfig.ShaderChainEnabled && !GSConfig.ShaderChainPreset.empty())
+	{
+		if (GSTexture* const pre_chain = g_gs_device->GetCurrent())
+		{
+			const GSVector4i pre_src(CalculateDrawSrcRect(pre_chain, m_real_size));
+			const GSVector4 pre_dst(CalculateDrawDstRect(g_gs_device->GetWindowWidth(),
+				g_gs_device->GetWindowHeight(), pre_src, pre_chain->GetSize(), s_display_alignment,
+				g_gs_device->UsesLowerLeftOrigin(), GetVideoMode() == GSVideoMode::SDTV_480P));
+			const GSVector2i on_screen(
+				static_cast<int>(std::floor((pre_dst.z - pre_dst.x) + 0.5f)),
+				static_cast<int>(std::floor((pre_dst.w - pre_dst.y) + 0.5f)));
+			g_gs_device->ApplyShaderChain(on_screen);
+		}
+	}
 
 	// Sharpens biinear at lower resolutions, almost nearest but with more uniform pixels.
 	if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp && (g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y))
@@ -1136,6 +1179,23 @@ void GSTranslateWindowToDisplayCoordinates(float window_x, float window_y, float
 
 	*display_x = rel_x / draw_width;
 	*display_y = rel_y / draw_height;
+}
+
+// Same mapping but without collapsing out-of-display positions to (-1,-1): the caller
+// gets graded coordinates beyond [0,1] (used by the arcade lightgun overscan ring).
+void GSTranslateWindowToDisplayCoordinatesUnclamped(float window_x, float window_y, float* display_x, float* display_y)
+{
+	const float draw_width = s_last_draw_rect.z - s_last_draw_rect.x;
+	const float draw_height = s_last_draw_rect.w - s_last_draw_rect.y;
+	if (draw_width <= 0.0f || draw_height <= 0.0f)
+	{
+		*display_x = -1.0f;
+		*display_y = -1.0f;
+		return;
+	}
+
+	*display_x = (window_x - s_last_draw_rect.x) / draw_width;
+	*display_y = (window_y - s_last_draw_rect.y) / draw_height;
 }
 
 void GSSetDisplayAlignment(GSDisplayAlignment alignment)

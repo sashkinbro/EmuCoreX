@@ -2254,6 +2254,36 @@
     <string name="hub_empty_state_title">Jeszcze nic tu nie ma</string>
     <string name="hub_no_matches">Brak wyników</string>
     <string name="hub_clear_search">Wyczyść wyszukiwanie</string>
+    <string name="settings_customization_side_artwork_section">Grafiki boczne emulacji</string>
+    <string name="settings_customization_side_artwork">Grafika boczna</string>
+    <string name="settings_customization_side_artwork_help">Wypełnia tylko niewykorzystane boczne marginesy wokół obrazu gry o prawidłowych proporcjach. Jest ukrywana przy rozciągnięciu lub gdy gra wypełnia ekran.</string>
+    <string name="settings_customization_side_artwork_none">Brak</string>
+    <string name="settings_customization_side_artwork_olympus">Olimp</string>
+    <string name="settings_customization_side_artwork_night_racing">Nocne wyścigi</string>
+    <string name="settings_customization_side_artwork_jungle">Przygoda w dżungli</string>
+    <string name="settings_customization_side_artwork_colossus">Starożytny kolos</string>
+    <string name="settings_customization_side_artwork_custom">Własna</string>
+    <string name="settings_customization_side_artwork_preview">Podgląd obrazu gry</string>
+    <string name="settings_customization_side_artwork_import">Wybierz własną grafikę</string>
+    <string name="settings_customization_side_artwork_import_desc">Wybierz szeroki obraz z tego urządzenia</string>
+    <string name="settings_customization_side_artwork_remove">Usuń własną grafikę</string>
+    <string name="settings_customization_side_artwork_remove_desc">Usuń zaimportowany obraz</string>
+    <string name="settings_customization_side_artwork_applied">Zastosowano grafikę boczną</string>
+    <string name="settings_customization_side_artwork_failed">Nie udało się zaimportować tego obrazu</string>
+    <string name="settings_customization_side_artwork_removed">Usunięto własną grafikę boczną</string>
+    <string name="settings_retroarch_shaders">Shadery RetroArch</string>
+    <string name="settings_retroarch_shaders_desc">Stosuje łańcuchy .slangp do końcowego obrazu gry.</string>
+    <string name="settings_help_retroarch_shaders">Obsługuje presety RetroArch Slang w Vulkan i OpenGL ES. Złożone presety mogą obniżyć wydajność.</string>
+    <string name="settings_shader_preset">Preset shadera</string>
+    <string name="settings_shader_preset_none">Brak</string>
+    <string name="settings_help_shader_preset">Zainstaluj pakiet i wybierz preset .slangp. Powiązane pliki pozostają razem.</string>
+    <string name="settings_shader_pack_download">Pobierz oficjalny pakiet</string>
+    <string name="settings_shader_pack_download_desc">RetroArch Slang Shaders · około 51 MB · zalecane Wi‑Fi</string>
+    <string name="settings_shader_pack_working">Instalowanie pakietu shaderów…</string>
+    <string name="settings_shader_pack_import">Importuj pakiet shaderów</string>
+    <string name="settings_shader_pack_import_desc">Wybierz .zip z plikami .slangp i .slang</string>
+    <string name="settings_shader_pack_installed">Pakiet shaderów zainstalowany</string>
+    <string name="settings_shader_pack_failed">Nie udało się zainstalować pakietu shaderów</string>
 </resources>
 
 

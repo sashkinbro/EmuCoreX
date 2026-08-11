@@ -160,4 +160,5 @@ namespace Terminator
 {
 	static constexpr u32 NOT_READY = 0x66;
 	static constexpr u32 READY = 0x55;
+	static constexpr u32 AUTHENTICATED = 0x5a;
 } // namespace Terminator

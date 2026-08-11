@@ -915,6 +915,10 @@ struct Pcsx2Config
 		std::string AndroidGpuProfileOverride = "auto";
 		GSDepthFeedbackMode DepthFeedbackMode = GSDepthFeedbackMode::Auto;
 
+		// RetroArch (.slangp) shader chain, applied at present after post-processing.
+		bool ShaderChainEnabled = false;
+		std::string ShaderChainPreset;
+
 		u8 CAS_Sharpness = 50;
 		u8 ShadeBoost_Brightness = DEFAULT_SHADEBOOST_BRIGHTNESS;
 		u8 ShadeBoost_Contrast = DEFAULT_SHADEBOOST_CONTRAST;
@@ -1381,6 +1385,19 @@ struct Pcsx2Config
 
 	// ------------------------------------------------------------------------
 
+	struct ArcadeOptions
+	{
+		bool SRAMVerboseReads = false;
+		bool RAMVerboseReads = false;
+		bool ATAVerboseReads = false;
+		bool UARTVerbose = false;
+
+		void LoadSave(SettingsWrapper& wrap);
+
+		bool operator==(const ArcadeOptions& right) const;
+		bool operator!=(const ArcadeOptions& right) const;
+	};
+
 	BITFIELD32()
 	bool
 		CdvdVerboseReads : 1, // enables cdvd read activity verbosely dumped to the console
@@ -1428,6 +1445,7 @@ struct Pcsx2Config
 	FilenameOptions BaseFilenames;
 
 	AchievementsOptions Achievements;
+	ArcadeOptions Arcade;
 
 	// Memorycard options - first 2 are default slots, last 6 are multitap 1 and 2
 	// slots (3 each)

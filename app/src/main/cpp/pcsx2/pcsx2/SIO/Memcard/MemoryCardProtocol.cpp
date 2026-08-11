@@ -6,6 +6,7 @@
 #include "SIO/Sio.h"
 #include "SIO/Sio2.h"
 #include "SIO/Sio0.h"
+#include "DEV9/ACJV.h"
 
 #include "common/Assertions.h"
 #include "common/Console.h"
@@ -517,7 +518,8 @@ void MemoryCardProtocol::AuthF3()
 	}
 	else
 	{
-		mcd->term = Terminator::READY;
+		if (ACJV::GetGameId().empty())
+			mcd->term = Terminator::READY;
 		The2bTerminator(5);
 	}
 }

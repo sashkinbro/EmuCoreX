@@ -1401,7 +1401,7 @@ u32 ohci_mem_read(OHCIState* ptr, u32 addr)
 {
 	auto val = ohci_mem_read_impl(ptr, addr);
 	int idx = (addr - ptr->mem_base) >> 2;
-	if (idx < countof(reg_names))
+	if (idx < (int)std::size(reg_names))
 	{
 		Console.Warning("ohci_mem_read %s(%d): %08x\n", reg_names[idx], idx, val);
 	}
@@ -1501,7 +1501,7 @@ void ohci_mem_write_impl(OHCIState* ptr, u32 addr, u32 val);
 void ohci_mem_write(OHCIState* ptr, u32 addr, u32 val)
 {
 	int idx = (addr - ptr->mem_base) >> 2;
-	if (idx < countof(reg_names))
+	if (idx < (int)std::size(reg_names))
 	{
 		Console.Warning("ohci_mem_write %s(%d): %08x\n", reg_names[idx], idx, val);
 	}

@@ -155,8 +155,8 @@ static constexpr uint DVD_MAX_ROTATION_X1 = 1515;
 // Legacy Note: FullSeek timing causes many games to load very slow, but it likely not the real problem.
 // Games breaking with it set to PSXCLK*40 : "wrath unleashed" and "Shijou Saikyou no Deshi Kenichi".
 
-static constexpr uint Cdvd_FullSeek_Cycles = (36864000UL * 100UL) / 1000UL; // average number of cycles per fullseek (100ms)
-static constexpr uint Cdvd_FastSeek_Cycles = (36864000UL * 30UL) / 1000UL;  // average number of cycles per fastseek (37ms)
+static inline uint Cdvd_FullSeek_Cycles() { return (PSXCLK * 100UL) / 1000UL; } // average number of IOP cycles per fullseek (100ms)
+static inline uint Cdvd_FastSeek_Cycles() { return (PSXCLK * 30UL) / 1000UL; }  // average number of IOP cycles per fastseek (37ms)
 bool trayState = 0; // Used to check if the CD tray status has changed since the last time
 
 static const char* mg_zones[8] = {"Japan", "USA", "Europe", "Oceania", "Asia", "Russia", "China", "Mexico"};

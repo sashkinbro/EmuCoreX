@@ -55,7 +55,7 @@ struct _mcd
 	void Write(u8 *src, int size)
 	{
 		//DevCon.WriteLn("Memcard Write (sectorAddr = %08X)", sectorAddr);
-		FileMcd_Save(port, slot, src,transferAddr, size);
+		FileMcd_Save(port, slot, src, transferAddr, size);
 	}
 
 	bool IsPresent()

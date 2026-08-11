@@ -275,6 +275,7 @@ inline GIFregisters& GetGifRegs() { return reinterpret_cast<GIFregisters&>(eeHw[
 #define gifRegs (GetGifRegs())
 
 extern void gifInterrupt();
+extern void Gif_FinishIRQEvent();
 extern void GIFdma();
 extern void dmaGIF();
 extern void mfifoGIFtransfer();

@@ -149,7 +149,10 @@ fun buildOverlayCanvasLayout(
     val dpadCenterOffset = (dpadClusterExtent - dpadButtonSize) / 2f
     val actionCenterOffset = (actionClusterExtent - actionButtonSize) / 2f
     val edgePadding = (if (isLandscape) 16.dp else 10.dp) * responsiveScale
-    val verticalPadding = 8.dp * responsiveScale
+    // Shoulder buttons used to hug the cutout/system-bar edge, which made the whole
+    // controller look top-heavy and uncomfortable to reach on tall phones. Keep a
+    // deliberate, scale-aware breathing zone while still honoring asymmetric insets.
+    val verticalPadding = (if (isLandscape) 22.dp else 16.dp) * responsiveScale
     val edgePadStart = safeLeftInset + edgePadding
     val edgePadEnd = safeRightInset + edgePadding
     val edgePadTop = safeTopInset + verticalPadding

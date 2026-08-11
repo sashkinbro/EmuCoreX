@@ -40,6 +40,7 @@ public:
 	// does not accidentally use dmaBlockSize.
 	size_t dmaBlockSize = 0;
 	bool queueComplete = false;
+	size_t transferBytes = 0;
 
 	Sio2();
 	~Sio2();
@@ -59,6 +60,8 @@ public:
 	void Pad();
 	void Multitap();
 	void Infrared();
+
+	friend void sio2DelayedInterrupt();
 	void Memcard();
 
 	void Write(u8 data);
@@ -68,3 +71,4 @@ public:
 extern std::deque<u8> g_Sio2FifoIn;
 extern std::deque<u8> g_Sio2FifoOut;
 extern Sio2 g_Sio2;
+extern void sio2DelayedInterrupt();

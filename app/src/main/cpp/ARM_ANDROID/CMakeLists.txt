@@ -210,6 +210,9 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/3rdparty/freesurround" "${CMAKE_CURRENT_BINARY_DIR}/upstream/freesurround" EXCLUDE_FROM_ALL)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/3rdparty/vulkan" "${CMAKE_CURRENT_BINARY_DIR}/upstream/vulkan" EXCLUDE_FROM_ALL)
 	add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/third_party/libadrenotools" "${CMAKE_CURRENT_BINARY_DIR}/third_party/libadrenotools" EXCLUDE_FROM_ALL)
+	# RetroArch .slangp shader chains. Optional for contributor builds without Rust;
+	# release builders install cargo and get the pinned, reproducible runtime.
+	add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/third_party/librashader" "${CMAKE_CURRENT_BINARY_DIR}/third_party/librashader")
 	set_property(TARGET freesurround PROPERTY CXX_STANDARD 20)
 	set_property(TARGET freesurround PROPERTY CXX_STANDARD_REQUIRED ON)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/3rdparty/demangler" "${CMAKE_CURRENT_BINARY_DIR}/upstream/demangler" EXCLUDE_FROM_ALL)
@@ -228,6 +231,10 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	set_property(TARGET common PROPERTY CXX_STANDARD_REQUIRED ON)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/pcsx2" "${CMAKE_CURRENT_BINARY_DIR}/upstream/pcsx2")
 	target_link_libraries(PCSX2_FLAGS INTERFACE JPEG::JPEG)
+	if(EMUCOREX_HAVE_LIBRASHADER)
+		target_link_libraries(PCSX2_FLAGS INTERFACE librashader)
+		target_compile_definitions(PCSX2_FLAGS INTERFACE ARMSX2_HAS_LIBRASHADER=1)
+	endif()
 	target_include_directories(PCSX2 PRIVATE
 		"${CMAKE_CURRENT_LIST_DIR}/include"
 		"${EMUCOREX_OAKNUT_INCLUDE_DIR}"
@@ -350,5 +357,8 @@ endif()
 
 if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	target_link_libraries(emucore PRIVATE PCSX2 PCSX2_FLAGS)
+	if(EMUCOREX_HAVE_LIBRASHADER)
+		target_link_libraries(emucore PRIVATE librashader)
+	endif()
 	add_dependencies(emucore main_hook file_redirect_hook gsl_alloc_hook hook_impl)
 endif()

@@ -30,6 +30,14 @@ class SetupValidatorTest {
     }
 
     @Test
+    fun arcadeManifestIsRecognizedAsGameFile() {
+        assertEquals(
+            SetupValidator.DocumentEntryKind.GAME_FILE,
+            SetupValidator.classifyDocumentEntry("text/plain", "tekken5.acgame")
+        )
+    }
+
+    @Test
     fun missingMimeTypeWithoutGameExtensionRemainsTraversable() {
         assertEquals(
             SetupValidator.DocumentEntryKind.UNKNOWN,

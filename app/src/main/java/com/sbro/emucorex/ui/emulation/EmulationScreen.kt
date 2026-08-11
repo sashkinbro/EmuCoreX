@@ -152,6 +152,7 @@ import com.sbro.emucorex.core.AndroidTouchHaptics
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.buildUpscaleOptions
@@ -179,6 +180,7 @@ import com.sbro.emucorex.data.gameMenuSectionsForTab
 import com.sbro.emucorex.ui.controls.CustomControlVisual
 import com.sbro.emucorex.ui.controls.composeShape
 import com.sbro.emucorex.ui.common.BitmapPathImage
+import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
 import com.sbro.emucorex.ui.common.ProvideGamepadMenuAction
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.ProvideGamepadUiNavigation
@@ -842,6 +844,20 @@ fun EmulationScreen(
         }
     }
 
+    val nativeDisplayDrawRect by produceState<FloatArray?>(
+        initialValue = null,
+        key1 = uiState.isRunning,
+        key2 = uiState.aspectRatio
+    ) {
+        if (!uiState.isRunning) return@produceState
+        while (true) {
+            value = runCatching { NativeApp.getDisplayDrawRect() }
+                .getOrNull()
+                ?.takeIf { it.size >= 4 && it[2] > it[0] && it[3] > it[1] }
+            delay(250.milliseconds)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Game surface
         AndroidView(
@@ -893,6 +909,14 @@ fun EmulationScreen(
                     }
                     false
                 }
+        )
+
+        EmulationSideArtworkOverlay(
+            artwork = globalDefaults.emulationSideArtwork,
+            revision = globalDefaults.emulationSideArtworkRevision,
+            aspectRatioMode = uiState.aspectRatio,
+            nativeDrawRect = nativeDisplayDrawRect,
+            modifier = Modifier.fillMaxSize()
         )
 
         if (!showControlsEditor) {

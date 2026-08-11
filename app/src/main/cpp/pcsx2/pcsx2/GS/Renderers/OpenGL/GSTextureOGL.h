@@ -22,6 +22,7 @@ private:
 	u32 m_map_offset = 0;
 
 	// internal opengl format/type/alignment
+	GLenum m_gl_format = 0;
 	GLenum m_int_format = 0;
 	GLenum m_int_type = 0;
 	u32 m_int_shift = 0;
@@ -31,6 +32,7 @@ public:
 	~GSTextureOGL() override;
 
 	__fi GLenum GetIntFormat() const { return m_int_format; }
+	__fi GLenum GetGLFormat() const { return m_gl_format; }
 	__fi GLenum GetIntType() const { return m_int_type; }
 	__fi u32 GetIntShift() const { return m_int_shift; }
 

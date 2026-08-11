@@ -24,6 +24,21 @@ enum class HomeBackgroundType(val preferenceValue: Int) {
     }
 }
 
+/** Artwork rendered only in the unused side gutters around an aspect-correct game frame. */
+enum class EmulationSideArtwork(val preferenceValue: Int) {
+    NONE(0),
+    OLYMPUS(1),
+    NIGHT_RACING(2),
+    JUNGLE(3),
+    COLOSSUS(4),
+    CUSTOM(5);
+
+    companion object {
+        fun fromPreference(value: Int?): EmulationSideArtwork =
+            entries.firstOrNull { it.preferenceValue == value } ?: NONE
+    }
+}
+
 /** Visual treatment only; controller geometry and input hit targets never depend on this value. */
 enum class TouchControlVisualStyle(val preferenceValue: Int) {
     CLASSIC(0),

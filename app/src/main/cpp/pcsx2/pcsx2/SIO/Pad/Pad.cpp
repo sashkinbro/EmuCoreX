@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Host.h"
+#include "DEV9/ACJV.h"
 #include "Input/InputManager.h"
 #include "SIO/Pad/Pad.h"
 #include "SIO/Pad/PadDualshock2.h"
@@ -543,12 +544,132 @@ PadBase* Pad::GetPad(const u8 unifiedSlot)
 	return s_controllers[unifiedSlot].get();
 }
 
+static GenericInputBinding GetDualShockGenericBinding(u32 bind)
+{
+	switch (bind)
+	{
+		case PadDualshock2::PAD_UP: return GenericInputBinding::DPadUp;
+		case PadDualshock2::PAD_RIGHT: return GenericInputBinding::DPadRight;
+		case PadDualshock2::PAD_DOWN: return GenericInputBinding::DPadDown;
+		case PadDualshock2::PAD_LEFT: return GenericInputBinding::DPadLeft;
+		case PadDualshock2::PAD_TRIANGLE: return GenericInputBinding::Triangle;
+		case PadDualshock2::PAD_CIRCLE: return GenericInputBinding::Circle;
+		case PadDualshock2::PAD_CROSS: return GenericInputBinding::Cross;
+		case PadDualshock2::PAD_SQUARE: return GenericInputBinding::Square;
+		case PadDualshock2::PAD_SELECT: return GenericInputBinding::Select;
+		case PadDualshock2::PAD_START: return GenericInputBinding::Start;
+		case PadDualshock2::PAD_L1: return GenericInputBinding::L1;
+		case PadDualshock2::PAD_L2: return GenericInputBinding::L2;
+		case PadDualshock2::PAD_R1: return GenericInputBinding::R1;
+		case PadDualshock2::PAD_R2: return GenericInputBinding::R2;
+		case PadDualshock2::PAD_L3: return GenericInputBinding::L3;
+		case PadDualshock2::PAD_R3: return GenericInputBinding::R3;
+		case PadDualshock2::PAD_L_UP: return GenericInputBinding::LeftStickUp;
+		case PadDualshock2::PAD_L_RIGHT: return GenericInputBinding::LeftStickRight;
+		case PadDualshock2::PAD_L_DOWN: return GenericInputBinding::LeftStickDown;
+		case PadDualshock2::PAD_L_LEFT: return GenericInputBinding::LeftStickLeft;
+		case PadDualshock2::PAD_R_UP: return GenericInputBinding::RightStickUp;
+		case PadDualshock2::PAD_R_RIGHT: return GenericInputBinding::RightStickRight;
+		case PadDualshock2::PAD_R_DOWN: return GenericInputBinding::RightStickDown;
+		case PadDualshock2::PAD_R_LEFT: return GenericInputBinding::RightStickLeft;
+		default: return GenericInputBinding::Unknown;
+	}
+}
+
+static GenericInputBinding GetArcadeDPadFallback(GenericInputBinding binding)
+{
+	switch (binding)
+	{
+		case GenericInputBinding::LeftStickUp: return GenericInputBinding::DPadUp;
+		case GenericInputBinding::LeftStickRight: return GenericInputBinding::DPadRight;
+		case GenericInputBinding::LeftStickDown: return GenericInputBinding::DPadDown;
+		case GenericInputBinding::LeftStickLeft: return GenericInputBinding::DPadLeft;
+		default: return GenericInputBinding::Unknown;
+	}
+}
+
+static void MirrorControllerStateToJVS(u32 controller, u32 bind, float value)
+{
+	if (controller >= 2 || ACJV::GetGameId().empty())
+		return;
+
+	const GenericInputBinding generic = GetDualShockGenericBinding(bind);
+	if (generic == GenericInputBinding::Unknown)
+		return;
+
+	// Most standard/fighting JVS cabinets expose a digital lever. Mirror the
+	// left stick to those direction bits as a compatibility fallback while
+	// retaining the real analog path for driving, gun, drum and touch hardware.
+	const JVS_MODE mode = ACJV::GetMode();
+	const GenericInputBinding dpad_fallback =
+		(mode == JVS_MODE::DEFAULT || mode == JVS_MODE::FIGHTING || mode == JVS_MODE::STANDARD) ?
+			GetArcadeDPadFallback(generic) : GenericInputBinding::Unknown;
+
+	static std::array<bool, 2> coin_down = {};
+	static std::array<bool, 2> test_down = {};
+	const bool pressed = value > 0.5f;
+	if (generic == GenericInputBinding::L3)
+	{
+		if (pressed && !coin_down[controller])
+			ACJV::InsertCoin(controller);
+		coin_down[controller] = pressed;
+		return;
+	}
+	if (generic == GenericInputBinding::R3)
+	{
+		if (pressed && !test_down[controller])
+			ACJV::ToggleDIPSwitchState(0);
+		test_down[controller] = pressed;
+		return;
+	}
+
+	const auto mirror_buttons = [controller, generic, pressed](std::span<const InputBindingInfo> bindings) {
+		for (const InputBindingInfo& binding : bindings)
+		{
+			if (binding.generic_mapping == generic)
+				ACJV::SetButtonState(controller, binding.bind_index, pressed);
+		}
+	};
+
+	const std::span<const InputBindingInfo> layout =
+		(ACJV::GetMode() == JVS_MODE::FIGHTING) ? ACJV::GetFightingButtons() :
+		(ACJV::GetMode() == JVS_MODE::DRIVE) ? ACJV::GetRacingButtons() :
+		(ACJV::GetMode() == JVS_MODE::STANDARD) ? ACJV::GetStandardButtons() :
+		(ACJV::GetMode() == JVS_MODE::TWINSTICK) ? ACJV::GetTwinstickBindings() :
+		std::span<const InputBindingInfo>();
+
+	const auto system_buttons = (controller == 0) ? ACJV::GetButtonBindings() : ACJV::GetP2ButtonBindings();
+	for (const InputBindingInfo& binding : system_buttons)
+	{
+		const bool system_control = binding.generic_mapping == GenericInputBinding::DPadUp ||
+			binding.generic_mapping == GenericInputBinding::DPadRight ||
+			binding.generic_mapping == GenericInputBinding::DPadDown ||
+			binding.generic_mapping == GenericInputBinding::DPadLeft ||
+			binding.generic_mapping == GenericInputBinding::Start ||
+			binding.generic_mapping == GenericInputBinding::Select;
+		if ((system_control || layout.empty()) &&
+			(binding.generic_mapping == generic || binding.generic_mapping == dpad_fallback))
+			ACJV::SetButtonState(controller, binding.bind_index, pressed);
+	}
+	mirror_buttons(layout);
+
+	if (controller == 0 && ACJV::GetMode() == JVS_MODE::DRIVE)
+	{
+		for (const InputBindingInfo& binding : ACJV::GetWheelBindings())
+		{
+			if (binding.generic_mapping == generic)
+				ACJV::SetWheelAxis(binding.bind_index, value);
+		}
+	}
+}
+
 void Pad::SetControllerState(u32 controller, u32 bind, float value)
 {
 	if (controller >= NUM_CONTROLLER_PORTS)
 		return;
 
 	s_controllers[controller]->Set(bind, value);
+	MirrorControllerStateToJVS(controller, bind, value);
 }
 
 bool Pad::Freeze(StateWrapper& sw)

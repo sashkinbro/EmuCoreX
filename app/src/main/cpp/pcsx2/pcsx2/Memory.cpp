@@ -440,6 +440,9 @@ void memMapPhy()
 	// Various ROMs (all read-only)
 	vtlb_MapBlock(eeMem->ROM,	0x1fc00000, Ps2MemSize::Rom);
 	vtlb_MapBlock(eeMem->ROM1,	0x1e000000, Ps2MemSize::Rom1);
+	// COH-H exposes ROM1 through the arcade ACDEV window as well.
+	if (BiosZone == "COH-H")
+		vtlb_MapBlock(eeMem->ROM1, 0xB0000000, Ps2MemSize::Rom1);
 	vtlb_MapBlock(eeMem->ROM2,	0x1e400000, Ps2MemSize::Rom2);
 
 	// IOP memory

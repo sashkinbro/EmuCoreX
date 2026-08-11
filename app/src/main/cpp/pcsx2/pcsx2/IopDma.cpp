@@ -10,6 +10,8 @@
 #include "SIO/Sio2.h"
 
 #include "Sif.h"
+#include "IopMem.h"
+#include "DEV9/ACJV.h"
 #include "DEV9/DEV9.h"
 
 using namespace R3000A;
@@ -188,6 +190,10 @@ void psxDma9(u32 madr, u32 bcr, u32 chcr)
 	sif0.iop.end = false;
 
 	SIF0Dma();
+
+	// Clear dma9 busy now so each queued sceSifSetDma re-kicks & reads the reused bounce fresh (else movie corrupts).
+	if (!ACJV::GetGameId().empty() && !sif0.iop.busy)
+		HW_DMA9_CHCR &= ~0x01000000;
 }
 
 void psxDma10(u32 madr, u32 bcr, u32 chcr)

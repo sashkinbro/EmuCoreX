@@ -3,6 +3,7 @@
 
 #include "SIO/Sio.h"
 
+#include "DEV9/ACJV.h"
 #include "SIO/SioTypes.h"
 #include "SIO/Memcard/MemoryCardProtocol.h"
 #include "Counters.h"
@@ -26,8 +27,8 @@ void sioNextFrame() {
 void sioSetGameSerial( const std::string& serial ) {
 	for ( uint port = 0; port < 2; ++port ) {
 		for ( uint slot = 0; slot < 4; ++slot ) {
-			if ( mcds[port][slot].ReIndex( serial ) ) {
-				AutoEject::Set( port, slot );
+			if (mcds[port][slot].ReIndex(serial) && ACJV::GetGameId().empty()) {
+				AutoEject::Set(port, slot);
 			}
 		}
 	}

@@ -32,6 +32,10 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.HomeBackgroundRepository
 import com.sbro.emucorex.data.HomeBackgroundType
+import com.sbro.emucorex.data.EmulationSideArtwork
+import com.sbro.emucorex.data.EmulationSideArtworkRepository
+import com.sbro.emucorex.data.RetroArchShaderPreset
+import com.sbro.emucorex.data.RetroArchShaderRepository
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.GameMenuLayoutStyle
@@ -82,6 +86,14 @@ data class SettingsUiState(
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
     val homeBackgroundRevision: Int = 0,
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
+    val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
+    val emulationSideArtworkRevision: Int = 0,
+    val isSideArtworkImporting: Boolean = false,
+    val shaderChainEnabled: Boolean = false,
+    val shaderChainPreset: String = "",
+    val shaderPresets: List<RetroArchShaderPreset> = emptyList(),
+    val isShaderPackBusy: Boolean = false,
+    val shaderPackMessageResId: Int? = null,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
     val gameMenuLayoutStyle: GameMenuLayoutStyle = GameMenuLayoutStyle.SIDEBAR,
@@ -299,6 +311,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val preferences = AppPreferences(application)
     private val customFontRepository = CustomFontRepository(application)
     private val homeBackgroundRepository = HomeBackgroundRepository(application)
+    private val emulationSideArtworkRepository = EmulationSideArtworkRepository(application)
+    private val retroArchShaderRepository = RetroArchShaderRepository(application)
     private val appUpdateRepository = AppUpdateRepository(application)
     private val gpuDriverManager = GpuDriverManager(application)
     private val gpuDriverCatalogRepository = GpuDriverCatalogRepository(application)
@@ -309,6 +323,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         refreshInstalledGpuDrivers()
+        refreshShaderPresets()
         viewModelScope.launch {
             preferences.cleanupLegacyClampingPreferencesIfNeeded()
             preferences.settingsSnapshot.collect { snapshot ->
@@ -362,6 +377,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             homeBackgroundType = snapshot.homeBackgroundType,
             homeBackgroundRevision = snapshot.homeBackgroundRevision,
             homeBackgroundDim = snapshot.homeBackgroundDim,
+            emulationSideArtwork = snapshot.emulationSideArtwork,
+            emulationSideArtworkRevision = snapshot.emulationSideArtworkRevision,
+            shaderChainEnabled = snapshot.shaderChainEnabled,
+            shaderChainPreset = snapshot.shaderChainPreset,
             touchControlVisualStyle = snapshot.touchControlVisualStyle,
             touchControlPressEffect = snapshot.touchControlPressEffect,
             gameMenuLayoutStyle = snapshot.gameMenuLayoutStyle,
@@ -740,11 +759,93 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    fun setEmulationSideArtwork(artwork: EmulationSideArtwork) = viewModelScope.launch {
+        if (artwork != EmulationSideArtwork.CUSTOM || emulationSideArtworkRepository.existingCustomFile() != null) {
+            preferences.setEmulationSideArtwork(artwork)
+        }
+    }
+
+    fun installEmulationSideArtwork(uri: Uri) = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(
+            isSideArtworkImporting = true,
+            customizationMessageResId = null
+        )
+        val result = emulationSideArtworkRepository.install(uri)
+        if (result.isSuccess) {
+            preferences.setEmulationSideArtwork(EmulationSideArtwork.CUSTOM)
+        }
+        _uiState.value = _uiState.value.copy(
+            isSideArtworkImporting = false,
+            customizationMessageResId = if (result.isSuccess) {
+                com.sbro.emucorex.R.string.settings_customization_side_artwork_applied
+            } else {
+                com.sbro.emucorex.R.string.settings_customization_side_artwork_failed
+            }
+        )
+    }
+
+    fun clearCustomEmulationSideArtwork() = viewModelScope.launch(Dispatchers.IO) {
+        emulationSideArtworkRepository.clear()
+        preferences.setEmulationSideArtwork(EmulationSideArtwork.NONE)
+        _uiState.value = _uiState.value.copy(
+            customizationMessageResId = com.sbro.emucorex.R.string.settings_customization_side_artwork_removed
+        )
+    }
+
+    fun refreshShaderPresets() = viewModelScope.launch(Dispatchers.IO) {
+        val presets = retroArchShaderRepository.listPresets()
+        _uiState.value = _uiState.value.copy(shaderPresets = presets)
+    }
+
+    fun setShaderChainEnabled(enabled: Boolean) = viewModelScope.launch {
+        val preset = _uiState.value.shaderChainPreset
+        preferences.setShaderChain(enabled, preset)
+        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainEnabled", "bool", enabled.toString())
+        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainPreset", "string", preset)
+    }
+
+    fun setShaderChainPreset(path: String) = viewModelScope.launch {
+        val enabled = path.isNotBlank() && _uiState.value.shaderChainEnabled
+        preferences.setShaderChain(enabled, path)
+        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainEnabled", "bool", enabled.toString())
+        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainPreset", "string", path)
+    }
+
+    fun downloadOfficialShaderPack() = installShaderPack {
+        retroArchShaderRepository.downloadOfficialPack()
+    }
+
+    fun importShaderPack(uri: Uri) = installShaderPack {
+        retroArchShaderRepository.importArchive(uri)
+    }
+
+    private fun installShaderPack(block: () -> Result<Int>) = viewModelScope.launch(Dispatchers.IO) {
+        if (_uiState.value.isShaderPackBusy) return@launch
+        _uiState.value = _uiState.value.copy(isShaderPackBusy = true, shaderPackMessageResId = null)
+        val result = block()
+        val presets = retroArchShaderRepository.listPresets()
+        _uiState.value = _uiState.value.copy(
+            isShaderPackBusy = false,
+            shaderPresets = presets,
+            shaderPackMessageResId = if (result.isSuccess) {
+                com.sbro.emucorex.R.string.settings_shader_pack_installed
+            } else {
+                com.sbro.emucorex.R.string.settings_shader_pack_failed
+            }
+        )
+    }
+
+    fun clearShaderPackMessage() {
+        _uiState.value = _uiState.value.copy(shaderPackMessageResId = null)
+    }
+
     fun resetCustomization() = viewModelScope.launch(Dispatchers.IO) {
         homeBackgroundRepository.clear()
+        emulationSideArtworkRepository.clear()
         customFontRepository.clear()
         preferences.setHomeBackgroundType(HomeBackgroundType.NONE)
         preferences.setHomeBackgroundDim(AppPreferences.DEFAULT_HOME_BACKGROUND_DIM)
+        preferences.setEmulationSideArtwork(EmulationSideArtwork.NONE)
         preferences.setHomeGridScale(AppPreferences.DEFAULT_HOME_GRID_SCALE)
         preferences.setAppFontChoice(AppFontChoice.SYSTEM)
         preferences.clearCustomFont()

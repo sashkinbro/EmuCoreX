@@ -6,6 +6,12 @@
 #include "CDVD/CDVD.h"
 #include "CDVD/IsoReader.h"
 #include "Counters.h"
+#include "DEV9/ACATA.h"
+#include "DEV9/ACATAPI.h"
+#include "DEV9/ACCORE.h"
+#include "DEV9/ACJV.h"
+#include "DEV9/ACRAM.h"
+#include "DEV9/ACSRAM.h"
 #include "DEV9/DEV9.h"
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/SymbolImporter.h"
@@ -42,6 +48,7 @@
 #include "Vif_Dynarec.h"
 #include "VMManager.h"
 #include "ps2/BiosTools.h"
+#include "common/ARCADE.h"
 #if defined(__ANDROID__)
 #include <sys/resource.h>
 #include "emucorex/debug_logcat.h"
@@ -69,6 +76,10 @@
 #include <atomic>
 #include <mutex>
 #include <sstream>
+
+#ifdef __ANDROID__
+std::string ResolveArcadeAssetUriJNI(const char* manifest_uri, const char* relative_path);
+#endif
 
 #ifdef _WIN32
 #include "common/RedtapeWindows.h"
@@ -171,6 +182,7 @@ static std::deque<std::thread> s_save_state_threads;
 static std::mutex s_save_state_threads_mutex;
 
 static std::recursive_mutex s_info_mutex;
+static std::string s_arcade_gameid;
 static std::string s_disc_serial;
 static std::string s_disc_elf;
 static std::string s_disc_version;
@@ -184,11 +196,45 @@ static std::string s_elf_path;
 static std::pair<u32, u32> s_elf_text_range;
 static bool s_elf_executed = false;
 static std::string s_elf_override;
+static std::string s_acgame;
+static std::string s_acgame_serial;
+std::string ArcadeiLinkID;
 static std::string s_input_profile_name;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
 static bool s_gs_open_on_initialize = false;
 static bool s_thread_affinities_set = false;
+static bool s_acgame_sys246 = false;
+static bool s_acgame_sys256 = false;
+static std::string s_arcade_card1;
+static std::string s_arcade_card2;
+static std::string s_arcade_usb1;
+static std::string s_arcade_usb2;
+
+static void ResetArcadeState()
+{
+	if (!s_acgame.empty())
+		ACATA::TH::IO_CloseImage();
+	ACATA::Reset();
+	ACATAPI::Reset();
+	ACCORE::Reset();
+	ACRAM::Reset();
+	ACJV::SetGameId({});
+	ACJV::SetMode(JVS_MODE::DEFAULT);
+	s_acgame = {};
+	s_acgame_serial = {};
+	s_arcade_gameid = {};
+	ArcadeiLinkID = {};
+	s_acgame_sys246 = false;
+	s_acgame_sys256 = false;
+	s_arcade_card1 = {};
+	s_arcade_card2 = {};
+	s_arcade_usb1 = {};
+	s_arcade_usb2 = {};
+	ACSRAM::filepath = {};
+	PS2CLK = PS2CLK_DEFAULT;
+	PSXCLK = 36864000;
+}
 
 static LimiterModeType s_limiter_mode = LimiterModeType::Nominal;
 static s64 s_limiter_ticks_per_frame = 0;
@@ -547,6 +593,10 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	si.SetBoolValue("Logging", "EnableIOPConsole", false);
 	si.SetBoolValue("Logging", "EnableInputRecordingLogs", true);
 	si.SetBoolValue("Logging", "EnableControllerLogs", false);
+	si.SetBoolValue("Arcade", "ATAVerboseReads", false);
+	si.SetBoolValue("Arcade", "SRAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "RAMVerboseReads", false);
+	si.SetBoolValue("Arcade", "UARTVerbose", false);
 
 	EmuConfig.Trace.Enabled = false;
 	EmuConfig.Trace.EE.bitset = 0;
@@ -604,6 +654,7 @@ void VMManager::SetDefaultSettings(
 	{
 		Pad::SetDefaultControllerConfig(si);
 		USB::SetDefaultConfiguration(&si);
+		ACJV::SetDefaultConfiguration(si);
 	}
 	if (hotkeys)
 		Pad::SetDefaultHotkeyConfig(si);
@@ -622,6 +673,7 @@ void VMManager::LoadSettings()
 	SettingsInterface* si = Host::GetSettingsInterface();
 	LoadCoreSettings(*si);
 	Pad::LoadConfig(*si);
+	ACJV::LoadConfig(*si);
 	Host::LoadSettings(*si, lock);
 	InputManager::ReloadSources(*si, lock);
 	LoadInputBindings(*si, lock);
@@ -722,6 +774,9 @@ bool VMManager::HasAnyBindingsForPad(const SettingsInterface& si, u32 port)
 
 void VMManager::WarnAboutUnconfiguredController()
 {
+	if (!s_acgame.empty())
+		return;
+
 	std::unique_lock<std::mutex> lock = Host::GetSettingsLock();
 	SettingsInterface* si = Host::GetSettingsInterface();
 	if (!si || HasAnyBindingsForPad(*si, 0))
@@ -769,6 +824,15 @@ static void ApplyManualCpuModeOverrides(Pcsx2Config& config, SettingsInterface& 
 
 void VMManager::ApplyGameFixes()
 {
+	if (!s_acgame.empty())
+	{
+		if (const auto* game = GameDatabase::findGame(ACJV::GetGameId()))
+		{
+			game->applyGameFixes(EmuConfig, EmuConfig.EnableGameFixes);
+			game->applyGSHardwareFixes(EmuConfig.GS);
+		}
+	}
+
 	if (!HasBootedELF() && !GSDumpReplayer::IsReplayingDump())
 	{
 		// Instant DMA needs to be on for this BIOS (font rendering is broken without it, possible cache issues).
@@ -912,6 +976,11 @@ std::string VMManager::GetDebuggerSettingsFilePathForCurrentGame()
 	return GetDebuggerSettingsFilePath(s_disc_serial, s_current_crc);
 }
 
+static u32 GetCRCForPatches()
+{
+	return s_acgame.empty() ? s_current_crc : 0;
+}
+
 void VMManager::Internal::UpdateEmuFolders()
 {
 	const std::string old_cheats_directory(EmuFolders::Cheats);
@@ -927,7 +996,7 @@ void VMManager::Internal::UpdateEmuFolders()
 	if (VMManager::HasValidVM())
 	{
 		if (EmuFolders::Cheats != old_cheats_directory || EmuFolders::Patches != old_patches_directory)
-			Patch::ReloadPatches(s_disc_serial, s_current_crc, true, false, true, true);
+			Patch::ReloadPatches(s_disc_serial, GetCRCForPatches(), true, false, true, true);
 
 		if (EmuFolders::MemoryCards != old_memcards_directory)
 		{
@@ -1012,22 +1081,27 @@ void VMManager::RequestDisplaySize(float scale /*= 0.0f*/)
 
 std::string VMManager::GetSerialForGameSettings()
 {
-	// If we're running an ELF, we don't want to use the serial for any ISO override
-	// for game settings, since the game settings is where we define the override.
 	std::unique_lock lock(s_info_mutex);
+	if (!s_acgame_serial.empty())
+		return s_acgame_serial;
+
+	// Loose ELF overrides do not inherit disc-specific settings.
 	return s_elf_override.empty() ? std::string(s_disc_serial) : std::string();
 }
 
 bool VMManager::UpdateGameSettingsLayer()
 {
 	std::unique_ptr<INISettingsInterface> new_interface;
-	if (s_disc_crc != 0)
+	if (s_disc_crc != 0 || !s_acgame.empty())
 	{
-		std::string filename(GetGameSettingsPath(GetSerialForGameSettings(), s_disc_crc));
-		if (!FileSystem::FileExists(filename.c_str()))
+		const std::string game_serial = GetSerialForGameSettings();
+		std::string filename(GetGameSettingsPath(game_serial, s_disc_crc));
+		if (!FileSystem::FileExists(filename.c_str()) && s_acgame.empty())
 		{
-			// try the legacy format (crc.ini)
-			filename = GetGameSettingsPath({}, s_disc_crc);
+			if (!game_serial.empty())
+				filename = GetGameSettingsPath(game_serial, 0);
+			if (!FileSystem::FileExists(filename.c_str()))
+				filename = GetGameSettingsPath({}, s_disc_crc);
 		}
 
 		if (FileSystem::FileExists(filename.c_str()))
@@ -1044,6 +1118,19 @@ bool VMManager::UpdateGameSettingsLayer()
 		{
 			DevCon.WriteLn("No game settings found (tried '%s')", filename.c_str());
 		}
+	}
+
+	if (!s_acgame.empty())
+	{
+		if (!new_interface)
+			new_interface = std::make_unique<INISettingsInterface>(
+				GetGameSettingsPath(GetSerialForGameSettings(), 0));
+		if (!s_arcade_card1.empty())
+			new_interface->SetStringValue("MemoryCards", "Slot1_Filename", s_arcade_card1.c_str());
+		if (!s_arcade_card2.empty())
+			new_interface->SetStringValue("MemoryCards", "Slot2_Filename", s_arcade_card2.c_str());
+		new_interface->SetStringValue("USB1", "Type", s_arcade_usb1.c_str());
+		new_interface->SetStringValue("USB2", "Type", s_arcade_usb2.c_str());
 	}
 
 	std::string input_profile_name;
@@ -1107,6 +1194,18 @@ void VMManager::UpdateDiscDetails(bool booting)
 		else if (CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc)
 		{
 			cdvdGetDiscInfo(&s_disc_serial, &s_disc_elf, &s_disc_version, &s_disc_crc, nullptr);
+			// A CD-backed arcade title is identified by the manifest's NM game ID,
+			// not by any retail-style serial which happens to be present in its image.
+			if (!s_acgame_serial.empty())
+				s_disc_serial = s_acgame_serial;
+			serial_is_valid = !s_disc_serial.empty();
+		}
+		else if (!s_acgame.empty())
+		{
+			s_disc_serial = s_arcade_gameid;
+			title = s_title;
+			s_disc_version = {};
+			s_disc_crc = 0;
 			serial_is_valid = !s_disc_serial.empty();
 		}
 		else if (!s_elf_override.empty())
@@ -1126,6 +1225,8 @@ void VMManager::UpdateDiscDetails(bool booting)
 		// If we're booting an ELF, use its CRC, not the disc (if any).
 		if (!s_elf_override.empty())
 			s_disc_crc = cdvdGetElfCRC(s_elf_override);
+		if (!s_acgame.empty())
+			s_disc_crc = 0;
 
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
@@ -1198,7 +1299,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 	ApplySettings();
 
 	// Patches are game-dependent, thus should get applied after game settings ia loaded.
-	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, true, true, false, false);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, true, true, false, false);
 
 	ReportGameChangeToHost();
 	if (MTGS::IsOpen())
@@ -1235,7 +1336,7 @@ void VMManager::HandleELFChange(bool verbose_patches_if_changed)
 	Achievements::GameChanged(s_disc_crc, crc_to_report);
 
 	Console.WriteLn(Color_StrongOrange, fmt::format("ELF changed, active CRC {:08X} ({})", crc_to_report, s_elf_path));
-	Patch::ReloadPatches(s_disc_serial, crc_to_report, false, false, false, verbose_patches_if_changed);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, false, false, false, verbose_patches_if_changed);
 	ApplyCoreSettings();
 }
 
@@ -1288,6 +1389,79 @@ bool VMManager::HasBootedELF()
 	return s_current_crc != 0 && s_elf_executed;
 }
 
+static bool IsAndroidContentUri(std::string_view path)
+{
+	return StringUtil::StartsWithNoCase(path, "content://");
+}
+
+static std::string ResolveArcadeAsset(const std::string& manifest, const std::string& relative_path)
+{
+	if (relative_path.empty())
+		return {};
+
+#ifdef __ANDROID__
+	if (IsAndroidContentUri(manifest))
+		return ResolveArcadeAssetUriJNI(manifest.c_str(), relative_path.c_str());
+#endif
+
+	if (Path::IsAbsolute(relative_path))
+		return Path::ToNativePath(relative_path);
+	return Path::Combine(Path::GetDirectory(manifest), relative_path);
+}
+
+static bool ArcadeAssetExists(const std::string& path)
+{
+	if (path.empty())
+		return false;
+	if (!IsAndroidContentUri(path))
+		return FileSystem::FileExists(path.c_str());
+	return static_cast<bool>(FileSystem::OpenManagedCFile(path.c_str(), "rb"));
+}
+
+static s64 GetArcadeAssetSize(const std::string& path)
+{
+	auto file = FileSystem::OpenManagedCFile(path.c_str(), "rb");
+	return file ? FileSystem::FSize64(file.get()) : -1;
+}
+
+static std::string FindArcadeAsset(const std::string& manifest, const std::string& subdir,
+	const std::string& filename)
+{
+	const std::string candidates[] = {
+		Path::Combine(subdir, filename),
+		filename,
+		Path::Combine("memcards", filename),
+	};
+	for (const std::string& candidate : candidates)
+	{
+		std::string resolved = ResolveArcadeAsset(manifest, candidate);
+		if (ArcadeAssetExists(resolved))
+			return resolved;
+	}
+	return {};
+}
+
+static bool CopyArcadeAsset(const std::string& source, const std::string& destination, bool overwrite)
+{
+	if (source.empty() || (!overwrite && FileSystem::FileExists(destination.c_str())))
+		return false;
+
+	auto input = FileSystem::OpenManagedCFile(source.c_str(), "rb");
+	if (!input)
+		return false;
+	auto output = FileSystem::OpenManagedCFile(destination.c_str(), "wb");
+	if (!output)
+		return false;
+
+	std::array<u8, 64 * 1024> buffer;
+	while (const size_t count = std::fread(buffer.data(), 1, buffer.size(), input.get()))
+	{
+		if (std::fwrite(buffer.data(), 1, count, output.get()) != count)
+			return false;
+	}
+	return std::ferror(input.get()) == 0;
+}
+
 bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 {
 	if (!filename.empty())
@@ -1319,6 +1493,165 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			}
 
 			s_elf_override = filename;
+			return true;
+		}
+		else if (isArcadeManifest(filename))
+		{
+			s_acgame = filename;
+			CDVDsys_ChangeSource(CDVD_SourceType::NoDisc);
+
+			INISettingsInterface ini(filename);
+			if (!ini.Load())
+			{
+				Error::SetStringFmt(error, "Cannot read arcade game manifest '{}'.", filename);
+				return false;
+			}
+
+			const std::string subdir = ini.GetStringValue("data", "subdir", "");
+			const std::string game_id = ini.GetStringValue("game", "gameid", "");
+			bool valid_id = game_id.length() == 7 && game_id[0] == 'N' && game_id[1] == 'M';
+			for (size_t i = 2; valid_id && i < game_id.length(); i++)
+				valid_id = std::isdigit(static_cast<unsigned char>(game_id[i])) != 0;
+			if (!valid_id)
+			{
+				Error::SetStringFmt(error, "Invalid arcade GameID '{}'; expected NM followed by five digits.", game_id);
+				return false;
+			}
+
+			s_arcade_gameid = s_disc_serial = s_acgame_serial = game_id;
+			s_title = ini.GetStringValue("game", "name", game_id.c_str());
+			ACJV::SetGameId(game_id);
+
+			const std::string platform = ini.GetStringValue("game", "platform", "246");
+			if (platform != "246" && platform != "256" && platform != "super256")
+			{
+				Error::SetStringFmt(error, "Unsupported arcade platform '{}'.", platform);
+				return false;
+			}
+			s_acgame_sys246 = true;
+			s_acgame_sys256 = (platform == "256" || platform == "super256");
+			PS2CLK = (platform == "super256") ? PS2CLK_SS256 :
+				(s_acgame_sys256 ? PS2CLK_S256 : PS2CLK_DEFAULT);
+
+			ArcadeiLinkID = ini.GetStringValue("data", "256Region", "");
+			if (!ArcadeiLinkID.empty() && ArcadeiLinkID != "ASIA4" &&
+				ArcadeiLinkID != "ASIA5" && ArcadeiLinkID != "JAPAN")
+			{
+				Error::SetStringFmt(error, "Invalid System 256 regional signature '{}'.", ArcadeiLinkID);
+				return false;
+			}
+
+			std::string card = ini.GetStringValue("data", "dongle", "");
+			if (!card.empty())
+			{
+				const std::string source = FindArcadeAsset(filename, subdir, card);
+				const std::string card_name(Path::GetFileName(card));
+				if (source.empty())
+				{
+					Error::SetStringFmt(error, "Cannot prepare arcade dongle '{}'.", card);
+					return false;
+				}
+
+				// System 246/256 dongles are PS2 memory cards containing mc0:/boot.bin.
+				// Small board ROMs are commonly mislabeled as the dongle in arcade sets.
+				static constexpr s64 MIN_DONGLE_SIZE = 8 * 1024 * 1024;
+				const s64 card_size = GetArcadeAssetSize(source);
+				if (card_size >= 0 && card_size < MIN_DONGLE_SIZE)
+				{
+					Error::SetStringFmt(error,
+						"Arcade dongle '{}' is only {} bytes. Expected an 8 MB PS2 memory-card dump containing mc0:/boot.bin, not a board ROM.",
+						card, card_size);
+					return false;
+				}
+
+				if (!CopyArcadeAsset(source, Path::Combine(EmuFolders::MemoryCards, card_name), true))
+				{
+					Error::SetStringFmt(error, "Cannot prepare arcade dongle '{}'.", card);
+					return false;
+				}
+				s_arcade_card1 = card_name;
+			}
+
+			card = ini.GetStringValue("data", "card", "");
+			if (!card.empty())
+			{
+				const std::string source = FindArcadeAsset(filename, subdir, card);
+				const std::string card_name(Path::GetFileName(card));
+				const std::string destination = Path::Combine(EmuFolders::MemoryCards, card_name);
+				if (source.empty() || (!FileSystem::FileExists(destination.c_str()) &&
+					!CopyArcadeAsset(source, destination, false)))
+				{
+					Error::SetStringFmt(error, "Cannot prepare arcade memory card '{}'.", card);
+					return false;
+				}
+				s_arcade_card2 = card_name;
+			}
+
+			const std::string elf_name = ini.GetStringValue("data", "elf", "");
+			s_elf_override = ResolveArcadeAsset(filename, Path::Combine(subdir, elf_name));
+			if (!ArcadeAssetExists(s_elf_override))
+			{
+				Error::SetStringFmt(error, "Cannot open arcade boot ELF '{}'.", elf_name);
+				return false;
+			}
+			// A SAF document URI cannot survive the EELOAD "host:" boot: ioman's host_path()
+			// canonicalizes away the "//", and the URI is far longer than the rom0:OSDSYS
+			// string slot it gets strcpy'd over. Stage the ELF at a short real path instead.
+			if (IsAndroidContentUri(s_elf_override))
+			{
+				const std::string arcade_dir = Path::Combine(EmuFolders::DataRoot, "arcade");
+				FileSystem::CreateDirectoryPath(arcade_dir.c_str(), false);
+				std::string local_elf = Path::Combine(arcade_dir, game_id + ".elf");
+				if (!CopyArcadeAsset(s_elf_override, local_elf, true))
+				{
+					Error::SetStringFmt(error, "Cannot stage arcade boot ELF '{}'.", elf_name);
+					return false;
+				}
+				s_elf_override = std::move(local_elf);
+			}
+			EmuConfig.CurrentGameArgs = ini.GetStringValue("data", "args", "");
+
+			const std::string sram_dir = Path::Combine(EmuFolders::DataRoot, "sram");
+			FileSystem::CreateDirectoryPath(sram_dir.c_str(), false);
+			ACSRAM::filepath = Path::Combine(sram_dir, game_id + ".bin");
+
+			const std::string jvs_name = ini.GetStringValue("data", "jvsmode", "");
+			JVS_MODE mode = ACJV::ResolveModeFromGameId(game_id);
+			if (jvs_name == "lightgun") mode = JVS_MODE::LIGHTGUN;
+			else if (jvs_name == "fighting") mode = JVS_MODE::FIGHTING;
+			else if (jvs_name == "drum") mode = JVS_MODE::DRUM;
+			else if (jvs_name == "racing") mode = JVS_MODE::DRIVE;
+			else if (jvs_name == "standard") mode = JVS_MODE::STANDARD;
+			else if (jvs_name == "twinstick") mode = JVS_MODE::TWINSTICK;
+			else if (!jvs_name.empty()) mode = JVS_MODE::DEFAULT;
+			ACJV::SetMode(mode);
+
+			const bool lightgun = (mode == JVS_MODE::LIGHTGUN);
+			const bool two_gun = lightgun && ACJV::GetGunMapping().p2_start != 0;
+			s_arcade_usb1 = lightgun ? "guncon2" : "None";
+			s_arcade_usb2 = two_gun ? "guncon2" : "None";
+
+			const std::string media_name = ini.GetStringValue("data", "mediasrc", "");
+			const std::string media_type = ini.GetStringValue("data", "media", "");
+			const std::string media_path = ResolveArcadeAsset(filename, Path::Combine(subdir, media_name));
+			if (!ArcadeAssetExists(media_path))
+			{
+				Error::SetStringFmt(error, "Cannot open arcade media '{}'.", media_name);
+				return false;
+			}
+			ACATA::SetEnv({}, media_path, media_type);
+			if (ACATA::TH::IO_OpenImage() != 0)
+			{
+				Error::SetString(error, "Cannot open arcade media image.");
+				return false;
+			}
+			if (media_type == "CD")
+			{
+				CDVDsys_SetFile(CDVD_SourceType::Iso, ACATA::imgpath);
+				CDVDsys_ChangeSource(CDVD_SourceType::Iso);
+			}
+
+			Console.WriteLnFmt(Color_Green, "Arcade {} ({}) configured from '{}'.", game_id, platform, filename);
 			return true;
 		}
 		else
@@ -1414,6 +1747,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 			GSDumpReplayer::Shutdown();
 
 		s_elf_override = {};
+		ResetArcadeState();
 		ClearELFInfo();
 		ClearDiscDetails();
 
@@ -1503,6 +1837,8 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 		// Must happen after BIOS load, depends on BIOS version.
 		cdvdLoadNVRAM();
 	}
+	if (!s_acgame.empty())
+		ACSRAM::ReadFile();
 
 	Error cdvd_error;
 	Console.WriteLn("Opening CDVD...");
@@ -1529,7 +1865,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 
 	if (!s_elf_override.empty())
 	{
-		if (!FileSystem::FileExists(s_elf_override.c_str()))
+		if (!ArcadeAssetExists(s_elf_override))
 		{
 			Error::SetStringFmt(error,
 				TRANSLATE_FS("VMManager", "Requested boot ELF '{}' does not exist."), s_elf_override);
@@ -1572,6 +1908,8 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
 	mmap_ResetBlockTracking();
+	if (s_acgame_sys246)
+		EmuConfig.Cpu.ExtraMemory = true;
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	g_cpuRegistersPack.Cpu = EmuConfig.Cpu;
 	Internal::ClearCPUExecutionCaches();
@@ -1730,6 +2068,7 @@ void VMManager::Shutdown(bool save_resume_state)
 	if (g_InputRecording.isActive())
 		g_InputRecording.stop();
 
+	const bool was_arcade = !s_acgame.empty();
 	SaveSessionTime(s_disc_serial);
 	s_elf_override = {};
 	ClearELFInfo();
@@ -1764,6 +2103,9 @@ void VMManager::Shutdown(bool save_resume_state)
 	DoCDVDclose();
 	FWclose();
 	FileMcd_EmuClose();
+	if (was_arcade)
+		ACSRAM::WriteFile();
+	ResetArcadeState();
 
 	// If the fullscreen UI is running, do a hardware reset on the GS
 	// so that the texture cache and targets are all cleared.
@@ -2488,6 +2830,11 @@ bool VMManager::IsElfFileName(const std::string_view path)
 	return StringUtil::EndsWithNoCase(path, ".elf");
 }
 
+bool VMManager::isArcadeManifest(const std::string_view path)
+{
+	return StringUtil::EndsWithNoCase(path, ".acgame");
+}
+
 bool VMManager::IsBlockDumpFileName(const std::string_view path)
 {
 	return StringUtil::EndsWithNoCase(path, ".dump");
@@ -2519,7 +2866,8 @@ bool VMManager::IsDiscFileName(const std::string_view path)
 
 bool VMManager::IsLoadableFileName(const std::string_view path)
 {
-	return IsDiscFileName(path) || IsElfFileName(path) || IsGSDumpFileName(path) || IsBlockDumpFileName(path);
+	return IsDiscFileName(path) || IsElfFileName(path) || IsGSDumpFileName(path) ||
+		IsBlockDumpFileName(path) || isArcadeManifest(path);
 }
 
 #ifdef _WIN32
@@ -3212,7 +3560,7 @@ void VMManager::ReloadPatches(bool reload_files, bool reload_enabled_list, bool 
 	if (!HasValidVM())
 		return;
 
-	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, reload_files, reload_enabled_list, verbose, verbose_if_changed);
+	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? GetCRCForPatches() : 0, reload_files, reload_enabled_list, verbose, verbose_if_changed);
 
 	// Might change widescreen mode.
 	if (Patch::ReloadPatchAffectingOptions())

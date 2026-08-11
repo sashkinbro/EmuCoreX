@@ -26,6 +26,14 @@
 
 #include "imgui.h"
 
+#ifdef ARMSX2_HAS_LIBRASHADER
+// librashader only declares its Vulkan entry points when the consumer opts in, and it
+// needs the Vulkan types already in scope — GSDeviceVK.h pulls those in above. Defined
+// by CMake only when the Rust toolchain actually produced the library.
+#define LIBRA_RUNTIME_VULKAN
+#include "librashader.h"
+#endif
+
 #include <bit>
 #include <limits>
 #include <mutex>
@@ -2455,6 +2463,10 @@ void GSDeviceVK::Destroy()
 
 	GSDevice::Destroy();
 
+	// Free the filter chain before the device goes away — it owns Vulkan objects created
+	// against m_device, so tearing the device down first would leak/UB them.
+	DestroyShaderChain();
+
 	EndRenderPass();
 	if (GetCurrentCommandBuffer() != VK_NULL_HANDLE)
 	{
@@ -3843,6 +3855,183 @@ void GSDeviceVK::DoFXAA(GSTexture* sTex, GSTexture* dTex)
 	EndRenderPass();
 
 	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+}
+
+#ifdef ARMSX2_HAS_LIBRASHADER
+
+static void ReportShaderChainError(const char* what, libra_error_t err)
+{
+	char* msg = nullptr;
+	if (libra_error_write(err, &msg) == 0 && msg)
+	{
+		Console.Error("(GS) librashader %s failed: %s", what, msg);
+		libra_error_free_string(&msg);
+	}
+	else
+	{
+		Console.Error("(GS) librashader %s failed (errno %d)", what, static_cast<int>(libra_error_errno(err)));
+	}
+	libra_error_free(&err);
+}
+
+#endif
+
+void GSDeviceVK::DestroyShaderChain()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	if (m_shader_chain)
+	{
+		libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+		libra_vk_filter_chain_free(&chain);
+		m_shader_chain = nullptr;
+	}
+#endif
+	m_shader_chain_preset.clear();
+	m_shader_chain_failed = false;
+	m_shader_frame_count = 0;
+	m_shader_param_generation = 0;
+}
+
+void GSDeviceVK::ApplyShaderChainParams()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	// Per-frame fast path: one atomic load. The lock and the copy only happen on the
+	// frames where the user actually moved something.
+	const u64 generation = GetShaderChainParamGeneration();
+	if (generation == m_shader_param_generation)
+		return;
+
+	std::vector<std::pair<std::string, float>> params;
+	if (GetShaderChainParams(m_shader_chain_preset, &params))
+	{
+		libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+		for (const auto& [name, value] : params)
+		{
+			// A preset can be swapped under a stale override set, so an unknown parameter
+			// name is a routine miss, not a fault: report nothing and keep going, since
+			// the remaining names are still valid.
+			if (libra_error_t err = libra_vk_filter_chain_set_param(&chain, name.c_str(), value))
+				libra_error_free(&err);
+		}
+	}
+
+	// Set even when the store held another preset's values or none at all — otherwise this
+	// re-runs the lookup on every frame for as long as the generation stays ahead.
+	m_shader_param_generation = generation;
+#endif
+}
+
+bool GSDeviceVK::DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex)
+{
+#ifndef ARMSX2_HAS_LIBRASHADER
+	return false;
+#else
+	// A preset that fails to compile must not be retried every frame — that would run a
+	// full slang compile 60x/sec. Latch the failure until the user picks another preset.
+	if (m_shader_chain_failed && m_shader_chain_preset == GSConfig.ShaderChainPreset)
+		return false;
+
+	if (!m_shader_chain || m_shader_chain_preset != GSConfig.ShaderChainPreset)
+	{
+		DestroyShaderChain();
+		m_shader_chain_preset = GSConfig.ShaderChainPreset;
+
+		libra_shader_preset_t preset = nullptr;
+		if (libra_error_t err = libra_preset_create(m_shader_chain_preset.c_str(), &preset))
+		{
+			ReportShaderChainError("preset load", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		libra_device_vk_t vk = {};
+		vk.physical_device = m_physical_device;
+		vk.instance = m_instance;
+		vk.device = m_device;
+		vk.queue = m_graphics_queue;
+		// librashader resolves Vulkan through this loader rather than linking it, which
+		// is why it transparently rides a user's custom Turnip ICD.
+		vk.entry = vkGetInstanceProcAddr;
+
+		// create() invalidates `preset` unconditionally ("the shader preset is
+		// immediately invalidated"), so it must NOT be freed afterwards on either path.
+		libra_vk_filter_chain_t chain = nullptr;
+		if (libra_error_t err = libra_vk_filter_chain_create(&preset, vk, nullptr, &chain))
+		{
+			ReportShaderChainError("chain create", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		m_shader_chain = chain;
+		m_shader_frame_count = 0;
+		// The new chain sits at the preset's initial values, so whatever we last pushed is
+		// gone with the old one — force ApplyShaderChainParams to feed it again.
+		m_shader_param_generation = 0;
+		Console.WriteLn("(GS) librashader: loaded preset '%s'", m_shader_chain_preset.c_str());
+	}
+
+	// GS thread, chain alive, before the frame call — the only place a set_param is safe.
+	ApplyShaderChainParams();
+
+	GSTextureVK* const src = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* const dst = static_cast<GSTextureVK*>(dTex);
+
+	// The chain records its own render passes, so it must not run inside one of ours.
+	EndRenderPass();
+
+	// librashader's contract: source in SHADER_READ_ONLY_OPTIMAL, target in
+	// COLOR_ATTACHMENT_OPTIMAL.
+	src->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+
+	const libra_image_vk_t in = {src->GetImage(), src->GetVkFormat(),
+		static_cast<uint32_t>(src->GetWidth()), static_cast<uint32_t>(src->GetHeight())};
+	const libra_image_vk_t out = {dst->GetImage(), dst->GetVkFormat(),
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+	const libra_viewport_t vp = {0.0f, 0.0f,
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+
+	// Every librashader entry point takes the chain handle by address, not by value.
+	libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+	if (libra_error_t err = libra_vk_filter_chain_frame(&chain, GetCurrentCommandBuffer(),
+			m_shader_frame_count, in, out, &vp, nullptr, nullptr))
+	{
+		ReportShaderChainError("frame", err);
+		m_shader_chain_failed = true;
+		return false;
+	}
+	m_shader_frame_count++;
+
+	// The chain left the target in COLOR_ATTACHMENT_OPTIMAL behind the tracker's back, so
+	// resync it WITHOUT emitting a barrier (Override), then transition for real to the
+	// ShaderReadOnly that DoFXAA/DoShadeBoost also leave behind and the presenter expects.
+	// Skipping the Override would make the next barrier start from a stale layout.
+	dst->OverrideImageLayout(GSTextureVK::Layout::ColorAttachment);
+	dst->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->SetState(GSTexture::State::Dirty);
+
+	// librashader recycles its per-frame objects (VkImageView / VkFramebuffer / descriptor
+	// sets) on its OWN internal frame counter, over a `frames_in_flight`-deep ring
+	// (default 3): frame N destroys what frame N-3 recorded. That is only safe if every
+	// frame() call is followed by a submit, so the fence for N-3 has been waited by the
+	// time N recycles its slot.
+	//
+	// PCSX2 violates that. GSRenderer::VSync calls Merge() -- and therefore the chain --
+	// BEFORE it decides whether to present, and a skipped present (SkipDuplicateFrames,
+	// which is default-on, or the FIFO present throttle) returns early from BeginPresent
+	// and never reaches EndPresent, so it never submits. MAX_SKIPPED_DUPLICATE_FRAMES is
+	// 3 -- exactly the ring depth -- so three skipped frames in a row let librashader
+	// destroy views that are still bound to the command buffer we are STILL recording.
+	// Validation names it: VUID-vkDestroyImageView-imageView-01026, followed by the
+	// buffer going invalid and the Adreno driver segfaulting as it walks it at submit.
+	//
+	// Kicking the buffer here keeps exactly one submit per chain frame, so librashader's
+	// ring and our NUM_COMMAND_BUFFERS ring advance together. The GL backend is immune
+	// because it executes immediately and has no recorded buffer to go stale.
+	ExecuteCommandBuffer(false);
+	return true;
+#endif
 }
 
 void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t count, size_t align_multiplier)

@@ -68,6 +68,8 @@ data class SettingsSnapshot(
     val homeBackgroundType: HomeBackgroundType = HomeBackgroundType.NONE,
     val homeBackgroundRevision: Int = 0,
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
+    val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
+    val emulationSideArtworkRevision: Int = 0,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
     val gameMenuLayoutStyle: GameMenuLayoutStyle = GameMenuLayoutStyle.SIDEBAR,
@@ -85,6 +87,8 @@ data class SettingsSnapshot(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val shaderChainEnabled: Boolean = false,
+    val shaderChainPreset: String = "",
     val audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
     val audioFastForwardVolume: Int = AudioDefaults.VOLUME_DEFAULT,
     val audioMuted: Boolean = false,
@@ -361,7 +365,7 @@ class AppPreferences(private val context: Context) {
         const val OVERLAY_OPACITY_MIN = 0
         const val OVERLAY_OPACITY_MAX = 100
         const val DEFAULT_OVERLAY_OPACITY = 80
-        const val DEFAULT_TOUCHSCREEN_RIGHT_STICK = false
+        const val DEFAULT_TOUCHSCREEN_RIGHT_STICK = true
         const val TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN = 50
         const val TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX = 200
         const val DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY = 100
@@ -421,13 +425,13 @@ class AppPreferences(private val context: Context) {
             "cross" to OverlayControlLayout(),
             "square" to OverlayControlLayout(),
             "circle" to OverlayControlLayout(),
-            "right_stick" to OverlayControlLayout(scale = stickScale, widthScale = 160, visible = false),
+            "right_stick" to OverlayControlLayout(scale = stickScale, widthScale = 160, visible = true),
             "select" to OverlayControlLayout(scale = 80),
             "left_input_toggle" to OverlayControlLayout(scale = 80, visible = true),
             "pressure" to OverlayControlLayout(scale = 80, visible = false),
             "start" to OverlayControlLayout(scale = 80),
-            "l3" to OverlayControlLayout(visible = false),
-            "r3" to OverlayControlLayout(visible = false)
+            "l3" to OverlayControlLayout(scale = 76, visible = true),
+            "r3" to OverlayControlLayout(scale = 76, visible = true)
         )
 
         private val THEME_MODE = intPreferencesKey("theme_mode")
@@ -442,6 +446,8 @@ class AppPreferences(private val context: Context) {
         private val HOME_BACKGROUND_TYPE = intPreferencesKey("home_background_type")
         private val HOME_BACKGROUND_REVISION = intPreferencesKey("home_background_revision")
         private val HOME_BACKGROUND_DIM = intPreferencesKey("home_background_dim")
+        private val EMULATION_SIDE_ARTWORK = intPreferencesKey("emulation_side_artwork")
+        private val EMULATION_SIDE_ARTWORK_REVISION = intPreferencesKey("emulation_side_artwork_revision")
         private val COVER_CACHE_REVISION = intPreferencesKey("cover_cache_revision")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
@@ -467,6 +473,8 @@ class AppPreferences(private val context: Context) {
         private val RENDERER = intPreferencesKey("renderer")
         private val UPSCALE = floatPreferencesKey("upscale_multiplier_v2")
         private val UPSCALE_LEGACY = intPreferencesKey("upscale_multiplier")
+        private val SHADER_CHAIN_ENABLED = booleanPreferencesKey("shader_chain_enabled")
+        private val SHADER_CHAIN_PRESET = stringPreferencesKey("shader_chain_preset")
         private val BIOS_PATH = stringPreferencesKey("bios_path")
         private val GAME_PATH = stringPreferencesKey("game_path")
         private val GAME_PATHS = stringPreferencesKey("game_paths")
@@ -757,6 +765,14 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> (prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM).coerceIn(0, 85) }
         .distinctUntilChanged()
 
+    val emulationSideArtwork: Flow<EmulationSideArtwork> = context.dataStore.data
+        .map { prefs -> EmulationSideArtwork.fromPreference(prefs[EMULATION_SIDE_ARTWORK]) }
+        .distinctUntilChanged()
+
+    val emulationSideArtworkRevision: Flow<Int> = context.dataStore.data
+        .map { prefs -> (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0).coerceAtLeast(0) }
+        .distinctUntilChanged()
+
     val coverCacheRevision: Flow<Int> = context.dataStore.data
         .map { prefs -> (prefs[COVER_CACHE_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
@@ -907,6 +923,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setHomeBackgroundDim(dim: Int) {
         context.dataStore.edit { it[HOME_BACKGROUND_DIM] = dim.coerceIn(0, 85) }
+    }
+
+    suspend fun setEmulationSideArtwork(artwork: EmulationSideArtwork) {
+        context.dataStore.edit { prefs ->
+            prefs[EMULATION_SIDE_ARTWORK] = artwork.preferenceValue
+            prefs[EMULATION_SIDE_ARTWORK_REVISION] =
+                (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0) + 1
+        }
     }
 
     suspend fun notifyCoverCacheCleared() {
@@ -1068,6 +1092,13 @@ class AppPreferences(private val context: Context) {
     suspend fun setRenderer(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[RENDERER] = normalizeRendererPreference(value)
+        }
+    }
+
+    suspend fun setShaderChain(enabled: Boolean, preset: String) {
+        context.dataStore.edit { prefs ->
+            prefs[SHADER_CHAIN_ENABLED] = enabled
+            prefs[SHADER_CHAIN_PRESET] = preset
         }
     }
 
@@ -1481,6 +1512,9 @@ class AppPreferences(private val context: Context) {
                 homeBackgroundRevision = (prefs[HOME_BACKGROUND_REVISION] ?: 0).coerceAtLeast(0),
                 homeBackgroundDim = (prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM)
                     .coerceIn(0, 85),
+                emulationSideArtwork = EmulationSideArtwork.fromPreference(prefs[EMULATION_SIDE_ARTWORK]),
+                emulationSideArtworkRevision = (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0)
+                    .coerceAtLeast(0),
                 touchControlVisualStyle = TouchControlVisualStyle.fromPreference(prefs[TOUCH_CONTROL_VISUAL_STYLE]),
                 touchControlPressEffect = TouchControlPressEffect.fromPreference(prefs[TOUCH_CONTROL_PRESS_EFFECT]),
                 gameMenuLayoutStyle = GameMenuLayoutStyle.fromPreference(prefs[GAME_MENU_LAYOUT_STYLE]),
@@ -1498,6 +1532,8 @@ class AppPreferences(private val context: Context) {
                 renderer = normalizeRendererPreference(prefs[RENDERER]),
                 upscaleMultiplier = readUpscale(prefs),
                 aspectRatio = normalizeAspectRatioPreference(prefs[ASPECT_RATIO]),
+                shaderChainEnabled = prefs[SHADER_CHAIN_ENABLED] ?: false,
+                shaderChainPreset = prefs[SHADER_CHAIN_PRESET].orEmpty(),
                 audioVolume = AudioDefaults.coerceVolume(
                     prefs[AUDIO_VOLUME] ?: AudioDefaults.VOLUME_DEFAULT
                 ),
@@ -3403,6 +3439,8 @@ class AppPreferences(private val context: Context) {
             put("renderer", normalizeRendererPreference(prefs[RENDERER]))
             put("mediatekAngleOpenGl", prefs[MEDIATEK_ANGLE_OPENGL] ?: false)
             put("upscaleMultiplier", readUpscale(prefs).toDouble())
+            put("shaderChainEnabled", prefs[SHADER_CHAIN_ENABLED] ?: false)
+            put("shaderChainPreset", prefs[SHADER_CHAIN_PRESET].orEmpty())
             put("biosPath", prefs[BIOS_PATH])
             put("gamePath", prefs[GAME_PATH])
             put("gamePaths", JSONArray(readGamePaths(prefs)))
@@ -3696,6 +3734,10 @@ class AppPreferences(private val context: Context) {
             prefs[MEDIATEK_ANGLE_OPENGL] = json.optBoolean("mediatekAngleOpenGl", false) &&
                 GpuHardwareProfiles.isMediatekProfile(gpuHardwareProfile)
             prefs[UPSCALE] = json.readUpscaleMultiplier()
+            prefs[SHADER_CHAIN_ENABLED] = json.optBoolean("shaderChainEnabled", false)
+            json.optString("shaderChainPreset").trim().takeIf(String::isNotEmpty)?.let {
+                prefs[SHADER_CHAIN_PRESET] = it
+            } ?: prefs.remove(SHADER_CHAIN_PRESET)
             json.optString("biosPath").takeIf { it.isNotBlank() }?.let { prefs[BIOS_PATH] = it } ?: prefs.remove(BIOS_PATH)
             val importedGamePaths = json.optJSONArray("gamePaths")?.let { array ->
                 buildList {
