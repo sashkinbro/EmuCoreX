@@ -3944,6 +3944,7 @@ private fun EmulationSidebarMenu(
                             currentValue = uiState.localMultiplayerMode,
                             onValueChange = onSetLocalMultiplayerMode,
                             allowWrap = false,
+                            horizontalScrolling = true,
                             helpText = stringResource(R.string.emulation_local_multiplayer_help),
                             onResetToDefault = {
                                 onSetLocalMultiplayerMode(AppPreferences.LOCAL_MULTIPLAYER_OFF)
@@ -5708,6 +5709,7 @@ private fun LiveSelectionRow(
     currentValue: Int,
     onValueChange: (Int) -> Unit,
     allowWrap: Boolean = true,
+    horizontalScrolling: Boolean = false,
     helpText: String? = null,
     onResetToDefault: (() -> Unit)? = null
 ) {
@@ -5749,6 +5751,20 @@ private fun LiveSelectionRow(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 options.forEach { option ->
+                    LiveSelectionChip(
+                        option = option,
+                        selected = option.value == currentValue,
+                        onClick = { onValueChange(option.value) }
+                    )
+                }
+            }
+        } else if (horizontalScrolling) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(options, key = { it.value }) { option ->
                     LiveSelectionChip(
                         option = option,
                         selected = option.value == currentValue,
