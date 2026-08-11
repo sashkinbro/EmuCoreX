@@ -250,19 +250,41 @@ static bool IsTekken5Serial(std::string_view serial)
 	return std::find(serials.begin(), serials.end(), serial) != serials.end();
 }
 
+static bool IsValkyrieProfile2Serial(std::string_view serial)
+{
+	static constexpr std::array<std::string_view, 11> serials = {
+		"SCAJ-20177", "SCAJ-20197", "SCKA-20079", "SLES-54644", "SLES-54645", "SLES-54646",
+		"SLES-54647", "SLES-54648", "SLPM-66419", "SLPM-66782", "SLUS-21452",
+	};
+	return std::find(serials.begin(), serials.end(), serial) != serials.end();
+}
+
 static void ApplyAndroidGameDBOverrides()
 {
+	if (GSConfig.ManualUserHacks)
+		return;
+
+	const std::string serial = VMManager::GetDiscSerial();
+	if (GSConfig.UpscaleMultiplier > 1.0f && IsValkyrieProfile2Serial(serial))
+	{
+		// The desktop profile produces corrupt full-screen render targets on mobile GPUs when upscaling.
+		GSConfig.UserHacks_HalfPixelOffset = GSHalfPixelOffset::Off;
+		GSConfig.UserHacks_TextureInsideRt = GSTextureInRtMode::Disabled;
+		GSConfig.UserHacks_NativeScaling = GSNativeScaling::Normal;
+		GSConfig.UserHacks_RoundSprite = 1;
+		GSConfig.UserHacks_AutoFlush = GSHWAutoFlushLevel::Disabled;
+	}
+
 	// Native half-pixel offset changes target invalidation, clamping and downsampling in addition to
 	// vertex alignment. MediaTek Mali drivers can render duplicated horizontal framebuffer regions in
 	// Tekken 5 with this mode, while disabling it produces the correct frame. Keep the desktop GameDB
 	// fix for every other GPU/game, and preserve explicit manual hardware-hack selections.
 	if (!g_gs_device || !g_gs_device->IsMaliGPUProfile() || !g_gs_device->IsMediaTekSoC() ||
-		GSConfig.ManualUserHacks || GSConfig.UserHacks_HalfPixelOffset != GSHalfPixelOffset::Native)
+		GSConfig.UserHacks_HalfPixelOffset != GSHalfPixelOffset::Native)
 	{
 		return;
 	}
 
-	const std::string serial = VMManager::GetDiscSerial();
 	if (!IsTekken5Serial(serial))
 		return;
 
@@ -889,6 +911,9 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 
 	Pcsx2Config::GSOptions old_config(std::move(GSConfig));
 	GSConfig = new_config;
+#ifdef __ANDROID__
+	ApplyAndroidGameDBOverrides();
+#endif
 	g_perfmon.SetCounterTrackingEnabled(ShouldTrackGSPerfMonCounters());
 
 	if (!g_gs_renderer)
@@ -953,7 +978,17 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 		GSConfig.UserHacks_TextureInsideRt != old_config.UserHacks_TextureInsideRt ||
 		GSConfig.UserHacks_CPUSpriteRenderBW != old_config.UserHacks_CPUSpriteRenderBW ||
 		GSConfig.UserHacks_CPUCLUTRender != old_config.UserHacks_CPUCLUTRender ||
-		GSConfig.UserHacks_GPUTargetCLUTMode != old_config.UserHacks_GPUTargetCLUTMode)
+		GSConfig.UserHacks_GPUTargetCLUTMode != old_config.UserHacks_GPUTargetCLUTMode ||
+		GSConfig.UserHacks_NativeScaling != old_config.UserHacks_NativeScaling ||
+		GSConfig.UserHacks_AlignSpriteX != old_config.UserHacks_AlignSpriteX ||
+		GSConfig.UserHacks_MergePPSprite != old_config.UserHacks_MergePPSprite ||
+		GSConfig.UserHacks_RoundSprite != old_config.UserHacks_RoundSprite ||
+		GSConfig.UserHacks_HalfPixelOffset != old_config.UserHacks_HalfPixelOffset ||
+		GSConfig.UserHacks_ForceEvenSpritePosition != old_config.UserHacks_ForceEvenSpritePosition ||
+		GSConfig.UserHacks_NativePaletteDraw != old_config.UserHacks_NativePaletteDraw ||
+		GSConfig.UserHacks_BilinearHack != old_config.UserHacks_BilinearHack ||
+		GSConfig.UserHacks_TCOffsetX != old_config.UserHacks_TCOffsetX ||
+		GSConfig.UserHacks_TCOffsetY != old_config.UserHacks_TCOffsetY)
 	{
 		// Purging targets without a readback loses GPU-only contents. This is intentionally paid only
 		// for live settings changes, where correctness is more important than a one-off transition cost.

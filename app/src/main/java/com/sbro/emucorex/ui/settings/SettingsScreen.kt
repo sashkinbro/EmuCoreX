@@ -3183,8 +3183,6 @@ private fun CustomizationSettingsTab(
         smallestScreenWidthDp = minOf(windowWidthDp, windowHeightDp),
         gridScale = uiState.homeGridScale
     )
-    val emulationPreviewAspect = maxOf(windowWidthDp, windowHeightDp).toFloat() /
-        minOf(windowWidthDp, windowHeightDp).toFloat()
     val backgroundRepository = remember(context) { HomeBackgroundRepository(context) }
     val sideArtworkRepository = remember(context) { EmulationSideArtworkRepository(context) }
     val backgroundFile = backgroundRepository.existingFile(uiState.homeBackgroundType)
@@ -3445,7 +3443,7 @@ private fun CustomizationSettingsTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .aspectRatio(emulationPreviewAspect),
+                .height(210.dp),
             shape = RoundedCornerShape(18.dp),
             color = Color.Black,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
