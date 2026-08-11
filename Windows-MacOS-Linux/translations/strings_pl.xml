@@ -2257,6 +2257,9 @@
     <string name="hub_empty_state_title">Jeszcze nic tu nie ma</string>
     <string name="hub_no_matches">Brak wyników</string>
     <string name="hub_clear_search">Wyczyść wyszukiwanie</string>
+    <string name="settings_customization_rounding_help">Dostosowuje zaokrąglenie kart, przycisków i paneli w interfejsie PC.</string>
+    <string name="settings_customization_motion">Szybkość animacji</string>
+    <string name="settings_customization_motion_help">Dostosowuje szybkość przejść i animacji interfejsu. Nie wpływa na szybkość emulacji.</string>
 </resources>
 
 

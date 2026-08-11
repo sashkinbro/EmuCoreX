@@ -736,7 +736,7 @@
     <string name="settings_help_content_description">Показати деталі налаштування</string>
     <string name="settings_help_auto_gamepad">Автоматично перемикається на підключений контролер при його виявленні. Залиште ввімкненим, якщо ви часто перемикаєтеся між сенсорним керуванням і геймпадом; вимкніть, тільки якщо хочете зафіксувати поточну розкладку керування.</string>
     <string name="settings_help_keep_screen_on">Запобігає затемненню або блокуванню екрана Android під час гри. Корисно для тривалих сесій та ігор з катсценами, але витрачає трохи більше заряду батареї, якщо залишити програму відкритою.</string>
-    <string name="settings_help_pad_vibration">Дозволяє підтримуваним іграм викликати вібрацію контролера. Це додає корисний зворотний зв\'язок у перегонах, боях та іграх із сильними ударами, але може швидше розряджати батарею, а деякі бездротові геймпади можуть вібрувати слабко або з невеликою затримкою.</string>
+    <string name="settings_help_pad_vibration">Вмикає ігрову вібрацію на підключених геймпадах. Доступність і сила залежать від геймпада та його драйвера.</string>
     <string name="settings_help_recent_games">Показує рядок швидкого доступу до ігор, у які ви грали востаннє. Зручно, якщо ви часто перемикаєтеся між кількома іграми; вимкніть, якщо хочете, щоб головний екран був чистішим.</string>
     <string name="settings_help_home_search">Показує панель пошуку по бібліотеці прямо на головному екрані. Залиште ввімкненою для великих бібліотек; вимкніть, якщо віддаєте перевагу чистішому макету і рідко шукаєте за назвою.</string>
     <string name="settings_help_renderer">Вибирає графічний бекенд, який використовується для апаратного рендерингу. Vulkan зазвичай працює найшвидше на сучасних пристроях, OpenGL може бути безпечнішим для сумісності на деяких графічних процесорах, а Software — це здебільшого резервний варіант для тестування або ігор, які сильно ламаються в апаратному режимі.</string>
@@ -806,7 +806,7 @@
     <string name="settings_help_native_palette_draw">Відмальовує ефекти на основі палітри ближче до нативної точності. Це може виправити ефекти з індексуванням кольорів, тіні палітри або інші хитрощі, що інтенсивно використовують CLUT, які ламаються під час масштабування, але також може зробити зображення у високій роздільній здатності менш чистим.</string>
     <string name="settings_help_bilinear_filtering">Керує основним режимом фільтрації текстур, який використовує рендерер. «Найближчий» (Nearest) зберігає найчіткіший необроблений вигляд, «PS2» залишається найближчим до оригінальної поведінки консолі, а примусові режими згладжують більш агресивно. Якщо гра виглядає занадто піксельною або занадто розмитою, це перша опція фільтрації, яку слід налаштувати.</string>
     <string name="settings_help_bios_path">Вказує EmuCoreX на файл образу BIOS PS2. Чистий дамп із вашої власної консолі — найкращий вибір. Програма очікує основний образ BIOS, зазвичай файл .bin або .rom, а створені NVRAM/MEC файли зберігає поруч з імпортованою копією.</string>
-    <string name="settings_help_game_path">Вибирає папку бібліотеки, яку EmuCoreX сканує на наявність ігор. Сканування рекурсивне, тому підпапки також перевіряються. Підтримувані образи включають .iso, .bin, .img, .mdf, .gz, .cso, .zso, .chd та .elf. ISO — це найбезпечніша база, тоді як CHD зазвичай є найкращим довгостроковим форматом, оскільки він економить місце без шкоди для нормального використання.</string>
+    <string name="settings_help_game_path">Додайте одну або кілька папок з образами ігор PS2. EmuCoreX сканує вкладені папки, прибирає дублікати шляхів і зберігає список між запусками. Підтримуються .iso, .bin, .img, .mdf, .gz, .cso, .zso, .chd та .elf.</string>
     <string name="settings_help_cover_download_url">Перевизначає вбудоване джерело обкладинок, що використовується для автоматичного завантаження. URL-адреса має вказувати безпосередньо на папку, яка містить обкладинки у форматі JPG, названі за серійним номером гри, наприклад SLUS-20312.jpg. Змінюйте це лише в тому випадку, якщо ви розміщуєте власне дзеркало або хочете використовувати іншу сумісну бібліотеку обкладинок.</string>
     <string name="settings_cover_download_url">URL-адреса завантаження обкладинок</string>
     <string name="settings_cover_download_url_dialog_title">Власне джерело обкладинок</string>
@@ -1051,7 +1051,7 @@
     <string name="settings_pad_vibration_test_action">Перевірити</string>
     <string name="settings_pad_vibration_fallback">Використовувати вібрацію пристрою як запасну</string>
     <string name="settings_pad_vibration_fallback_desc">Вібрувати корпусом телефону або портативної консолі, якщо контролер не надає доступ до власного мотора.</string>
-    <string name="settings_help_pad_vibration_strength">Масштабує вібрацію гри перед її відправкою в Android. Зменште значення для шумних моторів портативних консолей або збільште, якщо вібрація контролера здається занадто слабкою.</string>
+    <string name="settings_help_pad_vibration_strength">Масштабує ігрову вібрацію перед передаванням на підключений геймпад. Зменште для м’якшої віддачі або збільште, якщо вібрація надто слабка.</string>
     <string name="settings_help_pad_vibration_test">Відправляє прямий запит на вібрацію Android спочатку до підключеного контролера, а потім, якщо увімкнено, до запасного варіанту на телефоні чи портативній консолі.</string>
     <string name="settings_help_pad_vibration_fallback">Деякі елементи керування портативних консолей визначаються як геймпад, але забезпечують вібрацію лише через вібромотор пристрою. Цей запасний варіант дозволяє зберегти вібрацію на таких пристроях, однак зовнішні контролери без вібрації замість цього викликатимуть вібрацію телефону або консолі.</string>
     <string name="settings_updates_history_title">Історія оновлень</string>
@@ -1619,7 +1619,7 @@
     <string name="settings_customization_preview_caption">Ваша бібліотека, налаштована для цього пристрою</string>
     <string name="settings_customization_background_section">Фон головного екрана</string>
     <string name="settings_customization_background">Вибрати зображення, GIF або відео</string>
-    <string name="settings_customization_background_help">Вибраний медіафайл копіюється у приватне сховище EmuCoreX. Відео зациклюються без звуку та ставляться на паузу, коли додаток неактивний.</string>
+    <string name="settings_customization_background_help">Використовує вибране зображення або анімований GIF як фон застосунку. Файл залишається на цьому PC, а анімація призупиняється, коли EmuCoreX неактивний.</string>
     <string name="settings_customization_background_none">Стандартний фон</string>
     <string name="settings_customization_background_image">Власне зображення</string>
     <string name="settings_customization_background_gif">Анімований GIF</string>
@@ -1632,7 +1632,7 @@
     <string name="settings_customization_background_removed">Власний фон видалено</string>
     <string name="settings_customization_library_section">Макет бібліотеки</string>
     <string name="settings_customization_grid_size">Розмір обкладинки гри</string>
-    <string name="settings_customization_grid_size_help">Менші обкладинки вміщують більше ігор на екрані. Сітка залишається адаптивною у портретній, альбомній орієнтаціях, на планшетах та складаних пристроях.</string>
+    <string name="settings_customization_grid_size_help">Менші обкладинки дозволяють показати більше ігор. Сітка автоматично підлаштовується під розмір вікна та масштаб дисплея.</string>
     <string name="settings_customization_text_section">Текст і шрифти</string>
     <string name="settings_customization_font">Шрифт додатка</string>
     <string name="settings_customization_font_system">Системний за замовчуванням</string>
@@ -1649,7 +1649,7 @@
     <string name="settings_customization_custom_font_failed">Цей файл неможливо використати як шрифт</string>
     <string name="settings_customization_custom_font_removed">Власний шрифт видалено</string>
     <string name="settings_customization_font_size">Розмір тексту</string>
-    <string name="settings_customization_font_size_help">Цей масштаб комбінується з розміром шрифту спеціальних можливостей Android, а не замінює його.</string>
+    <string name="settings_customization_font_size_help">Масштабує текст у всьому застосунку та працює разом із налаштуваннями відображення операційної системи.</string>
     <string name="settings_customization_reset_section">Скинути</string>
     <string name="settings_customization_reset">Скинути налаштування кастомізації</string>
     <string name="settings_customization_reset_desc">Відновити оригінальний фон, розмір обкладинки, шрифт та розмір тексту</string>
@@ -2239,4 +2239,7 @@
     <string name="hub_empty_state_title">Тут поки нічого немає</string>
     <string name="hub_no_matches">Збігів немає</string>
     <string name="hub_clear_search">Очистити пошук</string>
+    <string name="settings_customization_rounding_help">Налаштовує заокруглення карток, кнопок і панелей у PC-інтерфейсі.</string>
+    <string name="settings_customization_motion">Швидкість анімацій</string>
+    <string name="settings_customization_motion_help">Налаштовує швидкість переходів та анімацій інтерфейсу. На швидкість емуляції це не впливає.</string>
 </resources>

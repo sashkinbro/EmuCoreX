@@ -1,4 +1,5 @@
 #include "EmuCoreXCoreApi.h"
+#include "DesktopCoreSession.h"
 
 #include "pcsx2/GameList.h"
 #include "pcsx2/Config.h"
@@ -58,4 +59,54 @@ int emucorex_core_inspect_game(const char* utf8_path, EmuCoreXGameMetadata* meta
     copyString(metadata->region, GameList::RegionToString(entry.region, false));
     metadata->total_size = entry.total_size;
     return 1;
+}
+
+int emucorex_core_configure(const EmuCoreXCoreConfiguration* configuration)
+{
+    return configuration && emucorex::desktop::Configure(*configuration) ? 1 : 0;
+}
+
+void emucorex_core_set_render_surface(const EmuCoreXRenderSurface* surface)
+{
+    emucorex::desktop::SetRenderSurface(surface);
+}
+
+int emucorex_core_start_game(const char* utf8_path)
+{
+    return emucorex::desktop::Start(utf8_path, false) ? 1 : 0;
+}
+
+int emucorex_core_start_bios(void)
+{
+    return emucorex::desktop::Start(nullptr, true) ? 1 : 0;
+}
+
+uint32_t emucorex_core_state(void)
+{
+    return static_cast<uint32_t>(emucorex::desktop::GetState());
+}
+
+void emucorex_core_set_paused(int paused)
+{
+    emucorex::desktop::SetPaused(paused != 0);
+}
+
+void emucorex_core_shutdown(void)
+{
+    emucorex::desktop::Shutdown();
+}
+
+int emucorex_core_save_state(int slot)
+{
+    return emucorex::desktop::SaveState(slot) ? 1 : 0;
+}
+
+int emucorex_core_load_state(int slot)
+{
+    return emucorex::desktop::LoadState(slot) ? 1 : 0;
+}
+
+uint32_t emucorex_core_last_error(char* destination, uint32_t capacity)
+{
+    return emucorex::desktop::CopyLastError(destination, capacity);
 }

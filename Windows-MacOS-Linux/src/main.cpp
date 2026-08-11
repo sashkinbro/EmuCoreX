@@ -2,6 +2,7 @@
 #include "app/SingleInstanceGuard.h"
 #include "core/EmulatorController.h"
 #include "core/CoreRuntime.h"
+#include "core/NativeRenderItem.h"
 #include "data/DesktopDataService.h"
 #include "i18n/TranslationManager.h"
 #include "input/InputBindingService.h"
@@ -19,6 +20,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <qqml.h>
 
 int main(int argc, char* argv[])
 {
@@ -29,6 +31,7 @@ int main(int argc, char* argv[])
     QQuickStyle::setStyle("Basic");
 
     QGuiApplication app(argc, argv);
+    qmlRegisterType<NativeRenderItem>("EmuCoreX.Native", 1, 0, "NativeRenderSurface");
     QPixmap iconPixmap(256, 256);
     iconPixmap.fill(Qt::transparent);
     {
@@ -49,7 +52,7 @@ int main(int argc, char* argv[])
         polygon(QColor(QStringLiteral("#70B4FF")), {{49, 50}, {54, 44}, {59, 50}, {54, 56}});
     }
     app.setWindowIcon(QIcon(iconPixmap));
-    SingleInstanceGuard singleInstance("com.sbro.emucorex.desktop");
+    SingleInstanceGuard singleInstance("com.sbro.emucorex");
     if (!singleInstance.isPrimary())
         return 0;
 
@@ -58,6 +61,15 @@ int main(int argc, char* argv[])
     const int exoFontId = QFontDatabase::addApplicationFont(":/fonts/Exo2.ttf");
     const QString rubikFamily = QFontDatabase::applicationFontFamilies(rubikFontId).value(0, QStringLiteral("Rubik"));
     const QString exoFamily = QFontDatabase::applicationFontFamilies(exoFontId).value(0, QStringLiteral("Exo 2"));
+    const QStringList installedFontFamilies = QFontDatabase::families();
+
+    const auto availableFamily = [&](const QStringList& candidates) {
+        for (const QString& candidate : candidates) {
+            if (installedFontFamilies.contains(candidate, Qt::CaseInsensitive))
+                return candidate;
+        }
+        return systemFont.family();
+    };
 
     SettingsStore settings;
     const auto applyApplicationFont = [&] {
@@ -65,8 +77,16 @@ int main(int argc, char* argv[])
         QFont font = systemFont;
         if (selected == QLatin1String("exo2"))
             font.setFamily(exoFamily);
-        else if (selected != QLatin1String("system"))
+        else if (selected == QLatin1String("rubik"))
             font.setFamily(rubikFamily);
+        else if (selected == QLatin1String("segoe-ui"))
+            font.setFamily(availableFamily({QStringLiteral("Segoe UI Variable"), QStringLiteral("Segoe UI")}));
+        else if (selected == QLatin1String("arial"))
+            font.setFamily(availableFamily({QStringLiteral("Arial"), QStringLiteral("Liberation Sans")}));
+        else if (selected == QLatin1String("georgia"))
+            font.setFamily(availableFamily({QStringLiteral("Georgia"), QStringLiteral("Liberation Serif")}));
+        else if (selected == QLatin1String("consolas"))
+            font.setFamily(availableFamily({QStringLiteral("Consolas"), QStringLiteral("Cascadia Mono"), QStringLiteral("Liberation Mono")}));
         app.setFont(font);
     };
     applyApplicationFont();
@@ -84,9 +104,9 @@ int main(int argc, char* argv[])
     AppController appController(&settings);
     GameCatalogModel catalog;
     CoreRuntime coreRuntime;
-    GameLibraryModel library(&catalog, &coreRuntime);
+    GameLibraryModel library(&coreRuntime);
     CoverArtService coverArt(&settings);
-    EmulatorController emulator;
+    EmulatorController emulator(&coreRuntime, &settings, &translations);
     DesktopDataService desktopData(&settings);
     InputBindingService inputBindings;
 

@@ -2234,4 +2234,7 @@
     <string name="hub_empty_state_title">まだコンテンツはありません</string>
     <string name="hub_no_matches">一致する項目はありません</string>
     <string name="hub_clear_search">検索をクリア</string>
+    <string name="settings_customization_rounding_help">PC インターフェース全体のカード、ボタン、パネルの丸みを調整します。</string>
+    <string name="settings_customization_motion">アニメーション速度</string>
+    <string name="settings_customization_motion_help">画面切り替えやインターフェースの動きの速さを調整します。エミュレーション速度には影響しません。</string>
 </resources>

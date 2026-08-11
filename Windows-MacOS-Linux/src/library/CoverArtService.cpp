@@ -23,6 +23,11 @@ CoverArtService::CoverArtService(SettingsStore* settings, QObject* parent)
 
 QString CoverArtService::urlForSerial(const QString& serial, int style) const
 {
+    return urlsForSerial(serial, style).value(0);
+}
+
+QStringList CoverArtService::urlsForSerial(const QString& serial, int style) const
+{
     if (style <= 0)
         return {};
     const QString normalized = normalizedSerial(serial);
@@ -44,9 +49,20 @@ QString CoverArtService::urlForSerial(const QString& serial, int style) const
     if (!baseUrl.isValid() || (baseUrl.scheme() != QLatin1String("https") && baseUrl.scheme() != QLatin1String("http")))
         return {};
 
-    return QStringLiteral("%1/%2.%3?v=%4")
-        .arg(base, normalized, is3d ? QStringLiteral("png") : QStringLiteral("jpg"))
-        .arg(m_revision);
+    const QString compact = QString(normalized).remove(QLatin1Char('-'));
+    const QStringList extensions = is3d ? QStringList {QStringLiteral("png"), QStringLiteral("jpg")}
+                                        : QStringList {QStringLiteral("jpg"), QStringLiteral("png")};
+    QStringList urls;
+    const QStringList serials = compact == normalized ? QStringList {normalized}
+                                                       : QStringList {normalized, compact};
+    for (const QString& candidateSerial : serials) {
+        for (const QString& extension : extensions) {
+            urls.append(QStringLiteral("%1/%2.%3?v=%4")
+                .arg(base, candidateSerial, extension)
+                .arg(m_revision));
+        }
+    }
+    return urls;
 }
 
 void CoverArtService::invalidate()

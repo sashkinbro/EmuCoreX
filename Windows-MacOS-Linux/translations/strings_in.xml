@@ -2249,4 +2249,7 @@
     <string name="hub_empty_state_title">Belum ada apa pun di sini</string>
     <string name="hub_no_matches">Tidak ada kecocokan</string>
     <string name="hub_clear_search">Hapus pencarian</string>
+    <string name="settings_customization_rounding_help">Mengatur tingkat kebulatan kartu, tombol, dan panel di seluruh antarmuka PC.</string>
+    <string name="settings_customization_motion">Kecepatan animasi</string>
+    <string name="settings_customization_motion_help">Mengatur kecepatan transisi dan animasi antarmuka. Kecepatan emulasi tidak terpengaruh.</string>
 </resources>

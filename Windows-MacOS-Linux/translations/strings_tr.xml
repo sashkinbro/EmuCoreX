@@ -2235,4 +2235,7 @@
     <string name="hub_empty_state_title">Burada henüz bir şey yok</string>
     <string name="hub_no_matches">Eşleşme yok</string>
     <string name="hub_clear_search">Aramayı temizle</string>
+    <string name="settings_customization_rounding_help">PC arayüzündeki kartların, düğmelerin ve panellerin köşe yuvarlaklığını ayarlar.</string>
+    <string name="settings_customization_motion">Animasyon hızı</string>
+    <string name="settings_customization_motion_help">Arayüz geçişlerinin ve animasyonların hızını ayarlar. Emülasyon hızını etkilemez.</string>
 </resources>

@@ -2237,4 +2237,7 @@
     <string name="hub_empty_state_title">Todavía no hay nada aquí</string>
     <string name="hub_no_matches">Sin coincidencias</string>
     <string name="hub_clear_search">Borrar búsqueda</string>
+    <string name="settings_customization_rounding_help">Ajusta el redondeo de tarjetas, botones y paneles en la interfaz para PC.</string>
+    <string name="settings_customization_motion">Velocidad de animación</string>
+    <string name="settings_customization_motion_help">Ajusta la velocidad de las transiciones y animaciones de la interfaz. No afecta a la velocidad de emulación.</string>
 </resources>

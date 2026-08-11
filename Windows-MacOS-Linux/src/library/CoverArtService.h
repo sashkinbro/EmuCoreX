@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
 class SettingsStore;
 
@@ -15,6 +16,7 @@ public:
 
     int revision() const { return m_revision; }
     Q_INVOKABLE QString urlForSerial(const QString& serial, int style) const;
+    Q_INVOKABLE QStringList urlsForSerial(const QString& serial, int style) const;
     Q_INVOKABLE void invalidate();
 
 signals:

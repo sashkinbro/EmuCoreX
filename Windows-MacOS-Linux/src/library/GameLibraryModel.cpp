@@ -1,23 +1,31 @@
 #include "GameLibraryModel.h"
-#include "GameCatalogModel.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
-#include <QSet>
-#include <QUrl>
+#include <QRegularExpression>
 
-GameLibraryModel::GameLibraryModel(GameCatalogModel* catalog, const CoreRuntime* core, QObject* parent)
+#include <algorithm>
+
+GameLibraryModel::GameLibraryModel(const CoreRuntime* core, QObject* parent)
     : QAbstractListModel(parent)
     , m_settings(QSettings::IniFormat, QSettings::UserScope,
           QCoreApplication::organizationName(), QCoreApplication::applicationName())
     , m_folders(m_settings.value("library/folders").toStringList())
-    , m_catalog(catalog)
     , m_metadataProvider(core)
 {
+    for (QString& folder : m_folders) {
+        const QString canonical = QFileInfo(folder).canonicalFilePath();
+        folder = canonical.isEmpty() ? QDir::cleanPath(folder) : canonical;
+    }
+    m_folders.removeDuplicates();
+
     const QStringList favorites = m_settings.value("library/favorites").toStringList();
-    m_favoritePaths = QSet<QString>(favorites.cbegin(), favorites.cend());
+    for (const QString& favorite : favorites) {
+        const QString canonical = QFileInfo(favorite).canonicalFilePath();
+        m_favoritePaths.insert(canonical.isEmpty() ? QDir::cleanPath(favorite) : canonical);
+    }
     refresh();
 }
 
@@ -42,13 +50,6 @@ QVariant GameLibraryModel::data(const QModelIndex& index, int role) const
     case PathRole: return game.path;
     case SerialRole: return game.serial;
     case RegionRole: return game.region;
-    case CoverUrlRole: return game.coverUrl;
-    case HeroUrlRole: return game.heroUrl;
-    case SummaryRole: return game.summary;
-    case GenresRole: return game.genres;
-    case CatalogIdRole: return game.catalogId;
-    case YearRole: return game.year;
-    case RatingRole: return game.rating;
     case SizeRole: return game.size;
     case ModifiedRole: return game.modified;
     case FavoriteRole: return game.favorite;
@@ -58,13 +59,9 @@ QVariant GameLibraryModel::data(const QModelIndex& index, int role) const
 
 QHash<int, QByteArray> GameLibraryModel::roleNames() const
 {
-    return {
-        {TitleRole, "title"}, {PathRole, "path"}, {SerialRole, "serial"},
-        {RegionRole, "region"}, {CoverUrlRole, "coverUrl"}, {HeroUrlRole, "heroUrl"},
-        {SummaryRole, "summary"}, {GenresRole, "genres"}, {CatalogIdRole, "catalogId"},
-        {YearRole, "year"}, {RatingRole, "rating"}, {SizeRole, "fileSize"},
-        {ModifiedRole, "modified"}, {FavoriteRole, "favorite"}
-    };
+    return {{TitleRole, "title"}, {PathRole, "path"}, {SerialRole, "serial"},
+        {RegionRole, "region"}, {SizeRole, "fileSize"}, {ModifiedRole, "modified"},
+        {FavoriteRole, "favorite"}};
 }
 
 bool GameLibraryModel::isSupportedImage(const QString& path)
@@ -75,10 +72,20 @@ bool GameLibraryModel::isSupportedImage(const QString& path)
     return suffixes.contains(QFileInfo(path).suffix().toLower());
 }
 
+QString GameLibraryModel::normalizedSerial(const QString& serial)
+{
+    QString normalized = serial.toUpper();
+    normalized.remove(QRegularExpression(QStringLiteral("[^A-Z0-9]")));
+    return normalized;
+}
+
 void GameLibraryModel::addFolder(const QUrl& folderUrl)
 {
     QString path = folderUrl.isLocalFile() ? folderUrl.toLocalFile() : folderUrl.toString();
     path = QDir::cleanPath(path);
+    const QString canonical = QFileInfo(path).canonicalFilePath();
+    if (!canonical.isEmpty())
+        path = canonical;
     if (path.isEmpty() || !QDir(path).exists() || m_folders.contains(path))
         return;
     m_folders.append(path);
@@ -117,31 +124,16 @@ void GameLibraryModel::refresh()
             if (canonical.isEmpty() || paths.contains(canonical))
                 continue;
             paths.insert(canonical);
+
             const GameImageMetadata metadata = m_metadataProvider.inspect(canonical);
             DesktopGame game;
             game.title = metadata.title;
             game.path = canonical;
-            game.serial = metadata.serial;
-            game.region = metadata.region;
+            game.serial = metadata.authoritative ? metadata.serial : QString();
+            game.region = metadata.authoritative ? metadata.region : QString();
             game.size = metadata.totalSize > 0 ? metadata.totalSize : info.size();
             game.modified = info.lastModified();
             game.favorite = m_favoritePaths.contains(canonical);
-
-            if (m_catalog) {
-                const QVariantMap catalogMatch = m_catalog->matchGame(game.serial, game.title);
-                if (!catalogMatch.isEmpty()) {
-                    game.catalogId = catalogMatch.value(QStringLiteral("id")).toLongLong();
-                    if (!metadata.authoritative)
-                        game.title = catalogMatch.value(QStringLiteral("name"), game.title).toString();
-                    game.year = catalogMatch.value(QStringLiteral("year")).toInt();
-                    game.rating = catalogMatch.value(QStringLiteral("rating")).toDouble();
-                    game.summary = catalogMatch.value(QStringLiteral("summary")).toString();
-                    game.heroUrl = catalogMatch.value(QStringLiteral("heroUrl")).toString();
-                    game.genres = catalogMatch.value(QStringLiteral("genres")).toString();
-                    if (game.serial.isEmpty())
-                        game.serial = catalogMatch.value(QStringLiteral("primarySerial")).toString();
-                }
-            }
             games.append(std::move(game));
         }
     }
@@ -159,10 +151,18 @@ QString GameLibraryModel::pathAt(int index) const
     return (index >= 0 && index < m_visibleGames.size()) ? m_visibleGames.at(index).path : QString();
 }
 
-QVariantMap GameLibraryModel::gameForCatalogId(qint64 catalogId) const
+QVariantMap GameLibraryModel::gameForSerials(const QVariantList& serials) const
 {
+    QSet<QString> wanted;
+    for (const QVariant& serial : serials) {
+        const QString normalized = normalizedSerial(serial.toString());
+        if (!normalized.isEmpty())
+            wanted.insert(normalized);
+    }
+    if (wanted.isEmpty())
+        return {};
     for (const DesktopGame& game : m_allGames) {
-        if (game.catalogId != catalogId)
+        if (!wanted.contains(normalizedSerial(game.serial)))
             continue;
         return {{QStringLiteral("title"), game.title}, {QStringLiteral("path"), game.path},
             {QStringLiteral("serial"), game.serial}, {QStringLiteral("region"), game.region},
@@ -196,9 +196,8 @@ bool GameLibraryModel::toggleFavoritePath(const QString& path)
 
 void GameLibraryModel::toggleFavorite(int index)
 {
-    if (index < 0 || index >= m_visibleGames.size())
-        return;
-    toggleFavoritePath(m_visibleGames.at(index).path);
+    if (index >= 0 && index < m_visibleGames.size())
+        toggleFavoritePath(m_visibleGames.at(index).path);
 }
 
 void GameLibraryModel::invalidateCovers()
@@ -216,17 +215,27 @@ void GameLibraryModel::setSearchQuery(const QString& query)
     applyFilter();
 }
 
+void GameLibraryModel::setFavoritesOnly(bool favoritesOnly)
+{
+    if (m_favoritesOnly == favoritesOnly)
+        return;
+    m_favoritesOnly = favoritesOnly;
+    emit favoritesOnlyChanged();
+    applyFilter();
+}
+
 void GameLibraryModel::applyFilter()
 {
     beginResetModel();
-    if (m_searchQuery.trimmed().isEmpty()) {
-        m_visibleGames = m_allGames;
-    } else {
-        m_visibleGames.clear();
-        for (const DesktopGame& game : std::as_const(m_allGames)) {
-            if (game.title.contains(m_searchQuery, Qt::CaseInsensitive) || game.serial.contains(m_searchQuery, Qt::CaseInsensitive))
-                m_visibleGames.append(game);
-        }
+    m_visibleGames.clear();
+    const QString query = m_searchQuery.trimmed();
+    for (const DesktopGame& game : std::as_const(m_allGames)) {
+        if (m_favoritesOnly && !game.favorite)
+            continue;
+        if (!query.isEmpty() && !game.title.contains(query, Qt::CaseInsensitive)
+            && !game.serial.contains(query, Qt::CaseInsensitive))
+            continue;
+        m_visibleGames.append(game);
     }
     endResetModel();
     emit countChanged();
@@ -235,6 +244,7 @@ void GameLibraryModel::applyFilter()
 void GameLibraryModel::saveFolders()
 {
     m_settings.setValue("library/folders", m_folders);
+    m_settings.sync();
 }
 
 void GameLibraryModel::saveFavorites()
@@ -242,4 +252,5 @@ void GameLibraryModel::saveFavorites()
     QStringList favorites(m_favoritePaths.cbegin(), m_favoritePaths.cend());
     favorites.sort(Qt::CaseInsensitive);
     m_settings.setValue("library/favorites", favorites);
+    m_settings.sync();
 }

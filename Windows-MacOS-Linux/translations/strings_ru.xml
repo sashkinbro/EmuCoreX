@@ -2239,4 +2239,7 @@
     <string name="hub_empty_state_title">Здесь пока ничего нет</string>
     <string name="hub_no_matches">Совпадений нет</string>
     <string name="hub_clear_search">Очистить поиск</string>
+    <string name="settings_customization_rounding_help">Настраивает скругление карточек, кнопок и панелей в интерфейсе для ПК.</string>
+    <string name="settings_customization_motion">Скорость анимаций</string>
+    <string name="settings_customization_motion_help">Настраивает скорость переходов и анимаций интерфейса. На скорость эмуляции это не влияет.</string>
 </resources>

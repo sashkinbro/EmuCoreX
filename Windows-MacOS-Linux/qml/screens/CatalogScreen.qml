@@ -17,6 +17,18 @@ Item {
     property string selectedGenres: ""
     property string selectedSerial: ""
 
+    function coverSources(serial, catalogCover) {
+        const result = []
+        if (catalogCover && catalogCover.length > 0)
+            result.push(catalogCover)
+        const githubSources = CoverArtProvider.urlsForSerial(serial, Preferences.coverArtStyle)
+        for (let index = 0; index < githubSources.length; ++index) {
+            if (result.indexOf(githubSources[index]) < 0)
+                result.push(githubSources[index])
+        }
+        return result
+    }
+
     function selectGame(id, name, year, rating, summary, storyline, cover, hero, genres, serial) {
         if (selectedId === id) {
             clearSelection()
@@ -105,16 +117,13 @@ Item {
                     }
                     ToolButton {
                         visible: searchField.text.length > 0
-                        icon.name: "edit-clear"
-                        text: "×"
-                        font.pixelSize: Theme.sp(22)
+                        Accessible.name: I18n.get("gamedb_browser_clear_search")
                         onClicked: searchField.clear()
-                        contentItem: Text {
-                            text: parent.text
-                            color: Theme.textMuted
-                            font: parent.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                        contentItem: AppIcon {
+                            width: 18
+                            height: 18
+                            name: "close"
+                            color: parent.hovered ? Theme.text : Theme.textMuted
                         }
                         background: Rectangle {
                             radius: 12
@@ -203,7 +212,8 @@ Item {
                                         Layout.fillHeight: true
                                         Layout.margins: 7
                                         Layout.bottomMargin: 0
-                                        source: CoverArtProvider.urlForSerial(delegateRoot.catalogPrimarySerial, Preferences.coverArtStyle)
+                                        sources: root.coverSources(delegateRoot.catalogPrimarySerial,
+                                            delegateRoot.catalogCoverUrl)
                                         coverStyle: Preferences.coverArtStyle
                                         cornerRadius: 16
                                     }
@@ -311,9 +321,10 @@ Item {
 
                             AppButton {
                                 Layout.alignment: Qt.AlignRight
+                                text: ""
                                 iconName: "close"
-                                iconOnly: true
-                                accessibleName: I18n.get("common_close")
+                                toolTipText: I18n.get("common_close")
+                                Accessible.name: I18n.get("common_close")
                                 onClicked: root.clearSelection()
                             }
 
@@ -322,7 +333,7 @@ Item {
                                 Layout.preferredWidth: 116
                                 Layout.preferredHeight: 168
                                 Layout.alignment: Qt.AlignHCenter
-                                source: CoverArtProvider.urlForSerial(root.selectedSerial, Preferences.coverArtStyle)
+                                sources: root.coverSources(root.selectedSerial, root.selectedCover)
                                 coverStyle: Preferences.coverArtStyle
                                 cornerRadius: 18
                             }

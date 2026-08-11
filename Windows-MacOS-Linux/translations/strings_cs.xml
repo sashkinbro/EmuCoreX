@@ -2255,5 +2255,8 @@
     <string name="hub_empty_state_title">Zatím tu nic není</string>
     <string name="hub_no_matches">Žádné výsledky</string>
     <string name="hub_clear_search">Vymazat hledání</string>
+    <string name="settings_customization_rounding_help">Upravuje zaoblení karet, tlačítek a panelů v rozhraní pro PC.</string>
+    <string name="settings_customization_motion">Rychlost animací</string>
+    <string name="settings_customization_motion_help">Upravuje rychlost přechodů a animací rozhraní. Rychlost emulace se tím nemění.</string>
 </resources>
 

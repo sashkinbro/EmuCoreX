@@ -7,11 +7,17 @@ Item {
     id: root
 
     property url source
+    property var sources: []
+    property int sourceIndex: 0
     property int coverStyle: 1
     property real cornerRadius: 16
     property string fallbackIcon: "library"
     property alias status: artwork.status
     readonly property real artworkInset: coverStyle === 2 ? 10 : 5
+    readonly property url resolvedSource: sources.length > 0 && sourceIndex < sources.length
+        ? sources[sourceIndex] : source
+
+    onSourcesChanged: sourceIndex = 0
 
     Rectangle {
         anchors.fill: parent
@@ -25,7 +31,7 @@ Item {
         id: artwork
         anchors.fill: parent
         anchors.margins: root.artworkInset
-        source: root.source
+        source: root.resolvedSource
         asynchronous: true
         cache: true
         mipmap: true
@@ -69,6 +75,16 @@ Item {
         height: width
         name: root.fallbackIcon
         color: Theme.borderStrong
-        visible: artwork.status === Image.Error || root.source.toString().length === 0
+        visible: (artwork.status === Image.Error && root.sourceIndex + 1 >= root.sources.length)
+            || root.resolvedSource.toString().length === 0
+    }
+
+    Connections {
+        target: artwork
+        function onStatusChanged() {
+            if (artwork.status === Image.Error && root.sources.length > 0
+                    && root.sourceIndex + 1 < root.sources.length)
+                root.sourceIndex += 1
+        }
     }
 }

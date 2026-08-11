@@ -2250,4 +2250,7 @@
     <string name="hub_empty_state_title">هنوز چیزی اینجا نیست</string>
     <string name="hub_no_matches">نتیجه‌ای پیدا نشد</string>
     <string name="hub_clear_search">پاک کردن جست‌وجو</string>
+    <string name="settings_customization_rounding_help">میزان گردی کارت‌ها، دکمه‌ها و پنل‌ها را در رابط رایانه تنظیم می‌کند.</string>
+    <string name="settings_customization_motion">سرعت پویانمایی</string>
+    <string name="settings_customization_motion_help">سرعت گذارها و پویانمایی‌های رابط را تنظیم می‌کند و بر سرعت شبیه‌سازی اثری ندارد.</string>
 </resources>

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(EmuCoreXDesktop VERSION 0.1.0 LANGUAGES CXX)
+project(EmuCoreX VERSION 0.3.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,6 +10,7 @@ set(CMAKE_AUTORCC ON)
 
 option(EMUCOREX_WITH_PCSX2 "Build the embedded PCSX2 core adapter" OFF)
 option(EMUCOREX_CONSOLE "Keep a console attached for desktop diagnostics" OFF)
+option(EMUCOREX_BUILD_TOOLS "Build desktop runtime diagnostic tools" ON)
 set(EMUCOREX_PREBUILT_CORE_DIR "" CACHE PATH
     "Directory containing the separately built EmuCoreX core and its runtime dependencies")
 
@@ -63,6 +64,8 @@ qt_add_executable(EmuCoreXDesktop
     src/core/CoreRuntime.h
     src/core/GameMetadataProvider.cpp
     src/core/GameMetadataProvider.h
+    src/core/NativeRenderItem.cpp
+    src/core/NativeRenderItem.h
     src/data/DesktopDataService.cpp
     src/data/DesktopDataService.h
     src/i18n/TranslationManager.cpp
@@ -80,6 +83,8 @@ qt_add_executable(EmuCoreXDesktop
     resources.qrc
 )
 
+set_target_properties(EmuCoreXDesktop PROPERTIES OUTPUT_NAME "EmuCoreX")
+
 target_link_libraries(EmuCoreXDesktop PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -95,6 +100,23 @@ target_compile_definitions(EmuCoreXDesktop PRIVATE
     EMUCOREX_VERSION="${PROJECT_VERSION}"
     $<$<BOOL:${EMUCOREX_WITH_PCSX2}>:EMUCOREX_WITH_PCSX2=1>
 )
+
+if(EMUCOREX_BUILD_TOOLS)
+    add_executable(EmuCoreXCoreProbe
+        tools/CoreProbe.cpp
+        src/core/CoreRuntime.cpp
+        src/core/CoreRuntime.h
+        src/core/GameMetadataProvider.cpp
+        src/core/GameMetadataProvider.h
+        src/library/GameCatalogModel.cpp
+        src/library/GameCatalogModel.h
+        resources.qrc
+    )
+    target_link_libraries(EmuCoreXCoreProbe PRIVATE Qt6::Core Qt6::Sql)
+    target_compile_definitions(EmuCoreXCoreProbe PRIVATE
+        EMUCOREX_VERSION="${PROJECT_VERSION}"
+    )
+endif()
 
 if(EMUCOREX_WITH_PCSX2)
     target_include_directories(EmuCoreXDesktop PRIVATE
@@ -231,7 +253,7 @@ elseif(APPLE)
     set_target_properties(EmuCoreXDesktop PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "EmuCoreX"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.sbro.emucorex.desktop"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.sbro.emucorex"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     )

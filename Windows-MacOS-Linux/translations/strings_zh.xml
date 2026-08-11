@@ -2236,4 +2236,7 @@
     <string name="hub_empty_state_title">这里暂时没有内容</string>
     <string name="hub_no_matches">没有匹配项</string>
     <string name="hub_clear_search">清除搜索</string>
+    <string name="settings_customization_rounding_help">调整 PC 界面中卡片、按钮和面板的圆角程度。</string>
+    <string name="settings_customization_motion">动画速度</string>
+    <string name="settings_customization_motion_help">调整界面过渡和动画的速度，不会影响模拟速度。</string>
 </resources>

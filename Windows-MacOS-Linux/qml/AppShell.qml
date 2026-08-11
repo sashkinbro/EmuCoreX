@@ -3,11 +3,13 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
 import "components"
+import "screens"
 import "theme"
 
 Item {
     id: root
     property bool compact: Preferences.compactSidebar || width < 1120
+    readonly property bool inGame: App.currentRoute === "emulation"
     property string globalSearch: ""
 
     Rectangle {
@@ -19,7 +21,8 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: parent.left
-            width: root.compact ? Theme.sidebarCompact : Theme.sidebarWide
+            width: root.inGame ? 0 : (root.compact ? Theme.sidebarCompact : Theme.sidebarWide)
+            visible: width > 0
             color: Theme.sidebar
             border.width: 1
             border.color: Theme.border
@@ -141,7 +144,8 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.topBarHeight
+                Layout.preferredHeight: root.inGame ? 0 : Theme.topBarHeight
+                visible: !root.inGame
                 color: Theme.backgroundRaised
                 border.width: 1
                 border.color: Theme.border
@@ -235,7 +239,7 @@ Item {
         title: I18n.get("shell_launch_game")
         nameFilters: ["PlayStation 2 images (*.iso *.bin *.img *.mdf *.nrg *.chd *.cso *.gz *.zso)", "Executables (*.elf)", "All files (*)"]
         onAccepted: {
-            if (Emulator.bootGame(selectedFile.toString().replace(/^file:\/\//, "")))
+            if (Emulator.bootGame(decodeURIComponent(selectedFile.toString().replace(/^file:\/\//, ""))))
                 App.navigate("emulation")
         }
     }
@@ -245,7 +249,7 @@ Item {
     Component { id: hubComponent; Loader { source: "screens/HubScreen.qml" } }
     Component { id: profileComponent; Loader { source: "screens/ProfileScreen.qml" } }
     Component { id: settingsComponent; Loader { source: "screens/SettingsScreen.qml" } }
-    Component { id: emulationComponent; Loader { source: "screens/EmulationScreen.qml" } }
+    Component { id: emulationComponent; EmulationScreen { } }
     Component { id: gameDetailComponent; Loader { source: "screens/GameDetailScreen.qml" } }
     Component { id: saveManagerComponent; Loader { source: "screens/SaveManagerScreen.qml" } }
     Component { id: memoryCardsComponent; Loader { source: "screens/MemoryCardManagerScreen.qml" } }

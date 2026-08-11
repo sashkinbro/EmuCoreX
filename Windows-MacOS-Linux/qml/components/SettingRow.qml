@@ -22,6 +22,139 @@ Rectangle {
     signal numberSelected(real value)
     signal actionTriggered()
 
+    function optionValue(index) {
+        if (index < 0 || index >= options.length)
+            return ""
+        const option = options[index]
+        return option && typeof option === "object" && option.value !== undefined
+            ? String(option.value) : String(option)
+    }
+
+    function optionLabel(index) {
+        if (index < 0 || index >= options.length)
+            return ""
+        const option = options[index]
+        return option && typeof option === "object" && option.label !== undefined
+            ? String(option.label) : String(option)
+    }
+
+    function optionIndex(value) {
+        for (let index = 0; index < options.length; ++index) {
+            if (optionValue(index) === String(value))
+                return index
+        }
+        return options.length > 0 ? 0 : -1
+    }
+
+    Dialog {
+        id: helpDialog
+        anchors.centerIn: Overlay.overlay
+        width: Math.min(640, Overlay.overlay.width - 48)
+        height: Math.min(470, Overlay.overlay.height - 48)
+        modal: true
+        padding: 0
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+        background: Rectangle {
+            radius: 24
+            color: Theme.surface
+            border.width: 1
+            border.color: Theme.borderStrong
+        }
+
+        header: Item {
+            implicitHeight: 88
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 22
+                anchors.rightMargin: 16
+                spacing: 14
+                Rectangle {
+                    Layout.preferredWidth: 48
+                    Layout.preferredHeight: 48
+                    radius: 16
+                    color: Theme.accentContainer
+                    AppIcon {
+                        anchors.centerIn: parent
+                        width: 23
+                        height: 23
+                        name: "info"
+                        color: Theme.accentBright
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Text {
+                        text: I18n.get("settings_help_dialog_eyebrow")
+                        color: Theme.accentBright
+                        font.pixelSize: Theme.sp(11)
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.title
+                        color: Theme.text
+                        font.pixelSize: Theme.sp(19)
+                        font.weight: Font.Bold
+                        maximumLineCount: 2
+                        wrapMode: Text.WordWrap
+                        elide: Text.ElideRight
+                    }
+                }
+                AppButton {
+                    text: ""
+                    iconName: "close"
+                    toolTipText: I18n.get("common_close")
+                    Accessible.name: I18n.get("common_close")
+                    onClicked: helpDialog.close()
+                }
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.border
+            }
+        }
+
+        contentItem: ScrollView {
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            Text {
+                width: helpDialog.availableWidth - 48
+                x: 24
+                topPadding: 24
+                bottomPadding: 24
+                text: root.description
+                color: Theme.textMuted
+                font.pixelSize: Theme.sp(14)
+                lineHeight: 1.32
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 72
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 1
+                color: Theme.border
+            }
+            AppButton {
+                anchors.right: parent.right
+                anchors.rightMargin: 18
+                anchors.verticalCenter: parent.verticalCenter
+                text: I18n.get("common_close")
+                primary: true
+                onClicked: helpDialog.close()
+            }
+        }
+    }
+
     implicitHeight: Math.max(description.length > 0 ? 92 : 72, rowLayout.implicitHeight + 28)
     color: hover.hovered ? Theme.surfaceHover : Theme.surface
     radius: 22
@@ -56,6 +189,14 @@ Rectangle {
                 wrapMode: Text.WordWrap
                 elide: Text.ElideRight
             }
+        }
+        AppButton {
+            visible: root.description.length > 0
+            text: ""
+            iconName: "info"
+            toolTipText: I18n.get("settings_help_content_description")
+            Accessible.name: I18n.get("settings_help_content_description")
+            onClicked: helpDialog.open()
         }
         Switch {
             id: toggleControl
@@ -98,14 +239,14 @@ Rectangle {
             id: comboControl
             visible: root.controlType === "combo"
             model: root.options
-            currentIndex: Math.max(0, root.options.indexOf(root.currentValue))
+            currentIndex: root.optionIndex(root.currentValue)
             implicitWidth: 190
             implicitHeight: 44
-            onActivated: root.valueSelected(currentText)
+            onActivated: root.valueSelected(root.optionValue(index))
             contentItem: Text {
                 leftPadding: 15
                 rightPadding: 38
-                text: comboControl.displayText
+                text: root.optionLabel(comboControl.currentIndex)
                 color: Theme.text
                 font.pixelSize: Theme.sp(13)
                 verticalAlignment: Text.AlignVCenter
@@ -134,7 +275,8 @@ Rectangle {
                 height: 44
                 highlighted: comboControl.highlightedIndex === index
                 contentItem: Text {
-                    text: modelData
+                    text: modelData && typeof modelData === "object" && modelData.label !== undefined
+                        ? String(modelData.label) : String(modelData)
                     color: Theme.text
                     font.pixelSize: Theme.sp(13)
                     verticalAlignment: Text.AlignVCenter
@@ -192,6 +334,8 @@ Rectangle {
                 stepSize: root.stepSize
                 value: root.numericValue
                 live: true
+                snapMode: Slider.SnapAlways
+                focusPolicy: Qt.StrongFocus
                 onMoved: root.numberSelected(value)
                 background: Rectangle {
                     x: sliderControl.leftPadding
@@ -210,14 +354,26 @@ Rectangle {
                 handle: Rectangle {
                     x: sliderControl.leftPadding + sliderControl.visualPosition * (sliderControl.availableWidth - width)
                     y: sliderControl.topPadding + sliderControl.availableHeight / 2 - height / 2
-                    implicitWidth: 20
-                    implicitHeight: 20
+                    width: 20
+                    height: 20
                     radius: 10
                     color: sliderControl.pressed ? Theme.accentBright : Theme.text
                     border.width: 3
                     border.color: Theme.accent
                     scale: sliderControl.pressed ? 1.12 : 1
                     Behavior on scale { NumberAnimation { duration: Theme.durationFast } }
+                }
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                    onWheel: function(event) {
+                        const direction = event.angleDelta.y >= 0 ? 1 : -1
+                        const nextValue = Math.max(sliderControl.from,
+                            Math.min(sliderControl.to, sliderControl.value + direction * sliderControl.stepSize))
+                        sliderControl.value = nextValue
+                        root.numberSelected(nextValue)
+                        event.accepted = true
+                    }
                 }
             }
             Rectangle {

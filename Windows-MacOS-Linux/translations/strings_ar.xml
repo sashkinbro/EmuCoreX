@@ -2239,4 +2239,7 @@
     <string name="hub_empty_state_title">لا يوجد شيء هنا بعد</string>
     <string name="hub_no_matches">لا توجد نتائج مطابقة</string>
     <string name="hub_clear_search">مسح البحث</string>
+    <string name="settings_customization_rounding_help">يضبط مدى استدارة البطاقات والأزرار واللوحات في واجهة الكمبيوتر.</string>
+    <string name="settings_customization_motion">سرعة الحركة</string>
+    <string name="settings_customization_motion_help">يضبط سرعة انتقالات الواجهة وحركاتها. لا يؤثر ذلك في سرعة المحاكاة.</string>
 </resources>

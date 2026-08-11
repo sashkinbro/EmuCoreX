@@ -5,7 +5,7 @@
 [![Support EmuCoreX on Patreon](https://img.shields.io/badge/Patreon-Support%20EmuCoreX-ff424d?logo=patreon&logoColor=white)](https://www.patreon.com/c/emucore/membership)
 [![Join the EmuCoreX Discord](https://img.shields.io/badge/Discord-Join%20our%20server-5865F2?logo=discord&logoColor=white)](https://discord.gg/c5EBeNRpz2)
 
-EmuCoreX is a PlayStation 2 library and launcher for Android. It pairs a custom Android interface with a PCSX2-based emulation core adapted by EmuCoreX for Android.
+EmuCoreX is a PlayStation 2 library, launcher, and emulator frontend for Android and desktop. It pairs a purpose-built interface with PCSX2-derived emulation cores adapted for each supported architecture.
 
 Official website: https://emucorex.web.app/
 
@@ -39,10 +39,25 @@ Official website: https://emucorex.web.app/
 - Cheat management with `.pnach` import, editing, and per-game activation in overlay
 - Advanced graphics and GS hack controls, including device-safe defaults for MediaTek
 - Physical gamepad remapping and gamepad-aware UI flows
+- A shared desktop application for Windows, Linux, and macOS with a native Qt Quick interface
+
+## Desktop Roadmap
+
+Desktop builds are under active development in `Windows-MacOS-Linux/`. EmuCoreX is designed as one application across all three desktop operating systems, with native packaging and platform-appropriate graphics backends.
+
+Planned desktop targets:
+
+| Platform | x64 | ARM64 |
+| --- | :---: | :---: |
+| Windows | Planned | Planned |
+| Linux | Planned | Planned |
+| macOS | Planned | Planned |
+
+The first public desktop pre-release alpha is planned for the end of 2026. This is a development target rather than a guaranteed release date; stability and core integration will determine the final timing.
 
 ## What This Repository Contains
 
-This repository contains the Android app, UI, settings, bridge code, and bundled native core sources used by EmuCoreX.
+This repository contains the Android app and the in-development Windows, Linux, and macOS application, together with their UI, settings, bridge code, and native emulation core integrations.
 
 ## Tech Stack
 
@@ -51,15 +66,19 @@ This repository contains the Android app, UI, settings, bridge code, and bundled
 - JNI bridge to native C++
 - Emulation core derived from PCSX2 and integrated into EmuCoreX's native Android stack
 - Firebase services used by the Android app
+- C++20, Qt 6, Qt Quick, and QML for the desktop application
+- PCSX2 x64 integration and the EmuCoreX ARM64 core path selected per architecture
 
 ## Current App Scope
 
-EmuCoreX currently targets Android with:
+EmuCoreX version `0.3.3` currently targets Android with:
 
 - `minSdk 29`
 - `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.3.0`
+- version `0.3.3`
+
+Desktop version `0.3.3` is in development for Windows, Linux, and macOS on x64 and ARM64. Public desktop binaries are not available yet.
 
 ## Building Locally
 
@@ -87,6 +106,7 @@ EmuCoreX currently targets Android with:
 - `app/src/main/java/com/sbro/emucorex` Kotlin app code
 - `app/src/main/cpp` Native bridge and core sources
 - `app/src/main/res` Android resources and translations
+- `Windows-MacOS-Linux/` shared desktop application, native core adapters, packaging scripts, and desktop translations
 
 ## Notes
 

@@ -2237,4 +2237,7 @@
     <string name="hub_empty_state_title">Rien ici pour le moment</string>
     <string name="hub_no_matches">Aucun résultat</string>
     <string name="hub_clear_search">Effacer la recherche</string>
+    <string name="settings_customization_rounding_help">Ajuste l’arrondi des cartes, boutons et panneaux dans l’interface PC.</string>
+    <string name="settings_customization_motion">Vitesse des animations</string>
+    <string name="settings_customization_motion_help">Ajuste la vitesse des transitions et animations de l’interface. La vitesse d’émulation n’est pas affectée.</string>
 </resources>

@@ -117,6 +117,7 @@ app/src/main/cpp/PCSX2/**/Docs/
 app/src/main/cpp/PCSX2/bin/docs/
 
 # Temporary / backup directories
+/tmp/
 CoreVixlOLD/
 OLDCORE/
 oldcore/

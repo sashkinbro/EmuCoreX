@@ -2237,4 +2237,7 @@
     <string name="hub_empty_state_title">Hier ist noch nichts</string>
     <string name="hub_no_matches">Keine Treffer</string>
     <string name="hub_clear_search">Suche löschen</string>
+    <string name="settings_customization_rounding_help">Passt die Rundung von Karten, Schaltflächen und Bereichen der PC-Oberfläche an.</string>
+    <string name="settings_customization_motion">Animationsgeschwindigkeit</string>
+    <string name="settings_customization_motion_help">Passt die Geschwindigkeit von Übergängen und Oberflächenanimationen an. Die Emulationsgeschwindigkeit bleibt unverändert.</string>
 </resources>

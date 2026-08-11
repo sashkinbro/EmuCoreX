@@ -20,6 +20,8 @@ class SettingsStore final : public QObject
     Q_PROPERTY(double fontScale READ fontScale WRITE setFontScale NOTIFY fontScaleChanged)
     Q_PROPERTY(QString backgroundPath READ backgroundPath WRITE setBackgroundPath NOTIFY backgroundPathChanged)
     Q_PROPERTY(int backgroundDim READ backgroundDim WRITE setBackgroundDim NOTIFY backgroundDimChanged)
+    Q_PROPERTY(double cornerScale READ cornerScale WRITE setCornerScale NOTIFY cornerScaleChanged)
+    Q_PROPERTY(double motionScale READ motionScale WRITE setMotionScale NOTIFY motionScaleChanged)
 
 public:
     explicit SettingsStore(QObject* parent = nullptr);
@@ -37,6 +39,8 @@ public:
     double fontScale() const;
     QString backgroundPath() const;
     int backgroundDim() const;
+    double cornerScale() const;
+    double motionScale() const;
 
     void setThemeMode(const QString& value);
     void setAccentColor(const QString& value);
@@ -51,6 +55,8 @@ public:
     void setFontScale(double value);
     void setBackgroundPath(const QString& value);
     void setBackgroundDim(int value);
+    void setCornerScale(double value);
+    void setMotionScale(double value);
 
     Q_INVOKABLE QVariant value(const QString& key, const QVariant& fallback = {}) const;
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
@@ -70,6 +76,8 @@ signals:
     void fontScaleChanged();
     void backgroundPathChanged();
     void backgroundDimChanged();
+    void cornerScaleChanged();
+    void motionScaleChanged();
     void valueChanged(const QString& key, const QVariant& value);
 
 private:

@@ -21,6 +21,7 @@
         <file alias="qml/components/ManagerPage.qml">qml/components/ManagerPage.qml</file>
         <file alias="qml/components/RoundedImage.qml">qml/components/RoundedImage.qml</file>
         <file alias="qml/components/FeaturePage.qml">qml/components/FeaturePage.qml</file>
+        <file alias="qml/components/GameFoldersDialog.qml">qml/components/GameFoldersDialog.qml</file>
         <file alias="qml/components/PageHeader.qml">qml/components/PageHeader.qml</file>
         <file alias="qml/components/SettingRow.qml">qml/components/SettingRow.qml</file>
         <file alias="qml/components/SidebarItem.qml">qml/components/SidebarItem.qml</file>

@@ -2234,4 +2234,7 @@
     <string name="hub_empty_state_title">아직 표시할 내용이 없습니다</string>
     <string name="hub_no_matches">일치하는 항목 없음</string>
     <string name="hub_clear_search">검색어 지우기</string>
+    <string name="settings_customization_rounding_help">PC 인터페이스의 카드, 버튼, 패널 모서리 둥글기를 조절합니다.</string>
+    <string name="settings_customization_motion">애니메이션 속도</string>
+    <string name="settings_customization_motion_help">인터페이스 전환과 애니메이션 속도를 조절합니다. 에뮬레이션 속도에는 영향을 주지 않습니다.</string>
 </resources>

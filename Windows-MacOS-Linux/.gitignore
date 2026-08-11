@@ -1,7 +1,14 @@
 build*/
 out/
 dist/
+release/
+.cache/
+cores/
+runtime-data/
+logs/
 vcpkg_installed/
 CMakeUserPresets.json
 *.user
 *.log
+*.pdb
+*.ilk

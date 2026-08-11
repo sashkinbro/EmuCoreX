@@ -11,7 +11,10 @@ Item {
 
     function reload() {
         details = GameCatalog.detailsForId(App.selectedCatalogGameId)
-        localGame = GameLibrary.gameForCatalogId(App.selectedCatalogGameId)
+        const identitySerials = details.serials || []
+        if (identitySerials.length === 0 && details.primarySerial)
+            identitySerials.push(details.primarySerial)
+        localGame = GameLibrary.gameForSerials(identitySerials)
     }
 
     function formatSize(bytes) {
@@ -69,7 +72,7 @@ Item {
                     Layout.preferredWidth: 220
                     Layout.preferredHeight: 314
                     Layout.alignment: Qt.AlignBottom
-                    source: CoverArtProvider.urlForSerial(root.localGame.path ? root.localGame.serial : (root.details.primarySerial || ""), Preferences.coverArtStyle)
+                    sources: CoverArtProvider.urlsForSerial(root.localGame.path ? root.localGame.serial : (root.details.primarySerial || ""), Preferences.coverArtStyle)
                     coverStyle: Preferences.coverArtStyle
                     cornerRadius: 24
                 }
@@ -140,7 +143,7 @@ Item {
                             text: I18n.get("hub_tab_favorites")
                             onClicked: {
                                 GameLibrary.toggleFavoritePath(root.localGame.path)
-                                root.localGame = GameLibrary.gameForCatalogId(App.selectedCatalogGameId)
+                                root.reload()
                             }
                         }
                         AppButton {

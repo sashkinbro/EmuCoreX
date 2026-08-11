@@ -2235,4 +2235,7 @@
     <string name="hub_empty_state_title">अभी यहाँ कुछ नहीं है</string>
     <string name="hub_no_matches">कोई मेल नहीं</string>
     <string name="hub_clear_search">खोज साफ़ करें</string>
+    <string name="settings_customization_rounding_help">PC इंटरफ़ेस में कार्ड, बटन और पैनल के गोलाई स्तर को समायोजित करता है।</string>
+    <string name="settings_customization_motion">एनिमेशन गति</string>
+    <string name="settings_customization_motion_help">इंटरफ़ेस ट्रांज़िशन और एनिमेशन की गति समायोजित करता है। इससे एमुलेशन की गति प्रभावित नहीं होती।</string>
 </resources>

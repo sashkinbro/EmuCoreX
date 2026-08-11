@@ -2235,4 +2235,7 @@
     <string name="hub_empty_state_title">Non c’è ancora nulla</string>
     <string name="hub_no_matches">Nessun risultato</string>
     <string name="hub_clear_search">Cancella ricerca</string>
+    <string name="settings_customization_rounding_help">Regola l’arrotondamento di schede, pulsanti e pannelli nell’interfaccia PC.</string>
+    <string name="settings_customization_motion">Velocità animazioni</string>
+    <string name="settings_customization_motion_help">Regola la velocità delle transizioni e delle animazioni dell’interfaccia. Non influisce sulla velocità di emulazione.</string>
 </resources>

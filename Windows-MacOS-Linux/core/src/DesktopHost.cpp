@@ -8,7 +8,10 @@
 #include "pcsx2/ImGui/ImGuiFullscreen.h"
 #include "pcsx2/ImGui/ImGuiManager.h"
 #include "pcsx2/Input/InputManager.h"
+#include "pcsx2/MTGS.h"
 #include "pcsx2/VMManager.h"
+
+#include "DesktopCoreSession.h"
 
 #include "common/ProgressCallback.h"
 
@@ -94,7 +97,8 @@ void Host::EndTextInput()
 
 std::optional<WindowInfo> Host::GetTopLevelWindowInfo()
 {
-    return std::nullopt;
+    const WindowInfo info = emucorex::desktop::GetWindowInfo();
+    return info.type == WindowInfo::Type::Surfaceless ? std::nullopt : std::optional<WindowInfo>(info);
 }
 
 void Host::OnInputDeviceConnected(const std::string_view, const std::string_view)
@@ -115,7 +119,7 @@ void Host::SetMouseLock(bool)
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool)
 {
-    return std::nullopt;
+    return emucorex::desktop::GetWindowInfo();
 }
 
 void Host::ReleaseRenderWindow()
@@ -170,16 +174,15 @@ void Host::OnSaveStateSaved(const std::string_view)
 {
 }
 
-void Host::RunOnCPUThread(std::function<void()> function, bool)
+void Host::RunOnCPUThread(std::function<void()> function, bool block)
 {
-    if (function)
-        function();
+    emucorex::desktop::RunOnCPUThread(std::move(function), block);
 }
 
 void Host::RunOnGSThread(std::function<void()> function)
 {
     if (function)
-        function();
+        RunOnCPUThread([fn = std::move(function)] { MTGS::RunOnGSThread(std::move(fn)); });
 }
 
 void Host::RefreshGameListAsync(bool)
@@ -223,6 +226,7 @@ void Host::RequestVMShutdown(bool, bool, bool)
 
 void Host::PumpMessagesOnCPUThread()
 {
+    emucorex::desktop::PumpCPUThreadTasks();
 }
 
 s32 Host::Internal::GetTranslatedStringImpl(

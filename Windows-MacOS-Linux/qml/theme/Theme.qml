@@ -10,6 +10,8 @@ QtObject {
     readonly property color accentContainer: light ? Qt.rgba(accent.r, accent.g, accent.b, 0.18) : Qt.rgba(accent.r, accent.g, accent.b, 0.24)
     readonly property color onAccentContainer: light ? Qt.darker(accent, 1.35) : Qt.lighter(accent, 1.85)
     readonly property real fontScale: Preferences.fontScale
+    readonly property real cornerScale: Preferences.cornerScale
+    readonly property real motionScale: Preferences.motionScale
     readonly property color background: light ? "#F6F6FA" : "#050506"
     readonly property color backgroundRaised: light ? "#FFFFFF" : "#08080A"
     readonly property color sidebar: light ? "#EEEEF4" : "#09090C"
@@ -26,13 +28,13 @@ QtObject {
     readonly property color warning: "#C6A15A"
     readonly property color error: "#FF6B7A"
 
-    readonly property int radiusSmall: 10
-    readonly property int radius: 16
-    readonly property int radiusLarge: 26
-    readonly property int radiusXLarge: 32
-    readonly property int durationFast: 140
-    readonly property int duration: 240
-    readonly property int durationSlow: 420
+    readonly property int radiusSmall: Math.round(10 * cornerScale)
+    readonly property int radius: Math.round(16 * cornerScale)
+    readonly property int radiusLarge: Math.round(26 * cornerScale)
+    readonly property int radiusXLarge: Math.round(32 * cornerScale)
+    readonly property int durationFast: Math.round(140 * motionScale)
+    readonly property int duration: Math.round(240 * motionScale)
+    readonly property int durationSlow: Math.round(420 * motionScale)
     readonly property int sidebarWide: 246
     readonly property int sidebarCompact: 78
     readonly property int topBarHeight: 72

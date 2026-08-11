@@ -26,6 +26,7 @@ Item {
     ]
 
     function t(key) { return I18n.get(key) }
+    function option(value, label) { return { value: value, label: label } }
     function toggle(title, description, icon, key, fallback) {
         return { title: t(title), desc: t(description), icon: icon, type: "switch", key: key,
             value: Preferences.value(key, fallback) }
@@ -58,19 +59,21 @@ Item {
     }
 
     function languageOptions() {
-        return I18n.availableLanguages.map(function(code) { return root.languageLabel(code) })
+        return I18n.availableLanguages.map(function(code) {
+            return root.option(code, root.languageLabel(code))
+        })
     }
 
-    function coverStyleLabel(style) {
-        if (style === 0) return t("settings_cover_art_style_off")
-        if (style === 2) return t("settings_cover_art_style_3d")
-        return t("settings_cover_art_style_flat")
-    }
-
-    function fontLabel(fontId) {
-        if (fontId === "system") return t("settings_customization_font_system")
-        if (fontId === "exo2") return t("settings_customization_font_exo2")
-        return t("settings_customization_font_rubik")
+    function fontOptions() {
+        return [
+            option("system", t("settings_customization_font_system")),
+            option("rubik", t("settings_customization_font_rubik")),
+            option("exo2", t("settings_customization_font_exo2")),
+            option("segoe-ui", "Segoe UI"),
+            option("arial", "Arial"),
+            option("georgia", "Georgia"),
+            option("consolas", "Consolas")
+        ]
     }
 
     function rows(tab) {
@@ -78,7 +81,7 @@ Item {
         case "general":
             return [
                 { title: t("settings_language"), desc: t("settings_language_screen_subtitle"), icon: "hub",
-                    type: "combo", key: "general/language", value: languageLabel(Preferences.language), options: languageOptions() },
+                    type: "combo", key: "general/language", value: Preferences.language, options: languageOptions() },
                 toggle("settings_confirm_save_load_actions", "settings_help_confirm_save_load_actions", "save", "general/confirmSaveLoad", true),
                 toggle("settings_show_recent_games", "settings_help_recent_games", "refresh", "general/showRecent", true),
                 toggle("settings_show_home_search", "settings_help_home_search", "search", "general/showSearch", true),
@@ -86,25 +89,25 @@ Item {
             ]
         case "video":
             return [
-                choice("settings_renderer", "settings_help_renderer", "chip", "video/renderer", t("settings_renderer_auto"),
-                    [t("settings_renderer_auto"), t("settings_renderer_vulkan"), t("settings_renderer_d3d12"), t("settings_renderer_d3d11"), t("settings_renderer_opengl"), t("settings_renderer_software")]),
-                choice("settings_upscale", "settings_help_upscale", "image", "video/upscale", t("settings_upscale_3x"),
-                    [t("settings_upscale_native"), t("settings_upscale_2x"), t("settings_upscale_3x"), t("settings_upscale_4x"), t("settings_upscale_5x"), t("settings_upscale_6x")]),
-                choice("settings_aspect_ratio", "settings_help_aspect_ratio", "image", "video/aspect", t("settings_aspect_ratio_auto"),
-                    [t("settings_aspect_ratio_auto"), t("settings_aspect_ratio_43"), t("settings_aspect_ratio_169"), t("settings_aspect_ratio_107")]),
-                choice("settings_bilinear_filtering", "settings_help_bilinear_filtering", "image", "video/bilinear", t("settings_bilinear_filtering_ps2"),
-                    [t("settings_bilinear_filtering_nearest"), t("settings_bilinear_filtering_ps2"), t("settings_bilinear_filtering_forced"), t("settings_bilinear_filtering_no_sprite")]),
-                choice("settings_trilinear_filtering", "settings_help_trilinear_filtering", "image", "video/trilinear", t("settings_trilinear_filtering_auto"),
-                    [t("settings_trilinear_filtering_auto"), t("settings_trilinear_filtering_off"), t("settings_trilinear_filtering_ps2"), t("settings_trilinear_filtering_forced")]),
-                choice("settings_blending_accuracy", "settings_help_blending_accuracy", "tune", "video/blending", t("settings_blending_accuracy_basic"),
-                    [t("settings_blending_accuracy_minimum"), t("settings_blending_accuracy_basic"), t("settings_blending_accuracy_medium"), t("settings_blending_accuracy_high"), t("settings_blending_accuracy_full"), t("settings_blending_accuracy_maximum")]),
+                choice("settings_renderer", "settings_help_renderer", "chip", "video/renderer", "auto",
+                    [option("auto", t("settings_renderer_auto")), option("vulkan", t("settings_renderer_vulkan")), option("d3d12", t("settings_renderer_d3d12")), option("d3d11", t("settings_renderer_d3d11")), option("opengl", t("settings_renderer_opengl")), option("software", t("settings_renderer_software"))]),
+                choice("settings_upscale", "settings_help_upscale", "image", "video/upscale", "3x",
+                    [option("native", t("settings_upscale_native")), option("2x", t("settings_upscale_2x")), option("3x", t("settings_upscale_3x")), option("4x", t("settings_upscale_4x")), option("5x", t("settings_upscale_5x")), option("6x", t("settings_upscale_6x"))]),
+                choice("settings_aspect_ratio", "settings_help_aspect_ratio", "image", "video/aspect", "auto",
+                    [option("auto", t("settings_aspect_ratio_auto")), option("4:3", t("settings_aspect_ratio_43")), option("16:9", t("settings_aspect_ratio_169")), option("10:7", t("settings_aspect_ratio_107"))]),
+                choice("settings_bilinear_filtering", "settings_help_bilinear_filtering", "image", "video/bilinear", "ps2",
+                    [option("nearest", t("settings_bilinear_filtering_nearest")), option("ps2", t("settings_bilinear_filtering_ps2")), option("forced", t("settings_bilinear_filtering_forced")), option("no-sprite", t("settings_bilinear_filtering_no_sprite"))]),
+                choice("settings_trilinear_filtering", "settings_help_trilinear_filtering", "image", "video/trilinear", "auto",
+                    [option("auto", t("settings_trilinear_filtering_auto")), option("off", t("settings_trilinear_filtering_off")), option("ps2", t("settings_trilinear_filtering_ps2")), option("forced", t("settings_trilinear_filtering_forced"))]),
+                choice("settings_blending_accuracy", "settings_help_blending_accuracy", "tune", "video/blending", "basic",
+                    [option("minimum", t("settings_blending_accuracy_minimum")), option("basic", t("settings_blending_accuracy_basic")), option("medium", t("settings_blending_accuracy_medium")), option("high", t("settings_blending_accuracy_high")), option("full", t("settings_blending_accuracy_full")), option("maximum", t("settings_blending_accuracy_maximum"))]),
                 choice("settings_anisotropic_filtering", "settings_help_anisotropic_filtering", "tune", "video/aniso", "8x",
-                    [t("settings_dithering_off"), "2x", "4x", "8x", "16x"]),
+                    [option("off", t("settings_dithering_off")), option("2x", "2x"), option("4x", "4x"), option("8x", "8x"), option("16x", "16x")]),
                 toggle("settings_fxaa", "settings_help_fxaa", "image", "video/fxaa", false),
-                choice("settings_cas", "settings_help_cas", "image", "video/cas", t("settings_cas_mode_off"),
-                    [t("settings_cas_mode_off"), t("settings_cas_mode_sharpen_only"), t("settings_cas_mode_sharpen_resize")]),
-                choice("settings_texture_preloading", "settings_help_texture_preloading", "image", "video/preloading", t("settings_texture_preloading_partial"),
-                    [t("settings_texture_preloading_none"), t("settings_texture_preloading_partial"), t("settings_texture_preloading_full")]),
+                choice("settings_cas", "settings_help_cas", "image", "video/cas", "off",
+                    [option("off", t("settings_cas_mode_off")), option("sharpen", t("settings_cas_mode_sharpen_only")), option("resize", t("settings_cas_mode_sharpen_resize"))]),
+                choice("settings_texture_preloading", "settings_help_texture_preloading", "image", "video/preloading", "partial",
+                    [option("none", t("settings_texture_preloading_none")), option("partial", t("settings_texture_preloading_partial")), option("full", t("settings_texture_preloading_full"))]),
                 toggle("settings_hw_mipmapping", "settings_help_hw_mipmapping", "image", "video/mipmapping", true)
             ]
         case "controls":
@@ -119,10 +122,10 @@ Item {
         case "emulation":
             return [
                 toggle("settings_show_fps", "settings_show_fps_desc", "file", "emulation/showFps", false),
-                choice("settings_fps_overlay_mode", "settings_fps_overlay_metrics", "file", "emulation/fpsMode", t("settings_fps_overlay_mode_simple"),
-                    [t("settings_fps_overlay_mode_simple"), t("settings_fps_overlay_mode_detailed")]),
-                choice("settings_fps_overlay_position", "settings_fps_overlay_metrics", "file", "emulation/fpsPosition", t("settings_fps_overlay_corner_top_right"),
-                    [t("settings_fps_overlay_corner_top_left"), t("settings_fps_overlay_corner_top_right"), t("settings_fps_overlay_corner_bottom_left"), t("settings_fps_overlay_corner_bottom_right")]),
+                choice("settings_fps_overlay_mode", "settings_fps_overlay_metrics", "file", "emulation/fpsMode", "simple",
+                    [option("simple", t("settings_fps_overlay_mode_simple")), option("detailed", t("settings_fps_overlay_mode_detailed"))]),
+                choice("settings_fps_overlay_position", "settings_fps_overlay_metrics", "file", "emulation/fpsPosition", "top-right",
+                    [option("top-left", t("settings_fps_overlay_corner_top_left")), option("top-right", t("settings_fps_overlay_corner_top_right")), option("bottom-left", t("settings_fps_overlay_corner_bottom_left")), option("bottom-right", t("settings_fps_overlay_corner_bottom_right"))]),
                 toggle("settings_enable_ee_recompiler", "settings_help_enable_ee_recompiler", "chip", "emulation/eeRecompiler", true),
                 toggle("settings_enable_iop_recompiler", "settings_help_enable_iop_recompiler", "chip", "emulation/iopRecompiler", true),
                 toggle("settings_enable_vu0_recompiler", "settings_help_enable_vu0_recompiler", "chip", "emulation/vu0Recompiler", true),
@@ -141,10 +144,10 @@ Item {
                 range("settings_audio_volume", "settings_help_audio_volume", "play", "audio/volume", 100, 0, 100, 1, "%"),
                 range("settings_audio_fast_forward_volume", "settings_help_audio_fast_forward_volume", "play", "audio/fastForwardVolume", 100, 0, 100, 1, "%"),
                 toggle("settings_audio_mute", "settings_audio_mute_desc", "close", "audio/mute", false),
-                choice("settings_audio_interpolation", "settings_help_audio_interpolation", "tune", "audio/interpolation", t("settings_audio_interpolation_gaussian"),
-                    [t("settings_audio_interpolation_nearest"), t("settings_audio_interpolation_linear"), t("settings_audio_interpolation_gaussian"), t("settings_audio_interpolation_cubic")]),
-                choice("settings_audio_sync_mode", "settings_help_audio_sync_mode", "refresh", "audio/sync", t("settings_audio_sync_time_stretch"),
-                    [t("settings_audio_sync_time_stretch"), t("settings_audio_sync_disabled")]),
+                choice("settings_audio_interpolation", "settings_help_audio_interpolation", "tune", "audio/interpolation", "gaussian",
+                    [option("nearest", t("settings_audio_interpolation_nearest")), option("linear", t("settings_audio_interpolation_linear")), option("gaussian", t("settings_audio_interpolation_gaussian")), option("cubic", t("settings_audio_interpolation_cubic"))]),
+                choice("settings_audio_sync_mode", "settings_help_audio_sync_mode", "refresh", "audio/sync", "time-stretch",
+                    [option("time-stretch", t("settings_audio_sync_time_stretch")), option("disabled", t("settings_audio_sync_disabled"))]),
                 range("settings_audio_buffer_size", "settings_help_audio_buffer_size", "tune", "audio/buffer", 100, 20, 300, 5, " ms"),
                 toggle("settings_audio_minimal_latency", "settings_audio_minimal_latency_desc", "tune", "audio/minimalLatency", false),
                 range("settings_audio_output_latency", "settings_help_audio_output_latency", "tune", "audio/outputLatency", 40, 10, 200, 5, " ms")
@@ -153,13 +156,13 @@ Item {
             return [
                 toggle("settings_widescreen_patches", "settings_help_widescreen_patches", "image", "fixes/widescreen", false),
                 toggle("settings_no_interlacing_patches", "settings_help_no_interlacing_patches", "image", "fixes/noInterlacing", false),
-                choice("settings_deinterlacing", "settings_help_deinterlacing", "image", "fixes/deinterlacing", t("settings_deinterlacing_automatic"),
-                    [t("settings_deinterlacing_automatic"), t("settings_deinterlacing_off"), t("settings_deinterlacing_adaptive_tff"), t("settings_deinterlacing_bob_tff"), t("settings_deinterlacing_blend_tff")]),
-                choice("settings_dithering", "settings_help_dithering", "image", "fixes/dithering", t("settings_dithering_unscaled"),
-                    [t("settings_dithering_off"), t("settings_dithering_scaled"), t("settings_dithering_unscaled"), t("settings_dithering_force_32bit")]),
+                choice("settings_deinterlacing", "settings_help_deinterlacing", "image", "fixes/deinterlacing", "automatic",
+                    [option("automatic", t("settings_deinterlacing_automatic")), option("off", t("settings_deinterlacing_off")), option("adaptive-tff", t("settings_deinterlacing_adaptive_tff")), option("bob-tff", t("settings_deinterlacing_bob_tff")), option("blend-tff", t("settings_deinterlacing_blend_tff"))]),
+                choice("settings_dithering", "settings_help_dithering", "image", "fixes/dithering", "unscaled",
+                    [option("off", t("settings_dithering_off")), option("scaled", t("settings_dithering_scaled")), option("unscaled", t("settings_dithering_unscaled")), option("force-32bit", t("settings_dithering_force_32bit"))]),
                 toggle("settings_anti_blur", "settings_help_anti_blur", "image", "fixes/antiBlur", true),
-                choice("settings_bilinear_upscale", "settings_help_bilinear_upscale", "image", "fixes/bilinearUpscale", t("settings_bilinear_upscale_force_bilinear"),
-                    [t("settings_bilinear_upscale_force_bilinear"), t("settings_bilinear_upscale_force_nearest")])
+                choice("settings_bilinear_upscale", "settings_help_bilinear_upscale", "image", "fixes/bilinearUpscale", "bilinear",
+                    [option("bilinear", t("settings_bilinear_upscale_force_bilinear")), option("nearest", t("settings_bilinear_upscale_force_nearest"))])
             ]
         case "library":
             return [
@@ -169,8 +172,8 @@ Item {
                 action("settings_memory_cards_tab", "settings_memory_cards_open_desc", "card", "library/memoryCards", "settings_memory_cards_open"),
                 toggle("settings_library_click_details_title", "settings_library_click_details_desc", "library", "library/showDetailsOnClick", true),
                 { title: t("settings_cover_art_style"), desc: t("settings_help_cover_art_style"), icon: "image", type: "combo",
-                    key: "library/coverStyle", value: coverStyleLabel(Preferences.coverArtStyle),
-                    options: [t("settings_cover_art_style_off"), t("settings_cover_art_style_flat"), t("settings_cover_art_style_3d")] },
+                    key: "library/coverStyle", value: String(Preferences.coverArtStyle),
+                    options: [option("0", t("settings_cover_art_style_off")), option("1", t("settings_cover_art_style_flat")), option("2", t("settings_cover_art_style_3d"))] },
                 action("settings_clear_cover_cache", "settings_clear_cover_cache_desc", "refresh", "library/clearCovers", "settings_clear_cover_cache_action"),
                 action("settings_backup_export_title", "settings_backup_export_desc", "save", "library/export", "settings_backup_export_action"),
                 action("settings_backup_restore_title", "settings_backup_restore_desc", "refresh", "library/restore", "settings_backup_restore_title")
@@ -178,11 +181,11 @@ Item {
         case "network":
             return [
                 toggle("settings_network_enable", "settings_network_summary", "hub", "network/enabled", false),
-                choice("settings_network_mode", "settings_network_summary", "hub", "network/mode", t("settings_network_mode_online"),
-                    [t("settings_network_mode_online"), t("settings_network_mode_local_host"), t("settings_network_mode_local_join")]),
-                choice("settings_network_api", "settings_network_summary", "tune", "network/api", t("settings_network_api_sockets"), [t("settings_network_api_sockets")]),
-                choice("settings_network_dns_preset", "settings_network_dns_preset_help", "hub", "network/dnsPreset", t("settings_network_dns_preset_system"),
-                    [t("settings_network_dns_preset_system"), t("settings_network_dns_preset_ps2online"), t("settings_network_dns_preset_psrewired")]),
+                choice("settings_network_mode", "settings_network_summary", "hub", "network/mode", "online",
+                    [option("online", t("settings_network_mode_online")), option("host", t("settings_network_mode_local_host")), option("join", t("settings_network_mode_local_join"))]),
+                choice("settings_network_api", "settings_network_summary", "tune", "network/api", "sockets", [option("sockets", t("settings_network_api_sockets"))]),
+                choice("settings_network_dns_preset", "settings_network_dns_preset_help", "hub", "network/dnsPreset", "system",
+                    [option("system", t("settings_network_dns_preset_system")), option("ps2online", t("settings_network_dns_preset_ps2online")), option("psrewired", t("settings_network_dns_preset_psrewired"))]),
                 toggle("settings_network_intercept_dhcp", "settings_network_intercept_dhcp_desc", "hub", "network/interceptDhcp", true),
                 toggle("settings_network_log_dhcp", "settings_network_log_dhcp_desc", "file", "network/logDhcp", false),
                 toggle("settings_network_log_dns", "settings_network_log_dns_desc", "file", "network/logDns", false)
@@ -190,26 +193,27 @@ Item {
         case "customization":
             return [
                 choice("settings_theme", "theme_manager_preview_body", "palette", "appearance/theme", Preferences.themeMode,
-                    [t("settings_theme_dark"), t("settings_theme_light"), t("settings_theme_system")]),
+                    [option("dark", t("settings_theme_dark")), option("light", t("settings_theme_light")), option("system", t("settings_theme_system"))]),
                 { title: t("theme_manager_color_primary"), desc: t("theme_manager_usage_primary"), icon: "palette", type: "colors",
                     key: "appearance/accent", value: Preferences.accentColor,
                     options: ["#C4203A", "#2F66BE", "#8669D9", "#168A8A", "#2E8B57", "#B17B24"] },
                 action("settings_customization_background", "settings_customization_background_help", "image", "appearance/background", "settings_customization_background"),
-                range("settings_customization_background_dim", "settings_customization_background_help", "image", "appearance/backgroundDim", Preferences.backgroundDim, 0, 85, 5, "%"),
+                range("settings_customization_background_dim", "settings_customization_background_help", "image", "appearance/backgroundDim", Preferences.value("appearance/backgroundDim", 48), 0, 85, 5, "%"),
                 action("settings_customization_remove_background", "settings_customization_remove_background_desc", "close", "appearance/removeBackground", "settings_customization_remove_background"),
-                range("settings_customization_grid_size", "settings_customization_grid_size_help", "library", "appearance/gridScale", Preferences.gridScale * 100, 65, 155, 5, "%"),
-                choice("settings_customization_drawer_style", "settings_customization_drawer_summary", "menu", "appearance/drawerStyle", t("settings_drawer_style_classic"),
-                    [t("settings_drawer_style_classic"), t("settings_drawer_style_compact")]),
+                range("settings_customization_grid_size", "settings_customization_grid_size_help", "library", "appearance/gridScale", Number(Preferences.value("appearance/gridScale", 1.0)) * 100, 65, 155, 5, "%"),
+                choice("settings_customization_drawer_style", "settings_customization_drawer_summary", "menu", "appearance/drawerStyle", Preferences.compactSidebar ? "compact" : "classic",
+                    [option("classic", t("settings_drawer_style_classic")), option("compact", t("settings_drawer_style_compact"))]),
                 choice("settings_customization_font", "settings_customization_font_help", "file", "appearance/font",
-                    fontLabel(Preferences.value("appearance/font", "rubik")),
-                    [t("settings_customization_font_system"), t("settings_customization_font_rubik"), t("settings_customization_font_exo2")]),
-                range("settings_customization_font_size", "settings_customization_font_help", "file", "appearance/fontScale", Preferences.fontScale * 100, 85, 130, 5, "%"),
+                    Preferences.value("appearance/font", "rubik"), fontOptions()),
+                range("settings_customization_font_size", "settings_customization_font_size_help", "file", "appearance/fontScale", Number(Preferences.value("appearance/fontScale", 1.0)) * 100, 85, 130, 5, "%"),
+                range("theme_manager_rounding", "settings_customization_rounding_help", "palette", "appearance/cornerScale", Number(Preferences.value("appearance/cornerScale", 1.0)) * 100, 50, 150, 5, "%"),
+                range("settings_customization_motion", "settings_customization_motion_help", "refresh", "appearance/motionScale", Number(Preferences.value("appearance/motionScale", 1.0)) * 100, 50, 150, 5, "%"),
                 action("settings_customization_reset", "settings_customization_reset_desc", "refresh", "appearance/reset", "settings_customization_reset")
             ]
         case "game-menu":
             return [
-                choice("settings_game_menu_layout_section", "settings_game_menu_layout_help", "menu", "gameMenu/layout", t("settings_game_menu_layout_dashboard"),
-                    [t("settings_game_menu_layout_sidebar"), t("settings_game_menu_layout_dashboard"), t("settings_game_menu_layout_command_center"), t("settings_game_menu_layout_compact")]),
+                choice("settings_game_menu_layout_section", "settings_game_menu_layout_help", "menu", "gameMenu/layout", "dashboard",
+                    [option("sidebar", t("settings_game_menu_layout_sidebar")), option("dashboard", t("settings_game_menu_layout_dashboard")), option("command-center", t("settings_game_menu_layout_command_center")), option("compact", t("settings_game_menu_layout_compact"))]),
                 toggle("settings_game_menu_section_save_states", "settings_game_menu_content_summary", "save", "gameMenu/saveStates", true),
                 toggle("settings_game_menu_section_auto_save", "settings_game_menu_content_summary", "save", "gameMenu/autoSave", true),
                 toggle("settings_game_menu_section_quick_actions", "settings_game_menu_content_summary", "play", "gameMenu/quickActions", true),
@@ -245,23 +249,18 @@ Item {
 
     function applyChoice(key, value) {
         if (key === "general/language") {
-            const index = languageOptions().indexOf(value)
-            if (index >= 0) Preferences.language = I18n.availableLanguages[index]
+            Preferences.language = value
         } else if (key === "appearance/theme") {
-            if (value === t("settings_theme_light")) Preferences.themeMode = "light"
-            else if (value === t("settings_theme_system")) Preferences.themeMode = "system"
-            else Preferences.themeMode = "dark"
+            Preferences.themeMode = value
         } else if (key === "appearance/accent") {
             Preferences.accentColor = value
         } else if (key === "library/coverStyle") {
-            Preferences.coverArtStyle = value === t("settings_cover_art_style_off") ? 0
-                : (value === t("settings_cover_art_style_3d") ? 2 : 1)
+            Preferences.coverArtStyle = Number(value)
         } else if (key === "appearance/drawerStyle") {
-            Preferences.compactSidebar = value === t("settings_drawer_style_compact")
+            Preferences.compactSidebar = value === "compact"
             Preferences.setValue(key, value)
         } else if (key === "appearance/font") {
-            Preferences.setValue(key, value === t("settings_customization_font_system") ? "system"
-                : (value === t("settings_customization_font_exo2") ? "exo2" : "rubik"))
+            Preferences.setValue(key, value)
         } else {
             Preferences.setValue(key, value)
         }
@@ -271,12 +270,14 @@ Item {
         if (key === "appearance/gridScale") Preferences.gridScale = value / 100
         else if (key === "appearance/fontScale") Preferences.fontScale = value / 100
         else if (key === "appearance/backgroundDim") Preferences.backgroundDim = value
+        else if (key === "appearance/cornerScale") Preferences.cornerScale = value / 100
+        else if (key === "appearance/motionScale") Preferences.motionScale = value / 100
         else Preferences.setValue(key, value)
     }
 
     function handleAction(key) {
         if (key === "library/bios") biosDialog.open()
-        else if (key === "library/folders") gameFolderDialog.open()
+        else if (key === "library/folders") gameFoldersDialog.open()
         else if (key === "library/data") dataFolderDialog.open()
         else if (key === "library/memoryCards") App.replaceRoute("memory-cards")
         else if (key === "library/clearCovers") {
@@ -288,7 +289,7 @@ Item {
         else if (key === "appearance/removeBackground") Preferences.backgroundPath = ""
         else if (key === "appearance/reset") Preferences.resetDesktopPreferences()
         else if (key === "gameMenu/reset") {
-            Preferences.setValue("gameMenu/layout", t("settings_game_menu_layout_dashboard"))
+            Preferences.setValue("gameMenu/layout", "dashboard")
             Preferences.setValue("gameMenu/saveStates", true)
             Preferences.setValue("gameMenu/autoSave", true)
             Preferences.setValue("gameMenu/quickActions", true)
@@ -302,21 +303,17 @@ Item {
         else if (key === "about/core") App.openExternalUrl(t("settings_about_core_source_url"))
     }
 
-    FolderDialog {
-        id: gameFolderDialog
-        title: t("settings_game_path")
-        onAccepted: GameLibrary.addFolder(selectedFolder)
-    }
+    GameFoldersDialog { id: gameFoldersDialog }
     FolderDialog {
         id: dataFolderDialog
         title: t("emulator_data_location_title")
-        onAccepted: Preferences.emulatorDataPath = selectedFolder.toString().replace(/^file:\/\//, "")
+        onAccepted: Preferences.emulatorDataPath = selectedFolder.toString()
     }
     FileDialog {
         id: biosDialog
         title: t("settings_bios_path")
         nameFilters: ["PlayStation 2 BIOS (*.bin *.rom *.nvm)", "All files (*)"]
-        onAccepted: Preferences.biosPath = selectedFile.toString().replace(/^file:\/\//, "")
+        onAccepted: Preferences.biosPath = selectedFile.toString()
     }
     FileDialog {
         id: backgroundDialog
