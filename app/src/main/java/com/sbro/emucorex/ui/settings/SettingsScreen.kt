@@ -3248,21 +3248,16 @@ private fun CustomizationSettingsTab(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.settings_customization_preview_caption),
+                            text = stringResource(R.string.app_name),
                             modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3286,6 +3281,14 @@ private fun CustomizationSettingsTab(
                             )
                         }
                     }
+                    Text(
+                        text = stringResource(R.string.settings_customization_preview_caption),
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.78f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     Row(
                         modifier = Modifier
                             .weight(1f)
@@ -3438,60 +3441,53 @@ private fun CustomizationSettingsTab(
     }
 
     SettingsSection(title = stringResource(R.string.settings_customization_side_artwork_section)) {
-        Box(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 16.dp)
+                .aspectRatio(emulationPreviewAspect),
+            shape = RoundedCornerShape(18.dp),
+            color = Color.Black,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         ) {
-            Surface(
-                modifier = Modifier
-                    .widthIn(max = 210.dp * emulationPreviewAspect)
-                    .fillMaxWidth()
-                    .aspectRatio(emulationPreviewAspect),
-                shape = RoundedCornerShape(18.dp),
-                color = Color.Black,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    EmulationSideArtworkOverlay(
-                        artwork = uiState.emulationSideArtwork,
-                        revision = uiState.emulationSideArtworkRevision,
-                        aspectRatioMode = 2,
-                        modifier = Modifier.fillMaxSize(),
-                        preview = true
+            Box(modifier = Modifier.fillMaxSize()) {
+                EmulationSideArtworkOverlay(
+                    artwork = uiState.emulationSideArtwork,
+                    revision = uiState.emulationSideArtworkRevision,
+                    aspectRatioMode = 2,
+                    modifier = Modifier.fillMaxSize(),
+                    preview = true
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(4f / 3f)
+                        .align(Alignment.Center)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_customization_side_artwork_preview),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        textAlign = TextAlign.Center,
+                        color = Color.White.copy(alpha = 0.82f),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                     )
+                }
+                if (uiState.isSideArtworkImporting) {
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(4f / 3f)
-                            .align(Alignment.Center)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
-                                )
-                            ),
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = stringResource(R.string.settings_customization_side_artwork_preview),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                            textAlign = TextAlign.Center,
-                            color = Color.White.copy(alpha = 0.82f),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
-                    if (uiState.isSideArtworkImporting) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                        CircularProgressIndicator()
                     }
                 }
             }
