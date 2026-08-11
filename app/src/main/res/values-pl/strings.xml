@@ -2356,6 +2356,31 @@
     <string name="emulation_local_multiplayer_crop">Przytnij podział poziomy</string>
     <string name="emulation_local_multiplayer_crop_swapped">Przytnij podział (zamieniony)</string>
     <string name="emulation_local_multiplayer_help">Powiela końcową klatkę dla dwóch graczy dotykowych. Tryby przycinania powiększają istniejący w grze podział góra/dół, ale nie dodają trybu wieloosobowego do gry jednoosobowej.</string>
+<string name="save_manager_import_source_title">Importuj szybkie zapisy</string>
+    <string name="save_manager_import_source_body">Wybierz źródło. EmuCoreX sprawdzi pliki i użyje tylko wolnych slotów.</string>
+    <string name="save_manager_import_nethersx2">NetherSX2 / AetherSX2</string>
+    <string name="save_manager_import_nethersx2_desc">Pojedynczy plik .p2s lub wyeksportowane archiwum</string>
+    <string name="save_manager_import_armsx2">ARMSX2</string>
+    <string name="save_manager_import_armsx2_desc">Pojedynczy plik .p2s lub kopia ARMSX2</string>
+    <string name="save_manager_import_emucorex">Kopia EmuCoreX</string>
+    <string name="save_manager_import_emucorex_desc">ZIP utworzony przez ten menedżer</string>
+    <string name="save_manager_import_auto">Wykryj automatycznie</string>
+    <string name="save_manager_import_auto_desc">Wybierz plik .p2s lub ZIP</string>
+    <string name="save_manager_import_auto_detected">Pojedynczy szybki zapis</string>
+    <string name="save_manager_import_preview_title">Sprawdź import</string>
+    <string name="save_manager_import_detected_source">Źródło: %1$s</string>
+    <string name="save_manager_import_detected_format">Format: %1$s</string>
+    <string name="save_manager_import_format_current">Bieżący EmuCoreX / ARMSX2</string>
+    <string name="save_manager_import_format_unknown">Nieznany</string>
+    <string name="save_manager_import_target_game">Zapisy trafią do wolnych slotów tej gry.</string>
+    <string name="save_manager_import_target_library">Zapisy zostaną przypisane do odpowiednich gier w bibliotece.</string>
+    <string name="save_manager_import_ready_count">Gotowe do importu: %1$d</string>
+    <string name="save_manager_import_skipped_count">Pominięte z powodu braku wolnego slotu: %1$d</string>
+    <string name="save_manager_import_incompatible_count">Nieobsługiwane lub uszkodzone pliki: %1$d</string>
+    <string name="save_manager_import_no_overwrite_note">Istniejące zapisy nie są nadpisywane. Zajęty slot jest zastępowany następnym wolnym slotem ręcznym.</string>
+    <string name="save_manager_import_confirm">Importuj</string>
+    <string name="save_manager_import_success">Zaimportowane zapisy: %1$d</string>
+    <string name="save_manager_import_partial">Zaimportowano: %1$d. Błędy: %2$d.</string>
 </resources>
 
 

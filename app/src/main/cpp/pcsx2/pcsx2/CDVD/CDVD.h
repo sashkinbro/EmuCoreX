@@ -170,6 +170,7 @@ extern void cdvdLoadNVRAM();
 extern void cdvdSaveNVRAM();
 extern void cdvdReset();
 extern void cdvdVsync();
+extern void cdvdRecalculateRotSpeed();
 extern void cdvdActionInterrupt();
 extern void cdvdSectorReady();
 extern void cdvdReadInterrupt();

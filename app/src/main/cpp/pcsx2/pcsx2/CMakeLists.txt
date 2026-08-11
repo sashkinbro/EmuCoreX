@@ -104,6 +104,7 @@ set(pcsx2Sources
 	R5900OpcodeImpl.cpp
 	R5900OpcodeTables.cpp
 	SaveState.cpp
+	SaveStateLegacy.cpp
 	ShiftJisToUnicode.cpp
 	Sif.cpp
 	Sif0.cpp
@@ -181,6 +182,7 @@ set(pcsx2Headers
 	R5900.h
 	R5900OpcodeTables.h
 	SaveState.h
+	SaveStateLegacy.h
 	ShaderCacheVersion.h
 	Sifcmd.h
 	Sif.h
@@ -253,6 +255,7 @@ set(pcsx2SPU2Sources
 	SPU2/RegTable.cpp
 	SPU2/Reverb.cpp
 	SPU2/spu2freeze.cpp
+	SPU2/spu2freeze-legacy.cpp
 	SPU2/spu2sys.cpp
 	SPU2/Wavedump_wav.cpp
 )

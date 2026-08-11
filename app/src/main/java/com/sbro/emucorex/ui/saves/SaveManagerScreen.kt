@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,8 +29,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.FolderZip
+import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Tune
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +64,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.SaveStateEntryInfo
+import com.sbro.emucorex.data.SaveStateImportFormat
+import com.sbro.emucorex.data.SaveStateImportPreview
+import com.sbro.emucorex.data.SaveStateImportSource
 import com.sbro.emucorex.data.SaveStateRepository
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ScreenTopBar
@@ -70,6 +79,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -88,8 +98,9 @@ fun SaveManagerScreen(
     val horizontalSystemBarPadding = navigationBarsHorizontalPaddingValues()
     val backupSuccessMessage = stringResource(R.string.save_manager_backup_success)
     val backupFailureMessage = stringResource(R.string.save_manager_backup_failed)
-    val restoreSuccessMessage = stringResource(R.string.save_manager_restore_success)
     val restoreFailureMessage = stringResource(R.string.save_manager_restore_failed)
+    val importSuccessTemplate = stringResource(R.string.save_manager_import_success)
+    val importPartialTemplate = stringResource(R.string.save_manager_import_partial)
     val deleteSuccessMessage = stringResource(R.string.save_manager_delete_success)
     val deleteFailureMessage = stringResource(R.string.save_manager_delete_failed)
 
@@ -99,6 +110,9 @@ fun SaveManagerScreen(
     var isPreparingEntries by remember(gamePath, gameTitle, gameSerial) { mutableStateOf(true) }
     var isResolvingEntries by remember(gamePath, gameTitle, gameSerial) { mutableStateOf(false) }
     val pendingDelete = remember { mutableStateOf<SaveStateEntryInfo?>(null) }
+    var showImportSourceDialog by remember { mutableStateOf(false) }
+    var selectedImportSource by remember { mutableStateOf(SaveStateImportSource.AUTO) }
+    var importPreview by remember { mutableStateOf<SaveStateImportPreview?>(null) }
     var refreshGeneration by remember(gamePath, gameTitle, gameSerial) { mutableIntStateOf(0) }
 
     val isFiltered = !gamePath.isNullOrBlank()
@@ -188,17 +202,65 @@ fun SaveManagerScreen(
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             isWorking = true
-            val success = withContext(Dispatchers.IO) {
-                repository.restoreStates(uri)
-            }
+            val preview = runCatching {
+                withContext(Dispatchers.IO) {
+                    repository.analyzeImport(
+                        source = uri,
+                        requestedSource = selectedImportSource,
+                        gamePath = gamePath,
+                        gameSerial = gameSerial
+                    )
+                }
+            }.getOrNull()
             isWorking = false
-            Toast.makeText(
-                context,
-                if (success) restoreSuccessMessage else restoreFailureMessage,
-                Toast.LENGTH_SHORT
-            ).show()
-            refresh()
+            if (preview == null) {
+                Toast.makeText(context, restoreFailureMessage, Toast.LENGTH_SHORT).show()
+            } else {
+                importPreview = preview
+            }
         }
+    }
+
+    if (showImportSourceDialog) {
+        SaveImportSourceDialog(
+            onDismiss = { showImportSourceDialog = false },
+            onSourceSelected = { source ->
+                selectedImportSource = source
+                showImportSourceDialog = false
+                restoreLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+            }
+        )
+    }
+
+    importPreview?.let { preview ->
+        SaveImportPreviewDialog(
+            preview = preview,
+            isFiltered = isFiltered,
+            onDismiss = {
+                repository.discardImport(preview)
+                importPreview = null
+            },
+            onConfirm = {
+                importPreview = null
+                scope.launch {
+                    isWorking = true
+                    val result = withContext(Dispatchers.IO) { repository.importStates(preview) }
+                    isWorking = false
+                    val message = when {
+                        result.importedCount == 0 -> restoreFailureMessage
+                        result.failedCount > 0 -> String.format(
+                            Locale.getDefault(),
+                            importPartialTemplate,
+                            result.importedCount,
+                            result.failedCount
+                        )
+                        else -> String.format(Locale.getDefault(), importSuccessTemplate, result.importedCount)
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    refresh()
+                }
+            }
+        )
     }
 
     pendingDelete.value?.let { entry ->
@@ -319,7 +381,7 @@ fun SaveManagerScreen(
                             )
                         }
                         OutlinedButton(
-                            onClick = { restoreLauncher.launch(arrayOf("application/zip", "*/*")) },
+                            onClick = { showImportSourceDialog = true },
                             enabled = !isWorking,
                             modifier = Modifier.weight(1.14f),
                             colors = ButtonDefaults.outlinedButtonColors(
@@ -359,6 +421,208 @@ fun SaveManagerScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SaveImportSourceDialog(
+    onDismiss: () -> Unit,
+    onSourceSelected: (SaveStateImportSource) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.save_manager_import_source_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.save_manager_import_source_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SaveImportSourceOption(
+                    icon = Icons.Rounded.PhoneAndroid,
+                    title = stringResource(R.string.save_manager_import_nethersx2),
+                    description = stringResource(R.string.save_manager_import_nethersx2_desc),
+                    onClick = { onSourceSelected(SaveStateImportSource.NETHERSX2) }
+                )
+                SaveImportSourceOption(
+                    icon = Icons.Rounded.Gamepad,
+                    title = stringResource(R.string.save_manager_import_armsx2),
+                    description = stringResource(R.string.save_manager_import_armsx2_desc),
+                    onClick = { onSourceSelected(SaveStateImportSource.ARMSX2) }
+                )
+                SaveImportSourceOption(
+                    icon = Icons.Rounded.FolderZip,
+                    title = stringResource(R.string.save_manager_import_emucorex),
+                    description = stringResource(R.string.save_manager_import_emucorex_desc),
+                    onClick = { onSourceSelected(SaveStateImportSource.EMUCOREX) }
+                )
+                SaveImportSourceOption(
+                    icon = Icons.Rounded.Tune,
+                    title = stringResource(R.string.save_manager_import_auto),
+                    description = stringResource(R.string.save_manager_import_auto_desc),
+                    onClick = { onSourceSelected(SaveStateImportSource.AUTO) }
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun SaveImportSourceOption(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .clickable(onClick = onClick),
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SaveImportPreviewDialog(
+    preview: SaveStateImportPreview,
+    isFiltered: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val sourceName = when (preview.detectedSource) {
+        SaveStateImportSource.NETHERSX2 -> stringResource(R.string.save_manager_import_nethersx2)
+        SaveStateImportSource.ARMSX2 -> stringResource(R.string.save_manager_import_armsx2)
+        SaveStateImportSource.EMUCOREX -> stringResource(R.string.save_manager_import_emucorex)
+        SaveStateImportSource.AUTO -> stringResource(R.string.save_manager_import_auto_detected)
+    }
+    val formats = preview.candidates.map { candidate ->
+        when (candidate.format) {
+            SaveStateImportFormat.CURRENT -> stringResource(R.string.save_manager_import_format_current)
+            SaveStateImportFormat.AETHERSX2 -> "AetherSX2"
+            SaveStateImportFormat.NETHERSX2 -> "NetherSX2"
+            SaveStateImportFormat.UNKNOWN -> stringResource(R.string.save_manager_import_format_unknown)
+        }
+    }.distinct().joinToString()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.save_manager_import_preview_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            text = preview.displayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = stringResource(R.string.save_manager_import_detected_source, sourceName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (formats.isNotBlank()) {
+                            Text(
+                                text = stringResource(R.string.save_manager_import_detected_format, formats),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(
+                        if (isFiltered) R.string.save_manager_import_target_game else R.string.save_manager_import_target_library
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stringResource(R.string.save_manager_import_ready_count, preview.importableCount),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (preview.importableCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (preview.skippedCount > 0) {
+                    Text(
+                        text = stringResource(R.string.save_manager_import_skipped_count, preview.skippedCount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (preview.incompatibleCount > 0) {
+                    Text(
+                        text = stringResource(R.string.save_manager_import_incompatible_count, preview.incompatibleCount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.save_manager_import_no_overwrite_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = preview.importableCount > 0) {
+                Text(stringResource(R.string.save_manager_import_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
+    )
 }
 
 @Composable

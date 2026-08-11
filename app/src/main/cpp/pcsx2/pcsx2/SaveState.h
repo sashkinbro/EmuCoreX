@@ -94,8 +94,11 @@ public:
 		return (m_version & 0xffff);
 	}
 
+	__fi void SetVersion(u32 version) { m_version = version; }
+
 	bool FreezeBios();
 	bool FreezeInternals(Error* error);
+	bool FreezeInternalsLegacy(Error* error);
 
 	// Loads or saves an arbitrary data type.  Usable on atomic types, structs, and arrays.
 	// For dynamically allocated pointers use FreezeMem instead.
@@ -114,6 +117,12 @@ public:
 	}
 
 	void PrepBlock( int size );
+
+	void FreezeSkip( int size )
+	{
+		PrepBlock( size );
+		CommitBlock( size );
+	}
 
 	template <typename T>
 	void FreezeDeque(std::deque<T>& q)

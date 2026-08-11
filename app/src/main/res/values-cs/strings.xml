@@ -2354,5 +2354,30 @@
     <string name="emulation_local_multiplayer_crop">Oříznout vodorovné rozdělení</string>
     <string name="emulation_local_multiplayer_crop_swapped">Oříznout rozdělení (prohozené)</string>
     <string name="emulation_local_multiplayer_help">Duplikuje výsledný snímek pro dva dotykové hráče. Režimy ořezu zvětší existující horní/dolní rozdělení hry, ale nepřidají hru více hráčů do hry pro jednoho.</string>
+<string name="save_manager_import_source_title">Importovat rychlé pozice</string>
+    <string name="save_manager_import_source_body">Vyberte zdroj. EmuCoreX soubory ověří a použije jen volné sloty.</string>
+    <string name="save_manager_import_nethersx2">NetherSX2 / AetherSX2</string>
+    <string name="save_manager_import_nethersx2_desc">Samostatný soubor .p2s nebo exportovaný archiv</string>
+    <string name="save_manager_import_armsx2">ARMSX2</string>
+    <string name="save_manager_import_armsx2_desc">Samostatný soubor .p2s nebo záloha ARMSX2</string>
+    <string name="save_manager_import_emucorex">Záloha EmuCoreX</string>
+    <string name="save_manager_import_emucorex_desc">ZIP vytvořený tímto správcem</string>
+    <string name="save_manager_import_auto">Rozpoznat automaticky</string>
+    <string name="save_manager_import_auto_desc">Vyberte .p2s nebo ZIP</string>
+    <string name="save_manager_import_auto_detected">Samostatná rychlá pozice</string>
+    <string name="save_manager_import_preview_title">Zkontrolovat import</string>
+    <string name="save_manager_import_detected_source">Zdroj: %1$s</string>
+    <string name="save_manager_import_detected_format">Formát: %1$s</string>
+    <string name="save_manager_import_format_current">Aktuální EmuCoreX / ARMSX2</string>
+    <string name="save_manager_import_format_unknown">Neznámý</string>
+    <string name="save_manager_import_target_game">Pozice budou vloženy do volných slotů této hry.</string>
+    <string name="save_manager_import_target_library">Pozice budou přiřazeny odpovídajícím hrám v knihovně.</string>
+    <string name="save_manager_import_ready_count">Připraveno k importu: %1$d</string>
+    <string name="save_manager_import_skipped_count">Přeskočeno kvůli chybějícímu volnému slotu: %1$d</string>
+    <string name="save_manager_import_incompatible_count">Nepodporované nebo poškozené soubory: %1$d</string>
+    <string name="save_manager_import_no_overwrite_note">Existující pozice se nepřepisují. Je-li slot obsazen, použije se další volný ruční slot.</string>
+    <string name="save_manager_import_confirm">Importovat</string>
+    <string name="save_manager_import_success">Importované pozice: %1$d</string>
+    <string name="save_manager_import_partial">Importováno: %1$d. Selhalo: %2$d.</string>
 </resources>
 

@@ -2,6 +2,7 @@ package com.sbro.emucorex.data
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
@@ -12,15 +13,103 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.UUID
 import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 private const val AUTO_SAVE_SLOT = 0
 private val SAVE_STATE_SLOTS = 0..10
 private val SAVE_STATE_FILE_REGEX = Regex("""^(.+?) \(([0-9A-Fa-f]{8})\)\.(\d{2})\.p2s$""")
+private const val SAVE_STATE_VERSION_ENTRY = "PCSX2 Savestate Version.id"
+private const val CURRENT_SAVE_STATE_MAJOR = 0x9A59
+private const val AETHERSX2_SAVE_STATE_MAJOR = 0x9A2C
+private const val NETHERSX2_SAVE_STATE_MAJOR = 0x9A34
+private const val MAX_IMPORT_FILE_BYTES = 1_073_741_824L
+private const val MAX_IMPORT_ARCHIVE_BYTES = 4_294_967_296L
+private const val MAX_IMPORT_CANDIDATES = 500
+
+enum class SaveStateImportSource {
+    NETHERSX2,
+    ARMSX2,
+    EMUCOREX,
+    AUTO
+}
+
+enum class SaveStateImportFormat {
+    CURRENT,
+    AETHERSX2,
+    NETHERSX2,
+    UNKNOWN
+}
+
+data class SaveStateImportCandidate(
+    val sourceEntryName: String?,
+    val originalFileName: String,
+    val targetFileName: String,
+    val targetSlot: Int,
+    val serial: String?,
+    val format: SaveStateImportFormat,
+    val sizeBytes: Long
+)
+
+data class SaveStateImportPreview(
+    val stagedFilePath: String,
+    val displayName: String,
+    val requestedSource: SaveStateImportSource,
+    val detectedSource: SaveStateImportSource,
+    val candidates: List<SaveStateImportCandidate>,
+    val skippedCount: Int,
+    val incompatibleCount: Int
+) {
+    val importableCount: Int get() = candidates.size
+}
+
+data class SaveStateImportResult(
+    val importedCount: Int,
+    val failedCount: Int
+) {
+    val isSuccess: Boolean get() = importedCount > 0 && failedCount == 0
+}
+
+internal data class ParsedExternalSaveStateName(
+    val serial: String,
+    val crc: String,
+    val slot: Int
+)
+
+internal fun parseExternalSaveStateName(fileName: String): ParsedExternalSaveStateName? {
+    val cleanName = fileName.substringAfterLast('/').substringAfterLast('\\')
+    val match = SAVE_STATE_FILE_REGEX.matchEntire(cleanName) ?: return null
+    return ParsedExternalSaveStateName(
+        serial = match.groupValues[1].normalizeSaveStateSerialKey() ?: return null,
+        crc = match.groupValues[2].uppercase(Locale.ROOT),
+        slot = match.groupValues[3].toIntOrNull()?.takeIf { it in SAVE_STATE_SLOTS } ?: return null
+    )
+}
+
+internal fun saveStateFormatForVersion(version: Int?): SaveStateImportFormat {
+    if (version == null) return SaveStateImportFormat.UNKNOWN
+    return when (version ushr 16) {
+        CURRENT_SAVE_STATE_MAJOR -> if (version.toUInt() <= 0x9A590000u) {
+            SaveStateImportFormat.CURRENT
+        } else {
+            SaveStateImportFormat.UNKNOWN
+        }
+        AETHERSX2_SAVE_STATE_MAJOR -> SaveStateImportFormat.AETHERSX2
+        NETHERSX2_SAVE_STATE_MAJOR -> SaveStateImportFormat.NETHERSX2
+        else -> SaveStateImportFormat.UNKNOWN
+    }
+}
+
+internal fun allocateSaveStateSlot(preferred: Int?, occupied: Set<Int>): Int? {
+    if (preferred != null && preferred in SAVE_STATE_SLOTS && preferred !in occupied) return preferred
+    return (1..10).firstOrNull { it !in occupied }
+}
 
 internal fun findFallbackSaveStateFile(
     files: Array<out File>,
@@ -194,23 +283,254 @@ class SaveStateRepository(private val context: Context) {
         }.getOrDefault(false)
     }
 
-    fun restoreStates(source: Uri): Boolean {
-        val contentResolver = context.contentResolver
-        return runCatching {
-            contentResolver.openInputStream(source)?.use { input ->
-                ZipInputStream(input).use { zip ->
-                    generateSequence { zip.nextEntry }.forEach { entry ->
-                        if (!entry.name.startsWith("slots/")) return@forEach
-                        val targetName = entry.name.substringAfterLast('/')
-                        val targetFile = File(saveStatesDir(), targetName)
-                        targetFile.parentFile?.mkdirs()
-                        targetFile.outputStream().use { output -> zip.copyTo(output) }
-                        zip.closeEntry()
+    fun analyzeImport(
+        source: Uri,
+        requestedSource: SaveStateImportSource,
+        gamePath: String? = null,
+        gameSerial: String? = null
+    ): SaveStateImportPreview {
+        val displayName = readDisplayName(source)
+        val importDir = importCacheDir()
+        val stagedFile = File(importDir, "save-import-${UUID.randomUUID()}.bin")
+        try {
+            context.contentResolver.openInputStream(source)?.use { input ->
+                stagedFile.outputStream().use { output ->
+                    input.copyBoundedTo(output, MAX_IMPORT_ARCHIVE_BYTES)
+                }
+            } ?: error("Unable to open the selected file")
+
+            return ZipFile(stagedFile).use { zip ->
+                val directState = zip.getEntry(SAVE_STATE_VERSION_ENTRY)
+                val detectedSource = detectImportSource(zip, directState != null)
+                val rawCandidates = if (directState != null) {
+                    listOf(
+                        RawImportCandidate(
+                            entryName = null,
+                            fileName = displayName,
+                            sizeBytes = stagedFile.length(),
+                            version = zip.getInputStream(directState).use(::readSaveStateVersion)
+                        )
+                    )
+                } else {
+                    collectArchiveCandidates(zip, requestedSource)
+                }
+
+                buildImportPreview(
+                    stagedFile = stagedFile,
+                    displayName = displayName,
+                    requestedSource = requestedSource,
+                    detectedSource = detectedSource,
+                    rawCandidates = rawCandidates,
+                    gamePath = gamePath,
+                    gameSerial = gameSerial
+                )
+            }
+        } catch (error: Throwable) {
+            stagedFile.delete()
+            throw error
+        }
+    }
+
+    fun importStates(preview: SaveStateImportPreview): SaveStateImportResult {
+        val stagedFile = File(preview.stagedFilePath)
+        val importDir = importCacheDir().canonicalFile
+        require(stagedFile.canonicalFile.parentFile == importDir) { "Invalid staged import path" }
+        if (!stagedFile.isFile) return SaveStateImportResult(importedCount = 0, failedCount = preview.candidates.size)
+
+        var imported = 0
+        var failed = 0
+        try {
+            ZipFile(stagedFile).use { zip ->
+                preview.candidates.forEach { candidate ->
+                    val target = File(saveStatesDir(), candidate.targetFileName)
+                    if (target.exists()) {
+                        failed++
+                        return@forEach
+                    }
+                    val temporary = File(target.parentFile, ".${target.name}.${UUID.randomUUID()}.importing")
+                    val success = runCatching {
+                        target.parentFile?.mkdirs()
+                        val input = candidate.sourceEntryName?.let { entryName ->
+                            zip.getEntry(entryName)?.let(zip::getInputStream)
+                        } ?: stagedFile.inputStream()
+                        requireNotNull(input) { "Save-state entry disappeared" }.use { source ->
+                            temporary.outputStream().use { output ->
+                                source.copyBoundedTo(output, MAX_IMPORT_FILE_BYTES)
+                            }
+                        }
+                        check(!target.exists()) { "Target slot is no longer empty" }
+                        check(temporary.renameTo(target)) { "Unable to finalize imported save state" }
+                    }.isSuccess
+                    if (success) imported++ else {
+                        temporary.delete()
+                        failed++
                     }
                 }
-            } != null
-        }.getOrDefault(false)
+            }
+        } finally {
+            stagedFile.delete()
+        }
+        return SaveStateImportResult(importedCount = imported, failedCount = failed)
     }
+
+    fun discardImport(preview: SaveStateImportPreview?) {
+        val path = preview?.stagedFilePath ?: return
+        runCatching {
+            val file = File(path).canonicalFile
+            if (file.parentFile == importCacheDir().canonicalFile) file.delete()
+        }
+    }
+
+    private fun buildImportPreview(
+        stagedFile: File,
+        displayName: String,
+        requestedSource: SaveStateImportSource,
+        detectedSource: SaveStateImportSource,
+        rawCandidates: List<RawImportCandidate>,
+        gamePath: String?,
+        gameSerial: String?
+    ): SaveStateImportPreview {
+        val occupiedNames = saveStatesDir().listFiles().orEmpty().filter(File::isFile).mapTo(mutableSetOf()) { it.name }
+        val occupiedSlots = if (gamePath.isNullOrBlank()) {
+            mutableMapOf<String, MutableSet<Int>>()
+        } else {
+            mutableMapOf("selected" to listSlots(gamePath, gameSerial).filter { it.exists }.mapTo(mutableSetOf()) { it.slot })
+        }
+        val normalizedGameSerial = gameSerial.normalizeSaveStateSerialKey()
+        var skipped = 0
+        var incompatible = 0
+        val candidates = mutableListOf<SaveStateImportCandidate>()
+
+        rawCandidates.take(MAX_IMPORT_CANDIDATES).forEach { raw ->
+            val format = saveStateFormatForVersion(raw.version)
+            if (format == SaveStateImportFormat.UNKNOWN || raw.sizeBytes !in 1..MAX_IMPORT_FILE_BYTES) {
+                incompatible++
+                return@forEach
+            }
+            val parsed = parseExternalSaveStateName(raw.fileName)
+            if (normalizedGameSerial != null && parsed?.serial != null && parsed.serial != normalizedGameSerial) {
+                skipped++
+                return@forEach
+            }
+
+            val slotKey = if (gamePath.isNullOrBlank()) {
+                parsed?.let { "${it.serial}|${it.crc}" }
+            } else {
+                "selected"
+            }
+            if (slotKey == null) {
+                skipped++
+                return@forEach
+            }
+            val slots = occupiedSlots.getOrPut(slotKey) {
+                occupiedNames.mapNotNullTo(mutableSetOf()) { existing ->
+                    parseExternalSaveStateName(existing)?.takeIf { "${it.serial}|${it.crc}" == slotKey }?.slot
+                }
+            }
+            val targetSlot = allocateSaveStateSlot(parsed?.slot, slots)
+            if (targetSlot == null) {
+                skipped++
+                return@forEach
+            }
+            val targetName = if (!gamePath.isNullOrBlank()) {
+                runCatching { NativeApp.getSaveStatePathForFile(gamePath, targetSlot) }
+                    .getOrNull()
+                    ?.let(::File)
+                    ?.name
+                    ?.takeIf { it.endsWith(".p2s", ignoreCase = true) }
+                    ?: parsed?.let { "${it.serial} (${it.crc}).${targetSlot.toString().padStart(2, '0')}.p2s" }
+            } else {
+                parsed?.let { "${it.serial} (${it.crc}).${targetSlot.toString().padStart(2, '0')}.p2s" }
+            }
+            if (targetName.isNullOrBlank() || targetName in occupiedNames) {
+                skipped++
+                return@forEach
+            }
+            occupiedNames += targetName
+            slots += targetSlot
+            candidates += SaveStateImportCandidate(
+                sourceEntryName = raw.entryName,
+                originalFileName = raw.fileName,
+                targetFileName = targetName,
+                targetSlot = targetSlot,
+                serial = parsed?.serial ?: normalizedGameSerial,
+                format = format,
+                sizeBytes = raw.sizeBytes
+            )
+        }
+        skipped += (rawCandidates.size - MAX_IMPORT_CANDIDATES).coerceAtLeast(0)
+
+        return SaveStateImportPreview(
+            stagedFilePath = stagedFile.absolutePath,
+            displayName = displayName,
+            requestedSource = requestedSource,
+            detectedSource = detectedSource,
+            candidates = candidates,
+            skippedCount = skipped,
+            incompatibleCount = incompatible
+        )
+    }
+
+    private fun collectArchiveCandidates(zip: ZipFile, requestedSource: SaveStateImportSource): List<RawImportCandidate> {
+        return zip.entries().asSequence()
+            .filterNot(ZipEntry::isDirectory)
+            .filter { entry ->
+                val normalized = entry.name.replace('\\', '/').trimStart('/')
+                val isState = normalized.endsWith(".p2s", ignoreCase = true)
+                isState && when (requestedSource) {
+                    SaveStateImportSource.EMUCOREX -> normalized.startsWith("slots/", ignoreCase = true)
+                    SaveStateImportSource.ARMSX2 -> normalized.startsWith("files/sstates/", ignoreCase = true) ||
+                        normalized.startsWith("sstates/", ignoreCase = true)
+                    SaveStateImportSource.NETHERSX2 -> normalized.startsWith("sstates/", ignoreCase = true) ||
+                        normalized.startsWith("savestates/", ignoreCase = true) || '/' !in normalized
+                    SaveStateImportSource.AUTO -> true
+                }
+            }
+            .take(MAX_IMPORT_CANDIDATES + 1)
+            .map { entry ->
+                val version = zip.getInputStream(entry).use { nestedInput ->
+                    readNestedSaveStateVersion(nestedInput)
+                }
+                RawImportCandidate(
+                    entryName = entry.name,
+                    fileName = entry.name.substringAfterLast('/').substringAfterLast('\\'),
+                    sizeBytes = entry.size,
+                    version = version
+                )
+            }
+            .toList()
+    }
+
+    private fun detectImportSource(zip: ZipFile, directState: Boolean): SaveStateImportSource {
+        if (directState) return SaveStateImportSource.AUTO
+        val names = zip.entries().asSequence().map { it.name.replace('\\', '/') }.toList()
+        return when {
+            names.any { it.equals("armsx2-backup.json", ignoreCase = true) || it.startsWith("files/sstates/", ignoreCase = true) } ->
+                SaveStateImportSource.ARMSX2
+            names.any { it.equals("manifest.json", ignoreCase = true) && names.any { name -> name.startsWith("slots/", ignoreCase = true) } } ->
+                SaveStateImportSource.EMUCOREX
+            names.any { it.startsWith("sstates/", ignoreCase = true) || it.startsWith("savestates/", ignoreCase = true) } ->
+                SaveStateImportSource.NETHERSX2
+            else -> SaveStateImportSource.AUTO
+        }
+    }
+
+    private fun readDisplayName(uri: Uri): String {
+        return runCatching {
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment?.substringAfterLast('/') ?: "save-state.p2s"
+    }
+
+    private fun importCacheDir(): File = File(context.cacheDir, "save-state-imports").apply { mkdirs() }
+
+    private data class RawImportCandidate(
+        val entryName: String?,
+        val fileName: String,
+        val sizeBytes: Long,
+        val version: Int?
+    )
 
     fun getPreviewImagePath(entry: SaveStateEntryInfo): String? {
         val saveFile = File(entry.absolutePath)
@@ -449,4 +769,48 @@ class SaveStateRepository(private val context: Context) {
 private fun String.sha1(): String {
     val digest = MessageDigest.getInstance("SHA-1")
     return digest.digest(toByteArray()).joinToString("") { "%02x".format(it) }
+}
+
+private fun readNestedSaveStateVersion(input: InputStream): Int? {
+    return runCatching {
+        ZipInputStream(input).use { zip ->
+            var version: Int? = null
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory && entry.name == SAVE_STATE_VERSION_ENTRY) {
+                    version = readSaveStateVersion(zip)
+                    break
+                }
+                zip.closeEntry()
+            }
+            version
+        }
+    }.getOrNull()
+}
+
+private fun readSaveStateVersion(input: InputStream): Int? {
+    val bytes = ByteArray(4)
+    var offset = 0
+    while (offset < bytes.size) {
+        val read = input.read(bytes, offset, bytes.size - offset)
+        if (read <= 0) return null
+        offset += read
+    }
+    return (bytes[0].toInt() and 0xff) or
+        ((bytes[1].toInt() and 0xff) shl 8) or
+        ((bytes[2].toInt() and 0xff) shl 16) or
+        ((bytes[3].toInt() and 0xff) shl 24)
+}
+
+private fun InputStream.copyBoundedTo(output: java.io.OutputStream, maxBytes: Long): Long {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var total = 0L
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) break
+        total += read
+        require(total <= maxBytes) { "Selected save-state file is too large" }
+        output.write(buffer, 0, read)
+    }
+    return total
 }
