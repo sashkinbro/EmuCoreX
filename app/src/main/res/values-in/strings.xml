@@ -2341,4 +2341,11 @@
     <string name="discord_presence_playing">Memainkan %1$s</string>
     <string name="discord_friends_title">Teman di EmuCoreX</string>
     <string name="discord_friends_empty">Saat ini tidak ada teman Discord Anda yang menggunakan EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Multipemain lokal</string>
+    <string name="emulation_local_multiplayer_off">Nonaktif</string>
+    <string name="emulation_local_multiplayer_side_by_side">Berdampingan</string>
+    <string name="emulation_local_multiplayer_stacked">Atas dan bawah</string>
+    <string name="emulation_local_multiplayer_crop">Potong layar terbagi horizontal</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Potong layar terbagi (ditukar)</string>
+    <string name="emulation_local_multiplayer_help">Menggandakan frame akhir untuk dua pemain sentuh. Mode potong memperbesar pembagian atas/bawah yang sudah ada dalam game; fitur ini tidak menambahkan multipemain ke game pemain tunggal.</string>
 </resources>

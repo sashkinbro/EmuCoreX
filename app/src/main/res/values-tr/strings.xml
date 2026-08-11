@@ -2327,4 +2327,11 @@
     <string name="discord_presence_playing">%1$s oynuyor</string>
     <string name="discord_friends_title">EmuCoreX\'teki arkadaşlar</string>
     <string name="discord_friends_empty">Şu anda Discord arkadaşlarınızdan hiçbiri EmuCoreX kullanmıyor.</string>
+    <string name="emulation_local_multiplayer_title">Yerel çok oyunculu</string>
+    <string name="emulation_local_multiplayer_off">Kapalı</string>
+    <string name="emulation_local_multiplayer_side_by_side">Yan yana</string>
+    <string name="emulation_local_multiplayer_stacked">Alt alta</string>
+    <string name="emulation_local_multiplayer_crop">Yatay bölünmeyi kırp</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Bölünmeyi kırp (değiştir)</string>
+    <string name="emulation_local_multiplayer_help">Son kareyi iki dokunmatik oyuncu için çoğaltır. Kırpma modları oyunun mevcut üst/alt bölünmesini büyütür; tek oyunculu bir oyuna çok oyunculu özellik eklemez.</string>
 </resources>

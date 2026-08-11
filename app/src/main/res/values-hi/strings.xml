@@ -2327,4 +2327,11 @@
     <string name="discord_presence_playing">%1$s खेल रहा है</string>
     <string name="discord_friends_title">EmuCoreX में मित्र</string>
     <string name="discord_friends_empty">अभी आपका कोई भी Discord मित्र EmuCoreX का उपयोग नहीं कर रहा है।</string>
+    <string name="emulation_local_multiplayer_title">स्थानीय मल्टीप्लेयर</string>
+    <string name="emulation_local_multiplayer_off">बंद</string>
+    <string name="emulation_local_multiplayer_side_by_side">साथ-साथ</string>
+    <string name="emulation_local_multiplayer_stacked">ऊपर और नीचे</string>
+    <string name="emulation_local_multiplayer_crop">क्षैतिज विभाजन क्रॉप करें</string>
+    <string name="emulation_local_multiplayer_crop_swapped">विभाजन क्रॉप करें (अदला-बदली)</string>
+    <string name="emulation_local_multiplayer_help">दो टच खिलाड़ियों के लिए अंतिम रेंडर फ्रेम की प्रतिलिपि बनाता है। क्रॉप मोड गेम के मौजूदा ऊपर/नीचे विभाजन को बड़ा करते हैं; वे एकल-खिलाड़ी गेम में मल्टीप्लेयर नहीं जोड़ते।</string>
 </resources>

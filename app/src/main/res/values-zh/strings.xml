@@ -2328,4 +2328,11 @@
     <string name="discord_presence_playing">正在玩 %1$s</string>
     <string name="discord_friends_title">EmuCoreX 中的好友</string>
     <string name="discord_friends_empty">目前没有 Discord 好友正在使用 EmuCoreX。</string>
+    <string name="emulation_local_multiplayer_title">本地多人游戏</string>
+    <string name="emulation_local_multiplayer_off">关闭</string>
+    <string name="emulation_local_multiplayer_side_by_side">左右并排</string>
+    <string name="emulation_local_multiplayer_stacked">上下排列</string>
+    <string name="emulation_local_multiplayer_crop">裁剪横向分屏</string>
+    <string name="emulation_local_multiplayer_crop_swapped">裁剪分屏（交换）</string>
+    <string name="emulation_local_multiplayer_help">为两名触控玩家复制最终渲染画面。裁剪模式会放大游戏已有的上下分屏，但不会为单人游戏添加多人功能。</string>
 </resources>

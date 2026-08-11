@@ -55,4 +55,15 @@ class EmulationSideArtworkTest {
         assertEquals(SideArtworkGutters(0, 0), calculateSideArtworkGutters(0, 1080, 2))
         assertEquals(SideArtworkGutters(0, 0), calculateSideArtworkGutters(1920, 1080, 99))
     }
+
+    @Test
+    fun `settings preview keeps artwork balanced across orientations`() {
+        val portrait = calculateSideArtworkPreviewLayout(widthDp = 393, heightDp = 852)
+        val landscape = calculateSideArtworkPreviewLayout(widthDp = 852, heightDp = 393)
+
+        assertEquals(SideArtworkPreviewLayout(heightDp = 190, contentFraction = 0.60f), portrait)
+        assertEquals(SideArtworkPreviewLayout(heightDp = 165, contentFraction = 0.58f), landscape)
+        assertEquals(SideArtworkGutters(200, 200), calculateSideArtworkPreviewGutters(1000, portrait.contentFraction))
+        assertEquals(SideArtworkGutters(420, 420), calculateSideArtworkPreviewGutters(2000, landscape.contentFraction))
+    }
 }

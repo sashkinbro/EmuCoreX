@@ -2331,4 +2331,11 @@
     <string name="discord_presence_playing">يلعب %1$s</string>
     <string name="discord_friends_title">الأصدقاء في EmuCoreX</string>
     <string name="discord_friends_empty">لا يستخدم أي من أصدقائك على Discord تطبيق EmuCoreX الآن.</string>
+    <string name="emulation_local_multiplayer_title">لعب محلي متعدد</string>
+    <string name="emulation_local_multiplayer_off">إيقاف</string>
+    <string name="emulation_local_multiplayer_side_by_side">جنبًا إلى جنب</string>
+    <string name="emulation_local_multiplayer_stacked">أعلى وأسفل</string>
+    <string name="emulation_local_multiplayer_crop">قص الانقسام الأفقي</string>
+    <string name="emulation_local_multiplayer_crop_swapped">قص الانقسام (معكوس)</string>
+    <string name="emulation_local_multiplayer_help">يكرر الإطار النهائي للاعبين اثنين باللمس. تكبر أوضاع القص الانقسام العلوي/السفلي الموجود في اللعبة، لكنها لا تضيف اللعب الجماعي إلى لعبة فردية.</string>
 </resources>

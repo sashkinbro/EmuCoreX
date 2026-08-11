@@ -2342,4 +2342,11 @@
     <string name="discord_presence_playing">در حال اجرای %1$s</string>
     <string name="discord_friends_title">دوستان در EmuCoreX</string>
     <string name="discord_friends_empty">در حال حاضر هیچ‌یک از دوستان Discord شما از EmuCoreX استفاده نمی‌کند.</string>
+    <string name="emulation_local_multiplayer_title">چندنفره محلی</string>
+    <string name="emulation_local_multiplayer_off">خاموش</string>
+    <string name="emulation_local_multiplayer_side_by_side">کنار هم</string>
+    <string name="emulation_local_multiplayer_stacked">بالا و پایین</string>
+    <string name="emulation_local_multiplayer_crop">برش تقسیم افقی</string>
+    <string name="emulation_local_multiplayer_crop_swapped">برش تقسیم (جابه‌جا)</string>
+    <string name="emulation_local_multiplayer_help">فریم نهایی را برای دو بازیکن لمسی تکرار می‌کند. حالت‌های برش، تقسیم بالا/پایین موجود در بازی را بزرگ می‌کنند، اما به بازی تک‌نفره قابلیت چندنفره اضافه نمی‌کنند.</string>
 </resources>

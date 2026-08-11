@@ -819,6 +819,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(Crop[1]) &&
 		OpEqu(Crop[2]) &&
 		OpEqu(Crop[3]) &&
+		OpEqu(LocalMultiplayerMode) &&
 
 		OpEqu(OsdScale) &&
 		OpEqu(OsdMargin) &&
@@ -953,6 +954,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapEntryEx(Crop[1], "CropTop");
 	SettingsWrapEntryEx(Crop[2], "CropRight");
 	SettingsWrapEntryEx(Crop[3], "CropBottom");
+	SettingsWrapEntryEx(LocalMultiplayerMode, "LocalMultiplayerMode");
 
 	// Unfortunately, because code in the GS still reads the setting by key instead of
 	// using these variables, we need to use the old names. Maybe post 2.0 we can change this.

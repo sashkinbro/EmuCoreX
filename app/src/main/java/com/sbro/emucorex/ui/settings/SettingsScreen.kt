@@ -222,6 +222,8 @@ import com.sbro.emucorex.ui.common.RequestFocusOnResume
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
+import com.sbro.emucorex.ui.common.EmulationSideArtworkThumbnail
+import com.sbro.emucorex.ui.common.calculateSideArtworkPreviewLayout
 import com.sbro.emucorex.ui.common.SettingsStyledDialog
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
@@ -1357,6 +1359,22 @@ private fun SettingsContent(
                             onSelect = viewModel::setAspectRatio,
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { viewModel.setAspectRatio(defaults.aspectRatio) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.emulation_local_multiplayer_title),
+                            options = listOf(
+                                AppPreferences.LOCAL_MULTIPLAYER_OFF to stringResource(R.string.emulation_local_multiplayer_off),
+                                AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE to stringResource(R.string.emulation_local_multiplayer_side_by_side),
+                                AppPreferences.LOCAL_MULTIPLAYER_STACKED to stringResource(R.string.emulation_local_multiplayer_stacked),
+                                AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP to stringResource(R.string.emulation_local_multiplayer_crop),
+                                AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED to stringResource(R.string.emulation_local_multiplayer_crop_swapped)
+                            ),
+                            selectedValue = uiState.localMultiplayerMode,
+                            onSelect = viewModel::setLocalMultiplayerMode,
+                            helpText = stringResource(R.string.emulation_local_multiplayer_help),
+                            onResetToDefault = {
+                                viewModel.setLocalMultiplayerMode(AppPreferences.LOCAL_MULTIPLAYER_OFF)
+                            }
                         )
                         val crop = uiState.displayCrop
                         val cropPreset = when (crop) {
@@ -3183,6 +3201,7 @@ private fun CustomizationSettingsTab(
         smallestScreenWidthDp = minOf(windowWidthDp, windowHeightDp),
         gridScale = uiState.homeGridScale
     )
+    val sideArtworkPreviewLayout = calculateSideArtworkPreviewLayout(windowWidthDp, windowHeightDp)
     val backgroundRepository = remember(context) { HomeBackgroundRepository(context) }
     val sideArtworkRepository = remember(context) { EmulationSideArtworkRepository(context) }
     val backgroundFile = backgroundRepository.existingFile(uiState.homeBackgroundType)
@@ -3443,7 +3462,7 @@ private fun CustomizationSettingsTab(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .height(210.dp),
+                .height(sideArtworkPreviewLayout.heightDp.dp),
             shape = RoundedCornerShape(18.dp),
             color = Color.Black,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
@@ -3454,29 +3473,45 @@ private fun CustomizationSettingsTab(
                     revision = uiState.emulationSideArtworkRevision,
                     aspectRatioMode = 2,
                     modifier = Modifier.fillMaxSize(),
-                    preview = true
+                    preview = true,
+                    previewContentFraction = sideArtworkPreviewLayout.contentFraction,
+                    dimPercent = uiState.emulationSideArtworkDim
                 )
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .aspectRatio(4f / 3f)
+                        .fillMaxWidth(sideArtworkPreviewLayout.contentFraction)
                         .align(Alignment.Center)
                         .background(
                             Brush.linearGradient(
-                                listOf(Color(0xFF14233A), Color(0xFF3B1E46), Color(0xFF0D1524))
+                                listOf(Color(0xFF071A33), Color(0xFF142B46), Color(0xFF301B46), Color(0xFF081524))
+                            )
+                        )
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(Color(0xFF4A86E8).copy(alpha = 0.24f), Color.Transparent)
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.settings_customization_side_artwork_preview),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        textAlign = TextAlign.Center,
-                        color = Color.White.copy(alpha = 0.82f),
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Gamepad,
+                            contentDescription = null,
+                            modifier = Modifier.size(30.dp),
+                            tint = Color.White.copy(alpha = 0.72f)
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_customization_side_artwork_preview),
+                            textAlign = TextAlign.Center,
+                            color = Color.White.copy(alpha = 0.88f),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
                 }
                 if (uiState.isSideArtworkImporting) {
                     Box(
@@ -3490,16 +3525,31 @@ private fun CustomizationSettingsTab(
                 }
             }
         }
-        ChoiceSection(
+        SideArtworkPicker(
             title = stringResource(R.string.settings_customization_side_artwork),
             options = sideArtworkOptions,
             selectedValue = uiState.emulationSideArtwork.preferenceValue,
+            revision = uiState.emulationSideArtworkRevision,
             onSelect = { value ->
                 viewModel.setEmulationSideArtwork(EmulationSideArtwork.fromPreference(value))
             },
-            helpText = stringResource(R.string.settings_customization_side_artwork_help),
-            onResetToDefault = { viewModel.setEmulationSideArtwork(EmulationSideArtwork.NONE) }
+            helpText = stringResource(R.string.settings_customization_side_artwork_help)
         )
+        if (uiState.emulationSideArtwork != EmulationSideArtwork.NONE) {
+            SliderItem(
+                icon = Icons.Rounded.Visibility,
+                title = stringResource(R.string.settings_customization_background_dim),
+                subtitle = "",
+                value = uiState.emulationSideArtworkDim.toFloat(),
+                range = 0f..85f,
+                steps = 16,
+                onValueChange = { viewModel.setEmulationSideArtworkDim(it.roundToInt()) },
+                valueLabel = { "${it.roundToInt()}%" },
+                onResetToDefault = {
+                    viewModel.setEmulationSideArtworkDim(AppPreferences.DEFAULT_EMULATION_SIDE_ARTWORK_DIM)
+                }
+            )
+        }
         SettingsItem(
             icon = Icons.Rounded.Wallpaper,
             label = stringResource(R.string.settings_customization_side_artwork_import),
@@ -6217,6 +6267,92 @@ private fun ShaderPresetDialogOption(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SideArtworkPicker(
+    title: String,
+    options: List<Pair<Int, String>>,
+    selectedValue: Int,
+    revision: Int,
+    onSelect: (Int) -> Unit,
+    helpText: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            SettingHelpButton(title = title, description = helpText)
+        }
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .tvFocusGroup(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(options, key = { it.first }) { (value, label) ->
+                val artwork = EmulationSideArtwork.fromPreference(value)
+                val selected = selectedValue == value
+                val interactionSource = remember { MutableInteractionSource() }
+                Surface(
+                    onClick = { onSelect(value) },
+                    modifier = Modifier
+                        .width(156.dp)
+                        .aspectRatio(16f / 9f)
+                        .tvGamepadFocusableCard(
+                            shape = RoundedCornerShape(14.dp),
+                            interactionSource = interactionSource,
+                            addFocusTarget = false
+                        ),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.Black,
+                    interactionSource = interactionSource,
+                    border = BorderStroke(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outlineVariant
+                    )
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        EmulationSideArtworkThumbnail(
+                            artwork = artwork,
+                            revision = revision,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.42f to Color.Transparent,
+                                        1f to Color.Black.copy(alpha = 0.86f)
+                                    )
+                                )
+                        )
+                        Text(
+                            text = label,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
     }

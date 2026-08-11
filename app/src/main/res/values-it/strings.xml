@@ -2327,4 +2327,11 @@
     <string name="discord_presence_playing">Gioca a %1$s</string>
     <string name="discord_friends_title">Amici su EmuCoreX</string>
     <string name="discord_friends_empty">Al momento nessuno dei tuoi amici Discord sta usando EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Multigiocatore locale</string>
+    <string name="emulation_local_multiplayer_off">Disattivato</string>
+    <string name="emulation_local_multiplayer_side_by_side">Affiancato</string>
+    <string name="emulation_local_multiplayer_stacked">Sovrapposto</string>
+    <string name="emulation_local_multiplayer_crop">Ritaglia divisione orizzontale</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Ritaglia divisione (invertita)</string>
+    <string name="emulation_local_multiplayer_help">Duplica il fotogramma finale per due giocatori touch. Le modalità di ritaglio ingrandiscono la divisione superiore/inferiore già presente nel gioco, ma non aggiungono il multigiocatore a un gioco singolo.</string>
 </resources>

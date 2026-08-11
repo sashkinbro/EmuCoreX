@@ -427,6 +427,9 @@ fun EmulationScreen(
     }
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val scope = rememberCoroutineScope()
+    LaunchedEffect(uiState.localMultiplayerMode) {
+        EmulatorBridge.setLocalMultiplayerMode(uiState.localMultiplayerMode)
+    }
     val swapDiscPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -941,7 +944,8 @@ fun EmulationScreen(
             revision = globalDefaults.emulationSideArtworkRevision,
             aspectRatioMode = uiState.aspectRatio,
             nativeDrawRect = nativeDisplayDrawRect,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            dimPercent = globalDefaults.emulationSideArtworkDim
         )
 
         if (!showControlsEditor) {
@@ -1247,7 +1251,8 @@ fun EmulationScreen(
         if (shouldShowOverlay && !uiState.showMenu && !showControlsEditor) {
             val scaleFactor = uiState.overlayScale / 100f
             val alpha = uiState.overlayOpacity / 100f
-            OnScreenControls(
+            if (uiState.localMultiplayerMode == AppPreferences.LOCAL_MULTIPLAYER_OFF) {
+                OnScreenControls(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(20f)
@@ -1284,7 +1289,21 @@ fun EmulationScreen(
                 onPadInput = { keyCode, range, pressed ->
                     viewModel.onPadInput(overlayPadIndex, keyCode, range, pressed)
                 }
-            )
+                )
+            } else {
+                LocalMultiplayerTouchControls(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(20f),
+                    mode = uiState.localMultiplayerMode,
+                    uiState = uiState,
+                    scaleFactor = scaleFactor,
+                    alpha = alpha,
+                    onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                    onFastForwardHoldChange = viewModel::setFastForwardHeld,
+                    onPadInput = viewModel::onPadInput
+                )
+            }
         }
         }
 
@@ -1379,6 +1398,7 @@ fun EmulationScreen(
                     onSetUpscale = { viewModel.setUpscale(it) },
                     onSetAspectRatio = { viewModel.setAspectRatio(it) },
                     onSetDisplayCrop = { viewModel.setDisplayCrop(it) },
+                    onSetLocalMultiplayerMode = viewModel::setLocalMultiplayerMode,
                     onSetMtvu = { viewModel.setMtvu(it) },
                     onSetThreadPinning = { viewModel.setThreadPinning(it) },
                     onSetFastCdvd = { viewModel.setFastCdvd(it) },
@@ -1841,6 +1861,154 @@ private fun TransportStatusOverlay(mode: EmulationTransportMode) {
     }
 }
 
+@Composable
+private fun LocalMultiplayerTouchControls(
+    modifier: Modifier,
+    mode: Int,
+    uiState: EmulationUiState,
+    scaleFactor: Float,
+    alpha: Float,
+    onToggleLeftInputMode: () -> Unit,
+    onFastForwardHoldChange: (Boolean) -> Unit,
+    onPadInput: (Int, Int, Int, Boolean) -> Unit
+) {
+    val sideBySide = mode == AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE
+    val (firstPad, secondPad) = localMultiplayerPadOrder(mode)
+
+    if (sideBySide) {
+        Row(modifier = modifier) {
+            LocalMultiplayerTouchZone(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                padIndex = firstPad,
+                uiState = uiState,
+                scaleFactor = scaleFactor * 0.58f,
+                alpha = alpha,
+                onToggleLeftInputMode = onToggleLeftInputMode,
+                onFastForwardHoldChange = onFastForwardHoldChange,
+                onPadInput = onPadInput
+            )
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(Color.White.copy(alpha = 0.16f))
+            )
+            LocalMultiplayerTouchZone(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                padIndex = secondPad,
+                uiState = uiState,
+                scaleFactor = scaleFactor * 0.58f,
+                alpha = alpha,
+                onToggleLeftInputMode = onToggleLeftInputMode,
+                onFastForwardHoldChange = {},
+                onPadInput = onPadInput
+            )
+        }
+    } else {
+        Column(modifier = modifier) {
+            LocalMultiplayerTouchZone(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                padIndex = firstPad,
+                uiState = uiState,
+                scaleFactor = scaleFactor * 0.50f,
+                alpha = alpha,
+                onToggleLeftInputMode = onToggleLeftInputMode,
+                onFastForwardHoldChange = onFastForwardHoldChange,
+                onPadInput = onPadInput
+            )
+            HorizontalDivider(color = Color.White.copy(alpha = 0.16f))
+            LocalMultiplayerTouchZone(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                padIndex = secondPad,
+                uiState = uiState,
+                scaleFactor = scaleFactor * 0.50f,
+                alpha = alpha,
+                onToggleLeftInputMode = onToggleLeftInputMode,
+                onFastForwardHoldChange = {},
+                onPadInput = onPadInput
+            )
+        }
+    }
+}
+
+internal fun localMultiplayerPadOrder(mode: Int): Pair<Int, Int> {
+    return if (mode == AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED) {
+        1 to 0
+    } else {
+        0 to 1
+    }
+}
+
+@Composable
+private fun LocalMultiplayerTouchZone(
+    modifier: Modifier,
+    padIndex: Int,
+    uiState: EmulationUiState,
+    scaleFactor: Float,
+    alpha: Float,
+    onToggleLeftInputMode: () -> Unit,
+    onFastForwardHoldChange: (Boolean) -> Unit,
+    onPadInput: (Int, Int, Int, Boolean) -> Unit
+) {
+    Box(modifier = modifier) {
+        OnScreenControls(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(alpha = alpha),
+            scaleFactor = scaleFactor,
+            stickScaleFactor = uiState.stickScale / 100f,
+            leftStickSensitivity = uiState.leftStickSensitivity / 100f,
+            rightStickSensitivity = uiState.rightStickSensitivity / 100f,
+            invertLeftStick = uiState.invertLeftStick,
+            invertRightStick = uiState.invertRightStick,
+            invertLeftStickHorizontal = uiState.invertLeftStickHorizontal,
+            invertRightStickHorizontal = uiState.invertRightStickHorizontal,
+            rightStickUpToR2 = uiState.gamepadRightStickUpToR2,
+            rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
+            touchscreenRightStick = uiState.touchscreenRightStick,
+            touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
+            touchHaptics = uiState.touchHaptics,
+            touchHapticsPreset = uiState.touchHapticsPreset,
+            touchHapticsStrength = uiState.touchHapticsStrength,
+            visualStyle = uiState.touchControlVisualStyle,
+            pressEffect = uiState.touchControlPressEffect,
+            customControls = uiState.customTouchControls.controls,
+            dpadOffset = uiState.dpadOffset,
+            lstickOffset = uiState.lstickOffset,
+            rstickOffset = uiState.rstickOffset,
+            actionOffset = uiState.actionOffset,
+            lbtnOffset = uiState.lbtnOffset,
+            rbtnOffset = uiState.rbtnOffset,
+            centerOffset = uiState.centerOffset,
+            controlLayouts = uiState.controlLayouts,
+            racingMode = uiState.racingMode,
+            onToggleLeftInputMode = onToggleLeftInputMode,
+            onFastForwardHoldChange = onFastForwardHoldChange,
+            onPadInput = { key, range, pressed -> onPadInput(padIndex, key, range, pressed) },
+            respectSystemInsets = false
+        )
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .zIndex(30f),
+            shape = RoundedCornerShape(999.dp),
+            color = Color.Black.copy(alpha = 0.56f),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.20f))
+        ) {
+            Text(
+                text = stringResource(
+                    if (padIndex == 0) R.string.settings_gamepad_player_1
+                    else R.string.settings_gamepad_player_2
+                ),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
+            )
+        }
+    }
+}
+
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 private fun OnScreenControls(
@@ -1874,14 +2042,19 @@ private fun OnScreenControls(
     racingMode: Boolean,
     onToggleLeftInputMode: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
-    onPadInput: (Int, Int, Boolean) -> Unit
+    onPadInput: (Int, Int, Boolean) -> Unit,
+    respectSystemInsets: Boolean = true
 ) {
     val density = LocalDensity.current
     val safeDrawingPadding = WindowInsets.safeDrawing.asPaddingValues()
-    val safeLeft = safeDrawingPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
-    val safeRight = safeDrawingPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
-    val safeTop = safeDrawingPadding.calculateTopPadding()
-    val safeBottom = safeDrawingPadding.calculateBottomPadding()
+    val safeLeft = if (respectSystemInsets) {
+        safeDrawingPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+    } else 0.dp
+    val safeRight = if (respectSystemInsets) {
+        safeDrawingPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+    } else 0.dp
+    val safeTop = if (respectSystemInsets) safeDrawingPadding.calculateTopPadding() else 0.dp
+    val safeBottom = if (respectSystemInsets) safeDrawingPadding.calculateBottomPadding() else 0.dp
     val context = LocalContext.current
     val hapticView = LocalView.current
     val currentOnPadInput by rememberUpdatedState(onPadInput)
@@ -2678,6 +2851,7 @@ private fun EmulationSidebarMenu(
     onSetUpscale: (Float) -> Unit,
     onSetAspectRatio: (Int) -> Unit,
     onSetDisplayCrop: (DisplayCrop) -> Unit,
+    onSetLocalMultiplayerMode: (Int) -> Unit,
     onSetMtvu: (Boolean) -> Unit,
     onSetThreadPinning: (Boolean) -> Unit,
     onSetFastCdvd: (Boolean) -> Unit,
@@ -3741,6 +3915,39 @@ private fun EmulationSidebarMenu(
                             allowWrap = false,
                             helpText = stringResource(R.string.settings_help_aspect_ratio),
                             onResetToDefault = { onSetAspectRatio(globalDefaults.aspectRatio) }
+                        )
+
+                        LiveSelectionRow(
+                            title = stringResource(R.string.emulation_local_multiplayer_title),
+                            options = listOf(
+                                LiveSelectionOption(
+                                    AppPreferences.LOCAL_MULTIPLAYER_OFF,
+                                    stringResource(R.string.emulation_local_multiplayer_off)
+                                ),
+                                LiveSelectionOption(
+                                    AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE,
+                                    stringResource(R.string.emulation_local_multiplayer_side_by_side)
+                                ),
+                                LiveSelectionOption(
+                                    AppPreferences.LOCAL_MULTIPLAYER_STACKED,
+                                    stringResource(R.string.emulation_local_multiplayer_stacked)
+                                ),
+                                LiveSelectionOption(
+                                    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP,
+                                    stringResource(R.string.emulation_local_multiplayer_crop)
+                                ),
+                                LiveSelectionOption(
+                                    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED,
+                                    stringResource(R.string.emulation_local_multiplayer_crop_swapped)
+                                )
+                            ),
+                            currentValue = uiState.localMultiplayerMode,
+                            onValueChange = onSetLocalMultiplayerMode,
+                            allowWrap = false,
+                            helpText = stringResource(R.string.emulation_local_multiplayer_help),
+                            onResetToDefault = {
+                                onSetLocalMultiplayerMode(AppPreferences.LOCAL_MULTIPLAYER_OFF)
+                            }
                         )
 
                         val crop = uiState.displayCrop

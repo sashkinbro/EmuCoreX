@@ -2331,4 +2331,11 @@
     <string name="discord_presence_playing">Играет в %1$s</string>
     <string name="discord_friends_title">Друзья в EmuCoreX</string>
     <string name="discord_friends_empty">Сейчас никто из ваших друзей в Discord не использует EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Локальная игра вдвоём</string>
+    <string name="emulation_local_multiplayer_off">Выкл.</string>
+    <string name="emulation_local_multiplayer_side_by_side">Рядом</string>
+    <string name="emulation_local_multiplayer_stacked">Друг над другом</string>
+    <string name="emulation_local_multiplayer_crop">Обрезать горизонтальное разделение</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Обрезать разделение (поменять)</string>
+    <string name="emulation_local_multiplayer_help">Дублирует итоговый кадр для двух игроков с сенсорным управлением. Режимы обрезки увеличивают существующее в игре разделение сверху/снизу, но не добавляют мультиплеер в одиночную игру.</string>
 </resources>

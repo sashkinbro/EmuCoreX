@@ -71,6 +71,8 @@ data class SettingsSnapshot(
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
     val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
     val emulationSideArtworkRevision: Int = 0,
+    val emulationSideArtworkDim: Int = AppPreferences.DEFAULT_EMULATION_SIDE_ARTWORK_DIM,
+    val localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
     val touchControlPressEffect: TouchControlPressEffect = TouchControlPressEffect.GROW,
     val gameMenuLayoutStyle: GameMenuLayoutStyle = GameMenuLayoutStyle.SIDEBAR,
@@ -334,6 +336,12 @@ class AppPreferences(private val context: Context) {
         const val MIN_HOME_GRID_SCALE = 0.60f
         const val MAX_HOME_GRID_SCALE = 1.60f
         const val DEFAULT_HOME_BACKGROUND_DIM = 48
+        const val DEFAULT_EMULATION_SIDE_ARTWORK_DIM = 0
+        const val LOCAL_MULTIPLAYER_OFF = 0
+        const val LOCAL_MULTIPLAYER_SIDE_BY_SIDE = 1
+        const val LOCAL_MULTIPLAYER_STACKED = 2
+        const val LOCAL_MULTIPLAYER_HORIZONTAL_CROP = 3
+        const val LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED = 4
         const val MIN_FAST_FORWARD_SPEED = 1.25f
         const val MAX_FAST_FORWARD_SPEED = 5.0f
         private const val LEGACY_DEFAULT_LSTICK_OFFSET_X = 18f
@@ -451,6 +459,8 @@ class AppPreferences(private val context: Context) {
         private val HOME_BACKGROUND_DIM = intPreferencesKey("home_background_dim")
         private val EMULATION_SIDE_ARTWORK = intPreferencesKey("emulation_side_artwork")
         private val EMULATION_SIDE_ARTWORK_REVISION = intPreferencesKey("emulation_side_artwork_revision")
+        private val EMULATION_SIDE_ARTWORK_DIM = intPreferencesKey("emulation_side_artwork_dim")
+        private val LOCAL_MULTIPLAYER_MODE = intPreferencesKey("local_multiplayer_mode")
         private val COVER_CACHE_REVISION = intPreferencesKey("cover_cache_revision")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
@@ -784,6 +794,16 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
 
+    val emulationSideArtworkDim: Flow<Int> = context.dataStore.data
+        .map { prefs ->
+            (prefs[EMULATION_SIDE_ARTWORK_DIM] ?: DEFAULT_EMULATION_SIDE_ARTWORK_DIM).coerceIn(0, 85)
+        }
+        .distinctUntilChanged()
+
+    val localMultiplayerMode: Flow<Int> = context.dataStore.data
+        .map { prefs -> normalizeLocalMultiplayerMode(prefs[LOCAL_MULTIPLAYER_MODE]) }
+        .distinctUntilChanged()
+
     val coverCacheRevision: Flow<Int> = context.dataStore.data
         .map { prefs -> (prefs[COVER_CACHE_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
@@ -950,6 +970,22 @@ class AppPreferences(private val context: Context) {
             prefs[EMULATION_SIDE_ARTWORK_REVISION] =
                 (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0) + 1
         }
+    }
+
+    suspend fun setEmulationSideArtworkDim(dim: Int) {
+        context.dataStore.edit { it[EMULATION_SIDE_ARTWORK_DIM] = dim.coerceIn(0, 85) }
+    }
+
+    suspend fun setLocalMultiplayerMode(mode: Int) {
+        context.dataStore.edit { it[LOCAL_MULTIPLAYER_MODE] = normalizeLocalMultiplayerMode(mode) }
+    }
+
+    private fun normalizeLocalMultiplayerMode(mode: Int?): Int = when (mode) {
+        LOCAL_MULTIPLAYER_SIDE_BY_SIDE,
+        LOCAL_MULTIPLAYER_STACKED,
+        LOCAL_MULTIPLAYER_HORIZONTAL_CROP,
+        LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED -> mode
+        else -> LOCAL_MULTIPLAYER_OFF
     }
 
     suspend fun notifyCoverCacheCleared() {
@@ -1535,6 +1571,10 @@ class AppPreferences(private val context: Context) {
                 emulationSideArtwork = EmulationSideArtwork.fromPreference(prefs[EMULATION_SIDE_ARTWORK]),
                 emulationSideArtworkRevision = (prefs[EMULATION_SIDE_ARTWORK_REVISION] ?: 0)
                     .coerceAtLeast(0),
+                emulationSideArtworkDim =
+                    (prefs[EMULATION_SIDE_ARTWORK_DIM] ?: DEFAULT_EMULATION_SIDE_ARTWORK_DIM)
+                        .coerceIn(0, 85),
+                localMultiplayerMode = normalizeLocalMultiplayerMode(prefs[LOCAL_MULTIPLAYER_MODE]),
                 touchControlVisualStyle = TouchControlVisualStyle.fromPreference(prefs[TOUCH_CONTROL_VISUAL_STYLE]),
                 touchControlPressEffect = TouchControlPressEffect.fromPreference(prefs[TOUCH_CONTROL_PRESS_EFFECT]),
                 gameMenuLayoutStyle = GameMenuLayoutStyle.fromPreference(prefs[GAME_MENU_LAYOUT_STYLE]),
@@ -3466,6 +3506,11 @@ class AppPreferences(private val context: Context) {
             put("customFontName", prefs[CUSTOM_FONT_NAME])
             put("homeGridScale", (prefs[HOME_GRID_SCALE] ?: DEFAULT_HOME_GRID_SCALE).toDouble())
             put("homeBackgroundDim", prefs[HOME_BACKGROUND_DIM] ?: DEFAULT_HOME_BACKGROUND_DIM)
+            put(
+                "emulationSideArtworkDim",
+                prefs[EMULATION_SIDE_ARTWORK_DIM] ?: DEFAULT_EMULATION_SIDE_ARTWORK_DIM
+            )
+            put("localMultiplayerMode", normalizeLocalMultiplayerMode(prefs[LOCAL_MULTIPLAYER_MODE]))
             put("homeBackgroundType", prefs[HOME_BACKGROUND_TYPE] ?: HomeBackgroundType.NONE.preferenceValue)
             put("homeBackgroundPreset", prefs[HOME_BACKGROUND_PRESET] ?: HomeBackgroundPreset.OLYMPUS.preferenceValue)
             put("touchControlVisualStyle", prefs[TOUCH_CONTROL_VISUAL_STYLE] ?: TouchControlVisualStyle.CLASSIC.preferenceValue)
@@ -3744,6 +3789,13 @@ class AppPreferences(private val context: Context) {
                 .toFloat().coerceIn(MIN_HOME_GRID_SCALE, MAX_HOME_GRID_SCALE)
             prefs[HOME_BACKGROUND_DIM] = json.optInt("homeBackgroundDim", DEFAULT_HOME_BACKGROUND_DIM)
                 .coerceIn(0, 85)
+            prefs[EMULATION_SIDE_ARTWORK_DIM] = json.optInt(
+                "emulationSideArtworkDim",
+                DEFAULT_EMULATION_SIDE_ARTWORK_DIM
+            ).coerceIn(0, 85)
+            prefs[LOCAL_MULTIPLAYER_MODE] = normalizeLocalMultiplayerMode(
+                json.optInt("localMultiplayerMode", LOCAL_MULTIPLAYER_OFF)
+            )
             prefs[HOME_BACKGROUND_TYPE] = HomeBackgroundType.fromPreference(
                 json.optInt("homeBackgroundType", HomeBackgroundType.NONE.preferenceValue)
             ).preferenceValue

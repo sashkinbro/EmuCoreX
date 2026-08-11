@@ -871,6 +871,7 @@ struct Pcsx2Config
 
 		float StretchY = 100.0f;
 		int Crop[4] = {};
+		int LocalMultiplayerMode = 0;
 
 		float OsdScale = DEFAULT_OSD_SCALE;
 		float OsdMargin = DEFAULT_OSD_MARGIN;

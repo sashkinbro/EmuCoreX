@@ -91,6 +91,7 @@ data class SettingsUiState(
     val homeBackgroundDim: Int = AppPreferences.DEFAULT_HOME_BACKGROUND_DIM,
     val emulationSideArtwork: EmulationSideArtwork = EmulationSideArtwork.NONE,
     val emulationSideArtworkRevision: Int = 0,
+    val emulationSideArtworkDim: Int = AppPreferences.DEFAULT_EMULATION_SIDE_ARTWORK_DIM,
     val isSideArtworkImporting: Boolean = false,
     val shaderChainEnabled: Boolean = false,
     val shaderChainPreset: String = "",
@@ -123,6 +124,7 @@ data class SettingsUiState(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
     val displayCrop: DisplayCrop = DisplayCrop.None,
     val audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
     val audioFastForwardVolume: Int = AudioDefaults.VOLUME_DEFAULT,
@@ -385,6 +387,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             homeBackgroundDim = snapshot.homeBackgroundDim,
             emulationSideArtwork = snapshot.emulationSideArtwork,
             emulationSideArtworkRevision = snapshot.emulationSideArtworkRevision,
+            emulationSideArtworkDim = snapshot.emulationSideArtworkDim,
             shaderChainEnabled = snapshot.shaderChainEnabled,
             shaderChainPreset = snapshot.shaderChainPreset,
             touchControlVisualStyle = snapshot.touchControlVisualStyle,
@@ -402,6 +405,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             renderer = snapshot.renderer,
             upscaleMultiplier = snapshot.upscaleMultiplier,
             aspectRatio = snapshot.aspectRatio,
+            localMultiplayerMode = snapshot.localMultiplayerMode,
             displayCrop = snapshot.displayCrop,
             audioVolume = snapshot.audioVolume,
             audioFastForwardVolume = snapshot.audioFastForwardVolume,
@@ -668,6 +672,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.setHomeBackgroundDim(dim)
     }
 
+    fun setEmulationSideArtworkDim(dim: Int) = viewModelScope.launch {
+        preferences.setEmulationSideArtworkDim(dim)
+    }
+
     fun setTouchControlVisualStyle(style: TouchControlVisualStyle) = viewModelScope.launch {
         preferences.setTouchControlVisualStyle(style)
     }
@@ -864,6 +872,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         preferences.setHomeBackgroundType(HomeBackgroundType.NONE)
         preferences.setHomeBackgroundDim(AppPreferences.DEFAULT_HOME_BACKGROUND_DIM)
         preferences.setEmulationSideArtwork(EmulationSideArtwork.NONE)
+        preferences.setEmulationSideArtworkDim(AppPreferences.DEFAULT_EMULATION_SIDE_ARTWORK_DIM)
         preferences.setHomeGridScale(AppPreferences.DEFAULT_HOME_GRID_SCALE)
         preferences.setAppFontChoice(AppFontChoice.SYSTEM)
         preferences.clearCustomFont()
@@ -1015,6 +1024,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setAspectRatio(value)
             EmulatorBridge.setAspectRatio(value)
+        }
+    }
+
+    fun setLocalMultiplayerMode(value: Int) {
+        viewModelScope.launch {
+            preferences.setLocalMultiplayerMode(value)
+            EmulatorBridge.setLocalMultiplayerMode(value)
         }
     }
 
@@ -2082,6 +2098,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 gpuHardwareProfile = GpuHardwareProfiles.detectHardwareProfile(),
                 mediatekAngleOpenGl = _uiState.value.mediatekAngleOpenGl,
                 aspectRatio = _uiState.value.aspectRatio,
+                localMultiplayerMode = _uiState.value.localMultiplayerMode,
                 audioVolume = _uiState.value.audioVolume,
                 audioFastForwardVolume = _uiState.value.audioFastForwardVolume,
                 audioMuted = _uiState.value.audioMuted,

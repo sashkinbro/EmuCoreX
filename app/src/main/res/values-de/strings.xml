@@ -2329,4 +2329,11 @@
     <string name="discord_presence_playing">Spielt %1$s</string>
     <string name="discord_friends_title">Freunde in EmuCoreX</string>
     <string name="discord_friends_empty">Momentan verwendet keiner deiner Discord-Freunde EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Lokaler Mehrspielermodus</string>
+    <string name="emulation_local_multiplayer_off">Aus</string>
+    <string name="emulation_local_multiplayer_side_by_side">Nebeneinander</string>
+    <string name="emulation_local_multiplayer_stacked">Übereinander</string>
+    <string name="emulation_local_multiplayer_crop">Horizontalen Split zuschneiden</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Split zuschneiden (vertauscht)</string>
+    <string name="emulation_local_multiplayer_help">Dupliziert das fertige Bild für zwei Touch-Spieler. Zuschneidemodi vergrößern einen vorhandenen oberen/unteren Split des Spiels, fügen einem Einzelspiel aber keinen Mehrspielermodus hinzu.</string>
 </resources>

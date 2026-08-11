@@ -2329,4 +2329,11 @@
     <string name="discord_presence_playing">A jogar %1$s</string>
     <string name="discord_friends_title">Amigos no EmuCoreX</string>
     <string name="discord_friends_empty">Nenhum dos seus amigos do Discord está usando o EmuCoreX agora.</string>
+    <string name="emulation_local_multiplayer_title">Multijogador local</string>
+    <string name="emulation_local_multiplayer_off">Desativado</string>
+    <string name="emulation_local_multiplayer_side_by_side">Lado a lado</string>
+    <string name="emulation_local_multiplayer_stacked">Um sobre o outro</string>
+    <string name="emulation_local_multiplayer_crop">Recortar divisão horizontal</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Recortar divisão (invertida)</string>
+    <string name="emulation_local_multiplayer_help">Duplica o quadro final para dois jogadores por toque. Os modos de recorte ampliam a divisão superior/inferior existente no jogo; não adicionam multijogador a um jogo individual.</string>
 </resources>

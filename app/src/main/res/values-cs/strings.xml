@@ -2347,5 +2347,12 @@
     <string name="discord_presence_playing">Hraje %1$s</string>
     <string name="discord_friends_title">Přátelé v EmuCoreX</string>
     <string name="discord_friends_empty">Žádný z vašich přátel na Discordu právě nepoužívá EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Místní hra více hráčů</string>
+    <string name="emulation_local_multiplayer_off">Vypnuto</string>
+    <string name="emulation_local_multiplayer_side_by_side">Vedle sebe</string>
+    <string name="emulation_local_multiplayer_stacked">Nad sebou</string>
+    <string name="emulation_local_multiplayer_crop">Oříznout vodorovné rozdělení</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Oříznout rozdělení (prohozené)</string>
+    <string name="emulation_local_multiplayer_help">Duplikuje výsledný snímek pro dva dotykové hráče. Režimy ořezu zvětší existující horní/dolní rozdělení hry, ale nepřidají hru více hráčů do hry pro jednoho.</string>
 </resources>
 

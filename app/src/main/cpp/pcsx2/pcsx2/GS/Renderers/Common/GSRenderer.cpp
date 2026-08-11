@@ -44,6 +44,45 @@ static constexpr std::array<PresentShader, 8> s_tv_shader_indices = {
 	PresentShader::COMPLEX_FILTER, PresentShader::LOTTES_FILTER,
 	PresentShader::SUPERSAMPLE_4xRGSS, PresentShader::SUPERSAMPLE_AUTO};
 
+static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4& src_uv,
+	const GSVector4& draw_rect, PresentShader shader, float shader_parameter, bool linear)
+{
+	const int mode = std::clamp(GSConfig.LocalMultiplayerMode, 0, 4);
+	if (mode == 0)
+	{
+		g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect, shader, shader_parameter, linear);
+		return;
+	}
+
+	const float width = static_cast<float>(g_gs_device->GetWindowWidth());
+	const float height = static_cast<float>(g_gs_device->GetWindowHeight());
+	const GSVector4 left(0.0f, 0.0f, width * 0.5f, height);
+	const GSVector4 right(width * 0.5f, 0.0f, width, height);
+	const GSVector4 top(0.0f, 0.0f, width, height * 0.5f);
+	const GSVector4 bottom(0.0f, height * 0.5f, width, height);
+
+	if (mode == 1)
+	{
+		g_gs_device->PresentRect(current, src_uv, nullptr, left, shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, src_uv, nullptr, right, shader, shader_parameter, linear);
+	}
+	else if (mode == 2)
+	{
+		g_gs_device->PresentRect(current, src_uv, nullptr, top, shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, src_uv, nullptr, bottom, shader, shader_parameter, linear);
+	}
+	else
+	{
+		const float middle_v = (src_uv.y + src_uv.w) * 0.5f;
+		const GSVector4 first(src_uv.x, src_uv.y, src_uv.z, middle_v);
+		const GSVector4 second(src_uv.x, middle_v, src_uv.z, src_uv.w);
+		g_gs_device->PresentRect(current, mode == 3 ? first : second, nullptr, top,
+			shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, mode == 3 ? second : first, nullptr, bottom,
+			shader, shader_parameter, linear);
+	}
+}
+
 static std::deque<std::thread> s_screenshot_threads;
 static std::mutex s_screenshot_threads_mutex;
 
@@ -862,7 +901,9 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			draw_rect = CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
 				GetVideoMode() == GSVideoMode::SDTV_480P);
-			s_last_draw_rect = draw_rect;
+			s_last_draw_rect = GSConfig.LocalMultiplayerMode == 0 ? draw_rect :
+				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetWindowWidth()),
+					static_cast<float>(g_gs_device->GetWindowHeight()));
 
 			if (GSConfig.CASMode != GSCASMode::Disabled && !IsSGSRPresentActive())
 			{
@@ -894,7 +935,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 				const bool use_sgsr = IsSGSRPresentActive();
 				const float present_shader_parameter = use_sgsr ? static_cast<float>(GSConfig.SGSRMode) : shader_time;
-				g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
+				PresentLocalMultiplayerFrame(current, src_uv, draw_rect,
 					use_sgsr ? PresentShader::SGSR : s_tv_shader_indices[GSConfig.TVShader], present_shader_parameter,
 					use_sgsr ? false : (GSConfig.LinearPresent != GSPostBilinearMode::Off));
 			}
@@ -1153,14 +1194,16 @@ void GSRenderer::PresentCurrentFrame()
 			const GSVector4 draw_rect(CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
 				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
 				GetVideoMode() == GSVideoMode::SDTV_480P));
-			s_last_draw_rect = draw_rect;
+			s_last_draw_rect = GSConfig.LocalMultiplayerMode == 0 ? draw_rect :
+				GSVector4(0.0f, 0.0f, static_cast<float>(g_gs_device->GetWindowWidth()),
+					static_cast<float>(g_gs_device->GetWindowHeight()));
 
 			const u64 current_time = Common::Timer::GetCurrentValue();
 			const float shader_time = static_cast<float>(Common::Timer::ConvertValueToSeconds(current_time - m_shader_time_start));
 
 			const bool use_sgsr = IsSGSRPresentActive();
 			const float present_shader_parameter = use_sgsr ? static_cast<float>(GSConfig.SGSRMode) : shader_time;
-			g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect,
+			PresentLocalMultiplayerFrame(current, src_uv, draw_rect,
 				use_sgsr ? PresentShader::SGSR : s_tv_shader_indices[GSConfig.TVShader], present_shader_parameter,
 				use_sgsr ? false : (GSConfig.LinearPresent != GSPostBilinearMode::Off));
 		}

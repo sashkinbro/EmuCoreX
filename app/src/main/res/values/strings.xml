@@ -2344,4 +2344,11 @@
     <string name="discord_presence_playing">Playing %1$s</string>
     <string name="discord_friends_title">Friends in EmuCoreX</string>
     <string name="discord_friends_empty">No Discord friends are using EmuCoreX right now.</string>
+    <string name="emulation_local_multiplayer_title">Local multiplayer</string>
+    <string name="emulation_local_multiplayer_off">Off</string>
+    <string name="emulation_local_multiplayer_side_by_side">Side by side</string>
+    <string name="emulation_local_multiplayer_stacked">Stacked</string>
+    <string name="emulation_local_multiplayer_crop">Crop horizontal split</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Crop split (swapped)</string>
+    <string name="emulation_local_multiplayer_help">Duplicates the final rendered frame for two touch players. Crop modes enlarge a game’s existing top/bottom split; they do not add multiplayer to a single-player game.</string>
 </resources>

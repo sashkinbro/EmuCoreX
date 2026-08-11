@@ -311,6 +311,7 @@ object EmulatorBridge {
         gpuHardwareProfile: Int = GpuHardwareProfiles.ADRENO,
         mediatekAngleOpenGl: Boolean = false,
         aspectRatio: Int = 1,
+        localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
         displayCrop: DisplayCrop = DisplayCrop.None,
         audioVolume: Int = AudioDefaults.VOLUME_DEFAULT,
         audioFastForwardVolume: Int = AudioDefaults.VOLUME_DEFAULT,
@@ -531,6 +532,17 @@ object EmulatorBridge {
                 add(settingOp("Pad2", "PressureModifier", "float", pressureAmount.toString()))
                 add(upscaleOp(upscaleMultiplier))
                 add(aspectOp(aspectRatio))
+                add(
+                    settingOp(
+                        "EmuCore/GS",
+                        "LocalMultiplayerMode",
+                        "int",
+                        localMultiplayerMode.coerceIn(
+                            AppPreferences.LOCAL_MULTIPLAYER_OFF,
+                            AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED
+                        ).toString()
+                    )
+                )
                 displayCrop.sanitized().let { crop ->
                     add(settingOp("EmuCore/GS", "CropLeft", "int", crop.left.toString()))
                     add(settingOp("EmuCore/GS", "CropTop", "int", crop.top.toString()))
@@ -1172,6 +1184,17 @@ object EmulatorBridge {
         performRuntimeOps(values.map { (key, pixels) ->
             settingOp("EmuCore/GS", key, "int", pixels.toString())
         })
+    }
+
+    suspend fun setLocalMultiplayerMode(mode: Int) {
+        val normalized = mode.coerceIn(
+            AppPreferences.LOCAL_MULTIPLAYER_OFF,
+            AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED
+        )
+        settingsCache["EmuCore/GS:LocalMultiplayerMode"] = normalized.toString()
+        performRuntimeOps(
+            listOf(settingOp("EmuCore/GS", "LocalMultiplayerMode", "int", normalized.toString()))
+        )
     }
 
     suspend fun setCustomDriverPath(path: String) {

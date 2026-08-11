@@ -2326,4 +2326,11 @@
     <string name="discord_presence_playing">%1$s 플레이 중</string>
     <string name="discord_friends_title">EmuCoreX의 친구</string>
     <string name="discord_friends_empty">현재 EmuCoreX를 사용 중인 Discord 친구가 없습니다.</string>
+    <string name="emulation_local_multiplayer_title">로컬 멀티플레이</string>
+    <string name="emulation_local_multiplayer_off">끄기</string>
+    <string name="emulation_local_multiplayer_side_by_side">좌우 배치</string>
+    <string name="emulation_local_multiplayer_stacked">상하 배치</string>
+    <string name="emulation_local_multiplayer_crop">가로 분할 자르기</string>
+    <string name="emulation_local_multiplayer_crop_swapped">분할 자르기(교체)</string>
+    <string name="emulation_local_multiplayer_help">최종 렌더링 프레임을 두 명의 터치 플레이어용으로 복제합니다. 자르기 모드는 게임의 기존 상하 분할 화면을 확대하지만 싱글플레이 게임에 멀티플레이를 추가하지는 않습니다.</string>
 </resources>

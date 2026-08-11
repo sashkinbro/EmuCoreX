@@ -14,6 +14,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -34,6 +35,38 @@ data class SideArtworkGutters(
     val rightPx: Int
 ) {
     val isVisible: Boolean get() = leftPx > 0 || rightPx > 0
+}
+
+data class SideArtworkPreviewLayout(
+    val heightDp: Int,
+    val contentFraction: Float
+)
+
+fun calculateSideArtworkPreviewLayout(widthDp: Int, heightDp: Int): SideArtworkPreviewLayout {
+    val landscape = widthDp > heightDp
+    return if (landscape) {
+        SideArtworkPreviewLayout(
+            heightDp = (heightDp * 0.42f).roundToInt().coerceIn(132, 180),
+            contentFraction = 0.58f
+        )
+    } else {
+        SideArtworkPreviewLayout(
+            heightDp = (heightDp * 0.24f).roundToInt().coerceIn(148, 190),
+            contentFraction = 0.60f
+        )
+    }
+}
+
+fun calculateSideArtworkPreviewGutters(
+    widthPx: Int,
+    contentFraction: Float
+): SideArtworkGutters {
+    if (widthPx <= 0) return SideArtworkGutters(0, 0)
+    val unusedWidth = (widthPx * (1f - contentFraction.coerceIn(0.1f, 1f)))
+        .roundToInt()
+        .coerceAtLeast(0)
+    val left = unusedWidth / 2
+    return SideArtworkGutters(left, unusedWidth - left)
 }
 
 /**
@@ -77,7 +110,9 @@ fun EmulationSideArtworkOverlay(
     aspectRatioMode: Int,
     modifier: Modifier = Modifier,
     nativeDrawRect: FloatArray? = null,
-    preview: Boolean = false
+    preview: Boolean = false,
+    previewContentFraction: Float = 0.60f,
+    dimPercent: Int = 0
 ) {
     if (artwork == EmulationSideArtwork.NONE) return
     val painter = rememberSideArtworkPainter(artwork, revision) ?: return
@@ -86,13 +121,18 @@ fun EmulationSideArtworkOverlay(
         val density = androidx.compose.ui.platform.LocalDensity.current
         val widthPx = with(density) { maxWidth.roundToPx() }
         val heightPx = with(density) { maxHeight.roundToPx() }
-        val gutters = calculateSideArtworkGutters(widthPx, heightPx, aspectRatioMode, nativeDrawRect)
+        val gutters = if (preview) {
+            calculateSideArtworkPreviewGutters(widthPx, previewContentFraction)
+        } else {
+            calculateSideArtworkGutters(widthPx, heightPx, aspectRatioMode, nativeDrawRect)
+        }
         if (!gutters.isVisible) return@BoxWithConstraints
         Image(
             painter = painter,
             contentDescription = null,
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { alpha = 1f - (dimPercent.coerceIn(0, 85) / 100f) }
                 .drawWithContent {
                     if (gutters.leftPx > 0) {
                         clipRect(right = gutters.leftPx.toFloat()) {
@@ -119,6 +159,21 @@ fun EmulationSideArtworkOverlay(
             )
         }
     }
+}
+
+@Composable
+fun EmulationSideArtworkThumbnail(
+    artwork: EmulationSideArtwork,
+    revision: Int,
+    modifier: Modifier = Modifier
+) {
+    val painter = rememberSideArtworkPainter(artwork, revision) ?: return
+    Image(
+        painter = painter,
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop
+    )
 }
 
 @Composable

@@ -875,6 +875,16 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_aspect_ratio),
                         onResetToDefault = { onDraftChange(draft.copy(aspectRatio = defaultProfile.aspectRatio)) }
                     )
+                    SelectionRow(
+                        title = stringResource(R.string.emulation_local_multiplayer_title),
+                        options = localMultiplayerOptions(),
+                        selectedValue = draft.localMultiplayerMode,
+                        onSelected = { onDraftChange(draft.copy(localMultiplayerMode = it)) },
+                        helpText = stringResource(R.string.emulation_local_multiplayer_help),
+                        onResetToDefault = {
+                            onDraftChange(draft.copy(localMultiplayerMode = defaultProfile.localMultiplayerMode))
+                        }
+                    )
                 }
                 EditorSection(title = stringResource(R.string.game_settings_manager_section_graphics)) {
                     SelectionRow(
@@ -1731,6 +1741,16 @@ private fun GameSettingsEditorDialog(
                                 onSelected = { draft = draft.copy(aspectRatio = it) },
                                 helpText = stringResource(R.string.settings_help_aspect_ratio),
                                 onResetToDefault = { draft = draft.copy(aspectRatio = defaultProfile.aspectRatio) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.emulation_local_multiplayer_title),
+                                options = localMultiplayerOptions(),
+                                selectedValue = draft.localMultiplayerMode,
+                                onSelected = { draft = draft.copy(localMultiplayerMode = it) },
+                                helpText = stringResource(R.string.emulation_local_multiplayer_help),
+                                onResetToDefault = {
+                                    draft = draft.copy(localMultiplayerMode = defaultProfile.localMultiplayerMode)
+                                }
                             )
                         }
                         EditorSection(title = stringResource(R.string.settings_customization_touch_controls_section)) {
@@ -3431,6 +3451,15 @@ private fun eeCycleRateOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
+private fun localMultiplayerOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.LOCAL_MULTIPLAYER_OFF to stringResource(R.string.emulation_local_multiplayer_off),
+    AppPreferences.LOCAL_MULTIPLAYER_SIDE_BY_SIDE to stringResource(R.string.emulation_local_multiplayer_side_by_side),
+    AppPreferences.LOCAL_MULTIPLAYER_STACKED to stringResource(R.string.emulation_local_multiplayer_stacked),
+    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP to stringResource(R.string.emulation_local_multiplayer_crop),
+    AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED to stringResource(R.string.emulation_local_multiplayer_crop_swapped)
+)
+
+@Composable
 private fun eeCycleSkipOptions(): List<Pair<Int, String>> = listOf(
     0 to stringResource(R.string.settings_ee_cycle_disabled),
     1 to stringResource(R.string.settings_ee_cycle_mild),
@@ -3755,6 +3784,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         mediatekAngleOpenGl = mediatekAngleOpenGl,
         upscaleMultiplier = upscaleMultiplier,
         aspectRatio = aspectRatio,
+        localMultiplayerMode = localMultiplayerMode,
         displayCrop = displayCrop,
         showFps = showFps,
         fpsOverlayMode = fpsOverlayMode,
@@ -3860,6 +3890,11 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl, defaultProfile.mediatekAngleOpenGl),
         upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier, defaultProfile.upscaleMultiplier),
         aspectRatio = pick("aspectRatio", aspectRatio, defaultProfile.aspectRatio),
+        localMultiplayerMode = pick(
+            "localMultiplayerMode",
+            localMultiplayerMode,
+            defaultProfile.localMultiplayerMode
+        ),
         displayCrop = pick("displayCrop", displayCrop, defaultProfile.displayCrop),
         showFps = pick("showFps", showFps, defaultProfile.showFps),
         fpsOverlayMode = pick("fpsOverlayMode", fpsOverlayMode, defaultProfile.fpsOverlayMode),

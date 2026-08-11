@@ -20,6 +20,7 @@ data class PerGameSettings(
     val mediatekAngleOpenGl: Boolean = false,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
+    val localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
     val displayCrop: DisplayCrop = DisplayCrop.None,
     val showFps: Boolean = false,
     val fpsOverlayMode: Int = AppPreferences.FPS_OVERLAY_MODE_DETAILED,
@@ -243,6 +244,10 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         mediatekAngleOpenGl = optBoolean("mediatekAngleOpenGl", false),
         upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1).let(::sanitizeAspectRatioValue),
+        localMultiplayerMode = optInt(
+            "localMultiplayerMode",
+            AppPreferences.LOCAL_MULTIPLAYER_OFF
+        ).let(::sanitizeLocalMultiplayerMode),
         displayCrop = optJSONObject("displayCrop")?.let { crop ->
             DisplayCrop(
                 left = crop.optInt("left", 0),
@@ -415,6 +420,9 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("mediatekAngleOpenGl")) put("mediatekAngleOpenGl", mediatekAngleOpenGl)
         if (shouldWrite("upscaleMultiplier")) put("upscaleMultiplier", upscaleMultiplier.toDouble())
         if (shouldWrite("aspectRatio")) put("aspectRatio", sanitizeAspectRatioValue(aspectRatio))
+        if (shouldWrite("localMultiplayerMode")) {
+            put("localMultiplayerMode", sanitizeLocalMultiplayerMode(localMultiplayerMode))
+        }
         if (shouldWrite("displayCrop")) put("displayCrop", JSONObject().apply {
             val crop = displayCrop.sanitized()
             put("left", crop.left)
@@ -634,6 +642,13 @@ private fun sanitizeRendererValue(value: Int): Int {
 
 private fun sanitizeAspectRatioValue(value: Int): Int {
     return if (value in 0..4) value else 1
+}
+
+private fun sanitizeLocalMultiplayerMode(value: Int): Int {
+    return value.coerceIn(
+        AppPreferences.LOCAL_MULTIPLAYER_OFF,
+        AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED
+    )
 }
 
 private fun sanitizeFloatRoundMode(value: Int, fallback: Int): Int {

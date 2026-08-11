@@ -2329,4 +2329,11 @@
     <string name="discord_presence_playing">Joue à %1$s</string>
     <string name="discord_friends_title">Amis sur EmuCoreX</string>
     <string name="discord_friends_empty">Aucun de vos amis Discord n’utilise EmuCoreX pour le moment.</string>
+    <string name="emulation_local_multiplayer_title">Multijoueur local</string>
+    <string name="emulation_local_multiplayer_off">Désactivé</string>
+    <string name="emulation_local_multiplayer_side_by_side">Côte à côte</string>
+    <string name="emulation_local_multiplayer_stacked">Superposé</string>
+    <string name="emulation_local_multiplayer_crop">Recadrer l’écran partagé horizontal</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Recadrer le partage (inversé)</string>
+    <string name="emulation_local_multiplayer_help">Duplique l’image finale pour deux joueurs tactiles. Les modes de recadrage agrandissent le partage haut/bas existant du jeu, mais n’ajoutent pas de multijoueur à un jeu solo.</string>
 </resources>

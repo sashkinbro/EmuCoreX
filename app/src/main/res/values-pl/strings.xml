@@ -2349,6 +2349,13 @@
     <string name="discord_presence_playing">Gra w %1$s</string>
     <string name="discord_friends_title">Znajomi w EmuCoreX</string>
     <string name="discord_friends_empty">Żaden z Twoich znajomych na Discordzie nie używa teraz EmuCoreX.</string>
+    <string name="emulation_local_multiplayer_title">Lokalny tryb wieloosobowy</string>
+    <string name="emulation_local_multiplayer_off">Wył.</string>
+    <string name="emulation_local_multiplayer_side_by_side">Obok siebie</string>
+    <string name="emulation_local_multiplayer_stacked">Jeden nad drugim</string>
+    <string name="emulation_local_multiplayer_crop">Przytnij podział poziomy</string>
+    <string name="emulation_local_multiplayer_crop_swapped">Przytnij podział (zamieniony)</string>
+    <string name="emulation_local_multiplayer_help">Powiela końcową klatkę dla dwóch graczy dotykowych. Tryby przycinania powiększają istniejący w grze podział góra/dół, ale nie dodają trybu wieloosobowego do gry jednoosobowej.</string>
 </resources>
 
 

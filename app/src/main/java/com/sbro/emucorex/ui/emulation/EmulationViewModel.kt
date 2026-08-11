@@ -183,6 +183,7 @@ data class EmulationUiState(
     val renderer: Int = RendererDefaults.defaultForHardware(),
     val upscale: Float = 1f,
     val aspectRatio: Int = 1,
+    val localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
     val displayCrop: DisplayCrop = DisplayCrop.None,
     val performancePreset: Int = PerformancePresets.CUSTOM,
     val enableInstantVu1: Boolean = true,
@@ -280,6 +281,7 @@ private data class EmulationLaunchConfig(
     val gpuHardwareProfile: Int,
     val mediatekAngleOpenGl: Boolean,
     val aspectRatio: Int,
+    val localMultiplayerMode: Int,
     val displayCrop: DisplayCrop,
     val audioVolume: Int,
     val audioFastForwardVolume: Int,
@@ -398,6 +400,7 @@ private data class LiveRuntimeSnapshot(
     val renderer: Int,
     val upscale: Float,
     val aspectRatio: Int,
+    val localMultiplayerMode: Int,
     val displayCrop: DisplayCrop,
     val performancePreset: Int,
     val enableInstantVu1: Boolean,
@@ -868,6 +871,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.aspectRatio.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(aspectRatio = value) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.localMultiplayerMode.collect { value ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(localMultiplayerMode = value) }
             }
         }
         viewModelScope.launch {
@@ -1536,6 +1544,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gpuHardwareProfile = config.gpuHardwareProfile,
                     mediatekAngleOpenGl = config.mediatekAngleOpenGl,
                     aspectRatio = config.aspectRatio,
+                    localMultiplayerMode = config.localMultiplayerMode,
                     displayCrop = config.displayCrop,
                     audioVolume = config.audioVolume,
                     audioFastForwardVolume = config.audioFastForwardVolume,
@@ -1775,6 +1784,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     renderer = liveRuntime.renderer,
                     upscale = liveRuntime.upscale,
                     aspectRatio = liveRuntime.aspectRatio,
+                    localMultiplayerMode = liveRuntime.localMultiplayerMode,
                     displayCrop = liveRuntime.displayCrop,
                     performancePreset = liveRuntime.performancePreset,
                     enableInstantVu1 = liveRuntime.enableInstantVu1,
@@ -2555,6 +2565,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setEnableMtvu(effectiveEnabled)
             }
             EmulatorBridge.setSetting("EmuCore/Speedhacks", "vuThread", "bool", effectiveEnabled.toString())
+            updateCrashContext()
+        }
+    }
+
+    fun setLocalMultiplayerMode(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(
+                AppPreferences.LOCAL_MULTIPLAYER_OFF,
+                AppPreferences.LOCAL_MULTIPLAYER_HORIZONTAL_CROP_SWAPPED
+            )
+            persistRuntimeState(_uiState.value.copy(localMultiplayerMode = normalized)) {
+                preferences.setLocalMultiplayerMode(normalized)
+            }
+            EmulatorBridge.setLocalMultiplayerMode(normalized)
             updateCrashContext()
         }
     }
@@ -3695,6 +3719,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gpuHardwareProfile = settings.gpuHardwareProfile,
             mediatekAngleOpenGl = settings.mediatekAngleOpenGl,
             aspectRatio = settings.aspectRatio,
+            localMultiplayerMode = settings.localMultiplayerMode,
             displayCrop = settings.displayCrop,
             audioVolume = settings.audioVolume,
             audioFastForwardVolume = settings.audioFastForwardVolume,
@@ -3826,6 +3851,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = settings.renderer,
             upscale = settings.upscaleMultiplier,
             aspectRatio = settings.aspectRatio,
+            localMultiplayerMode = settings.localMultiplayerMode,
             displayCrop = settings.displayCrop,
             performancePreset = settings.performancePreset,
             enableInstantVu1 = settings.enableInstantVu1,
@@ -3931,6 +3957,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl) { mediatekAngleOpenGl },
             upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            localMultiplayerMode = pick("localMultiplayerMode", localMultiplayerMode) { localMultiplayerMode },
             displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             instantVu1 = pick("enableInstantVu1", instantVu1) { enableInstantVu1 },
             mtvu = pick("enableMtvu", mtvu) { enableMtvu },
@@ -4045,6 +4072,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = pick("renderer", renderer) { renderer },
             upscale = pick("upscaleMultiplier", upscale) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
+            localMultiplayerMode = pick("localMultiplayerMode", localMultiplayerMode) { localMultiplayerMode },
             displayCrop = pick("displayCrop", displayCrop) { displayCrop },
             enableInstantVu1 = pick("enableInstantVu1", enableInstantVu1) { enableInstantVu1 },
             enableMtvu = pick("enableMtvu", enableMtvu) { enableMtvu },
@@ -4162,6 +4190,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             renderer = renderer,
             upscaleMultiplier = upscale,
             aspectRatio = aspectRatio,
+            localMultiplayerMode = localMultiplayerMode,
             displayCrop = displayCrop,
             showFps = showFps,
             fpsOverlayMode = fpsOverlayMode,
@@ -4256,6 +4285,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (renderer != preferences.renderer.first()) add("renderer")
             if (upscale != preferences.upscaleMultiplier.first()) add("upscaleMultiplier")
             if (aspectRatio != preferences.aspectRatio.first()) add("aspectRatio")
+            if (localMultiplayerMode != preferences.localMultiplayerMode.first()) add("localMultiplayerMode")
             if (displayCrop != preferences.displayCrop.first()) add("displayCrop")
             if (showFps != globalShowFps) add("showFps")
             if (fpsOverlayMode != globalFpsOverlayMode) add("fpsOverlayMode")
@@ -4791,6 +4821,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         })
         NativeApp.setCrashContextString("emu_upscale", state.upscale.toString())
         NativeApp.setCrashContextInt("emu_aspect_ratio", state.aspectRatio)
+        NativeApp.setCrashContextInt("emu_local_multiplayer_mode", state.localMultiplayerMode)
         NativeApp.setCrashContextInt("emu_crop_left", state.displayCrop.left)
         NativeApp.setCrashContextInt("emu_crop_top", state.displayCrop.top)
         NativeApp.setCrashContextInt("emu_crop_right", state.displayCrop.right)
