@@ -95,6 +95,7 @@ data class SettingsUiState(
     val shaderChainEnabled: Boolean = false,
     val shaderChainPreset: String = "",
     val shaderPresets: List<RetroArchShaderPreset> = emptyList(),
+    val isShaderPackInstalled: Boolean = false,
     val isShaderPackBusy: Boolean = false,
     val shaderPackMessageResId: Int? = null,
     val touchControlVisualStyle: TouchControlVisualStyle = TouchControlVisualStyle.CLASSIC,
@@ -804,7 +805,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshShaderPresets() = viewModelScope.launch(Dispatchers.IO) {
         val presets = retroArchShaderRepository.listPresets()
-        _uiState.value = _uiState.value.copy(shaderPresets = presets)
+        _uiState.value = _uiState.value.copy(
+            shaderPresets = presets,
+            isShaderPackInstalled = retroArchShaderRepository.hasInstalledPack()
+        )
     }
 
     fun setShaderChainEnabled(enabled: Boolean) = viewModelScope.launch {
@@ -821,8 +825,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainPreset", "string", path)
     }
 
-    fun downloadOfficialShaderPack() = installShaderPack {
-        retroArchShaderRepository.downloadOfficialPack()
+    fun downloadOfficialShaderPack() {
+        if (_uiState.value.isShaderPackInstalled) return
+        installShaderPack {
+            retroArchShaderRepository.downloadOfficialPack()
+        }
     }
 
     fun importShaderPack(uri: Uri) = installShaderPack {
@@ -837,6 +844,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(
             isShaderPackBusy = false,
             shaderPresets = presets,
+            isShaderPackInstalled = retroArchShaderRepository.hasInstalledPack(),
             shaderPackMessageResId = if (result.isSuccess) {
                 com.sbro.emucorex.R.string.settings_shader_pack_installed
             } else {

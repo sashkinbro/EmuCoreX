@@ -2818,33 +2818,11 @@ private fun EmulationSidebarMenu(
                             .padding(horizontal = 18.dp, vertical = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = uiState.currentGameTitle.ifBlank { stringResource(R.string.emulation_sidebar_title) },
-                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-                            androidx.compose.material3.IconButton(
-                                onClick = onExit,
-                                enabled = !uiState.isActionInProgress,
-                                colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f),
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Rounded.ExitToApp,
-                                    contentDescription = stringResource(R.string.emulation_exit)
-                                )
-                            }
-                        }
+                        Text(
+                            text = uiState.currentGameTitle.ifBlank { stringResource(R.string.emulation_sidebar_title) },
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -2879,18 +2857,35 @@ private fun EmulationSidebarMenu(
 
                 when (selectedMenuTab) {
                     EmulationMenuTab.Session -> {
-                        MenuButton(
-                            modifier = Modifier.focusRequester(firstMenuFocusRequester),
-                            icon = if (uiState.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
-                            text = stringResource(if (uiState.isPaused) R.string.emulation_resume else R.string.emulation_pause),
-                            onClick = onPauseToggle,
-                            enabled = !uiState.isActionInProgress,
-                            containerColor = if (!uiState.isPaused) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f)
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                MenuButton(
+                                    modifier = Modifier.focusRequester(firstMenuFocusRequester),
+                                    icon = if (uiState.isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                                    text = stringResource(if (uiState.isPaused) R.string.emulation_resume else R.string.emulation_pause),
+                                    onClick = onPauseToggle,
+                                    enabled = !uiState.isActionInProgress,
+                                    containerColor = if (!uiState.isPaused) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.46f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                    }
+                                )
                             }
-                        )
+                            Box(modifier = Modifier.weight(1f)) {
+                                MenuButton(
+                                    icon = Icons.AutoMirrored.Rounded.ExitToApp,
+                                    text = stringResource(R.string.emulation_exit),
+                                    onClick = onExit,
+                                    enabled = !uiState.isActionInProgress,
+                                    isDestructive = true,
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.28f)
+                                )
+                            }
+                        }
 
                         MenuButton(
                             icon = Icons.Rounded.Album,

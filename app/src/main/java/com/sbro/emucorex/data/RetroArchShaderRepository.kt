@@ -31,6 +31,11 @@ class RetroArchShaderRepository(private val context: Context) {
             val canonicalRoot = destination.canonicalPath + File.separator
             return File(destination, relative).canonicalPath.startsWith(canonicalRoot)
         }
+
+        internal fun containsPresetFiles(directory: File): Boolean =
+            directory.exists() && directory.walkTopDown().any {
+                it.isFile && it.extension.equals("slangp", ignoreCase = true)
+            }
     }
 
     private val root: File
@@ -49,6 +54,8 @@ class RetroArchShaderRepository(private val context: Context) {
             .sortedBy { it.label.lowercase() }
             .toList()
     }
+
+    fun hasInstalledPack(): Boolean = containsPresetFiles(root)
 
     fun downloadOfficialPack(): Result<Int> = runCatching {
         val archive = File(context.cacheDir, "retroarch-shaders-${UUID.randomUUID()}.zip")

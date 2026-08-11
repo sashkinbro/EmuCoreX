@@ -50,6 +50,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -1419,14 +1420,21 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setShaderChainPreset("") }
                         )
                         SettingsItem(
-                            icon = Icons.Rounded.SystemUpdateAlt,
+                            icon = if (uiState.isShaderPackInstalled) {
+                                Icons.Rounded.CheckCircle
+                            } else {
+                                Icons.Rounded.SystemUpdateAlt
+                            },
                             label = stringResource(R.string.settings_shader_pack_download),
                             value = if (uiState.isShaderPackBusy) {
                                 stringResource(R.string.settings_shader_pack_working)
+                            } else if (uiState.isShaderPackInstalled) {
+                                stringResource(R.string.settings_shader_pack_installed)
                             } else {
                                 stringResource(R.string.settings_shader_pack_download_desc)
                             },
-                            onClick = viewModel::downloadOfficialShaderPack
+                            onClick = viewModel::downloadOfficialShaderPack,
+                            enabled = !uiState.isShaderPackBusy && !uiState.isShaderPackInstalled
                         )
                         SettingsItem(
                             icon = Icons.Rounded.FolderOpen,
@@ -5155,7 +5163,8 @@ private fun SettingsItem(
     value: String,
     onClick: () -> Unit,
     helpText: String? = null,
-    border: BorderStroke? = null
+    border: BorderStroke? = null,
+    enabled: Boolean = true
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -5177,6 +5186,7 @@ private fun SettingsItem(
                 }
             )
             .gamepadFocusableCard(
+                enabled = enabled,
                 shape = shape,
                 interactionSource = interactionSource,
                 addFocusTarget = false
@@ -5185,6 +5195,7 @@ private fun SettingsItem(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         border = border,
         interactionSource = interactionSource,
+        enabled = enabled,
         onClick = debouncedClick
     ) {
         Row(
@@ -5195,13 +5206,15 @@ private fun SettingsItem(
                 modifier = Modifier
                     .size(38.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -5215,7 +5228,7 @@ private fun SettingsItem(
                     Text(
                         text = label,
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.5f),
                         modifier = Modifier.weight(1f, fill = false)
                     )
                     helpText?.let {
@@ -5230,7 +5243,7 @@ private fun SettingsItem(
                 Text(
                     text = value,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.6f)
                 )
             }
         }
