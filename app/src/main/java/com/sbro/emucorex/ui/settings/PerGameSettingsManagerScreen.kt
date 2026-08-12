@@ -979,7 +979,8 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_shader_preset),
                         leadingOptions = listOf(
                             SHADER_PRESET_USE_GLOBAL to stringResource(R.string.controls_editor_global_scope)
-                        )
+                        ),
+                        cardHorizontalPadding = 0.dp
                     )
                     ToggleRow(
                         title = stringResource(R.string.settings_fxaa),

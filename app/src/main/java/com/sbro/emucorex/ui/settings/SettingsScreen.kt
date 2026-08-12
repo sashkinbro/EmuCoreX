@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -155,6 +156,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -5253,7 +5255,8 @@ private fun SettingsItem(
     enabled: Boolean = true,
     progressVisible: Boolean = false,
     progress: Float? = null,
-    progressLabel: String? = null
+    progressLabel: String? = null,
+    horizontalPadding: Dp = 16.dp
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
@@ -5264,7 +5267,7 @@ private fun SettingsItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = horizontalPadding)
             .then(
                 if (tvUiEnabled && helpText != null) {
                     Modifier
@@ -6023,12 +6026,14 @@ internal fun ShaderPresetSelector(
     selectedPath: String,
     onSelect: (String) -> Unit,
     helpText: String,
-    leadingOptions: List<Pair<String, String>> = emptyList()
+    leadingOptions: List<Pair<String, String>> = emptyList(),
+    cardHorizontalPadding: Dp = 16.dp
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var expandedCategoryKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val categoryListState = rememberLazyListState()
     val noneLabel = stringResource(R.string.settings_shader_preset_none)
     val selectedLabel = leadingOptions.firstOrNull { (path, _) -> path == selectedPath }?.second
         ?: presets
@@ -6047,7 +6052,8 @@ internal fun ShaderPresetSelector(
             expandedCategoryKey = null
             showDialog = true
         },
-        helpText = helpText
+        helpText = helpText,
+        horizontalPadding = cardHorizontalPadding
     )
 
     if (showDialog) {
@@ -6229,6 +6235,7 @@ internal fun ShaderPresetSelector(
                                     ShaderPresetCategoryList(
                                         groups = groups,
                                         selectedPath = selectedPath,
+                                        listState = categoryListState,
                                         onOpenCategory = { expandedCategoryKey = it }
                                     )
                                 } else {
@@ -6337,9 +6344,11 @@ internal fun shaderPresetCategoryTitle(category: String): String {
 private fun ShaderPresetCategoryList(
     groups: List<ShaderPresetDialogGroup>,
     selectedPath: String,
+    listState: LazyListState,
     onOpenCategory: (String) -> Unit
 ) {
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .tvFocusGroup(),
