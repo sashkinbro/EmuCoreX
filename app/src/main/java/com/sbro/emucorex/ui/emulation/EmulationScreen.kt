@@ -5760,8 +5760,10 @@ private fun LiveSelectionRow(
             }
         } else if (horizontalScrolling) {
             LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalViewportBleed(18.dp),
+                contentPadding = PaddingValues(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(options, key = { it.value }) { option ->
