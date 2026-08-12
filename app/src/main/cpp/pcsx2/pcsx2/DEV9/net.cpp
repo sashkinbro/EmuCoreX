@@ -16,6 +16,7 @@
 #include "pcap_io.h"
 #include "sockets.h"
 #include "LocalLinkAdapter.h"
+#include "InternetLinkAdapter.h"
 
 #include "PacketReader/EthernetFrame.h"
 #include "PacketReader/IP/IP_Packet.h"
@@ -81,6 +82,9 @@ NetAdapter* GetNetAdapter()
 			break;
 		case Pcsx2Config::DEV9Options::NetApi::LocalLink:
 			na = static_cast<NetAdapter*>(new LocalLinkAdapter());
+			break;
+		case Pcsx2Config::DEV9Options::NetApi::InternetLink:
+			na = static_cast<NetAdapter*>(new InternetLinkAdapter());
 			break;
 		default:
 			Console.Error("DEV9: no network backend for EthApi=%d, Ethernet stays off (a stale "

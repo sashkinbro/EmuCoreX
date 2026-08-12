@@ -82,6 +82,7 @@ import com.sbro.emucorex.ui.settings.ControlsLayoutEditorHostScreen
 import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import com.sbro.emucorex.ui.settings.SettingsViewModel
+import com.sbro.emucorex.ui.settings.NetworkModesScreen
 import com.sbro.emucorex.ui.textures.TextureManagerScreen
 import com.sbro.emucorex.ui.theme.ThemeManagerScreen
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
@@ -131,6 +132,9 @@ internal fun EmulationRoute.isMeaningfulReviewSession(): Boolean =
 
 @Serializable
 data class SettingsRoute(val tab: String = "general")
+
+@Serializable
+object NetworkModesRoute
 
 @Serializable
 object LanguageSettingsRoute
@@ -895,9 +899,21 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenNetworkModes = {
+                            navController.navigate(NetworkModesRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         viewModel = settingsViewModel
                     )
                 }
+            }
+
+            composable<NetworkModesRoute> {
+                NetworkModesScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
             }
 
             composable<LanguageSettingsRoute> {

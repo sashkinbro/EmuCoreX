@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings as AndroidSettings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,7 +19,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -33,8 +31,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,9 +43,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -57,38 +55,38 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Gamepad
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.Palette
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RateReview
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.SaveAs
 import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.ScreenRotation
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SettingsSuggest
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Star
@@ -102,7 +100,6 @@ import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WarningAmber
-import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -110,9 +107,9 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -135,15 +132,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
@@ -153,8 +149,8 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -162,34 +158,26 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.R
-import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AudioDefaults
+import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.GpuHardwareProfiles
+import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.ProPurchaseTier
-import com.sbro.emucorex.core.availableProSupportOffers
-import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.TvUiPolicy
+import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.core.buildUpscaleOptions
 import com.sbro.emucorex.core.upscaleKeyToMultiplier
 import com.sbro.emucorex.core.upscaleMultiplierValue
-import com.sbro.emucorex.ui.common.TvStoragePickerHost
-import com.sbro.emucorex.ui.common.TvStorageRequest
-import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
-import com.sbro.emucorex.ui.common.tvFocusGroup
-import com.sbro.emucorex.core.utils.NetworkAdapterCollector
-import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppFontChoice
+import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.CheatRepository
@@ -198,54 +186,59 @@ import com.sbro.emucorex.data.CustomThemeConfig
 import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.DisplayCrop
-import com.sbro.emucorex.data.HomeBackgroundRepository
-import com.sbro.emucorex.data.HomeBackgroundPreset
-import com.sbro.emucorex.data.HomeBackgroundType
+import com.sbro.emucorex.data.DrawerItemId
+import com.sbro.emucorex.data.DrawerVisualStyle
 import com.sbro.emucorex.data.EmulationSideArtwork
 import com.sbro.emucorex.data.EmulationSideArtworkRepository
-import com.sbro.emucorex.data.TouchControlVisualStyle
-import com.sbro.emucorex.data.TouchControlPressEffect
-import com.sbro.emucorex.data.DrawerItemId
-import com.sbro.emucorex.data.GameMenuTabId
-import com.sbro.emucorex.data.GameMenuSectionId
 import com.sbro.emucorex.data.GameMenuLayoutStyle
-import com.sbro.emucorex.data.DrawerVisualStyle
+import com.sbro.emucorex.data.GameMenuSectionId
+import com.sbro.emucorex.data.GameMenuTabId
+import com.sbro.emucorex.data.HomeBackgroundPreset
+import com.sbro.emucorex.data.HomeBackgroundRepository
+import com.sbro.emucorex.data.HomeBackgroundType
 import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
-import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.PerGameSettingsRepository
+import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.RetroArchShaderPreset
-import com.sbro.emucorex.data.ShaderPackInstallStage
 import com.sbro.emucorex.data.SettingsBackupRepository
 import com.sbro.emucorex.data.SettingsSnapshot
+import com.sbro.emucorex.data.ShaderPackInstallStage
+import com.sbro.emucorex.data.TouchControlPressEffect
+import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.formatDownloadBytes
-import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
-import com.sbro.emucorex.ui.home.calculateHomeGridColumnCount
-import com.sbro.emucorex.ui.common.NavigationBackButton
-import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
-import com.sbro.emucorex.ui.common.ScrollableFilterTabRow
-import com.sbro.emucorex.ui.common.RequestFocusOnResume
-import com.sbro.emucorex.ui.common.ScreenTopBar
-import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
 import com.sbro.emucorex.ui.common.EmulationSideArtworkThumbnail
-import com.sbro.emucorex.ui.common.calculateSideArtworkPreviewLayout
+import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
+import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
+import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
+import com.sbro.emucorex.ui.common.RequestFocusOnResume
+import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.ScrollableFilterTabRow
+import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.SettingsStyledDialog
+import com.sbro.emucorex.ui.common.TvStoragePickerHost
+import com.sbro.emucorex.ui.common.TvStorageRequest
+import com.sbro.emucorex.ui.common.VectorAnalogStick
+import com.sbro.emucorex.ui.common.VectorOverlayButton
+import com.sbro.emucorex.ui.common.appScreenTopPadding
+import com.sbro.emucorex.ui.common.calculateSideArtworkPreviewLayout
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
-import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
-import com.sbro.emucorex.ui.common.VectorOverlayButton
-import com.sbro.emucorex.ui.common.VectorAnalogStick
-import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
+import com.sbro.emucorex.ui.common.tvFocusGroup
+import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
+import com.sbro.emucorex.ui.home.calculateHomeGridColumnCount
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.ThemeMode
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 
 private enum class SettingsTab {
     General, Graphics, Controls, Emulation, Audio, Fixes, Library, Network, Customization, GameMenu, Updates, Pro, About
@@ -263,6 +256,7 @@ fun SettingsScreen(
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
     onOpenThemeManager: (() -> Unit)? = null,
     onOpenTouchControlCreator: (() -> Unit)? = null,
+    onOpenNetworkModes: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -573,6 +567,7 @@ fun SettingsScreen(
                 onOpenControlsLayoutEditor = onOpenControlsLayoutEditor,
                 onOpenThemeManager = onOpenThemeManager,
                 onOpenTouchControlCreator = onOpenTouchControlCreator,
+                onOpenNetworkModes = onOpenNetworkModes,
                 viewModel = viewModel,
                 topInset = 0.dp,
                 modifier = Modifier
@@ -1110,7 +1105,8 @@ private fun SettingsContent(
     onOpenGameDbBrowser: (() -> Unit)? = null,
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
     onOpenThemeManager: (() -> Unit)? = null,
-    onOpenTouchControlCreator: (() -> Unit)? = null
+    onOpenTouchControlCreator: (() -> Unit)? = null,
+    onOpenNetworkModes: (() -> Unit)? = null
 ) {
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val defaults = remember { SettingsSnapshot() }
@@ -3101,7 +3097,19 @@ private fun SettingsContent(
                 }
 
                 SettingsTab.Network -> {
-                    NetworkSettingsTab(uiState, context, defaults, viewModel)
+                    SettingsSection(title = stringResource(R.string.settings_network_tab)) {
+                        SettingsItem(
+                            icon = Icons.Rounded.Link,
+                            label = stringResource(R.string.network_hub_title),
+                            value = stringResource(R.string.network_hub_entry_desc),
+                            helpText = stringResource(R.string.network_hub_entry_help),
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)
+                            ),
+                            onClick = { onOpenNetworkModes?.invoke() }
+                        )
+                    }
                 }
 
                 SettingsTab.Pro -> {
@@ -4397,295 +4405,6 @@ private fun gameMenuSectionLabel(section: GameMenuSectionId): String = when (sec
 }
 
 @Composable
-private fun NetworkSettingsTab(
-    uiState: SettingsUiState,
-    context: android.content.Context,
-    defaults: SettingsSnapshot,
-    viewModel: SettingsViewModel
-) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    var adapterRefreshKey by remember { mutableIntStateOf(0) }
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) adapterRefreshKey++
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    val adapters = remember(context, adapterRefreshKey) {
-        NetworkAdapterCollector.collectAdapters(context)
-            .filter { adapter ->
-                adapter.isUp && !adapter.isLoopback && adapter.ipAddresses.any { !it.contains(':') }
-            }
-    }
-    val devices = remember(adapters, uiState.dev9EthernetDevice) {
-        buildList {
-            add("Auto" to "Auto")
-            adapters.forEach { adapter ->
-                add(adapter.name to "${adapter.displayName} (${adapter.name})")
-            }
-            if (uiState.dev9EthernetDevice != "Auto" && none { it.first == uiState.dev9EthernetDevice }) {
-                add(uiState.dev9EthernetDevice to uiState.dev9EthernetDevice)
-            }
-        }.distinctBy { it.first }
-    }
-    val dnsModes = listOf(
-        AppPreferences.DEV9_DNS_MODE_AUTO to stringResource(R.string.settings_network_dns_mode_auto),
-        AppPreferences.DEV9_DNS_MODE_MANUAL to stringResource(R.string.settings_network_dns_mode_manual),
-        AppPreferences.DEV9_DNS_MODE_INTERNAL to stringResource(R.string.settings_network_dns_mode_internal)
-    )
-    val localAddresses: List<String> = remember(adapters) {
-        adapters.asSequence()
-            .filterNot { it.displayName == "VPN" || it.displayName == "Mobile data" }
-            .flatMap { it.ipAddresses.asSequence() }
-            .filter(::isPrivateIpv4)
-            .distinct()
-            .toList()
-    }
-
-    SettingsSection(title = stringResource(R.string.settings_network_tab)) {
-        SettingsInlineNote(stringResource(R.string.settings_network_summary))
-        val localLinkActive = uiState.dev9LocalLinkMode != AppPreferences.DEV9_LOCAL_LINK_OFF
-        ToggleItem(
-            icon = Icons.Rounded.Link,
-            title = stringResource(R.string.settings_network_enable),
-            subtitle = stringResource(R.string.settings_network_enable_desc),
-            checked = uiState.dev9EthernetEnabled || localLinkActive,
-            onCheckedChange = { enabled ->
-                viewModel.setDev9EthernetEnabled(enabled || localLinkActive)
-            },
-            helpText = stringResource(R.string.settings_network_enable_help),
-            onResetToDefault = {
-                viewModel.setDev9EthernetEnabled(defaults.dev9EthernetEnabled || localLinkActive)
-            }
-        )
-        ChoiceSection(
-            title = stringResource(R.string.settings_network_mode),
-            options = listOf(
-                AppPreferences.DEV9_LOCAL_LINK_OFF to stringResource(R.string.settings_network_mode_online),
-                AppPreferences.DEV9_LOCAL_LINK_HOST to stringResource(R.string.settings_network_mode_local_host),
-                AppPreferences.DEV9_LOCAL_LINK_JOIN to stringResource(R.string.settings_network_mode_local_join)
-            ),
-            selectedValue = uiState.dev9LocalLinkMode,
-            onSelect = viewModel::setDev9LocalLinkMode,
-            helpText = stringResource(R.string.settings_network_mode_help),
-            onResetToDefault = { viewModel.setDev9LocalLinkMode(defaults.dev9LocalLinkMode) }
-        )
-        if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) {
-            SettingsItem(
-                icon = Icons.Rounded.Link,
-                label = stringResource(R.string.settings_network_api),
-                value = stringResource(R.string.settings_network_api_sockets),
-                onClick = {}
-            )
-            ChoiceSection(
-                title = stringResource(R.string.settings_network_adapter),
-                options = devices.mapIndexed { index, (_, label) -> index to label },
-                selectedValue = devices.indexOfFirst { it.first == uiState.dev9EthernetDevice }.coerceAtLeast(0),
-                onSelect = { index -> devices.getOrNull(index)?.first?.let(viewModel::setDev9EthernetDevice) },
-                helpText = stringResource(R.string.settings_network_adapter_help),
-                onResetToDefault = { viewModel.setDev9EthernetDevice(defaults.dev9EthernetDevice) }
-            )
-        } else {
-            SettingsInlineNote(stringResource(R.string.settings_network_local_summary))
-            SettingsItem(
-                icon = Icons.Rounded.Link,
-                label = stringResource(R.string.settings_network_open_wifi_settings),
-                value = stringResource(R.string.settings_network_open_wifi_settings_desc),
-                onClick = {
-                    runCatching { context.startActivity(Intent(AndroidSettings.ACTION_WIRELESS_SETTINGS)) }
-                }
-            )
-            if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_HOST) {
-                SettingsInlineNote(
-                    stringResource(
-                        R.string.settings_network_local_host_addresses,
-                        localAddresses.joinToString().ifBlank { stringResource(R.string.settings_network_local_no_address) }
-                    )
-                )
-            } else {
-                var hostDraft by remember(uiState.dev9LocalLinkAddress) { mutableStateOf(uiState.dev9LocalLinkAddress) }
-                val hostValid = remember(hostDraft) { isValidIpv4(hostDraft) }
-                OutlinedTextField(
-                    value = hostDraft,
-                    onValueChange = { value ->
-                        hostDraft = value.filter { it.isDigit() || it == '.' }.take(15)
-                        if (isValidIpv4(hostDraft)) viewModel.setDev9LocalLinkAddress(hostDraft)
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
-                    label = { Text(stringResource(R.string.settings_network_local_host_address)) },
-                    supportingText = { Text(stringResource(R.string.settings_network_local_host_address_desc)) },
-                    isError = !hostValid,
-                    singleLine = true
-                )
-            }
-            var portDraft by remember(uiState.dev9LocalLinkPort) { mutableStateOf(uiState.dev9LocalLinkPort.toString()) }
-            val portValid = portDraft.toIntOrNull() in 1024..65535
-            OutlinedTextField(
-                value = portDraft,
-                onValueChange = { value ->
-                    portDraft = value.filter(Char::isDigit).take(5)
-                    portDraft.toIntOrNull()?.takeIf { it in 1024..65535 }?.let(viewModel::setDev9LocalLinkPort)
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
-                label = { Text(stringResource(R.string.settings_network_local_port)) },
-                supportingText = { Text(stringResource(R.string.settings_network_local_port_desc)) },
-                isError = !portValid,
-                singleLine = true
-            )
-            var roomDraft by remember(uiState.dev9LocalLinkRoomCode) { mutableStateOf(uiState.dev9LocalLinkRoomCode) }
-            val roomValid = roomDraft.length in 4..12
-            OutlinedTextField(
-                value = roomDraft,
-                onValueChange = { value ->
-                    roomDraft = value.filter(Char::isLetterOrDigit).take(12).uppercase()
-                    viewModel.setDev9LocalLinkRoomCode(roomDraft)
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
-                label = { Text(stringResource(R.string.settings_network_local_room_code)) },
-                supportingText = { Text(stringResource(R.string.settings_network_local_room_code_desc)) },
-                isError = !roomValid,
-                singleLine = true
-            )
-            SettingsInlineNote(stringResource(R.string.settings_network_local_peer_id, uiState.dev9LocalLinkPeerId))
-            SettingsInlineNote(stringResource(R.string.settings_network_local_compatibility_note))
-        }
-        if (uiState.dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) {
-        ChoiceSection(
-            title = stringResource(R.string.settings_network_dns_preset),
-            options = listOf(
-                0 to stringResource(R.string.settings_network_dns_preset_system),
-                1 to stringResource(R.string.settings_network_dns_preset_ps2online),
-                2 to stringResource(R.string.settings_network_dns_preset_psrewired)
-            ),
-            selectedValue = when (uiState.dev9Dns1Mode) {
-                AppPreferences.DEV9_DNS_MODE_MANUAL -> when (uiState.dev9Dns1) {
-                    "45.7.228.197" -> 1
-                    "67.222.156.250" -> 2
-                    else -> 0
-                }
-                else -> 0
-            },
-            onSelect = { preset ->
-                when (preset) {
-                    1 -> {
-                        viewModel.setDev9Dns1Mode(AppPreferences.DEV9_DNS_MODE_MANUAL)
-                        viewModel.setDev9Dns1("45.7.228.197")
-                    }
-                    2 -> {
-                        viewModel.setDev9Dns1Mode(AppPreferences.DEV9_DNS_MODE_MANUAL)
-                        viewModel.setDev9Dns1("67.222.156.250")
-                    }
-                    else -> {
-                        viewModel.setDev9Dns1Mode(AppPreferences.DEV9_DNS_MODE_AUTO)
-                        viewModel.setDev9Dns1("0.0.0.0")
-                    }
-                }
-            },
-            helpText = stringResource(R.string.settings_network_dns_preset_help)
-        )
-        DnsModeSetting(
-            title = stringResource(R.string.settings_network_dns1_mode),
-            addressTitle = stringResource(R.string.settings_network_dns1),
-            mode = uiState.dev9Dns1Mode,
-            address = uiState.dev9Dns1,
-            modes = dnsModes,
-            onModeChange = viewModel::setDev9Dns1Mode,
-            onAddressChange = viewModel::setDev9Dns1
-        )
-        DnsModeSetting(
-            title = stringResource(R.string.settings_network_dns2_mode),
-            addressTitle = stringResource(R.string.settings_network_dns2),
-            mode = uiState.dev9Dns2Mode,
-            address = uiState.dev9Dns2,
-            modes = dnsModes,
-            onModeChange = viewModel::setDev9Dns2Mode,
-            onAddressChange = viewModel::setDev9Dns2
-        )
-        ToggleItem(
-            icon = Icons.Rounded.Link,
-            title = stringResource(R.string.settings_network_intercept_dhcp),
-            subtitle = stringResource(R.string.settings_network_intercept_dhcp_desc),
-            checked = uiState.dev9InterceptDhcp,
-            onCheckedChange = viewModel::setDev9InterceptDhcp,
-            onResetToDefault = { viewModel.setDev9InterceptDhcp(defaults.dev9InterceptDhcp) }
-        )
-        ToggleItem(
-            icon = Icons.Rounded.Info,
-            title = stringResource(R.string.settings_network_log_dhcp),
-            subtitle = stringResource(R.string.settings_network_log_dhcp_desc),
-            checked = uiState.dev9LogDhcp,
-            onCheckedChange = viewModel::setDev9LogDhcp,
-            onResetToDefault = { viewModel.setDev9LogDhcp(defaults.dev9LogDhcp) }
-        )
-        ToggleItem(
-            icon = Icons.Rounded.Info,
-            title = stringResource(R.string.settings_network_log_dns),
-            subtitle = stringResource(R.string.settings_network_log_dns_desc),
-            checked = uiState.dev9LogDns,
-            onCheckedChange = viewModel::setDev9LogDns,
-            onResetToDefault = { viewModel.setDev9LogDns(defaults.dev9LogDns) }
-        )
-        }
-    }
-}
-
-@Composable
-private fun DnsModeSetting(
-    title: String,
-    addressTitle: String,
-    mode: String,
-    address: String,
-    modes: List<Pair<String, String>>,
-    onModeChange: (String) -> Unit,
-    onAddressChange: (String) -> Unit
-) {
-    ChoiceSection(
-        title = title,
-        options = modes.mapIndexed { index, (_, label) -> index to label },
-        selectedValue = modes.indexOfFirst { it.first == mode }.coerceAtLeast(0),
-        onSelect = { index -> modes.getOrNull(index)?.first?.let(onModeChange) },
-        helpText = stringResource(R.string.settings_network_dns_mode_help)
-    )
-    if (mode == AppPreferences.DEV9_DNS_MODE_MANUAL) {
-        var draft by remember(address) { mutableStateOf(address) }
-        val valid = remember(draft) { isValidIpv4(draft) }
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { value ->
-                draft = value.filter { it.isDigit() || it == '.' }.take(15)
-                if (isValidIpv4(draft)) onAddressChange(draft)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .skipGamepadTextFieldFocus(),
-            label = { Text(addressTitle) },
-            supportingText = {
-                Text(stringResource(if (valid) R.string.settings_network_dns_address_desc else R.string.settings_network_dns_invalid))
-            },
-            isError = !valid,
-            singleLine = true
-        )
-    }
-}
-
-private fun isValidIpv4(value: String): Boolean {
-    val parts = value.split('.')
-    return parts.size == 4 && parts.all { part ->
-        part.isNotEmpty() && part.length <= 3 && part.toIntOrNull() in 0..255
-    }
-}
-
-private fun isPrivateIpv4(value: String): Boolean {
-    val parts = value.split('.').mapNotNull(String::toIntOrNull)
-    if (parts.size != 4 || parts.any { it !in 0..255 }) return false
-    return parts[0] == 10 ||
-        (parts[0] == 172 && parts[1] in 16..31) ||
-        (parts[0] == 192 && parts[1] == 168)
-}
-
-@Composable
 private fun ProSettingsTab(
     uiState: SettingsUiState,
     onPurchase: () -> Unit,
@@ -5202,7 +4921,7 @@ private fun CustomControlsQuickSelector(
 }
 
 @Composable
-private fun SettingsSection(
+internal fun SettingsSection(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -5231,7 +4950,7 @@ private fun SettingsSection(
 }
 
 @Composable
-private fun SettingsItem(
+internal fun SettingsItem(
     icon: ImageVector,
     label: String,
     value: String,
@@ -5656,7 +5375,7 @@ private fun GamepadBindingRow(
 }
 
 @Composable
-private fun ToggleItem(
+internal fun ToggleItem(
     icon: ImageVector,
     title: String,
     subtitle: String,
@@ -6614,7 +6333,7 @@ private fun SideArtworkPicker(
 }
 
 @Composable
-private fun ChoiceSection(
+internal fun ChoiceSection(
     title: String,
     options: List<Pair<Int, String>>,
     selectedValue: Int,
@@ -6791,7 +6510,7 @@ private fun premiumFilterChipColors() = FilterChipDefaults.filterChipColors(
 )
 
 @Composable
-private fun SettingsInlineNote(text: String) {
+internal fun SettingsInlineNote(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,

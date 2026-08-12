@@ -5,6 +5,8 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.view.Surface
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.network.NetPlaySession
+import com.sbro.emucorex.network.RemotePlaySession
 import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.core.utils.NetworkAdapterCollector
 import kotlinx.coroutines.CoroutineScope
@@ -515,7 +517,13 @@ object EmulatorBridge {
             buildList {
                 add(settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString()))
                 add(settingOp("DEV9/Eth", "EthEnable", "bool", effectiveDev9EthernetEnabled.toString()))
-                add(settingOp("DEV9/Eth", "EthApi", "string", if (dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_OFF) "Sockets" else "Local Link"))
+                add(settingOp("DEV9/Eth", "EthApi", "string", when (dev9LocalLinkMode) {
+                    AppPreferences.DEV9_INTERNET_LINK_HOST,
+                    AppPreferences.DEV9_INTERNET_LINK_JOIN -> "Internet Link"
+                    AppPreferences.DEV9_LOCAL_LINK_HOST,
+                    AppPreferences.DEV9_LOCAL_LINK_JOIN -> "Local Link"
+                    else -> "Sockets"
+                }))
                 add(settingOp("DEV9/Eth", "EthDevice", "string", dev9EthernetDevice.ifBlank { "Auto" }))
                 add(settingOp("DEV9/Eth", "InterceptDHCP", "bool", dev9InterceptDhcp.toString()))
                 add(settingOp("DEV9/Eth", "ModeDNS1", "string", dev9Dns1Mode))
@@ -524,7 +532,10 @@ object EmulatorBridge {
                 add(settingOp("DEV9/Eth", "DNS2", "string", dev9Dns2))
                 add(settingOp("DEV9/Eth", "EthLogDHCP", "bool", dev9LogDhcp.toString()))
                 add(settingOp("DEV9/Eth", "EthLogDNS", "bool", dev9LogDns.toString()))
-                add(settingOp("DEV9/Eth", "LocalLinkHost", "bool", (dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_HOST).toString()))
+                add(settingOp("DEV9/Eth", "LocalLinkHost", "bool", (
+                    dev9LocalLinkMode == AppPreferences.DEV9_LOCAL_LINK_HOST ||
+                        dev9LocalLinkMode == AppPreferences.DEV9_INTERNET_LINK_HOST
+                    ).toString()))
                 add(settingOp("DEV9/Eth", "LocalLinkAddress", "string", dev9LocalLinkAddress))
                 add(settingOp("DEV9/Eth", "LocalLinkPort", "int", dev9LocalLinkPort.coerceIn(1024, 65535).toString()))
                 add(settingOp("DEV9/Eth", "LocalLinkPeerId", "int", dev9LocalLinkPeerId.coerceIn(2, 65533).toString()))
@@ -1261,7 +1272,9 @@ object EmulatorBridge {
     fun setPadButton(padIndex: Int, index: Int, range: Int, pressed: Boolean) {
         if (!isNativeLoaded) return
         try {
-            NativeApp.setPadButton(padIndex, index, range, pressed)
+            if (RemotePlaySession.forwardGuestButton(index, range, pressed)) return
+            val mappedPadIndex = NetPlaySession.mapAndSendLocalButton(padIndex, index, range, pressed)
+            NativeApp.setPadButton(mappedPadIndex, index, range, pressed)
         } catch (_: Exception) { }
     }
 

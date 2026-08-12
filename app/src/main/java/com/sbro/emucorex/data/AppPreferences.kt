@@ -323,6 +323,8 @@ class AppPreferences(private val context: Context) {
         const val DEV9_LOCAL_LINK_OFF = 0
         const val DEV9_LOCAL_LINK_HOST = 1
         const val DEV9_LOCAL_LINK_JOIN = 2
+        const val DEV9_INTERNET_LINK_HOST = 3
+        const val DEV9_INTERNET_LINK_JOIN = 4
         const val DEFAULT_LOCAL_LINK_PORT = 19072
         private const val CURRENT_OVERLAY_LAYOUT_VERSION = 16
         const val DEFAULT_NTSC_FRAMERATE = 59.94f
@@ -1875,7 +1877,10 @@ class AppPreferences(private val context: Context) {
     }
 
     private fun sanitizeLocalLinkMode(mode: Int?): Int = when (mode) {
-        DEV9_LOCAL_LINK_HOST, DEV9_LOCAL_LINK_JOIN -> mode
+        DEV9_LOCAL_LINK_HOST,
+        DEV9_LOCAL_LINK_JOIN,
+        DEV9_INTERNET_LINK_HOST,
+        DEV9_INTERNET_LINK_JOIN -> mode
         else -> DEV9_LOCAL_LINK_OFF
     }
 

@@ -123,6 +123,10 @@ object NativeApp {
     @JvmStatic external fun getCoreVersion(): String?
     @JvmStatic external fun queueGsDump(frames: Int)
     @JvmStatic external fun setPadButton(padIndex: Int, index: Int, range: Int, pressed: Boolean)
+    @JvmStatic external fun setInternetLinkTransportReady(ready: Boolean)
+    @JvmStatic external fun resetInternetLinkTransport()
+    @JvmStatic external fun pushInternetLinkFrame(frame: ByteArray): Boolean
+    @JvmStatic external fun pollInternetLinkFrame(): ByteArray?
     @JvmStatic external fun setPadPressureModifierAmount(amountPercent: Int)
     @JvmStatic external fun onHostKeyEvent(keyCode: Int, pressed: Boolean)
     @JvmStatic external fun onHostMousePosition(x: Float, y: Float)

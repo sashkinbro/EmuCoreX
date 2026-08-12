@@ -29,6 +29,8 @@ fun buildConfigString(value: String): String = "\"" + value
 
 val feedbackEndpoint = localProperty("emucorex.feedback.endpoint").orEmpty()
 val feedbackApiKey = localProperty("emucorex.feedback.apiKey").orEmpty()
+val multiplayerSignalingUrl = "https://emucorex-multiplayer.kyivstar19971502.workers.dev"
+val multiplayerClientCode = "ecx-mp-v1-7H4K9M2Q"
 val discordApplicationId = "1536775623287115786"
 val discordSdkDirectory = (
     providers.gradleProperty("emucorex.discord.sdkDir").orNull
@@ -69,6 +71,8 @@ android {
 
         buildConfigField("String", "FEEDBACK_ENDPOINT", buildConfigString(feedbackEndpoint))
         buildConfigField("String", "FEEDBACK_API_KEY", buildConfigString(feedbackApiKey))
+        buildConfigField("String", "MULTIPLAYER_SIGNALING_URL", buildConfigString(multiplayerSignalingUrl))
+        buildConfigField("String", "MULTIPLAYER_CLIENT_CODE", buildConfigString(multiplayerClientCode))
         buildConfigField("long", "DISCORD_APPLICATION_ID", "${discordApplicationId}L")
         buildConfigField("boolean", "DISCORD_SDK_AVAILABLE", (discordSdkDirectory != null).toString())
         manifestPlaceholders["discordSdkAvailable"] = (discordSdkDirectory != null).toString()
@@ -326,6 +330,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.browser)
+    implementation(libs.webrtc.android)
     discordSdkDirectory?.let { sdkDir ->
         implementation(files(sdkDir.resolve("discord_partner_sdk.aar")))
     }

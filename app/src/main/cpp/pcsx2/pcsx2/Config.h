@@ -1064,6 +1064,7 @@ struct Pcsx2Config
 			TAP = 3,
 			Sockets = 4,
 			LocalLink = 5,
+			InternetLink = 6,
 		};
 		static const char* NetApiNames[];
 

@@ -14,6 +14,7 @@
 #include "pcsx2/HangTrace.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/JitProfiler.h"
+#include "pcsx2/DEV9/InternetLinkAdapter.h"
 #include "pcsx2/ps2/BiosTools.h"
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -530,6 +531,30 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsD
 	});
 }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadButton(JNIEnv*, jclass, jint pad_index, jint index, jint range, jboolean pressed) { AndroidRuntime::Instance().SetPadButton(pad_index, index, range, pressed == JNI_TRUE); }
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setInternetLinkTransportReady(JNIEnv*, jclass, jboolean ready) { InternetLinkBridge::SetTransportReady(ready == JNI_TRUE); }
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_resetInternetLinkTransport(JNIEnv*, jclass) { InternetLinkBridge::Reset(); }
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_pushInternetLinkFrame(JNIEnv* env, jclass, jbyteArray frame)
+{
+	if (frame == nullptr)
+		return JNI_FALSE;
+	const jsize size = env->GetArrayLength(frame);
+	if (size <= 0 || size > 1514)
+		return JNI_FALSE;
+	std::array<std::uint8_t, 1514> data{};
+	env->GetByteArrayRegion(frame, 0, size, reinterpret_cast<jbyte*>(data.data()));
+	return InternetLinkBridge::PushInbound(data.data(), static_cast<std::size_t>(size)) ? JNI_TRUE : JNI_FALSE;
+}
+extern "C" JNIEXPORT jbyteArray JNICALL Java_com_sbro_emucorex_core_NativeApp_pollInternetLinkFrame(JNIEnv* env, jclass)
+{
+	std::array<std::uint8_t, 1514> data{};
+	std::size_t size = 0;
+	if (!InternetLinkBridge::PopOutbound(data.data(), data.size(), &size))
+		return nullptr;
+	jbyteArray result = env->NewByteArray(static_cast<jsize>(size));
+	if (result != nullptr)
+		env->SetByteArrayRegion(result, 0, static_cast<jsize>(size), reinterpret_cast<const jbyte*>(data.data()));
+	return result;
+}
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadPressureModifierAmount(JNIEnv*, jclass, jint amount_percent) { AndroidRuntime::Instance().SetPadPressureModifierAmount(amount_percent); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onHostKeyEvent(JNIEnv*, jclass, jint key_code, jboolean pressed) { AndroidRuntime::Instance().OnHostKeyEvent(key_code, pressed == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onHostMousePosition(JNIEnv*, jclass, jfloat x, jfloat y) { AndroidRuntime::Instance().OnHostMousePosition(x, y); }

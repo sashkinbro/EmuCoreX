@@ -295,6 +295,7 @@ set(pcsx2DEV9Sources
 	DEV9/InternalServers/DNS_Logger.cpp
 	DEV9/InternalServers/DNS_Server.cpp
 	DEV9/LocalLinkAdapter.cpp
+	DEV9/InternetLinkAdapter.cpp
 	DEV9/PacketReader/ARP/ARP_Packet.cpp
 	DEV9/PacketReader/ARP/ARP_PacketEditor.cpp
 	DEV9/PacketReader/IP/ICMP/ICMP_Packet.cpp
@@ -338,6 +339,7 @@ set(pcsx2DEV9Sources
 # DEV9 headers
 set(pcsx2DEV9Headers
 	DEV9/AdapterUtils.h
+	DEV9/InternetLinkAdapter.h
 	DEV9/ATA/ATA.h
 	DEV9/ATA/HddCreate.h
 	DEV9/DEV9.h

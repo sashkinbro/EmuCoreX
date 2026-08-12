@@ -1359,6 +1359,7 @@ const char* Pcsx2Config::DEV9Options::NetApiNames[] = {
 	"TAP",
 	"Sockets",
 	"Local Link",
+	"Internet Link",
 	nullptr};
 
 const char* Pcsx2Config::DEV9Options::DnsModeNames[] = {
