@@ -2409,6 +2409,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">指南</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">实验性</string>
     <string name="network_netplay_desc">在两台设备上运行同一游戏，并通过互联网同步玩家输入。</string>
     <string name="network_netplay_beginner_hint">实验性输入同步模式。双方必须使用相同的游戏、BIOS、EmuCoreX 版本和模拟设置。主机为玩家 1，访客为玩家 2。</string>
     <string name="network_netplay_connected">已连接 — 请在两台设备上启动同一游戏</string>

@@ -2423,6 +2423,7 @@
     <string name="network_tab_netplay">نت پلی</string>
     <string name="network_tab_guides">راهنماها</string>
     <string name="network_netplay_title">نت پلی</string>
+    <string name="network_experimental_badge">آزمایشی</string>
     <string name="network_netplay_desc">همان بازی را روی دو دستگاه اجرا کنید و ورودی پخش کننده را از طریق اینترنت همگام کنید.</string>
     <string name="network_netplay_beginner_hint">حالت همگام‌سازی ورودی تجربی. هر دو بازیکن به یک بازی، BIOS، نسخه EmuCoreX و تنظیمات شبیه‌سازی نیاز دارند. میزبان بازیکن 1 است. مهمان بازیکن 2 است.</string>
     <string name="network_netplay_connected">متصل - یک بازی را در هر دو دستگاه اجرا کنید</string>

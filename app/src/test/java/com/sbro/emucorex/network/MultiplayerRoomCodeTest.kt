@@ -26,4 +26,16 @@ class MultiplayerRoomCodeTest {
             assertFalse(code.any { it in "01IO" })
         }
     }
+
+    @Test
+    fun digitalTouchPressUsesFullNetworkRange() {
+        assertEquals(255, encodeNetworkButtonRange(range = 0, pressed = true))
+    }
+
+    @Test
+    fun analogPressureIsPreservedAndReleaseIsZero() {
+        assertEquals(127, encodeNetworkButtonRange(range = 127, pressed = true))
+        assertEquals(255, encodeNetworkButtonRange(range = 999, pressed = true))
+        assertEquals(0, encodeNetworkButtonRange(range = 127, pressed = false))
+    }
 }

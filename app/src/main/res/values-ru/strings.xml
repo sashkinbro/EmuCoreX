@@ -2412,6 +2412,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Путеводители</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Экспериментальный</string>
     <string name="network_netplay_desc">Запустите одну и ту же игру на двух устройствах и синхронизируйте действия игроков через Интернет.</string>
     <string name="network_netplay_beginner_hint">Экспериментальный режим входной синхронизации. Обоим плеерам нужна одна и та же игра, BIOS, версия EmuCoreX и настройки эмуляции. Хост — игрок 1; гость — игрок 2.</string>
     <string name="network_netplay_connected">Подключено — запустите одну и ту же игру на обоих устройствах.</string>

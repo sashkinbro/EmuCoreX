@@ -2422,6 +2422,7 @@
     <string name="network_tab_netplay">Permainan Bersih</string>
     <string name="network_tab_guides">Panduan</string>
     <string name="network_netplay_title">Permainan Bersih</string>
+    <string name="network_experimental_badge">Eksperimental</string>
     <string name="network_netplay_desc">Jalankan game yang sama di dua perangkat dan sinkronkan input pemain melalui internet.</string>
     <string name="network_netplay_beginner_hint">Mode sinkronisasi masukan eksperimental. Kedua pemain memerlukan game, BIOS, versi EmuCoreX, dan pengaturan emulasi yang sama. Tuan rumah adalah pemain 1; tamu adalah pemain 2.</string>
     <string name="network_netplay_connected">Terhubung — meluncurkan game yang sama di kedua perangkat</string>

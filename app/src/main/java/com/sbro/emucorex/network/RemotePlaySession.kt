@@ -162,7 +162,7 @@ object RemotePlaySession {
         val channel = controlChannel ?: return
         if (channel.state() != DataChannel.State.OPEN) return
         val payload = ByteBuffer.allocate(13).order(ByteOrder.LITTLE_ENDIAN)
-            .put(1).putInt(padIndex).putInt(index).putInt(if (pressed) range.coerceIn(0, 255) else 0)
+            .put(1).putInt(padIndex).putInt(index).putInt(encodeNetworkButtonRange(range, pressed))
             .apply { flip() }
         channel.send(DataChannel.Buffer(payload, true))
     }

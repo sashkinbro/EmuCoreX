@@ -2408,6 +2408,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Guide</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Sperimentale</string>
     <string name="network_netplay_desc">Esegui lo stesso gioco su due dispositivi e sincronizza l\'input del giocatore su Internet.</string>
     <string name="network_netplay_beginner_hint">Modalità di sincronizzazione dell\'input sperimentale. Entrambi i giocatori necessitano dello stesso gioco, BIOS, versione di EmuCoreX e impostazioni di emulazione. L\'host è il giocatore 1; l\'ospite è il giocatore 2.</string>
     <string name="network_netplay_connected">Connesso: avvia lo stesso gioco su entrambi i dispositivi</string>

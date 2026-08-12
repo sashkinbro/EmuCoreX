@@ -2384,6 +2384,7 @@
     <string name="network_internet_link_title">Internet Link</string>
     <string name="network_internet_link_desc">Гра в режимі PS2 LAN з іншим пристроєм через інтернет за кодом кімнати.</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Експериментальний</string>
     <string name="network_netplay_desc">Запуск однакової гри на двох пристроях із синхронізацією керування через інтернет.</string>
     <string name="network_netplay_beginner_hint">Експериментальний режим синхронізації керування. Обом гравцям потрібні однакова гра, BIOS, версія EmuCoreX і параметри емуляції. Ведучий — гравець 1, учасник — гравець 2.</string>
     <string name="network_netplay_connected">З’єднано — запустіть однакову гру на обох пристроях</string>

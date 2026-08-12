@@ -2428,6 +2428,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Průvodci</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Experimentální</string>
     <string name="network_netplay_desc">Spusťte stejnou hru na dvou zařízeních a synchronizujte vstup hráče přes internet.</string>
     <string name="network_netplay_beginner_hint">Experimentální režim synchronizace vstupu. Oba hráči potřebují stejnou hru, BIOS, verzi EmuCoreX a nastavení emulace. Hostitelem je hráč 1; hostem je hráč 2.</string>
     <string name="network_netplay_connected">Připojeno – spusťte stejnou hru na obou zařízeních</string>

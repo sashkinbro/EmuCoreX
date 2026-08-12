@@ -136,7 +136,7 @@ object NetPlaySession {
                 .put(1)
                 .putInt(mappedPad)
                 .putInt(buttonIndex)
-                .putInt(if (pressed) range.coerceIn(0, 255) else 0)
+                .putInt(encodeNetworkButtonRange(range, pressed))
                 .apply { flip() }
             channel.send(DataChannel.Buffer(packet, true))
         }
@@ -278,6 +278,11 @@ object NetPlaySession {
     private fun fail(error: InternetLinkError) {
         _state.value = _state.value.copy(status = NetPlayStatus.Error, error = error)
     }
+}
+
+internal fun encodeNetworkButtonRange(range: Int, pressed: Boolean): Int {
+    if (!pressed) return 0
+    return range.coerceIn(0, 255).takeIf { it > 0 } ?: 255
 }
 
 private abstract class NetPlayPeerObserver : PeerConnection.Observer {

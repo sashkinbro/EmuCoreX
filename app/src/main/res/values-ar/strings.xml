@@ -2412,6 +2412,7 @@
     <string name="network_tab_netplay">نتبلاي</string>
     <string name="network_tab_guides">أدلة</string>
     <string name="network_netplay_title">نتبلاي</string>
+    <string name="network_experimental_badge">تجريبي</string>
     <string name="network_netplay_desc">قم بتشغيل نفس اللعبة على جهازين وقم بمزامنة مدخلات اللاعب عبر الإنترنت.</string>
     <string name="network_netplay_beginner_hint">وضع مزامنة الإدخال التجريبي. يحتاج كلا اللاعبين إلى نفس اللعبة وإصدار BIOS وإصدار EmuCoreX وإعدادات المحاكاة. المضيف هو اللاعب 1؛ الضيف هو اللاعب 2</string>
     <string name="network_netplay_connected">متصل - قم بتشغيل نفس اللعبة على كلا الجهازين</string>

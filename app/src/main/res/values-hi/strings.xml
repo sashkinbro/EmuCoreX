@@ -2408,6 +2408,7 @@
     <string name="network_tab_netplay">कुल चालन</string>
     <string name="network_tab_guides">गाइड</string>
     <string name="network_netplay_title">कुल चालन</string>
+    <string name="network_experimental_badge">प्रायोगिक</string>
     <string name="network_netplay_desc">एक ही गेम को दो डिवाइस पर चलाएं और प्लेयर इनपुट को इंटरनेट पर सिंक्रोनाइज़ करें।</string>
     <string name="network_netplay_beginner_hint">प्रायोगिक इनपुट-सिंक मोड. दोनों खिलाड़ियों को समान गेम, BIOS, EmuCoreX संस्करण और इम्यूलेशन सेटिंग्स की आवश्यकता होती है। मेज़बान खिलाड़ी 1 है; अतिथि खिलाड़ी 2 है।</string>
     <string name="network_netplay_connected">कनेक्टेड - दोनों डिवाइस पर एक ही गेम लॉन्च करें</string>

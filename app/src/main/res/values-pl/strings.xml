@@ -2430,6 +2430,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Przewodniki</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Eksperymentalne</string>
     <string name="network_netplay_desc">Uruchom tę samą grę na dwóch urządzeniach i zsynchronizuj działania graczy przez Internet.</string>
     <string name="network_netplay_beginner_hint">Eksperymentalny tryb synchronizacji wejścia. Obaj gracze potrzebują tej samej gry, BIOS-u, wersji EmuCoreX i ustawień emulacji. Gospodarzem jest gracz 1; gość jest graczem 2.</string>
     <string name="network_netplay_connected">Połączono — uruchom tę samą grę na obu urządzeniach</string>

@@ -2397,6 +2397,7 @@
     <string name="network_internet_link_title">Internet Link</string>
     <string name="network_internet_link_desc">Play a PS2 LAN game with another device over the internet using a room code.</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Experimental</string>
     <string name="network_netplay_desc">Run the same game on two devices and synchronize player input over the internet.</string>
     <string name="network_netplay_beginner_hint">Experimental input-sync mode. Both players need the same game, BIOS, EmuCoreX version and emulation settings. Host is player 1; guest is player 2.</string>
     <string name="network_netplay_connected">Connected — launch the same game on both devices</string>

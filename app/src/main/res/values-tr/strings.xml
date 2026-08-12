@@ -2408,6 +2408,7 @@
     <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Kılavuzlar</string>
     <string name="network_netplay_title">NetPlay</string>
+    <string name="network_experimental_badge">Deneysel</string>
     <string name="network_netplay_desc">Aynı oyunu iki cihazda çalıştırın ve oyuncu girişlerini internet üzerinden eşitleyin.</string>
     <string name="network_netplay_beginner_hint">Deneysel giriş eşitleme modu. Her iki oyuncu da aynı oyun, BIOS, EmuCoreX sürümü ve emülasyon ayarlarını kullanmalıdır. Ev sahibi oyuncu 1, konuk oyuncu 2 olur.</string>
     <string name="network_netplay_connected">Bağlandı — aynı oyunu iki cihazda da başlatın</string>

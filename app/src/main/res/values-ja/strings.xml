@@ -2407,6 +2407,7 @@
     <string name="network_tab_netplay">ネットプレイ</string>
     <string name="network_tab_guides">ガイド</string>
     <string name="network_netplay_title">ネットプレイ</string>
+    <string name="network_experimental_badge">試験的</string>
     <string name="network_netplay_desc">2 つのデバイスで同じゲームを実行し、インターネット経由でプレーヤーの入力を同期します。</string>
     <string name="network_netplay_beginner_hint">実験的な入力同期モード。どちらのプレイヤーも同じゲーム、BIOS、EmuCoreX バージョン、エミュレーション設定を必要とします。ホストはプレーヤー 1 です。ゲストはプレイヤー2です。</string>
     <string name="network_netplay_connected">接続済み — 両方のデバイスで同じゲームを起動します</string>

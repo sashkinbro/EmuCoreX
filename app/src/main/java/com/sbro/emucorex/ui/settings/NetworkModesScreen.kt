@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -236,7 +237,7 @@ private fun NetworkOverview(
         )
         SettingsItem(
             icon = Icons.Rounded.Gamepad,
-            label = stringResource(R.string.network_netplay_title),
+            label = netPlayExperimentalTitle(),
             value = stringResource(R.string.network_netplay_desc),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
             onClick = { onOpen(NetworkHubTab.NetPlay) }
@@ -274,6 +275,12 @@ private fun NetworkNetPlayPanel() {
     }
 
     SettingsSection(title = stringResource(R.string.network_netplay_title)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            NetPlayExperimentalBadge()
+        }
         SettingsInlineNote(stringResource(R.string.network_netplay_beginner_hint))
         SettingsItem(
             icon = if (state.status == NetPlayStatus.Connected) Icons.Rounded.CheckCircle else Icons.Rounded.Gamepad,
@@ -337,6 +344,21 @@ private fun NetworkNetPlayPanel() {
                 Text(stringResource(R.string.network_end_session))
             }
         }
+    }
+}
+
+@Composable
+private fun NetPlayExperimentalBadge() {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+    ) {
+        Text(
+            text = stringResource(R.string.network_experimental_badge),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
     }
 }
 
@@ -645,8 +667,10 @@ private fun internetLinkErrorLabel(error: InternetLinkError?): String = stringRe
 )
 
 @Composable
-private fun networkHubTabLabel(tab: NetworkHubTab): String = stringResource(
-    when (tab) {
+private fun networkHubTabLabel(tab: NetworkHubTab): String {
+    if (tab == NetworkHubTab.NetPlay) return netPlayExperimentalTitle()
+    return stringResource(
+        when (tab) {
         NetworkHubTab.Overview -> R.string.network_tab_overview
         NetworkHubTab.Online -> R.string.network_tab_online
         NetworkHubTab.LocalLink -> R.string.network_tab_local
@@ -655,8 +679,16 @@ private fun networkHubTabLabel(tab: NetworkHubTab): String = stringResource(
         NetworkHubTab.RemotePlay -> R.string.network_tab_remote_play
         NetworkHubTab.Guides -> R.string.network_tab_guides
         NetworkHubTab.Advanced -> R.string.network_tab_advanced
-    }
-)
+        }
+    )
+}
+
+@Composable
+private fun netPlayExperimentalTitle(): String = buildString {
+    append(stringResource(R.string.network_netplay_title))
+    append(" · ")
+    append(stringResource(R.string.network_experimental_badge))
+}
 
 private fun networkHubTabIcon(tab: NetworkHubTab): ImageVector = when (tab) {
     NetworkHubTab.Overview -> Icons.Rounded.Gamepad

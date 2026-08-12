@@ -2407,6 +2407,7 @@
     <string name="network_tab_netplay">넷플레이</string>
     <string name="network_tab_guides">가이드</string>
     <string name="network_netplay_title">넷플레이</string>
+    <string name="network_experimental_badge">실험적</string>
     <string name="network_netplay_desc">두 장치에서 동일한 게임을 실행하고 인터넷을 통해 플레이어 입력을 동기화합니다.</string>
     <string name="network_netplay_beginner_hint">실험적인 입력 동기화 모드. 두 플레이어 모두 동일한 게임, BIOS, EmuCoreX 버전 및 에뮬레이션 설정이 필요합니다. 호스트는 플레이어 1입니다. 손님은 플레이어 2입니다.</string>
     <string name="network_netplay_connected">연결됨 — 두 장치 모두에서 동일한 게임을 시작합니다.</string>
