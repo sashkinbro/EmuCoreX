@@ -115,3 +115,7 @@
 -dontwarn com.google.android.gms.**
 -dontwarn com.pierfrancescosoffritti.androidyoutubeplayer.**
 -dontwarn kotlinx.coroutines.debug.**
+
+# WebRTC and jni_zero (used by WebRTC natively)
+-keep class org.webrtc.** { *; }
+-keep class org.jni_zero.** { *; }
