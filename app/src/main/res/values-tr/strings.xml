@@ -2419,7 +2419,7 @@
     <string name="network_guide_steps">Nasıl bağlanılır</string>
     <string name="network_guide_limits">Önemli sınırlamalar</string>
     <string name="network_guide_online_purpose">Oyunun kendi Online veya Network seçeneği varsa ve topluluk sunucusu yeniden çalıştırılmışsa PS2 Online kullanın. Oyun gerçek bir PS2 gibi bağlanır.</string>
-    <string name="network_guide_online_requirements">Desteklenen oyun, etkin topluluk sunucusu ve güncel DNS adresi gerekir. Her oyuncu için bir cihaz yeterlidir. PS2 sunucusu için EmuCoreX hesabı gerekmez.</string>
+    <string name="network_guide_online_requirements">Desteklenen oyun, etkin topluluk sunucusu ve güncel DNS adresi gerekir. Her oyuncu için bir cihaz yeterlidir.</string>
     <string name="network_guide_online_steps">1. PS2 Online sekmesinde Ethernet\'i etkinleştirin.\n2. Sunucu topluluğunun önerdiği DNS ön ayarını seçin.\n3. Oyunu başlatıp ağ yapılandırmasını açın.\n4. Otomatik IP ayarlarını ve seçilen DNS\'i kullanın.\n5. Oyunun Online modunu açıp orada oturum açın.</string>
     <string name="network_guide_online_limits">Kullanılabilirlik topluluk sunucularına ve oyunun özgün ağ koduna bağlıdır. EmuCoreX artık bulunmayan bir sunucuyu geri getiremez. Bazı oyunlar topluluk hesabı veya oyuna özel yama ister.</string>
     <string name="network_guide_local_purpose">PS2 oyununda LAN, Network veya sistem bağlantılı çok oyunculu mod varsa ve iki Android cihaz aynı Wi‑Fi ya da telefon erişim noktasındaysa Yerel Bağlantı\'yı kullanın.</string>
@@ -2435,7 +2435,7 @@
     <string name="network_guide_netplay_steps">1. Ev sahibi NetPlay odası oluşturup kodu paylaşır.\n2. Konuk katılır ve Bağlandı durumunu bekler.\n3. İki oyuncu aynı oyunu temiz açılışla başlatır.\n4. Aynı yerel iki oyunculu menüye aynı anda girin.\n5. Ev sahibi oyuncu 1\'i kullanır; konuk girişi otomatik olarak oyuncu 2\'ye eşlenir.</string>
     <string name="network_guide_netplay_limits">Bu deneysel giriş eşitlemesidir, tam rollback değildir. BIOS, oyun, ayar, zamanlama, kayıt durumu, duraklatma veya hızlı ileri alma farkları eşitlemeyi bozabilir. Ekranlar ayrışırsa iki oyunu da yeniden başlatın.</string>
     <string name="network_guide_remote_purpose">Oyun yalnızca ev sahibi cihazda çalışacaksa Remote Play kullanın. Konuk ev sahibinin ekran yayınını izler ve oyuncu 2 kontrolünü geri gönderir; oyunun LAN desteğine ihtiyacı yoktur.</string>
-    <string name="network_guide_remote_requirements">Yalnızca ev sahibinde oyun ve BIOS bulunmalıdır. İki oyuncuda da EmuCoreX ve kararlı bağlantı gerekir, ancak hesap gerekmez. Ev sahibi Android ekran paylaşımını onaylamalı ve Remote Play bildirimini etkin tutmalıdır.</string>
+    <string name="network_guide_remote_requirements">Yalnızca ev sahibinde oyun ve BIOS bulunmalıdır. İki oyuncuda da EmuCoreX ve kararlı bağlantı gerekir. Ev sahibi Android ekran paylaşımını onaylamalı ve Remote Play bildirimini etkin tutmalıdır.</string>
     <string name="network_guide_remote_steps">1. Ev sahibi Bu ekranı paylaş\'a dokunup ekran yakalamayı onaylar.\n2. Gösterilen oda kodunu paylaşır.\n3. Konuk kodu girip yayına katılır.\n4. Ev sahibi oyunu başlatıp yerel iki oyunculu modu açar.\n5. Konuk ekrandaki oyuncu 2 kontrollerini kullanır.</string>
     <string name="network_guide_remote_limits">Video kalitesi ve kontrol gecikmesi ev sahibi cihaza ve iki internet bağlantısına bağlıdır. Mevcut sürüm video ve kontrol girdisini aktarır; oyun sesi henüz iletilmez. Android yakalama iznini kaldırırsa ekran paylaşımı durur.</string>
 </resources>

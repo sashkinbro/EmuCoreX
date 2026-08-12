@@ -2420,7 +2420,7 @@
     <string name="network_guide_steps">连接方法</string>
     <string name="network_guide_limits">重要限制</string>
     <string name="network_guide_online_purpose">当游戏本身具有 Online 或 Network 选项，且社区已恢复公共服务器时，请使用 PS2 Online。游戏会像真实 PS2 一样连接。</string>
-    <string name="network_guide_online_requirements">需要受支持的游戏、可用的社区服务器及其当前 DNS 地址。每位玩家各需一台设备。连接 PS2 服务器不需要 EmuCoreX 账户。</string>
+    <string name="network_guide_online_requirements">需要受支持的游戏、可用的社区服务器及其当前 DNS 地址。每位玩家各需一台设备。</string>
     <string name="network_guide_online_steps">1. 在 PS2 Online 标签中启用以太网。\n2. 选择服务器社区推荐的 DNS 预设。\n3. 启动游戏并打开网络配置。\n4. 使用自动 IP 设置和所选 DNS。\n5. 打开游戏的 Online 模式并在其中登录。</string>
     <string name="network_guide_online_limits">可用性取决于社区服务器和各游戏原有的网络代码。EmuCoreX 无法恢复已经消失的服务器。某些游戏需要社区账户或游戏专用补丁。</string>
     <string name="network_guide_local_purpose">当 PS2 游戏支持 LAN、Network 或系统连接多人模式，且两台 Android 设备位于同一 Wi‑Fi 或手机热点时，请使用本地连接。</string>
@@ -2436,7 +2436,7 @@
     <string name="network_guide_netplay_steps">1. 主机创建 NetPlay 房间并分享代码。\n2. 访客加入并等待“已连接”。\n3. 双方从干净启动开始运行同一游戏。\n4. 同时进入相同的本地双人菜单。\n5. 主机使用玩家 1；访客输入会自动映射到玩家 2。</string>
     <string name="network_guide_netplay_limits">这是实验性输入同步，不是完整的回滚网络代码。BIOS、游戏、设置、时序、即时存档、暂停或快进的差异都可能导致不同步。若画面不再一致，请重新启动双方游戏。</string>
     <string name="network_guide_remote_purpose">当游戏只在主机设备上运行时，请使用 Remote Play。访客观看主机屏幕串流并发送玩家 2 输入，因此游戏本身不需要支持 LAN。</string>
-    <string name="network_guide_remote_requirements">只有主机需要游戏和 BIOS。双方都需要 EmuCoreX 和稳定连接，但无需账户。主机必须允许 Android 屏幕共享，并保持 Remote Play 通知处于活动状态。</string>
+    <string name="network_guide_remote_requirements">只有主机需要游戏和 BIOS。双方都需要 EmuCoreX 和稳定连接。主机必须允许 Android 屏幕共享，并保持 Remote Play 通知处于活动状态。</string>
     <string name="network_guide_remote_steps">1. 主机点击“共享此屏幕”并允许屏幕捕获。\n2. 分享显示的房间代码。\n3. 访客输入代码并加入串流。\n4. 主机启动游戏并打开本地双人模式。\n5. 访客使用屏幕上的玩家 2 控件。</string>
     <string name="network_guide_remote_limits">视频质量和操作延迟取决于主机设备及双方网络。目前会传输视频和手柄输入；游戏音频尚未传输。当 Android 撤销捕获权限时，屏幕共享会停止。</string>
 </resources>

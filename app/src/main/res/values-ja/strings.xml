@@ -2418,7 +2418,7 @@
     <string name="network_guide_steps">接続方法</string>
     <string name="network_guide_limits">重要な制限事項</string>
     <string name="network_guide_online_purpose">ゲーム自体にオンラインまたはネットワーク オプションがあり、コミュニティがパブリック サーバーを復元した場合は、PS2 オンラインを使用してください。ゲームは、実際の PS2 がオンラインであるかのように接続します。</string>
-    <string name="network_guide_online_requirements">サポートされているゲーム、アクティブなコミュニティ サーバー、およびその現在の DNS アドレスが必要です。各プレーヤーに必要なデバイスは 1 つだけです。 PS2サーバー自体にはEmuCoreXへのサインインは必要ありません。</string>
+    <string name="network_guide_online_requirements">サポートされているゲーム、アクティブなコミュニティ サーバー、およびその現在の DNS アドレスが必要です。各プレーヤーに必要なデバイスは 1 つだけです。</string>
     <string name="network_guide_online_steps">1. [PS2 オンライン] タブでイーサネットを有効にします。\n2.サーバー コミュニティが推奨する DNS プリセットを選択します。\n3.ゲームを開始し、ネットワーク構成を開きます。\n4.自動 IP 設定と選択した DNS を使用します。\n5.ゲームのオンライン モードを開き、そこにサインインします。</string>
     <string name="network_guide_online_limits">利用できるかどうかは、コミュニティ サーバーと各ゲームの元のネットワーク コードによって異なります。 EmuCoreX は、存在しなくなったサーバーを復元できません。一部のゲームでは、コミュニティ アカウントまたはゲーム固有のパッチが必要です。</string>
     <string name="network_guide_local_purpose">PS2 ゲームに LAN、ネットワーク、またはシステムリンク マルチプレイヤーがあり、両方の Android デバイスが同じ Wi-Fi ネットワークまたは電話ホットスポット上にある場合は、ローカル リンクを使用します。</string>
@@ -2426,7 +2426,7 @@
     <string name="network_guide_local_steps">1. 最初のデバイスでホストを選択し、表示されている IP アドレスをメモします。\n2. 2 番目のデバイスで [参加] を選択し、その IP を入力します。\n3.両方のデバイスで同じポートと部屋コードを設定します。\n4.両方で同じゲームを開始します。\n5.ゲームの LAN モードを開きます。ホスト上で一致を作成し、ゲスト上で検索または参加します。</string>
     <string name="network_guide_local_limits">このモードは、ゲームのエミュレートされたイーサネット トラフィックのみを転送します。ゲームはすでに LAN プレイをサポートしている必要があります。ゲスト Wi-Fi の分離、VPN、制限付きホットスポットにより、デバイス間のトラフィックがブロックされる可能性があります。</string>
     <string name="network_guide_internet_purpose">他のプレーヤーがローカル Wi-Fi の外にいる場合は、PS2 LAN サポートを備えたゲームにインターネット リンクを使用します。 EmuCoreX は、エミュレートされたイーサネット フレームを安全な部屋を通じてトンネリングします。</string>
-    <string name="network_guide_internet_requirements">両方のプレイヤーに同じゲーム バージョンと安定したインターネット接続が必要です。EmuCoreX アカウントは不要です。直接接続がブロックされる場合は TURN リレーが必要になることがあります。</string>
+    <string name="network_guide_internet_requirements">両方のプレイヤーに同じゲーム バージョンと安定したインターネット接続が必要です。直接接続がブロックされる場合は TURN リレーが必要になることがあります。</string>
     <string name="network_guide_internet_steps">1. ホストはルームを作成し、8 文字のコードを共有します。\n2.ゲストはコードを入力し、接続されるまで待ちます。\n3.両方のプレイヤーが同じゲームを起動します。\n4.ゲームの LAN モードを開きます。\n5.ホストが一致を作成します。ゲストは検索して参加します。</string>
     <string name="network_guide_internet_limits">ゲームは LAN またはシステムリンク プレイをサポートしている必要があります。インターネットの遅延は、ゲーム独自のネットワーク プロトコルに追加されます。企業ネットワーク、キャリアグレードのネットワーク、または厳しく制限されたネットワークでは、TURN リレーが必要になる場合があります。</string>
     <string name="network_guide_netplay_purpose">各人が自分のデバイスでゲームを実行したい場合は、ローカル 2 プレイヤー ゲームに実験的な NetPlay を使用します。 EmuCoreX は、2 つのエミュレータ インスタンス間でプレーヤー 1 とプレーヤー 2 の入力を送信します。</string>
@@ -2434,7 +2434,7 @@
     <string name="network_guide_netplay_steps">1. ホストは NetPlay ルームを作成し、そのコードを共有します。\n2.ゲストは参加し、接続されるまで待ちます。\n3.両方のプレーヤーがクリーン ブートから同じゲームを起動します。\n4.同時に同じローカル 2 プレーヤー メニューに入ります。\n5.ホストはプレーヤー 1 を使用します。ゲスト入力はプレーヤー 2 に自動的にマッピングされます。</string>
     <string name="network_guide_netplay_limits">これは実験的な入力同期であり、完全なロールバックではありません。 BIOS、ゲーム、設定、タイミング、状態の保存、一時停止または早送りの違いにより、非同期が発生する可能性があります。画面が一致しなくなった場合は、両方のゲームを再起動します。</string>
     <string name="network_guide_remote_purpose">ゲームがホスト デバイス上でのみ実行される場合は、リモート プレイを使用します。ゲストはホストの画面ストリームを監視し、コントローラー 2 入力を送り返すため、ゲーム自体は LAN サポートを必要としません。</string>
-    <string name="network_guide_remote_requirements">ゲームと BIOS はホストだけに必要です。両方に EmuCoreX と安定した接続が必要ですが、アカウントは不要です。ホストは Android の画面共有を許可し、Remote Play 通知を有効に保つ必要があります。</string>
+    <string name="network_guide_remote_requirements">ゲームと BIOS はホストだけに必要です。両方に EmuCoreX と安定した接続が必要です。ホストは Android の画面共有を許可し、Remote Play 通知を有効に保つ必要があります。</string>
     <string name="network_guide_remote_steps">1. 主催者は [この画面を共有] をタップし、画面キャプチャを承認します。\n2.表示された部屋コードを共有します。\n3.ゲストはコードを入力してストリームに参加します。\n4.ホストがゲームを起動し、ローカル 2 プレーヤー モードを開きます。\n5.ゲストは、表示されたプレーヤー 2 コントロールを使用します。</string>
     <string name="network_guide_remote_limits">ビデオの品質と制御遅延は、ホスト デバイスと両方のインターネット接続に依存します。現在の実装では、ビデオとコントローラー入力をストリーミングします。ゲーム音声はまだ送信されていません。 Android がキャプチャ許可を取り消すと、画面共有が停止します。</string>
 </resources>
