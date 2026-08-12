@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="com.android.vending.BILLING" />
     <!-- The Social SDK AAR also contains voice features. EmuCoreX only uses account linking and
@@ -119,11 +118,6 @@
             android:process=":discord"
             android:enabled="${discordSdkAvailable}"
             android:exported="false" />
-
-        <service
-            android:name=".network.RemotePlayCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
 
         <service
             android:name="com.discord.socialsdk.ForegroundService"

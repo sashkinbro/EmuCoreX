@@ -2,21 +2,18 @@ package com.sbro.emucorex.ui.settings
 
 import android.app.Activity
 import android.content.Intent
-import android.media.projection.MediaProjectionManager
 import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Info
@@ -58,11 +54,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -74,25 +68,17 @@ import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.network.InternetLinkError
 import com.sbro.emucorex.network.InternetLinkSession
 import com.sbro.emucorex.network.InternetLinkStatus
-import com.sbro.emucorex.network.NetPlaySession
-import com.sbro.emucorex.network.NetPlayStatus
-import com.sbro.emucorex.network.RemotePlayCaptureService
-import com.sbro.emucorex.network.RemotePlaySession
-import com.sbro.emucorex.network.RemotePlayStatus
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.ScrollableFilterTabRow
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
-import org.webrtc.SurfaceViewRenderer
 private enum class NetworkHubTab {
     Overview,
     Online,
     LocalLink,
     InternetLink,
-    NetPlay,
-    RemotePlay,
     Guides,
     Advanced
 }
@@ -183,8 +169,6 @@ fun NetworkModesScreen(
                 NetworkHubTab.InternetLink -> NetworkInternetLinkPanel(
                     viewModel = viewModel
                 )
-                NetworkHubTab.NetPlay -> NetworkNetPlayPanel()
-                NetworkHubTab.RemotePlay -> NetworkRemotePlayPanel()
                 NetworkHubTab.Guides -> MultiplayerGuidesPanel(
                     onOpenGuide = { selectedGuide = it }
                 )
@@ -235,317 +219,6 @@ private fun NetworkOverview(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
             onClick = { onOpen(NetworkHubTab.InternetLink) }
         )
-        SettingsItem(
-            icon = Icons.Rounded.Gamepad,
-            label = netPlayExperimentalTitle(),
-            value = stringResource(R.string.network_netplay_desc),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
-            onClick = { onOpen(NetworkHubTab.NetPlay) }
-        )
-        SettingsItem(
-            icon = Icons.Rounded.CastConnected,
-            label = stringResource(R.string.network_remote_play_title),
-            value = stringResource(R.string.network_remote_play_desc),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
-            onClick = { onOpen(NetworkHubTab.RemotePlay) }
-        )
-    }
-}
-
-@Composable
-private fun NetworkNetPlayPanel() {
-    val context = LocalContext.current
-    val state by NetPlaySession.state.collectAsState()
-    var roomDraft by rememberSaveable { mutableStateOf("") }
-    val busy = state.status in setOf(
-        NetPlayStatus.Creating,
-        NetPlayStatus.WaitingForPeer,
-        NetPlayStatus.Joining,
-        NetPlayStatus.Connecting
-    )
-    val active = busy || state.status == NetPlayStatus.Connected
-    val statusText = when (state.status) {
-        NetPlayStatus.Idle -> stringResource(R.string.network_session_idle)
-        NetPlayStatus.Creating -> stringResource(R.string.network_session_creating)
-        NetPlayStatus.WaitingForPeer -> stringResource(R.string.network_session_waiting)
-        NetPlayStatus.Joining -> stringResource(R.string.network_session_joining)
-        NetPlayStatus.Connecting -> stringResource(R.string.network_session_connecting)
-        NetPlayStatus.Connected -> stringResource(R.string.network_netplay_connected)
-        NetPlayStatus.Error -> internetLinkErrorLabel(state.error)
-    }
-
-    SettingsSection(title = stringResource(R.string.network_netplay_title)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            NetPlayExperimentalBadge()
-        }
-        SettingsInlineNote(stringResource(R.string.network_netplay_beginner_hint))
-        SettingsItem(
-            icon = if (state.status == NetPlayStatus.Connected) Icons.Rounded.CheckCircle else Icons.Rounded.Gamepad,
-            label = stringResource(R.string.network_session_status),
-            value = statusText,
-            border = BorderStroke(
-                1.dp,
-                if (state.status == NetPlayStatus.Connected) MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)
-            ),
-            progressVisible = busy,
-            onClick = {}
-        )
-        if (state.roomCode.isNotBlank()) {
-            SettingsItem(
-                icon = Icons.Rounded.Gamepad,
-                label = stringResource(R.string.network_room_code),
-                value = state.roomCode,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
-                onClick = {}
-            )
-        }
-        if (!active) {
-            Button(
-                onClick = { NetPlaySession.createRoom(context) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Icon(Icons.Rounded.Gamepad, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.network_create_room))
-            }
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-            )
-            OutlinedTextField(
-                value = roomDraft,
-                onValueChange = { roomDraft = NetPlaySession.sanitizeRoomCode(it) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
-                label = { Text(stringResource(R.string.network_room_code)) },
-                supportingText = { Text(stringResource(R.string.network_room_code_hint)) },
-                shape = RoundedCornerShape(18.dp),
-                singleLine = true
-            )
-            OutlinedButton(
-                onClick = { NetPlaySession.joinRoom(context, roomDraft) },
-                enabled = roomDraft.length == 8,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Text(stringResource(R.string.network_join_room))
-            }
-        } else {
-            SettingsInlineNote(stringResource(R.string.network_netplay_launch_note))
-            OutlinedButton(
-                onClick = NetPlaySession::disconnect,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Text(stringResource(R.string.network_end_session))
-            }
-        }
-    }
-}
-
-@Composable
-private fun NetPlayExperimentalBadge() {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-    ) {
-        Text(
-            text = stringResource(R.string.network_experimental_badge),
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-        )
-    }
-}
-
-@Composable
-private fun NetworkRemotePlayPanel() {
-    val context = LocalContext.current
-    val state by RemotePlaySession.state.collectAsState()
-    val remoteTrack by RemotePlaySession.remoteVideoTrack.collectAsState()
-    var roomDraft by rememberSaveable { mutableStateOf("") }
-    val projectionManager = remember {
-        context.getSystemService(MediaProjectionManager::class.java)
-    }
-    val captureLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val permission = result.data
-        if (result.resultCode == Activity.RESULT_OK && permission != null) {
-            RemotePlayCaptureService.start(context)
-            RemotePlaySession.host(context, permission)
-        }
-    }
-    val busy = state.status in setOf(
-        RemotePlayStatus.Creating,
-        RemotePlayStatus.WaitingForPeer,
-        RemotePlayStatus.Joining,
-        RemotePlayStatus.Connecting
-    )
-    val active = busy || state.status == RemotePlayStatus.Connected
-    val statusText = when (state.status) {
-        RemotePlayStatus.Idle -> stringResource(R.string.network_session_idle)
-        RemotePlayStatus.Creating -> stringResource(R.string.network_session_creating)
-        RemotePlayStatus.WaitingForPeer -> stringResource(R.string.network_session_waiting)
-        RemotePlayStatus.Joining -> stringResource(R.string.network_session_joining)
-        RemotePlayStatus.Connecting -> stringResource(R.string.network_session_connecting)
-        RemotePlayStatus.Connected -> stringResource(R.string.network_session_connected)
-        RemotePlayStatus.Error -> internetLinkErrorLabel(state.error)
-    }
-
-    SettingsSection(title = stringResource(R.string.network_remote_play_title)) {
-        SettingsInlineNote(stringResource(R.string.network_remote_play_beginner_hint))
-        SettingsItem(
-            icon = if (state.status == RemotePlayStatus.Connected) Icons.Rounded.CheckCircle else Icons.Rounded.CastConnected,
-            label = stringResource(R.string.network_session_status),
-            value = statusText,
-            border = BorderStroke(
-                1.dp,
-                if (state.status == RemotePlayStatus.Connected) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)
-                }
-            ),
-            progressVisible = busy,
-            onClick = {}
-        )
-        if (state.roomCode.isNotBlank()) {
-            SettingsItem(
-                icon = Icons.Rounded.Gamepad,
-                label = stringResource(R.string.network_room_code),
-                value = state.roomCode,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f)),
-                onClick = {}
-            )
-        }
-        if (!active) {
-            Button(
-                onClick = { captureLauncher.launch(projectionManager.createScreenCaptureIntent()) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Icon(Icons.Rounded.CastConnected, contentDescription = null)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.network_remote_play_host))
-            }
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-            )
-            OutlinedTextField(
-                value = roomDraft,
-                onValueChange = { roomDraft = RemotePlaySession.sanitizeCode(it) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
-                label = { Text(stringResource(R.string.network_room_code)) },
-                supportingText = { Text(stringResource(R.string.network_room_code_hint)) },
-                shape = RoundedCornerShape(18.dp),
-                singleLine = true
-            )
-            OutlinedButton(
-                onClick = { RemotePlaySession.join(context, roomDraft) },
-                enabled = roomDraft.length == 8,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Text(stringResource(R.string.network_remote_play_join))
-            }
-        } else {
-            if (!state.isHost && remoteTrack != null) {
-                RemotePlayVideo(track = remoteTrack!!)
-                Text(
-                    text = stringResource(R.string.network_remote_play_controls),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-                RemotePlayController()
-            }
-            OutlinedButton(
-                onClick = RemotePlaySession::disconnect,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Text(stringResource(R.string.network_end_session))
-            }
-        }
-    }
-}
-
-@Composable
-private fun RemotePlayVideo(track: org.webrtc.VideoTrack) {
-    var renderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
-    AndroidView(
-        factory = { viewContext ->
-            SurfaceViewRenderer(viewContext).apply {
-                init(RemotePlaySession.eglContext, null)
-                setEnableHardwareScaler(true)
-                setMirror(false)
-                renderer = this
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .aspectRatio(16f / 9f)
-    )
-    DisposableEffect(track, renderer) {
-        val currentRenderer = renderer
-        if (currentRenderer != null) track.addSink(currentRenderer)
-        onDispose {
-            if (currentRenderer != null) {
-                track.removeSink(currentRenderer)
-                currentRenderer.release()
-                if (renderer === currentRenderer) renderer = null
-            }
-        }
-    }
-}
-
-@Composable
-private fun RemotePlayController() {
-    val rows = listOf(
-        listOf("↑" to 19, "△" to 100),
-        listOf("←" to 21, "↓" to 20, "→" to 22),
-        listOf("□" to 99, "×" to 96, "○" to 97),
-        listOf("L1" to 102, "SELECT" to 109, "START" to 108, "R1" to 103)
-    )
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        rows.forEach { buttons ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
-            ) {
-                buttons.forEach { (label, index) ->
-                    RemotePlayHoldButton(label = label, index = index, modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RemotePlayHoldButton(label: String, index: Int, modifier: Modifier = Modifier) {
-    OutlinedButton(
-        onClick = {},
-        modifier = modifier.pointerInput(index) {
-            detectTapGestures(
-                onPress = {
-                    RemotePlaySession.sendButton(index, 255, true)
-                    tryAwaitRelease()
-                    RemotePlaySession.sendButton(index, 0, false)
-                }
-            )
-        },
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Text(label, maxLines = 1)
     }
 }
 
@@ -668,35 +341,22 @@ private fun internetLinkErrorLabel(error: InternetLinkError?): String = stringRe
 
 @Composable
 private fun networkHubTabLabel(tab: NetworkHubTab): String {
-    if (tab == NetworkHubTab.NetPlay) return netPlayExperimentalTitle()
     return stringResource(
         when (tab) {
         NetworkHubTab.Overview -> R.string.network_tab_overview
         NetworkHubTab.Online -> R.string.network_tab_online
         NetworkHubTab.LocalLink -> R.string.network_tab_local
         NetworkHubTab.InternetLink -> R.string.network_tab_internet
-        NetworkHubTab.NetPlay -> R.string.network_tab_netplay
-        NetworkHubTab.RemotePlay -> R.string.network_tab_remote_play
         NetworkHubTab.Guides -> R.string.network_tab_guides
         NetworkHubTab.Advanced -> R.string.network_tab_advanced
         }
     )
 }
-
-@Composable
-private fun netPlayExperimentalTitle(): String = buildString {
-    append(stringResource(R.string.network_netplay_title))
-    append(" · ")
-    append(stringResource(R.string.network_experimental_badge))
-}
-
 private fun networkHubTabIcon(tab: NetworkHubTab): ImageVector = when (tab) {
     NetworkHubTab.Overview -> Icons.Rounded.Gamepad
     NetworkHubTab.Online -> Icons.Rounded.Public
     NetworkHubTab.LocalLink -> Icons.Rounded.Link
     NetworkHubTab.InternetLink -> Icons.Rounded.Public
-    NetworkHubTab.NetPlay -> Icons.Rounded.Gamepad
-    NetworkHubTab.RemotePlay -> Icons.Rounded.CastConnected
     NetworkHubTab.Guides -> Icons.AutoMirrored.Rounded.MenuBook
     NetworkHubTab.Advanced -> Icons.Rounded.Tune
 }

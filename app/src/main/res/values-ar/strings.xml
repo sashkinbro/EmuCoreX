@@ -2370,7 +2370,6 @@
     <string name="network_tab_online">PS2 اون لاين</string>
     <string name="network_tab_local">الشبكة المحلية</string>
     <string name="network_tab_internet">رابط الانترنت</string>
-    <string name="network_tab_remote_play">اللعب عن بعد</string>
     <string name="network_tab_advanced">متقدم</string>
     <string name="network_overview_choose_mode">اختر الطريقة التي تريد اللعب بها</string>
     <string name="network_overview_desc">كل وضع يحل مهمة مختلفة. افتح البطاقة للاطلاع فقط على الخطوات والإعدادات اللازمة لهذا الوضع.</string>
@@ -2383,14 +2382,7 @@
     <string name="network_internet_link_desc">العب لعبة PS2 LAN مع جهاز آخر عبر الإنترنت باستخدام رمز الغرفة.</string>
     <string name="network_internet_link_preparing">جاري تهيئة النقل الآمن للغرفة. سيظهر هنا إنشاء الغرفة والانضمام إليها.</string>
     <string name="network_remote_play_title">اللعب عن بعد</string>
-    <string name="network_remote_play_desc">قم ببث لعبة قيد التشغيل إلى جهاز آخر واستقبل مدخلات وحدة التحكم الخاصة بها.</string>
-    <string name="network_remote_play_preparing">يتم الآن تهيئة البث الآمن للفيديو ووحدة التحكم. ستظهر هنا الاستضافة والانضمام.</string>
     <string name="network_remote_play_notification">تتم مشاركة شاشة لعبتك</string>
-    <string name="network_remote_play_beginner_hint">يشارك المضيف شاشة اللعبة لهذا الجهاز. يفتح الانضمام الدفق ويرسل إدخال وحدة التحكم 2 مرة أخرى إلى المضيف.</string>
-    <string name="network_remote_play_host">مشاركة هذه الشاشة</string>
-    <string name="network_remote_play_join">انضم إلى الدفق</string>
-    <string name="network_remote_play_preview">لعبة عن بعد</string>
-    <string name="network_remote_play_controls">ضوابط اللاعب 2</string>
     <string name="network_advanced_desc">تتم مشاركة خيارات DEV9 وDNS هذه بواسطة شبكة PS2. قم بتغييرها فقط عندما يطلب منك دليل الخادم أو خطوة استكشاف الأخطاء وإصلاحها.</string>
     <string name="network_internet_link_beginner_hint">استخدم هذا عندما تحتوي اللعبة على وضع LAN أو شبكة ولكن اللاعب الآخر ليس متصلاً بشبكة Wi-Fi الخاصة بك. يقوم أحد اللاعبين بإنشاء غرفة، ويشارك الرمز، ويبدأ اللعبة كمضيف.</string>
     <string name="network_session_status">حالة الجلسة</string>
@@ -2409,14 +2401,7 @@
     <string name="network_error_room_not_found">لم يتم العثور على الغرفة أو منتهية الصلاحية</string>
     <string name="network_error_room_full">تحتوي هذه الغرفة بالفعل على لاعبين</string>
     <string name="network_error_connection">تعذر تأسيس الاتصال</string>
-    <string name="network_tab_netplay">نتبلاي</string>
     <string name="network_tab_guides">أدلة</string>
-    <string name="network_netplay_title">نتبلاي</string>
-    <string name="network_experimental_badge">تجريبي</string>
-    <string name="network_netplay_desc">قم بتشغيل نفس اللعبة على جهازين وقم بمزامنة مدخلات اللاعب عبر الإنترنت.</string>
-    <string name="network_netplay_beginner_hint">وضع مزامنة الإدخال التجريبي. يحتاج كلا اللاعبين إلى نفس اللعبة وإصدار BIOS وإصدار EmuCoreX وإعدادات المحاكاة. المضيف هو اللاعب 1؛ الضيف هو اللاعب 2</string>
-    <string name="network_netplay_connected">متصل - قم بتشغيل نفس اللعبة على كلا الجهازين</string>
-    <string name="network_netplay_launch_note">قم الآن بتشغيل نفس اللعبة وأدخل إلى وضع اللاعبين المحليين الخاص بها على كلا الجهازين. لا تستخدم حالات الحفظ أو التقديم السريع أو الإيقاف المؤقت على جهاز واحد فقط.</string>
     <string name="network_guides_title">أدلة متعددة اللاعبين</string>
     <string name="network_guides_intro">افتح الوضع لترى ما يفعله وما يحتاجه كلا اللاعبين وخطوات الإعداد الدقيقة والقيود المعروفة.</string>
     <string name="network_guide_purpose">متى تستخدم هذا الوضع</string>
@@ -2435,12 +2420,4 @@
     <string name="network_guide_internet_requirements">يحتاج كلا اللاعبين إلى نفس إصدار اللعبة واتصال إنترنت مستقر. قد يلزم ترحيل TURN إذا كان الاتصال المباشر محظورًا.</string>
     <string name="network_guide_internet_steps">1. يقوم المضيف بإنشاء غرفة ويشارك الرمز المكون من 8 أحرف.\n2. يقوم الضيف بإدخال الرمز وينتظر الاتصال.\n3. يقوم كلا اللاعبين بتشغيل نفس اللعبة.\n4. افتح وضع LAN الخاص باللعبة.\n5. يقوم المضيف بإنشاء تطابق؛ يبحث الضيف عنه وينضم إليه.</string>
     <string name="network_guide_internet_limits">يجب أن تدعم اللعبة اللعب عبر شبكة LAN أو ارتباط النظام. تتم إضافة زمن الوصول إلى الإنترنت إلى بروتوكول الشبكة الخاص باللعبة. قد تتطلب شبكات الشركات أو شبكات الناقل أو الشبكات المقيدة بشدة مرحل TURN.</string>
-    <string name="network_guide_netplay_purpose">استخدم NetPlay التجريبي للعبة محلية ثنائية اللاعبين عندما يريد كل شخص تشغيل اللعبة على أجهزته الخاصة. يرسل EmuCoreX مدخلات اللاعب 1 واللاعب 2 بين مثيلين للمحاكي.</string>
-    <string name="network_guide_netplay_requirements">يجب أن يستخدم كلا الجهازين نفس ملف تفريغ اللعبة ونظام BIOS وإصدار EmuCoreX والعارض وإعدادات السرعة والتصحيحات. يتحكم المضيف في المشغل 1 ويتحكم الضيف في المشغل 2. استخدم إنترنت مستقرًا منخفض زمن الوصول.</string>
-    <string name="network_guide_netplay_steps">1. يقوم المضيف بإنشاء غرفة NetPlay ويشارك الرمز الخاص بها.\n2. ينضم الضيف وينتظر الاتصال.\n3. يقوم كلا اللاعبين بتشغيل نفس اللعبة من بداية نظيفة.\n4. أدخل نفس القائمة المحلية للاعبين في نفس الوقت.\n5. يستخدم المضيف اللاعب 1؛ يتم تعيين إدخال الضيف إلى اللاعب 2 تلقائيًا.</string>
-    <string name="network_guide_netplay_limits">هذه مزامنة إدخال تجريبية، وليست تراجعًا كاملاً. يمكن أن تؤدي الاختلافات في BIOS أو اللعبة أو الإعدادات أو التوقيت أو حالات الحفظ أو الإيقاف المؤقت أو التقديم السريع إلى إلغاء التزامن. أعد تشغيل كلتا اللعبتين إذا لم تعد شاشتيهما متطابقتين.</string>
-    <string name="network_guide_remote_purpose">استخدم اللعب عن بعد عندما تعمل اللعبة على الجهاز المضيف فقط. يشاهد الضيف تدفق شاشة المضيف ويرسل مدخلات وحدة التحكم 2 مرة أخرى، وبالتالي فإن اللعبة نفسها لا تحتاج إلى دعم LAN.</string>
-    <string name="network_guide_remote_requirements">المضيف فقط يحتاج إلى اللعبة وBIOS. يحتاج كلا اللاعبين إلى EmuCoreX واتصال مستقر. يجب أن يسمح المضيف بمشاركة شاشة Android وإبقاء إشعار Remote Play نشطًا.</string>
-    <string name="network_guide_remote_steps">1. ينقر المضيف على &quot;مشاركة هذه الشاشة&quot; ويوافق على التقاط الشاشة.\n2. قم بمشاركة رمز الغرفة المعروض.\n3. يُدخل الضيف الرمز وينضم إلى البث.\n4. يقوم المضيف بتشغيل اللعبة وفتح الوضع المحلي للاعبين.\n5. يستخدم الضيف عناصر التحكم في اللاعب 2 المعروضة.</string>
-    <string name="network_guide_remote_limits">تعتمد جودة الفيديو وتأخير التحكم على الجهاز المضيف واتصالي الإنترنت. يقوم التنفيذ الحالي بتدفق مدخلات الفيديو ووحدة التحكم؛ لم يتم نقل صوت اللعبة بعد. تتوقف مشاركة الشاشة عندما يلغي Android إذن الالتقاط.</string>
 </resources>

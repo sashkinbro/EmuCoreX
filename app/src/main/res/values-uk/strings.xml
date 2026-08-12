@@ -2370,8 +2370,6 @@
     <string name="network_tab_online">PS2 Online</string>
     <string name="network_tab_local">Локальна мережа</string>
     <string name="network_tab_internet">Internet Link</string>
-    <string name="network_tab_netplay">NetPlay</string>
-    <string name="network_tab_remote_play">Remote Play</string>
     <string name="network_tab_guides">Посібники</string>
     <string name="network_tab_advanced">Додатково</string>
     <string name="network_overview_choose_mode">Оберіть, як хочете грати</string>
@@ -2383,22 +2381,9 @@
     <string name="network_local_link_desc">З’єднання двох пристроїв у спільній Wi‑Fi мережі або через точку доступу.</string>
     <string name="network_internet_link_title">Internet Link</string>
     <string name="network_internet_link_desc">Гра в режимі PS2 LAN з іншим пристроєм через інтернет за кодом кімнати.</string>
-    <string name="network_netplay_title">NetPlay</string>
-    <string name="network_experimental_badge">Експериментальний</string>
-    <string name="network_netplay_desc">Запуск однакової гри на двох пристроях із синхронізацією керування через інтернет.</string>
-    <string name="network_netplay_beginner_hint">Експериментальний режим синхронізації керування. Обом гравцям потрібні однакова гра, BIOS, версія EmuCoreX і параметри емуляції. Ведучий — гравець 1, учасник — гравець 2.</string>
-    <string name="network_netplay_connected">З’єднано — запустіть однакову гру на обох пристроях</string>
-    <string name="network_netplay_launch_note">Тепер запустіть однакову гру та відкрийте її локальний режим для двох гравців на обох пристроях. Не використовуйте збереження стану, прискорення або паузу лише на одному пристрої.</string>
     <string name="network_internet_link_preparing">Ініціалізується захищений транспорт кімнати. Тут з’являться створення кімнати й приєднання.</string>
     <string name="network_remote_play_title">Remote Play</string>
-    <string name="network_remote_play_desc">Трансляція запущеної гри на інший пристрій і приймання його керування.</string>
-    <string name="network_remote_play_preparing">Ініціалізується захищена трансляція відео й керування. Тут з’являться створення сесії та приєднання.</string>
     <string name="network_remote_play_notification">Екран гри зараз транслюється</string>
-    <string name="network_remote_play_beginner_hint">Ведучий транслює екран гри з цього пристрою. Учасник бачить трансляцію та керує другим гравцем.</string>
-    <string name="network_remote_play_host">Транслювати цей екран</string>
-    <string name="network_remote_play_join">Приєднатися до трансляції</string>
-    <string name="network_remote_play_preview">Віддалена гра</string>
-    <string name="network_remote_play_controls">Керування гравця 2</string>
     <string name="network_advanced_desc">Ці параметри DEV9 і DNS спільні для мережі PS2. Змінюйте їх лише за інструкцією сервера або під час діагностики.</string>
     <string name="network_internet_link_beginner_hint">Використовуйте, коли гра має режим LAN або Network, але інший гравець не у вашій Wi‑Fi мережі. Один гравець створює кімнату, передає код і запускає гру як хост.</string>
     <string name="network_session_status">Стан сесії</string>
@@ -2435,12 +2420,4 @@
     <string name="network_guide_internet_requirements">Обом гравцям потрібні однакова версія гри та стабільне інтернет-з’єднання. У мережах, де пряме peer-to-peer з’єднання заблоковано, може знадобитися TURN.</string>
     <string name="network_guide_internet_steps">1. Ведучий створює кімнату й передає 8-символьний код.\n2. Учасник вводить код і чекає стану «З’єднано».\n3. Обидва запускають однакову гру.\n4. Відкривають LAN-режим гри.\n5. Ведучий створює матч, а учасник знаходить його та приєднується.</string>
     <string name="network_guide_internet_limits">Гра повинна підтримувати LAN або system-link. Затримка інтернету додається до власного мережевого протоколу гри. Корпоративні, операторські та сильно обмежені мережі можуть потребувати TURN-ретранслятора.</string>
-    <string name="network_guide_netplay_purpose">Використовуйте експериментальний NetPlay для локальної гри на двох, коли кожен хоче запускати гру на своєму пристрої. EmuCoreX передає керування гравців 1 і 2 між двома емуляторами.</string>
-    <string name="network_guide_netplay_requirements">На обох пристроях мають бути однакові дамп гри, BIOS, версія EmuCoreX, рендерер, параметри швидкості й патчі. Ведучий керує гравцем 1, учасник — гравцем 2. Бажаний стабільний інтернет із малою затримкою.</string>
-    <string name="network_guide_netplay_steps">1. Ведучий створює кімнату NetPlay і передає код.\n2. Учасник приєднується й чекає стану «З’єднано».\n3. Обидва запускають однакову гру з чистого старту.\n4. Одночасно відкривають той самий локальний режим для двох.\n5. Ведучий грає за гравця 1, керування учасника автоматично стає гравцем 2.</string>
-    <string name="network_guide_netplay_limits">Це експериментальна синхронізація вводу, а не повний rollback. Різні BIOS, гра, налаштування, таймінги, збереження стану, пауза чи прискорення можуть спричинити десинхронізацію. Якщо зображення розійшлися — перезапустіть гру на обох пристроях.</string>
-    <string name="network_guide_remote_purpose">Використовуйте Remote Play, коли гра працює лише на пристрої ведучого. Учасник бачить трансляцію екрана ведучого та надсилає назад керування гравця 2, тому самій грі не потрібен LAN.</string>
-    <string name="network_guide_remote_requirements">Гра й BIOS потрібні лише ведучому. Обом потрібні EmuCoreX і стабільне з’єднання. Ведучий має дозволити Android трансляцію екрана й не вимикати сповіщення Remote Play.</string>
-    <string name="network_guide_remote_steps">1. Ведучий натискає «Транслювати цей екран» і дозволяє захоплення.\n2. Передає показаний код кімнати.\n3. Учасник вводить код і приєднується до трансляції.\n4. Ведучий запускає гру й відкриває локальний режим для двох.\n5. Учасник використовує показане керування гравця 2.</string>
-    <string name="network_guide_remote_limits">Якість відео й затримка керування залежать від пристрою ведучого та обох інтернет-з’єднань. Поточна реалізація передає відео й керування; звук гри поки не передається. Трансляція зупиниться, якщо Android відкличе дозвіл на захоплення екрана.</string>
 </resources>

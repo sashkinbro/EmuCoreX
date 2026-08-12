@@ -2366,7 +2366,6 @@
     <string name="network_tab_online">PS2 in linea</string>
     <string name="network_tab_local">Rete locale</string>
     <string name="network_tab_internet">Collegamento Internet</string>
-    <string name="network_tab_remote_play">Riproduzione remota</string>
     <string name="network_tab_advanced">Avanzato</string>
     <string name="network_overview_choose_mode">Scegli come vuoi giocare</string>
     <string name="network_overview_desc">Ciascuna modalità risolve un compito diverso. Apri una scheda per visualizzare solo i passaggi e le impostazioni necessari per quella modalità.</string>
@@ -2379,14 +2378,7 @@
     <string name="network_internet_link_desc">Gioca a un gioco LAN PS2 con un altro dispositivo su Internet utilizzando un codice camera.</string>
     <string name="network_internet_link_preparing">È in corso l\'inizializzazione del trasporto sicuro della stanza. La creazione e l\'adesione alla stanza verranno visualizzati qui.</string>
     <string name="network_remote_play_title">Riproduzione remota</string>
-    <string name="network_remote_play_desc">Trasmetti in streaming un gioco in esecuzione su un altro dispositivo e ricevi l\'input del controller.</string>
-    <string name="network_remote_play_preparing">È in corso l\'inizializzazione dello streaming protetto di video e controller. L\'hosting e la partecipazione verranno visualizzati qui.</string>
     <string name="network_remote_play_notification">La tua schermata di gioco è in fase di condivisione</string>
-    <string name="network_remote_play_beginner_hint">L\'host condivide la schermata di gioco di questo dispositivo. Join apre il flusso e invia l\'input del controller 2 all\'host.</string>
-    <string name="network_remote_play_host">Condividi questa schermata</string>
-    <string name="network_remote_play_join">Partecipa a uno streaming</string>
-    <string name="network_remote_play_preview">Gioco a distanza</string>
-    <string name="network_remote_play_controls">Il giocatore 2 controlla</string>
     <string name="network_advanced_desc">Queste opzioni DEV9 e DNS sono condivise dalla rete PS2. Modificali solo quando te lo richiede una guida del server o una fase di risoluzione dei problemi.</string>
     <string name="network_internet_link_beginner_hint">Usalo quando un gioco ha una modalità LAN o Rete ma l\'altro giocatore non è connesso al tuo Wi-Fi. Un giocatore crea una stanza, condivide il codice e avvia il gioco come host.</string>
     <string name="network_session_status">Stato della sessione</string>
@@ -2405,14 +2397,7 @@
     <string name="network_error_room_not_found">Camera non trovata o scaduta</string>
     <string name="network_error_room_full">Questa stanza ha già due giocatori</string>
     <string name="network_error_connection">Impossibile stabilire la connessione</string>
-    <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">Guide</string>
-    <string name="network_netplay_title">NetPlay</string>
-    <string name="network_experimental_badge">Sperimentale</string>
-    <string name="network_netplay_desc">Esegui lo stesso gioco su due dispositivi e sincronizza l\'input del giocatore su Internet.</string>
-    <string name="network_netplay_beginner_hint">Modalità di sincronizzazione dell\'input sperimentale. Entrambi i giocatori necessitano dello stesso gioco, BIOS, versione di EmuCoreX e impostazioni di emulazione. L\'host è il giocatore 1; l\'ospite è il giocatore 2.</string>
-    <string name="network_netplay_connected">Connesso: avvia lo stesso gioco su entrambi i dispositivi</string>
-    <string name="network_netplay_launch_note">Ora avvia lo stesso gioco e accedi alla modalità locale a due giocatori su entrambi i dispositivi. Non utilizzare gli stati di salvataggio, avanzamento rapido o pausa su un solo dispositivo.</string>
     <string name="network_guides_title">Guide multigiocatore</string>
     <string name="network_guides_intro">Apri una modalità per vedere cosa fa, di cosa hanno bisogno entrambi i giocatori, i passaggi esatti di configurazione e le limitazioni note.</string>
     <string name="network_guide_purpose">Quando utilizzare questa modalità</string>
@@ -2431,12 +2416,4 @@
     <string name="network_guide_internet_requirements">Entrambi i giocatori necessitano della stessa versione del gioco e di una connessione stabile. Potrebbe essere necessario un relay TURN se la connessione diretta è bloccata.</string>
     <string name="network_guide_internet_steps">1. L\'host crea una stanza e condivide il codice di 8 caratteri.\n2. L\'ospite inserisce il codice e attende Connesso.\n3. Entrambi i giocatori avviano lo stesso gioco.\n4. Apri la modalità LAN del gioco.\n5. L\'host crea una corrispondenza; l\'ospite lo cerca e si unisce ad esso.</string>
     <string name="network_guide_internet_limits">Il gioco deve supportare la riproduzione tramite LAN o collegamento di sistema. La latenza Internet viene aggiunta al protocollo di rete del gioco. Le reti aziendali, di livello carrier o fortemente limitate potrebbero richiedere un relè TURN.</string>
-    <string name="network_guide_netplay_purpose">Utilizza NetPlay sperimentale per un gioco locale a due giocatori quando ogni persona desidera eseguire il gioco sul proprio dispositivo. EmuCoreX invia l\'input del giocatore 1 e del giocatore 2 tra due istanze dell\'emulatore.</string>
-    <string name="network_guide_netplay_requirements">Entrambi i dispositivi devono utilizzare lo stesso dump del gioco, BIOS, versione di EmuCoreX, renderer, impostazioni di velocità e patch. L\'host controlla il giocatore 1 e l\'ospite controlla il giocatore 2. Utilizza una connessione Internet stabile a bassa latenza.</string>
-    <string name="network_guide_netplay_steps">1. L\'host crea una stanza NetPlay e ne condivide il codice.\n2. L\'ospite si unisce e attende Connesso.\n3. Entrambi i giocatori avviano lo stesso gioco con un avvio pulito.\n4. Accedi allo stesso menu locale per due giocatori contemporaneamente.\n5. L\'host utilizza il giocatore 1; l\'input dell\'ospite viene mappato automaticamente sul giocatore 2.</string>
-    <string name="network_guide_netplay_limits">Si tratta di una sincronizzazione dell\'input sperimentale, non di un rollback completo. Differenze nel BIOS, nel gioco, nelle impostazioni, nei tempi, negli stati di salvataggio, nella pausa o nell\'avanzamento veloce possono causare la desincronizzazione. Riavvia entrambi i giochi se le loro schermate non corrispondono più.</string>
-    <string name="network_guide_remote_purpose">Utilizza la riproduzione remota quando il gioco viene eseguito solo sul dispositivo host. L\'ospite guarda lo streaming dello schermo dell\'host e invia indietro l\'input del controller 2, quindi il gioco stesso non necessita del supporto LAN.</string>
-    <string name="network_guide_remote_requirements">Solo l\'host necessita del gioco e del BIOS. Entrambi necessitano di EmuCoreX e di una connessione stabile. L\'host deve consentire la condivisione dello schermo Android e mantenere attiva la notifica Remote Play.</string>
-    <string name="network_guide_remote_steps">1. L\'host tocca Condividi questa schermata e approva l\'acquisizione dello schermo.\n2. Condividi il codice della camera visualizzato.\n3. L\'ospite inserisce il codice e si unisce allo streaming.\n4. L\'host avvia il gioco e apre la modalità locale a due giocatori.\n5. L\'ospite utilizza i controlli visualizzati del giocatore 2.</string>
-    <string name="network_guide_remote_limits">La qualità del video e il ritardo del controllo dipendono dal dispositivo host e da entrambe le connessioni Internet. L\'attuale implementazione trasmette in streaming l\'input video e del controller; l\'audio del gioco non è stato ancora trasmesso. La condivisione dello schermo si interrompe quando Android revoca l\'autorizzazione all\'acquisizione.</string>
 </resources>

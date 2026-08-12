@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CastConnected
-import androidx.compose.material.icons.rounded.Gamepad
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Card
@@ -40,7 +38,7 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 
-internal enum class MultiplayerGuideId { Online, LocalLink, InternetLink, NetPlay, RemotePlay }
+internal enum class MultiplayerGuideId { Online, LocalLink, InternetLink }
 
 @Composable
 internal fun MultiplayerGuidesPanel(onOpenGuide: (MultiplayerGuideId) -> Unit) {
@@ -163,8 +161,6 @@ private fun multiplayerGuideIcon(guide: MultiplayerGuideId): ImageVector = when 
     MultiplayerGuideId.Online -> Icons.Rounded.Public
     MultiplayerGuideId.LocalLink -> Icons.Rounded.Link
     MultiplayerGuideId.InternetLink -> Icons.Rounded.Public
-    MultiplayerGuideId.NetPlay -> Icons.Rounded.Gamepad
-    MultiplayerGuideId.RemotePlay -> Icons.Rounded.CastConnected
 }
 
 @StringRes
@@ -172,8 +168,6 @@ private fun multiplayerGuideTitle(guide: MultiplayerGuideId): Int = when (guide)
     MultiplayerGuideId.Online -> R.string.network_online_title
     MultiplayerGuideId.LocalLink -> R.string.network_local_link_title
     MultiplayerGuideId.InternetLink -> R.string.network_internet_link_title
-    MultiplayerGuideId.NetPlay -> R.string.network_netplay_title
-    MultiplayerGuideId.RemotePlay -> R.string.network_remote_play_title
 }
 
 @StringRes
@@ -181,8 +175,6 @@ private fun multiplayerGuideSummary(guide: MultiplayerGuideId): Int = when (guid
     MultiplayerGuideId.Online -> R.string.network_online_desc
     MultiplayerGuideId.LocalLink -> R.string.network_local_link_desc
     MultiplayerGuideId.InternetLink -> R.string.network_internet_link_desc
-    MultiplayerGuideId.NetPlay -> R.string.network_netplay_desc
-    MultiplayerGuideId.RemotePlay -> R.string.network_remote_play_desc
 }
 
 @StringRes
@@ -190,8 +182,6 @@ private fun multiplayerGuidePurpose(guide: MultiplayerGuideId): Int = when (guid
     MultiplayerGuideId.Online -> R.string.network_guide_online_purpose
     MultiplayerGuideId.LocalLink -> R.string.network_guide_local_purpose
     MultiplayerGuideId.InternetLink -> R.string.network_guide_internet_purpose
-    MultiplayerGuideId.NetPlay -> R.string.network_guide_netplay_purpose
-    MultiplayerGuideId.RemotePlay -> R.string.network_guide_remote_purpose
 }
 
 @StringRes
@@ -199,8 +189,6 @@ private fun multiplayerGuideRequirements(guide: MultiplayerGuideId): Int = when 
     MultiplayerGuideId.Online -> R.string.network_guide_online_requirements
     MultiplayerGuideId.LocalLink -> R.string.network_guide_local_requirements
     MultiplayerGuideId.InternetLink -> R.string.network_guide_internet_requirements
-    MultiplayerGuideId.NetPlay -> R.string.network_guide_netplay_requirements
-    MultiplayerGuideId.RemotePlay -> R.string.network_guide_remote_requirements
 }
 
 @StringRes
@@ -208,8 +196,6 @@ private fun multiplayerGuideSteps(guide: MultiplayerGuideId): Int = when (guide)
     MultiplayerGuideId.Online -> R.string.network_guide_online_steps
     MultiplayerGuideId.LocalLink -> R.string.network_guide_local_steps
     MultiplayerGuideId.InternetLink -> R.string.network_guide_internet_steps
-    MultiplayerGuideId.NetPlay -> R.string.network_guide_netplay_steps
-    MultiplayerGuideId.RemotePlay -> R.string.network_guide_remote_steps
 }
 
 @StringRes
@@ -217,6 +203,4 @@ private fun multiplayerGuideLimits(guide: MultiplayerGuideId): Int = when (guide
     MultiplayerGuideId.Online -> R.string.network_guide_online_limits
     MultiplayerGuideId.LocalLink -> R.string.network_guide_local_limits
     MultiplayerGuideId.InternetLink -> R.string.network_guide_internet_limits
-    MultiplayerGuideId.NetPlay -> R.string.network_guide_netplay_limits
-    MultiplayerGuideId.RemotePlay -> R.string.network_guide_remote_limits
 }

@@ -2366,7 +2366,6 @@
     <string name="network_tab_online">PS2 ऑनलाइन</string>
     <string name="network_tab_local">स्थानीय नेटवर्क</string>
     <string name="network_tab_internet">इंटरनेट लिंक</string>
-    <string name="network_tab_remote_play">रिमोट प्ले</string>
     <string name="network_tab_advanced">विकसित</string>
     <string name="network_overview_choose_mode">चुनें कि आप कैसे खेलना चाहते हैं</string>
     <string name="network_overview_desc">प्रत्येक मोड एक अलग कार्य हल करता है। केवल उस मोड के लिए आवश्यक चरण और सेटिंग्स देखने के लिए एक कार्ड खोलें।</string>
@@ -2379,14 +2378,7 @@
     <string name="network_internet_link_desc">रूम कोड का उपयोग करके इंटरनेट पर किसी अन्य डिवाइस के साथ PS2 LAN गेम खेलें।</string>
     <string name="network_internet_link_preparing">सुरक्षित कक्ष परिवहन आरंभ किया जा रहा है। कक्ष निर्माण और जुड़ाव यहां दिखाई देगा.</string>
     <string name="network_remote_play_title">रिमोट प्ले</string>
-    <string name="network_remote_play_desc">किसी चल रहे गेम को किसी अन्य डिवाइस पर स्ट्रीम करें और उसका नियंत्रक इनपुट प्राप्त करें।</string>
-    <string name="network_remote_play_preparing">सुरक्षित वीडियो और नियंत्रक स्ट्रीमिंग आरंभ की जा रही है। होस्टिंग और जॉइनिंग यहां दिखाई देगी.</string>
     <string name="network_remote_play_notification">आपकी गेम स्क्रीन साझा की जा रही है</string>
-    <string name="network_remote_play_beginner_hint">होस्ट इस डिवाइस की गेम स्क्रीन साझा करता है। जॉइन स्ट्रीम खोलता है और कंट्रोलर 2 इनपुट को होस्ट को वापस भेजता है।</string>
-    <string name="network_remote_play_host">इस स्क्रीन को साझा करें</string>
-    <string name="network_remote_play_join">एक धारा में शामिल हों</string>
-    <string name="network_remote_play_preview">रिमोट गेम</string>
-    <string name="network_remote_play_controls">प्लेयर 2 नियंत्रण</string>
     <string name="network_advanced_desc">ये DEV9 और DNS विकल्प PS2 नेटवर्किंग द्वारा साझा किए जाते हैं। उन्हें केवल तभी बदलें जब कोई सर्वर गाइड या समस्या निवारण चरण आपसे ऐसा करने के लिए कहे।</string>
     <string name="network_internet_link_beginner_hint">इसका उपयोग तब करें जब किसी गेम में LAN या नेटवर्क मोड हो लेकिन दूसरा प्लेयर आपके वाई-फ़ाई पर न हो। एक खिलाड़ी एक कमरा बनाता है, कोड साझा करता है, और मेजबान के रूप में खेल शुरू करता है।</string>
     <string name="network_session_status">सत्र की स्थिति</string>
@@ -2405,14 +2397,7 @@
     <string name="network_error_room_not_found">कमरा नहीं मिला या समाप्त हो गया</string>
     <string name="network_error_room_full">इस कमरे में पहले से ही दो खिलाड़ी हैं</string>
     <string name="network_error_connection">कनेक्शन स्थापित नहीं किया जा सका</string>
-    <string name="network_tab_netplay">कुल चालन</string>
     <string name="network_tab_guides">गाइड</string>
-    <string name="network_netplay_title">कुल चालन</string>
-    <string name="network_experimental_badge">प्रायोगिक</string>
-    <string name="network_netplay_desc">एक ही गेम को दो डिवाइस पर चलाएं और प्लेयर इनपुट को इंटरनेट पर सिंक्रोनाइज़ करें।</string>
-    <string name="network_netplay_beginner_hint">प्रायोगिक इनपुट-सिंक मोड. दोनों खिलाड़ियों को समान गेम, BIOS, EmuCoreX संस्करण और इम्यूलेशन सेटिंग्स की आवश्यकता होती है। मेज़बान खिलाड़ी 1 है; अतिथि खिलाड़ी 2 है।</string>
-    <string name="network_netplay_connected">कनेक्टेड - दोनों डिवाइस पर एक ही गेम लॉन्च करें</string>
-    <string name="network_netplay_launch_note">अब एक ही गेम लॉन्च करें और दोनों डिवाइस पर इसका स्थानीय दो-खिलाड़ी मोड दर्ज करें। केवल एक डिवाइस पर सेव स्टेट्स, फ़ास्ट-फ़ॉरवर्ड या पॉज़ का उपयोग न करें।</string>
     <string name="network_guides_title">मल्टीप्लेयर गाइड</string>
     <string name="network_guides_intro">यह क्या करता है, दोनों खिलाड़ियों को क्या चाहिए, सटीक सेटअप चरण और ज्ञात सीमाएँ देखने के लिए एक मोड खोलें।</string>
     <string name="network_guide_purpose">इस मोड का उपयोग कब करें</string>
@@ -2431,12 +2416,4 @@
     <string name="network_guide_internet_requirements">दोनों खिलाड़ियों को एक ही गेम संस्करण और स्थिर इंटरनेट चाहिए। सीधा कनेक्शन अवरुद्ध होने पर TURN रिले की आवश्यकता हो सकती है।</string>
     <string name="network_guide_internet_steps">1. होस्ट एक कमरा बनाता है और 8-अक्षर का कोड साझा करता है।\n2. अतिथि कोड दर्ज करता है और कनेक्टेड की प्रतीक्षा करता है।\n3. दोनों खिलाड़ी एक ही गेम लॉन्च करते हैं।\n4. गेम का LAN मोड खोलें.\n5. मेज़बान एक मेल बनाता है; अतिथि इसे खोजता है और इसमें शामिल होता है।</string>
     <string name="network_guide_internet_limits">गेम को LAN या सिस्टम-लिंक प्ले का समर्थन करना चाहिए। इंटरनेट विलंबता को गेम के अपने नेटवर्क प्रोटोकॉल में जोड़ा जाता है। कॉर्पोरेट, कैरियर-ग्रेड या अत्यधिक प्रतिबंधित नेटवर्क को TURN रिले की आवश्यकता हो सकती है।</string>
-    <string name="network_guide_netplay_purpose">जब प्रत्येक व्यक्ति अपने डिवाइस पर गेम चलाना चाहता हो तो स्थानीय दो-खिलाड़ियों वाले गेम के लिए प्रयोगात्मक नेटप्ले का उपयोग करें। EmuCoreX दो एमुलेटर इंस्टेंसेस के बीच प्लेयर 1 और प्लेयर 2 इनपुट भेजता है।</string>
-    <string name="network_guide_netplay_requirements">दोनों डिवाइसों को समान गेम डंप, BIOS, EmuCoreX संस्करण, रेंडरर, स्पीड सेटिंग्स और पैच का उपयोग करना चाहिए। होस्ट प्लेयर 1 को नियंत्रित करता है और अतिथि प्लेयर 2 को नियंत्रित करता है। स्थिर कम-विलंबता इंटरनेट का उपयोग करें।</string>
-    <string name="network_guide_netplay_steps">1. होस्ट एक नेटप्ले रूम बनाता है और उसका कोड साझा करता है।\n2. अतिथि जुड़ता है और कनेक्टेड की प्रतीक्षा करता है।\n3. दोनों खिलाड़ी क्लीन बूट से एक ही गेम लॉन्च करते हैं।\n4. एक ही समय में समान स्थानीय दो-खिलाड़ी मेनू दर्ज करें।\n5. मेज़बान खिलाड़ी 1 का उपयोग करता है; अतिथि इनपुट स्वचालित रूप से प्लेयर 2 पर मैप किया जाता है।</string>
-    <string name="network_guide_netplay_limits">यह प्रायोगिक इनपुट सिंक्रोनाइज़ेशन है, पूर्ण रोलबैक नहीं। BIOS, गेम, सेटिंग्स, टाइमिंग, सेव स्टेट्स, पॉज़ या फ़ास्ट-फ़ॉरवर्ड में अंतर डीसिंक्रनाइज़ेशन का कारण बन सकता है। यदि दोनों गेम की स्क्रीन मेल नहीं खाती है तो पुनः प्रारंभ करें।</string>
-    <string name="network_guide_remote_purpose">जब गेम केवल होस्ट डिवाइस पर चलता हो तो रिमोट प्ले का उपयोग करें। अतिथि होस्ट की स्क्रीन स्ट्रीम देखता है और नियंत्रक 2 इनपुट को वापस भेजता है, इसलिए गेम को LAN समर्थन की आवश्यकता नहीं होती है।</string>
-    <string name="network_guide_remote_requirements">केवल होस्ट को गेम और BIOS चाहिए। दोनों को EmuCoreX और स्थिर कनेक्शन चाहिए। होस्ट को Android स्क्रीन शेयरिंग की अनुमति देनी होगी और Remote Play सूचना सक्रिय रखनी होगी।</string>
-    <string name="network_guide_remote_steps">1. होस्ट इस स्क्रीन को साझा करें पर टैप करता है और स्क्रीन कैप्चर को मंजूरी देता है।\n2. प्रदर्शित कक्ष कोड साझा करें.\n3. अतिथि कोड दर्ज करता है और स्ट्रीम में शामिल होता है।\n4. होस्ट गेम लॉन्च करता है और इसका स्थानीय दो-खिलाड़ी मोड खोलता है।\n5. अतिथि प्रदर्शित प्लेयर 2 नियंत्रणों का उपयोग करता है।</string>
-    <string name="network_guide_remote_limits">वीडियो की गुणवत्ता और नियंत्रण में देरी होस्ट डिवाइस और दोनों इंटरनेट कनेक्शन पर निर्भर करती है। वर्तमान कार्यान्वयन वीडियो और नियंत्रक इनपुट स्ट्रीम करता है; गेम ऑडियो अभी प्रसारित नहीं हुआ है. जब एंड्रॉइड कैप्चर अनुमति रद्द कर देता है तो स्क्रीन शेयरिंग बंद हो जाती है।</string>
 </resources>

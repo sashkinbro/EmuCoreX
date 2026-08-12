@@ -2383,8 +2383,6 @@
     <string name="network_tab_online">PS2 Online</string>
     <string name="network_tab_local">Local network</string>
     <string name="network_tab_internet">Internet Link</string>
-    <string name="network_tab_netplay">NetPlay</string>
-    <string name="network_tab_remote_play">Remote Play</string>
     <string name="network_tab_guides">Guides</string>
     <string name="network_tab_advanced">Advanced</string>
     <string name="network_overview_choose_mode">Choose how you want to play</string>
@@ -2396,22 +2394,9 @@
     <string name="network_local_link_desc">Connect two devices on the same Wi-Fi or phone hotspot.</string>
     <string name="network_internet_link_title">Internet Link</string>
     <string name="network_internet_link_desc">Play a PS2 LAN game with another device over the internet using a room code.</string>
-    <string name="network_netplay_title">NetPlay</string>
-    <string name="network_experimental_badge">Experimental</string>
-    <string name="network_netplay_desc">Run the same game on two devices and synchronize player input over the internet.</string>
-    <string name="network_netplay_beginner_hint">Experimental input-sync mode. Both players need the same game, BIOS, EmuCoreX version and emulation settings. Host is player 1; guest is player 2.</string>
-    <string name="network_netplay_connected">Connected — launch the same game on both devices</string>
-    <string name="network_netplay_launch_note">Now launch the same game and enter its local two-player mode on both devices. Do not use save states, fast-forward or pause on only one device.</string>
     <string name="network_internet_link_preparing">Secure room transport is being initialized. Room creation and joining will appear here.</string>
     <string name="network_remote_play_title">Remote Play</string>
-    <string name="network_remote_play_desc">Stream a running game to another device and receive its controller input.</string>
-    <string name="network_remote_play_preparing">Secure video and controller streaming is being initialized. Hosting and joining will appear here.</string>
     <string name="network_remote_play_notification">Your game screen is being shared</string>
-    <string name="network_remote_play_beginner_hint">Host shares this device\'s game screen. Join opens the stream and sends controller 2 input back to the host.</string>
-    <string name="network_remote_play_host">Share this screen</string>
-    <string name="network_remote_play_join">Join a stream</string>
-    <string name="network_remote_play_preview">Remote game</string>
-    <string name="network_remote_play_controls">Player 2 controls</string>
     <string name="network_advanced_desc">These DEV9 and DNS options are shared by PS2 networking. Change them only when a server guide or troubleshooting step asks you to.</string>
     <string name="network_internet_link_beginner_hint">Use this when a game has a LAN or Network mode but the other player is not on your Wi-Fi. One player creates a room, shares the code, and starts the game as host.</string>
     <string name="network_session_status">Session status</string>
@@ -2448,12 +2433,4 @@
     <string name="network_guide_internet_requirements">Both players need the same game version and a stable internet connection. A TURN relay may be needed when direct peer-to-peer traffic is blocked.</string>
     <string name="network_guide_internet_steps">1. The host creates a room and shares the 8-character code.\n2. The guest enters the code and waits for Connected.\n3. Both players launch the same game.\n4. Open the game\'s LAN mode.\n5. The host creates a match; the guest searches for and joins it.</string>
     <string name="network_guide_internet_limits">The game must support LAN or system-link play. Internet latency is added to the game\'s own network protocol. Corporate, carrier-grade or heavily restricted networks may require a TURN relay.</string>
-    <string name="network_guide_netplay_purpose">Use experimental NetPlay for a local two-player game when each person wants to run the game on their own device. EmuCoreX sends player 1 and player 2 input between two emulator instances.</string>
-    <string name="network_guide_netplay_requirements">Both devices must use the same game dump, BIOS, EmuCoreX version, renderer, speed settings and patches. Host controls player 1 and guest controls player 2. Use stable low-latency internet.</string>
-    <string name="network_guide_netplay_steps">1. The host creates a NetPlay room and shares its code.\n2. The guest joins and waits for Connected.\n3. Both players launch the same game from a clean boot.\n4. Enter the same local two-player menu at the same time.\n5. Host uses player 1; guest input is mapped to player 2 automatically.</string>
-    <string name="network_guide_netplay_limits">This is experimental input synchronization, not full rollback. Differences in BIOS, game, settings, timing, save states, pause or fast-forward can cause desynchronization. Restart both games if their screens no longer match.</string>
-    <string name="network_guide_remote_purpose">Use Remote Play when the game runs only on the host device. The guest watches the host\'s screen stream and sends controller 2 input back, so the game itself does not need LAN support.</string>
-    <string name="network_guide_remote_requirements">Only the host needs the game and BIOS. Both players need EmuCoreX and a stable connection. The host must approve Android\'s screen-sharing prompt and keep the Remote Play notification active.</string>
-    <string name="network_guide_remote_steps">1. The host taps Share this screen and approves screen capture.\n2. Share the displayed room code.\n3. The guest enters the code and joins the stream.\n4. The host launches the game and opens its local two-player mode.\n5. The guest uses the displayed player 2 controls.</string>
-    <string name="network_guide_remote_limits">Video quality and control delay depend on the host device and both internet connections. The current implementation streams video and controller input; game audio is not transmitted yet. Screen sharing stops when Android revokes capture permission.</string>
 </resources>

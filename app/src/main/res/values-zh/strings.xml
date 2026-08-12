@@ -2367,7 +2367,6 @@
     <string name="network_tab_online">PS2在线</string>
     <string name="network_tab_local">本地网络</string>
     <string name="network_tab_internet">互联网链接</string>
-    <string name="network_tab_remote_play">远程游戏</string>
     <string name="network_tab_advanced">先进的</string>
     <string name="network_overview_choose_mode">选择您想玩的方式</string>
     <string name="network_overview_desc">每种模式解决不同的任务。打开卡片仅查看该模式所需的步骤和设置。</string>
@@ -2380,14 +2379,7 @@
     <string name="network_internet_link_desc">使用房间代码通过互联网与另一台设备玩 PS2 LAN 游戏。</string>
     <string name="network_internet_link_preparing">安全房间运输正在初始化。房间创建和加入将出现在这里。</string>
     <string name="network_remote_play_title">远程游戏</string>
-    <string name="network_remote_play_desc">将正在运行的游戏流式传输到另一台设备并接收其控制器输入。</string>
-    <string name="network_remote_play_preparing">安全视频和控制器流正在初始化。托管和加入将出现在这里。</string>
     <string name="network_remote_play_notification">您的游戏屏幕正在共享</string>
-    <string name="network_remote_play_beginner_hint">主机共享该设备的游戏屏幕。 Join 打开流并将控制器 2 输入发送回主机。</string>
-    <string name="network_remote_play_host">分享此屏幕</string>
-    <string name="network_remote_play_join">加入直播</string>
-    <string name="network_remote_play_preview">远程游戏</string>
-    <string name="network_remote_play_controls">玩家 2 控制</string>
     <string name="network_advanced_desc">这些 DEV9 和 DNS 选项由 PS2 网络共享。仅当服务器指南或故障排除步骤要求您更改它们时。</string>
     <string name="network_internet_link_beginner_hint">当游戏具有 LAN 或网络模式但其他玩家未使用您的 Wi-Fi 时，请使用此选项。一名玩家创建一个房间，共享代码，并作为主机开始游戏。</string>
     <string name="network_session_status">会话状态</string>
@@ -2406,14 +2398,7 @@
     <string name="network_error_room_not_found">房间未找到或已过期</string>
     <string name="network_error_room_full">该房间已有两名玩家</string>
     <string name="network_error_connection">无法建立连接</string>
-    <string name="network_tab_netplay">NetPlay</string>
     <string name="network_tab_guides">指南</string>
-    <string name="network_netplay_title">NetPlay</string>
-    <string name="network_experimental_badge">实验性</string>
-    <string name="network_netplay_desc">在两台设备上运行同一游戏，并通过互联网同步玩家输入。</string>
-    <string name="network_netplay_beginner_hint">实验性输入同步模式。双方必须使用相同的游戏、BIOS、EmuCoreX 版本和模拟设置。主机为玩家 1，访客为玩家 2。</string>
-    <string name="network_netplay_connected">已连接 — 请在两台设备上启动同一游戏</string>
-    <string name="network_netplay_launch_note">现在请在两台设备上启动同一游戏并进入本地双人模式。不要只在一台设备上使用即时存档、快进或暂停。</string>
     <string name="network_guides_title">多人游戏指南</string>
     <string name="network_guides_intro">打开一种模式即可查看其用途、双方所需条件、详细连接步骤和已知限制。</string>
     <string name="network_guide_purpose">适用场景</string>
@@ -2432,12 +2417,4 @@
     <string name="network_guide_internet_requirements">双方需要相同的游戏版本和稳定的互联网连接。若网络阻止点对点直连，可能需要 TURN 中继。</string>
     <string name="network_guide_internet_steps">1. 主机创建房间并分享 8 位代码。\n2. 访客输入代码并等待“已连接”。\n3. 双方启动同一游戏。\n4. 打开游戏的 LAN 模式。\n5. 主机创建比赛，访客搜索并加入。</string>
     <string name="network_guide_internet_limits">游戏必须支持 LAN 或系统连接。互联网延迟会叠加到游戏自身的网络协议。企业网络、运营商级 NAT 或严格受限网络可能需要 TURN 中继。</string>
-    <string name="network_guide_netplay_purpose">当双方希望各自在自己的设备上运行本地双人游戏时，可使用实验性 NetPlay。EmuCoreX 会在两个模拟器实例之间传输玩家 1 和玩家 2 的输入。</string>
-    <string name="network_guide_netplay_requirements">两台设备必须使用相同的游戏镜像、BIOS、EmuCoreX 版本、渲染器、速度设置和补丁。主机控制玩家 1，访客控制玩家 2。请使用稳定、低延迟的网络。</string>
-    <string name="network_guide_netplay_steps">1. 主机创建 NetPlay 房间并分享代码。\n2. 访客加入并等待“已连接”。\n3. 双方从干净启动开始运行同一游戏。\n4. 同时进入相同的本地双人菜单。\n5. 主机使用玩家 1；访客输入会自动映射到玩家 2。</string>
-    <string name="network_guide_netplay_limits">这是实验性输入同步，不是完整的回滚网络代码。BIOS、游戏、设置、时序、即时存档、暂停或快进的差异都可能导致不同步。若画面不再一致，请重新启动双方游戏。</string>
-    <string name="network_guide_remote_purpose">当游戏只在主机设备上运行时，请使用 Remote Play。访客观看主机屏幕串流并发送玩家 2 输入，因此游戏本身不需要支持 LAN。</string>
-    <string name="network_guide_remote_requirements">只有主机需要游戏和 BIOS。双方都需要 EmuCoreX 和稳定连接。主机必须允许 Android 屏幕共享，并保持 Remote Play 通知处于活动状态。</string>
-    <string name="network_guide_remote_steps">1. 主机点击“共享此屏幕”并允许屏幕捕获。\n2. 分享显示的房间代码。\n3. 访客输入代码并加入串流。\n4. 主机启动游戏并打开本地双人模式。\n5. 访客使用屏幕上的玩家 2 控件。</string>
-    <string name="network_guide_remote_limits">视频质量和操作延迟取决于主机设备及双方网络。目前会传输视频和手柄输入；游戏音频尚未传输。当 Android 撤销捕获权限时，屏幕共享会停止。</string>
 </resources>
