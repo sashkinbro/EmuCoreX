@@ -2796,20 +2796,6 @@ private fun SettingsContent(
                             onResetToDefault = { viewModel.setEnableFastCdvd(defaults.enableFastCdvd) }
                         )
                     }
-                    SettingsSection(title = stringResource(R.string.settings_cheats_tab)) {
-                        ToggleItem(
-                            icon = Icons.Rounded.Star,
-                            title = stringResource(R.string.settings_enable_cheats),
-                            subtitle = stringResource(R.string.settings_enable_cheats_desc),
-                            checked = uiState.enableCheats,
-                            onCheckedChange = viewModel::setEnableCheats,
-                            helpText = stringResource(R.string.settings_help_cheats),
-                            onResetToDefault = { viewModel.setEnableCheats(defaults.enableCheats) }
-                        )
-                        SettingsInlineNote(
-                            text = stringResource(R.string.settings_cheats_note)
-                        )
-                    }
                 }
 
                 SettingsTab.Fixes -> {
@@ -5533,7 +5519,6 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Emulation, R.string.settings_ee_cycle_skip),
         entry(SettingsTab.Emulation, R.string.settings_mtvu),
         entry(SettingsTab.Emulation, R.string.settings_fast_cdvd),
-        entry(SettingsTab.Emulation, R.string.settings_enable_cheats),
         entry(SettingsTab.Emulation, R.string.settings_frame_skip),
         entry(SettingsTab.Fixes, R.string.settings_cpu_sprite_render_size),
         entry(SettingsTab.Fixes, R.string.settings_gpu_target_clut),
