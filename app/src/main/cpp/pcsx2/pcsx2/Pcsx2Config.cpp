@@ -745,7 +745,7 @@ Pcsx2Config::GSOptions::GSOptions()
 	OsdShowInputRec = true;
 	OsdShowTextureReplacements = false;
 
-	HWDownloadMode = GSHardwareDownloadMode::Disabled;
+	HWDownloadMode = GSHardwareDownloadMode::NoReadbacks;
 	HWSpinGPUForReadbacks = false;
 	HWSpinCPUForReadbacks = false;
 	GPUPaletteConversion = false;

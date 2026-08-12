@@ -10,7 +10,7 @@ class GsHackDefaultsTest {
         assertEquals(-1, GsHackDefaults.TRILINEAR_FILTERING_DEFAULT)
         assertEquals(1, GsHackDefaults.BLENDING_ACCURACY_DEFAULT)
         assertEquals(2, GsHackDefaults.TEXTURE_PRELOADING_DEFAULT)
-        assertEquals(4, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT)
+        assertEquals(2, GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT)
         assertEquals(true, GsHackDefaults.ANTI_BLUR_DEFAULT)
         assertEquals(GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT, PerformanceProfiles.safeConfig.hwDownloadMode)
         assertEquals(GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT, PerformanceProfiles.fastConfig.hwDownloadMode)

@@ -886,7 +886,7 @@ struct Pcsx2Config
 		BiFiltering TextureFiltering = DEFAULT_TEXTURE_FILTERING_MODE;
 		TexturePreloadingLevel TexturePreloading = TexturePreloadingLevel::Full;
 		GSDumpCompressionMethod GSDumpCompression = GSDumpCompressionMethod::Zstandard;
-		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::Disabled;
+		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::NoReadbacks;
 		GSCASMode CASMode = DEFAULT_CAS_MODE;
 		GSSGSRMode SGSRMode = DEFAULT_SGSR_MODE;
 		u8 Dithering = 2;

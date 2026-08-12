@@ -26,10 +26,9 @@ object GsHackDefaults {
     const val HW_MIPMAPPING_DEFAULT = true
     // Preserve the sharper PS2 output used before the mobile profile rollout.
     const val ANTI_BLUR_DEFAULT = true
-    // Preserve the non-blocking Android path used before the mobile profile rollout.
-    // NoReadbacks still synchronizes EE/GS download requests before discarding the readback;
-    // Disabled avoids that otherwise pointless stall and remains user-overridable per game.
-    const val HW_DOWNLOAD_MODE_DEFAULT = 4
+    // Keep EE/GS download requests ordered while avoiding the cost of GPU readbacks.
+    // Fully disabling downloads can hang games which depend on this synchronization.
+    const val HW_DOWNLOAD_MODE_DEFAULT = 2
     const val HW_DOWNLOAD_MODE_MIN = 0
     const val HW_DOWNLOAD_MODE_MAX = 5
     const val FRAME_SKIP_DEFAULT = 0
