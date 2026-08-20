@@ -50,7 +50,8 @@ data class PlayerProfile(
     val playerTag: String = "",
     val profileAccent: String = DEFAULT_PROFILE_ACCENT,
     val favoriteGameKeys: List<String> = emptyList(),
-    val isProMember: Boolean = false
+    val isProMember: Boolean = false,
+    val publicDevice: PublicPlayerDevice? = null
 )
 
 data class PlayerGamePlayStat(
@@ -522,6 +523,8 @@ class PlayerProfileRepository(context: Context) {
                 )
             }
         }.await()
+        // Achievement sync is additive and must never make play-time persistence fail.
+        runCatching { EmuAchievementRepository(appContext).evaluateCurrentProfile() }
     }
 
     private suspend fun removeLegacyAutotestProfileEntries(uid: String) {
@@ -731,7 +734,8 @@ class PlayerProfileRepository(context: Context) {
             playerTag = getString(FIELD_PLAYER_TAG) ?: buildPlayerTag(uid),
             profileAccent = getString(FIELD_PROFILE_ACCENT) ?: DEFAULT_PROFILE_ACCENT,
             favoriteGameKeys = stringList(FIELD_FAVORITE_GAME_KEYS),
-            isProMember = getBoolean(FIELD_PRO_MEMBER) == true
+            isProMember = getBoolean(FIELD_PRO_MEMBER) == true,
+            publicDevice = publicDevice()
         )
     }
 
@@ -751,7 +755,22 @@ class PlayerProfileRepository(context: Context) {
             playerTag = getString(FIELD_PLAYER_TAG) ?: buildPlayerTag(uid),
             profileAccent = getString(FIELD_PROFILE_ACCENT) ?: DEFAULT_PROFILE_ACCENT,
             favoriteGameKeys = stringList(FIELD_FAVORITE_GAME_KEYS),
-            isProMember = getBoolean(FIELD_PRO_MEMBER) == true
+            isProMember = getBoolean(FIELD_PRO_MEMBER) == true,
+            publicDevice = publicDevice()
+        )
+    }
+
+    private fun DocumentSnapshot.publicDevice(): PublicPlayerDevice? {
+        if (getBoolean("deviceVisibility") != true) return null
+        val device = get("primaryDevice") as? Map<*, *> ?: return null
+        return PublicPlayerDevice(
+            displayName = device["displayName"] as? String ?: return null,
+            soc = device["soc"] as? String ?: "",
+            gpuFamily = device["gpuFamily"] as? String ?: "",
+            ramMb = (device["ramMb"] as? Number)?.toLong() ?: 0L,
+            androidVersion = device["androidVersion"] as? String ?: "",
+            appVersion = device["appVersion"] as? String ?: "",
+            coreVersion = device["coreVersion"] as? String ?: ""
         )
     }
 

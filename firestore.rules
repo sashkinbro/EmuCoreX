@@ -1,0 +1,260 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'sashabro1997@gmail.com';
+    }
+
+    function shortString(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    function optionalString(data, key, maxLength) {
+      return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLength);
+    }
+
+    function validProfileWrite(uid) {
+      return owns(uid)
+        && request.resource.data.uid == uid
+        && optionalString(request.resource.data, 'displayName', 32)
+        && optionalString(request.resource.data, 'photoURL', 500)
+        && optionalString(request.resource.data, 'playerTag', 16)
+        && (!('totalPlayTimeMs' in request.resource.data)
+          || (request.resource.data.totalPlayTimeMs is int && request.resource.data.totalPlayTimeMs >= 0))
+        && (!('gamesPlayed' in request.resource.data)
+          || (request.resource.data.gamesPlayed is int && request.resource.data.gamesPlayed >= 0));
+    }
+
+    function validDevice(data, uid, deviceId) {
+      return data.keys().hasOnly([
+          'uid', 'deviceId', 'displayName', 'manufacturer', 'model', 'soc', 'gpuFamily',
+          'ramMb', 'androidVersion', 'appVersion', 'coreVersion', 'isCurrent',
+          'isPublic', 'createdAt', 'lastSeenAt'
+        ])
+        && data.uid == uid
+        && data.deviceId == deviceId
+        && shortString(data.displayName, 120)
+        && optionalString(data, 'manufacturer', 80)
+        && optionalString(data, 'model', 120)
+        && optionalString(data, 'soc', 160)
+        && optionalString(data, 'gpuFamily', 40)
+        && data.ramMb is int && data.ramMb >= 0 && data.ramMb <= 262144
+        && optionalString(data, 'androidVersion', 40)
+        && optionalString(data, 'appVersion', 40)
+        && optionalString(data, 'coreVersion', 40)
+        && data.isCurrent is bool
+        && data.isPublic is bool;
+    }
+
+    function validUnlock(data, unlockId) {
+      return data.keys().hasOnly([
+          'uid', 'achievementId', 'unlockedAt', 'progress', 'target', 'catalogVersion',
+          'sourceGameSerial', 'visibility'
+        ])
+        && data.uid == request.auth.uid
+        && shortString(data.achievementId, 80)
+        && unlockId == request.auth.uid + '_' + data.achievementId
+        && data.progress is int && data.progress >= 1
+        && data.target is int && data.target >= 1
+        && data.catalogVersion is int && data.catalogVersion >= 1
+        && optionalString(data, 'sourceGameSerial', 32)
+        && data.visibility in ['public', 'private']
+        && data.unlockedAt == request.time;
+    }
+
+    function validFeedEvent(data, uid, eventId) {
+      return data.keys().hasOnly([
+          'uid', 'eventId', 'type', 'achievementId', 'gameSerial', 'gameTitle',
+          'value', 'visibility', 'createdAt'
+        ])
+        && data.uid == uid
+        && data.eventId == eventId
+        && data.type in ['achievement_unlocked', 'new_game', 'play_time_milestone', 'arcade_debut', 'device_added']
+        && optionalString(data, 'achievementId', 80)
+        && optionalString(data, 'gameSerial', 32)
+        && optionalString(data, 'gameTitle', 120)
+        && (!('value' in data) || (data.value is int && data.value >= 0))
+        && data.visibility in ['public', 'friends', 'private']
+        && data.createdAt == request.time;
+    }
+
+    function validFriendship(data, friendshipId) {
+      return data.keys().hasOnly(['id', 'members', 'requestedBy', 'status', 'createdAt', 'updatedAt'])
+        && data.id == friendshipId
+        && data.members is list
+        && data.members.size() == 2
+        && data.members[0] != data.members[1]
+        && data.requestedBy in data.members
+        && data.status in ['pending', 'accepted'];
+    }
+
+    match /users/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if validProfileWrite(uid);
+      allow delete: if owns(uid);
+
+      match /activity/{day} {
+        allow read, write: if owns(uid);
+      }
+
+      match /achievementProgress/{achievementId} {
+        allow read, create, update: if owns(uid)
+          && request.resource.data.keys().hasOnly(['achievementId', 'progress', 'target', 'updatedAt'])
+          && request.resource.data.achievementId == achievementId
+          && request.resource.data.progress is int
+          && request.resource.data.progress >= 0
+          && request.resource.data.target is int
+          && request.resource.data.target >= 1;
+        allow delete: if owns(uid);
+      }
+
+      match /devices/{deviceId} {
+        allow read: if owns(uid);
+        allow create, update: if owns(uid) && validDevice(request.resource.data, uid, deviceId);
+        allow delete: if owns(uid);
+      }
+
+      match /emulatorProfiles/{profileId} {
+        allow read, delete: if owns(uid);
+        allow create, update: if owns(uid)
+          && request.resource.data.keys().hasOnly([
+            'uid', 'profileId', 'name', 'schemaVersion', 'appVersion', 'coreVersion',
+            'sourceDeviceId', 'portableSettings', 'perGameSettings', 'createdAt', 'updatedAt'
+          ])
+          && request.resource.data.uid == uid
+          && request.resource.data.profileId == profileId
+          && shortString(request.resource.data.name, 64)
+          && request.resource.data.schemaVersion is int
+          && request.resource.data.schemaVersion >= 1
+          && optionalString(request.resource.data, 'appVersion', 40)
+          && optionalString(request.resource.data, 'coreVersion', 40)
+          && optionalString(request.resource.data, 'sourceDeviceId', 80)
+          && request.resource.data.portableSettings is map
+          && request.resource.data.perGameSettings is map;
+      }
+
+      match /blocks/{blockedUid} {
+        allow read, delete: if owns(uid);
+        allow create, update: if owns(uid)
+          && blockedUid != uid
+          && request.resource.data.keys().hasOnly(['uid', 'blockedUid', 'createdAt'])
+          && request.resource.data.uid == uid
+          && request.resource.data.blockedUid == blockedUid;
+      }
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if validProfileWrite(uid);
+      allow delete: if owns(uid);
+
+      match /games/{gameKey} {
+        allow read: if signedIn();
+        allow write: if owns(uid);
+      }
+
+      match /feed/{eventId} {
+        allow read: if signedIn() && (
+          resource.data.visibility == 'public'
+          || resource.data.uid == request.auth.uid
+          || (resource.data.visibility == 'friends' && (
+            (exists(/databases/$(database)/documents/friendships/$(request.auth.uid + '_' + uid))
+              && get(/databases/$(database)/documents/friendships/$(request.auth.uid + '_' + uid)).data.status == 'accepted')
+            || (exists(/databases/$(database)/documents/friendships/$(uid + '_' + request.auth.uid))
+              && get(/databases/$(database)/documents/friendships/$(uid + '_' + request.auth.uid)).data.status == 'accepted')
+          ))
+        );
+        allow create: if owns(uid) && validFeedEvent(request.resource.data, uid, eventId);
+        allow delete: if owns(uid);
+        allow update: if false;
+      }
+    }
+
+    match /leaderboardPlayTime/{uid} {
+      allow read: if signedIn();
+      allow create, update: if validProfileWrite(uid);
+      allow delete: if owns(uid);
+    }
+
+    match /achievementUnlocks/{unlockId} {
+      allow read: if signedIn() && (resource.data.visibility == 'public' || resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && validUnlock(request.resource.data, unlockId);
+      allow update, delete: if false;
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn()
+        && validFriendship(request.resource.data, friendshipId)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.auth.uid in request.resource.data.members
+        && (
+          (request.resource.data.members[0] == request.auth.uid
+            && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/blocks/$(request.resource.data.members[1]))
+            && !exists(/databases/$(database)/documents/users/$(request.resource.data.members[1])/blocks/$(request.auth.uid)))
+          ||
+          (request.resource.data.members[1] == request.auth.uid
+            && !exists(/databases/$(database)/documents/users/$(request.auth.uid)/blocks/$(request.resource.data.members[0]))
+            && !exists(/databases/$(database)/documents/users/$(request.resource.data.members[0])/blocks/$(request.auth.uid)))
+        );
+      allow update: if signedIn()
+        && validFriendship(request.resource.data, friendshipId)
+        && request.auth.uid in resource.data.members
+        && request.resource.data.members == resource.data.members
+        && request.resource.data.requestedBy == resource.data.requestedBy
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.auth.uid != resource.data.requestedBy
+        && !exists(/databases/$(database)/documents/users/$(resource.data.members[0])/blocks/$(resource.data.members[1]))
+        && !exists(/databases/$(database)/documents/users/$(resource.data.members[1])/blocks/$(resource.data.members[0]));
+      allow delete: if signedIn() && request.auth.uid in resource.data.members;
+    }
+
+    match /games/{gameId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'gameId', 'rating', 'text', 'uid', 'displayName', 'photoURL', 'phoneBrand',
+          'phoneId', 'phoneModel', 'phoneName', 'phoneCpu', 'phoneRam', 'createdAt'
+        ])
+        && (request.resource.data.gameId == gameId || request.resource.data.gameId is int)
+        && shortString(request.resource.data.text, 800)
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'rating', 'text', 'phoneBrand', 'phoneId', 'phoneModel', 'phoneName', 'phoneCpu', 'phoneRam'
+        ])
+        && shortString(request.resource.data.text, 800)
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    match /releases/{releaseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
