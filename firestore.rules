@@ -23,6 +23,20 @@ service cloud.firestore {
       return !(key in data) || data[key] == null || (data[key] is string && data[key].size() <= maxLength);
     }
 
+    function validPublicDevice(data) {
+      return data is map
+        && data.keys().hasOnly([
+          'displayName', 'soc', 'gpuFamily', 'ramMb', 'androidVersion', 'appVersion', 'coreVersion'
+        ])
+        && shortString(data.displayName, 120)
+        && optionalString(data, 'soc', 160)
+        && optionalString(data, 'gpuFamily', 40)
+        && data.ramMb is int && data.ramMb >= 0 && data.ramMb <= 262144
+        && optionalString(data, 'androidVersion', 40)
+        && optionalString(data, 'appVersion', 40)
+        && optionalString(data, 'coreVersion', 40);
+    }
+
     function validProfileWrite(uid) {
       return owns(uid)
         && request.resource.data.uid == uid
@@ -32,7 +46,23 @@ service cloud.firestore {
         && (!('totalPlayTimeMs' in request.resource.data)
           || (request.resource.data.totalPlayTimeMs is int && request.resource.data.totalPlayTimeMs >= 0))
         && (!('gamesPlayed' in request.resource.data)
-          || (request.resource.data.gamesPlayed is int && request.resource.data.gamesPlayed >= 0));
+          || (request.resource.data.gamesPlayed is int && request.resource.data.gamesPlayed >= 0))
+        && (!('achievementCount' in request.resource.data)
+          || (request.resource.data.achievementCount is int
+            && request.resource.data.achievementCount >= 0
+            && request.resource.data.achievementCount <= 1000))
+        && (!('achievementPoints' in request.resource.data)
+          || (request.resource.data.achievementPoints is int
+            && request.resource.data.achievementPoints >= 0
+            && request.resource.data.achievementPoints <= 1000000))
+        && (!('achievementCatalogVersion' in request.resource.data)
+          || (request.resource.data.achievementCatalogVersion is int
+            && request.resource.data.achievementCatalogVersion >= 1
+            && request.resource.data.achievementCatalogVersion <= 10000))
+        && (!('deviceVisibility' in request.resource.data)
+          || request.resource.data.deviceVisibility is bool)
+        && (!('primaryDevice' in request.resource.data)
+          || validPublicDevice(request.resource.data.primaryDevice));
     }
 
     function validDevice(data, uid, deviceId) {

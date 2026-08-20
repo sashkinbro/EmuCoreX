@@ -179,7 +179,9 @@ fun ProfileScreen(
     var showProCustomization by rememberSaveable { mutableStateOf(false) }
     var showDevices by rememberSaveable { mutableStateOf(false) }
     var showCloudProfiles by rememberSaveable { mutableStateOf(false) }
-    var showSocialCenter by rememberSaveable { mutableStateOf(false) }
+    var showNotifications by rememberSaveable { mutableStateOf(false) }
+    var showFriends by rememberSaveable { mutableStateOf(false) }
+    var showBlockedPlayers by rememberSaveable { mutableStateOf(false) }
     var achievementFilter by rememberSaveable { mutableStateOf("all") }
     val isViewingLeaderboardProfile = uiState.viewedProfile != null || uiState.isViewedProfileLoading
 
@@ -224,17 +226,42 @@ fun ProfileScreen(
         )
     }
 
-    if (showSocialCenter) {
-        ProfileSocialCenterDialog(
+    if (showNotifications) {
+        ProfileNotificationsDialog(
             friendships = uiState.friendships,
-            blockedUids = uiState.blockedUids,
             feed = uiState.feed,
             profiles = uiState.socialProfiles,
             isLoading = uiState.isFeatureActionLoading,
             onAccept = viewModel::acceptFriendRequest,
+            onOpenProfile = { uid ->
+                showNotifications = false
+                viewModel.viewSocialProfile(uid)
+            },
+            onDismiss = { showNotifications = false }
+        )
+    }
+
+    if (showFriends) {
+        ProfileFriendsDialog(
+            friendships = uiState.friendships,
+            profiles = uiState.socialProfiles,
+            isLoading = uiState.isFeatureActionLoading,
             onRemove = viewModel::removeFriendship,
+            onOpenProfile = { uid ->
+                showFriends = false
+                viewModel.viewSocialProfile(uid)
+            },
+            onDismiss = { showFriends = false }
+        )
+    }
+
+    if (showBlockedPlayers) {
+        ProfileBlockedPlayersDialog(
+            blockedUids = uiState.blockedUids,
+            profiles = uiState.socialProfiles,
+            isLoading = uiState.isFeatureActionLoading,
             onUnblock = viewModel::unblockPlayer,
-            onDismiss = { showSocialCenter = false }
+            onDismiss = { showBlockedPlayers = false }
         )
     }
 
@@ -310,7 +337,15 @@ fun ProfileScreen(
                         item {
                             ScreenTopBar(
                                 title = stringResource(R.string.profile_title),
-                                onBackClick = onBackClick
+                                onBackClick = onBackClick,
+                                actions = {
+                                    ProfileNotificationButton(
+                                        pendingCount = uiState.friendships.count {
+                                            it.status == FriendshipStatus.PendingIncoming
+                                        },
+                                        onClick = { showNotifications = true }
+                                    )
+                                }
                             )
                         }
                         when (tabs[selectedTab.intValue]) {
@@ -343,11 +378,11 @@ fun ProfileScreen(
                                         deviceCount = uiState.devices.size,
                                         cloudProfileCount = uiState.cloudProfiles.size,
                                         friendCount = uiState.friendships.count { it.status == FriendshipStatus.Accepted },
-                                        pendingCount = uiState.friendships.count { it.status == FriendshipStatus.PendingIncoming },
                                         blockedCount = uiState.blockedUids.size,
                                         onDevices = { showDevices = true },
                                         onCloudProfiles = { showCloudProfiles = true },
-                                        onSocial = { showSocialCenter = true }
+                                        onFriends = { showFriends = true },
+                                        onBlocked = { showBlockedPlayers = true }
                                     )
                                 }
                                 if (uiState.isProfileLoading && uiState.profile == null) {
@@ -781,10 +816,11 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
         tonalElevation = 2.dp,
         border = if (profile.isProMember) BorderStroke(1.dp, accent.copy(alpha = 0.72f)) else profileCardBorder()
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+        Column {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (profile.isProMember) {
                     Row(
@@ -867,7 +903,26 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
                     modifier = Modifier.weight(1f)
                 )
             }
-            FavoriteGamesShowcase(profile)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatChip(
+                    icon = Icons.Rounded.EmojiEvents,
+                    label = stringResource(R.string.profile_tab_achievements),
+                    value = profile.achievementCount.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                StatChip(
+                    icon = Icons.Rounded.Leaderboard,
+                    label = stringResource(R.string.settings_ra_points_label),
+                    value = profile.achievementPoints.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            }
+            FavoriteGamesShowcase(
+                profile = profile,
+                modifier = Modifier.padding(bottom = 16.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            )
         }
     }
 }
@@ -933,11 +988,11 @@ private fun ProfileFeatureHubCard(
     deviceCount: Int,
     cloudProfileCount: Int,
     friendCount: Int,
-    pendingCount: Int,
     blockedCount: Int,
     onDevices: () -> Unit,
     onCloudProfiles: () -> Unit,
-    onSocial: () -> Unit
+    onFriends: () -> Unit,
+    onBlocked: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -963,15 +1018,52 @@ private fun ProfileFeatureHubCard(
                     Text(stringResource(R.string.profile_cloud_count, cloudProfileCount), maxLines = 1)
                 }
             }
-            Text(
-                text = stringResource(R.string.profile_friends_count, friendCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            OutlinedButton(onClick = onSocial, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Rounded.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
+            OutlinedButton(onClick = onFriends, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.profile_social_center_summary, pendingCount, blockedCount), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    stringResource(R.string.profile_friends_title),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start
+                )
+                Text(friendCount.toString())
+            }
+            OutlinedButton(onClick = onBlocked, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Block, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.profile_blocked_title),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Start
+                )
+                Text(blockedCount.toString())
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileNotificationButton(pendingCount: Int, onClick: () -> Unit) {
+    Box {
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = Icons.Rounded.Notifications,
+                contentDescription = stringResource(R.string.profile_social_center_title),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (pendingCount > 0) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopEnd),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError
+            ) {
+                Text(
+                    text = pendingCount.coerceAtMost(99).toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                )
             }
         }
     }
@@ -1100,19 +1192,16 @@ private fun achievementDescription(definition: EmuAchievementDefinition): String
 }
 
 @Composable
-private fun ProfileSocialCenterDialog(
+private fun ProfileNotificationsDialog(
     friendships: List<ProfileFriendship>,
-    blockedUids: List<String>,
     feed: List<ProfileFeedEvent>,
     profiles: Map<String, PlayerProfile>,
     isLoading: Boolean,
     onAccept: (String) -> Unit,
-    onRemove: (String) -> Unit,
-    onUnblock: (String) -> Unit,
+    onOpenProfile: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val incoming = friendships.filter { it.status == FriendshipStatus.PendingIncoming }
-    val accepted = friendships.filter { it.status == FriendshipStatus.Accepted }
     ProfileFeatureDialog(title = stringResource(R.string.profile_social_center_title), onDismiss = onDismiss) {
         Text(stringResource(R.string.profile_friend_requests), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         if (incoming.isEmpty()) Text(stringResource(R.string.profile_friend_requests_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1120,39 +1209,10 @@ private fun ProfileSocialCenterDialog(
             SocialIdentityRow(
                 uid = relation.otherUid,
                 profile = profiles[relation.otherUid],
+                onOpen = { onOpenProfile(relation.otherUid) },
                 action = {
                     Button(enabled = !isLoading, onClick = { onAccept(relation.id) }) {
                         Text(stringResource(R.string.profile_friend_accept))
-                    }
-                }
-            )
-        }
-        HorizontalDivider()
-        Text(stringResource(R.string.profile_friends_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-        if (accepted.isEmpty()) Text(stringResource(R.string.profile_friends_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        accepted.forEach { relation ->
-            SocialIdentityRow(
-                uid = relation.otherUid,
-                profile = profiles[relation.otherUid],
-                action = {
-                    TextButton(enabled = !isLoading, onClick = { onRemove(relation.id) }) {
-                        Text(stringResource(R.string.profile_friend_remove_action))
-                    }
-                }
-            )
-        }
-        HorizontalDivider()
-        Text(stringResource(R.string.profile_blocked_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-        if (blockedUids.isEmpty()) Text(stringResource(R.string.profile_blocked_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        blockedUids.forEach { uid ->
-            SocialIdentityRow(
-                uid = uid,
-                profile = profiles[uid],
-                action = {
-                    OutlinedButton(enabled = !isLoading, onClick = { onUnblock(uid) }) {
-                        Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.profile_unblock_player))
                     }
                 }
             )
@@ -1176,8 +1236,73 @@ private fun ProfileSocialCenterDialog(
 }
 
 @Composable
-private fun SocialIdentityRow(uid: String, profile: PlayerProfile?, action: @Composable () -> Unit) {
-    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) {
+private fun ProfileFriendsDialog(
+    friendships: List<ProfileFriendship>,
+    profiles: Map<String, PlayerProfile>,
+    isLoading: Boolean,
+    onRemove: (String) -> Unit,
+    onOpenProfile: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val accepted = friendships.filter { it.status == FriendshipStatus.Accepted }
+    ProfileFeatureDialog(title = stringResource(R.string.profile_friends_title), onDismiss = onDismiss) {
+        if (accepted.isEmpty()) Text(stringResource(R.string.profile_friends_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        accepted.forEach { relation ->
+            SocialIdentityRow(
+                uid = relation.otherUid,
+                profile = profiles[relation.otherUid],
+                onOpen = { onOpenProfile(relation.otherUid) },
+                action = {
+                    TextButton(enabled = !isLoading, onClick = { onRemove(relation.id) }) {
+                        Text(stringResource(R.string.profile_friend_remove_action))
+                    }
+                }
+            )
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun ProfileBlockedPlayersDialog(
+    blockedUids: List<String>,
+    profiles: Map<String, PlayerProfile>,
+    isLoading: Boolean,
+    onUnblock: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ProfileFeatureDialog(title = stringResource(R.string.profile_blocked_title), onDismiss = onDismiss) {
+        if (blockedUids.isEmpty()) Text(stringResource(R.string.profile_blocked_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        blockedUids.forEach { uid ->
+            SocialIdentityRow(
+                uid = uid,
+                profile = profiles[uid],
+                action = {
+                    OutlinedButton(enabled = !isLoading, onClick = { onUnblock(uid) }) {
+                        Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.profile_unblock_player))
+                    }
+                }
+            )
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun SocialIdentityRow(
+    uid: String,
+    profile: PlayerProfile?,
+    onOpen: (() -> Unit)? = null,
+    action: @Composable () -> Unit
+) {
+    Surface(
+        onClick = onOpen ?: {},
+        enabled = onOpen != null,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Column(modifier = Modifier.weight(1f)) {
@@ -1726,20 +1851,28 @@ private fun ProBadge(accent: Color, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun FavoriteGamesShowcase(profile: PlayerProfile) {
+private fun FavoriteGamesShowcase(
+    profile: PlayerProfile,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues()
+) {
     val gamesByKey = remember(profile.games) { profile.games.associateBy { it.gameKey } }
     val favorites = remember(profile.favoriteGameKeys, profile.games) {
         profile.favoriteGameKeys.mapNotNull(gamesByKey::get).take(3)
     }
     if (favorites.isEmpty()) return
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             text = stringResource(R.string.profile_showcase_title),
             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(contentPadding)
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(
+            contentPadding = contentPadding,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             items(favorites, key = { it.gameKey }) { game ->
                 Row(
                     modifier = Modifier.width(180.dp),

@@ -15,6 +15,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.sbro.emucorex.R
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.Locale
@@ -58,6 +59,20 @@ data class EmuAchievementState(
 ) {
     val unlocked: Boolean get() = unlockedAtMs != null
     val progressFraction: Float get() = (progress.toFloat() / definition.target.coerceAtLeast(1L)).coerceIn(0f, 1f)
+}
+
+internal fun resolveAchievementState(
+    definition: EmuAchievementDefinition,
+    progress: Long,
+    cloudUnlockedAtMs: Long?,
+    localCompletedAtMs: Long
+): EmuAchievementState {
+    val boundedProgress = progress.coerceAtMost(definition.target)
+    return EmuAchievementState(
+        definition = definition,
+        progress = boundedProgress,
+        unlockedAtMs = cloudUnlockedAtMs ?: localCompletedAtMs.takeIf { boundedProgress >= definition.target }
+    )
 }
 
 object EmuCoreXAchievementCatalog {
@@ -164,12 +179,21 @@ class EmuAchievementRepository(context: Context) {
         val newlyUnlocked = if (candidates.isEmpty()) emptyList() else runCatching { firestore.runTransaction { transaction ->
             // Firestore transactions require every read to happen before the first write.
             val unreadUnlocks = candidates.map { definition ->
-                val reference = firestore.collection(UNLOCKS).document("${uid}_${definition.id}")
-                Triple(definition, reference, transaction.get(reference).exists())
+                val unlockReference = firestore.collection(UNLOCKS).document("${uid}_${definition.id}")
+                val eventReference = firestore.collection(PUBLIC_PROFILES).document(uid)
+                    .collection(FEED).document("achievement_${definition.id}")
+                AchievementSyncCandidate(
+                    definition = definition,
+                    unlockReference = unlockReference,
+                    unlockExists = transaction.get(unlockReference).exists(),
+                    eventReference = eventReference,
+                    eventExists = transaction.get(eventReference).exists()
+                )
             }
-            unreadUnlocks.filterNot { it.third }.map { (definition, unlockRef, _) ->
+            unreadUnlocks.filterNot(AchievementSyncCandidate::unlockExists).map { candidate ->
+                val definition = candidate.definition
                 val progress = snapshot.progressFor(definition)
-                transaction.set(unlockRef, mapOf(
+                transaction.set(candidate.unlockReference, mapOf(
                     "uid" to uid,
                     "achievementId" to definition.id,
                     "unlockedAt" to FieldValue.serverTimestamp(),
@@ -179,18 +203,17 @@ class EmuAchievementRepository(context: Context) {
                     "sourceGameSerial" to snapshot.lastSerial.orEmpty().take(32),
                     "visibility" to "public"
                 ))
-                val eventId = "achievement_${definition.id}"
-                transaction.set(
-                    firestore.collection(PUBLIC_PROFILES).document(uid).collection(FEED).document(eventId),
-                    mapOf(
+                if (!candidate.eventExists) {
+                    val eventId = "achievement_${definition.id}"
+                    transaction.set(candidate.eventReference, mapOf(
                         "uid" to uid,
                         "eventId" to eventId,
                         "type" to "achievement_unlocked",
                         "achievementId" to definition.id,
                         "visibility" to "public",
                         "createdAt" to FieldValue.serverTimestamp()
-                    )
-                )
+                    ))
+                }
                 definition
             }
         }.await() }.onFailure { Log.w(TAG, "Unable to sync achievement unlocks", it) }.getOrDefault(emptyList())
@@ -201,14 +224,34 @@ class EmuAchievementRepository(context: Context) {
             notifyBulkUnlocked(newlyUnlocked.size)
         }
         val now = System.currentTimeMillis()
-        val unlockedIds = unlocks.keys + newlyUnlocked.map { it.id }
-        return EmuCoreXAchievementCatalog.definitions.map { definition ->
-            EmuAchievementState(
+        val states = EmuCoreXAchievementCatalog.definitions.map { definition ->
+            // Progress is the local source of truth. A temporary Firestore failure must not
+            // make a completed achievement look locked or discard its points in the UI.
+            resolveAchievementState(
                 definition = definition,
-                progress = snapshot.progressFor(definition).coerceAtMost(definition.target),
-                unlockedAtMs = unlocks[definition.id] ?: now.takeIf { definition.id in unlockedIds }
+                progress = snapshot.progressFor(definition),
+                cloudUnlockedAtMs = unlocks[definition.id],
+                localCompletedAtMs = now
             )
         }
+        syncPublicSummary(uid, states)
+        return states
+    }
+
+    private suspend fun syncPublicSummary(uid: String, states: List<EmuAchievementState>) {
+        val unlocked = states.filter(EmuAchievementState::unlocked)
+        runCatching {
+            firestore.collection(PUBLIC_PROFILES).document(uid).set(
+                mapOf(
+                    "uid" to uid,
+                    "achievementCount" to unlocked.size,
+                    "achievementPoints" to unlocked.sumOf { it.definition.points },
+                    "achievementCatalogVersion" to EmuCoreXAchievementCatalog.VERSION,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ),
+                SetOptions.merge()
+            ).await()
+        }.onFailure { Log.w(TAG, "Unable to sync public achievement summary", it) }
     }
 
     private suspend fun loadPublic(uid: String, profile: PlayerProfile): List<EmuAchievementState> {
@@ -302,6 +345,14 @@ class EmuAchievementRepository(context: Context) {
         val serial: String?,
         val totalPlayTimeMs: Long,
         val sessions: Long
+    )
+
+    private data class AchievementSyncCandidate(
+        val definition: EmuAchievementDefinition,
+        val unlockReference: com.google.firebase.firestore.DocumentReference,
+        val unlockExists: Boolean,
+        val eventReference: com.google.firebase.firestore.DocumentReference,
+        val eventExists: Boolean
     )
 
     private fun PlayerProfile.toAchievementSnapshot() = AchievementSnapshot(
