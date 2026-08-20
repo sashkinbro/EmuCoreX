@@ -3,6 +3,7 @@ package com.sbro.emucorex.data
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -16,6 +17,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
@@ -55,10 +57,17 @@ object ProfileDeviceInfoProvider {
     fun current(context: Context, isPublic: Boolean = false): PlayerDevice {
         val appContext = context.applicationContext
         val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val deviceId = preferences.getString(DEVICE_ID, null)?.takeIf { it.isNotBlank() }
-            ?: UUID.randomUUID().toString().also {
-                preferences.edit().putString(DEVICE_ID, it).apply()
-            }
+        val androidId = Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID)
+            .orEmpty()
+            .trim()
+        val deviceId = if (androidId.isNotEmpty()) {
+            stableDeviceId(androidId, appContext.packageName)
+        } else {
+            preferences.getString(DEVICE_ID, null)?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+        }
+        if (preferences.getString(DEVICE_ID, null) != deviceId) {
+            preferences.edit().putString(DEVICE_ID, deviceId).apply()
+        }
         val memoryInfo = ActivityManager.MemoryInfo()
         (appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)
             ?.getMemoryInfo(memoryInfo)
@@ -97,6 +106,13 @@ object ProfileDeviceInfoProvider {
 
     private fun String.cleanDeviceLabel(): String =
         replace(Regex("[\\p{Cntrl}]"), "").replace(Regex("\\s+"), " ").trim()
+
+    internal fun stableDeviceId(androidId: String, packageName: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("$packageName:$androidId".toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+        return "android_${digest.take(40)}"
+    }
 }
 
 class ProfileDeviceRepository(context: Context) {
@@ -120,6 +136,7 @@ class ProfileDeviceRepository(context: Context) {
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents.orEmpty().mapNotNull { it.toPlayerDevice() }
+                    .hideMigratedDuplicates()
                     .sortedWith(compareByDescending<PlayerDevice> { it.isCurrent }.thenByDescending { it.lastSeenAtMs ?: 0L }))
             }
         awaitClose { registration.remove() }
@@ -130,14 +147,23 @@ class ProfileDeviceRepository(context: Context) {
         val ref = firestore.collection(USERS).document(uid).collection(DEVICES)
         val local = currentDevice()
         val existing = ref.document(local.deviceId).get().await()
-        val isPublic = existing.getBoolean(FIELD_PUBLIC) == true
+        val allDevices = ref.get().await().documents
+        val legacyDuplicates = allDevices.filter { document ->
+            document.id != local.deviceId &&
+                !document.id.startsWith(STABLE_ID_PREFIX) &&
+                document.toPlayerDevice()?.sameHardwareProfile(local) == true
+        }
+        val isPublic = existing.getBoolean(FIELD_PUBLIC) == true ||
+            legacyDuplicates.any { it.getBoolean(FIELD_PUBLIC) == true }
         val current = local.copy(isPublic = isPublic)
-        val data = current.toPrivateMap(uid)
-        val previousCurrent = ref.whereEqualTo(FIELD_CURRENT, true).get().await().documents
+        val data = current.toPrivateMap(uid, includeCreatedAt = !existing.exists())
+        val previousCurrent = allDevices.filter { it.getBoolean(FIELD_CURRENT) == true }
+        val legacyDuplicateIds = legacyDuplicates.mapTo(mutableSetOf()) { it.id }
         firestore.runBatch { batch ->
-            previousCurrent.filter { it.id != current.deviceId }.forEach { document ->
+            previousCurrent.filter { it.id != current.deviceId && it.id !in legacyDuplicateIds }.forEach { document ->
                 batch.set(document.reference, mapOf(FIELD_CURRENT to false), SetOptions.merge())
             }
+            legacyDuplicates.forEach { document -> batch.delete(document.reference) }
             batch.set(ref.document(current.deviceId), data, SetOptions.merge())
             if (isPublic) {
                 batch.set(
@@ -175,7 +201,8 @@ class ProfileDeviceRepository(context: Context) {
         }.await()
     }
 
-    private fun PlayerDevice.toPrivateMap(uid: String): Map<String, Any> = mapOf(
+    private fun PlayerDevice.toPrivateMap(uid: String, includeCreatedAt: Boolean): Map<String, Any> = buildMap {
+        putAll(mapOf(
         "uid" to uid,
         "deviceId" to deviceId,
         "displayName" to displayName,
@@ -189,9 +216,10 @@ class ProfileDeviceRepository(context: Context) {
         "coreVersion" to coreVersion,
         FIELD_CURRENT to isCurrent,
         FIELD_PUBLIC to isPublic,
-        "createdAt" to FieldValue.serverTimestamp(),
         FIELD_LAST_SEEN to FieldValue.serverTimestamp()
-    )
+        ))
+        if (includeCreatedAt) put("createdAt", FieldValue.serverTimestamp())
+    }
 
     private fun PlayerDevice.toPublicMap(): Map<String, Any> = mapOf(
         "displayName" to displayName,
@@ -222,6 +250,20 @@ class ProfileDeviceRepository(context: Context) {
         )
     }
 
+    private fun List<PlayerDevice>.hideMigratedDuplicates(): List<PlayerDevice> {
+        val stableProfiles = filter { it.deviceId.startsWith(STABLE_ID_PREFIX) }
+        return filter { device ->
+            device.deviceId.startsWith(STABLE_ID_PREFIX) || stableProfiles.none { it.sameHardwareProfile(device) }
+        }.distinctBy(PlayerDevice::deviceId)
+    }
+
+    private fun PlayerDevice.sameHardwareProfile(other: PlayerDevice): Boolean =
+        manufacturer.equals(other.manufacturer, ignoreCase = true) &&
+            model.equals(other.model, ignoreCase = true) &&
+            soc.equals(other.soc, ignoreCase = true) &&
+            gpuFamily.equals(other.gpuFamily, ignoreCase = true) &&
+            ramMb == other.ramMb
+
     private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { continuation ->
         addOnSuccessListener { continuation.resume(it) }
         addOnFailureListener { continuation.resumeWithException(it) }
@@ -237,5 +279,6 @@ class ProfileDeviceRepository(context: Context) {
         const val FIELD_LAST_SEEN = "lastSeenAt"
         const val FIELD_PRIMARY_DEVICE = "primaryDevice"
         const val FIELD_DEVICE_VISIBLE = "deviceVisibility"
+        const val STABLE_ID_PREFIX = "android_"
     }
 }
