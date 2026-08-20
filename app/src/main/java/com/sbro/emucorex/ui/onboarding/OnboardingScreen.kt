@@ -113,7 +113,6 @@ import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.GamepadFocusHighlightMode
-import com.sbro.emucorex.ui.common.NamcoArcadeGuideContent
 import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
@@ -546,19 +545,21 @@ fun OnboardingScreen(
                                     modifier = Modifier.padding(horizontal = 32.dp)
                                 )
                             } else if (page == 5) {
-                                Column(
+                                Text(
+                                    text = stringResource(R.string.namco_guide_subtitle),
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        lineHeight = 28.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        letterSpacing = 0.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .verticalScroll(rememberScrollState())
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 40.dp)
                                         .statusBarsPadding()
-                                        .padding(horizontal = 32.dp, vertical = 24.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    NamcoArcadeGuideContent(
-                                        modifier = Modifier.widthIn(max = 560.dp)
-                                    )
-                                }
+                                        .padding(top = 32.dp)
+                                )
                             } else {
                                 Box(modifier = Modifier.fillMaxSize()) {
                                     Column(
@@ -709,14 +710,7 @@ fun OnboardingScreen(
                                     contentFocusRequester = pageContentFocusRequesters[page]
                                 )
                             }
-                            5 -> {
-                                OnboardingHeroArcade()
-                                Spacer(modifier = Modifier.height(28.dp))
-                                NamcoArcadeGuideContent(
-                                    showIntro = false,
-                                    modifier = Modifier.widthIn(max = 560.dp)
-                                )
-                            }
+                            5 -> OnboardingHeroArcade()
                             6 -> {
                                 OnboardingHeroSetup()
                                 Spacer(modifier = Modifier.height(32.dp))
