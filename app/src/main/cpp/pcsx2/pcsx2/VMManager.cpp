@@ -387,6 +387,11 @@ std::string VMManager::GetDiscSerial()
 	return s_disc_serial;
 }
 
+bool VMManager::IsArcadeSystem246()
+{
+	return s_acgame_sys246;
+}
+
 std::string VMManager::GetDiscELF()
 {
 	std::unique_lock lock(s_info_mutex);
@@ -1431,6 +1436,7 @@ static std::string FindArcadeAsset(const std::string& manifest, const std::strin
 		Path::Combine(subdir, filename),
 		filename,
 		Path::Combine("memcards", filename),
+		Path::Combine("../../memcards", filename),
 	};
 	for (const std::string& candidate : candidates)
 	{
@@ -1460,6 +1466,23 @@ static bool CopyArcadeAsset(const std::string& source, const std::string& destin
 			return false;
 	}
 	return std::ferror(input.get()) == 0;
+}
+
+static bool IsArcadeAssetAllZero(const std::string& path)
+{
+	auto input = FileSystem::OpenManagedCFile(path.c_str(), "rb");
+	if (!input)
+		return false;
+
+	std::array<u8, 4096> buffer;
+	bool read_any = false;
+	while (const size_t count = std::fread(buffer.data(), 1, buffer.size(), input.get()))
+	{
+		read_any = true;
+		if (std::any_of(buffer.begin(), buffer.begin() + count, [](u8 value) { return value != 0; }))
+			return false;
+	}
+	return read_any && std::ferror(input.get()) == 0;
 }
 
 bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
@@ -1522,7 +1545,25 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			s_title = ini.GetStringValue("game", "name", game_id.c_str());
 			ACJV::SetGameId(game_id);
 
-			const std::string platform = ini.GetStringValue("game", "platform", "246");
+			std::string platform = ini.GetStringValue("game", "platform", "246");
+			// Clone manifests in the established Namco set format put the parent set
+			// short name in "platform" (for example tekken4a -> tekken4). Resolve the
+			// actual board generation from the parent manifest before validating it.
+			if (platform != "246" && platform != "256" && platform != "super256")
+			{
+				const std::string parent_dir = Path::Combine(Path::GetDirectory(filename), "..");
+				const std::string parent_manifest = Path::Combine(
+					Path::Combine(parent_dir, platform), fmt::format("{}.acgame", platform));
+				INISettingsInterface parent_ini(parent_manifest);
+				if (parent_ini.Load())
+					platform = parent_ini.GetStringValue("game", "platform", platform.c_str());
+
+				// SAF manifests cannot be opened directly through INISettingsInterface.
+				// These are the clone families used by the established System 246 set;
+				// their assets are still resolved relative to the selected document tree.
+				if (platform == "tekken4" || platform == "rrvac" || platform == "timecrs3")
+					platform = "246";
+			}
 			if (platform != "246" && platform != "256" && platform != "super256")
 			{
 				Error::SetStringFmt(error, "Unsupported arcade platform '{}'.", platform);
@@ -1532,6 +1573,16 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			s_acgame_sys256 = (platform == "256" || platform == "super256");
 			PS2CLK = (platform == "super256") ? PS2CLK_SS256 :
 				(s_acgame_sys256 ? PS2CLK_S256 : PS2CLK_DEFAULT);
+
+			// A single user-selected BIOS directory can contain both COH-H ROMs.
+			// Select the board-correct image for this launch; regular PS2 launches
+			// continue to use the user's configured console BIOS.
+			const char* arcade_bios = s_acgame_sys256 ? "r27v1602f.8g" : "r27v1602f.7d";
+			if (FileSystem::FileExists(Path::Combine(EmuFolders::Bios, arcade_bios).c_str()))
+				EmuConfig.BaseFilenames.Bios = arcade_bios;
+			else
+				Console.Warning("Preferred System %s BIOS '%s' was not found in '%s'.",
+					s_acgame_sys256 ? "256" : "246", arcade_bios, EmuFolders::Bios.c_str());
 
 			ArcadeiLinkID = ini.GetStringValue("data", "256Region", "");
 			if (!ArcadeiLinkID.empty() && ArcadeiLinkID != "ASIA4" &&
@@ -1614,6 +1665,15 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			const std::string sram_dir = Path::Combine(EmuFolders::DataRoot, "sram");
 			FileSystem::CreateDirectoryPath(sram_dir.c_str(), false);
 			ACSRAM::filepath = Path::Combine(sram_dir, game_id + ".bin");
+			const std::string sram_name = ini.GetStringValue("data", "sram", "sram.bin");
+			const std::string sram_source = FindArcadeAsset(filename, subdir, sram_name);
+			if (!sram_source.empty() &&
+				(!FileSystem::FileExists(ACSRAM::filepath.c_str()) || IsArcadeAssetAllZero(ACSRAM::filepath)) &&
+				!CopyArcadeAsset(sram_source, ACSRAM::filepath, true))
+			{
+				Error::SetStringFmt(error, "Cannot prepare arcade SRAM '{}'.", sram_name);
+				return false;
+			}
 
 			const std::string jvs_name = ini.GetStringValue("data", "jvsmode", "");
 			JVS_MODE mode = ACJV::ResolveModeFromGameId(game_id);
@@ -1905,11 +1965,12 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_target_speed = GetTargetSpeedForLimiterMode(s_limiter_mode);
 	s_use_vsync_for_timing = false;
 
+	if (s_acgame_sys246)
+		EmuConfig.Cpu.ExtraMemory = true;
+
 	s_cpu_implementation_changed = false;
 	UpdateCPUImplementations();
 	mmap_ResetBlockTracking();
-	if (s_acgame_sys246)
-		EmuConfig.Cpu.ExtraMemory = true;
 	memSetExtraMemMode(EmuConfig.Cpu.ExtraMemory);
 	g_cpuRegistersPack.Cpu = EmuConfig.Cpu;
 	Internal::ClearCPUExecutionCaches();

@@ -8,6 +8,7 @@
 #include "MTGS.h"
 #include "Vif.h"
 #include "Vif_Dma.h"
+#include "VMManager.h"
 
 //////////////////////////////////////////////////////////////////////////
 /////////////////////////// Quick & dirty FIFO :D ////////////////////////
@@ -30,6 +31,10 @@ void ReadFIFO_VIF1(mem128_t* out)
 	}
 
 	ZeroQWC(out); // Clear first in case no data gets written...
+	// System 246/256 software polls VIF1 even when the FIFO is empty. The
+	// hardware returns no data in that state; the zeroed QWC above models it.
+	if (vif1Regs.stat.FQC == 0 && VMManager::IsArcadeSystem246())
+		return;
 	pxAssertRel(vif1Regs.stat.FQC != 0, "FQC = 0 on VIF FIFO READ!");
 	if (vif1Regs.stat.FDR)
 	{

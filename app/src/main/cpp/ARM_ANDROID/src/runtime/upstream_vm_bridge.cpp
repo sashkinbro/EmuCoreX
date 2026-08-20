@@ -15,6 +15,7 @@
 #include "common/FileSystem.h"
 #include "common/MemorySettingsInterface.h"
 #include "common/Path.h"
+#include "common/StringUtil.h"
 #include "common/Threading.h"
 
 #include <SDL3/SDL_hints.h>
@@ -352,7 +353,12 @@ VMBootParameters CreateBootParameters(const VmLaunchConfig& config)
 	else
 	{
 		params.filename = config.path;
-		if (!config.path.empty())
+		// Arcade manifests must go through VMManager::AutoDetectSource(). Treating a
+		// SAF-backed .acgame URI as an ISO bypasses manifest parsing and hands the
+		// encoded document ID to CDVD instead.
+		if (StringUtil::EndsWithNoCase(config.path, ".acgame"))
+			params.source_type.reset();
+		else if (!config.path.empty())
 			params.source_type = CDVD_SourceType::Iso;
 		else
 			params.source_type = CDVD_SourceType::NoDisc;

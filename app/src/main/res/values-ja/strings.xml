@@ -362,10 +362,10 @@
     <string name="settings_paths">ファイル</string>
     <string name="settings_bios_path">BIOSファイル</string>
     <string name="settings_bios_path_desc">ゲームを開始するために必要なPS2 BIOSイメージファイルを選択します。</string>
-    <string name="settings_bios_picker_title">BIOSファイルの選択</string>
-    <string name="settings_bios_picker_desc">PlayStation 2 BIOSイメージファイルを選択してください。このファイルは、通常のゲームの起動およびBIOSの起動に使用されます。</string>
+    <string name="settings_bios_picker_title">BIOSフォルダーの選択</string>
+    <string name="settings_bios_picker_desc">BIOSフォルダーを選択してください。EmuCoreXは家庭用ゲームには通常のPS2 BIOS、Namco System 246/256にはr27v1602f.7d/.8gを選択します。</string>
     <string name="settings_bios_picker_current">現在のBIOSファイル</string>
-    <string name="settings_bios_picker_action">ファイルを選択</string>
+    <string name="settings_bios_picker_action">フォルダーを選択</string>
     <string name="settings_game_path">ゲームフォルダ</string>
     <string name="settings_game_path_desc">ゲームが含まれているフォルダを選択します。</string>
     <string name="settings_cover_download_url">カバーダウンロードURL</string>
@@ -816,7 +816,7 @@
     <string name="onboarding_title">プレイの準備をしましょう</string>
     <string name="onboarding_subtitle">BIOSファイルを追加し、ゲームフォルダを選択し、すべてのファイルへのアクセスを許可します。</string>
     <string name="onboarding_bios_title">BIOSファイルの選択</string>
-    <string name="onboarding_bios_desc">ゲームを開始するために必要なPS2 BIOSイメージファイルを選択します。</string>
+    <string name="onboarding_bios_desc">通常のPS2 BIOSとNamco System 246/256 ROMを含む1つのBIOSフォルダーを選択します。</string>
     <string name="onboarding_games_title">ゲームフォルダを選択</string>
     <string name="onboarding_games_desc">ゲームが含まれているフォルダを選択します。</string>
     <string name="onboarding_status_required">必須</string>
@@ -2415,4 +2415,18 @@
     <string name="network_guide_internet_requirements">両方のプレイヤーに同じゲーム バージョンと安定したインターネット接続が必要です。直接接続がブロックされる場合は TURN リレーが必要になることがあります。</string>
     <string name="network_guide_internet_steps">1. ホストはルームを作成し、8 文字のコードを共有します。\n2.ゲストはコードを入力し、接続されるまで待ちます。\n3.両方のプレイヤーが同じゲームを起動します。\n4.ゲームの LAN モードを開きます。\n5.ホストが一致を作成します。ゲストは検索して参加します。</string>
     <string name="network_guide_internet_limits">ゲームは LAN またはシステムリンク プレイをサポートしている必要があります。インターネットの遅延は、ゲーム独自のネットワーク プロトコルに追加されます。企業ネットワーク、キャリアグレードのネットワーク、または厳しく制限されたネットワークでは、TURN リレーが必要になる場合があります。</string>
+    <string name="settings_arcade_cover_download_url">Namco Arcade カバーURL</string>
+    <string name="settings_arcade_cover_url_dialog_title">Namco Arcade カバーソース</string>
+    <string name="settings_arcade_cover_url_dialog_body">NM00004.png のようにNamcoゲームIDで命名した画像を含む直接ベースURLを入力します。空欄の場合は内蔵のLibretro MAMEソースを使用します。</string>
+    <string name="settings_help_arcade_cover_download_url">Namco System 246/256ゲーム用の内蔵画像ソースを上書きします。独自のPNGまたはJPGはゲームのNM IDで命名してください。</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">アーケードゲームには複数のファイルが必要で、.acgameマニフェストから起動します。</string>
+    <string name="namco_guide_intro">各アーケードゲームを個別のフォルダーに保存してください。EmuCoreXがマニフェストを読み、ELF、ディスクイメージ、セキュリティキー、SRAM、メモリーカードを自動的に準備します。</string>
+    <string name="namco_guide_step_bios">BIOSフォルダー — 通常のPS2 BIOSと必要なアーケードROMを含むフォルダーを選択します。System 246はr27v1602f.7d、System 256はr27v1602f.8gです。</string>
+    <string name="namco_guide_step_game">ゲームフォルダー — .acgameマニフェストをELF、ISO/CHD、参照されるキーまたはSRAMファイルと同じ場所に置き、親フォルダーをライブラリに追加します。</string>
+    <string name="namco_guide_step_launch">起動 — ライブラリの.acgame項目を開きます。子のELF、ISO、CHDを直接起動しないでください。</string>
+    <string name="namco_guide_step_controls">アーケード操作 — デモモードでL3を押すとプレイヤー1のコインが入り、Startでゲームを開始します。その他は通常のPS2配置です。</string>
+    <string name="namco_guide_step_covers">カバー — アーケード画像はPNGです。内蔵ソースはNM IDをLibretro MAME画像に対応付け、カスタムソースではNM00004.pngまたはNM00004.jpgを配置できます。</string>
+    <string name="namco_guide_settings_desc">BIOS、フォルダー、起動、コイン、カバーの完全ガイド。</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

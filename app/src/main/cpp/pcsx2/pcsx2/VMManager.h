@@ -91,6 +91,9 @@ namespace VMManager
 	/// Returns the serial of the disc currently running.
 	std::string GetDiscSerial();
 
+	/// Returns true while a Namco System 246/256 title is active.
+	bool IsArcadeSystem246();
+
 	/// Returns the path of the main ELF of the disc currently running.
 	std::string GetDiscELF();
 

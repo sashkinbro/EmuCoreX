@@ -545,7 +545,7 @@
     <string name="onboarding_title">Готуйтеся до гри</string>
     <string name="onboarding_subtitle">Додайте файл BIOS та виберіть папку з іграми.</string>
     <string name="onboarding_bios_title">Виберіть файл BIOS</string>
-    <string name="onboarding_bios_desc">Виберіть файл образу BIOS PS2, необхідний для запуску ігор.</string>
+    <string name="onboarding_bios_desc">Виберіть одну папку BIOS зі звичайним BIOS PS2 та ROM-файлами Namco System 246/256.</string>
     <string name="onboarding_games_title">Виберіть папку з іграми</string>
     <string name="onboarding_games_desc">Виберіть папку, яка містить ваші ігри.</string>
     <string name="onboarding_status_required">Обов\'язково</string>
@@ -857,10 +857,10 @@
     <string name="settings_cover_download_url_copied">Приклади URL-адрес скопійовано.</string>
     <string name="settings_help_cover_art_style">Вибирає тип обкладинки за замовчуванням, що використовується під час завантаження зображень. Пласкі обкладинки відповідають класичному вигляду передньої частини коробки, тоді як 3D-коробка використовує кутові рендери коробок, якщо джерело їх надає. 3D-обкладинки можуть виглядати більш ефектно, але їхня доступність може бути трохи гіршою, ніж у пласких зображень.</string>
     <string name="settings_renderer_auto">Авто</string>
-    <string name="settings_bios_picker_title">Вибрати файл BIOS</string>
-    <string name="settings_bios_picker_desc">Виберіть файл образу BIOS PlayStation 2. Цей файл використовуватиметься для звичайного запуску ігор та запуску BIOS.</string>
+    <string name="settings_bios_picker_title">Вибрати папку BIOS</string>
+    <string name="settings_bios_picker_desc">Виберіть папку BIOS. EmuCoreX сам обере звичайний BIOS PS2 для консольних ігор та r27v1602f.7d/.8g для Namco System 246/256.</string>
     <string name="settings_bios_picker_current">Поточний файл BIOS</string>
-    <string name="settings_bios_picker_action">Вибрати файл</string>
+    <string name="settings_bios_picker_action">Вибрати папку</string>
     <string name="settings_auto">Авто</string>
     <string name="settings_target_fps_mode">Режим цільового FPS</string>
     <string name="settings_target_fps_auto">Авто FPS</string>
@@ -2420,4 +2420,18 @@
     <string name="network_guide_internet_requirements">Обом гравцям потрібні однакова версія гри та стабільне інтернет-з’єднання. У мережах, де пряме peer-to-peer з’єднання заблоковано, може знадобитися TURN.</string>
     <string name="network_guide_internet_steps">1. Ведучий створює кімнату й передає 8-символьний код.\n2. Учасник вводить код і чекає стану «З’єднано».\n3. Обидва запускають однакову гру.\n4. Відкривають LAN-режим гри.\n5. Ведучий створює матч, а учасник знаходить його та приєднується.</string>
     <string name="network_guide_internet_limits">Гра повинна підтримувати LAN або system-link. Затримка інтернету додається до власного мережевого протоколу гри. Корпоративні, операторські та сильно обмежені мережі можуть потребувати TURN-ретранслятора.</string>
+    <string name="settings_arcade_cover_download_url">URL обкладинок Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">Джерело обкладинок Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">Вкажіть пряму базову URL-адресу із зображеннями, названими за ID гри Namco, наприклад NM00004.png. Залиште поле порожнім, щоб використовувати вбудоване джерело Libretro MAME.</string>
+    <string name="settings_help_arcade_cover_download_url">Перевизначає вбудоване джерело зображень для ігор Namco System 246/256. Власні файли PNG або JPG мають бути названі за NM ID гри.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Аркадним іграм потрібен невеликий набір файлів, а запуск виконується через маніфест .acgame.</string>
+    <string name="namco_guide_intro">Зберігайте кожну аркадну гру в окремій папці. EmuCoreX читає маніфест і автоматично готує ELF, образ диска, захисний ключ, SRAM та карту пам’яті.</string>
+    <string name="namco_guide_step_bios">Папка BIOS — Виберіть папку зі звичайним BIOS PS2 і потрібним аркадним ROM: r27v1602f.7d для System 246 та/або r27v1602f.8g для System 256.</string>
+    <string name="namco_guide_step_game">Папка гри — Тримайте маніфест .acgame разом з ELF, ISO/CHD і файлами ключа або SRAM, на які він посилається. Додайте батьківську папку до бібліотеки.</string>
+    <string name="namco_guide_step_launch">Запуск — Відкривайте з бібліотеки саме запис .acgame. Не запускайте дочірні ELF, ISO або CHD напряму.</string>
+    <string name="namco_guide_step_controls">Керування — Коли гра перейде в деморежим, L3 додає монету гравця 1, а Start починає гру. Решта кнопок відповідає звичайній розкладці PS2.</string>
+    <string name="namco_guide_step_covers">Обкладинки — Аркадні зображення мають формат PNG. Вбудоване джерело зіставляє ID NM із Libretro MAME; власне джерело може містити NM00004.png або NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">Повна інструкція щодо BIOS, папок, запуску, монет та обкладинок.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

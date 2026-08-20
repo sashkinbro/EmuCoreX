@@ -880,12 +880,12 @@
     <string name="settings_memory_cards_tab">Memory Cards</string>
     <string name="settings_bios_path">BIOS-Datei</string>
     <string name="settings_bios_path_desc">Wähle die PS2-BIOS-Image-Datei aus, die zum Starten von Spielen benötigt wird.</string>
-    <string name="settings_bios_picker_title">BIOS-Datei auswählen</string>
-    <string name="settings_bios_picker_desc">Wähle deine PlayStation 2 BIOS-Image-Datei. Diese Datei wird für den normalen Spielstart und den BIOS-Start verwendet.</string>
+    <string name="settings_bios_picker_title">BIOS-Ordner auswählen</string>
+    <string name="settings_bios_picker_desc">Wähle den BIOS-Ordner. EmuCoreX wählt für Konsolenspiele ein normales PS2-BIOS und für Namco System 246/256 r27v1602f.7d/.8g aus.</string>
     <string name="settings_bios_picker_current">Aktuelle BIOS-Datei</string>
-    <string name="settings_bios_picker_action">Datei auswählen</string>
+    <string name="settings_bios_picker_action">Ordner auswählen</string>
     <string name="settings_help_bios_path">Verweist EmuCoreX auf deine PS2-BIOS-Image-Datei. Ein sauberer Dump von deiner eigenen Konsole ist die beste Wahl. Die App erwartet das Haupt-BIOS-Image, normalerweise eine .bin- oder .rom-Datei, und speichert alle generierten NVRAM/MEC-Dateien neben der importierten Kopie.</string>
-    <string name="onboarding_bios_desc">Wähle die PS2-BIOS-Image-Datei aus, die zum Starten von Spielen benötigt wird.</string>
+    <string name="onboarding_bios_desc">Wähle einen BIOS-Ordner mit deinem normalen PS2-BIOS und den ROMs für Namco System 246/256.</string>
     <string name="emulation_quick_save_confirm_title">Spielstand speichern?</string>
     <string name="emulation_quick_save_confirm_desc">Dies überschreibt Steckplatz %1$d mit dem aktuellen Spielstand.</string>
     <string name="emulation_quick_load_confirm_title">Spielstand laden?</string>
@@ -2418,4 +2418,18 @@
     <string name="network_guide_internet_requirements">Beide Spieler benötigen die gleiche Spielversion und eine stabile Internetverbindung. Wenn direkte Peer-to-Peer-Verbindungen blockiert sind, kann TURN nötig sein.</string>
     <string name="network_guide_internet_steps">1. Der Gastgeber erstellt einen Raum und teilt den 8-stelligen Code mit.\n2. Der Gast gibt den Code ein und wartet auf Connected.\n3. Beide Spieler starten dasselbe Spiel.\n4. Öffnen Sie den LAN-Modus des Spiels.\n5. Der Host erstellt eine Übereinstimmung; Der Gast sucht danach und tritt ihm bei.</string>
     <string name="network_guide_internet_limits">Das Spiel muss LAN- oder Systemlink-Spielen unterstützen. Internetlatenz wird zum spieleigenen Netzwerkprotokoll hinzugefügt. Unternehmens-, Carrier-Grade- oder stark eingeschränkte Netzwerke erfordern möglicherweise ein TURN-Relay.</string>
+    <string name="settings_arcade_cover_download_url">Namco-Arcade-Cover-URL</string>
+    <string name="settings_arcade_cover_url_dialog_title">Namco-Arcade-Coverquelle</string>
+    <string name="settings_arcade_cover_url_dialog_body">Direkte Basis-URL mit Bildern eingeben, die nach der Namco-Spiel-ID benannt sind, z. B. NM00004.png. Leer lassen, um die integrierte Libretro-MAME-Quelle zu verwenden.</string>
+    <string name="settings_help_arcade_cover_download_url">Überschreibt die integrierte Bildquelle für Namco System 246/256. Eigene PNG- oder JPG-Dateien müssen nach der NM-Spiel-ID benannt sein.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Arcade-Spiele benötigen einige Dateien und werden über das .acgame-Manifest gestartet.</string>
+    <string name="namco_guide_intro">Bewahre jedes Arcade-Spiel in einem eigenen Ordner auf. EmuCoreX liest das Manifest und bereitet ELF, Datenträgerabbild, Sicherheitsschlüssel, SRAM und Speicherkarte automatisch vor.</string>
+    <string name="namco_guide_step_bios">BIOS-Ordner — Wähle einen Ordner mit deinem normalen PS2-BIOS und dem benötigten Arcade-ROM: r27v1602f.7d für System 246 und/oder r27v1602f.8g für System 256.</string>
+    <string name="namco_guide_step_game">Spielordner — Bewahre das .acgame-Manifest zusammen mit ELF, ISO/CHD und allen referenzierten Schlüssel- oder SRAM-Dateien auf. Füge den übergeordneten Ordner zur Bibliothek hinzu.</string>
+    <string name="namco_guide_step_launch">Start — Starte den .acgame-Eintrag aus der Bibliothek. ELF, ISO oder CHD nicht direkt öffnen.</string>
+    <string name="namco_guide_step_controls">Arcade-Steuerung — Im Demomodus wirft L3 eine Münze für Spieler 1 ein und Start beginnt das Spiel. Die übrigen Tasten entsprechen dem normalen PS2-Layout.</string>
+    <string name="namco_guide_step_covers">Cover — Arcade-Grafiken sind PNG-Dateien. Die integrierte Quelle ordnet NM-IDs Libretro-MAME-Grafiken zu; eine eigene Quelle kann NM00004.png oder NM00004.jpg bereitstellen.</string>
+    <string name="namco_guide_settings_desc">Vollständige Anleitung zu BIOS, Ordnern, Start, Münzen und Covern.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

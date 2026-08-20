@@ -211,6 +211,7 @@ import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
 import com.sbro.emucorex.ui.common.EmulationSideArtworkThumbnail
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.NavigationBackButton
+import com.sbro.emucorex.ui.common.NamcoArcadeGuideContent
 import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.RequestFocusOnResume
@@ -241,7 +242,7 @@ import kotlin.math.roundToInt
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 
 private enum class SettingsTab {
-    General, Graphics, Controls, Emulation, Audio, Fixes, Library, Network, Customization, GameMenu, Updates, Pro, About
+    General, Graphics, Controls, Emulation, Audio, Fixes, Library, Network, Customization, GameMenu, Updates, Pro, Arcade, About
 }
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -273,7 +274,9 @@ fun SettingsScreen(
     var showBackupExportDialog by rememberSaveable { mutableStateOf(false) }
     var includeSaveStatesInBackup by rememberSaveable { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
+    var editingArcadeCoverUrl by remember { mutableStateOf(false) }
     var showClearCoverCacheDialog by rememberSaveable { mutableStateOf(false) }
+    var showNamcoArcadeGuide by rememberSaveable { mutableStateOf(false) }
     val showBiosDialog = remember { mutableStateOf(false) }
     var showEmulatorDataLocationDialog by remember { mutableStateOf(false) }
     val pendingCoverUrl = remember { mutableStateOf("") }
@@ -336,7 +339,7 @@ fun SettingsScreen(
     }
 
     val biosPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? -> uri?.let(viewModel::setBiosPath) }
 
     val gamePicker = rememberLauncherForActivityResult(
@@ -369,7 +372,7 @@ fun SettingsScreen(
     val launchBiosPicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-            else biosPicker.launch(arrayOf("*/*"))
+            else biosPicker.launch(null)
         }
     )
     val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog.value = true })
@@ -541,9 +544,16 @@ fun SettingsScreen(
                     shaderPackPicker.launch(arrayOf("application/zip", "application/octet-stream"))
                 },
                 onOpenCoverUrlEditor = {
+                    editingArcadeCoverUrl = false
                     pendingCoverUrl.value = uiState.coverDownloadBaseUrl.orEmpty()
                     showCoverUrlDialog.value = true
                 },
+                onOpenArcadeCoverUrlEditor = {
+                    editingArcadeCoverUrl = true
+                    pendingCoverUrl.value = uiState.arcadeCoverDownloadBaseUrl.orEmpty()
+                    showCoverUrlDialog.value = true
+                },
+                onOpenNamcoArcadeGuide = { showNamcoArcadeGuide = true },
                 onClearCoverCache = { showClearCoverCacheDialog = true },
                 launchSettingsBackupExport = {
                     includeSaveStatesInBackup = false
@@ -575,6 +585,34 @@ fun SettingsScreen(
             )
 
             Spacer(modifier = Modifier.height(bottomInset))
+        }
+    }
+
+    if (showNamcoArcadeGuide) {
+        SettingsStyledDialog(
+            title = stringResource(R.string.namco_guide_title),
+            eyebrow = stringResource(R.string.app_name),
+            icon = Icons.Rounded.Gamepad,
+            onDismissRequest = { showNamcoArcadeGuide = false }
+        ) {
+            Text(
+                text = stringResource(R.string.namco_guide_subtitle),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            NamcoArcadeGuideContent()
+            Button(
+                onClick = { showNamcoArcadeGuide = false },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.close),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
         }
     }
 
@@ -838,8 +876,12 @@ fun SettingsScreen(
 
     if (showCoverUrlDialog.value) {
         val coverUrlFocusRequester = remember { FocusRequester() }
-        val exampleBundle = remember {
-            "${CoverArtRepository.DEFAULT_COVER_BASE_URL} ${CoverArtRepository.DEFAULT_COVER_3D_BASE_URL}"
+        val exampleBundle = remember(editingArcadeCoverUrl) {
+            if (editingArcadeCoverUrl) {
+                CoverArtRepository.DEFAULT_ARCADE_COVER_BASE_URL
+            } else {
+                "${CoverArtRepository.DEFAULT_COVER_BASE_URL} ${CoverArtRepository.DEFAULT_COVER_3D_BASE_URL}"
+            }
         }
         LaunchedEffect(showCoverUrlDialog.value) {
             if (showCoverUrlDialog.value) {
@@ -849,12 +891,12 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showCoverUrlDialog.value = false },
             title = {
-                Text(stringResource(R.string.settings_cover_download_url_dialog_title))
+                Text(stringResource(if (editingArcadeCoverUrl) R.string.settings_arcade_cover_url_dialog_title else R.string.settings_cover_download_url_dialog_title))
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = stringResource(R.string.settings_cover_download_url_dialog_body),
+                        text = stringResource(if (editingArcadeCoverUrl) R.string.settings_arcade_cover_url_dialog_body else R.string.settings_cover_download_url_dialog_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -867,8 +909,8 @@ fun SettingsScreen(
                         minLines = 2,
                         maxLines = 4,
                         shape = RoundedCornerShape(18.dp),
-                        label = { Text(stringResource(R.string.settings_cover_download_url)) },
-                        placeholder = { Text(stringResource(R.string.settings_cover_download_url_placeholder)) }
+                        label = { Text(stringResource(if (editingArcadeCoverUrl) R.string.settings_arcade_cover_download_url else R.string.settings_cover_download_url)) },
+                        placeholder = { Text(if (editingArcadeCoverUrl) CoverArtRepository.DEFAULT_ARCADE_COVER_BASE_URL else stringResource(R.string.settings_cover_download_url_placeholder)) }
                     )
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -904,6 +946,17 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    TextButton(
+                        onClick = {
+                            pendingCoverUrl.value = ""
+                            if (editingArcadeCoverUrl) viewModel.setArcadeCoverDownloadBaseUrl(null)
+                            else viewModel.setCoverDownloadBaseUrl(null)
+                            showCoverUrlDialog.value = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.settings_cover_download_url_use_default))
+                    }
                 }
             },
             confirmButton = {
@@ -916,7 +969,7 @@ fun SettingsScreen(
                         val hasInvalidPart = parts.any {
                             !it.startsWith("http://") && !it.startsWith("https://")
                         }
-                        if (hasInvalidPart || parts.size > 2) {
+                        if (hasInvalidPart || parts.size > if (editingArcadeCoverUrl) 1 else 2) {
                             Toast.makeText(
                                 context,
                                 coverUrlInvalidMessage,
@@ -924,7 +977,8 @@ fun SettingsScreen(
                             ).show()
                             return@TextButton
                         }
-                        viewModel.setCoverDownloadBaseUrl(value.ifBlank { null })
+                        if (editingArcadeCoverUrl) viewModel.setArcadeCoverDownloadBaseUrl(value.ifBlank { null })
+                        else viewModel.setCoverDownloadBaseUrl(value.ifBlank { null })
                         showCoverUrlDialog.value = false
                     }
                 ) {
@@ -932,19 +986,8 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        onClick = {
-                            pendingCoverUrl.value = ""
-                            viewModel.setCoverDownloadBaseUrl(null)
-                            showCoverUrlDialog.value = false
-                        }
-                    ) {
-                        Text(stringResource(R.string.settings_cover_download_url_use_default))
-                    }
-                    TextButton(onClick = { showCoverUrlDialog.value = false }) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
+                TextButton(onClick = { showCoverUrlDialog.value = false }) {
+                    Text(stringResource(android.R.string.cancel))
                 }
             }
         )
@@ -1091,6 +1134,8 @@ private fun SettingsContent(
     launchCustomFontPicker: () -> Unit,
     launchShaderPackPicker: () -> Unit,
     onOpenCoverUrlEditor: () -> Unit,
+    onOpenArcadeCoverUrlEditor: () -> Unit,
+    onOpenNamcoArcadeGuide: () -> Unit,
     onClearCoverCache: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
@@ -2266,7 +2311,6 @@ private fun SettingsContent(
                     } else {
                         builtInCoverSourceLabel
                     }
-
                     LaunchedEffect(repository) {
                         val assignments = repository.ensureDefaultCardsAssigned()
                         val cards = repository.listCards()
@@ -3124,6 +3168,49 @@ private fun SettingsContent(
                         onRestore = viewModel::restoreProPurchases,
                         onApplyCrimson = { viewModel.setThemeMode(ThemeMode.PRO) }
                     )
+                }
+
+                SettingsTab.Arcade -> {
+                    val biosDisplayName = uiState.biosPath
+                        ?.let(DocumentPathResolver::getFallbackDisplayName)
+                        ?: notSetLabel
+                    val arcadeCoverUrlDisplay = if (uiState.arcadeCoverDownloadBaseUrl.isNullOrBlank()) {
+                        stringResource(R.string.settings_cover_download_url_builtin)
+                    } else {
+                        uiState.arcadeCoverDownloadBaseUrl
+                    }
+                    SettingsSection(title = stringResource(R.string.namco_guide_title)) {
+                        SettingsItem(
+                            icon = Icons.Rounded.Info,
+                            label = stringResource(R.string.namco_guide_title),
+                            value = stringResource(R.string.namco_guide_settings_desc),
+                            onClick = onOpenNamcoArcadeGuide,
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                    SettingsSection(title = stringResource(R.string.settings_bios_picker_title)) {
+                        SettingsItem(
+                            icon = Icons.Rounded.FolderOpen,
+                            label = stringResource(R.string.settings_bios_picker_action),
+                            value = biosDisplayName,
+                            onClick = launchBiosPicker,
+                            helpText = stringResource(R.string.settings_bios_picker_desc)
+                        )
+                        SettingsInlineNote(stringResource(R.string.namco_guide_step_bios))
+                    }
+                    SettingsSection(title = stringResource(R.string.settings_covers_tab)) {
+                        SettingsItem(
+                            icon = Icons.Rounded.Link,
+                            label = stringResource(R.string.settings_arcade_cover_download_url),
+                            value = arcadeCoverUrlDisplay,
+                            onClick = onOpenArcadeCoverUrlEditor,
+                            helpText = stringResource(R.string.settings_help_arcade_cover_download_url)
+                        )
+                        SettingsInlineNote(stringResource(R.string.namco_guide_step_covers))
+                    }
                 }
 
                 SettingsTab.About -> {
@@ -5206,6 +5293,8 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Library, R.string.settings_cover_art_style),
         entry(SettingsTab.Library, R.string.settings_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_clear_cover_cache),
+        entry(SettingsTab.Arcade, R.string.namco_guide_title),
+        entry(SettingsTab.Arcade, R.string.settings_arcade_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_backup_export_title),
         entry(SettingsTab.Library, R.string.settings_backup_restore_title),
         entry(SettingsTab.Emulation, R.string.settings_show_fps),
@@ -7038,6 +7127,7 @@ private fun SettingsTab.label(): String {
         SettingsTab.Library -> stringResource(R.string.settings_library_tab)
         SettingsTab.Pro -> stringResource(R.string.settings_pro_tab)
         SettingsTab.Updates -> stringResource(R.string.settings_updates_tab)
+        SettingsTab.Arcade -> stringResource(R.string.settings_namco_arcade_tab)
         SettingsTab.About -> stringResource(R.string.settings_about)
     }
 }
@@ -7056,6 +7146,7 @@ private fun SettingsTab.icon(): ImageVector {
         SettingsTab.Library -> Icons.Rounded.FolderOpen
         SettingsTab.Pro -> Icons.Rounded.Star
         SettingsTab.Updates -> Icons.Rounded.SystemUpdateAlt
+        SettingsTab.Arcade -> Icons.Rounded.Gamepad
         SettingsTab.About -> Icons.Rounded.Info
     }
 }
@@ -7074,6 +7165,7 @@ private fun String.toSettingsTab(): SettingsTab {
         "network", "networking", "multiplayer", "online", "dev9" -> SettingsTab.Network
         "pro", "premium", "crimson", "support" -> SettingsTab.Pro
         "updates", "update", "app_update", "app-update" -> SettingsTab.Updates
+        "arcade", "namco", "system246", "system256", "system-246", "system-256" -> SettingsTab.Arcade
         "about" -> SettingsTab.About
         else -> SettingsTab.General
     }

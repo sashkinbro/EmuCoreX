@@ -1028,6 +1028,64 @@ static void vtlb_CreateFastmemMapping(u32 vaddr, u32 mainmem_offset, const PageP
 	s_fastmem_physical_mapping.emplace(mainmem_offset, vaddr);
 }
 
+#ifdef __ANDROID__
+// Android limits the number of VMAs in a process. Mapping 128 MB of System
+// 246/256 RAM one host page at a time for each EE alias can exhaust that limit.
+// Install an untouched contiguous run with one mmap() while retaining the
+// existing per-VTLB-page bookkeeping for protection changes and teardown.
+static u32 vtlb_CreateFastmemMappingRun(u32 vaddr, u32 paddr, u32 max_size)
+{
+	u32 first_offset, first_size;
+	PageProtectionMode first_mode;
+	if (!vtlb_GetMainMemoryOffset(paddr, &first_offset, &first_size, &first_mode))
+		return 0;
+
+	if ((vaddr & __pagemask) != 0 || (first_offset & __pagemask) != 0)
+		return 0;
+
+	u32 run_size = 0;
+	while (run_size < max_size)
+	{
+		u32 offset, available;
+		PageProtectionMode mode;
+		if (!vtlb_GetMainMemoryOffset(paddr + run_size, &offset, &available, &mode) ||
+			offset != first_offset + run_size ||
+			mode.CanRead() != first_mode.CanRead() ||
+			mode.CanWrite() != first_mode.CanWrite() ||
+			mode.CanExecute() != first_mode.CanExecute())
+		{
+			break;
+		}
+
+		const u32 page = (vaddr + run_size) / VTLB_PAGE_SIZE;
+		if (s_fastmem_virtual_mapping[page] != NO_FASTMEM_MAPPING)
+			break;
+
+		run_size += VTLB_PAGE_SIZE;
+	}
+
+	run_size &= ~static_cast<u32>(__pagemask);
+	if (run_size <= __pagesize)
+		return 0;
+
+	if (!s_fastmem_area->Map(SysMemory::GetDataFileHandle(), first_offset,
+			s_fastmem_area->OffsetPointer(vaddr), run_size, first_mode))
+	{
+		return 0;
+	}
+
+	for (u32 offset = 0; offset < run_size; offset += VTLB_PAGE_SIZE)
+	{
+		const u32 page_vaddr = vaddr + offset;
+		const u32 mainmem_offset = first_offset + offset;
+		s_fastmem_virtual_mapping[page_vaddr / VTLB_PAGE_SIZE] = mainmem_offset;
+		s_fastmem_physical_mapping.emplace(mainmem_offset, page_vaddr);
+	}
+
+	return run_size;
+}
+#endif
+
 static void vtlb_RemoveFastmemMapping(u32 vaddr)
 {
 	const u32 page = vaddr / VTLB_PAGE_SIZE;
@@ -1206,18 +1264,35 @@ void vtlb_VMap(u32 vaddr, u32 paddr, u32 size)
 
 	if (CHECK_FASTMEM)
 	{
-		const u32 num_pages = size / VTLB_PAGE_SIZE;
+		const u32 fastmem_size = size;
 		u32 current_vaddr = vaddr;
 		u32 current_paddr = paddr;
+		u32 mapped_size = 0;
 
-		for (u32 i = 0; i < num_pages; i++, current_vaddr += VTLB_PAGE_SIZE, current_paddr += VTLB_PAGE_SIZE)
+		while (mapped_size < fastmem_size)
 		{
+			#ifdef __ANDROID__
+			const u32 run_size = vtlb_CreateFastmemMappingRun(
+				current_vaddr, current_paddr, fastmem_size - mapped_size);
+			if (run_size != 0)
+			{
+				current_vaddr += run_size;
+				current_paddr += run_size;
+				mapped_size += run_size;
+				continue;
+			}
+			#endif
+
 			u32 hoffset, hsize;
 			PageProtectionMode mode;
 			if (vtlb_GetMainMemoryOffset(current_paddr, &hoffset, &hsize, &mode))
 				vtlb_CreateFastmemMapping(current_vaddr, hoffset, mode);
 			else
 				vtlb_RemoveFastmemMapping(current_vaddr);
+
+			current_vaddr += VTLB_PAGE_SIZE;
+			current_paddr += VTLB_PAGE_SIZE;
+			mapped_size += VTLB_PAGE_SIZE;
 		}
 	}
 

@@ -164,6 +164,7 @@ data class SettingsUiState(
     val emulatorDataPath: String? = null,
     val sdCardDataPath: String? = null,
     val coverDownloadBaseUrl: String? = null,
+    val arcadeCoverDownloadBaseUrl: String? = null,
     val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DEFAULT,
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
@@ -444,6 +445,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             gamePaths = snapshot.gamePaths,
             emulatorDataPath = snapshot.emulatorDataPath,
             coverDownloadBaseUrl = snapshot.coverDownloadBaseUrl,
+            arcadeCoverDownloadBaseUrl = snapshot.arcadeCoverDownloadBaseUrl,
             coverArtStyle = snapshot.coverArtStyle,
             setupComplete = snapshot.setupComplete,
             performanceProfile = snapshot.performanceProfile,
@@ -2244,6 +2246,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCoverDownloadBaseUrl(url: String?) {
         viewModelScope.launch {
             preferences.setCoverDownloadBaseUrl(url)
+            CoverArtRepository(getApplication()).clearCache()
+            clearCoverImageMemoryCache()
+        }
+    }
+
+    fun setArcadeCoverDownloadBaseUrl(url: String?) {
+        viewModelScope.launch {
+            preferences.setArcadeCoverDownloadBaseUrl(url)
             CoverArtRepository(getApplication()).clearCache()
             clearCoverImageMemoryCache()
         }

@@ -540,10 +540,10 @@
     <string name="settings_paths">فایل‌ها</string>
     <string name="settings_bios_path">فایل BIOS</string>
     <string name="settings_bios_path_desc">فایل تصویر BIOS پلی‌استیشن 2 مورد نیاز برای شروع بازی‌ها را انتخاب کنید.</string>
-    <string name="settings_bios_picker_title">انتخاب فایل BIOS</string>
-    <string name="settings_bios_picker_desc">فایل تصویر BIOS پلی‌استیشن 2 خود را انتخاب کنید. این فایل برای بوت شدن عادی بازی و بوت شدن BIOS استفاده خواهد شد.</string>
+    <string name="settings_bios_picker_title">انتخاب پوشه BIOS</string>
+    <string name="settings_bios_picker_desc">پوشه BIOS را انتخاب کنید. EmuCoreX برای بازی‌های کنسولی BIOS عادی PS2 و برای Namco System 246/256 فایل r27v1602f.7d/.8g را انتخاب می‌کند.</string>
     <string name="settings_bios_picker_current">فایل BIOS فعلی</string>
-    <string name="settings_bios_picker_action">انتخاب فایل</string>
+    <string name="settings_bios_picker_action">انتخاب پوشه</string>
     <string name="settings_game_path">پوشه بازی‌ها</string>
     <string name="settings_game_path_desc">پوشه‌ای را که حاوی بازی‌های شماست انتخاب کنید.</string>
     <string name="settings_emulator_data_path">پوشه شبیه‌ساز</string>
@@ -1144,7 +1144,7 @@
     <string name="onboarding_title">برای بازی آماده شوید</string>
     <string name="onboarding_subtitle">یک فایل BIOS اضافه کنید، پوشه بازی‌های خود را انتخاب کنید و دسترسی کامل به فایل را بدهید.</string>
     <string name="onboarding_bios_title">انتخاب فایل BIOS</string>
-    <string name="onboarding_bios_desc">فایل تصویر BIOS پلی‌استیشن 2 مورد نیاز برای شروع بازی‌ها را انتخاب کنید.</string>
+    <string name="onboarding_bios_desc">یک پوشه BIOS شامل BIOS عادی PS2 و ROMهای Namco System 246/256 انتخاب کنید.</string>
     <string name="onboarding_games_title">انتخاب پوشه بازی‌ها</string>
     <string name="onboarding_games_desc">پوشه‌ای را که حاوی بازی‌های شماست انتخاب کنید.</string>
     <string name="onboarding_emulator_folder_title">انتخاب پوشه شبیه‌ساز</string>
@@ -2431,4 +2431,18 @@
     <string name="network_guide_internet_requirements">هر دو بازیکن به نسخه یکسان بازی و اینترنت پایدار نیاز دارند. اگر اتصال مستقیم مسدود باشد ممکن است رله TURN لازم شود.</string>
     <string name="network_guide_internet_steps">1. میزبان اتاقی ایجاد می‌کند و کد 8 نویسه‌ای را به اشتراک می‌گذارد.\n2. مهمان کد را وارد می‌کند و منتظر Connected می‌شود.\n3. هر دو بازیکن یک بازی را راه‌اندازی می‌کنند.\n4. حالت LAN بازی را باز کنید.\n5. میزبان مسابقه ایجاد می کند. مهمان آن را جستجو می کند و به آن ملحق می شود.</string>
     <string name="network_guide_internet_limits">بازی باید از LAN یا System-link play پشتیبانی کند. تأخیر اینترنت به پروتکل شبکه خود بازی اضافه شده است. شبکه‌های شرکتی، درجه حامل یا به شدت محدود ممکن است به رله TURN نیاز داشته باشند.</string>
+    <string name="settings_arcade_cover_download_url">نشانی جلد Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">منبع جلد Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">یک نشانی پایه مستقیم برای تصاویر نام‌گذاری‌شده با شناسه بازی Namco مانند NM00004.png وارد کنید. برای استفاده از منبع داخلی Libretro MAME خالی بگذارید.</string>
+    <string name="settings_help_arcade_cover_download_url">منبع داخلی تصاویر بازی‌های Namco System 246/256 را جایگزین می‌کند. فایل‌های PNG یا JPG سفارشی باید با شناسه NM بازی نام‌گذاری شوند.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">بازی‌های آرکید به چند فایل نیاز دارند و از طریق مانیفست .acgame اجرا می‌شوند.</string>
+    <string name="namco_guide_intro">هر بازی آرکید را در پوشه جداگانه نگه دارید. EmuCoreX مانیفست را می‌خواند و ELF، تصویر دیسک، کلید امنیتی، SRAM و کارت حافظه را خودکار آماده می‌کند.</string>
+    <string name="namco_guide_step_bios">پوشه BIOS — پوشه‌ای با BIOS عادی PS2 و ROM آرکید لازم انتخاب کنید: r27v1602f.7d برای System 246 و/یا r27v1602f.8g برای System 256.</string>
+    <string name="namco_guide_step_game">پوشه بازی — مانیفست .acgame را همراه ELF، ISO/CHD و فایل‌های کلید یا SRAM اشاره‌شده نگه دارید. پوشه والد را به کتابخانه اضافه کنید.</string>
+    <string name="namco_guide_step_launch">اجرا — ورودی .acgame را از کتابخانه باز کنید. ELF، ISO یا CHD فرزند را مستقیم اجرا نکنید.</string>
+    <string name="namco_guide_step_controls">کنترل آرکید — در حالت نمایش، L3 سکه بازیکن ۱ را وارد می‌کند و Start بازی را آغاز می‌کند. بقیه دکمه‌ها از چیدمان عادی PS2 استفاده می‌کنند.</string>
+    <string name="namco_guide_step_covers">جلدها — تصاویر آرکید PNG هستند. منبع داخلی شناسه NM را با Libretro MAME تطبیق می‌دهد؛ منبع سفارشی می‌تواند NM00004.png یا NM00004.jpg داشته باشد.</string>
+    <string name="namco_guide_settings_desc">راهنمای کامل BIOS، پوشه‌ها، اجرا، سکه و جلدها.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

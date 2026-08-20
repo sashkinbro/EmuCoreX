@@ -22,9 +22,9 @@ object DocumentPathResolver {
         val fileName: String?
     )
 
-    private val biosImageExtensions = setOf("bin", "rom")
+    private val biosImageExtensions = setOf("bin", "rom", "7d", "8g")
     private val biosArtifactExtensions = setOf("mec", "nvm", "elf")
-    private val biosNameHints = listOf("scph", "ps2", "bios", "rom")
+    private val biosNameHints = listOf("scph", "ps2", "bios", "rom", "r27v1602f")
     private const val MAX_IMPORTED_BIOS_BYTES = 8L * 1024L * 1024L
 
     fun resolveFilePath(context: Context, rawPath: String): String? {
@@ -166,7 +166,17 @@ object DocumentPathResolver {
 
         return dir.walkTopDown()
             .maxDepth(2)
-            .filter(::isValidPreparedBiosFile).minByOrNull { it.name.lowercase() }
+            .filter(::isValidPreparedBiosFile)
+            .sortedWith(
+                compareBy<File> {
+                    when (it.name.lowercase()) {
+                        "r27v1602f.7d" -> 1
+                        "r27v1602f.8g" -> 2
+                        else -> 0
+                    }
+                }.thenBy { it.name.lowercase() }
+            )
+            .firstOrNull()
             ?.name
     }
 

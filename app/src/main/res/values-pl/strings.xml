@@ -572,10 +572,10 @@
     <string name="settings_paths">Pliki</string>
     <string name="settings_bios_path">Plik BIOS</string>
     <string name="settings_bios_path_desc">Wybierz plik obrazu BIOS PS2, niezbędny do uruchamiania gier.</string>
-    <string name="settings_bios_picker_title">Wybierz plik BIOS</string>
-    <string name="settings_bios_picker_desc">Wybierz plik obrazu BIOS PlayStation 2. Będzie on używany do normalnego uruchamiania gier oraz rozruchu z BIOS-u.</string>
+    <string name="settings_bios_picker_title">Wybierz folder BIOS</string>
+    <string name="settings_bios_picker_desc">Wybierz folder BIOS. EmuCoreX wybierze zwykły BIOS PS2 dla gier konsolowych oraz r27v1602f.7d/.8g dla Namco System 246/256.</string>
     <string name="settings_bios_picker_current">Bieżący plik BIOS</string>
-    <string name="settings_bios_picker_action">Wybierz plik</string>
+    <string name="settings_bios_picker_action">Wybierz folder</string>
     <string name="settings_game_path">Foldery z grami</string>
     <string name="settings_game_path_desc">Dodaj jeden lub więcej folderów zawierających twoje gry.</string>
     <string name="settings_game_folders_count">Wybrano %1$d folderów</string>
@@ -1210,7 +1210,7 @@
 
     <string name="onboarding_subtitle">Dodaj plik BIOS, wybierz foldery z grami i przyznaj dostęp do plików.</string>
     <string name="onboarding_bios_title">Wybierz plik BIOS</string>
-    <string name="onboarding_bios_desc">Wybierz plik obrazu BIOS PS2 wymagany do uruchamiania gier.</string>
+    <string name="onboarding_bios_desc">Wybierz jeden folder BIOS ze zwykłym BIOS-em PS2 i ROM-ami Namco System 246/256.</string>
     <string name="onboarding_games_title">Dodaj foldery z grami</string>
     <string name="onboarding_games_desc">Dodaj jeden lub więcej folderów zawierających Twoje gry.</string>
     <string name="onboarding_games_selected_count">Wybrano folderów: %1$d. Dotknij, aby dodać kolejny.</string>
@@ -2438,4 +2438,18 @@
     <string name="network_guide_internet_requirements">Obaj gracze potrzebują tej samej wersji gry i stabilnego internetu. Gdy połączenie bezpośrednie jest blokowane, może być potrzebny przekaźnik TURN.</string>
     <string name="network_guide_internet_steps">1. Gospodarz tworzy pokój i udostępnia 8-znakowy kod.\n2. Gość wprowadza kod i czeka na połączenie.\n3. Obaj gracze uruchamiają tę samą grę.\n4. Otwórz tryb LAN gry.\n5. Gospodarz tworzy dopasowanie; gość szuka i dołącza do niego.</string>
     <string name="network_guide_internet_limits">Gra musi obsługiwać grę w sieci LAN lub przez łącze systemowe. Opóźnienie Internetu zostało dodane do protokołu sieciowego gry. Sieci korporacyjne, operatorskie lub sieci o dużych ograniczeniach mogą wymagać przekaźnika TURN.</string>
+    <string name="settings_arcade_cover_download_url">URL okładek Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">Źródło okładek Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">Podaj bezpośredni bazowy URL z obrazami nazwanymi według identyfikatora gry Namco, np. NM00004.png. Pozostaw puste, aby użyć wbudowanego źródła Libretro MAME.</string>
+    <string name="settings_help_arcade_cover_download_url">Zastępuje wbudowane źródło dla gier Namco System 246/256. Własne pliki PNG lub JPG muszą mieć nazwę zgodną z identyfikatorem NM gry.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Gry arcade wymagają kilku plików i są uruchamiane przez manifest .acgame.</string>
+    <string name="namco_guide_intro">Przechowuj każdą grę arcade w osobnym folderze. EmuCoreX odczyta manifest i automatycznie przygotuje ELF, obraz dysku, klucz zabezpieczeń, SRAM i kartę pamięci.</string>
+    <string name="namco_guide_step_bios">Folder BIOS — Wybierz folder ze zwykłym BIOS-em PS2 i wymaganą pamięcią ROM arcade: r27v1602f.7d dla System 246 i/lub r27v1602f.8g dla System 256.</string>
+    <string name="namco_guide_step_game">Folder gry — Przechowuj manifest .acgame razem z ELF, ISO/CHD oraz wskazanymi plikami klucza lub SRAM. Dodaj folder nadrzędny do biblioteki.</string>
+    <string name="namco_guide_step_launch">Uruchamianie — Otwórz wpis .acgame z biblioteki. Nie uruchamiaj bezpośrednio plików ELF, ISO ani CHD.</string>
+    <string name="namco_guide_step_controls">Sterowanie arcade — W trybie demonstracyjnym L3 wrzuca monetę gracza 1, a Start rozpoczyna grę. Pozostałe przyciski używają zwykłego układu PS2.</string>
+    <string name="namco_guide_step_covers">Okładki — Grafiki arcade używają PNG. Wbudowane źródło dopasowuje ID NM do Libretro MAME; własne źródło może udostępniać NM00004.png lub NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">Pełna instrukcja BIOS-u, folderów, uruchamiania, monet i okładek.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>
