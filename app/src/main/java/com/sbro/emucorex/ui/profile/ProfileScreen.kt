@@ -1,9 +1,14 @@
 package com.sbro.emucorex.ui.profile
 
 import android.app.Activity
+import android.Manifest
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
@@ -27,6 +32,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,12 +57,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Leaderboard
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
@@ -68,6 +80,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -94,6 +108,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -110,6 +125,12 @@ import com.sbro.emucorex.data.PlayerGamePlayStat
 import com.sbro.emucorex.data.PlayerLeaderboardEntry
 import com.sbro.emucorex.data.PlayerProfile
 import com.sbro.emucorex.data.PlayerRankInsights
+import com.sbro.emucorex.data.CloudEmulatorProfile
+import com.sbro.emucorex.data.EmuAchievementState
+import com.sbro.emucorex.data.FriendshipStatus
+import com.sbro.emucorex.data.PlayerDevice
+import com.sbro.emucorex.data.ProfileFriendship
+import com.sbro.emucorex.data.PublicPlayerDevice
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ScreenTopBar
@@ -126,6 +147,7 @@ import java.util.Locale
 private enum class ProfileTab {
     Overview,
     Games,
+    Achievements,
     Leaderboard,
     Stats
 }
@@ -148,8 +170,20 @@ fun ProfileScreen(
     val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val selectedTab = rememberSaveable { mutableIntStateOf(0) }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     var showProCustomization by rememberSaveable { mutableStateOf(false) }
+    var showDevices by rememberSaveable { mutableStateOf(false) }
+    var showCloudProfiles by rememberSaveable { mutableStateOf(false) }
     val isViewingLeaderboardProfile = uiState.viewedProfile != null || uiState.isViewedProfileLoading
+
+    LaunchedEffect(selectedTab.intValue, uiState.account?.uid) {
+        if (uiState.account != null && selectedTab.intValue == ProfileTab.Achievements.ordinal &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     if (showProCustomization && uiState.profile != null) {
         ProProfileCustomizationDialog(
@@ -160,6 +194,26 @@ fun ProfileScreen(
                 showProCustomization = false
                 viewModel.updateProProfile(accent, favoriteGameKeys)
             }
+        )
+    }
+
+    if (showDevices) {
+        ProfileDevicesDialog(
+            devices = uiState.devices,
+            isLoading = uiState.isFeatureActionLoading,
+            onSetPublic = viewModel::setDevicePublic,
+            onDismiss = { showDevices = false }
+        )
+    }
+
+    if (showCloudProfiles) {
+        CloudProfilesDialog(
+            profiles = uiState.cloudProfiles,
+            isLoading = uiState.isFeatureActionLoading,
+            onSave = viewModel::saveCloudProfile,
+            onRestore = viewModel::restoreCloudProfile,
+            onDelete = viewModel::deleteCloudProfile,
+            onDismiss = { showCloudProfiles = false }
         )
     }
 
@@ -212,6 +266,12 @@ fun ProfileScreen(
                     onBack = viewModel::closeViewedProfile,
                     onLoadMoreGames = viewModel::loadMoreViewedGames,
                     onGameClick = { game -> viewModel.openGameDetails(game, onOpenGameDetails) },
+                    friendship = uiState.friendships.firstOrNull { it.otherUid == uiState.viewedProfile?.uid },
+                    isActionLoading = uiState.isFeatureActionLoading,
+                    onAddFriend = { uiState.viewedProfile?.uid?.let(viewModel::sendFriendRequest) },
+                    onAcceptFriend = viewModel::acceptFriendRequest,
+                    onRemoveFriend = viewModel::removeFriendship,
+                    onBlock = { uiState.viewedProfile?.uid?.let(viewModel::blockPlayer) },
                     modifier = Modifier.weight(1f)
                 )
             } else {
@@ -257,6 +317,15 @@ fun ProfileScreen(
                                         )
                                     }
                                 }
+                                item {
+                                    ProfileFeatureHubCard(
+                                        deviceCount = uiState.devices.size,
+                                        cloudProfileCount = uiState.cloudProfiles.size,
+                                        friendCount = uiState.friendships.count { it.status == FriendshipStatus.Accepted },
+                                        onDevices = { showDevices = true },
+                                        onCloudProfiles = { showCloudProfiles = true }
+                                    )
+                                }
                                 if (uiState.isProfileLoading && uiState.profile == null) {
                                     item { RecentGamesSkeletonCard() }
                                 } else {
@@ -291,6 +360,19 @@ fun ProfileScreen(
                                             game = game,
                                             onClick = { viewModel.openGameDetails(game, onOpenGameDetails) }
                                         )
+                                    }
+                                }
+                            }
+
+                            ProfileTab.Achievements -> {
+                                item {
+                                    AchievementSummaryCard(uiState.achievements)
+                                }
+                                if (!uiState.hasLoadedAchievements && uiState.achievements.isEmpty()) {
+                                    items(4, key = { "achievement-skeleton-$it" }) { GamePlayStatSkeletonRow() }
+                                } else {
+                                    items(uiState.achievements, key = { it.definition.id }) { achievement ->
+                                        AchievementRow(achievement)
                                     }
                                 }
                             }
@@ -592,6 +674,12 @@ private fun ViewedPlayerProfile(
     onBack: () -> Unit,
     onLoadMoreGames: () -> Unit,
     onGameClick: (PlayerGamePlayStat) -> Unit,
+    friendship: ProfileFriendship?,
+    isActionLoading: Boolean,
+    onAddFriend: () -> Unit,
+    onAcceptFriend: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+    onBlock: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -619,6 +707,16 @@ private fun ViewedPlayerProfile(
         } else {
             item {
                 ReadOnlyProfileCard(profile = profile)
+            }
+            item {
+                PlayerSocialActions(
+                    friendship = friendship,
+                    isLoading = isActionLoading,
+                    onAddFriend = onAddFriend,
+                    onAcceptFriend = onAcceptFriend,
+                    onRemoveFriend = onRemoveFriend,
+                    onBlock = onBlock
+                )
             }
             if (profile.games.isNotEmpty()) {
                 item {
@@ -648,6 +746,10 @@ private fun ViewedPlayerProfile(
 @Composable
 private fun ReadOnlyProfileCard(profile: PlayerProfile) {
     val accent = profileAccentColor(profile.profileAccent)
+    var showDevice by rememberSaveable(profile.uid) { mutableStateOf(false) }
+    if (showDevice && profile.publicDevice != null) {
+        PublicDeviceDialog(profile.publicDevice, onDismiss = { showDevice = false })
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -713,6 +815,15 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
                         )
                     }
                 }
+                if (profile.publicDevice != null) {
+                    IconButton(onClick = { showDevice = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.Devices,
+                            contentDescription = stringResource(R.string.profile_device_show),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
             }
 
@@ -733,6 +844,325 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
                 )
             }
             FavoriteGamesShowcase(profile)
+        }
+    }
+}
+
+@Composable
+private fun PlayerSocialActions(
+    friendship: ProfileFriendship?,
+    isLoading: Boolean,
+    onAddFriend: () -> Unit,
+    onAcceptFriend: (String) -> Unit,
+    onRemoveFriend: (String) -> Unit,
+    onBlock: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = profileCardBorder()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                enabled = !isLoading && friendship?.status != FriendshipStatus.PendingOutgoing,
+                onClick = {
+                    when (friendship?.status) {
+                        FriendshipStatus.PendingIncoming -> onAcceptFriend(friendship.id)
+                        FriendshipStatus.Accepted -> onRemoveFriend(friendship.id)
+                        FriendshipStatus.PendingOutgoing -> Unit
+                        null -> onAddFriend()
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = if (friendship?.status == FriendshipStatus.Accepted) Icons.Rounded.CheckCircle else Icons.Rounded.PersonAdd,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(when (friendship?.status) {
+                        FriendshipStatus.PendingIncoming -> R.string.profile_friend_accept
+                        FriendshipStatus.PendingOutgoing -> R.string.profile_friend_pending
+                        FriendshipStatus.Accepted -> R.string.profile_friend_remove
+                        null -> R.string.profile_friend_add
+                    }),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            IconButton(enabled = !isLoading, onClick = onBlock) {
+                Icon(Icons.Rounded.Block, contentDescription = stringResource(R.string.profile_block_player))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileFeatureHubCard(
+    deviceCount: Int,
+    cloudProfileCount: Int,
+    friendCount: Int,
+    onDevices: () -> Unit,
+    onCloudProfiles: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        border = profileCardBorder()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.profile_features_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onDevices, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Devices, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(stringResource(R.string.profile_devices_count, deviceCount), maxLines = 1)
+                }
+                OutlinedButton(onClick = onCloudProfiles, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(stringResource(R.string.profile_cloud_count, cloudProfileCount), maxLines = 1)
+                }
+            }
+            Text(
+                text = stringResource(R.string.profile_friends_count, friendCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun AchievementSummaryCard(achievements: List<EmuAchievementState>) {
+    val unlocked = achievements.filter { it.unlocked }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+        border = profileCardBorder()
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.profile_tab_achievements), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                Text(
+                    stringResource(R.string.achievement_summary_format, unlocked.size, achievements.size, unlocked.sumOf { it.definition.points }),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AchievementRow(state: EmuAchievementState) {
+    val hideDetails = state.definition.hidden && !state.unlocked
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = profileCardBorder(alpha = if (state.unlocked) 0.8f else 0.45f)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = if (state.unlocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (hideDetails) Icons.Rounded.Block else Icons.Rounded.EmojiEvents,
+                        contentDescription = null,
+                        tint = if (state.unlocked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(if (hideDetails) R.string.achievement_hidden_title else state.definition.titleRes),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(stringResource(R.string.achievement_points_format, state.definition.points), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                Text(
+                    text = stringResource(if (hideDetails) R.string.achievement_hidden_description else state.definition.descriptionRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                LinearProgressIndicator(
+                    progress = { if (hideDetails) 0f else state.progressFraction },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!hideDetails) {
+                    Text(
+                        stringResource(R.string.achievement_progress_format, state.progress, state.definition.target),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileDevicesDialog(
+    devices: List<PlayerDevice>,
+    isLoading: Boolean,
+    onSetPublic: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ProfileFeatureDialog(title = stringResource(R.string.profile_devices_title), onDismiss = onDismiss) {
+        Text(stringResource(R.string.profile_devices_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (devices.isEmpty()) {
+            Text(stringResource(R.string.profile_devices_empty), style = MaterialTheme.typography.bodyMedium)
+        }
+        devices.forEach { device ->
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(9.dp))
+                        Text(device.displayName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+                        if (device.isCurrent) Text(stringResource(R.string.profile_device_current), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(listOf(device.soc, device.gpuFamily, device.androidVersion).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(
+                        enabled = !isLoading,
+                        onClick = { onSetPublic(device.deviceId, !device.isPublic) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(if (device.isPublic) R.string.profile_device_make_private else R.string.profile_device_make_public))
+                    }
+                }
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun CloudProfilesDialog(
+    profiles: List<CloudEmulatorProfile>,
+    isLoading: Boolean,
+    onSave: (String, String?) -> Unit,
+    onRestore: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var pendingRestore by rememberSaveable { mutableStateOf<String?>(null) }
+    ProfileFeatureDialog(title = stringResource(R.string.profile_cloud_title), onDismiss = onDismiss) {
+        Text(stringResource(R.string.profile_cloud_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it.take(64) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(stringResource(R.string.profile_cloud_name)) }
+        )
+        Button(
+            enabled = !isLoading && name.trim().isNotEmpty() && profiles.size < 5,
+            onClick = { onSave(name, null); name = "" },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.profile_cloud_save_current)) }
+        profiles.forEach { profile ->
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(profile.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(stringResource(R.string.profile_cloud_version, profile.appVersion, profile.coreVersion), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (pendingRestore == profile.id) {
+                        Text(stringResource(R.string.profile_cloud_restore_warning), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            enabled = !isLoading,
+                            onClick = {
+                                if (pendingRestore == profile.id) {
+                                    onRestore(profile.id)
+                                    pendingRestore = null
+                                } else pendingRestore = profile.id
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text(stringResource(if (pendingRestore == profile.id) R.string.profile_cloud_confirm_restore else R.string.profile_cloud_restore)) }
+                        IconButton(enabled = !isLoading, onClick = { onDelete(profile.id) }) {
+                            Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.profile_cloud_delete))
+                        }
+                    }
+                }
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun PublicDeviceDialog(device: PublicPlayerDevice, onDismiss: () -> Unit) {
+    ProfileFeatureDialog(title = device.displayName, onDismiss = onDismiss) {
+        listOf(
+            R.string.profile_device_soc to device.soc,
+            R.string.profile_device_gpu to device.gpuFamily,
+            R.string.profile_device_ram to if (device.ramMb > 0) "${device.ramMb / 1024} GB" else "—",
+            R.string.profile_device_android to device.androidVersion,
+            R.string.profile_device_app_core to "${device.appVersion} · ${device.coreVersion}"
+        ).forEach { (label, value) ->
+            if (value.isNotBlank()) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(stringResource(label), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, modifier = Modifier.weight(1f).padding(start = 12.dp))
+                }
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun ProfileFeatureDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(20.dp).widthIn(max = 620.dp).heightIn(max = 720.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            border = profileCardBorder()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                content = {
+                    Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+                    content()
+                }
+            )
         }
     }
 }
@@ -2547,6 +2977,7 @@ private fun StatChip(
 private fun ProfileTab.titleRes(): Int = when (this) {
     ProfileTab.Overview -> R.string.profile_tab_overview
     ProfileTab.Games -> R.string.profile_tab_games
+    ProfileTab.Achievements -> R.string.profile_tab_achievements
     ProfileTab.Leaderboard -> R.string.profile_tab_leaderboard
     ProfileTab.Stats -> R.string.profile_tab_stats
 }
@@ -2554,8 +2985,9 @@ private fun ProfileTab.titleRes(): Int = when (this) {
 private fun ProfileTab.icon() = when (this) {
     ProfileTab.Overview -> Icons.Rounded.Person
     ProfileTab.Games -> Icons.Rounded.SportsEsports
+    ProfileTab.Achievements -> Icons.Rounded.EmojiEvents
     ProfileTab.Leaderboard -> Icons.Rounded.Leaderboard
-    ProfileTab.Stats -> Icons.Rounded.EmojiEvents
+    ProfileTab.Stats -> Icons.Rounded.BarChart
 }
 
 @Composable
@@ -2570,6 +3002,15 @@ private fun profileMessageRes(key: String): Int = when (key) {
     "profile_name_updated" -> R.string.profile_name_updated
     "profile_signed_out" -> R.string.profile_signed_out
     "profile_pro_updated" -> R.string.profile_pro_updated
+    "profile_device_public" -> R.string.profile_device_public_done
+    "profile_device_private" -> R.string.profile_device_private_done
+    "profile_cloud_saved" -> R.string.profile_cloud_saved
+    "profile_cloud_restored" -> R.string.profile_cloud_restored
+    "profile_cloud_deleted" -> R.string.profile_cloud_deleted
+    "profile_friend_request_sent" -> R.string.profile_friend_request_sent
+    "profile_friend_added" -> R.string.profile_friend_added
+    "profile_friend_removed" -> R.string.profile_friend_removed
+    "profile_player_blocked" -> R.string.profile_player_blocked
     else -> R.string.profile_done
 }
 

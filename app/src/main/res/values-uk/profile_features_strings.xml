@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_close">Закрити</string>
+    <string name="profile_features_title">Можливості профілю</string>
+    <string name="profile_devices_count">Пристрої · %1$d</string>
+    <string name="profile_cloud_count">Хмара · %1$d</string>
+    <string name="profile_friends_count">Друзі: %1$d</string>
+    <string name="profile_devices_title">Ваші пристрої</string>
+    <string name="profile_devices_description">Для пристрою використовується випадковий ID застосунку, а не апаратний ідентифікатор. Ви самі обираєте, чи показувати один пристрій у профілі.</string>
+    <string name="profile_devices_empty">Зареєстрованих пристроїв ще немає.</string>
+    <string name="profile_device_current">Цей пристрій</string>
+    <string name="profile_device_make_public">Показувати у профілі</string>
+    <string name="profile_device_make_private">Приховати з профілю</string>
+    <string name="profile_device_show">Показати пристрій</string>
+    <string name="profile_device_soc">Процесор</string>
+    <string name="profile_device_gpu">Графіка</string>
+    <string name="profile_device_ram">Пам’ять</string>
+    <string name="profile_device_android">Система</string>
+    <string name="profile_device_app_core">Застосунок · ядро</string>
+    <string name="profile_device_public_done">Пристрій тепер видно у вашому профілі.</string>
+    <string name="profile_device_private_done">Пристрій приховано з вашого профілю.</string>
+    <string name="profile_cloud_title">Налаштування емулятора у хмарі</string>
+    <string name="profile_cloud_description">Збережіть до 5 іменованих профілів. Синхронізуються лише переносимі налаштування емулятора та окремих ігор; шляхи до ігор, BIOS, карт пам’яті й власних драйверів залишаються на пристрої.</string>
+    <string name="profile_cloud_name">Назва профілю</string>
+    <string name="profile_cloud_save_current">Зберегти поточні налаштування</string>
+    <string name="profile_cloud_version">Застосунок %1$s · ядро %2$s</string>
+    <string name="profile_cloud_restore">Відновити</string>
+    <string name="profile_cloud_confirm_restore">Підтвердити відновлення</string>
+    <string name="profile_cloud_restore_warning">Це замінить налаштування емулятора та окремих ігор на цьому пристрої. Бібліотека, BIOS і збереження не зміняться.</string>
+    <string name="profile_cloud_delete">Видалити хмарний профіль</string>
+    <string name="profile_cloud_saved">Налаштування емулятора збережено у профілі.</string>
+    <string name="profile_cloud_restored">Налаштування емулятора відновлено. Перезапустіть активну гру, щоб застосувати їх.</string>
+    <string name="profile_cloud_deleted">Хмарний профіль видалено.</string>
+    <string name="profile_friend_add">Додати в друзі</string>
+    <string name="profile_friend_accept">Прийняти запит</string>
+    <string name="profile_friend_pending">Запит надіслано</string>
+    <string name="profile_friend_remove">У друзях</string>
+    <string name="profile_block_player">Заблокувати гравця</string>
+    <string name="profile_friend_request_sent">Запит у друзі надіслано.</string>
+    <string name="profile_friend_added">Друга додано.</string>
+    <string name="profile_friend_removed">Дружбу припинено.</string>
+    <string name="profile_player_blocked">Гравця заблоковано.</string>
+</resources>
