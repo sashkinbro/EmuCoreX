@@ -40,4 +40,17 @@
     <string name="profile_friend_added">Друга додано.</string>
     <string name="profile_friend_removed">Дружбу припинено.</string>
     <string name="profile_player_blocked">Гравця заблоковано.</string>
+    <string name="profile_player_unblocked">Гравця розблоковано.</string>
+    <string name="profile_social_center_summary">Запити %1$d · заблоковано %2$d</string>
+    <string name="profile_social_center_title">Друзі та сповіщення</string>
+    <string name="profile_friend_requests">Запити в друзі</string>
+    <string name="profile_friend_requests_empty">Нових запитів немає.</string>
+    <string name="profile_friends_title">Друзі</string>
+    <string name="profile_friends_empty">Друзів ще не додано.</string>
+    <string name="profile_friend_remove_action">Видалити</string>
+    <string name="profile_blocked_title">Заблоковані гравці</string>
+    <string name="profile_blocked_empty">Заблокованих гравців немає.</string>
+    <string name="profile_unblock_player">Розблокувати</string>
+    <string name="profile_recent_events">Останні події</string>
+    <string name="profile_event_achievement">Досягнення розблоковано</string>
 </resources>
