@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   query,
+  orderBy,
   serverTimestamp,
   setDoc,
   where,
@@ -187,6 +188,61 @@ describe("profile feature isolation", () => {
       status: "accepted",
       updatedAt: serverTimestamp(),
     }));
+    await assertSucceeds(getDocs(query(
+      collection(dbFor("alice"), "friendships"),
+      where("members", "array-contains", "alice"),
+      orderBy("updatedAt", "desc"),
+    )));
+    await assertSucceeds(getDocs(query(
+      collection(dbFor("bob"), "friendships"),
+      where("members", "array-contains", "bob"),
+      orderBy("updatedAt", "desc"),
+    )));
+    await assertSucceeds(deleteDoc(doc(dbFor("alice"), "friendships/alice_bob")));
+  });
+
+  test("blocking either side prevents a friend request until the block is removed", async () => {
+    await seed("users/bob/blocks/alice", {
+      uid: "bob", blockedUid: "alice", createdAt: new Date(),
+    });
+    const request = {
+      id: "alice_bob",
+      members: ["alice", "bob"],
+      requestedBy: "alice",
+      status: "pending",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    await assertFails(setDoc(doc(dbFor("alice"), "friendships/alice_bob"), request));
+    await assertSucceeds(deleteDoc(doc(dbFor("bob"), "users/bob/blocks/alice")));
+    await assertSucceeds(setDoc(doc(dbFor("alice"), "friendships/alice_bob"), request));
+  });
+
+  test("achievement totals and one chosen device are readable from the public profile", async () => {
+    const alice = dbFor("alice");
+    await assertSucceeds(setDoc(doc(alice, "publicProfiles/alice"), {
+      uid: "alice",
+      displayName: "Alice",
+      achievementCount: 7,
+      achievementPoints: 125,
+      achievementCatalogVersion: 1,
+      deviceVisibility: true,
+      primaryDevice: {
+        displayName: "Galaxy",
+        soc: "Snapdragon",
+        gpuFamily: "Adreno",
+        ramMb: 12288,
+        androidVersion: "Android 16",
+        appVersion: "1.0",
+        coreVersion: "2.7.316",
+      },
+    }, { merge: true }));
+    const publicProfile = await assertSucceeds(getDoc(doc(dbFor("bob"), "publicProfiles/alice")));
+    assert.equal(publicProfile.data().achievementCount, 7);
+    assert.equal(publicProfile.data().primaryDevice.displayName, "Galaxy");
+    await assertFails(setDoc(doc(alice, "publicProfiles/alice"), {
+      uid: "alice", achievementCount: -1,
+    }, { merge: true }));
   });
 
   test("default rule denies unknown collections", async () => {

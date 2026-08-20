@@ -423,11 +423,24 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             profileAccent = entry.profileAccent,
             isProMember = entry.isProMember
         )
+        loadViewedProfile(entry.uid, fallbackProfile)
+    }
+
+    fun viewSocialProfile(uid: String) {
+        val profile = _uiState.value.socialProfiles[uid] ?: return
+        if (uid == _uiState.value.account?.uid) {
+            closeViewedProfile()
+            return
+        }
+        loadViewedProfile(uid, profile)
+    }
+
+    private fun loadViewedProfile(uid: String, fallbackProfile: PlayerProfile) {
         viewedProfileJob?.cancel()
         viewedGamesCursor = null
         _uiState.update { it.copy(viewedProfile = null, isViewedProfileLoading = true, errorMessage = null) }
         viewedProfileJob = viewModelScope.launch {
-            runCatching { repository.loadPublicProfile(entry.uid) }
+            runCatching { repository.loadPublicProfile(uid) }
                 .onSuccess { page ->
                     viewedGamesCursor = page.cursor
                     _uiState.update {

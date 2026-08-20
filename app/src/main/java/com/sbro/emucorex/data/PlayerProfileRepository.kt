@@ -51,7 +51,9 @@ data class PlayerProfile(
     val profileAccent: String = DEFAULT_PROFILE_ACCENT,
     val favoriteGameKeys: List<String> = emptyList(),
     val isProMember: Boolean = false,
-    val publicDevice: PublicPlayerDevice? = null
+    val publicDevice: PublicPlayerDevice? = null,
+    val achievementCount: Int = 0,
+    val achievementPoints: Int = 0
 )
 
 data class PlayerGamePlayStat(
@@ -748,7 +750,9 @@ class PlayerProfileRepository(context: Context) {
             profileAccent = getString(FIELD_PROFILE_ACCENT) ?: DEFAULT_PROFILE_ACCENT,
             favoriteGameKeys = stringList(FIELD_FAVORITE_GAME_KEYS),
             isProMember = getBoolean(FIELD_PRO_MEMBER) == true,
-            publicDevice = publicDevice()
+            publicDevice = publicDevice(),
+            achievementCount = (getLong(FIELD_ACHIEVEMENT_COUNT) ?: 0L).toInt(),
+            achievementPoints = (getLong(FIELD_ACHIEVEMENT_POINTS) ?: 0L).toInt()
         )
     }
 
@@ -769,7 +773,9 @@ class PlayerProfileRepository(context: Context) {
             profileAccent = getString(FIELD_PROFILE_ACCENT) ?: DEFAULT_PROFILE_ACCENT,
             favoriteGameKeys = stringList(FIELD_FAVORITE_GAME_KEYS),
             isProMember = getBoolean(FIELD_PRO_MEMBER) == true,
-            publicDevice = publicDevice()
+            publicDevice = publicDevice(),
+            achievementCount = (getLong(FIELD_ACHIEVEMENT_COUNT) ?: 0L).toInt(),
+            achievementPoints = (getLong(FIELD_ACHIEVEMENT_POINTS) ?: 0L).toInt()
         )
     }
 
@@ -990,6 +996,8 @@ class PlayerProfileRepository(context: Context) {
         private const val FIELD_PROFILE_ACCENT = "profileAccent"
         private const val FIELD_FAVORITE_GAME_KEYS = "favoriteGameKeys"
         private const val FIELD_PRO_MEMBER = "proMember"
+        private const val FIELD_ACHIEVEMENT_COUNT = "achievementCount"
+        private const val FIELD_ACHIEVEMENT_POINTS = "achievementPoints"
 
         private const val ACTIVITY_PLAY_TIME_MS = "playTimeMs"
         private const val ACTIVITY_SESSIONS = "sessions"
