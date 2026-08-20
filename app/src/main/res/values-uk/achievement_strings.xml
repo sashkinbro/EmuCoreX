@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_tab_achievements">Досягнення</string>
+    <string name="achievement_notification_channel">Досягнення</string>
+    <string name="achievement_unlocked_notification">Досягнення розблоковано</string>
+    <string name="achievement_hidden_title">Таємне досягнення</string>
+    <string name="achievement_hidden_description">Продовжуйте грати, щоб відкрити це досягнення.</string>
+    <string name="achievement_points_format">%1$d оч.</string>
+    <string name="achievement_progress_format">%1$d / %2$d</string>
+    <string name="achievement_summary_format">Відкрито %1$d із %2$d · %3$d оч.</string>
+    <string name="achievement_empty">Ваші досягнення з’являться тут після початку гри.</string>
+    <string name="achievement_first_game_title">Перший запуск</string>
+    <string name="achievement_first_game_description">Запустіть свою першу гру.</string>
+    <string name="achievement_five_games_title">Дослідник</string>
+    <string name="achievement_five_games_description">Зіграйте у 5 різних ігор.</string>
+    <string name="achievement_twenty_games_title">Ігрова бібліотека</string>
+    <string name="achievement_twenty_games_description">Зіграйте у 20 різних ігор.</string>
+    <string name="achievement_one_hour_title">Початок шляху</string>
+    <string name="achievement_one_hour_description">Проведіть в іграх 1 годину.</string>
+    <string name="achievement_ten_hours_title">Постійний гравець</string>
+    <string name="achievement_ten_hours_description">Проведіть в іграх 10 годин.</string>
+    <string name="achievement_hundred_hours_title">Ветеран емуляції</string>
+    <string name="achievement_hundred_hours_description">Проведіть в іграх 100 годин.</string>
+    <string name="achievement_ten_sessions_title">Ще один раунд</string>
+    <string name="achievement_ten_sessions_description">Почніть 10 ігрових сеансів.</string>
+    <string name="achievement_arcade_debut_title">Аркадний дебют</string>
+    <string name="achievement_arcade_debut_description">Запустіть гру Namco System 246 або 256.</string>
+    <string name="achievement_dedicated_title">Справжня відданість</string>
+    <string name="achievement_dedicated_description">Проведіть 10 годин в одній грі.</string>
+    <string name="achievement_god_of_war_title">Бог серед смертних</string>
+    <string name="achievement_god_of_war_description">Проведіть 2 години у грі God of War.</string>
+    <string name="achievement_san_andreas_title">Знову в Лос-Сантосі</string>
+    <string name="achievement_san_andreas_description">Проведіть 2 години в Grand Theft Auto: San Andreas.</string>
+    <string name="achievement_tekken_five_title">Король Залізного кулака</string>
+    <string name="achievement_tekken_five_description">Проведіть 90 хвилин у Tekken 5.</string>
+</resources>

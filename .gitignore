@@ -20,9 +20,6 @@ app/google-services.json
 # Local Firebase deployment and maintenance files
 /.firebase/
 /.firebaserc
-/firebase.json
-/firestore.rules
-/firestore.indexes.json
 /firestore-debug.log
 /migrate-player-profiles.mjs
 

@@ -14,6 +14,15 @@ import com.sbro.emucorex.data.PlayerLeaderboardEntry
 import com.sbro.emucorex.data.PlayerProfile
 import com.sbro.emucorex.data.PlayerProfileRepository
 import com.sbro.emucorex.data.PlayerRankInsights
+import com.sbro.emucorex.data.PlayerDevice
+import com.sbro.emucorex.data.ProfileDeviceRepository
+import com.sbro.emucorex.data.CloudEmulatorProfile
+import com.sbro.emucorex.data.CloudEmulatorSettingsRepository
+import com.sbro.emucorex.data.EmuAchievementRepository
+import com.sbro.emucorex.data.EmuAchievementState
+import com.sbro.emucorex.data.ProfileFeedEvent
+import com.sbro.emucorex.data.ProfileFriendship
+import com.sbro.emucorex.data.ProfileSocialRepository
 import com.sbro.emucorex.data.ps2.Ps2CatalogRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +45,11 @@ data class ProfileUiState(
     val leaderboardSearchQuery: String = "",
     val rankInsights: PlayerRankInsights? = null,
     val activity: List<PlayerActivityDay> = emptyList(),
+    val devices: List<PlayerDevice> = emptyList(),
+    val achievements: List<EmuAchievementState> = emptyList(),
+    val cloudProfiles: List<CloudEmulatorProfile> = emptyList(),
+    val friendships: List<ProfileFriendship> = emptyList(),
+    val feed: List<ProfileFeedEvent> = emptyList(),
     val isProUnlocked: Boolean = false,
     val isAuthLoading: Boolean = false,
     val isProfileLoading: Boolean = true,
@@ -50,6 +64,8 @@ data class ProfileUiState(
     val isActivityLoading: Boolean = false,
     val hasLoadedActivity: Boolean = false,
     val hasAttemptedActivityLoad: Boolean = false,
+    val isFeatureActionLoading: Boolean = false,
+    val hasLoadedAchievements: Boolean = false,
     val messageKey: String? = null,
     val errorMessage: String? = null
 )
@@ -59,6 +75,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val repository = PlayerProfileRepository(application)
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private val catalogRepository = Ps2CatalogRepository(application)
+    private val deviceRepository = ProfileDeviceRepository(application)
+    private val cloudSettingsRepository = CloudEmulatorSettingsRepository(application)
+    private val achievementRepository = EmuAchievementRepository(application)
+    private val socialRepository = ProfileSocialRepository()
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
@@ -66,6 +86,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var viewedProfileJob: Job? = null
     private var searchJob: Job? = null
     private var rankJob: Job? = null
+    private var devicesJob: Job? = null
+    private var friendshipsJob: Job? = null
+    private var feedJob: Job? = null
+    private var achievementsJob: Job? = null
     private var leaderboardCursor: DocumentSnapshot? = null
     private var viewedGamesCursor: DocumentSnapshot? = null
 
@@ -76,6 +100,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 viewedProfileJob?.cancel()
                 searchJob?.cancel()
                 rankJob?.cancel()
+                devicesJob?.cancel()
+                friendshipsJob?.cancel()
+                feedJob?.cancel()
+                achievementsJob?.cancel()
                 leaderboardCursor = null
                 viewedGamesCursor = null
                 _uiState.update {
@@ -89,12 +117,18 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         leaderboardSearchQuery = "",
                         rankInsights = null,
                         activity = emptyList(),
+                        devices = emptyList(),
+                        achievements = emptyList(),
+                        cloudProfiles = emptyList(),
+                        friendships = emptyList(),
+                        feed = emptyList(),
                         isProfileLoading = account != null,
                         isViewedProfileLoading = false,
                         hasLoadedLeaderboard = false,
                         hasMoreLeaderboard = true,
                         hasLoadedActivity = false,
                         hasAttemptedActivityLoad = false,
+                        hasLoadedAchievements = false,
                         errorMessage = null
                     )
                 }
@@ -102,6 +136,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     viewModelScope.launch {
                         runCatching {
                             repository.ensureCurrentUserProfile()
+                            deviceRepository.registerCurrentDevice()
                             val proState = proPurchaseManager.state.value
                             if (proState.isProUnlocked || proState.isPurchaseStatusVerified) {
                                 repository.updateProMembership(proState.isProUnlocked)
@@ -109,6 +144,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                     observeProfile(account.uid)
+                    observeProfileFeatures(account.uid)
+                    refreshCloudProfiles()
                 }
             }
         }
@@ -171,8 +208,68 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     fun onProfileTabSelected(tabName: String) {
         when (tabName) {
+            "Achievements" -> if (!_uiState.value.hasLoadedAchievements) refreshAchievements()
             "Leaderboard" -> if (!_uiState.value.hasLoadedLeaderboard) refreshLeaderboard()
             "Stats" -> if (!_uiState.value.hasLoadedActivity) loadActivity()
+        }
+    }
+
+    fun setDevicePublic(deviceId: String, visible: Boolean) = runFeatureAction(
+        successKey = if (visible) "profile_device_public" else "profile_device_private"
+    ) {
+        deviceRepository.setPublic(deviceId, visible)
+    }
+
+    fun refreshCloudProfiles() {
+        if (_uiState.value.account == null) return
+        viewModelScope.launch {
+            runCatching { cloudSettingsRepository.loadProfiles() }
+                .onSuccess { profiles -> _uiState.update { it.copy(cloudProfiles = profiles) } }
+        }
+    }
+
+    fun saveCloudProfile(name: String, replaceProfileId: String? = null) = runFeatureAction("profile_cloud_saved") {
+        cloudSettingsRepository.saveCurrent(name, replaceProfileId)
+        _uiState.update { it.copy(cloudProfiles = cloudSettingsRepository.loadProfiles()) }
+    }
+
+    fun restoreCloudProfile(profileId: String) = runFeatureAction("profile_cloud_restored") {
+        cloudSettingsRepository.restore(profileId)
+    }
+
+    fun deleteCloudProfile(profileId: String) = runFeatureAction("profile_cloud_deleted") {
+        cloudSettingsRepository.delete(profileId)
+        _uiState.update { it.copy(cloudProfiles = cloudSettingsRepository.loadProfiles()) }
+    }
+
+    fun sendFriendRequest(uid: String) = runFeatureAction("profile_friend_request_sent") {
+        socialRepository.sendFriendRequest(uid)
+    }
+
+    fun acceptFriendRequest(friendshipId: String) = runFeatureAction("profile_friend_added") {
+        socialRepository.acceptFriendRequest(friendshipId)
+    }
+
+    fun removeFriendship(friendshipId: String) = runFeatureAction("profile_friend_removed") {
+        socialRepository.removeFriendship(friendshipId)
+    }
+
+    fun blockPlayer(uid: String) = runFeatureAction("profile_player_blocked") {
+        socialRepository.block(uid)
+        closeViewedProfile()
+    }
+
+    fun refreshAchievements() {
+        val profile = _uiState.value.profile ?: return
+        achievementsJob?.cancel()
+        achievementsJob = viewModelScope.launch {
+            runCatching { achievementRepository.evaluate(profile) }
+                .onSuccess { achievements ->
+                    _uiState.update { it.copy(achievements = achievements, hasLoadedAchievements = true) }
+                }
+                .onFailure { error ->
+                    _uiState.update { it.copy(errorMessage = error.localizedMessage ?: "Unable to load achievements.") }
+                }
         }
     }
 
@@ -419,8 +516,46 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 }
                 if (profile != null && profile.totalPlayTimeMs != previousTotal) {
                     loadRankInsights(profile.totalPlayTimeMs)
+                    refreshAchievements()
                 }
             }
+        }
+    }
+
+    private fun observeProfileFeatures(uid: String) {
+        devicesJob = viewModelScope.launch {
+            runCatching {
+                deviceRepository.observeDevices().collect { devices ->
+                    _uiState.update { it.copy(devices = devices) }
+                }
+            }
+        }
+        friendshipsJob = viewModelScope.launch {
+            runCatching {
+                socialRepository.observeFriendships().collect { friendships ->
+                    _uiState.update { it.copy(friendships = friendships) }
+                }
+            }
+        }
+        feedJob = viewModelScope.launch {
+            runCatching {
+                socialRepository.observeFeed(uid).collect { feed ->
+                    _uiState.update { it.copy(feed = feed) }
+                }
+            }
+        }
+    }
+
+    private fun runFeatureAction(successKey: String, action: suspend () -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isFeatureActionLoading = true, messageKey = null, errorMessage = null) }
+            runCatching { action() }
+                .onSuccess { _uiState.update { it.copy(isFeatureActionLoading = false, messageKey = successKey) } }
+                .onFailure { error ->
+                    _uiState.update {
+                        it.copy(isFeatureActionLoading = false, errorMessage = error.localizedMessage ?: "Something went wrong.")
+                    }
+                }
         }
     }
 

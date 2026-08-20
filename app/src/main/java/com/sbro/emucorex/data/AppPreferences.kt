@@ -318,6 +318,60 @@ class AppPreferences(private val context: Context) {
     private val localePrefs = context.getSharedPreferences("ui_locale", Context.MODE_PRIVATE)
 
     companion object {
+        /**
+         * Portable emulator/core settings that are safe to keep in a Firestore profile.
+         *
+         * Deliberately excludes library paths, BIOS/game locations, memory-card paths,
+         * custom GPU-driver paths, networking identities/room codes, locale and manager UI.
+         */
+        internal val EMULATOR_CLOUD_KEYS = setOf(
+            "performanceProfile", "renderer", "mediatekAngleOpenGl", "upscaleMultiplier",
+            "shaderChainEnabled", "shaderChainPreset", "aspectRatio", "displayCropLeft",
+            "displayCropTop", "displayCropRight", "displayCropBottom", "audioVolume",
+            "audioFastForwardVolume", "audioMuted", "audioInterpolation", "audioSyncMode",
+            "audioLightweightSpu2", "audioBackend", "audioBufferMs", "audioOutputLatencyMs",
+            "audioMinimalOutputLatency", "autoProgressiveScan", "padVibration",
+            "padVibrationStrength", "padVibrationFallback", "showFps", "fpsOverlayMode",
+            "fpsOverlayCorner", "fpsOverlayScale", "fpsOverlayMetrics", "confirmSaveLoadActions",
+            "backButtonExitsGame", "compactControls", "keepScreenOn", "overlayScale",
+            "overlayOpacity", "overlayShow", "racingMode", "touchscreenRightStick",
+            "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset",
+            "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
+            "gyroInvertX", "gyroInvertY", "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
+            "gamepadRightStickSensitivity", "gamepadRightStickUpToR2",
+            "gamepadRightStickDownToL2", "gamepadButtonHaptics", "pressureModifierAmount",
+            "enableFastBoot", "eeCycleRate", "eeCycleSkip", "enableEeRecompiler",
+            "enableIopRecompiler", "enableVu0Recompiler", "enableVu1Recompiler", "enableFastmem",
+            "eeFpuRoundMode", "vu0RoundMode", "vu1RoundMode", "eeFpuClampingMode",
+            "vu0ClampingMode", "vu1ClampingMode", "enableGameFixes", "enableEeTimingHack",
+            "enableWaitLoopSpeedhack", "enableIntcStatSpeedhack", "enableVuFlagHack",
+            "enableInstantVu1", "enableMtvu", "enableThreadPinning", "enableFastCdvd",
+            "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "textureFiltering",
+            "trilinearFiltering", "blendingAccuracy", "texturePreloading",
+            "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache",
+            "textureDumpingEnabled", "enableFxaa", "sgsrMode", "casMode", "casSharpness",
+            "tvShader", "enableWidescreenPatches", "enableNoInterlacingPatches",
+            "deinterlaceMode", "dithering", "antiBlur", "anisotropicFiltering",
+            "enableHwMipmapping", "cpuSpriteRenderSize", "cpuSpriteRenderLevel",
+            "softwareClutRender", "gpuTargetClutMode", "skipDrawStart", "skipDrawEnd",
+            "autoFlushHardware", "cpuFramebufferConversion", "disableDepthConversion",
+            "disableSafeFeatures", "disableRenderFixes", "preloadFrameData",
+            "disablePartialInvalidation", "textureInsideRt", "readTargetsOnClose",
+            "estimateTextureRegion", "gpuPaletteConversion", "halfPixelOffset", "nativeScaling",
+            "roundSprite", "bilinearUpscale", "textureOffsetX", "textureOffsetY", "alignSprite",
+            "mergeSprite", "forceEvenSpritePosition", "nativePaletteDraw", "enableAutoGamepad",
+            "hideOverlayOnGamepad", "gamepadBindings", "dev9EthernetEnabled", "dev9InterceptDhcp",
+            "dev9Dns1Mode", "dev9Dns1", "dev9Dns2Mode", "dev9Dns2", "dev9LocalLinkMode",
+            "frameLimitEnabled", "vSyncEnabled", "fastForwardSpeed", "targetFps", "ntscFramerate",
+            "palFramerate", "autoSaveEnabled", "autoSaveIntervalMinutes", "overlayLayoutVersion",
+            "dpadOffset", "lstickOffset", "rstickOffset", "actionOffset", "lbtnOffset",
+            "rbtnOffset", "centerOffset", "stickScale", "leftStickSensitivity",
+            "rightStickSensitivity", "invertLeftStick", "invertRightStick",
+            "invertLeftStickHorizontal", "invertRightStickHorizontal", "stickSurfaceMode",
+            "controlLayouts", "customTouchControls", "touchControlVisualStyle",
+            "touchControlPressEffect", "localMultiplayerMode"
+        )
+
         const val DEV9_DNS_MODE_MANUAL = "Manual"
         const val DEV9_DNS_MODE_AUTO = "Auto"
         const val DEV9_DNS_MODE_INTERNAL = "Internal"
@@ -3784,6 +3838,23 @@ class AppPreferences(private val context: Context) {
             put("memoryCardSlot1", prefs[MEMORY_CARD_SLOT1])
             put("memoryCardSlot2", prefs[MEMORY_CARD_SLOT2])
         }
+    }
+
+    suspend fun exportEmulatorCloudJson(): JSONObject {
+        val complete = exportJson()
+        return JSONObject().apply {
+            EMULATOR_CLOUD_KEYS.forEach { key ->
+                if (complete.has(key) && !complete.isNull(key)) put(key, complete.get(key))
+            }
+        }
+    }
+
+    suspend fun importEmulatorCloudJson(cloud: JSONObject) {
+        val merged = exportJson()
+        EMULATOR_CLOUD_KEYS.forEach { key ->
+            if (cloud.has(key) && !cloud.isNull(key)) merged.put(key, cloud.get(key))
+        }
+        importJson(merged)
     }
 
     suspend fun importJson(json: JSONObject) {
