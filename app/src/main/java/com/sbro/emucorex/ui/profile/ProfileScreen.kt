@@ -69,6 +69,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Search
@@ -79,6 +81,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -127,9 +130,11 @@ import com.sbro.emucorex.data.PlayerProfile
 import com.sbro.emucorex.data.PlayerRankInsights
 import com.sbro.emucorex.data.CloudEmulatorProfile
 import com.sbro.emucorex.data.EmuAchievementState
+import com.sbro.emucorex.data.EmuAchievementDefinition
 import com.sbro.emucorex.data.FriendshipStatus
 import com.sbro.emucorex.data.PlayerDevice
 import com.sbro.emucorex.data.ProfileFriendship
+import com.sbro.emucorex.data.ProfileFeedEvent
 import com.sbro.emucorex.data.PublicPlayerDevice
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
@@ -174,6 +179,8 @@ fun ProfileScreen(
     var showProCustomization by rememberSaveable { mutableStateOf(false) }
     var showDevices by rememberSaveable { mutableStateOf(false) }
     var showCloudProfiles by rememberSaveable { mutableStateOf(false) }
+    var showSocialCenter by rememberSaveable { mutableStateOf(false) }
+    var achievementFilter by rememberSaveable { mutableStateOf("all") }
     val isViewingLeaderboardProfile = uiState.viewedProfile != null || uiState.isViewedProfileLoading
 
     LaunchedEffect(selectedTab.intValue, uiState.account?.uid) {
@@ -214,6 +221,20 @@ fun ProfileScreen(
             onRestore = viewModel::restoreCloudProfile,
             onDelete = viewModel::deleteCloudProfile,
             onDismiss = { showCloudProfiles = false }
+        )
+    }
+
+    if (showSocialCenter) {
+        ProfileSocialCenterDialog(
+            friendships = uiState.friendships,
+            blockedUids = uiState.blockedUids,
+            feed = uiState.feed,
+            profiles = uiState.socialProfiles,
+            isLoading = uiState.isFeatureActionLoading,
+            onAccept = viewModel::acceptFriendRequest,
+            onRemove = viewModel::removeFriendship,
+            onUnblock = viewModel::unblockPlayer,
+            onDismiss = { showSocialCenter = false }
         )
     }
 
@@ -322,8 +343,11 @@ fun ProfileScreen(
                                         deviceCount = uiState.devices.size,
                                         cloudProfileCount = uiState.cloudProfiles.size,
                                         friendCount = uiState.friendships.count { it.status == FriendshipStatus.Accepted },
+                                        pendingCount = uiState.friendships.count { it.status == FriendshipStatus.PendingIncoming },
+                                        blockedCount = uiState.blockedUids.size,
                                         onDevices = { showDevices = true },
-                                        onCloudProfiles = { showCloudProfiles = true }
+                                        onCloudProfiles = { showCloudProfiles = true },
+                                        onSocial = { showSocialCenter = true }
                                     )
                                 }
                                 if (uiState.isProfileLoading && uiState.profile == null) {
@@ -368,10 +392,18 @@ fun ProfileScreen(
                                 item {
                                     AchievementSummaryCard(uiState.achievements)
                                 }
+                                item {
+                                    AchievementFilterRow(achievementFilter) { achievementFilter = it }
+                                }
                                 if (!uiState.hasLoadedAchievements && uiState.achievements.isEmpty()) {
                                     items(4, key = { "achievement-skeleton-$it" }) { GamePlayStatSkeletonRow() }
                                 } else {
-                                    items(uiState.achievements, key = { it.definition.id }) { achievement ->
+                                    val visibleAchievements = when (achievementFilter) {
+                                        "unlocked" -> uiState.achievements.filter { it.unlocked }
+                                        "hidden" -> uiState.achievements.filter { it.definition.hidden }
+                                        else -> uiState.achievements
+                                    }.sortedWith(compareByDescending<EmuAchievementState> { it.unlocked }.thenBy { it.definition.id })
+                                    items(visibleAchievements, key = { it.definition.id }) { achievement ->
                                         AchievementRow(achievement)
                                     }
                                 }
@@ -507,17 +539,9 @@ private fun ProfileBottomNav(
                     ) {
                         Icon(
                             imageVector = tab.icon(),
-                            contentDescription = null,
+                            contentDescription = stringResource(tab.titleRes()),
                             tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            text = stringResource(tab.titleRes()),
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
@@ -909,8 +933,11 @@ private fun ProfileFeatureHubCard(
     deviceCount: Int,
     cloudProfileCount: Int,
     friendCount: Int,
+    pendingCount: Int,
+    blockedCount: Int,
     onDevices: () -> Unit,
-    onCloudProfiles: () -> Unit
+    onCloudProfiles: () -> Unit,
+    onSocial: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -941,6 +968,11 @@ private fun ProfileFeatureHubCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            OutlinedButton(onClick = onSocial, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.Notifications, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.profile_social_center_summary, pendingCount, blockedCount), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -961,13 +993,31 @@ private fun AchievementSummaryCard(achievements: List<EmuAchievementState>) {
         ) {
             Icon(Icons.Rounded.EmojiEvents, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.profile_tab_achievements), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+                Text(stringResource(R.string.profile_tab_achievements), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     stringResource(R.string.achievement_summary_format, unlocked.size, achievements.size, unlocked.sumOf { it.definition.points }),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun AchievementFilterRow(selected: String, onSelect: (String) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            "all" to R.string.achievement_filter_all,
+            "unlocked" to R.string.achievement_filter_unlocked,
+            "hidden" to R.string.achievement_filter_hidden
+        ).forEach { (key, label) ->
+            FilterChip(
+                selected = selected == key,
+                onClick = { onSelect(key) },
+                label = { Text(stringResource(label), maxLines = 1) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -1002,14 +1052,14 @@ private fun AchievementRow(state: EmuAchievementState) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = stringResource(if (hideDetails) R.string.achievement_hidden_title else state.definition.titleRes),
+                        text = if (hideDetails) stringResource(R.string.achievement_hidden_title) else achievementTitle(state.definition),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier.weight(1f)
                     )
                     Text(stringResource(R.string.achievement_points_format, state.definition.points), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                 }
                 Text(
-                    text = stringResource(if (hideDetails) R.string.achievement_hidden_description else state.definition.descriptionRes),
+                    text = if (hideDetails) stringResource(R.string.achievement_hidden_description) else achievementDescription(state.definition),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1025,6 +1075,116 @@ private fun AchievementRow(state: EmuAchievementState) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun achievementTitle(definition: EmuAchievementDefinition): String {
+    if (!definition.templatedText) return stringResource(definition.titleRes)
+    return if (definition.textArgument != null) {
+        stringResource(definition.titleRes, definition.textArgument)
+    } else {
+        stringResource(definition.titleRes, definition.target)
+    }
+}
+
+@Composable
+private fun achievementDescription(definition: EmuAchievementDefinition): String {
+    if (!definition.templatedText) return stringResource(definition.descriptionRes)
+    return if (definition.textArgument != null) {
+        stringResource(definition.descriptionRes, definition.textArgument, definition.target)
+    } else {
+        stringResource(definition.descriptionRes, definition.target)
+    }
+}
+
+@Composable
+private fun ProfileSocialCenterDialog(
+    friendships: List<ProfileFriendship>,
+    blockedUids: List<String>,
+    feed: List<ProfileFeedEvent>,
+    profiles: Map<String, PlayerProfile>,
+    isLoading: Boolean,
+    onAccept: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onUnblock: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val incoming = friendships.filter { it.status == FriendshipStatus.PendingIncoming }
+    val accepted = friendships.filter { it.status == FriendshipStatus.Accepted }
+    ProfileFeatureDialog(title = stringResource(R.string.profile_social_center_title), onDismiss = onDismiss) {
+        Text(stringResource(R.string.profile_friend_requests), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        if (incoming.isEmpty()) Text(stringResource(R.string.profile_friend_requests_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        incoming.forEach { relation ->
+            SocialIdentityRow(
+                uid = relation.otherUid,
+                profile = profiles[relation.otherUid],
+                action = {
+                    Button(enabled = !isLoading, onClick = { onAccept(relation.id) }) {
+                        Text(stringResource(R.string.profile_friend_accept))
+                    }
+                }
+            )
+        }
+        HorizontalDivider()
+        Text(stringResource(R.string.profile_friends_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        if (accepted.isEmpty()) Text(stringResource(R.string.profile_friends_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        accepted.forEach { relation ->
+            SocialIdentityRow(
+                uid = relation.otherUid,
+                profile = profiles[relation.otherUid],
+                action = {
+                    TextButton(enabled = !isLoading, onClick = { onRemove(relation.id) }) {
+                        Text(stringResource(R.string.profile_friend_remove_action))
+                    }
+                }
+            )
+        }
+        HorizontalDivider()
+        Text(stringResource(R.string.profile_blocked_title), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        if (blockedUids.isEmpty()) Text(stringResource(R.string.profile_blocked_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        blockedUids.forEach { uid ->
+            SocialIdentityRow(
+                uid = uid,
+                profile = profiles[uid],
+                action = {
+                    OutlinedButton(enabled = !isLoading, onClick = { onUnblock(uid) }) {
+                        Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.profile_unblock_player))
+                    }
+                }
+            )
+        }
+        if (feed.isNotEmpty()) {
+            HorizontalDivider()
+            Text(stringResource(R.string.profile_recent_events), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+            feed.take(5).forEach { event ->
+                Text(
+                    text = when (event.type) {
+                        "achievement_unlocked" -> stringResource(R.string.profile_event_achievement)
+                        else -> event.gameTitle ?: event.type
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+    }
+}
+
+@Composable
+private fun SocialIdentityRow(uid: String, profile: PlayerProfile?, action: @Composable () -> Unit) {
+    Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(profile?.displayName ?: stringResource(R.string.profile_player), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(profile?.playerTag?.takeIf { it.isNotBlank() } ?: uid.take(8).uppercase(Locale.ROOT), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            action()
         }
     }
 }
@@ -1083,6 +1243,7 @@ private fun CloudProfilesDialog(
             onValueChange = { name = it.take(64) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            shape = RoundedCornerShape(18.dp),
             label = { Text(stringResource(R.string.profile_cloud_name)) }
         )
         Button(
@@ -3011,6 +3172,7 @@ private fun profileMessageRes(key: String): Int = when (key) {
     "profile_friend_added" -> R.string.profile_friend_added
     "profile_friend_removed" -> R.string.profile_friend_removed
     "profile_player_blocked" -> R.string.profile_player_blocked
+    "profile_player_unblocked" -> R.string.profile_player_unblocked
     else -> R.string.profile_done
 }
 

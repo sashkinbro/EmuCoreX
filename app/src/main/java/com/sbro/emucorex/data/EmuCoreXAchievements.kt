@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -25,7 +26,13 @@ enum class EmuAchievementMetric {
     TotalPlayTimeMinutes,
     TotalSessions,
     ArcadeGames,
+    ArcadeMinutes,
+    ArcadeSessions,
     LongestGameMinutes,
+    MaxGameSessions,
+    MatchingTitleMinutes,
+    MatchingTitleSessions,
+    MatchingGamesCount,
     GodOfWarMinutes,
     GtaSanAndreasMinutes,
     TekkenFiveMinutes
@@ -38,7 +45,10 @@ data class EmuAchievementDefinition(
     val metric: EmuAchievementMetric,
     val target: Long,
     val points: Int,
-    val hidden: Boolean = false
+    val hidden: Boolean = false,
+    val textArgument: String? = null,
+    val matchTerms: List<String> = emptyList(),
+    val templatedText: Boolean = false
 )
 
 data class EmuAchievementState(
@@ -51,9 +61,10 @@ data class EmuAchievementState(
 }
 
 object EmuCoreXAchievementCatalog {
-    const val VERSION = 1
+    const val VERSION = 2
 
-    val definitions = listOf(
+    val definitions = buildList {
+        addAll(listOf(
         EmuAchievementDefinition("first_game", R.string.achievement_first_game_title, R.string.achievement_first_game_description, EmuAchievementMetric.GamesPlayed, 1, 10),
         EmuAchievementDefinition("five_games", R.string.achievement_five_games_title, R.string.achievement_five_games_description, EmuAchievementMetric.GamesPlayed, 5, 20),
         EmuAchievementDefinition("twenty_games", R.string.achievement_twenty_games_title, R.string.achievement_twenty_games_description, EmuAchievementMetric.GamesPlayed, 20, 50),
@@ -66,7 +77,60 @@ object EmuCoreXAchievementCatalog {
         EmuAchievementDefinition("god_of_war_secret", R.string.achievement_god_of_war_title, R.string.achievement_god_of_war_description, EmuAchievementMetric.GodOfWarMinutes, 120, 50, hidden = true),
         EmuAchievementDefinition("san_andreas_secret", R.string.achievement_san_andreas_title, R.string.achievement_san_andreas_description, EmuAchievementMetric.GtaSanAndreasMinutes, 120, 50, hidden = true),
         EmuAchievementDefinition("tekken_five_secret", R.string.achievement_tekken_five_title, R.string.achievement_tekken_five_description, EmuAchievementMetric.TekkenFiveMinutes, 90, 50, hidden = true)
-    )
+        ))
+
+        fun milestones(prefix: String, metric: EmuAchievementMetric, targets: List<Long>, title: Int, description: Int, hidden: Boolean = false) {
+            targets.forEachIndexed { index, target ->
+                add(EmuAchievementDefinition(
+                    id = "${prefix}_$target",
+                    titleRes = title,
+                    descriptionRes = description,
+                    metric = metric,
+                    target = target,
+                    points = (10 + index * 5).coerceAtMost(100),
+                    hidden = hidden,
+                    templatedText = true
+                ))
+            }
+        }
+
+        milestones("library", EmuAchievementMetric.GamesPlayed, listOf(2, 3, 10, 15, 30, 40, 50, 75, 100), R.string.achievement_library_title, R.string.achievement_library_description)
+        milestones("total_minutes", EmuAchievementMetric.TotalPlayTimeMinutes, listOf(30, 120, 300, 1_200, 1_800, 3_000, 4_500, 9_000, 15_000, 30_000), R.string.achievement_total_time_title, R.string.achievement_total_time_description)
+        milestones("sessions", EmuAchievementMetric.TotalSessions, listOf(1, 5, 25, 50, 100, 250, 500, 1_000), R.string.achievement_sessions_title, R.string.achievement_sessions_description)
+        milestones("single_game_minutes", EmuAchievementMetric.LongestGameMinutes, listOf(30, 60, 120, 300, 1_200, 3_000, 6_000), R.string.achievement_single_game_time_title, R.string.achievement_single_game_time_description, hidden = true)
+        milestones("single_game_sessions", EmuAchievementMetric.MaxGameSessions, listOf(2, 5, 10, 25, 50, 100), R.string.achievement_single_game_sessions_title, R.string.achievement_single_game_sessions_description)
+        milestones("arcade_library", EmuAchievementMetric.ArcadeGames, listOf(2, 3, 5, 10, 20), R.string.achievement_arcade_library_title, R.string.achievement_arcade_library_description)
+        milestones("arcade_minutes", EmuAchievementMetric.ArcadeMinutes, listOf(30, 60, 180, 300, 600, 1_500), R.string.achievement_arcade_time_title, R.string.achievement_arcade_time_description)
+        milestones("arcade_sessions", EmuAchievementMetric.ArcadeSessions, listOf(1, 5, 10, 25, 50), R.string.achievement_arcade_sessions_title, R.string.achievement_arcade_sessions_description)
+
+        val topGames = listOf(
+            "God of War" to "god of war", "Grand Theft Auto: San Andreas" to "san andreas",
+            "Tekken 5" to "tekken 5", "Gran Turismo 4" to "gran turismo 4",
+            "Shadow of the Colossus" to "shadow of the colossus", "Resident Evil 4" to "resident evil 4",
+            "Need for Speed: Most Wanted" to "most wanted", "Metal Gear Solid 3" to "metal gear solid 3",
+            "Final Fantasy X" to "final fantasy x", "Silent Hill 2" to "silent hill 2",
+            "Persona 4" to "persona 4", "Kingdom Hearts" to "kingdom hearts",
+            "Devil May Cry 3" to "devil may cry 3", "Burnout 3" to "burnout 3"
+        )
+        topGames.forEachIndexed { index, (game, term) ->
+            val slug = term.replace(Regex("[^a-z0-9]+"), "_").trim('_')
+            add(EmuAchievementDefinition("game_${slug}_time", R.string.achievement_game_time_title, R.string.achievement_game_time_description, EmuAchievementMetric.MatchingTitleMinutes, 120, 50 + index, hidden = true, textArgument = game, matchTerms = listOf(term), templatedText = true))
+            add(EmuAchievementDefinition("game_${slug}_sessions", R.string.achievement_game_sessions_title, R.string.achievement_game_sessions_description, EmuAchievementMetric.MatchingTitleSessions, 10, 45 + index, hidden = true, textArgument = game, matchTerms = listOf(term), templatedText = true))
+        }
+
+        listOf(
+            "God of War" to "god of war", "Grand Theft Auto" to "grand theft auto",
+            "Tekken" to "tekken", "Gran Turismo" to "gran turismo",
+            "Need for Speed" to "need for speed", "Resident Evil" to "resident evil",
+            "Final Fantasy" to "final fantasy", "Metal Gear" to "metal gear"
+        ).forEach { (series, term) ->
+            val slug = term.replace(' ', '_')
+            add(EmuAchievementDefinition("series_$slug", R.string.achievement_series_title, R.string.achievement_series_description, EmuAchievementMetric.MatchingGamesCount, 2, 60, hidden = true, textArgument = series, matchTerms = listOf(term), templatedText = true))
+        }
+    }.also { definitions ->
+        check(definitions.size >= 100)
+        check(definitions.map { it.id }.distinct().size == definitions.size)
+    }
 }
 
 class EmuAchievementRepository(context: Context) {
@@ -88,17 +152,23 @@ class EmuAchievementRepository(context: Context) {
 
     private suspend fun evaluateAndSync(snapshot: AchievementSnapshot): List<EmuAchievementState> {
         val uid = auth.currentUser?.uid ?: return emptyList()
-        val unlockDocuments = firestore.collection(UNLOCKS).whereEqualTo("uid", uid).get().await().documents
+        val unlockDocuments = runCatching {
+            firestore.collection(UNLOCKS).whereEqualTo("uid", uid).get().await().documents
+        }.onFailure { Log.w(TAG, "Unable to load achievement unlocks; using local progress", it) }
+            .getOrDefault(emptyList())
         val unlocks = unlockDocuments.associate { it.getString("achievementId").orEmpty() to it.unlockedAtMs() }
         val candidates = EmuCoreXAchievementCatalog.definitions.filter { definition ->
-            unlocks[definition.id] == null && snapshot.progressFor(definition.metric) >= definition.target
+            unlocks[definition.id] == null && snapshot.progressFor(definition) >= definition.target
         }
 
-        val newlyUnlocked = if (candidates.isEmpty()) emptyList() else firestore.runTransaction { transaction ->
-            candidates.filter { definition ->
-                val unlockRef = firestore.collection(UNLOCKS).document("${uid}_${definition.id}")
-                if (transaction.get(unlockRef).exists()) return@filter false
-                val progress = snapshot.progressFor(definition.metric)
+        val newlyUnlocked = if (candidates.isEmpty()) emptyList() else runCatching { firestore.runTransaction { transaction ->
+            // Firestore transactions require every read to happen before the first write.
+            val unreadUnlocks = candidates.map { definition ->
+                val reference = firestore.collection(UNLOCKS).document("${uid}_${definition.id}")
+                Triple(definition, reference, transaction.get(reference).exists())
+            }
+            unreadUnlocks.filterNot { it.third }.map { (definition, unlockRef, _) ->
+                val progress = snapshot.progressFor(definition)
                 transaction.set(unlockRef, mapOf(
                     "uid" to uid,
                     "achievementId" to definition.id,
@@ -121,18 +191,21 @@ class EmuAchievementRepository(context: Context) {
                         "createdAt" to FieldValue.serverTimestamp()
                     )
                 )
-                true
+                definition
             }
-        }.await()
+        }.await() }.onFailure { Log.w(TAG, "Unable to sync achievement unlocks", it) }.getOrDefault(emptyList())
 
-        updateProgress(uid, snapshot)
-        newlyUnlocked.forEach(::notifyUnlocked)
+        if (newlyUnlocked.size <= 3) {
+            newlyUnlocked.forEach(::notifyUnlocked)
+        } else {
+            notifyBulkUnlocked(newlyUnlocked.size)
+        }
         val now = System.currentTimeMillis()
         val unlockedIds = unlocks.keys + newlyUnlocked.map { it.id }
         return EmuCoreXAchievementCatalog.definitions.map { definition ->
             EmuAchievementState(
                 definition = definition,
-                progress = snapshot.progressFor(definition.metric).coerceAtMost(definition.target),
+                progress = snapshot.progressFor(definition).coerceAtMost(definition.target),
                 unlockedAtMs = unlocks[definition.id] ?: now.takeIf { definition.id in unlockedIds }
             )
         }
@@ -154,24 +227,20 @@ class EmuAchievementRepository(context: Context) {
         }
     }
 
-    private suspend fun updateProgress(uid: String, snapshot: AchievementSnapshot) {
-        val batch = firestore.batch()
-        EmuCoreXAchievementCatalog.definitions.forEach { definition ->
-            val progress = snapshot.progressFor(definition.metric).coerceAtMost(definition.target)
-            batch.set(
-                firestore.collection(USERS).document(uid).collection(PROGRESS).document(definition.id),
-                mapOf(
-                    "achievementId" to definition.id,
-                    "progress" to progress.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                    "target" to definition.target.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                    "updatedAt" to FieldValue.serverTimestamp()
-                )
-            )
-        }
-        batch.commit().await()
+    private fun notifyUnlocked(definition: EmuAchievementDefinition) {
+        notifyAchievement(
+            text = if (!definition.templatedText) appContext.getString(definition.titleRes)
+            else if (definition.textArgument != null) appContext.getString(definition.titleRes, definition.textArgument)
+            else appContext.getString(definition.titleRes, definition.target),
+            notificationId = definition.id.hashCode()
+        )
     }
 
-    private fun notifyUnlocked(definition: EmuAchievementDefinition) {
+    private fun notifyBulkUnlocked(count: Int) {
+        notifyAchievement(appContext.getString(R.string.achievement_bulk_unlocked, count), BULK_NOTIFICATION_ID)
+    }
+
+    private fun notifyAchievement(text: String, notificationId: Int) {
         val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(
@@ -186,11 +255,11 @@ class EmuAchievementRepository(context: Context) {
         val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(appContext.getString(R.string.achievement_unlocked_notification))
-            .setContentText(appContext.getString(definition.titleRes))
+            .setContentText(text)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
-        NotificationManagerCompat.from(appContext).notify(definition.id.hashCode(), notification)
+        NotificationManagerCompat.from(appContext).notify(notificationId, notification)
     }
 
     private data class AchievementSnapshot(
@@ -199,15 +268,28 @@ class EmuAchievementRepository(context: Context) {
         val games: List<AchievementGame>,
         val lastSerial: String?
     ) {
-        fun progressFor(metric: EmuAchievementMetric): Long = when (metric) {
+        fun progressFor(definition: EmuAchievementDefinition): Long = when (definition.metric) {
             EmuAchievementMetric.GamesPlayed -> gamesPlayed
             EmuAchievementMetric.TotalPlayTimeMinutes -> totalPlayTimeMs / 60_000L
             EmuAchievementMetric.TotalSessions -> games.sumOf { it.sessions }
-            EmuAchievementMetric.ArcadeGames -> games.count { it.serial.orEmpty().uppercase(Locale.ROOT).startsWith("NM") }.toLong()
+            EmuAchievementMetric.ArcadeGames -> arcadeGames().size.toLong()
+            EmuAchievementMetric.ArcadeMinutes -> arcadeGames().sumOf { it.totalPlayTimeMs } / 60_000L
+            EmuAchievementMetric.ArcadeSessions -> arcadeGames().sumOf { it.sessions }
             EmuAchievementMetric.LongestGameMinutes -> (games.maxOfOrNull { it.totalPlayTimeMs } ?: 0L) / 60_000L
+            EmuAchievementMetric.MaxGameSessions -> games.maxOfOrNull { it.sessions } ?: 0L
+            EmuAchievementMetric.MatchingTitleMinutes -> matching(definition).sumOf { it.totalPlayTimeMs } / 60_000L
+            EmuAchievementMetric.MatchingTitleSessions -> matching(definition).sumOf { it.sessions }
+            EmuAchievementMetric.MatchingGamesCount -> matching(definition).size.toLong()
             EmuAchievementMetric.GodOfWarMinutes -> minutesForTitle("god of war")
             EmuAchievementMetric.GtaSanAndreasMinutes -> minutesForTitle("san andreas")
             EmuAchievementMetric.TekkenFiveMinutes -> minutesForTitle("tekken 5")
+        }
+
+        private fun arcadeGames() = games.filter { it.serial.orEmpty().uppercase(Locale.ROOT).startsWith("NM") }
+
+        private fun matching(definition: EmuAchievementDefinition): List<AchievementGame> = games.filter { game ->
+            val title = game.title.lowercase(Locale.ROOT)
+            definition.matchTerms.any { term -> title.contains(term.lowercase(Locale.ROOT)) }
         }
 
         private fun minutesForTitle(needle: String): Long = games
@@ -261,8 +343,9 @@ class EmuAchievementRepository(context: Context) {
         const val USERS = "users"
         const val PUBLIC_PROFILES = "publicProfiles"
         const val UNLOCKS = "achievementUnlocks"
-        const val PROGRESS = "achievementProgress"
         const val FEED = "feed"
         const val CHANNEL_ID = "emucorex_achievements"
+        const val TAG = "EmuAchievements"
+        const val BULK_NOTIFICATION_ID = 0x454D55
     }
 }

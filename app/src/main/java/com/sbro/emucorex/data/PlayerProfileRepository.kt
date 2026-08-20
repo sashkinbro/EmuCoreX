@@ -255,6 +255,19 @@ class PlayerProfileRepository(context: Context) {
         )
     }
 
+    suspend fun loadPublicProfileSummaries(uids: List<String>): Map<String, PlayerProfile> {
+        val uniqueUids = uids.filter { it.isNotBlank() }.distinct().take(50)
+        if (uniqueUids.isEmpty()) return emptyMap()
+        return buildMap {
+            uniqueUids.chunked(10).forEach { chunk ->
+                firestore.collection(PUBLIC_PROFILES_COLLECTION)
+                    .whereIn(FieldPath.documentId(), chunk)
+                    .get().await().documents
+                    .forEach { document -> document.toPublicPlayerProfile(emptyList())?.let { put(it.uid, it) } }
+            }
+        }
+    }
+
     suspend fun loadPublicGamesPage(
         uid: String,
         cursor: DocumentSnapshot?

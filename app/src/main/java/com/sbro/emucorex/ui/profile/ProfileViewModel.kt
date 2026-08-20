@@ -50,6 +50,8 @@ data class ProfileUiState(
     val cloudProfiles: List<CloudEmulatorProfile> = emptyList(),
     val friendships: List<ProfileFriendship> = emptyList(),
     val feed: List<ProfileFeedEvent> = emptyList(),
+    val blockedUids: List<String> = emptyList(),
+    val socialProfiles: Map<String, PlayerProfile> = emptyMap(),
     val isProUnlocked: Boolean = false,
     val isAuthLoading: Boolean = false,
     val isProfileLoading: Boolean = true,
@@ -90,6 +92,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var friendshipsJob: Job? = null
     private var feedJob: Job? = null
     private var achievementsJob: Job? = null
+    private var blocksJob: Job? = null
     private var leaderboardCursor: DocumentSnapshot? = null
     private var viewedGamesCursor: DocumentSnapshot? = null
 
@@ -104,6 +107,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 friendshipsJob?.cancel()
                 feedJob?.cancel()
                 achievementsJob?.cancel()
+                blocksJob?.cancel()
                 leaderboardCursor = null
                 viewedGamesCursor = null
                 _uiState.update {
@@ -122,6 +126,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                         cloudProfiles = emptyList(),
                         friendships = emptyList(),
                         feed = emptyList(),
+                        blockedUids = emptyList(),
+                        socialProfiles = emptyMap(),
                         isProfileLoading = account != null,
                         isViewedProfileLoading = false,
                         hasLoadedLeaderboard = false,
@@ -257,6 +263,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun blockPlayer(uid: String) = runFeatureAction("profile_player_blocked") {
         socialRepository.block(uid)
         closeViewedProfile()
+    }
+
+    fun unblockPlayer(uid: String) = runFeatureAction("profile_player_unblocked") {
+        socialRepository.unblock(uid)
     }
 
     fun refreshAchievements() {
@@ -534,6 +544,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             runCatching {
                 socialRepository.observeFriendships().collect { friendships ->
                     _uiState.update { it.copy(friendships = friendships) }
+                    hydrateSocialProfiles(friendships.map { it.otherUid })
                 }
             }
         }
@@ -543,6 +554,23 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     _uiState.update { it.copy(feed = feed) }
                 }
             }
+        }
+        blocksJob = viewModelScope.launch {
+            runCatching {
+                socialRepository.observeBlockedUids().collect { blocked ->
+                    _uiState.update { it.copy(blockedUids = blocked) }
+                    hydrateSocialProfiles(blocked)
+                }
+            }
+        }
+    }
+
+    private suspend fun hydrateSocialProfiles(uids: List<String>) {
+        val missing = uids.distinct().take(50).filterNot { it in _uiState.value.socialProfiles }
+        if (missing.isEmpty()) return
+        val loaded = runCatching { repository.loadPublicProfileSummaries(missing) }.getOrDefault(emptyMap())
+        if (loaded.isNotEmpty()) {
+            _uiState.update { it.copy(socialProfiles = it.socialProfiles + loaded) }
         }
     }
 

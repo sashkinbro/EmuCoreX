@@ -40,4 +40,17 @@
     <string name="profile_friend_added">Friend added.</string>
     <string name="profile_friend_removed">Friendship removed.</string>
     <string name="profile_player_blocked">Player blocked.</string>
+    <string name="profile_player_unblocked">Player unblocked.</string>
+    <string name="profile_social_center_summary">Requests %1$d · blocked %2$d</string>
+    <string name="profile_social_center_title">Friends and notifications</string>
+    <string name="profile_friend_requests">Friend requests</string>
+    <string name="profile_friend_requests_empty">No incoming requests.</string>
+    <string name="profile_friends_title">Friends</string>
+    <string name="profile_friends_empty">No friends added yet.</string>
+    <string name="profile_friend_remove_action">Remove</string>
+    <string name="profile_blocked_title">Blocked players</string>
+    <string name="profile_blocked_empty">No blocked players.</string>
+    <string name="profile_unblock_player">Unblock</string>
+    <string name="profile_recent_events">Recent events</string>
+    <string name="profile_event_achievement">Achievement unlocked</string>
 </resources>
