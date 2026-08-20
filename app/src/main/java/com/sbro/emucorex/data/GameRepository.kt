@@ -139,6 +139,9 @@ class GameRepository {
         val coverRepository = CoverArtRepository(context)
         val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
+        val containsArcadeManifest = children.any {
+            it.isFile && it.extension.equals("acgame", ignoreCase = true)
+        }
 
         children.forEach { file ->
             if (shouldAbort()) return items
@@ -148,6 +151,11 @@ class GameRepository {
                 }
 
                 file.isFile && file.extension.lowercase() in SUPPORTED_EXTENSIONS -> {
+                    // A .acgame manifest is the launchable item. Its ELF/disc/CHD files are
+                    // private assets and must not appear as duplicate, unbootable games.
+                    if (containsArcadeManifest && !file.extension.equals("acgame", ignoreCase = true)) {
+                        return@forEach
+                    }
                     val cachedGame = cachedGamesByPath[file.absolutePath]
                     val canReuseCachedMetadata = cachedGame != null &&
                         cachedGame.fileSize == file.length() &&
@@ -205,6 +213,10 @@ class GameRepository {
         val coverRepository = CoverArtRepository(context)
         val customCoverRepository = CustomGameCoverRepository(context)
         val compatibilityRepository = Pcsx2CompatibilityRepository(context)
+        val containsArcadeManifest = children.any { child ->
+            val childName = documentDisplayName(context, child)
+            childName.substringAfterLast('.', "").equals("acgame", ignoreCase = true)
+        }
 
         for (file in children) {
             if (shouldAbort() || !budget.tryVisitEntry()) return items
@@ -227,6 +239,9 @@ class GameRepository {
                     }
                 }
                 SetupValidator.DocumentEntryKind.GAME_FILE -> {
+                    if (containsArcadeManifest && !name.substringAfterLast('.', "").equals("acgame", ignoreCase = true)) {
+                        continue
+                    }
                     val uriPath = file.uri.toString()
                     val fileSize = runCatching { file.length() }.getOrDefault(0L)
                     val lastModified = runCatching { file.lastModified() }.getOrDefault(0L)

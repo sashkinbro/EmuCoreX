@@ -540,10 +540,10 @@
     <string name="settings_paths">File</string>
     <string name="settings_bios_path">File BIOS</string>
     <string name="settings_bios_path_desc">Pilih file gambar BIOS PS2 yang diperlukan untuk memulai game.</string>
-    <string name="settings_bios_picker_title">Pilih File BIOS</string>
-    <string name="settings_bios_picker_desc">Pilih file gambar BIOS PlayStation 2 Anda. File ini akan digunakan untuk boot game normal dan boot BIOS.</string>
+    <string name="settings_bios_picker_title">Pilih Folder BIOS</string>
+    <string name="settings_bios_picker_desc">Pilih folder BIOS. EmuCoreX akan memilih BIOS PS2 biasa untuk game konsol dan r27v1602f.7d/.8g untuk Namco System 246/256.</string>
     <string name="settings_bios_picker_current">File BIOS saat ini</string>
-    <string name="settings_bios_picker_action">Pilih File</string>
+    <string name="settings_bios_picker_action">Pilih Folder</string>
     <string name="settings_game_path">Folder Game</string>
     <string name="settings_game_path_desc">Pilih folder yang berisi game Anda.</string>
     <string name="settings_emulator_data_path">Folder Emulator</string>
@@ -1144,7 +1144,7 @@
     <string name="onboarding_title">Bersiaplah untuk bermain</string>
     <string name="onboarding_subtitle">Tambahkan file BIOS, pilih folder game Anda, dan berikan akses file penuh.</string>
     <string name="onboarding_bios_title">Pilih File BIOS</string>
-    <string name="onboarding_bios_desc">Pilih file gambar BIOS PS2 yang diperlukan untuk memulai game.</string>
+    <string name="onboarding_bios_desc">Pilih satu folder BIOS berisi BIOS PS2 biasa dan ROM Namco System 246/256.</string>
     <string name="onboarding_games_title">Pilih folder game</string>
     <string name="onboarding_games_desc">Pilih folder yang berisi game Anda.</string>
     <string name="onboarding_emulator_folder_title">Pilih folder emulator</string>
@@ -2430,4 +2430,18 @@
     <string name="network_guide_internet_requirements">Kedua pemain memerlukan versi game yang sama dan internet stabil. Relay TURN mungkin diperlukan jika koneksi langsung diblokir.</string>
     <string name="network_guide_internet_steps">1. Tuan rumah membuat ruangan dan membagikan kode 8 karakter.\n2. Tamu memasukkan kode dan menunggu Terhubung.\n3. Kedua pemain meluncurkan game yang sama.\n4. Buka mode LAN game.\n5. Tuan rumah menciptakan kecocokan; tamu mencari dan bergabung dengannya.</string>
     <string name="network_guide_internet_limits">Game harus mendukung permainan LAN atau sistem-link. Latensi internet ditambahkan ke protokol jaringan game itu sendiri. Jaringan korporat, tingkat operator, atau jaringan yang sangat terbatas mungkin memerlukan relai TURN.</string>
+    <string name="settings_arcade_cover_download_url">URL Sampul Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">Sumber sampul Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">Masukkan URL dasar langsung berisi gambar yang dinamai menurut ID game Namco, misalnya NM00004.png. Kosongkan untuk memakai sumber Libretro MAME bawaan.</string>
+    <string name="settings_help_arcade_cover_download_url">Mengganti sumber gambar bawaan untuk game Namco System 246/256. File PNG atau JPG kustom harus dinamai menurut ID NM game.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Game arkade memerlukan beberapa file dan dimulai melalui manifes .acgame.</string>
+    <string name="namco_guide_intro">Simpan setiap game arkade dalam folder tersendiri. EmuCoreX membaca manifes dan otomatis menyiapkan ELF, citra disk, kunci keamanan, SRAM, dan kartu memori.</string>
+    <string name="namco_guide_step_bios">Folder BIOS — Pilih folder berisi BIOS PS2 biasa dan ROM arkade yang diperlukan: r27v1602f.7d untuk System 246 dan/atau r27v1602f.8g untuk System 256.</string>
+    <string name="namco_guide_step_game">Folder game — Simpan manifes .acgame bersama ELF, ISO/CHD serta file kunci atau SRAM yang dirujuk. Tambahkan folder induk ke pustaka.</string>
+    <string name="namco_guide_step_launch">Mulai — Buka entri .acgame dari pustaka. Jangan jalankan ELF, ISO, atau CHD anak secara langsung.</string>
+    <string name="namco_guide_step_controls">Kontrol arkade — Dalam mode demo, L3 memasukkan koin pemain 1 dan Start memulai game. Kontrol lain memakai tata letak PS2 biasa.</string>
+    <string name="namco_guide_step_covers">Sampul — Gambar arkade memakai PNG. Sumber bawaan mencocokkan ID NM dengan Libretro MAME; sumber khusus dapat menyediakan NM00004.png atau NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">Panduan lengkap BIOS, folder, peluncuran, koin, dan sampul.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

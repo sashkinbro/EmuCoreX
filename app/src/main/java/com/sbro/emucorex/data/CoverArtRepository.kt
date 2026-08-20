@@ -2,6 +2,7 @@ package com.sbro.emucorex.data
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
 import java.io.File
 import java.net.HttpURLConnection
@@ -23,9 +24,32 @@ class CoverArtRepository(context: Context) {
         private const val TAG = "CoverArtRepository"
         const val DEFAULT_COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
         const val DEFAULT_COVER_3D_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d"
+        const val DEFAULT_ARCADE_COVER_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Logos"
         private const val CONNECT_TIMEOUT_MS = 10000
         private const val READ_TIMEOUT_MS = 15000
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
+
+        // PCSX2 exposes the Namco game ID as the serial. Libretro's maintained MAME
+        // artwork uses display names, so keep a deterministic bridge for the
+        // System 246/256 titles currently available in that source.
+        private val ARCADE_COVER_NAMES = mapOf(
+            "NM00001" to "Ridge Racer V Arcade Battle (RRV3 Ver. A).png",
+            "NM00003" to "Vampire Night (VPN3 Ver. B).png",
+            "NM00004" to "Tekken 4 (TEF3 Ver. C).png",
+            "NM00006" to "Smash Court Pro Tournament (SCP1).png",
+            "NM00008" to "Wangan Midnight (WMN1 Ver. A).png",
+            "NM00011" to "Pride GP 2003 (PR21 Ver. A).png",
+            "NM00012" to "Time Crisis 3 (TST1).png",
+            "NM00018" to "Capcom Fighting Jam (JAM1 Ver. A).png",
+            "NM00025" to "Zoids Infinity EX Plus (ver. 2.10).png",
+            "NM00026" to "Tekken 5 Dark Resurrection (TED1 Ver. A).png",
+            "NM00027" to "Super Dragon Ball Z (DB1 Ver. B).png",
+            "NM00032" to "Time Crisis 4 (World, TSF1002-NA-A).png",
+            "NM00039" to "MotoGP (MGP1004-NA-B).png",
+            "NM00042" to "Sengoku Basara X Cross.png",
+            "NM00047" to "Ace Driver 3_ Final Turn.png",
+            "NM00048" to "Fate_ Unlimited Codes (FUD1 ver. A).png"
+        )
     }
 
     private val context = context.applicationContext
@@ -136,6 +160,10 @@ class CoverArtRepository(context: Context) {
             return null
         }
 
+        if (normalizedSerial.startsWith("NM") && normalizedSerial.length == 7) {
+            return downloadArcadeCover(normalizedSerial, style, missFile)
+        }
+
         val extensionsToTry = if (style == AppPreferences.COVER_ART_STYLE_3D) listOf("png", "jpg") else listOf("jpg", "png")
         var result: String? = null
         for (extension in extensionsToTry) {
@@ -175,11 +203,45 @@ class CoverArtRepository(context: Context) {
         return result
     }
 
+    private fun downloadArcadeCover(serial: String, style: Int, missFile: File): String? {
+        val configuredBase = AppPreferences(context).getArcadeCoverDownloadBaseUrlSync()
+            ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+        val baseUrl = configuredBase ?: DEFAULT_ARCADE_COVER_BASE_URL
+        val candidates = buildList {
+            // Custom mirrors can use the stable NM game ID directly.
+            if (configuredBase != null) {
+                add("$baseUrl/$serial.png")
+                add("$baseUrl/$serial.jpg")
+            }
+            ARCADE_COVER_NAMES[serial]?.let { name ->
+                add("$baseUrl/${Uri.encode(name)}")
+            }
+        }.distinct()
+
+        for (url in candidates) {
+            val extension = url.substringBefore('?').substringAfterLast('.', "png").lowercase()
+            val target = File(cacheDirectory, cacheFileName(serial, style, extension))
+            downloadFromUrl(url, target, missFile, "Arcade")?.let { return it }
+        }
+        return null
+    }
+
     fun buildPublicCoverUrl(
         serial: String?,
         styleOverride: Int? = AppPreferences.COVER_ART_STYLE_DEFAULT
     ): String? {
         val normalizedSerial = normalizeSerial(serial) ?: return null
+        if (normalizedSerial.startsWith("NM") && normalizedSerial.length == 7) {
+            val configuredBase = AppPreferences(context).getArcadeCoverDownloadBaseUrlSync()
+                ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+            return if (configuredBase != null) {
+                "$configuredBase/$normalizedSerial.png"
+            } else {
+                ARCADE_COVER_NAMES[normalizedSerial]?.let { name ->
+                    "$DEFAULT_ARCADE_COVER_BASE_URL/${Uri.encode(name)}"
+                }
+            }
+        }
         val style = resolveCoverArtStyle(styleOverride)
         val baseUrl = if (style == AppPreferences.COVER_ART_STYLE_3D) {
             DEFAULT_COVER_3D_BASE_URL

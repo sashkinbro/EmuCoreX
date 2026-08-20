@@ -362,10 +362,10 @@
     <string name="settings_paths">الملفات</string>
     <string name="settings_bios_path">ملف BIOS</string>
     <string name="settings_bios_path_desc">حدد ملف صورة PS2 BIOS اللازم لبدء الألعاب.</string>
-    <string name="settings_bios_picker_title">اختر ملف BIOS</string>
-    <string name="settings_bios_picker_desc">اختر ملف صورة PlayStation 2 BIOS الخاص بك. سيتم استخدام هذا الملف لتشغيل الألعاب العادي وتمهيد BIOS.</string>
+    <string name="settings_bios_picker_title">اختر مجلد BIOS</string>
+    <string name="settings_bios_picker_desc">اختر مجلد BIOS. سيختار EmuCoreX BIOS عاديًا لـ PS2 لألعاب الجهاز وr27v1602f.7d/.8g لألعاب Namco System 246/256.</string>
     <string name="settings_bios_picker_current">ملف BIOS الحالي</string>
-    <string name="settings_bios_picker_action">اختر الملف</string>
+    <string name="settings_bios_picker_action">اختر المجلد</string>
     <string name="settings_game_path">مجلد الألعاب</string>
     <string name="settings_game_path_desc">حدد المجلد الذي يحتوي على ألعابك.</string>
     <string name="settings_cover_download_url">رابط تنزيل الأغلفة</string>
@@ -816,7 +816,7 @@
     <string name="onboarding_title">استعد للعب</string>
     <string name="onboarding_subtitle">أضف ملف BIOS، واختر مجلد ألعابك، وامنح وصولاً كاملاً للملفات.</string>
     <string name="onboarding_bios_title">اختر ملف BIOS</string>
-    <string name="onboarding_bios_desc">حدد ملف صورة PS2 BIOS اللازم لبدء الألعاب.</string>
+    <string name="onboarding_bios_desc">اختر مجلد BIOS واحدًا يحتوي على BIOS العادي لـ PS2 وملفات ROM الخاصة بـ Namco System 246/256.</string>
     <string name="onboarding_games_title">اختر مجلد الألعاب</string>
     <string name="onboarding_games_desc">حدد المجلد الذي يحتوي على ألعابك.</string>
     <string name="onboarding_status_required">مطلوب</string>
@@ -2420,4 +2420,18 @@
     <string name="network_guide_internet_requirements">يحتاج كلا اللاعبين إلى نفس إصدار اللعبة واتصال إنترنت مستقر. قد يلزم ترحيل TURN إذا كان الاتصال المباشر محظورًا.</string>
     <string name="network_guide_internet_steps">1. يقوم المضيف بإنشاء غرفة ويشارك الرمز المكون من 8 أحرف.\n2. يقوم الضيف بإدخال الرمز وينتظر الاتصال.\n3. يقوم كلا اللاعبين بتشغيل نفس اللعبة.\n4. افتح وضع LAN الخاص باللعبة.\n5. يقوم المضيف بإنشاء تطابق؛ يبحث الضيف عنه وينضم إليه.</string>
     <string name="network_guide_internet_limits">يجب أن تدعم اللعبة اللعب عبر شبكة LAN أو ارتباط النظام. تتم إضافة زمن الوصول إلى الإنترنت إلى بروتوكول الشبكة الخاص باللعبة. قد تتطلب شبكات الشركات أو شبكات الناقل أو الشبكات المقيدة بشدة مرحل TURN.</string>
+    <string name="settings_arcade_cover_download_url">رابط أغلفة Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">مصدر أغلفة Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">أدخل رابطًا أساسيًا مباشرًا لصور مسماة بمعرّف لعبة Namco مثل NM00004.png. اتركه فارغًا لاستخدام مصدر Libretro MAME المدمج.</string>
+    <string name="settings_help_arcade_cover_download_url">يستبدل مصدر الصور المدمج لألعاب Namco System 246/256. يجب تسمية ملفات PNG أو JPG المخصصة بمعرّف NM للعبة.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">تحتاج ألعاب الأركيد إلى مجموعة صغيرة من الملفات وتبدأ عبر ملف .acgame.</string>
+    <string name="namco_guide_intro">احتفظ بكل لعبة أركيد في مجلد منفصل. يقرأ EmuCoreX ملف التعريف ويجهز ELF وصورة القرص ومفتاح الحماية وSRAM وبطاقة الذاكرة تلقائيًا.</string>
+    <string name="namco_guide_step_bios">مجلد BIOS — اختر مجلدًا يحتوي على BIOS العادي لـ PS2 وROM الأركيد المطلوب: r27v1602f.7d لـ System 246 و/أو r27v1602f.8g لـ System 256.</string>
+    <string name="namco_guide_step_game">مجلد اللعبة — احتفظ بملف .acgame مع ELF وISO/CHD وملفات المفتاح أو SRAM المشار إليها. أضف المجلد الأب إلى المكتبة.</string>
+    <string name="namco_guide_step_launch">التشغيل — افتح عنصر .acgame من المكتبة. لا تشغل ملفات ELF أو ISO أو CHD التابعة مباشرةً.</string>
+    <string name="namco_guide_step_controls">تحكم الأركيد — في وضع العرض يضيف L3 عملة للاعب 1 ويبدأ Start اللعبة. تستخدم بقية الأزرار تخطيط PS2 العادي.</string>
+    <string name="namco_guide_step_covers">الأغلفة — تستخدم صور الأركيد تنسيق PNG. يطابق المصدر المدمج معرّف NM مع Libretro MAME، ويمكن للمصدر المخصص استضافة NM00004.png أو NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">دليل كامل لـ BIOS والمجلدات والتشغيل والعملات والأغلفة.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

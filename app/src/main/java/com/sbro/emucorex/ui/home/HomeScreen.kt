@@ -301,7 +301,7 @@ fun HomeScreen(
         uri?.let { viewModel.onFolderSelected(it) }
     }
     val biosPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let { viewModel.onBiosFolderSelected(it) }
     }
@@ -395,7 +395,7 @@ fun HomeScreen(
                 gamesReady = uiState.gameFolderSet,
                 onBiosClick = {
                     if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-                    else biosPicker.launch(arrayOf("*/*"))
+                    else biosPicker.launch(null)
                 },
                 onFolderClick = {
                     if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER

@@ -362,10 +362,10 @@
     <string name="settings_paths">Dosyalar</string>
     <string name="settings_bios_path">BIOS Dosyası</string>
     <string name="settings_bios_path_desc">Oyunları başlatmak için gereken PS2 BIOS imaj dosyasını seçin.</string>
-    <string name="settings_bios_picker_title">BIOS Dosyası Seç</string>
-    <string name="settings_bios_picker_desc">PlayStation 2 BIOS imaj dosyanızı seçin. Bu dosya normal oyun başlatma ve BIOS başlatma için kullanılacaktır.</string>
+    <string name="settings_bios_picker_title">BIOS Klasörü Seç</string>
+    <string name="settings_bios_picker_desc">BIOS klasörünü seçin. EmuCoreX konsol oyunları için normal PS2 BIOS’unu, Namco System 246/256 için r27v1602f.7d/.8g dosyasını seçer.</string>
     <string name="settings_bios_picker_current">Mevcut BIOS dosyası</string>
-    <string name="settings_bios_picker_action">Dosya Seç</string>
+    <string name="settings_bios_picker_action">Klasör Seç</string>
     <string name="settings_game_path">Oyun Klasörü</string>
     <string name="settings_game_path_desc">Oyunlarınızı içeren klasörü seçin.</string>
     <string name="settings_cover_download_url">Kapak İndirme URL\'si</string>
@@ -816,7 +816,7 @@
     <string name="onboarding_title">Oynamak için hazırlanın</string>
     <string name="onboarding_subtitle">Bir BIOS dosyası ekleyin, oyun klasörünüzü seçin ve tam dosya erişimi verin.</string>
     <string name="onboarding_bios_title">BIOS Dosyası Seç</string>
-    <string name="onboarding_bios_desc">Oyunları başlatmak için gereken PS2 BIOS imaj dosyasını seçin.</string>
+    <string name="onboarding_bios_desc">Normal PS2 BIOS’u ve Namco System 246/256 ROM’larını içeren tek bir BIOS klasörü seçin.</string>
     <string name="onboarding_games_title">Oyun klasörünü seç</string>
     <string name="onboarding_games_desc">Oyunlarınızı içeren klasörü seçin.</string>
     <string name="onboarding_status_required">Gerekli</string>
@@ -2416,4 +2416,18 @@
     <string name="network_guide_internet_requirements">İki oyuncuda da aynı oyun sürümü ve kararlı internet bağlantısı gerekir. Doğrudan eşler arası bağlantıyı engelleyen ağlarda TURN aktarımı gerekebilir.</string>
     <string name="network_guide_internet_steps">1. Ev sahibi oda oluşturur ve 8 karakterli kodu paylaşır.\n2. Konuk kodu girip Bağlandı durumunu bekler.\n3. İki oyuncu aynı oyunu başlatır.\n4. Oyunun LAN modunu açın.\n5. Ev sahibi maç oluşturur, konuk arayıp katılır.</string>
     <string name="network_guide_internet_limits">Oyun LAN veya sistem bağlantılı oyunu desteklemelidir. İnternet gecikmesi oyunun ağ protokolüne eklenir. Kurumsal, CGNAT veya çok kısıtlı ağlarda TURN aktarımı gerekebilir.</string>
+    <string name="settings_arcade_cover_download_url">Namco Arcade kapak URL’si</string>
+    <string name="settings_arcade_cover_url_dialog_title">Namco Arcade kapak kaynağı</string>
+    <string name="settings_arcade_cover_url_dialog_body">NM00004.png gibi Namco oyun kimliğine göre adlandırılmış resimler içeren doğrudan bir temel URL girin. Yerleşik Libretro MAME kaynağı için boş bırakın.</string>
+    <string name="settings_help_arcade_cover_download_url">Namco System 246/256 oyunlarının yerleşik görsel kaynağını değiştirir. Özel PNG veya JPG dosyaları oyunun NM kimliğiyle adlandırılmalıdır.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Arcade oyunları birkaç dosya gerektirir ve .acgame manifesti üzerinden başlatılır.</string>
+    <string name="namco_guide_intro">Her arcade oyununu ayrı klasörde tutun. EmuCoreX manifesti okuyup ELF, disk görüntüsü, güvenlik anahtarı, SRAM ve bellek kartını otomatik hazırlar.</string>
+    <string name="namco_guide_step_bios">BIOS klasörü — Normal PS2 BIOS’u ve gerekli arcade ROM’unu içeren klasörü seçin: System 246 için r27v1602f.7d ve/veya System 256 için r27v1602f.8g.</string>
+    <string name="namco_guide_step_game">Oyun klasörü — .acgame manifestini ELF, ISO/CHD ve referans verilen anahtar veya SRAM dosyalarıyla birlikte tutun. Üst klasörü kitaplığa ekleyin.</string>
+    <string name="namco_guide_step_launch">Başlatma — Kitaplıktan .acgame girişini açın. Alt ELF, ISO veya CHD dosyasını doğrudan başlatmayın.</string>
+    <string name="namco_guide_step_controls">Arcade kontrolleri — Gösteri modunda L3 oyuncu 1 jetonu ekler, Start oyunu başlatır. Diğer kontroller normal PS2 düzenini kullanır.</string>
+    <string name="namco_guide_step_covers">Kapaklar — Arcade görselleri PNG kullanır. Yerleşik kaynak NM kimliğini Libretro MAME ile eşler; özel kaynak NM00004.png veya NM00004.jpg barındırabilir.</string>
+    <string name="namco_guide_settings_desc">BIOS, klasörler, başlatma, jetonlar ve kapaklar için tam kılavuz.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

@@ -297,10 +297,10 @@
     <string name="settings_paths">File</string>
     <string name="settings_bios_path">File BIOS</string>
     <string name="settings_bios_path_desc">Seleziona il file immagine BIOS PS2 necessario per avviare i giochi.</string>
-    <string name="settings_bios_picker_title">Scegli file BIOS</string>
-    <string name="settings_bios_picker_desc">Scegli il tuo file immagine BIOS PlayStation 2. Questo file verrà utilizzato per l\'avvio normale dei giochi e per l\'avvio del BIOS.</string>
+    <string name="settings_bios_picker_title">Scegli cartella BIOS</string>
+    <string name="settings_bios_picker_desc">Scegli la cartella BIOS. EmuCoreX selezionerà un normale BIOS PS2 per i giochi console e r27v1602f.7d/.8g per Namco System 246/256.</string>
     <string name="settings_bios_picker_current">File BIOS attuale</string>
-    <string name="settings_bios_picker_action">Seleziona file</string>
+    <string name="settings_bios_picker_action">Seleziona cartella</string>
     <string name="settings_game_path">Cartella giochi</string>
     <string name="settings_game_path_desc">Seleziona la cartella che contiene i tuoi giochi.</string>
     <string name="settings_cover_download_url">URL download copertine</string>
@@ -730,7 +730,7 @@
     <string name="onboarding_title">Preparati a giocare</string>
     <string name="onboarding_subtitle">Aggiungi un file BIOS e scegli la tua cartella dei giochi.</string>
     <string name="onboarding_bios_title">Scegli file BIOS</string>
-    <string name="onboarding_bios_desc">Seleziona il file immagine BIOS PS2 necessario per avviare i giochi.</string>
+    <string name="onboarding_bios_desc">Seleziona una cartella BIOS con il normale BIOS PS2 e le ROM Namco System 246/256.</string>
     <string name="onboarding_games_title">Scegli cartella giochi</string>
     <string name="onboarding_games_desc">Seleziona la cartella che contiene i tuoi giochi.</string>
     <string name="onboarding_status_required">Richiesto</string>
@@ -2416,4 +2416,18 @@
     <string name="network_guide_internet_requirements">Entrambi i giocatori necessitano della stessa versione del gioco e di una connessione stabile. Potrebbe essere necessario un relay TURN se la connessione diretta è bloccata.</string>
     <string name="network_guide_internet_steps">1. L\'host crea una stanza e condivide il codice di 8 caratteri.\n2. L\'ospite inserisce il codice e attende Connesso.\n3. Entrambi i giocatori avviano lo stesso gioco.\n4. Apri la modalità LAN del gioco.\n5. L\'host crea una corrispondenza; l\'ospite lo cerca e si unisce ad esso.</string>
     <string name="network_guide_internet_limits">Il gioco deve supportare la riproduzione tramite LAN o collegamento di sistema. La latenza Internet viene aggiunta al protocollo di rete del gioco. Le reti aziendali, di livello carrier o fortemente limitate potrebbero richiedere un relè TURN.</string>
+    <string name="settings_arcade_cover_download_url">URL copertine Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">Sorgente copertine Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">Inserisci un URL base diretto con immagini nominate tramite ID gioco Namco, ad esempio NM00004.png. Lascia vuoto per usare la sorgente Libretro MAME integrata.</string>
+    <string name="settings_help_arcade_cover_download_url">Sostituisce la sorgente integrata per i giochi Namco System 246/256. I file PNG o JPG personalizzati devono usare l’ID NM del gioco.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">I giochi arcade richiedono alcuni file e si avviano tramite il manifesto .acgame.</string>
+    <string name="namco_guide_intro">Conserva ogni gioco arcade in una cartella separata. EmuCoreX legge il manifesto e prepara automaticamente ELF, immagine disco, chiave di sicurezza, SRAM e scheda di memoria.</string>
+    <string name="namco_guide_step_bios">Cartella BIOS — Scegli una cartella con il normale BIOS PS2 e la ROM arcade richiesta: r27v1602f.7d per System 246 e/o r27v1602f.8g per System 256.</string>
+    <string name="namco_guide_step_game">Cartella del gioco — Conserva il manifesto .acgame insieme a ELF, ISO/CHD e ai file chiave o SRAM indicati. Aggiungi la cartella superiore alla raccolta.</string>
+    <string name="namco_guide_step_launch">Avvio — Apri la voce .acgame dalla raccolta. Non avviare direttamente ELF, ISO o CHD secondari.</string>
+    <string name="namco_guide_step_controls">Comandi arcade — In modalità dimostrativa, L3 inserisce una moneta per il giocatore 1 e Start avvia la partita. Gli altri comandi usano la normale disposizione PS2.</string>
+    <string name="namco_guide_step_covers">Copertine — Le immagini arcade sono file PNG. La fonte integrata associa l’ID NM a Libretro MAME; una fonte personalizzata può ospitare NM00004.png o NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">Guida completa a BIOS, cartelle, avvio, monete e copertine.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

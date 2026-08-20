@@ -15,7 +15,7 @@ kotlinxSerializationJson = "1.11.0"
 documentfile = "1.1.0"
 fragment = "1.9.0"
 androidYoutubePlayer = "13.0.0"
-firebaseBom = "34.17.0"
+firebaseBom = "34.18.0"
 googleServices = "4.5.0"
 billing = "9.1.0"
 playReview = "2.0.2"
@@ -24,7 +24,7 @@ room = "2.8.4"
 ksp = "2.3.10"
 coil = "3.5.0"
 browser = "1.10.0"
-webrtc = "144.7559.09"
+webrtc = "144.7559.12"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

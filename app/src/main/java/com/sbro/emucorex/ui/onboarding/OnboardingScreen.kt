@@ -113,6 +113,7 @@ import com.sbro.emucorex.core.availableProSupportOffers
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.ui.common.EmulatorDataLocationDialog
 import com.sbro.emucorex.ui.common.GamepadFocusHighlightMode
+import com.sbro.emucorex.ui.common.NamcoArcadeGuideContent
 import com.sbro.emucorex.ui.common.ProSupportOptionsDialog
 import com.sbro.emucorex.ui.common.TvStoragePickerHost
 import com.sbro.emucorex.ui.common.TvStorageRequest
@@ -245,7 +246,7 @@ fun OnboardingScreen(
     }
 
     val biosPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let(viewModel::setBiosPath)
     }
@@ -265,7 +266,7 @@ fun OnboardingScreen(
     val launchBiosPicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-            else biosPicker.launch(arrayOf("*/*"))
+            else biosPicker.launch(null)
         }
     )
     val launchGamePicker = rememberDebouncedClick(
@@ -472,6 +473,10 @@ fun OnboardingScreen(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
+                                page == 5 -> OnboardingHeroArcade(
+                                    showSubtitle = false,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
                                 else -> OnboardingHeroSetup(
                                     showSubtitle = false,
                                     modifier = Modifier.padding(bottom = 8.dp)
@@ -540,6 +545,20 @@ fun OnboardingScreen(
                                     contentFocusRequester = pageContentFocusRequesters[page],
                                     modifier = Modifier.padding(horizontal = 32.dp)
                                 )
+                            } else if (page == 5) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .statusBarsPadding()
+                                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    NamcoArcadeGuideContent(
+                                        modifier = Modifier.widthIn(max = 560.dp)
+                                    )
+                                }
                             } else {
                                 Box(modifier = Modifier.fillMaxSize()) {
                                     Column(
@@ -691,6 +710,14 @@ fun OnboardingScreen(
                                 )
                             }
                             5 -> {
+                                OnboardingHeroArcade()
+                                Spacer(modifier = Modifier.height(28.dp))
+                                NamcoArcadeGuideContent(
+                                    showIntro = false,
+                                    modifier = Modifier.widthIn(max = 560.dp)
+                                )
+                            }
+                            6 -> {
                                 OnboardingHeroSetup()
                                 Spacer(modifier = Modifier.height(32.dp))
                                 OnboardingSetupContent(
@@ -940,6 +967,52 @@ private fun OnboardingHeroPro(
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = stringResource(R.string.onboarding_pro_subtitle),
+                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingHeroArcade(
+    modifier: Modifier = Modifier,
+    showSubtitle: Boolean = true
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.widthIn(max = 480.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(112.dp)
+                .clip(RoundedCornerShape(32.dp))
+                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Gamepad,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(56.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(28.dp))
+        Text(
+            text = stringResource(R.string.namco_guide_title),
+            style = MaterialTheme.typography.displaySmall.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = (-0.5).sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            textAlign = TextAlign.Center
+        )
+        if (showSubtitle) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.namco_guide_subtitle),
                 style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

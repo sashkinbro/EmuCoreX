@@ -89,6 +89,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -125,6 +126,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -137,6 +139,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -1251,81 +1254,89 @@ fun EmulationScreen(
         if (shouldShowOverlay && !uiState.showMenu && !showControlsEditor) {
             val scaleFactor = uiState.overlayScale / 100f
             val alpha = uiState.overlayOpacity / 100f
-            if (uiState.localMultiplayerMode == AppPreferences.LOCAL_MULTIPLAYER_OFF) {
-                OnScreenControls(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(20f)
-                    .graphicsLayer(alpha = alpha),
-                scaleFactor = scaleFactor,
-                stickScaleFactor = uiState.stickScale / 100f,
-                leftStickSensitivity = uiState.leftStickSensitivity / 100f,
-                rightStickSensitivity = uiState.rightStickSensitivity / 100f,
-                invertLeftStick = uiState.invertLeftStick,
-                invertRightStick = uiState.invertRightStick,
-                invertLeftStickHorizontal = uiState.invertLeftStickHorizontal,
-                invertRightStickHorizontal = uiState.invertRightStickHorizontal,
-                rightStickUpToR2 = uiState.gamepadRightStickUpToR2,
-                rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
-                touchscreenRightStick = uiState.touchscreenRightStick,
-                touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
-                touchHaptics = uiState.touchHaptics,
-                touchHapticsPreset = uiState.touchHapticsPreset,
-                touchHapticsStrength = uiState.touchHapticsStrength,
-                visualStyle = uiState.touchControlVisualStyle,
-                pressEffect = uiState.touchControlPressEffect,
-                customControls = uiState.customTouchControls.controls,
-                dpadOffset = uiState.dpadOffset,
-                lstickOffset = uiState.lstickOffset,
-                rstickOffset = uiState.rstickOffset,
-                actionOffset = uiState.actionOffset,
-                lbtnOffset = uiState.lbtnOffset,
-                rbtnOffset = uiState.rbtnOffset,
-                centerOffset = uiState.centerOffset,
-                controlLayouts = uiState.controlLayouts,
-                racingMode = uiState.racingMode,
-                onToggleLeftInputMode = viewModel::toggleLeftInputMode,
-                onFastForwardHoldChange = viewModel::setFastForwardHeld,
-                onPadInput = { keyCode, range, pressed ->
-                    viewModel.onPadInput(overlayPadIndex, keyCode, range, pressed)
-                }
-                )
-            } else {
-                LocalMultiplayerTouchControls(
+            // A gamepad is a physical control surface, so its layout must not mirror with
+            // the app's RTL locale. The touch hit boxes use absolute screen coordinates;
+            // keeping the visual overlay LTR guarantees that visible and logical buttons
+            // stay aligned in Arabic, Persian, and every other RTL language.
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                if (uiState.localMultiplayerMode == AppPreferences.LOCAL_MULTIPLAYER_OFF) {
+                    OnScreenControls(
                     modifier = Modifier
                         .fillMaxSize()
-                        .zIndex(20f),
-                    mode = uiState.localMultiplayerMode,
-                    uiState = uiState,
+                        .zIndex(20f)
+                        .graphicsLayer(alpha = alpha),
                     scaleFactor = scaleFactor,
-                    alpha = alpha,
+                    stickScaleFactor = uiState.stickScale / 100f,
+                    leftStickSensitivity = uiState.leftStickSensitivity / 100f,
+                    rightStickSensitivity = uiState.rightStickSensitivity / 100f,
+                    invertLeftStick = uiState.invertLeftStick,
+                    invertRightStick = uiState.invertRightStick,
+                    invertLeftStickHorizontal = uiState.invertLeftStickHorizontal,
+                    invertRightStickHorizontal = uiState.invertRightStickHorizontal,
+                    rightStickUpToR2 = uiState.gamepadRightStickUpToR2,
+                    rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
+                    touchscreenRightStick = uiState.touchscreenRightStick,
+                    touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
+                    touchHaptics = uiState.touchHaptics,
+                    touchHapticsPreset = uiState.touchHapticsPreset,
+                    touchHapticsStrength = uiState.touchHapticsStrength,
+                    visualStyle = uiState.touchControlVisualStyle,
+                    pressEffect = uiState.touchControlPressEffect,
+                    customControls = uiState.customTouchControls.controls,
+                    dpadOffset = uiState.dpadOffset,
+                    lstickOffset = uiState.lstickOffset,
+                    rstickOffset = uiState.rstickOffset,
+                    actionOffset = uiState.actionOffset,
+                    lbtnOffset = uiState.lbtnOffset,
+                    rbtnOffset = uiState.rbtnOffset,
+                    centerOffset = uiState.centerOffset,
+                    controlLayouts = uiState.controlLayouts,
+                    racingMode = uiState.racingMode,
                     onToggleLeftInputMode = viewModel::toggleLeftInputMode,
                     onFastForwardHoldChange = viewModel::setFastForwardHeld,
-                    onPadInput = viewModel::onPadInput
-                )
+                    onPadInput = { keyCode, range, pressed ->
+                        viewModel.onPadInput(overlayPadIndex, keyCode, range, pressed)
+                    }
+                    )
+                } else {
+                    LocalMultiplayerTouchControls(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(20f),
+                        mode = uiState.localMultiplayerMode,
+                        uiState = uiState,
+                        scaleFactor = scaleFactor,
+                        alpha = alpha,
+                        onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                        onFastForwardHoldChange = viewModel::setFastForwardHeld,
+                        onPadInput = viewModel::onPadInput
+                    )
+                }
             }
         }
         }
 
         if (showControlsEditor) {
-            ControlsEditorScreen(
-                state = uiState.toControlsEditorState(),
-                onBackClick = { showControlsEditor = false },
-                manageActivityOrientation = false,
-                overlayLeftSafeInset = overlayLeftSafeInset,
-                overlayRightSafeInset = overlayRightSafeInset,
-                overlayTopSafeInset = overlayTopSafeInset,
-                overlayBottomSafeInset = overlayBottomSafeInset,
-                onUpdateControlOffset = viewModel::updateTouchControlOffset,
-                onUpdateControlOffsets = viewModel::updateTouchControlOffsets,
-                onUpdateControlScale = viewModel::updateTouchControlScale,
-                onUpdateControlWidthScale = viewModel::updateTouchControlWidthScale,
-                onUpdateControlOpacity = viewModel::updateTouchControlOpacity,
-                onToggleLeftInputMode = viewModel::toggleLeftInputMode,
-                onSetControlVisible = viewModel::setTouchControlVisible,
-                onSetStickSurfaceMode = viewModel::setTouchStickSurfaceMode,
-                onResetLayout = viewModel::resetTouchControlsLayout
-            )
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                ControlsEditorScreen(
+                    state = uiState.toControlsEditorState(),
+                    onBackClick = { showControlsEditor = false },
+                    manageActivityOrientation = false,
+                    overlayLeftSafeInset = overlayLeftSafeInset,
+                    overlayRightSafeInset = overlayRightSafeInset,
+                    overlayTopSafeInset = overlayTopSafeInset,
+                    overlayBottomSafeInset = overlayBottomSafeInset,
+                    onUpdateControlOffset = viewModel::updateTouchControlOffset,
+                    onUpdateControlOffsets = viewModel::updateTouchControlOffsets,
+                    onUpdateControlScale = viewModel::updateTouchControlScale,
+                    onUpdateControlWidthScale = viewModel::updateTouchControlWidthScale,
+                    onUpdateControlOpacity = viewModel::updateTouchControlOpacity,
+                    onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                    onSetControlVisible = viewModel::setTouchControlVisible,
+                    onSetStickSurfaceMode = viewModel::setTouchStickSurfaceMode,
+                    onResetLayout = viewModel::resetTouchControlsLayout
+                )
+            }
         }
 
         // Sidebar Menu

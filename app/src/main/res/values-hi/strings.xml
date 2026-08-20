@@ -297,10 +297,10 @@
     <string name="settings_paths">फ़ाइलें</string>
     <string name="settings_bios_path">BIOS फ़ाइल</string>
     <string name="settings_bios_path_desc">गेम शुरू करने के लिए आवश्यक PS2 BIOS इमेज फ़ाइल चुनें।</string>
-    <string name="settings_bios_picker_title">BIOS फ़ाइल चुनें</string>
-    <string name="settings_bios_picker_desc">अपनी PlayStation 2 BIOS इमेज फ़ाइल चुनें। इस फ़ाइल का उपयोग सामान्य गेम बूट और BIOS बूट के लिए किया जाएगा।</string>
+    <string name="settings_bios_picker_title">BIOS फ़ोल्डर चुनें</string>
+    <string name="settings_bios_picker_desc">BIOS फ़ोल्डर चुनें। EmuCoreX कंसोल गेम के लिए सामान्य PS2 BIOS और Namco System 246/256 के लिए r27v1602f.7d/.8g चुनेगा।</string>
     <string name="settings_bios_picker_current">वर्तमान BIOS फ़ाइल</string>
-    <string name="settings_bios_picker_action">फ़ाइल चुनें</string>
+    <string name="settings_bios_picker_action">फ़ोल्डर चुनें</string>
     <string name="settings_game_path">गेम्स फ़ोल्डर</string>
     <string name="settings_game_path_desc">वह फ़ोल्डर चुनें जिसमें आपके गेम्स हैं।</string>
     <string name="settings_cover_download_url">कवर डाउनलोड URL</string>
@@ -730,7 +730,7 @@
     <string name="onboarding_title">खेलने के लिए तैयार हो जाएं</string>
     <string name="onboarding_subtitle">एक BIOS फ़ाइल जोड़ें और अपना गेम्स फ़ोल्डर चुनें।</string>
     <string name="onboarding_bios_title">BIOS फ़ाइल चुनें</string>
-    <string name="onboarding_bios_desc">गेम शुरू करने के लिए आवश्यक PS2 BIOS इमेज फ़ाइल चुनें।</string>
+    <string name="onboarding_bios_desc">सामान्य PS2 BIOS और Namco System 246/256 ROM वाला एक BIOS फ़ोल्डर चुनें।</string>
     <string name="onboarding_games_title">गेम्स फ़ोल्डर चुनें</string>
     <string name="onboarding_games_desc">वह फ़ोल्डर चुनें जिसमें आपके गेम्स हैं।</string>
     <string name="onboarding_status_required">आवश्यक</string>
@@ -2416,4 +2416,18 @@
     <string name="network_guide_internet_requirements">दोनों खिलाड़ियों को एक ही गेम संस्करण और स्थिर इंटरनेट चाहिए। सीधा कनेक्शन अवरुद्ध होने पर TURN रिले की आवश्यकता हो सकती है।</string>
     <string name="network_guide_internet_steps">1. होस्ट एक कमरा बनाता है और 8-अक्षर का कोड साझा करता है।\n2. अतिथि कोड दर्ज करता है और कनेक्टेड की प्रतीक्षा करता है।\n3. दोनों खिलाड़ी एक ही गेम लॉन्च करते हैं।\n4. गेम का LAN मोड खोलें.\n5. मेज़बान एक मेल बनाता है; अतिथि इसे खोजता है और इसमें शामिल होता है।</string>
     <string name="network_guide_internet_limits">गेम को LAN या सिस्टम-लिंक प्ले का समर्थन करना चाहिए। इंटरनेट विलंबता को गेम के अपने नेटवर्क प्रोटोकॉल में जोड़ा जाता है। कॉर्पोरेट, कैरियर-ग्रेड या अत्यधिक प्रतिबंधित नेटवर्क को TURN रिले की आवश्यकता हो सकती है।</string>
+    <string name="settings_arcade_cover_download_url">Namco Arcade कवर URL</string>
+    <string name="settings_arcade_cover_url_dialog_title">Namco Arcade कवर स्रोत</string>
+    <string name="settings_arcade_cover_url_dialog_body">NM00004.png जैसे Namco गेम ID से नामित चित्रों वाला सीधा बेस URL दर्ज करें। अंतर्निर्मित Libretro MAME स्रोत के लिए खाली छोड़ें।</string>
+    <string name="settings_help_arcade_cover_download_url">Namco System 246/256 गेम के अंतर्निर्मित चित्र स्रोत को बदलता है। कस्टम PNG या JPG फ़ाइलों का नाम गेम के NM ID पर होना चाहिए।</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">आर्केड गेम को कुछ फ़ाइलों की आवश्यकता होती है और वे .acgame मैनिफ़ेस्ट से शुरू होते हैं।</string>
+    <string name="namco_guide_intro">हर आर्केड गेम को अलग फ़ोल्डर में रखें। EmuCoreX मैनिफ़ेस्ट पढ़कर ELF, डिस्क इमेज, सुरक्षा कुंजी, SRAM और मेमोरी कार्ड अपने आप तैयार करता है।</string>
+    <string name="namco_guide_step_bios">BIOS फ़ोल्डर — सामान्य PS2 BIOS और आवश्यक आर्केड ROM वाला फ़ोल्डर चुनें: System 246 के लिए r27v1602f.7d और/या System 256 के लिए r27v1602f.8g।</string>
+    <string name="namco_guide_step_game">गेम फ़ोल्डर — .acgame मैनिफ़ेस्ट को ELF, ISO/CHD और उसमें बताए गए कुंजी या SRAM फ़ाइलों के साथ रखें। मूल फ़ोल्डर को लाइब्रेरी में जोड़ें।</string>
+    <string name="namco_guide_step_launch">शुरू करें — लाइब्रेरी से .acgame प्रविष्टि खोलें। सहायक ELF, ISO या CHD को सीधे न चलाएँ।</string>
+    <string name="namco_guide_step_controls">आर्केड नियंत्रण — डेमो मोड में L3 खिलाड़ी 1 का सिक्का डालता है और Start गेम शुरू करता है। अन्य बटन सामान्य PS2 लेआउट का उपयोग करते हैं।</string>
+    <string name="namco_guide_step_covers">कवर — आर्केड चित्र PNG में होते हैं। अंतर्निहित स्रोत NM ID को Libretro MAME से मिलाता है; कस्टम स्रोत NM00004.png या NM00004.jpg रख सकता है।</string>
+    <string name="namco_guide_settings_desc">BIOS, फ़ोल्डर, शुरुआत, सिक्के और कवर की पूरी मार्गदर्शिका।</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

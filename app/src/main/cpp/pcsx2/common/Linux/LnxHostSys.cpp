@@ -191,7 +191,9 @@ u8* SharedMemoryMappingArea::Map(void* file_handle, size_t file_offset, void* ma
 			return nullptr;
 	}
 
-	m_num_mappings++;
+	// Count mapped host pages rather than mmap() calls. Fastmem can install a
+	// contiguous range with one mmap() and later remove individual pages from it.
+	m_num_mappings += map_size / __pagesize;
 	return static_cast<u8*>(map_base);
 }
 
@@ -202,7 +204,9 @@ bool SharedMemoryMappingArea::Unmap(void* map_base, size_t map_size, bool is_fil
 	if (mmap(map_base, map_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) == MAP_FAILED)
 		return false;
 
-	m_num_mappings--;
+	const size_t num_pages = map_size / __pagesize;
+	pxAssertRel(m_num_mappings >= num_pages, "Invalid shared memory unmap count");
+	m_num_mappings -= num_pages;
 	return true;
 }
 

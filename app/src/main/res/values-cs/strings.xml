@@ -573,10 +573,10 @@
     <string name="settings_paths">Soubory</string>
     <string name="settings_bios_path">Soubor BIOS</string>
     <string name="settings_bios_path_desc">Vyberte soubor obrazu PS2 BIOS potřebný ke spouštění her.</string>
-    <string name="settings_bios_picker_title">Vyberte soubor BIOS</string>
-    <string name="settings_bios_picker_desc">Vyberte váš soubor obrazu PlayStation 2 BIOS. Tento soubor se použije pro běžné spuštění hry i spuštění samotného BIOSu.</string>
+    <string name="settings_bios_picker_title">Vyberte složku BIOS</string>
+    <string name="settings_bios_picker_desc">Vyberte složku BIOS. EmuCoreX zvolí běžný BIOS PS2 pro konzolové hry a r27v1602f.7d/.8g pro Namco System 246/256.</string>
     <string name="settings_bios_picker_current">Aktuální soubor BIOS</string>
-    <string name="settings_bios_picker_action">Vybrat soubor</string>
+    <string name="settings_bios_picker_action">Vybrat složku</string>
     <string name="settings_game_path">Složky s hrami</string>
     <string name="settings_game_path_desc">Přidejte jednu nebo více složek, které obsahují vaše hry.</string>
     <string name="settings_game_folders_count">%1$d vybraných složek</string>
@@ -1212,7 +1212,7 @@
     <string name="onboarding_title">Připravte se hrát</string>
     <string name="onboarding_subtitle">Přidejte soubor BIOS, vyberte složky s hrami a udělte přístup k souborům.</string>
     <string name="onboarding_bios_title">Vyberte soubor BIOS</string>
-    <string name="onboarding_bios_desc">Vyberte obraz BIOSu PS2, který je nutný ke spuštění her.</string>
+    <string name="onboarding_bios_desc">Vyberte jednu složku BIOS s běžným BIOSem PS2 a ROM soubory Namco System 246/256.</string>
     <string name="onboarding_games_title">Přidat složky s hrami</string>
     <string name="onboarding_games_desc">Přidejte jednu nebo více složek obsahujících vaše hry.</string>
     <string name="onboarding_games_selected_count">Vybrané složky: %1$d. Klepnutím přidáte další.</string>
@@ -2436,4 +2436,18 @@
     <string name="network_guide_internet_requirements">Oba hráči potřebují stejnou verzi hry a stabilní internet. Pokud je přímé spojení blokováno, může být potřeba TURN.</string>
     <string name="network_guide_internet_steps">1. Hostitel vytvoří místnost a sdílí 8místný kód.\n2. Host zadá kód a čeká na Připojeno.\n3. Oba hráči spustí stejnou hru.\n4. Otevřete herní režim LAN.\n5. Hostitel vytvoří shodu; host vyhledá a připojí se k němu.</string>
     <string name="network_guide_internet_limits">Hra musí podporovat hraní LAN nebo systémového propojení. K vlastnímu síťovému protokolu hry je přidána internetová latence. Firemní sítě, sítě na úrovni operátora nebo sítě se silným omezením mohou vyžadovat relé TURN.</string>
+    <string name="settings_arcade_cover_download_url">URL obalů Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_title">Zdroj obalů Namco Arcade</string>
+    <string name="settings_arcade_cover_url_dialog_body">Zadejte přímou základní URL s obrázky pojmenovanými podle ID hry Namco, například NM00004.png. Prázdná hodnota použije vestavěný zdroj Libretro MAME.</string>
+    <string name="settings_help_arcade_cover_download_url">Nahrazuje vestavěný zdroj pro hry Namco System 246/256. Vlastní PNG nebo JPG musí být pojmenovány podle NM ID hry.</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">Arkádové hry vyžadují několik souborů a spouštějí se přes manifest .acgame.</string>
+    <string name="namco_guide_intro">Každou arkádovou hru uchovávejte ve vlastní složce. EmuCoreX přečte manifest a automaticky připraví ELF, obraz disku, bezpečnostní klíč, SRAM a paměťovou kartu.</string>
+    <string name="namco_guide_step_bios">Složka BIOS — Vyberte složku s běžným BIOSem PS2 a potřebnou arkádovou ROM: r27v1602f.7d pro System 246 a/nebo r27v1602f.8g pro System 256.</string>
+    <string name="namco_guide_step_game">Složka hry — Uchovávejte manifest .acgame společně s ELF, ISO/CHD a odkazovanými soubory klíče nebo SRAM. Přidejte nadřazenou složku do knihovny.</string>
+    <string name="namco_guide_step_launch">Spuštění — Otevřete z knihovny položku .acgame. Nespouštějte přímo podřízené ELF, ISO ani CHD.</string>
+    <string name="namco_guide_step_controls">Arkádové ovládání — V ukázkovém režimu L3 vloží minci hráče 1 a Start zahájí hru. Ostatní ovládání používá běžné rozložení PS2.</string>
+    <string name="namco_guide_step_covers">Obaly — Arkádové obrázky používají PNG. Vestavěný zdroj přiřazuje ID NM k Libretro MAME; vlastní zdroj může hostovat NM00004.png nebo NM00004.jpg.</string>
+    <string name="namco_guide_settings_desc">Úplný návod k BIOSu, složkám, spuštění, mincím a obalům.</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>

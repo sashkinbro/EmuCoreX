@@ -201,7 +201,7 @@ private object TvStorageAccess {
         // Some TV variants of AnExplorer implement folder selection but accidentally omit the
         // OPEN_DOCUMENT_TREE manifest filter. Reuse its exported document activity explicitly
         // only when Android has no real tree picker of its own.
-        if (request == TvStorageRequest.GAME_FOLDER) {
+        if (request == TvStorageRequest.GAME_FOLDER || request == TvStorageRequest.BIOS_FILE) {
             val anExplorerActivity = findAnExplorerDocumentActivity(context)
             if (anExplorerActivity != null) {
                 return Intent(intent).setComponent(anExplorerActivity)
@@ -213,11 +213,7 @@ private object TvStorageAccess {
     private fun createPickerIntent(request: TvStorageRequest, volume: StorageVolume?): Intent {
         val treeIntent = volume?.createOpenDocumentTreeIntent()
         val intent = when (request) {
-            TvStorageRequest.BIOS_FILE -> Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                addCategory(Intent.CATEGORY_OPENABLE)
-                type = "*/*"
-                treeIntent?.initialUri()?.let { putExtra(DocumentsContract.EXTRA_INITIAL_URI, it) }
-            }
+            TvStorageRequest.BIOS_FILE -> treeIntent ?: Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
             TvStorageRequest.GAME_FOLDER -> treeIntent ?: Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         }
         return intent.addFlags(

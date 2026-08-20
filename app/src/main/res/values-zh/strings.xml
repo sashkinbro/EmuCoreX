@@ -880,12 +880,12 @@
     <string name="settings_memory_cards_tab">记忆卡</string>
     <string name="settings_bios_path">BIOS 文件</string>
     <string name="settings_bios_path_desc">选择启动游戏所需的 PS2 BIOS 镜像文件。</string>
-    <string name="settings_bios_picker_title">选择 BIOS 文件</string>
-    <string name="settings_bios_picker_desc">选择您的 PlayStation 2 BIOS 镜像文件。此文件将用于正常的游戏启动和 BIOS 启动。</string>
+    <string name="settings_bios_picker_title">选择 BIOS 文件夹</string>
+    <string name="settings_bios_picker_desc">选择 BIOS 文件夹。EmuCoreX 会为主机游戏选择普通 PS2 BIOS，并为 Namco System 246/256 选择 r27v1602f.7d/.8g。</string>
     <string name="settings_bios_picker_current">当前 BIOS 文件</string>
-    <string name="settings_bios_picker_action">选择文件</string>
+    <string name="settings_bios_picker_action">选择文件夹</string>
     <string name="settings_help_bios_path">将 EmuCoreX 指向您的 PS2 BIOS 镜像文件。从您自己的主机上获取的纯净转储是最佳选择。该应用需要主 BIOS 镜像（通常是 .bin 或 .rom 文件），并将生成的任何 NVRAM/MEC 文件保存在导入副本的旁边。</string>
-    <string name="onboarding_bios_desc">选择启动游戏所需的 PS2 BIOS 镜像文件。</string>
+    <string name="onboarding_bios_desc">选择一个同时包含普通 PS2 BIOS 和 Namco System 246/256 ROM 的 BIOS 文件夹。</string>
     <string name="emulation_quick_save_confirm_title">保存状态？</string>
     <string name="emulation_quick_save_confirm_desc">这将使用当前游戏状态覆盖插槽 %1$d。</string>
     <string name="emulation_quick_load_confirm_title">加载状态？</string>
@@ -2417,4 +2417,18 @@
     <string name="network_guide_internet_requirements">双方需要相同的游戏版本和稳定的互联网连接。若网络阻止点对点直连，可能需要 TURN 中继。</string>
     <string name="network_guide_internet_steps">1. 主机创建房间并分享 8 位代码。\n2. 访客输入代码并等待“已连接”。\n3. 双方启动同一游戏。\n4. 打开游戏的 LAN 模式。\n5. 主机创建比赛，访客搜索并加入。</string>
     <string name="network_guide_internet_limits">游戏必须支持 LAN 或系统连接。互联网延迟会叠加到游戏自身的网络协议。企业网络、运营商级 NAT 或严格受限网络可能需要 TURN 中继。</string>
+    <string name="settings_arcade_cover_download_url">Namco 街机封面 URL</string>
+    <string name="settings_arcade_cover_url_dialog_title">Namco 街机封面来源</string>
+    <string name="settings_arcade_cover_url_dialog_body">输入包含按 Namco 游戏 ID 命名图片的直接基础 URL，例如 NM00004.png。留空则使用内置 Libretro MAME 来源。</string>
+    <string name="settings_help_arcade_cover_download_url">覆盖 Namco System 246/256 游戏的内置图片来源。自定义 PNG 或 JPG 文件必须以游戏的 NM ID 命名。</string>
+    <string name="namco_guide_title">Namco System 246 / 256</string>
+    <string name="namco_guide_subtitle">街机游戏需要一组文件，并通过 .acgame 清单启动。</string>
+    <string name="namco_guide_intro">请将每个街机游戏放在独立文件夹中。EmuCoreX 会读取清单并自动准备 ELF、光盘镜像、安全密钥、SRAM 和记忆卡。</string>
+    <string name="namco_guide_step_bios">BIOS 文件夹 — 选择包含普通 PS2 BIOS 和所需街机 ROM 的文件夹：System 246 使用 r27v1602f.7d，System 256 使用 r27v1602f.8g。</string>
+    <string name="namco_guide_step_game">游戏文件夹 — 将 .acgame 清单与 ELF、ISO/CHD 及清单引用的密钥或 SRAM 文件放在一起，并将上级文件夹添加到游戏库。</string>
+    <string name="namco_guide_step_launch">启动 — 从游戏库打开 .acgame 项目。请勿直接启动其 ELF、ISO 或 CHD 文件。</string>
+    <string name="namco_guide_step_controls">街机控制 — 进入演示模式后，L3 为玩家 1 投币，Start 开始游戏。其他按钮使用普通 PS2 布局。</string>
+    <string name="namco_guide_step_covers">封面 — 街机图片使用 PNG。内置来源将 NM ID 与 Libretro MAME 图片匹配；自定义来源可提供 NM00004.png 或 NM00004.jpg。</string>
+    <string name="namco_guide_settings_desc">BIOS、文件夹、启动、投币和封面的完整说明。</string>
+    <string name="settings_namco_arcade_tab">Namco Arcade</string>
 </resources>
