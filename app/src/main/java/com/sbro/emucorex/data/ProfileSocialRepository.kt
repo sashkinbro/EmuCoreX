@@ -76,6 +76,25 @@ class ProfileSocialRepository {
         awaitClose { registration.remove() }
     }
 
+    fun observeBlockedUids(): Flow<List<String>> = callbackFlow {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val registration = firestore.collection(USERS).document(uid).collection(BLOCKS)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                trySend(snapshot?.documents.orEmpty().mapNotNull { it.getString("blockedUid") })
+            }
+        awaitClose { registration.remove() }
+    }
+
     suspend fun sendFriendRequest(otherUid: String) {
         val uid = auth.currentUser?.uid ?: error("Sign in is required")
         require(otherUid.isNotBlank() && otherUid != uid) { "Invalid player" }

@@ -12,8 +12,11 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  query,
   serverTimestamp,
   setDoc,
+  where,
   updateDoc,
 } from "firebase/firestore";
 
@@ -148,6 +151,21 @@ describe("profile feature isolation", () => {
       catalogVersion: 1,
       sourceGameSerial: "",
       visibility: "public",
+    }));
+  });
+
+  test("owner can query unlocks and write progress exactly like the Android client", async () => {
+    await seed("achievementUnlocks/alice_first_game", {
+      uid: "alice", achievementId: "first_game", visibility: "public", unlockedAt: new Date(),
+      progress: 1, target: 1, catalogVersion: 1, sourceGameSerial: "",
+    });
+    const alice = dbFor("alice");
+    await assertSucceeds(getDocs(query(
+      collection(alice, "achievementUnlocks"),
+      where("uid", "==", "alice"),
+    )));
+    await assertSucceeds(setDoc(doc(alice, "users/alice/achievementProgress/first_game"), {
+      achievementId: "first_game", progress: 1, target: 1, updatedAt: serverTimestamp(),
     }));
   });
 
