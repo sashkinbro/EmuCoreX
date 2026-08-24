@@ -113,6 +113,7 @@ Desktop version `0.3.5` is in development for Windows, Linux, and macOS on x64 a
 - BIOS files and game images are not distributed with this project.
 - You must use your own legally obtained BIOS files and game dumps.
 - Compatibility, performance, and graphics behavior vary by device and renderer.
+- Releases marked as "parallel" are identical to the primary build but use an alternate package ID to allow side-by-side installation.
 
 ## Credits
 
