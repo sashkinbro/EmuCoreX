@@ -30,6 +30,45 @@ class GamepadManagerTest {
     }
 
     @Test
+    fun externalControllerReplacesBuiltInHandheldAsPlayerOne() {
+        val assignments = GamepadManager.assignConnectedGamepadSlots(
+            previousAssignments = mapOf(41 to 0),
+            connectedDeviceIds = listOf(41, 72),
+            singleGamepadReplacesTouch = true,
+            preferExternalGamepadAsPlayerOne = true,
+            externalDeviceIds = setOf(72)
+        )
+
+        assertEquals(linkedMapOf(72 to 0, 41 to 1), assignments)
+    }
+
+    @Test
+    fun externalControllerPriorityCanBeDisabledForLocalMultiplayer() {
+        val assignments = GamepadManager.assignConnectedGamepadSlots(
+            previousAssignments = mapOf(41 to 0),
+            connectedDeviceIds = listOf(41, 72),
+            singleGamepadReplacesTouch = true,
+            preferExternalGamepadAsPlayerOne = false,
+            externalDeviceIds = setOf(72)
+        )
+
+        assertEquals(linkedMapOf(41 to 0, 72 to 1), assignments)
+    }
+
+    @Test
+    fun builtInControllerReturnsToPlayerOneAfterExternalDisconnects() {
+        val assignments = GamepadManager.assignConnectedGamepadSlots(
+            previousAssignments = mapOf(72 to 0, 41 to 1),
+            connectedDeviceIds = listOf(41),
+            singleGamepadReplacesTouch = true,
+            preferExternalGamepadAsPlayerOne = true,
+            externalDeviceIds = emptySet()
+        )
+
+        assertEquals(linkedMapOf(41 to 0), assignments)
+    }
+
+    @Test
     fun touchPlusGamepadUsesPlayerTwoForOnePhysicalController() {
         val assignments = GamepadManager.assignConnectedGamepadSlots(
             previousAssignments = emptyMap(),

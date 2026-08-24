@@ -557,6 +557,9 @@
     <string name="settings_gamepad_mode_desc">Bağlı bir gamepad\'in dokunmatik kontrollerin yerini mi alacağını yoksa onlarla birlikte mi çalışacağını seçin.</string>
     <string name="settings_gamepad_mode_replace_touch">Dokunmatiği Değiştir</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dokunmatik + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Oyuncu 1 için Harici Kumandaya Öncelik Ver</string>
+    <string name="settings_gamepad_external_player_one_desc">Bluetooth veya USB kumandayı dahili el konsolu kontrollerinden önce Oyuncu 1 olarak ata</string>
+    <string name="settings_help_gamepad_external_player_one">El konsolunu TV\'ye bağlarken bunu açık tutun: harici Bluetooth veya USB kumanda otomatik olarak Oyuncu 1 olur, dahili kontroller ise Oyuncu 2\'ye geçer. Yerel çok oyunculu modda dahili kontrollerin Oyuncu 1 olarak kalmasını istiyorsanız kapatın.</string>
     <string name="settings_gamepad_auto">Gamepad\'i Otomatik Algıla</string>
     <string name="settings_gamepad_hide_overlay">Gamepad Üzerinde Arayüzü Gizle</string>
 

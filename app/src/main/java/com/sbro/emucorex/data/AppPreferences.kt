@@ -228,6 +228,7 @@ data class SettingsSnapshot(
     val invertLeftStickHorizontal: Boolean = false,
     val invertRightStickHorizontal: Boolean = false,
     val enableAutoGamepad: Boolean = true,
+    val preferExternalGamepadPlayerOne: Boolean = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
     val hideOverlayOnGamepad: Boolean = true,
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
@@ -360,6 +361,7 @@ class AppPreferences(private val context: Context) {
             "estimateTextureRegion", "gpuPaletteConversion", "halfPixelOffset", "nativeScaling",
             "roundSprite", "bilinearUpscale", "textureOffsetX", "textureOffsetY", "alignSprite",
             "mergeSprite", "forceEvenSpritePosition", "nativePaletteDraw", "enableAutoGamepad",
+            "preferExternalGamepadPlayerOne",
             "hideOverlayOnGamepad", "gamepadBindings", "dev9EthernetEnabled", "dev9InterceptDhcp",
             "dev9Dns1Mode", "dev9Dns1", "dev9Dns2Mode", "dev9Dns2", "dev9LocalLinkMode",
             "frameLimitEnabled", "vSyncEnabled", "fastForwardSpeed", "targetFps", "ntscFramerate",
@@ -438,6 +440,7 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY = 100
         const val DEFAULT_GAMEPAD_STICK_DEADZONE = 15
         const val DEFAULT_GAMEPAD_STICK_SENSITIVITY = 100
+        const val DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE = true
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
         const val DEFAULT_PAD_VIBRATION_STRENGTH = 100
         const val DEFAULT_TOUCH_HAPTICS_STRENGTH = 60
@@ -682,6 +685,8 @@ class AppPreferences(private val context: Context) {
         private val NATIVE_PALETTE_DRAW = booleanPreferencesKey("native_palette_draw")
         private val PERFORMANCE_PRESET = intPreferencesKey("performance_preset")
         private val ENABLE_AUTO_GAMEPAD = booleanPreferencesKey("enable_auto_gamepad")
+        private val PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE =
+            booleanPreferencesKey("prefer_external_gamepad_player_one")
         private val HIDE_OVERLAY_ON_GAMEPAD = booleanPreferencesKey("hide_overlay_on_gamepad")
         private val TOUCH_HAPTICS = booleanPreferencesKey("touch_haptics")
         private val TOUCH_HAPTICS_PRESET = intPreferencesKey("touch_haptics_preset")
@@ -1866,6 +1871,8 @@ class AppPreferences(private val context: Context) {
                 invertLeftStickHorizontal = prefs[INVERT_LEFT_STICK_HORIZONTAL] ?: false,
                 invertRightStickHorizontal = prefs[INVERT_RIGHT_STICK_HORIZONTAL] ?: false,
                 enableAutoGamepad = prefs[ENABLE_AUTO_GAMEPAD] ?: true,
+                preferExternalGamepadPlayerOne = prefs[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE]
+                    ?: DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
                 hideOverlayOnGamepad = prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true,
                 gamepadStickDeadzone = prefs[GAMEPAD_STICK_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_DEADZONE,
                 gamepadLeftStickSensitivity = prefs[GAMEPAD_LEFT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY,
@@ -3240,6 +3247,14 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[ENABLE_AUTO_GAMEPAD] = enabled }
     }
 
+    val preferExternalGamepadPlayerOne: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE] ?: DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
+    }
+
+    suspend fun setPreferExternalGamepadPlayerOne(enabled: Boolean) {
+        context.dataStore.edit { it[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE] = enabled }
+    }
+
     // Hide overlay when gamepad connected
     val hideOverlayOnGamepad: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true
@@ -3788,6 +3803,10 @@ class AppPreferences(private val context: Context) {
             put("nativePaletteDraw", prefs[NATIVE_PALETTE_DRAW] ?: false)
             put("performancePreset", PerformancePresets.CUSTOM)
             put("enableAutoGamepad", prefs[ENABLE_AUTO_GAMEPAD] ?: true)
+            put(
+                "preferExternalGamepadPlayerOne",
+                prefs[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE] ?: DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
+            )
             put("hideOverlayOnGamepad", prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
             put("gpuDriverType", prefs[GPU_DRIVER_TYPE] ?: 0)
@@ -4173,6 +4192,10 @@ class AppPreferences(private val context: Context) {
             prefs[FORCE_EVEN_SPRITE_POSITION] = json.optBoolean("forceEvenSpritePosition", false)
             prefs[NATIVE_PALETTE_DRAW] = json.optBoolean("nativePaletteDraw", false)
             prefs[ENABLE_AUTO_GAMEPAD] = json.optBoolean("enableAutoGamepad", true)
+            prefs[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE] = json.optBoolean(
+                "preferExternalGamepadPlayerOne",
+                DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
+            )
             prefs[HIDE_OVERLAY_ON_GAMEPAD] = json.optBoolean("hideOverlayOnGamepad", true)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
             prefs[GPU_DRIVER_TYPE] = json.optInt("gpuDriverType", 0)

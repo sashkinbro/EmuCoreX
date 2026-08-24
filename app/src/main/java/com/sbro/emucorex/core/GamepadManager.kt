@@ -207,6 +207,8 @@ object GamepadManager {
     private var rightStickDownToL2 = false
     @Volatile
     private var singleGamepadReplacesTouch = true
+    @Volatile
+    private var preferExternalGamepadAsPlayerOne = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
 
     @Volatile
     private var perGameBindingsActive = false
@@ -368,6 +370,12 @@ object GamepadManager {
         scope.launch {
             preferences.enableAutoGamepad.collectLatest { enabled ->
                 singleGamepadReplacesTouch = enabled
+                refreshConnectedGamepads()
+            }
+        }
+        scope.launch {
+            preferences.preferExternalGamepadPlayerOne.collectLatest { enabled ->
+                preferExternalGamepadAsPlayerOne = enabled
                 refreshConnectedGamepads()
             }
         }
@@ -1004,10 +1012,15 @@ object GamepadManager {
                 }
             }
             val previousAssignments = deviceToPadIndex.toMap()
+            val externalDeviceIds = connectedDevices
+                .filter { it.isExternal }
+                .mapTo(mutableSetOf()) { it.id }
             val updatedAssignments = assignConnectedGamepadSlots(
                 previousAssignments = previousAssignments,
                 connectedDeviceIds = connectedDevices.map { it.id },
-                singleGamepadReplacesTouch = singleGamepadReplacesTouch
+                singleGamepadReplacesTouch = singleGamepadReplacesTouch,
+                preferExternalGamepadAsPlayerOne = preferExternalGamepadAsPlayerOne,
+                externalDeviceIds = externalDeviceIds
             )
 
             previousAssignments.forEach { (deviceId, padIndex) ->
@@ -1222,11 +1235,13 @@ object GamepadManager {
     internal fun assignConnectedGamepadSlots(
         previousAssignments: Map<Int, Int>,
         connectedDeviceIds: List<Int>,
-        singleGamepadReplacesTouch: Boolean
+        singleGamepadReplacesTouch: Boolean,
+        preferExternalGamepadAsPlayerOne: Boolean = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
+        externalDeviceIds: Set<Int> = emptySet()
     ): LinkedHashMap<Int, Int> {
         val connectedIds = connectedDeviceIds.distinct()
         val connectedIdSet = connectedIds.toSet()
-        val orderedDeviceIds = buildList {
+        val stableDeviceIds = buildList {
             addAll(
                 previousAssignments.entries
                     .sortedBy { it.value }
@@ -1238,6 +1253,12 @@ object GamepadManager {
                     add(deviceId)
                 }
             }
+        }
+        val orderedDeviceIds = if (preferExternalGamepadAsPlayerOne) {
+            stableDeviceIds.filter { it in externalDeviceIds } +
+                stableDeviceIds.filterNot { it in externalDeviceIds }
+        } else {
+            stableDeviceIds
         }
         val targetPadIndices = desiredPadIndices(
             connectedGamepadCount = orderedDeviceIds.size,

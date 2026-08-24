@@ -479,6 +479,9 @@
     <string name="settings_gamepad_mode_desc">Scegli se un gamepad collegato sostituisce i controlli touch o funziona insieme a essi.</string>
     <string name="settings_gamepad_mode_replace_touch">Sostituisci touch</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Preferisci controller esterno per il giocatore 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Assegna un controller Bluetooth o USB al giocatore 1 prima dei comandi integrati della console portatile</string>
+    <string name="settings_help_gamepad_external_player_one">Mantieni attiva questa opzione quando colleghi una console portatile alla TV: il controller Bluetooth o USB esterno diventa automaticamente il giocatore 1 e i comandi integrati passano al giocatore 2. Disattivala se vuoi che i comandi integrati restino il giocatore 1 nel multigiocatore locale.</string>
     <string name="settings_gamepad_auto">Rilevamento automatico Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Nascondi overlay con Gamepad</string>
 

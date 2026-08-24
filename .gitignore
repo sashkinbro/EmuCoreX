@@ -18,6 +18,9 @@ app/google-services.json
 /workers/
 
 # Local Firebase deployment and maintenance files
+/firebase.json
+/firestore.indexes.json
+/firestore.rules
 /.firebase/
 /.firebaserc
 /firebase-tests/

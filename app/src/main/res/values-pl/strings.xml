@@ -897,6 +897,9 @@
     <string name="settings_gamepad_mode_desc">Wybierz, czy podłączony gamepad ma zastępować kontrolki dotykowe, czy współpracować z nimi.</string>
     <string name="settings_gamepad_mode_replace_touch">Zastąp dotyk</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dotyk + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Preferuj zewnętrzny kontroler dla gracza 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Przypisz kontroler Bluetooth lub USB do gracza 1 przed wbudowanym sterowaniem konsoli przenośnej</string>
+    <string name="settings_help_gamepad_external_player_one">Pozostaw włączone podczas podłączania konsoli przenośnej do telewizora: zewnętrzny kontroler Bluetooth lub USB automatycznie zostanie graczem 1, a wbudowane sterowanie przejdzie na gracza 2. Wyłącz, jeśli w lokalnym trybie wieloosobowym wbudowane sterowanie ma pozostać graczem 1.</string>
     <string name="settings_gamepad_auto">Wykrywaj gamepad automatycznie</string>
     <string name="settings_gamepad_hide_overlay">Ukryj nakładkę przy gamepadzie</string>
 

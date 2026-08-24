@@ -953,6 +953,9 @@
     <string name="settings_gamepad_mode_desc">选择连接的一个手柄是替换触屏控制还是与触屏控制同时工作。</string>
     <string name="settings_gamepad_mode_replace_touch">替换触控</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">触控 + 手柄</string>
+    <string name="settings_gamepad_external_player_one">优先将外接手柄设为玩家 1</string>
+    <string name="settings_gamepad_external_player_one_desc">优先于掌机内置控制，将 Bluetooth 或 USB 手柄分配给玩家 1</string>
+    <string name="settings_help_gamepad_external_player_one">将掌机连接到电视时请保持开启：外接 Bluetooth 或 USB 手柄会自动成为玩家 1，内置控制则移至玩家 2。如果本地多人游戏需要内置控制保持为玩家 1，请关闭此选项。</string>
     <string name="settings_emulation_tab">模拟</string>
     <string name="settings_fixes_tab">修复</string>
     <string name="settings_library_tab">游戏库</string>

@@ -953,6 +953,9 @@
     <string name="settings_gamepad_mode_desc">Elige si un mando conectado reemplaza los controles táctiles o funciona junto a ellos.</string>
     <string name="settings_gamepad_mode_replace_touch">Reemplazar táctil</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Táctil + Mando</string>
+    <string name="settings_gamepad_external_player_one">Preferir mando externo para el jugador 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Asignar un mando Bluetooth o USB al jugador 1 antes que los controles integrados de la consola portátil</string>
+    <string name="settings_help_gamepad_external_player_one">Déjalo activado al conectar una consola portátil al televisor: el mando Bluetooth o USB externo se convierte automáticamente en el jugador 1 y los controles integrados pasan al jugador 2. Desactívalo si quieres que los controles integrados sigan siendo el jugador 1 en el multijugador local.</string>
     <string name="settings_emulation_tab">Emulación</string>
     <string name="settings_fixes_tab">Correcciones</string>
     <string name="settings_library_tab">Biblioteca</string>

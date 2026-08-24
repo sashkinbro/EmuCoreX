@@ -71,14 +71,14 @@ This repository contains the Android app and the in-development Windows, Linux, 
 
 ## Current App Scope
 
-EmuCoreX version `0.3.5` currently targets Android with:
+EmuCoreX version `0.3.6` currently targets Android with:
 
 - `minSdk 29`
 - `targetSdk 37`
 - package id `com.sbro.emucorex`
-- version `0.3.5`
+- version `0.3.6`
 
-Desktop version `0.3.5` is in development for Windows, Linux, and macOS on x64 and ARM64. Public desktop binaries are not available yet.
+Desktop version `0.3.6` is in development for Windows, Linux, and macOS on x64 and ARM64. Public desktop binaries are not available yet.
 
 ## Building Locally
 

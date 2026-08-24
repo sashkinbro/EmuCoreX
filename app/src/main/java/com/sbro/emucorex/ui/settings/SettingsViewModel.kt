@@ -270,6 +270,7 @@ data class SettingsUiState(
     val invertRightStickHorizontal: Boolean = false,
     // Gamepad
     val enableAutoGamepad: Boolean = true,
+    val preferExternalGamepadPlayerOne: Boolean = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
     val hideOverlayOnGamepad: Boolean = true,
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
@@ -546,6 +547,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             invertLeftStickHorizontal = snapshot.invertLeftStickHorizontal,
             invertRightStickHorizontal = snapshot.invertRightStickHorizontal,
             enableAutoGamepad = snapshot.enableAutoGamepad,
+            preferExternalGamepadPlayerOne = snapshot.preferExternalGamepadPlayerOne,
             hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
             gamepadStickDeadzone = snapshot.gamepadStickDeadzone,
             gamepadLeftStickSensitivity = snapshot.gamepadLeftStickSensitivity,
@@ -2087,6 +2089,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     // Gamepad
     fun setEnableAutoGamepad(enabled: Boolean) { viewModelScope.launch { preferences.setEnableAutoGamepad(enabled) } }
+    fun setPreferExternalGamepadPlayerOne(enabled: Boolean) {
+        viewModelScope.launch { preferences.setPreferExternalGamepadPlayerOne(enabled) }
+    }
     fun setHideOverlayOnGamepad(enabled: Boolean) { viewModelScope.launch { preferences.setHideOverlayOnGamepad(enabled) } }
     fun setGamepadStickDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadStickDeadzone(value) } }
     fun setGamepadLeftStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickSensitivity(value) } }

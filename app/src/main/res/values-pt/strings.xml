@@ -953,6 +953,9 @@
     <string name="settings_gamepad_mode_desc">Escolha se um gamepad conectado substitui os controles por toque ou funciona junto com eles.</string>
     <string name="settings_gamepad_mode_replace_touch">Substituir toque</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Toque + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Preferir controle externo para o Jogador 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Atribuir um controle Bluetooth ou USB ao Jogador 1 antes dos controles integrados do portátil</string>
+    <string name="settings_help_gamepad_external_player_one">Mantenha ativado ao conectar um portátil à TV: o controle Bluetooth ou USB externo se torna automaticamente o Jogador 1, enquanto os controles integrados passam para o Jogador 2. Desative se quiser manter os controles integrados como Jogador 1 no multijogador local.</string>
     <string name="settings_emulation_tab">Emulação</string>
     <string name="settings_fixes_tab">Correções</string>
     <string name="settings_library_tab">Biblioteca</string>

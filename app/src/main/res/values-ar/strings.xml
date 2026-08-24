@@ -557,6 +557,9 @@
     <string name="settings_gamepad_mode_desc">اختر ما إذا كانت وحدة تحكم واحدة متصلة تستبدل عناصر التحكم باللمس أو تعمل جنبًا إلى جنب معها.</string>
     <string name="settings_gamepad_mode_replace_touch">استبدال اللمس</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">اللمس + وحدة التحكم</string>
+    <string name="settings_gamepad_external_player_one">تفضيل وحدة التحكم الخارجية للاعب 1</string>
+    <string name="settings_gamepad_external_player_one_desc">تعيين وحدة تحكم Bluetooth أو USB للاعب 1 قبل عناصر التحكم المدمجة في الجهاز المحمول</string>
+    <string name="settings_help_gamepad_external_player_one">اترك هذا الخيار مفعلاً عند توصيل الجهاز المحمول بالتلفاز: تصبح وحدة تحكم Bluetooth أو USB الخارجية هي اللاعب 1 تلقائياً، بينما تنتقل عناصر التحكم المدمجة إلى اللاعب 2. عطّله إذا أردت أن تبقى عناصر التحكم المدمجة هي اللاعب 1 في اللعب الجماعي المحلي.</string>
     <string name="settings_gamepad_auto">الكشف التلقائي عن وحدة التحكم</string>
     <string name="settings_gamepad_hide_overlay">إخفاء الطبقة عند استخدام وحدة تحكم</string>
 

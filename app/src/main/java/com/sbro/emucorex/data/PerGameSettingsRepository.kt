@@ -250,13 +250,21 @@ private val legacyClampingProfileKeys = setOf(
     "enableVu0Clamping",
     "enableVu1Clamping"
 )
+private val perGameProfileMetadataKeys = setOf(
+    "gameKey",
+    "gameTitle",
+    "gameSerial",
+    "updatedAt"
+)
 
 private fun JSONObject.hasLegacyClampingKeys(): Boolean {
     return legacyClampingProfileKeys.any(::has)
 }
 
 private fun JSONObject.toPerGameSettings(): PerGameSettings {
-    val providedKeys = keys().asSequence().toSet() - legacyClampingProfileKeys
+    val providedKeys = keys().asSequence().toSet() -
+        legacyClampingProfileKeys -
+        perGameProfileMetadataKeys
     return PerGameSettings(
         gameKey = optString("gameKey"),
         gameTitle = optString("gameTitle"),

@@ -835,6 +835,9 @@
     <string name="settings_gamepad_mode_desc">Pilih apakah satu gamepad yang tersambung menggantikan kontrol sentuh atau bekerja bersamanya.</string>
     <string name="settings_gamepad_mode_replace_touch">Ganti Sentuh</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Sentuh + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Prioritaskan Kontroler Eksternal untuk Pemain 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Tetapkan kontroler Bluetooth atau USB sebagai Pemain 1 sebelum kontrol bawaan perangkat genggam</string>
+    <string name="settings_help_gamepad_external_player_one">Biarkan aktif saat menghubungkan perangkat genggam ke TV: kontroler Bluetooth atau USB eksternal otomatis menjadi Pemain 1, sedangkan kontrol bawaan berpindah ke Pemain 2. Nonaktifkan jika kontrol bawaan harus tetap menjadi Pemain 1 untuk multipemain lokal.</string>
     <string name="settings_gamepad_auto">Deteksi Otomatis Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Sembunyikan Hamparan pada Gamepad</string>
 

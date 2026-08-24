@@ -835,6 +835,9 @@
     <string name="settings_gamepad_mode_desc">انتخاب کنید که آیا یک گیم‌پد متصل جایگزین کنترل‌های لمسی شود یا در کنار آن‌ها کار کند.</string>
     <string name="settings_gamepad_mode_replace_touch">جایگزینی لمس</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">لمس + گیم‌پد</string>
+    <string name="settings_gamepad_external_player_one">اولویت کنترلر خارجی برای بازیکن ۱</string>
+    <string name="settings_gamepad_external_player_one_desc">اختصاص کنترلر Bluetooth یا USB به بازیکن ۱ پیش از کنترل‌های داخلی دستگاه دستی</string>
+    <string name="settings_help_gamepad_external_player_one">هنگام اتصال دستگاه دستی به تلویزیون این گزینه را روشن نگه دارید: کنترلر خارجی Bluetooth یا USB به‌طور خودکار بازیکن ۱ می‌شود و کنترل‌های داخلی به بازیکن ۲ منتقل می‌شوند. اگر می‌خواهید در بازی چندنفره محلی کنترل‌های داخلی بازیکن ۱ باقی بمانند، آن را خاموش کنید.</string>
     <string name="settings_gamepad_auto">تشخیص خودکار گیم‌پد</string>
     <string name="settings_gamepad_hide_overlay">مخفی کردن روکش در هنگام استفاده از گیم‌پد</string>
 

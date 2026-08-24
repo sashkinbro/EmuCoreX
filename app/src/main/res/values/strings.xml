@@ -900,6 +900,9 @@
     <string name="settings_gamepad_mode_desc">Choose whether one connected gamepad replaces touch controls or works alongside them.</string>
     <string name="settings_gamepad_mode_replace_touch">Replace Touch</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Prefer External Controller for Player 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Assign a Bluetooth or USB controller to Player 1 ahead of built-in handheld controls</string>
+    <string name="settings_help_gamepad_external_player_one">Keep this enabled when connecting a handheld to a TV: an external Bluetooth or USB controller becomes Player 1 automatically, while the built-in controls move to Player 2. Disable it when you want the handheld controls to remain Player 1 for local multiplayer.</string>
     <string name="settings_gamepad_auto">Auto-detect Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Hide Overlay on Gamepad</string>
 

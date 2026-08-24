@@ -957,6 +957,9 @@
     <string name="settings_gamepad_mode_desc">Выберите, должен ли один подключенный геймпад заменять сенсорное управление или работать параллельно с ним.</string>
     <string name="settings_gamepad_mode_replace_touch">Заменить сенсор</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Сенсор + Геймпад</string>
+    <string name="settings_gamepad_external_player_one">Внешний контроллер как Игрок 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Назначать Bluetooth- или USB-контроллер Игроком 1 вместо встроенного управления консоли</string>
+    <string name="settings_help_gamepad_external_player_one">Оставьте включённым при подключении портативной консоли к телевизору: внешний Bluetooth- или USB-контроллер автоматически станет Игроком 1, а встроенное управление — Игроком 2. Отключите, если для локальной игры встроенное управление должно оставаться Игроком 1.</string>
     <string name="settings_emulation_tab">Эмуляция</string>
     <string name="settings_fixes_tab">Исправления</string>
     <string name="settings_library_tab">Библиотека</string>

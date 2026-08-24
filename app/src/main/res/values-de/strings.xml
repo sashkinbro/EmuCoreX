@@ -953,6 +953,9 @@
     <string name="settings_gamepad_mode_desc">Wähle, ob ein verbundenes Gamepad die Touch-Steuerung ersetzt oder parallel dazu funktioniert.</string>
     <string name="settings_gamepad_mode_replace_touch">Touch ersetzen</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Externen Controller für Spieler 1 bevorzugen</string>
+    <string name="settings_gamepad_external_player_one_desc">Einen Bluetooth- oder USB-Controller vor der integrierten Handheld-Steuerung Spieler 1 zuweisen</string>
+    <string name="settings_help_gamepad_external_player_one">Beim Anschluss eines Handhelds an einen Fernseher aktiviert lassen: Ein externer Bluetooth- oder USB-Controller wird automatisch Spieler 1, während die integrierte Steuerung zu Spieler 2 wechselt. Deaktivieren, wenn die integrierte Steuerung im lokalen Mehrspielermodus Spieler 1 bleiben soll.</string>
     <string name="settings_emulation_tab">Emulation</string>
     <string name="settings_fixes_tab">Korrekturen</string>
     <string name="settings_library_tab">Bibliothek</string>

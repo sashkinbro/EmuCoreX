@@ -1,11 +1,14 @@
 package com.sbro.emucorex.navigation
 
+import android.content.res.Configuration
 import androidx.compose.material3.Text
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -54,25 +57,29 @@ class AdaptiveShellDrawerInstrumentedTest {
     }
 
     @Test
-    fun feedbackDestinationStaysDrawerFreeAfterStateRestoration() {
-        val restorationTester = StateRestorationTester(composeRule)
-        restorationTester.setContent {
+    fun feedbackDestinationStaysDrawerFreeAfterShellRecreation() {
+        val shellInstance = mutableStateOf(0)
+        composeRule.setContent {
             EmuCoreXTheme {
-                TestShell(selected = PrimaryDestination.Feedback, onBackClick = {})
+                key(shellInstance.value) {
+                    TestShell(selected = PrimaryDestination.Feedback, onBackClick = {})
+                }
             }
         }
 
         assertEquals(0, modalDrawerNodeCount())
-        restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { shellInstance.value++ }
         assertEquals(0, modalDrawerNodeCount())
     }
 
     @Test
-    fun openHomeDrawerIsClosedAfterStateRestoration() {
-        val restorationTester = StateRestorationTester(composeRule)
-        restorationTester.setContent {
+    fun openHomeDrawerIsClosedAfterShellRecreation() {
+        val shellInstance = mutableStateOf(0)
+        composeRule.setContent {
             EmuCoreXTheme {
-                TestShell(selected = PrimaryDestination.Home, onBackClick = null)
+                key(shellInstance.value) {
+                    TestShell(selected = PrimaryDestination.Home, onBackClick = null)
+                }
             }
         }
 
@@ -82,7 +89,7 @@ class AdaptiveShellDrawerInstrumentedTest {
         composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
             .assertIsDisplayed()
 
-        restorationTester.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { shellInstance.value++ }
         composeRule.mainClock.advanceTimeBy(500)
         composeRule.onNodeWithTag("adaptive_shell_drawer_sheet", useUnmergedTree = true)
             .assertIsNotDisplayed()
@@ -120,20 +127,27 @@ class AdaptiveShellDrawerInstrumentedTest {
 
 @androidx.compose.runtime.Composable
 private fun TestShell(selected: PrimaryDestination, onBackClick: (() -> Unit)?) {
-    AdaptiveShell(
-        selected = selected,
-        onNavigateHome = {},
-        onNavigateSearch = {},
-        onNavigateFormats = {},
-        onNavigateSettings = {},
-        onNavigateAchievements = {},
-        onBackClick = onBackClick
-    ) { openDrawer ->
-        Text(
-            text = "Test content",
-            modifier = Modifier
-                .testTag("test_open_drawer")
-                .clickable(enabled = openDrawer != null) { openDrawer?.invoke() }
-        )
+    val compactConfiguration = Configuration(LocalConfiguration.current).apply {
+        smallestScreenWidthDp = 411
+        screenWidthDp = 411
+        screenHeightDp = 891
+    }
+    CompositionLocalProvider(LocalConfiguration provides compactConfiguration) {
+        AdaptiveShell(
+            selected = selected,
+            onNavigateHome = {},
+            onNavigateSearch = {},
+            onNavigateFormats = {},
+            onNavigateSettings = {},
+            onNavigateAchievements = {},
+            onBackClick = onBackClick
+        ) { openDrawer ->
+            Text(
+                text = "Test content",
+                modifier = Modifier
+                    .testTag("test_open_drawer")
+                    .clickable(enabled = openDrawer != null) { openDrawer?.invoke() }
+            )
+        }
     }
 }

@@ -899,6 +899,9 @@
     <string name="settings_gamepad_mode_desc">Vyberte si, zda jeden připojený gamepad nahradí dotykové ovládání nebo bude fungovat společně s ním.</string>
     <string name="settings_gamepad_mode_replace_touch">Nahradit dotyk</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dotyk + Gamepad</string>
+    <string name="settings_gamepad_external_player_one">Upřednostnit externí ovladač pro hráče 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Přiřadit ovladač Bluetooth nebo USB hráči 1 před vestavěným ovládáním handheldu</string>
+    <string name="settings_help_gamepad_external_player_one">Při připojení handheldu k televizi ponechte zapnuto: externí ovladač Bluetooth nebo USB se automaticky stane hráčem 1 a vestavěné ovládání se přesune na hráče 2. Vypněte, pokud má při místní hře pro více hráčů zůstat hráčem 1 vestavěné ovládání.</string>
     <string name="settings_gamepad_auto">Automaticky detekovat gamepad</string>
     <string name="settings_gamepad_hide_overlay">Skrýt překrytí při gamepadu</string>
 

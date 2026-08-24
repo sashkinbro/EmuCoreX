@@ -479,6 +479,9 @@
     <string name="settings_gamepad_mode_desc">चुनें कि क्या कोई कनेक्टेड गेमपैड टच कंट्रोल्स को बदल देता है या उनके साथ काम करता है।</string>
     <string name="settings_gamepad_mode_replace_touch">टच बदलें</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">टच + गेमपैड</string>
+    <string name="settings_gamepad_external_player_one">खिलाड़ी 1 के लिए बाहरी कंट्रोलर को प्राथमिकता दें</string>
+    <string name="settings_gamepad_external_player_one_desc">हैंडहेल्ड के बिल्ट-इन कंट्रोल से पहले Bluetooth या USB कंट्रोलर को खिलाड़ी 1 असाइन करें</string>
+    <string name="settings_help_gamepad_external_player_one">हैंडहेल्ड को टीवी से जोड़ते समय इसे चालू रखें: बाहरी Bluetooth या USB कंट्रोलर अपने आप खिलाड़ी 1 बन जाएगा और बिल्ट-इन कंट्रोल खिलाड़ी 2 पर चले जाएँगे। लोकल मल्टीप्लेयर में बिल्ट-इन कंट्रोल को खिलाड़ी 1 रखना हो तो इसे बंद करें।</string>
     <string name="settings_gamepad_auto">स्वतः पता लगाएँ गेमपैड</string>
     <string name="settings_gamepad_hide_overlay">गेमपैड पर ओवरले छिपाएं</string>
 

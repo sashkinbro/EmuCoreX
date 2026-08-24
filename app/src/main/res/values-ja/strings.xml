@@ -557,6 +557,9 @@
     <string name="settings_gamepad_mode_desc">接続された1つのゲームパッドがタッチコントロールを置き換えるか、タッチコントロールと一緒に機能するかを選択します。</string>
     <string name="settings_gamepad_mode_replace_touch">タッチを置換</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">タッチ + ゲームパッド</string>
+    <string name="settings_gamepad_external_player_one">プレイヤー1に外部コントローラーを優先</string>
+    <string name="settings_gamepad_external_player_one_desc">携帯機の内蔵操作より先にBluetoothまたはUSBコントローラーをプレイヤー1へ割り当てます</string>
+    <string name="settings_help_gamepad_external_player_one">携帯機をテレビに接続するときは有効にしてください。外部のBluetoothまたはUSBコントローラーが自動的にプレイヤー1となり、内蔵操作はプレイヤー2へ移動します。ローカルマルチプレイで内蔵操作をプレイヤー1のままにする場合は無効にしてください。</string>
     <string name="settings_gamepad_auto">ゲームパッドを自動検出</string>
     <string name="settings_gamepad_hide_overlay">ゲームパッドでオーバーレイを隠す</string>
 

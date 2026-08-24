@@ -953,6 +953,9 @@
     <string name="settings_gamepad_mode_desc">Choisissez si une manette connectée remplace les contrôles tactiles ou fonctionne avec eux.</string>
     <string name="settings_gamepad_mode_replace_touch">Remplacer le tactile</string>
     <string name="settings_gamepad_mode_touch_plus_gamepad">Tactile + Manette</string>
+    <string name="settings_gamepad_external_player_one">Priorité à la manette externe pour le joueur 1</string>
+    <string name="settings_gamepad_external_player_one_desc">Attribuer une manette Bluetooth ou USB au joueur 1 avant les commandes intégrées de la console portable</string>
+    <string name="settings_help_gamepad_external_player_one">Laissez cette option activée lorsque vous connectez une console portable au téléviseur : la manette Bluetooth ou USB externe devient automatiquement le joueur 1 et les commandes intégrées passent au joueur 2. Désactivez-la si vous souhaitez conserver les commandes intégrées pour le joueur 1 en multijoueur local.</string>
     <string name="settings_emulation_tab">Émulation</string>
     <string name="settings_fixes_tab">Correctifs</string>
     <string name="settings_library_tab">Bibliothèque</string>

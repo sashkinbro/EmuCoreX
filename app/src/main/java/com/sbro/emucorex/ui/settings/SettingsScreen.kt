@@ -2079,6 +2079,19 @@ private fun SettingsContent(
                         )
                         SettingsInlineNote(text = stringResource(R.string.settings_gamepad_mode_desc))
                         ToggleItem(
+                            icon = Icons.Rounded.SwapHoriz,
+                            title = stringResource(R.string.settings_gamepad_external_player_one),
+                            subtitle = stringResource(R.string.settings_gamepad_external_player_one_desc),
+                            checked = uiState.preferExternalGamepadPlayerOne,
+                            onCheckedChange = viewModel::setPreferExternalGamepadPlayerOne,
+                            helpText = stringResource(R.string.settings_help_gamepad_external_player_one),
+                            onResetToDefault = {
+                                viewModel.setPreferExternalGamepadPlayerOne(
+                                    defaults.preferExternalGamepadPlayerOne
+                                )
+                            }
+                        )
+                        ToggleItem(
                             icon = Icons.Rounded.Visibility,
                             title = stringResource(R.string.settings_gamepad_hide_overlay),
                             subtitle = stringResource(R.string.settings_gamepad_hide_overlay_desc),
