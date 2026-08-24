@@ -3,7 +3,12 @@
 #include "common/StringUtil.h"
 #include "common/Console.h"
 #include <cstring>
+#include <cerrno>
 #include <limits>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 ChdImage::ChdImage() = default;
 
@@ -20,13 +25,21 @@ bool ChdImage::Open(const std::string& path)
     if (!m_source)
     {
         Console.ErrorFmt("{} failed to open CHD source '{}'", __FUNCTION__, path);
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "Arcade CHD source open failed: errno=%d path=%s", errno, path.c_str());
+#endif
         return false;
     }
 
     chd_error err = chd_open_file(m_source, CHD_OPEN_READ, nullptr, &m_chd);
 
     if (err != CHDERR_NONE) {
-        Console.ErrorFmt("{} failed to open CHD: {}", __FUNCTION__, (int)err);
+        Console.ErrorFmt("{} failed to open CHD: {} ({})", __FUNCTION__, static_cast<int>(err), chd_error_string(err));
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX",
+            "Arcade CHD parse failed: error=%d (%s) errno=%d ferror=%d path=%s",
+            static_cast<int>(err), chd_error_string(err), errno, std::ferror(m_source), path.c_str());
+#endif
         std::fclose(m_source);
         m_source = nullptr;
         return false;

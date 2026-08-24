@@ -20,6 +20,7 @@ app/google-services.json
 # Local Firebase deployment and maintenance files
 /.firebase/
 /.firebaserc
+/firebase-tests/
 /firestore-debug.log
 /migrate-player-profiles.mjs
 
@@ -73,6 +74,7 @@ app/src/main/native-tools/
 /app/src/main/jniLibs/arm64-v8a/
 
 # Private / generated local data
+/source/
 IGDB/
 pcsx2_official/
 public/
