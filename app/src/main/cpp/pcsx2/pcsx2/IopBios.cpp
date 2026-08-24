@@ -5,6 +5,7 @@
 #include "DebugTools/SymbolGuardian.h"
 #include "IopBios.h"
 #include "IopMem.h"
+#include "MemoryTypes.h"
 #include "R3000A.h"
 #include "R5900.h"
 #include "ps2/BiosTools.h"
@@ -416,6 +417,70 @@ namespace R3000A
 
 	namespace ioman
 	{
+		static std::string s_arcade_boot_redirect_game;
+		static bool s_arcade_boot_redirect_consumed = false;
+
+		static void RedirectMismatchedArcadeBootProgram(std::string* path)
+		{
+			const std::string& game_id = ACJV::GetGameId();
+			if (game_id != s_arcade_boot_redirect_game)
+			{
+				s_arcade_boot_redirect_game = game_id;
+				s_arcade_boot_redirect_consumed = false;
+			}
+
+			const std::string& expected = VMManager::GetArcadeBootProgram();
+			if (s_arcade_boot_redirect_consumed || game_id.empty() || expected.empty() ||
+				!path->starts_with("mc0:"))
+			{
+				return;
+			}
+
+			std::string_view requested(*path);
+			requested.remove_prefix(4);
+			if (requested.starts_with('/'))
+				requested.remove_prefix(1);
+			if (requested.find('/') != std::string_view::npos || requested.find('\\') != std::string_view::npos)
+				return;
+			const bool looks_like_boot_program = requested == "START" || requested.ends_with("LOAD") ||
+				requested.ends_with("GAME");
+			if (!looks_like_boot_program)
+				return;
+
+			// The first simple mc0 file opened by proverb is the title's executable.
+			// Some distributed sets reuse another game's proverb.elf (notably
+			// NM00025 uses the NM00016 loader), so resolve that request through the
+			// authoritative GameDB entry. Requiring equal lengths lets us update the
+			// caller-owned IOP string in place without risking an overflow.
+			if (requested != expected && requested.size() == expected.size())
+			{
+				const std::string original = *path;
+				const std::string redirected = fmt::format("mc0:{}", expected);
+				for (size_t i = 0; i <= redirected.size(); i++)
+					iopMemWrite8(a0 + static_cast<u32>(i), static_cast<u8>(redirected[i]));
+
+				// fioOpen receives an IOP-side copy of the path, while proverb later
+				// hands its original EE-side argv string to the embedded ELF loader.
+				// Keep both copies consistent or the existence check succeeds but the
+				// subsequent SifLoadElf call still requests the mismatched filename.
+				u32 ee_replacements = 0;
+				for (u32 offset = 0; offset + original.size() < Ps2MemSize::MainRam; offset++)
+				{
+					if (std::memcmp(&eeMem->Main[offset], original.data(), original.size()) == 0 &&
+						eeMem->Main[offset + original.size()] == 0)
+					{
+						std::memcpy(&eeMem->Main[offset], redirected.data(), redirected.size());
+						ee_replacements++;
+						offset += static_cast<u32>(original.size() - 1);
+					}
+				}
+				Console.WriteLn("Arcade boot redirect: %s -> %s (%s, %u EE copies)", original.c_str(),
+					redirected.c_str(), game_id.c_str(), ee_replacements);
+				*path = redirected;
+			}
+			s_arcade_boot_redirect_consumed = true;
+		}
+
 		const int firstfd = 0x100;
 		const int maxfds = 0x100;
 		int openfds = 0;
@@ -587,7 +652,8 @@ namespace R3000A
 		int open_HLE()
 		{
 			IOManFile* file = NULL;
-			const std::string path = clean_path(Ra0);
+			std::string path = clean_path(Ra0);
+			RedirectMismatchedArcadeBootProgram(&path);
 			s32 flags = a1;
 			u16 mode = a2;
 

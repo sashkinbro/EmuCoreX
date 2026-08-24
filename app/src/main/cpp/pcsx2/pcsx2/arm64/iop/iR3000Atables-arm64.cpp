@@ -1382,7 +1382,8 @@ static bool rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad load)
 		return false;
 
 	// Match the generic path exactly: W-register addition wraps at 32 bits,
-	// bit 28 selects the direct IOP RAM path, and RAM mirrors wrap at 2 MiB.
+	// bit 28 selects the direct IOP RAM path, and RAM mirrors wrap at the
+	// active machine's installed IOP RAM size (2 MiB PS2, 8 MiB System 256).
 	const u32 effective_address = g_psxConstRegs[_Rs_] + static_cast<u32>(_Imm_);
 	if (effective_address & 0x10000000u)
 		return false;
@@ -1404,7 +1405,7 @@ static bool rpsxTryEmitConstantRamLoad_emit_oaknut(IopConstantRamLoad load)
 	const oak::WReg result = (rt < 0) ? address : oakWRegister(rt);
 
 	recBeginOaknutEmit();
-	oakAsm->MOV(address, effective_address & 0x1fffffu);
+	oakAsm->MOV(address, effective_address & (Ps2MemSize::ExposedIopRam - 1));
 	switch (load)
 	{
 		case IopConstantRamLoad::Signed8:
@@ -1461,7 +1462,7 @@ static void rpsxLB_emit_oaknut()
 	rpsxFinishLoad8Signed_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
-	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, Ps2MemSize::ExposedIopRam - 1);
 	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
 	oakAsm->LDRSB(result, oak::util::X26, oak::util::X0);
 	if (rt < 0)
@@ -1496,7 +1497,7 @@ static void rpsxLBU_emit_oaknut()
 	rpsxFinishLoad8Unsigned_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
-	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, Ps2MemSize::ExposedIopRam - 1);
 	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
 	oakAsm->LDRB(result, oak::util::X26, oak::util::X0);
 	if (rt < 0)
@@ -1531,7 +1532,7 @@ static void rpsxLH_emit_oaknut()
 	rpsxFinishLoad16Signed_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
-	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, Ps2MemSize::ExposedIopRam - 1);
 	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
 	oakAsm->LDRSH(result, oak::util::X26, oak::util::X0);
 	if (rt < 0)
@@ -1566,7 +1567,7 @@ static void rpsxLHU_emit_oaknut()
 	rpsxFinishLoad16Unsigned_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
-	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, Ps2MemSize::ExposedIopRam - 1);
 	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
 	oakAsm->LDRH(result, oak::util::X26, oak::util::X0);
 	if (rt < 0)
@@ -1601,7 +1602,7 @@ static void rpsxLW_emit_oaknut()
 	rpsxFinishLoad32_emit_oaknut(rt);
 	oakAsm->B(done);
 	oakAsm->l(is_ram_read);
-	oakAsm->AND(OAK_WARG1, OAK_WARG1, 0x1fffff);
+	oakAsm->AND(OAK_WARG1, OAK_WARG1, Ps2MemSize::ExposedIopRam - 1);
 	const oak::WReg result = (rt < 0) ? OAK_WARG1 : oakWRegister(rt);
 	oakAsm->LDR(result, oak::util::X26, oak::util::X0);
 	if (rt < 0)

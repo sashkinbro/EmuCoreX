@@ -25,31 +25,53 @@ class CoverArtRepository(context: Context) {
         const val DEFAULT_COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
         const val DEFAULT_COVER_3D_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d"
         const val DEFAULT_ARCADE_COVER_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Logos"
+        private const val DEFAULT_PS2_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_2/master/Named_Boxarts"
+        private const val DEFAULT_PSP_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_Portable/master/Named_Boxarts"
         private const val CONNECT_TIMEOUT_MS = 10000
         private const val READ_TIMEOUT_MS = 15000
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
+        private const val ARCADE_COVER_SOURCE_REVISION = 3
+
+        private data class ArcadeCoverAsset(val baseUrl: String, val fileName: String)
+
+        private fun mameLogo(fileName: String) = ArcadeCoverAsset(DEFAULT_ARCADE_COVER_BASE_URL, fileName)
+        private fun ps2BoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PS2_BOXART_BASE_URL, fileName)
+        private fun pspBoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PSP_BOXART_BASE_URL, fileName)
 
         // PCSX2 exposes the Namco game ID as the serial. Libretro's maintained MAME
-        // artwork uses display names, so keep a deterministic bridge for the
-        // System 246/256 titles currently available in that source.
-        private val ARCADE_COVER_NAMES = mapOf(
-            "NM00001" to "Ridge Racer V Arcade Battle (RRV3 Ver. A).png",
-            "NM00003" to "Vampire Night (VPN3 Ver. B).png",
-            "NM00004" to "Tekken 4 (TEF3 Ver. C).png",
-            "NM00006" to "Smash Court Pro Tournament (SCP1).png",
-            "NM00008" to "Wangan Midnight (WMN1 Ver. A).png",
-            "NM00011" to "Pride GP 2003 (PR21 Ver. A).png",
-            "NM00012" to "Time Crisis 3 (TST1).png",
-            "NM00018" to "Capcom Fighting Jam (JAM1 Ver. A).png",
-            "NM00025" to "Zoids Infinity EX Plus (ver. 2.10).png",
-            "NM00026" to "Tekken 5 Dark Resurrection (TED1 Ver. A).png",
-            "NM00027" to "Super Dragon Ball Z (DB1 Ver. B).png",
-            "NM00032" to "Time Crisis 4 (World, TSF1002-NA-A).png",
-            "NM00039" to "MotoGP (MGP1004-NA-B).png",
-            "NM00042" to "Sengoku Basara X Cross.png",
-            "NM00047" to "Ace Driver 3_ Final Turn.png",
-            "NM00048" to "Fate_ Unlimited Codes (FUD1 ver. A).png"
+        // artwork uses display names rather than NM IDs. Prefer a matching portrait
+        // retail box art because the library cards use a 2:3 cover ratio. Keep exact
+        // MAME logos only for arcade-exclusive titles without a truthful box-art match.
+        private val ARCADE_COVER_ASSETS = mapOf(
+            "NM00001" to ps2BoxArt("Ridge Racer V (Japan).png"),
+            "NM00002" to ps2BoxArt("Bloody Roar 3 (Japan) (v2.01).png"),
+            "NM00003" to ps2BoxArt("Vampire Night (Japan).png"),
+            "NM00004" to ps2BoxArt("Tekken 4 (Japan, Asia).png"),
+            "NM00005" to ps2BoxArt("Wangan Midnight (Japan).png"),
+            "NM00006" to ps2BoxArt("Smash Court Pro Tournament (Japan).png"),
+            "NM00007" to ps2BoxArt("Soulcalibur II (Japan).png"),
+            "NM00008" to ps2BoxArt("Wangan Midnight (Japan).png"),
+            "NM00010" to ps2BoxArt("Battle Gear 3 (Japan).png"),
+            "NM00011" to ps2BoxArt("Pride (Japan).png"),
+            "NM00012" to ps2BoxArt("Time Crisis 3 (Japan).png"),
+            "NM00015" to ps2BoxArt("Battle Gear 3 (Japan, Asia).png"),
+            "NM00016" to mameLogo("Zoids Infinity EX Plus (ver. 2.10).png"),
+            "NM00018" to ps2BoxArt("Capcom Fighting Jam (Japan).png"),
+            "NM00019" to ps2BoxArt("Tekken 5 (Japan, Asia).png"),
+            "NM00021" to mameLogo("Cobra_ The Arcade (CBR1 Ver. B).png"),
+            "NM00025" to mameLogo("Zoids Infinity EX Plus (ver. 2.10).png"),
+            "NM00026" to pspBoxArt("Tekken - Dark Resurrection (Asia) (En) (v1.02).png"),
+            "NM00027" to ps2BoxArt("Super Dragon Ball Z (Japan).png"),
+            "NM00031" to ps2BoxArt("Soulcalibur III (Japan) (v2.00).png"),
+            "NM00032" to mameLogo("Time Crisis 4 (World, TSF1002-NA-A).png"),
+            "NM00039" to ps2BoxArt("MotoGP (Japan).png"),
+            "NM00042" to ps2BoxArt("Sengoku Basara X (Japan, Korea).png"),
+            "NM00047" to mameLogo("Ace Driver 3_ Final Turn.png"),
+            "NM00048" to ps2BoxArt("Fate-Unlimited Codes (Japan).png")
         )
+
+        internal fun hasDefaultArcadeCover(serial: String): Boolean =
+            ARCADE_COVER_ASSETS.containsKey(serial.uppercase(Locale.ROOT))
     }
 
     private val context = context.applicationContext
@@ -213,8 +235,9 @@ class CoverArtRepository(context: Context) {
                 add("$baseUrl/$serial.png")
                 add("$baseUrl/$serial.jpg")
             }
-            ARCADE_COVER_NAMES[serial]?.let { name ->
-                add("$baseUrl/${Uri.encode(name)}")
+            ARCADE_COVER_ASSETS[serial]?.let { asset ->
+                val assetBaseUrl = configuredBase ?: asset.baseUrl
+                add("$assetBaseUrl/${Uri.encode(asset.fileName)}")
             }
         }.distinct()
 
@@ -237,8 +260,8 @@ class CoverArtRepository(context: Context) {
             return if (configuredBase != null) {
                 "$configuredBase/$normalizedSerial.png"
             } else {
-                ARCADE_COVER_NAMES[normalizedSerial]?.let { name ->
-                    "$DEFAULT_ARCADE_COVER_BASE_URL/${Uri.encode(name)}"
+                ARCADE_COVER_ASSETS[normalizedSerial]?.let { asset ->
+                    "${asset.baseUrl}/${Uri.encode(asset.fileName)}"
                 }
             }
         }
@@ -391,10 +414,15 @@ class CoverArtRepository(context: Context) {
     }
 
     private fun cacheMissFileName(serial: String, style: Int): String {
-        return if (style == AppPreferences.COVER_ART_STYLE_3D) {
-            "${serial}_3d.miss"
+        val versionedSerial = if (serial.startsWith("NM") && serial.length == 7) {
+            "${serial}_arcade_v$ARCADE_COVER_SOURCE_REVISION"
         } else {
-            "$serial.miss"
+            serial
+        }
+        return if (style == AppPreferences.COVER_ART_STYLE_3D) {
+            "${versionedSerial}_3d.miss"
+        } else {
+            "$versionedSerial.miss"
         }
     }
 
