@@ -27,6 +27,41 @@ class OverlayCanvasResponsiveLayoutTest {
     }
 
     @Test
+    fun `default layout keeps the independent dpad beside the left stick`() {
+        listOf(
+            ScreenCase("narrow landscape phone", 640.dp, 280.dp),
+            ScreenCase("20 by 9 phone", 900.dp, 405.dp),
+            ScreenCase("4 by 3 tablet landscape", 1024.dp, 768.dp)
+        ).forEach { screen ->
+            val layout = buildLayout(screen)
+            val dpad = requireNotNull(layout.dpadCluster)
+            val leftStick = requireNotNull(layout.leftStick)
+            val rightStick = requireNotNull(layout.rightStick)
+            val leftGap = leftStick.x - (dpad.x + dpad.size)
+            val rightGap = layout.actionButtons.minOf { it.x } - (rightStick.x + rightStick.size)
+            val leftShoulderBottom = layout.leftShoulders.maxOf { it.y + it.height }
+
+            assertTrue("${screen.name}: independent dpad must be visible", dpad.visible)
+            assertTrue("${screen.name}: left stick must remain visible", leftStick.visible)
+            assertTrue("${screen.name}: dpad must stay left of the left stick", dpad.x + dpad.size < leftStick.x)
+            assertTrue("${screen.name}: left shoulders must stay above the dpad", leftShoulderBottom < dpad.y)
+            assertEquals("${screen.name}: primary control gaps must match", leftGap.value, rightGap.value, EPSILON)
+        }
+    }
+
+    @Test
+    fun `explicitly hidden independent dpad remains hidden`() {
+        val controls = AppPreferences.defaultOverlayControlLayouts().toMutableMap().apply {
+            this["dpad_cluster"] = requireNotNull(this["dpad_cluster"]).copy(visible = false)
+        }
+
+        val layout = buildLayout(ScreenCase("custom hidden dpad", 800.dp, 450.dp), controls)
+
+        assertTrue(layout.dpadCluster == null)
+        assertTrue(layout.leftStick?.visible == true)
+    }
+
+    @Test
     fun `asymmetric cutout and navigation insets define the actual safe area`() {
         val screen = ScreenCase(
             name = "asymmetric insets",
@@ -43,21 +78,22 @@ class OverlayCanvasResponsiveLayoutTest {
         assertNoOverlaps(screen.name, layout)
 
         val left = requireNotNull(layout.leftStick)
+        val independentDpad = requireNotNull(layout.dpadCluster)
         val rightActionEdge = layout.actionButtons.maxOf { it.x + it.width }
         assertTrue(left.x >= screen.leftInset)
         assertTrue(rightActionEdge <= screen.width - screen.rightInset)
         assertEquals(
             "physical side margins must remain symmetric",
-            left.x.value,
+            independentDpad.x.value,
             (screen.width - rightActionEdge).value,
             EPSILON
         )
 
-        val leftShoulderEdge = layout.leftShoulders.minOf { it.x }
+        val leftTopEdge = layout.leftShoulders.minOf { it.x }
         val rightShoulderEdge = layout.rightShoulders.maxOf { it.x + it.width }
         assertEquals(
-            "shoulder margins must remain symmetric",
-            leftShoulderEdge.value,
+            "top control margins must remain symmetric",
+            leftTopEdge.value,
             (screen.width - rightShoulderEdge).value,
             EPSILON
         )

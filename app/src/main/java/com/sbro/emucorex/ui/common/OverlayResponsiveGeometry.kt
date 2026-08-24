@@ -16,6 +16,7 @@ internal fun calculateOverlayResponsiveScale(
     safeBottomInset: Dp,
     requestedScale: Float,
     stickScale: Float,
+    extraDpadVisible: Boolean,
     leftStickVisible: Boolean,
     leftStickFootprintScale: Float,
     rightStickVisible: Boolean,
@@ -50,10 +51,20 @@ internal fun calculateOverlayResponsiveScale(
     val primaryExtent = maxOf(dpadExtent, actionExtent, analogBase)
 
     val horizontalGap = if (isLandscape) 18f else 12f
-    val widthNeeded = if (isLandscape && rightStickVisible) {
-        maxOf(dpadExtent, leftAnalogWidth) + rightAnalogWidth + actionExtent + horizontalGap * 2f + 32f
+    val primaryControlGap = if (isLandscape) {
+        OverlayPrimaryControlGapLandscape.value
     } else {
-        maxOf(dpadExtent, leftAnalogWidth) + actionExtent + horizontalGap + 20f
+        OverlayPrimaryControlGapPortrait.value
+    }
+    val leftControlsWidth = if (extraDpadVisible && leftStickVisible) {
+        dpadExtent + primaryControlGap + leftAnalogWidth
+    } else {
+        maxOf(dpadExtent, leftAnalogWidth)
+    }
+    val widthNeeded = if (isLandscape && rightStickVisible) {
+        leftControlsWidth + rightAnalogWidth + actionExtent + primaryControlGap + horizontalGap * 2f + 32f
+    } else {
+        leftControlsWidth + actionExtent + horizontalGap + 20f
     }
     val stackedRightStickHeight = if (!isLandscape && rightStickVisible) {
         analogBase + 18f

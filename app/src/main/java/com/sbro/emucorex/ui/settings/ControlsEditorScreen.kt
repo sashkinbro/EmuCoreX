@@ -655,9 +655,10 @@ private fun PreviewLayout(
         )
 
         val showLeftStick = layout.leftStick?.visible == true
+        val showIndependentDpad = layout.dpadCluster?.visible == true
 
         fun shouldShowButton(id: String): Boolean = when (id) {
-            "dpad_up", "dpad_down", "dpad_left", "dpad_right" -> !showLeftStick
+            "dpad_up", "dpad_down", "dpad_left", "dpad_right" -> !showLeftStick && !showIndependentDpad
             else -> true
         }
 

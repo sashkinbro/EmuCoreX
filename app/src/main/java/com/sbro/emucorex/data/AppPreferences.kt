@@ -486,7 +486,7 @@ class AppPreferences(private val context: Context) {
             "dpad_down" to OverlayControlLayout(visible = false),
             "dpad_left" to OverlayControlLayout(visible = false),
             "dpad_right" to OverlayControlLayout(visible = false),
-            "dpad_cluster" to OverlayControlLayout(visible = false),
+            "dpad_cluster" to OverlayControlLayout(visible = true),
             "left_stick" to OverlayControlLayout(scale = stickScale, widthScale = 160, visible = true),
             "triangle" to OverlayControlLayout(),
             "cross" to OverlayControlLayout(),

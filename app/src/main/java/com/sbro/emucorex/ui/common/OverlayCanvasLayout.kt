@@ -106,6 +106,7 @@ fun buildOverlayCanvasLayout(
 
     val leftStickLayout = layoutFor("left_stick", (stickScaleFactor * 100f).toInt())
     val rightStickLayout = layoutFor("right_stick", (stickScaleFactor * 100f).toInt())
+    val extraDpadLayout = layoutFor("dpad_cluster")
     val responsiveScale = calculateOverlayResponsiveScale(
         canvasWidth = canvasWidth,
         canvasHeight = canvasHeight,
@@ -115,6 +116,7 @@ fun buildOverlayCanvasLayout(
         safeBottomInset = safeBottomInset,
         requestedScale = scaleFactor,
         stickScale = stickScaleFactor,
+        extraDpadVisible = extraDpadLayout.visible,
         leftStickVisible = leftStickLayout.visible,
         leftStickFootprintScale = if (leftStickLayout.surfaceOnly) {
             (leftStickLayout.widthScale / 100f).coerceAtLeast(1f)
@@ -146,6 +148,7 @@ fun buildOverlayCanvasLayout(
     val actionStep = overlayClusterStep(actionButtonSize, actionGap)
     val dpadClusterExtent = dpadStep + dpadButtonSize
     val actionClusterExtent = actionStep + actionButtonSize
+    val extraDpadSize = dpadClusterExtent * (extraDpadLayout.scale / 100f)
     val dpadCenterOffset = (dpadClusterExtent - dpadButtonSize) / 2f
     val actionCenterOffset = (actionClusterExtent - actionButtonSize) / 2f
     val edgePadding = (if (isLandscape) 16.dp else 10.dp) * responsiveScale
@@ -207,6 +210,16 @@ fun buildOverlayCanvasLayout(
         AppPreferences.DEFAULT_CENTER_OFFSET_Y
     )
 
+    val leftStickSize = analogSize * (leftStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
+    val leftStickPanelWidth = if (leftStickLayout.surfaceOnly) {
+        leftStickSize * (leftStickLayout.widthScale / 100f).coerceAtLeast(1f)
+    } else {
+        leftStickSize
+    }
+    val primaryExtent = maxOf(dpadClusterExtent, actionClusterExtent, leftStickSize)
+    val centerBaseY = contentBottom - centerH + centerAdjustment.second
+    val primaryTop = centerBaseY - sectionGap - primaryExtent
+
     fun buttonSpec(
         id: String,
         width: Dp,
@@ -238,8 +251,14 @@ fun buildOverlayCanvasLayout(
         )
     }
 
+    val shoulderStackHeight = shoulderH * 2f + shoulderGap
+    val shoulderRowBaseY = if (isLandscape) {
+        maxOf(edgePadTop, primaryTop - sectionGap - shoulderStackHeight)
+    } else {
+        edgePadTop
+    }
     val leftShoulderBaseX = edgePadStart + leftShoulderAdjustment.first
-    val leftShoulderBaseY = edgePadTop + leftShoulderAdjustment.second
+    val leftShoulderBaseY = shoulderRowBaseY + leftShoulderAdjustment.second
     val leftShoulders = listOf(
         buttonSpec(
             id = "l2",
@@ -262,7 +281,7 @@ fun buildOverlayCanvasLayout(
     )
 
     val rightShoulderColumnBaseX = canvasWidth - edgePadEnd + rightShoulderAdjustment.first - shoulderW
-    val rightShoulderBaseY = edgePadTop + rightShoulderAdjustment.second
+    val rightShoulderBaseY = shoulderRowBaseY + rightShoulderAdjustment.second
     val rightShoulders = listOf(
         buttonSpec(
             id = "r2",
@@ -284,29 +303,30 @@ fun buildOverlayCanvasLayout(
         )
     )
 
-    val leftStickSize = analogSize * (leftStickLayout.scale / (stickScaleFactor * 100f).coerceAtLeast(1f))
-    val leftStickPanelWidth = if (leftStickLayout.surfaceOnly) {
-        leftStickSize * (leftStickLayout.widthScale / 100f).coerceAtLeast(1f)
-    } else {
-        leftStickSize
-    }
-    val primaryExtent = maxOf(dpadClusterExtent, actionClusterExtent, leftStickSize)
-    val centerBaseY = contentBottom - centerH + centerAdjustment.second
-    val primaryTop = centerBaseY - sectionGap - primaryExtent
     val leftStickBase = (primaryExtent - leftStickSize) / 2f
+    val primaryControlGap = (if (isLandscape) {
+        OverlayPrimaryControlGapLandscape
+    } else {
+        OverlayPrimaryControlGapPortrait
+    }) * responsiveScale
+    val leftStickRowStart = if (extraDpadLayout.visible) {
+        edgePadStart + extraDpadSize + primaryControlGap
+    } else {
+        edgePadStart
+    }
     val leftStick = OverlayCanvasStickSpec(
         id = "left_stick",
         size = leftStickSize,
         widthScale = leftStickLayout.widthScale,
-        baseX = edgePadStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first,
+        baseX = leftStickRowStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first,
         baseY = primaryTop + leftStickBase + leftStickAdjustment.second,
-        x = edgePadStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first + pxToDp(leftStickLayout.offset.first),
+        x = leftStickRowStart + (leftStickPanelWidth - leftStickSize) / 2f + leftStickAdjustment.first + pxToDp(leftStickLayout.offset.first),
         y = primaryTop + leftStickBase + leftStickAdjustment.second + pxToDp(leftStickLayout.offset.second),
         opacity = leftStickLayout.opacity,
         visible = leftStickLayout.visible
     )
 
-    val showDpad = !leftStickLayout.visible
+    val showDpad = !leftStickLayout.visible && !extraDpadLayout.visible
     val dpadClusterLeft = edgePadStart + dpadAdjustment.first
     val dpadClusterTop = primaryTop + (primaryExtent - dpadClusterExtent) / 2f + dpadAdjustment.second
     val dpadButtons = listOf(
@@ -348,12 +368,7 @@ fun buildOverlayCanvasLayout(
         )
     )
 
-    val extraDpadLayout = layoutFor("dpad_cluster")
-    val extraDpadSize = dpadClusterExtent * (extraDpadLayout.scale / 100f)
-    val extraDpadBaseY = maxOf(
-        edgePadTop + shoulderH * 2f + shoulderGap + sectionGap,
-        dpadClusterTop - extraDpadSize - sectionGap
-    )
+    val extraDpadBaseY = primaryTop + (primaryExtent - extraDpadSize) / 2f
     val dpadCluster = OverlayCanvasDpadClusterSpec(
         id = "dpad_cluster",
         size = extraDpadSize,
@@ -544,7 +559,7 @@ fun buildOverlayCanvasLayout(
     } else {
         rightStickSize
     }
-    val rightStickGap = 18.dp * responsiveScale
+    val rightStickGap = primaryControlGap
     val horizontalRightStick = isLandscape
     val defaultRightStickPanelX = if (horizontalRightStick) {
         actionClusterLeft - rightStickGap - rightStickPanelWidth
