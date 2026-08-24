@@ -15501,6 +15501,8 @@ SLES-50386:
   name: "Crash Bandicoot - The Wrath of Cortex"
   region: "PAL-M6"
   compat: 5
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -38166,6 +38168,8 @@ SLPM-62114:
   name-sort: "くらっしゅばんでぃくー4 さくれつ まじんぱわー"
   name-en: "Crash Bandicoot 4 - Sakuretsu! Majin Power"
   region: "NTSC-J"
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -41584,6 +41588,8 @@ SLPM-64509:
   name-sort: "Crash Bandicoot - Mawangui Buhwal"
   name-en: "Crash Bandicoot - Return of the Demon King [English Dub Edition]" # Wrath of Cortex
   region: "NTSC-K"
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -41601,6 +41607,8 @@ SLPM-64513:
   name-sort: "Crash Bandicoot - Mawangui Buhwal"
   name-en: "Crash Bandicoot - Return of the Demon King" # Wrath of Cortex
   region: "NTSC-K"
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -54403,6 +54411,8 @@ SLPM-74003:
   name-sort: "くらっしゅばんでぃくー4 さくれつ！まじんぱわー [PlayStation2 the Best]"
   name-en: "Crash Bandicoot 4 - Sakuretsu! Majin Power [PlayStation2 the Best]"
   region: "NTSC-J"
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -65827,6 +65837,8 @@ SLUS-20238:
   name: "Crash Bandicoot - The Wrath of Cortex"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
@@ -75885,6 +75897,8 @@ SLUS-29009:
 SLUS-29010:
   name: "Crash Bandicoot - The Wrath of Cortex [Demo]"
   region: "NTSC-U"
+  clampModes:
+    vu1ClampMode: 1 # Uses Normal VU1 clamping for stable game behavior.
   gsHWFixes:
     halfPixelOffset: 5 # Helps post misaligment.
     nativePaletteDraw: 1
