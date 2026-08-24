@@ -1419,6 +1419,7 @@ private fun RecentGameCard(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, tween(100))
     var showMenu by remember { mutableStateOf(false) }
+    val coverContentScale = if (game.serial?.startsWith("NM") == true) ContentScale.Fit else ContentScale.Crop
 
     Box(
         modifier = modifier
@@ -1462,7 +1463,7 @@ private fun RecentGameCard(
                         coverPath = game.coverArtPath,
                         fallbackTitle = game.title,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = coverContentScale
                     )
                 }
             }
@@ -1529,6 +1530,7 @@ private fun GameCard(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, tween(100))
     var showMenu by remember { mutableStateOf(false) }
+    val coverContentScale = if (game.serial?.startsWith("NM") == true) ContentScale.Fit else ContentScale.Crop
     val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val gridCardBorder = if (isLightTheme) {
         BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.34f))
@@ -1577,7 +1579,7 @@ private fun GameCard(
                     coverPath = game.coverArtPath,
                     fallbackTitle = game.title,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = coverContentScale
                 )
             }
         }

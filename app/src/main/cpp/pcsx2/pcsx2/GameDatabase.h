@@ -108,6 +108,8 @@ namespace GameDatabaseSchema
 		std::vector<std::string> memcardFilters;
 		std::unordered_map<u32, std::string> patches;
 		std::vector<Patch::DynamicPatch> dynaPatches;
+		// Namco System 246/256 executable stored on the security dongle.
+		std::string arcadeBootProgram;
 
 		// Returns the list of memory card serials as a `/` delimited string
 		std::string memcardFiltersAsString() const;

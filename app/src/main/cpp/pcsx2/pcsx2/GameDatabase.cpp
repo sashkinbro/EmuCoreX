@@ -86,6 +86,8 @@ const char* GameDatabaseSchema::GameEntry::compatAsString() const
 void GameDatabase::parseAndInsert(const std::string_view serial, const ryml::NodeRef& node)
 {
 	GameDatabaseSchema::GameEntry gameEntry;
+	if (node.has_child("bootprog"))
+		node["bootprog"] >> gameEntry.arcadeBootProgram;
 	if (node.has_child("name"))
 	{
 		node["name"] >> gameEntry.name;

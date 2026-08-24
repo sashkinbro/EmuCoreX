@@ -90,8 +90,10 @@
 
 #define CHD_MAX_HUNK_SIZE				(128 * 1024 * 1024) /* hunk size probably shouldn't be more than 128MB */
 
-/* we're currently only using this for CD/DVDs, if we end up with more than 10GB data, it's probably invalid */
-#define CHD_MAX_FILE_SIZE				(10ULL * 1024 * 1024 * 1024)
+/* Namco System 256 HDD images have logical sizes up to 80 GB even when their
+ * compressed CHD is much smaller. Keep a defensive ceiling, but allow genuine
+ * arcade disks instead of rejecting their headers as invalid parameters. */
+#define CHD_MAX_FILE_SIZE				(128ULL * 1024 * 1024 * 1024)
 
 #define COOKIE_VALUE				0xbaadf00d
 #define MAX_ZLIB_ALLOCS				64

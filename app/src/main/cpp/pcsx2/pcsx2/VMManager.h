@@ -94,6 +94,9 @@ namespace VMManager
 	/// Returns true while a Namco System 246/256 title is active.
 	bool IsArcadeSystem246();
 
+	/// Returns the expected first executable on the active arcade security dongle.
+	const std::string& GetArcadeBootProgram();
+
 	/// Returns the path of the main ELF of the disc currently running.
 	std::string GetDiscELF();
 

@@ -206,6 +206,7 @@ static bool s_gs_open_on_initialize = false;
 static bool s_thread_affinities_set = false;
 static bool s_acgame_sys246 = false;
 static bool s_acgame_sys256 = false;
+static std::string s_arcade_boot_program;
 static std::string s_arcade_card1;
 static std::string s_arcade_card2;
 static std::string s_arcade_usb1;
@@ -227,6 +228,7 @@ static void ResetArcadeState()
 	ArcadeiLinkID = {};
 	s_acgame_sys246 = false;
 	s_acgame_sys256 = false;
+	s_arcade_boot_program = {};
 	s_arcade_card1 = {};
 	s_arcade_card2 = {};
 	s_arcade_usb1 = {};
@@ -390,6 +392,11 @@ std::string VMManager::GetDiscSerial()
 bool VMManager::IsArcadeSystem246()
 {
 	return s_acgame_sys246;
+}
+
+const std::string& VMManager::GetArcadeBootProgram()
+{
+	return s_arcade_boot_program;
 }
 
 std::string VMManager::GetDiscELF()
@@ -1544,6 +1551,10 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			s_arcade_gameid = s_disc_serial = s_acgame_serial = game_id;
 			s_title = ini.GetStringValue("game", "name", game_id.c_str());
 			ACJV::SetGameId(game_id);
+			if (const GameDatabaseSchema::GameEntry* db_entry = GameDatabase::findGame(game_id))
+				s_arcade_boot_program = db_entry->arcadeBootProgram;
+			s_arcade_boot_program = ini.GetStringValue(
+				"data", "bootprog", s_arcade_boot_program.c_str());
 
 			std::string platform = ini.GetStringValue("game", "platform", "246");
 			// Clone manifests in the established Namco set format put the parent set

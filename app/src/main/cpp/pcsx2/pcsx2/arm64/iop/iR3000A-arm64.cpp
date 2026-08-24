@@ -865,7 +865,7 @@ void psxRecompileCodeConst3(R3000AFNPTR constcode, R3000AFNPTR_INFO constscode, 
 static u8* m_recBlockAlloc = NULL;
 
 static const uint m_recBlockAllocSize =
-	(((Ps2MemSize::IopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4) * sizeof(BASEBLOCK));
+	(((Ps2MemSize::TotalIopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4) * sizeof(BASEBLOCK));
 
 static void recReserve()
 {
@@ -886,7 +886,7 @@ static void recReserve()
 
 	u8* curpos = m_recBlockAlloc;
 	recRAM = (BASEBLOCK*)curpos;
-	curpos += (Ps2MemSize::IopRam / 4) * sizeof(BASEBLOCK);
+	curpos += (Ps2MemSize::TotalIopRam / 4) * sizeof(BASEBLOCK);
 	recROM = (BASEBLOCK*)curpos;
 	curpos += (Ps2MemSize::Rom / 4) * sizeof(BASEBLOCK);
 	recROM1 = (BASEBLOCK*)curpos;
@@ -917,7 +917,7 @@ void recResetIOP()
 	SysMemory::DiscardCodeCachePages(recPtr, old_high_water);
 
 	iopClearRecLUT((BASEBLOCK*)m_recBlockAlloc,
-		(((Ps2MemSize::IopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4)));
+		(((Ps2MemSize::TotalIopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4)));
 
 	for (int i = 0; i < 0x10000; i++)
 		recLUT_SetPage(psxRecLUT, 0, 0, 0, i, 0);
@@ -927,14 +927,15 @@ void recResetIOP()
 	// The bottom 2 bits of PC are always zero, so we <<14 to "compress"
 	// the pc indexer into it's lower common denominator.
 
-	// We're only mapping 20 pages here in 4 places.
-	// 0x80 comes from : (Ps2MemSize::IopRam / 0x10000) * 4
+	// Reserve all System 256 IOP RAM pages. Standard PS2 machines still mirror
+	// their 2 MiB RAM through the larger window via the runtime page mask.
+	const u32 ram_page_mask = (Ps2MemSize::ExposedIopRam / _64kb) - 1;
 
 	for (int i = 0; i < 0x80; i++)
 	{
-		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0x0000, i, i & 0x1f);
-		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0x8000, i, i & 0x1f);
-		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0xa000, i, i & 0x1f);
+		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0x0000, i, i & ram_page_mask);
+		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0x8000, i, i & ram_page_mask);
+		recLUT_SetPage(psxRecLUT, psxhwLUT, recRAM, 0xa000, i, i & ram_page_mask);
 	}
 
 	for (int i = 0x1fc0; i < 0x2000; i++)
