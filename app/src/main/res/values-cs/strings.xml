@@ -2482,4 +2482,7 @@
     <string name="frame_generation_requirements_ready">Nastavení je dokončeno. Funkci lze zapnout globálně i pro jednotlivé hry.</string>
     <string name="frame_generation_requirements">Požadavky: renderer Vulkan, Adreno 7xx nebo novější, komponenta podpory a uživatelem dodaný Lossless.dll. Hra musí udržet stabilní základní frekvenci.</string>
     <string name="frame_generation_settings_value">Nainstalovat a nastavit</string>
+    <string name="settings_low_latency_mode">Režim nízké latence</string>
+    <string name="settings_low_latency_mode_desc">Používá nulovou frontu snímků GS a žádá odpovídající režim s vysokou obnovovací frekvencí.</string>
+    <string name="settings_help_low_latency_mode">Zabraňuje vláknu GS řadit snímky dopředu a volí čistý násobek snímkové frekvence hry, čímž snižuje prodlevu mezi ovladačem a obrazovkou. Při nerovnoměrném vykreslování jej vypněte.</string>
 </resources>

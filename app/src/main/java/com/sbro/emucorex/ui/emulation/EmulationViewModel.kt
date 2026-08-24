@@ -206,6 +206,7 @@ data class EmulationUiState(
     val eeCycleSkip: Int = PerformanceProfiles.safeConfig.eeCycleSkip,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = true,
+    val lowLatencyMode: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -329,6 +330,7 @@ private data class EmulationLaunchConfig(
     val eeCycleSkip: Int,
     val frameSkip: Int,
     val skipDuplicateFrames: Boolean,
+    val lowLatencyMode: Boolean,
     val frameLimitEnabled: Boolean,
     val vSyncEnabled: Boolean,
     val fastForwardSpeed: Float,
@@ -431,6 +433,7 @@ private data class LiveRuntimeSnapshot(
     val eeCycleSkip: Int,
     val frameSkip: Int,
     val skipDuplicateFrames: Boolean,
+    val lowLatencyMode: Boolean,
     val frameLimitEnabled: Boolean,
     val fastForwardSpeed: Float,
     val racingMode: Boolean,
@@ -530,8 +533,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private val playTimeSyncCacheRepository = PlayTimeSyncCacheRepository(application)
     private val performanceCpuName = MobileSocNameMapper.currentDeviceName()
     private val androidGamePerformance = AndroidGamePerformance(application)
+    private val initialFrameGeneration = frameGenerationManager.snapshot()
     private val _uiState = MutableStateFlow(
-        EmulationUiState(performanceOverlayHeader = buildPerformanceOverlayHeader(application))
+        EmulationUiState(
+            performanceOverlayHeader = buildPerformanceOverlayHeader(application),
+            frameGenerationReady = initialFrameGeneration.isConfigured,
+            frameGenerationEnabled = initialFrameGeneration.settings.enabled,
+            frameGenerationMultiplier = initialFrameGeneration.settings.multiplier,
+            frameGenerationPerformance = initialFrameGeneration.settings.performanceMode,
+            frameGenerationFlowScale = initialFrameGeneration.settings.flowScalePercent,
+            frameGenerationTargetRate = initialFrameGeneration.settings.targetRefreshRate
+        )
     )
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
     private val lifecycleMutex = Mutex()
@@ -939,6 +951,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.skipDuplicateFrames.collect { enabled ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(skipDuplicateFrames = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            preferences.lowLatencyMode.collect { enabled ->
+                applyGlobalRuntimePreferenceUpdate { it.copy(lowLatencyMode = enabled) }
             }
         }
         viewModelScope.launch {
@@ -1606,6 +1623,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     eeCycleSkip = config.eeCycleSkip,
                     frameSkip = config.frameSkip,
                     skipDuplicateFrames = config.skipDuplicateFrames,
+                    lowLatencyMode = config.lowLatencyMode,
                     frameLimitEnabled = config.frameLimitEnabled,
                     vSyncEnabled = config.vSyncEnabled,
                     fastForwardSpeed = config.fastForwardSpeed,
@@ -1850,6 +1868,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     eeCycleSkip = liveRuntime.eeCycleSkip,
                     frameSkip = liveRuntime.frameSkip,
                     skipDuplicateFrames = liveRuntime.skipDuplicateFrames,
+                    lowLatencyMode = liveRuntime.lowLatencyMode,
                     textureFiltering = liveRuntime.textureFiltering,
                     trilinearFiltering = liveRuntime.trilinearFiltering,
                     blendingAccuracy = liveRuntime.blendingAccuracy,
@@ -2595,7 +2614,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 targetRefreshRate = settings.targetRefreshRate.coerceIn(0, 240)
             )
             val newState = _uiState.value.copy(
-                frameGenerationReady = setup.isReady,
+                frameGenerationReady = setup.isConfigured,
                 frameGenerationEnabled = normalized.enabled,
                 frameGenerationMultiplier = normalized.multiplier,
                 frameGenerationPerformance = normalized.performanceMode,
@@ -2819,6 +2838,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setSkipDuplicateFrames(enabled)
             }
             EmulatorBridge.setSkipDuplicateFrames(enabled)
+            updateCrashContext()
+        }
+    }
+
+    fun setLowLatencyMode(enabled: Boolean) {
+        viewModelScope.launch {
+            persistRuntimeState(_uiState.value.copy(lowLatencyMode = enabled)) {
+                preferences.setLowLatencyMode(enabled)
+            }
+            EmulatorBridge.setLowLatencyMode(enabled)
             updateCrashContext()
         }
     }
@@ -3765,7 +3794,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 .copy(
                     touchControlVisualStyle = settings.touchControlVisualStyle,
                     touchControlPressEffect = settings.touchControlPressEffect,
-                    frameGenerationReady = frameGeneration.isReady,
+                    frameGenerationReady = frameGeneration.isConfigured,
                     frameGenerationEnabled = frameGeneration.settings.enabled,
                     frameGenerationMultiplier = frameGeneration.settings.multiplier,
                     frameGenerationPerformance = frameGeneration.settings.performanceMode,
@@ -3847,6 +3876,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleSkip = settings.eeCycleSkip,
             frameSkip = settings.frameSkip,
             skipDuplicateFrames = settings.skipDuplicateFrames,
+            lowLatencyMode = settings.lowLatencyMode,
             frameLimitEnabled = settings.frameLimitEnabled,
             vSyncEnabled = settings.vSyncEnabled,
             fastForwardSpeed = settings.fastForwardSpeed,
@@ -3941,7 +3971,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             confirmSaveLoadActions = settings.confirmSaveLoadActions,
             backButtonExitsGame = settings.backButtonExitsGame,
             renderer = settings.renderer,
-            frameGenerationReady = frameGeneration.isReady,
+            frameGenerationReady = frameGeneration.isConfigured,
             frameGenerationEnabled = frameGeneration.settings.enabled,
             frameGenerationMultiplier = frameGeneration.settings.multiplier,
             frameGenerationPerformance = frameGeneration.settings.performanceMode,
@@ -3963,6 +3993,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleSkip = settings.eeCycleSkip,
             frameSkip = settings.frameSkip,
             skipDuplicateFrames = settings.skipDuplicateFrames,
+            lowLatencyMode = settings.lowLatencyMode,
             frameLimitEnabled = settings.frameLimitEnabled,
             fastForwardSpeed = settings.fastForwardSpeed,
             racingMode = settings.racingMode,
@@ -4080,6 +4111,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleSkip = pick("eeCycleSkip", eeCycleSkip) { eeCycleSkip },
             frameSkip = pick("frameSkip", frameSkip) { frameSkip },
             skipDuplicateFrames = pick("skipDuplicateFrames", skipDuplicateFrames) { skipDuplicateFrames },
+            lowLatencyMode = pick("lowLatencyMode", lowLatencyMode) { lowLatencyMode },
             frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled) { frameLimitEnabled },
             targetFps = pick("targetFps", targetFps) { targetFps },
             ntscFramerate = pick("ntscFramerate", ntscFramerate) { ntscFramerate },
@@ -4194,6 +4226,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleSkip = pick("eeCycleSkip", eeCycleSkip) { eeCycleSkip },
             frameSkip = pick("frameSkip", frameSkip) { frameSkip },
             skipDuplicateFrames = pick("skipDuplicateFrames", skipDuplicateFrames) { skipDuplicateFrames },
+            lowLatencyMode = pick("lowLatencyMode", lowLatencyMode) { lowLatencyMode },
             frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled) { frameLimitEnabled },
             targetFps = pick("targetFps", targetFps) { targetFps },
             ntscFramerate = pick("ntscFramerate", ntscFramerate) { ntscFramerate },
@@ -4267,6 +4300,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val globalEeCycleRate = preferences.eeCycleRate.first()
         val globalEeCycleSkip = preferences.eeCycleSkip.first()
         val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
+        val globalLowLatencyMode = preferences.lowLatencyMode.first()
         val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
         val globalRacingMode = preferences.racingMode.first()
         val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
@@ -4320,6 +4354,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             eeCycleSkip = eeCycleSkip,
             frameSkip = frameSkip,
             skipDuplicateFrames = skipDuplicateFrames,
+            lowLatencyMode = lowLatencyMode,
             frameLimitEnabled = frameLimitEnabled,
             racingMode = racingMode,
             touchscreenRightStick = touchscreenRightStick,
@@ -4420,6 +4455,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (eeCycleSkip != globalEeCycleSkip) add("eeCycleSkip")
             if (profile.frameSkip != preferences.frameSkip.first()) add("frameSkip")
             if (skipDuplicateFrames != globalSkipDuplicateFrames) add("skipDuplicateFrames")
+            if (lowLatencyMode != globalLowLatencyMode) add("lowLatencyMode")
             if (frameLimitEnabled != globalFrameLimitEnabled) add("frameLimitEnabled")
             if (racingMode != globalRacingMode) add("racingMode")
             if (touchscreenRightStick != globalTouchscreenRightStick) add("touchscreenRightStick")
@@ -4953,6 +4989,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         NativeApp.setCrashContextInt("emu_hw_download_mode", state.hwDownloadMode)
         NativeApp.setCrashContextInt("emu_frame_skip", state.frameSkip)
         NativeApp.setCrashContextBool("emu_skip_duplicate_frames", state.skipDuplicateFrames)
+        NativeApp.setCrashContextBool("emu_low_latency_mode", state.lowLatencyMode)
         NativeApp.setCrashContextBool("emu_frame_limit_enabled", state.frameLimitEnabled)
         NativeApp.setCrashContextInt("emu_target_fps", state.targetFps)
         NativeApp.setCrashContextInt("emu_texture_filtering", state.textureFiltering)

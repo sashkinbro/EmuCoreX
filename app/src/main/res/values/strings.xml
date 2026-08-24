@@ -2479,4 +2479,7 @@
     <string name="frame_generation_requirements_ready">Setup complete. Frame generation can now be enabled globally and for individual games.</string>
     <string name="frame_generation_requirements">Requirements: a Vulkan renderer, Adreno 7xx or newer, the support component, and a user-supplied Lossless.dll. Games must maintain a stable base frame rate.</string>
     <string name="frame_generation_settings_value">Set up and configure</string>
+    <string name="settings_low_latency_mode">Low latency mode</string>
+    <string name="settings_low_latency_mode_desc">Uses a zero-frame GS queue and requests a matching high-refresh display mode.</string>
+    <string name="settings_help_low_latency_mode">Prevents the GS thread from queuing frames ahead and selects a clean display multiple of the game rate to reduce controller-to-display delay. Disable it if a game shows uneven frame pacing.</string>
 </resources>

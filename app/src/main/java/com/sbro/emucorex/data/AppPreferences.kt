@@ -158,6 +158,7 @@ data class SettingsSnapshot(
     val hwDownloadMode: Int = PerformanceProfiles.safeConfig.hwDownloadMode,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = true,
+    val lowLatencyMode: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -347,7 +348,7 @@ class AppPreferences(private val context: Context) {
             "vu0ClampingMode", "vu1ClampingMode", "enableGameFixes", "enableEeTimingHack",
             "enableWaitLoopSpeedhack", "enableIntcStatSpeedhack", "enableVuFlagHack",
             "enableInstantVu1", "enableMtvu", "enableThreadPinning", "enableFastCdvd",
-            "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "textureFiltering",
+            "hwDownloadMode", "frameSkip", "skipDuplicateFrames", "lowLatencyMode", "textureFiltering",
             "trilinearFiltering", "blendingAccuracy", "texturePreloading",
             "textureReplacementsEnabled", "textureReplacementsAsync", "textureReplacementsPrecache",
             "textureDumpingEnabled", "enableFxaa", "sgsrMode", "casMode", "casSharpness",
@@ -631,6 +632,7 @@ class AppPreferences(private val context: Context) {
         private val HW_DOWNLOAD_MODE = intPreferencesKey("hw_download_mode")
         private val FRAME_SKIP = intPreferencesKey("frame_skip")
         private val SKIP_DUPLICATE_FRAMES = booleanPreferencesKey("skip_duplicate_frames")
+        private val LOW_LATENCY_MODE = booleanPreferencesKey("low_latency_mode")
         private val TEXTURE_FILTERING = intPreferencesKey("texture_filtering")
         private val TRILINEAR_FILTERING = intPreferencesKey("trilinear_filtering")
         private val BLENDING_ACCURACY = intPreferencesKey("blending_accuracy")
@@ -1404,6 +1406,14 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[SKIP_DUPLICATE_FRAMES] = enabled }
     }
 
+    val lowLatencyMode: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[LOW_LATENCY_MODE] ?: false
+    }
+
+    suspend fun setLowLatencyMode(enabled: Boolean) {
+        context.dataStore.edit { it[LOW_LATENCY_MODE] = enabled }
+    }
+
     suspend fun resetAllSettings() {
         context.dataStore.edit { prefs ->
             // Acknowledged compatibility notices are not user settings. Preserve them so a
@@ -1775,6 +1785,7 @@ class AppPreferences(private val context: Context) {
                     prefs[FRAME_SKIP] ?: GsHackDefaults.FRAME_SKIP_DEFAULT
                 ),
                 skipDuplicateFrames = prefs[SKIP_DUPLICATE_FRAMES] ?: true,
+                lowLatencyMode = prefs[LOW_LATENCY_MODE] ?: false,
                 textureFiltering = GsHackDefaults.coerceBilinearFiltering(
                     prefs[TEXTURE_FILTERING] ?: GsHackDefaults.BILINEAR_FILTERING_DEFAULT
                 ),
@@ -3736,6 +3747,7 @@ class AppPreferences(private val context: Context) {
                 prefs[FRAME_SKIP] ?: GsHackDefaults.FRAME_SKIP_DEFAULT
             ))
             put("skipDuplicateFrames", prefs[SKIP_DUPLICATE_FRAMES] ?: true)
+            put("lowLatencyMode", prefs[LOW_LATENCY_MODE] ?: false)
             put("textureFiltering", GsHackDefaults.coerceBilinearFiltering(
                 prefs[TEXTURE_FILTERING] ?: GsHackDefaults.BILINEAR_FILTERING_DEFAULT
             ))
@@ -4123,6 +4135,7 @@ class AppPreferences(private val context: Context) {
                 json.optInt("frameSkip", GsHackDefaults.FRAME_SKIP_DEFAULT)
             )
             prefs[SKIP_DUPLICATE_FRAMES] = json.optBoolean("skipDuplicateFrames", true)
+            prefs[LOW_LATENCY_MODE] = json.optBoolean("lowLatencyMode", false)
             prefs[TEXTURE_FILTERING] = GsHackDefaults.coerceBilinearFiltering(
                 json.optInt("textureFiltering", GsHackDefaults.BILINEAR_FILTERING_DEFAULT)
             )

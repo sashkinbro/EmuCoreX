@@ -2462,4 +2462,7 @@
     <string name="frame_generation_requirements_ready">Configurazione completata. Ora è possibile attivarla globalmente o per gioco.</string>
     <string name="frame_generation_requirements">Requisiti: renderer Vulkan, Adreno 7xx o successivo, componente di supporto e Lossless.dll fornito dall’utente. Il gioco deve mantenere una frequenza base stabile.</string>
     <string name="frame_generation_settings_value">Installa e configura</string>
+    <string name="settings_low_latency_mode">Modalità a bassa latenza</string>
+    <string name="settings_low_latency_mode_desc">Usa una coda GS senza fotogrammi in attesa e richiede una modalità ad alta frequenza compatibile.</string>
+    <string name="settings_help_low_latency_mode">Impedisce al thread GS di accodare fotogrammi in anticipo e sceglie un multiplo regolare della frequenza del gioco per ridurre il ritardo dal controller allo schermo. Disattivala se il frame pacing diventa irregolare.</string>
 </resources>

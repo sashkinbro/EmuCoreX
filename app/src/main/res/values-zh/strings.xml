@@ -2463,4 +2463,7 @@
     <string name="frame_generation_requirements_ready">设置完成。现在可全局或按游戏启用帧生成。</string>
     <string name="frame_generation_requirements">要求：Vulkan 渲染器、Adreno 7xx 或更新型号、支持组件以及用户提供的 Lossless.dll。游戏必须保持稳定的基础帧率。</string>
     <string name="frame_generation_settings_value">安装并配置</string>
+    <string name="settings_low_latency_mode">低延迟模式</string>
+    <string name="settings_low_latency_mode_desc">使用零帧 GS 队列，并请求匹配的高刷新率显示模式。</string>
+    <string name="settings_help_low_latency_mode">防止 GS 线程提前排队帧，并选择游戏帧率的整数倍刷新率，以降低从控制器到屏幕的延迟。如果帧节奏不稳定，请将其关闭。</string>
 </resources>

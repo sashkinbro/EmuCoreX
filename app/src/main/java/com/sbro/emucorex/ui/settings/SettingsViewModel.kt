@@ -198,6 +198,7 @@ data class SettingsUiState(
     val hwDownloadMode: Int = GsHackDefaults.HW_DOWNLOAD_MODE_DEFAULT,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = true,
+    val lowLatencyMode: Boolean = false,
     val textureFiltering: Int = GsHackDefaults.BILINEAR_FILTERING_DEFAULT,
     val trilinearFiltering: Int = GsHackDefaults.TRILINEAR_FILTERING_DEFAULT,
     val blendingAccuracy: Int = GsHackDefaults.BLENDING_ACCURACY_DEFAULT,
@@ -477,6 +478,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             hwDownloadMode = snapshot.hwDownloadMode,
             frameSkip = snapshot.frameSkip,
             skipDuplicateFrames = snapshot.skipDuplicateFrames,
+            lowLatencyMode = snapshot.lowLatencyMode,
             textureFiltering = snapshot.textureFiltering,
             trilinearFiltering = snapshot.trilinearFiltering,
             blendingAccuracy = snapshot.blendingAccuracy,
@@ -1530,6 +1532,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             preferences.setSkipDuplicateFrames(enabled)
             EmulatorBridge.setSkipDuplicateFrames(enabled)
+        }
+    }
+
+    fun setLowLatencyMode(enabled: Boolean) {
+        viewModelScope.launch {
+            preferences.setLowLatencyMode(enabled)
+            EmulatorBridge.setLowLatencyMode(enabled)
         }
     }
 

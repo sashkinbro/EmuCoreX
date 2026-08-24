@@ -2466,4 +2466,7 @@
     <string name="frame_generation_requirements_ready">Налаштування завершено. Генерацію кадрів тепер можна вмикати глобально й для окремих ігор.</string>
     <string name="frame_generation_requirements">Вимоги: рендерер Vulkan, Adreno 7xx або новіший, компонент підтримки та наданий користувачем Lossless.dll. Гра має тримати стабільну базову частоту кадрів.</string>
     <string name="frame_generation_settings_value">Встановити й налаштувати</string>
+    <string name="settings_low_latency_mode">Режим низької затримки</string>
+    <string name="settings_low_latency_mode_desc">Використовує нульову чергу кадрів GS і запитує відповідний режим екрана з високою частотою.</string>
+    <string name="settings_help_low_latency_mode">Не дозволяє потоку GS заздалегідь накопичувати кадри й вибирає цілу кратну частоту екрана, щоб зменшити затримку від контролера до зображення. Вимкніть, якщо подача кадрів стала нерівномірною.</string>
 </resources>

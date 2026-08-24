@@ -1244,6 +1244,13 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(enableFastCdvd = defaultProfile.enableFastCdvd)) }
                     )
                     ToggleRow(
+                        title = stringResource(R.string.settings_low_latency_mode),
+                        checked = draft.lowLatencyMode,
+                        onCheckedChange = { onDraftChange(draft.copy(lowLatencyMode = it)) },
+                        helpText = stringResource(R.string.settings_help_low_latency_mode),
+                        onResetToDefault = { onDraftChange(draft.copy(lowLatencyMode = defaultProfile.lowLatencyMode)) }
+                    )
+                    ToggleRow(
                         title = stringResource(R.string.settings_skip_duplicate_frames),
                         checked = draft.skipDuplicateFrames,
                         onCheckedChange = { onDraftChange(draft.copy(skipDuplicateFrames = it)) },
@@ -2059,6 +2066,13 @@ private fun GameSettingsEditorDialog(
                                 onResetToDefault = { draft = draft.copy(enableFastCdvd = defaultProfile.enableFastCdvd) }
                             )
                             ToggleRow(
+                                title = stringResource(R.string.settings_low_latency_mode),
+                                checked = draft.lowLatencyMode,
+                                onCheckedChange = { draft = draft.copy(lowLatencyMode = it) },
+                                helpText = stringResource(R.string.settings_help_low_latency_mode),
+                                onResetToDefault = { draft = draft.copy(lowLatencyMode = defaultProfile.lowLatencyMode) }
+                            )
+                            ToggleRow(
                                 title = stringResource(R.string.settings_skip_duplicate_frames),
                                 checked = draft.skipDuplicateFrames,
                                 onCheckedChange = { draft = draft.copy(skipDuplicateFrames = it) },
@@ -2694,7 +2708,7 @@ private fun GpuBackendProfileControls(
     }
     val isMediaTek = remember { GpuHardwareProfiles.isMediaTekHardware() }
     val bundledAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
-    val frameGenerationReady = remember(context) { FrameGenerationManager(context).snapshot().isReady }
+    val frameGenerationReady = remember(context) { FrameGenerationManager(context).snapshot().isConfigured }
 
     if (supportsCustomDrivers) {
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -3912,6 +3926,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         eeCycleSkip = eeCycleSkip,
         frameSkip = frameSkip,
         skipDuplicateFrames = skipDuplicateFrames,
+        lowLatencyMode = lowLatencyMode,
         frameLimitEnabled = frameLimitEnabled,
         targetFps = targetFps,
         ntscFramerate = ntscFramerate,
@@ -4026,6 +4041,7 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         eeCycleSkip = pick("eeCycleSkip", eeCycleSkip, defaultProfile.eeCycleSkip),
         frameSkip = pick("frameSkip", frameSkip, defaultProfile.frameSkip),
         skipDuplicateFrames = pick("skipDuplicateFrames", skipDuplicateFrames, defaultProfile.skipDuplicateFrames),
+        lowLatencyMode = pick("lowLatencyMode", lowLatencyMode, defaultProfile.lowLatencyMode),
         frameLimitEnabled = pick("frameLimitEnabled", frameLimitEnabled, defaultProfile.frameLimitEnabled),
         targetFps = pick("targetFps", targetFps, defaultProfile.targetFps),
         ntscFramerate = pick("ntscFramerate", ntscFramerate, defaultProfile.ntscFramerate),

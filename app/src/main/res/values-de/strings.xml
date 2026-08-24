@@ -2464,4 +2464,7 @@
     <string name="frame_generation_requirements_ready">Einrichtung abgeschlossen. Frame-Generierung kann global und pro Spiel aktiviert werden.</string>
     <string name="frame_generation_requirements">Anforderungen: Vulkan-Renderer, Adreno 7xx oder neuer, Support-Komponente und eine vom Benutzer bereitgestellte Lossless.dll. Das Spiel muss eine stabile Basisbildrate halten.</string>
     <string name="frame_generation_settings_value">Einrichten und konfigurieren</string>
+    <string name="settings_low_latency_mode">Modus mit niedriger Latenz</string>
+    <string name="settings_low_latency_mode_desc">Verwendet eine GS-Warteschlange ohne vorgepufferte Frames und fordert einen passenden Modus mit hoher Bildwiederholrate an.</string>
+    <string name="settings_help_low_latency_mode">Verhindert, dass der GS-Thread Frames vorpuffert, und wählt ein sauberes Vielfaches der Spielrate, um die Verzögerung vom Controller bis zum Display zu verringern. Bei ungleichmäßiger Frame-Ausgabe deaktivieren.</string>
 </resources>

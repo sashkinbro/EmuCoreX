@@ -68,6 +68,7 @@ data class PerGameSettings(
     val eeCycleSkip: Int = 0,
     val frameSkip: Int = 0,
     val skipDuplicateFrames: Boolean = true,
+    val lowLatencyMode: Boolean = false,
     val frameLimitEnabled: Boolean = true,
     val targetFps: Int = 0,
     val ntscFramerate: Float = AppPreferences.DEFAULT_NTSC_FRAMERATE,
@@ -355,6 +356,7 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
             optInt("frameSkip", GsHackDefaults.FRAME_SKIP_DEFAULT)
         ),
         skipDuplicateFrames = optBoolean("skipDuplicateFrames", true),
+        lowLatencyMode = optBoolean("lowLatencyMode", false),
         frameLimitEnabled = optBoolean("frameLimitEnabled", true),
         targetFps = optInt("targetFps", 0).let { if (it <= 0) 0 else it.coerceIn(20, 120) },
         ntscFramerate = sanitizeRegionFramerate(
@@ -527,6 +529,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("eeCycleSkip")) put("eeCycleSkip", eeCycleSkip)
         if (shouldWrite("frameSkip")) put("frameSkip", GsHackDefaults.coerceFrameSkip(frameSkip))
         if (shouldWrite("skipDuplicateFrames")) put("skipDuplicateFrames", skipDuplicateFrames)
+        if (shouldWrite("lowLatencyMode")) put("lowLatencyMode", lowLatencyMode)
         if (shouldWrite("frameLimitEnabled")) put("frameLimitEnabled", frameLimitEnabled)
         if (shouldWrite("targetFps")) put("targetFps", targetFps)
         if (shouldWrite("ntscFramerate")) put("ntscFramerate", ntscFramerate.toDouble())

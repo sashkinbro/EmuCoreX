@@ -2462,4 +2462,7 @@
     <string name="frame_generation_requirements_ready">सेटअप पूरा हुआ। फ़्रेम जनरेशन को सभी या अलग-अलग गेम के लिए चालू किया जा सकता है।</string>
     <string name="frame_generation_requirements">आवश्यकताएँ: Vulkan रेंडरर, Adreno 7xx या नया, सहायता कंपोनेंट और उपयोगकर्ता की Lossless.dll। गेम की मूल फ़्रेम दर स्थिर होनी चाहिए।</string>
     <string name="frame_generation_settings_value">इंस्टॉल और कॉन्फ़िगर करें</string>
+    <string name="settings_low_latency_mode">कम विलंबता मोड</string>
+    <string name="settings_low_latency_mode_desc">शून्य-फ़्रेम GS कतार का उपयोग करता है और मेल खाता उच्च रिफ़्रेश डिस्प्ले मोड माँगता है।</string>
+    <string name="settings_help_low_latency_mode">GS थ्रेड को फ़्रेम पहले से कतार में लगाने से रोकता है और कंट्रोलर से डिस्प्ले तक की देरी घटाने के लिए गेम दर का सही गुणक चुनता है। फ़्रेम पेसिंग असमान हो तो इसे बंद करें।</string>
 </resources>

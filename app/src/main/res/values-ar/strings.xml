@@ -2466,4 +2466,7 @@
     <string name="frame_generation_requirements_ready">اكتمل الإعداد. يمكن تمكين توليد الإطارات عامة أو لكل لعبة.</string>
     <string name="frame_generation_requirements">المتطلبات: عارض Vulkan وAdreno 7xx أو أحدث ومكوّن الدعم وLossless.dll يقدمه المستخدم. يجب أن تحافظ اللعبة على معدل إطارات أساسي ثابت.</string>
     <string name="frame_generation_settings_value">التثبيت والإعداد</string>
+    <string name="settings_low_latency_mode">وضع زمن الاستجابة المنخفض</string>
+    <string name="settings_low_latency_mode_desc">يستخدم طابور GS بلا إطارات ويطلب وضع عرض عالي التحديث متوافقًا.</string>
+    <string name="settings_help_low_latency_mode">يمنع خيط GS من تكديس الإطارات مسبقًا ويختار معدل تحديث مضاعفًا منتظمًا لمعدل اللعبة لتقليل التأخير من وحدة التحكم إلى الشاشة. عطّله إذا أصبح تتابع الإطارات غير منتظم.</string>
 </resources>

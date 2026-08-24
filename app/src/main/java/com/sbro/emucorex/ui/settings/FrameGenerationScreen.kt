@@ -64,12 +64,13 @@ fun FrameGenerationScreen(onBackClick: () -> Unit) {
     val manager = remember(context) { FrameGenerationManager(context) }
     val scope = rememberCoroutineScope()
     var setup by remember { mutableStateOf(manager.snapshot()) }
-    var busy by remember { mutableStateOf(false) }
+    var componentDownloadBusy by remember { mutableStateOf(false) }
+    var dllImportBusy by remember { mutableStateOf(false) }
     val importFailed = stringResource(R.string.frame_generation_import_failed)
     val downloadFailed = stringResource(R.string.frame_generation_download_failed)
     val dllPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
-        busy = true
+        dllImportBusy = true
         scope.launch {
             manager.importLosslessDll(uri)
                 .onSuccess {
@@ -77,7 +78,7 @@ fun FrameGenerationScreen(onBackClick: () -> Unit) {
                     Toast.makeText(context, R.string.frame_generation_dll_ready, Toast.LENGTH_SHORT).show()
                 }
                 .onFailure { Toast.makeText(context, it.message ?: importFailed, Toast.LENGTH_LONG).show() }
-            busy = false
+            dllImportBusy = false
         }
     }
 
@@ -114,14 +115,15 @@ fun FrameGenerationScreen(onBackClick: () -> Unit) {
                         stringResource(R.string.frame_generation_component_desc)
                     },
                     action = if (setup.componentInstalled) null else stringResource(R.string.frame_generation_download),
-                    busy = busy,
+                    busy = componentDownloadBusy,
+                    actionsEnabled = !dllImportBusy,
                     onAction = {
-                        busy = true
+                        componentDownloadBusy = true
                         scope.launch {
                             manager.installSupportComponent()
                                 .onSuccess { setup = manager.snapshot() }
                                 .onFailure { Toast.makeText(context, it.message ?: downloadFailed, Toast.LENGTH_LONG).show() }
-                            busy = false
+                            componentDownloadBusy = false
                         }
                     }
                 )
@@ -138,7 +140,8 @@ fun FrameGenerationScreen(onBackClick: () -> Unit) {
                     },
                     action = if (setup.dllInstalled) null else stringResource(R.string.frame_generation_choose_dll),
                     secondaryAction = stringResource(R.string.frame_generation_open_steam),
-                    busy = busy,
+                    busy = dllImportBusy,
+                    actionsEnabled = !componentDownloadBusy,
                     onAction = { dllPicker.launch(arrayOf("application/x-msdownload", "application/octet-stream", "*/*")) },
                     onSecondaryAction = { uriHandler.openUri(FrameGenerationManager.STEAM_URL) }
                 )
@@ -194,6 +197,7 @@ private fun SetupStepCard(
     body: String,
     action: String?,
     busy: Boolean,
+    actionsEnabled: Boolean = true,
     onAction: () -> Unit,
     secondaryAction: String? = null,
     onSecondaryAction: () -> Unit = {}
@@ -217,14 +221,14 @@ private fun SetupStepCard(
             if (action != null || secondaryAction != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     action?.let {
-                        Button(onClick = onAction, enabled = !busy) {
+                        Button(onClick = onAction, enabled = actionsEnabled && !busy) {
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                             else Icon(icon, null, Modifier.size(18.dp))
                             Text(it, modifier = Modifier.padding(start = 8.dp))
                         }
                     }
                     secondaryAction?.let {
-                        OutlinedButton(onClick = onSecondaryAction) {
+                        OutlinedButton(onClick = onSecondaryAction, enabled = actionsEnabled && !busy) {
                             Icon(Icons.AutoMirrored.Rounded.Launch, null, Modifier.size(18.dp))
                             Text(it, modifier = Modifier.padding(start = 8.dp))
                         }

@@ -2461,4 +2461,7 @@
     <string name="frame_generation_requirements_ready">설정 완료. 전체 또는 게임별로 프레임 생성을 켤 수 있습니다.</string>
     <string name="frame_generation_requirements">요구 사항: Vulkan 렌더러, Adreno 7xx 이상, 지원 구성 요소, 사용자가 제공한 Lossless.dll. 게임이 안정적인 기본 프레임 속도를 유지해야 합니다.</string>
     <string name="frame_generation_settings_value">설치 및 구성</string>
+    <string name="settings_low_latency_mode">저지연 모드</string>
+    <string name="settings_low_latency_mode_desc">GS 선행 프레임 대기열을 비우고 알맞은 고주사율 화면 모드를 요청합니다.</string>
+    <string name="settings_help_low_latency_mode">GS 스레드가 프레임을 미리 대기열에 넣지 않게 하고 게임 속도의 정확한 배수인 화면 주사율을 선택해 컨트롤러에서 화면까지의 지연을 줄입니다. 프레임 페이싱이 불안정하면 끄세요.</string>
 </resources>

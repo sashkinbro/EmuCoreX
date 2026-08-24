@@ -24,9 +24,11 @@
 #include <android/native_window.h>
 
 #include <chrono>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>
+#include <cmath>
 #include <cstdlib>
 #include <iomanip>
 #include <memory>
@@ -450,9 +452,12 @@ void AndroidRuntime::ReloadPatches()
 	}, false);
 }
 
-void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
+void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float refresh_rate)
 {
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d", window, width, height);
+	const float safe_refresh_rate =
+		(std::isfinite(refresh_rate) && refresh_rate > 0.0f) ? std::min(refresh_rate, 240.0f) : 0.0f;
+	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
+		window, width, height, safe_refresh_rate);
 	bool update_display_window = false;
 	ANativeWindow* old_window = nullptr;
 	{
@@ -461,6 +466,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height)
 		native_window_ = window;
 		surface_width_ = width;
 		surface_height_ = height;
+		surface_refresh_rate_ = safe_refresh_rate;
 		// Also update when a valid old surface is replaced by an invalid/zero-sized
 		// one, so GS is detached instead of continuing to present to old_window.
 		update_display_window = MTGS::IsOpen() &&
@@ -503,6 +509,7 @@ void AndroidRuntime::ClearSurface()
 		native_window_ = nullptr;
 		surface_width_ = 0;
 		surface_height_ = 0;
+		surface_refresh_rate_ = 0.0f;
 		update_display_window = (old_window && MTGS::IsOpen());
 	}
 
@@ -528,7 +535,7 @@ void AndroidRuntime::ClearSurface()
 		ANativeWindow_release(old_window);
 }
 
-bool AndroidRuntime::GetNativeSurface(void** window, int* width, int* height) const
+bool AndroidRuntime::GetNativeSurface(void** window, int* width, int* height, float* refresh_rate) const
 {
 	std::lock_guard lock(mutex_);
 	if (!native_window_ || surface_width_ <= 0 || surface_height_ <= 0)
@@ -537,6 +544,7 @@ bool AndroidRuntime::GetNativeSurface(void** window, int* width, int* height) co
 	*window = native_window_;
 	*width = surface_width_;
 	*height = surface_height_;
+	*refresh_rate = surface_refresh_rate_;
 	return true;
 }
 

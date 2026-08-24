@@ -69,6 +69,9 @@ namespace GSLsfg
 	/// for 8xx, 0 when the GPU is not an Adreno or was not recognised.
 	void NoteRendererCapability(bool is_vulkan, u32 adreno_generation);
 
+	/// Actual Android display rate, independent from the app's requested Surface frame rate.
+	void SetHostRefreshRate(float refresh_rate);
+
 	/// Absolute path to the user-supplied Lossless.dll, or empty when unset. The frontend copies
 	/// the SAF pick into app storage first — the PE is read with ordinary file IO, so a
 	/// content:// URI will not do.

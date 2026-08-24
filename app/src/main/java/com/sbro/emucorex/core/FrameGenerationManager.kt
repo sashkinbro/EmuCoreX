@@ -21,6 +21,92 @@ data class FrameGenerationSettings(
     val targetRefreshRate: Int = 0
 )
 
+internal data class FrameGenerationPresentationMode(
+    val id: Int,
+    val width: Int,
+    val height: Int,
+    val refreshRate: Float
+)
+
+internal object FrameGenerationRefreshRate {
+    /**
+     * The requested presentation rate comes only from LSFG settings. It is deliberately not
+     * filtered through Display.supportedModes: Android may expose vendor-specific rates late,
+     * and tying generation to a capability snapshot caused capable gaming displays to be held
+     * at 60 Hz. The compositor remains responsible for choosing the closest physical mode.
+     */
+    fun requested(settings: FrameGenerationSettings): Float {
+        if (!settings.enabled) return 0f
+        return if (settings.targetRefreshRate > 0) {
+            settings.targetRefreshRate.coerceIn(1, 240).toFloat()
+        } else {
+            settings.multiplier.coerceIn(2, 4) * 60f
+        }
+    }
+
+    /**
+     * Maps the independent LSFG output request onto an Android presentation mode. This never
+     * changes the configured generator rate; it only prevents vendor game services from leaving
+     * the Surface on 60/120 Hz while LSFG is presenting at a higher cadence.
+     */
+    fun preferredDisplayModeId(
+        requestedRate: Float,
+        activeWidth: Int,
+        activeHeight: Int,
+        modes: List<FrameGenerationPresentationMode>
+    ): Int {
+        if (!requestedRate.isFinite() || requestedRate <= 0f || modes.isEmpty()) return 0
+        val sameResolution = modes.filter { mode ->
+            (mode.width == activeWidth && mode.height == activeHeight) ||
+                (mode.width == activeHeight && mode.height == activeWidth)
+        }
+        return sameResolution.ifEmpty { modes }
+            .minWithOrNull(
+                compareBy<FrameGenerationPresentationMode> {
+                    kotlin.math.abs(it.refreshRate - requestedRate)
+                }.thenByDescending { it.refreshRate }
+            )
+            ?.id
+            ?: 0
+    }
+}
+
+internal object LowLatencyRefreshRate {
+    private const val RATE_MATCH_TOLERANCE_HZ = 1.5f
+
+    /**
+     * Chooses a same-resolution display cadence which is a clean high-refresh multiple of the
+     * emulated PAL/NTSC rate. If the panel has no clean multiple, staying near the native game
+     * rate avoids uneven 3:2-style cadence (for example 60 FPS forced onto a 90 Hz-only panel).
+     */
+    fun requested(
+        nominalGameRate: Float,
+        activeWidth: Int,
+        activeHeight: Int,
+        modes: List<FrameGenerationPresentationMode>
+    ): Float {
+        if (!nominalGameRate.isFinite() || nominalGameRate !in 20f..120f) return 0f
+        val rates = modes.asSequence()
+            .filter { mode ->
+                (mode.width == activeWidth && mode.height == activeHeight) ||
+                    (mode.width == activeHeight && mode.height == activeWidth)
+            }
+            .map { it.refreshRate }
+            .filter { it.isFinite() && it > 0f }
+            .distinct()
+            .toList()
+        if (rates.isEmpty()) return 0f
+
+        val cleanMultiples = rates.filter { rate ->
+            val multiple = kotlin.math.round(rate / nominalGameRate).toInt()
+            multiple >= 2 &&
+                kotlin.math.abs(rate - nominalGameRate * multiple) <= RATE_MATCH_TOLERANCE_HZ
+        }
+        return cleanMultiples.maxOrNull()
+            ?: rates.minBy { kotlin.math.abs(it - nominalGameRate) }
+    }
+}
+
 data class FrameGenerationSetup(
     val hardwareSupported: Boolean,
     val componentInstalled: Boolean,
@@ -30,6 +116,8 @@ data class FrameGenerationSetup(
     val settings: FrameGenerationSettings
 ) {
     val dllInstalled: Boolean get() = !dllPath.isNullOrBlank() && File(dllPath).isFile
+    /** Setup persistence is independent from runtime GPU discovery. */
+    val isConfigured: Boolean get() = componentInstalled && dllInstalled
     val isReady: Boolean get() = hardwareSupported && componentInstalled && dllInstalled
 }
 

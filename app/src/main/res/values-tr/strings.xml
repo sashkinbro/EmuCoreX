@@ -2462,4 +2462,7 @@
     <string name="frame_generation_requirements_ready">Kurulum tamamlandı. Kare oluşturma genel olarak veya oyun başına etkinleştirilebilir.</string>
     <string name="frame_generation_requirements">Gereksinimler: Vulkan işleyici, Adreno 7xx veya yenisi, destek bileşeni ve kullanıcının sağladığı Lossless.dll. Oyun kararlı bir temel kare hızı sağlamalıdır.</string>
     <string name="frame_generation_settings_value">Kur ve yapılandır</string>
+    <string name="settings_low_latency_mode">Düşük gecikme modu</string>
+    <string name="settings_low_latency_mode_desc">Sıfır karelik GS kuyruğu kullanır ve uygun yüksek yenileme hızlı ekran modunu ister.</string>
+    <string name="settings_help_low_latency_mode">GS iş parçacığının kareleri önceden kuyruğa almasını önler ve kontrolcüden ekrana gecikmeyi azaltmak için oyun hızının düzgün bir katını seçer. Kare zamanlaması düzensizleşirse kapatın.</string>
 </resources>

@@ -2464,4 +2464,7 @@
     <string name="frame_generation_requirements_ready">Configuración completa. Ya puedes activarla globalmente o por juego.</string>
     <string name="frame_generation_requirements">Requisitos: renderizador Vulkan, Adreno 7xx o posterior, componente de soporte y Lossless.dll proporcionado por el usuario. El juego debe mantener una frecuencia base estable.</string>
     <string name="frame_generation_settings_value">Instalar y configurar</string>
+    <string name="settings_low_latency_mode">Modo de baja latencia</string>
+    <string name="settings_low_latency_mode_desc">Usa una cola GS sin fotogramas acumulados y solicita un modo de alta frecuencia compatible.</string>
+    <string name="settings_help_low_latency_mode">Evita que el hilo GS ponga fotogramas en cola por adelantado y elige un múltiplo uniforme de la frecuencia del juego para reducir el retraso entre el mando y la pantalla. Desactívalo si el ritmo de fotogramas se vuelve irregular.</string>
 </resources>

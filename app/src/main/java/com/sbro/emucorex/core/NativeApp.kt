@@ -119,6 +119,8 @@ object NativeApp {
     @JvmStatic external fun isBiosFd(fd: Int): Boolean
     @JvmStatic external fun setPerformanceMetricsEnabled(visible: Boolean, detailed: Boolean, gpuTiming: Boolean)
     @JvmStatic external fun getPerformanceMetricsSnapshot(): String?
+    @JvmStatic external fun getNominalFrameRate(): Float
+    @JvmStatic external fun setDisplayRefreshRate(refreshRate: Float)
     @JvmStatic external fun getDisplayDrawRect(): FloatArray?
     @JvmStatic external fun getCoreVersion(): String?
     @JvmStatic external fun queueGsDump(frames: Int)
@@ -151,7 +153,7 @@ object NativeApp {
     @JvmStatic external fun setTurboModeEnabled(enabled: Boolean)
     @JvmStatic external fun reloadPatches()
     @JvmStatic external fun onNativeSurfaceCreated()
-    @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int)
+    @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int, refreshRate: Float)
     @JvmStatic external fun onNativeSurfaceDestroyed()
     @JvmStatic external fun runVMThread(path: String): Boolean
     /** Hot-swaps the mounted image on the CPU thread and leaves the VM paused for the caller to resume. */

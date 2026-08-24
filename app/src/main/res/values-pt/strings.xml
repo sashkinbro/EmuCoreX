@@ -2464,4 +2464,7 @@
     <string name="frame_generation_requirements_ready">Configuração concluída. A geração pode ser ativada globalmente ou por jogo.</string>
     <string name="frame_generation_requirements">Requisitos: renderizador Vulkan, Adreno 7xx ou mais recente, componente de suporte e Lossless.dll fornecido pelo usuário. O jogo deve manter uma taxa base estável.</string>
     <string name="frame_generation_settings_value">Instalar e configurar</string>
+    <string name="settings_low_latency_mode">Modo de baixa latência</string>
+    <string name="settings_low_latency_mode_desc">Usa uma fila GS sem quadros acumulados e solicita um modo de alta atualização compatível.</string>
+    <string name="settings_help_low_latency_mode">Impede que a thread GS enfileire quadros antecipadamente e escolhe um múltiplo uniforme da taxa do jogo para reduzir o atraso entre o controle e a tela. Desative se o ritmo dos quadros ficar irregular.</string>
 </resources>

@@ -2461,4 +2461,7 @@
     <string name="frame_generation_requirements_ready">セットアップ完了。全体またはゲームごとにフレーム生成を有効化できます。</string>
     <string name="frame_generation_requirements">要件：Vulkan レンダラー、Adreno 7xx 以降、サポートコンポーネント、ユーザー所有の Lossless.dll。ゲームが安定した基本フレームレートを維持する必要があります。</string>
     <string name="frame_generation_settings_value">インストールと設定</string>
+    <string name="settings_low_latency_mode">低遅延モード</string>
+    <string name="settings_low_latency_mode_desc">GS の先行フレームキューをゼロにし、適切な高リフレッシュレート表示を要求します。</string>
+    <string name="settings_help_low_latency_mode">GS スレッドによるフレームの先行キューを防ぎ、ゲーム速度の整数倍となる表示レートを選んで、コントローラーから画面までの遅延を減らします。フレームペーシングが不安定になる場合は無効にしてください。</string>
 </resources>

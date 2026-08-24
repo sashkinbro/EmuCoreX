@@ -15,6 +15,7 @@
 #include "pcsx2/HangTrace.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/JitProfiler.h"
+#include "pcsx2/VMManager.h"
 #include "pcsx2/DEV9/InternetLinkAdapter.h"
 #include "pcsx2/ps2/BiosTools.h"
 
@@ -44,6 +45,18 @@
 using emucorex::android::AndroidRuntime;
 using emucorex::android::JStringToString;
 using emucorex::android::StringToJString;
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_sbro_emucorex_core_NativeApp_getNominalFrameRate(JNIEnv*, jclass)
+{
+	return VMManager::HasValidVM() ? static_cast<jfloat>(VMManager::GetFrameRate()) : 0.0f;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_sbro_emucorex_core_NativeApp_setDisplayRefreshRate(JNIEnv*, jclass, jfloat refresh_rate)
+{
+	GSLsfg::SetHostRefreshRate(refresh_rate);
+}
 
 namespace
 {
@@ -604,12 +617,15 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_reloadPa
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceCreated(JNIEnv*, jclass) {
 	__android_log_write(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceCreated: JNI callback (no-op)");
 }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(JNIEnv* env, jclass, jobject surface, jint width, jint height)
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceChanged(
+	JNIEnv* env, jclass, jobject surface, jint width, jint height, jfloat refresh_rate)
 {
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: surface=%p width=%d height=%d", surface, width, height);
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: surface=%p width=%d height=%d rate=%.2f",
+		reinterpret_cast<void*>(surface), width, height, static_cast<double>(refresh_rate));
 	ANativeWindow* window = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: ANativeWindow=%p", window);
-	AndroidRuntime::Instance().SetNativeSurface(window, width, height);
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceChanged: ANativeWindow=%p",
+		reinterpret_cast<void*>(window));
+	AndroidRuntime::Instance().SetNativeSurface(window, width, height, refresh_rate);
 }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_onNativeSurfaceDestroyed(JNIEnv*, jclass) {
 	__android_log_write(ANDROID_LOG_INFO, "EmuCoreX", "onNativeSurfaceDestroyed: JNI callback");

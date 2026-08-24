@@ -1,9 +1,14 @@
 package com.sbro.emucorex.ui.emulation
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.graphics.PixelFormat
+import android.os.Build
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.widget.Toast
@@ -156,7 +161,10 @@ import com.sbro.emucorex.core.AndroidTouchHaptics
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.FrameGenerationPresentationMode
+import com.sbro.emucorex.core.FrameGenerationRefreshRate
 import com.sbro.emucorex.core.FrameGenerationSettings
+import com.sbro.emucorex.core.LowLatencyRefreshRate
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
@@ -307,6 +315,148 @@ private fun fpsOverlayCornerLiveOptions(): List<LiveSelectionOption> = listOf(
     LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_LEFT, stringResource(R.string.settings_fps_overlay_corner_bottom_left)),
     LiveSelectionOption(AppPreferences.FPS_OVERLAY_CORNER_BOTTOM_RIGHT, stringResource(R.string.settings_fps_overlay_corner_bottom_right))
 )
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        val base = current.baseContext
+        if (base === current) break
+        current = base
+    }
+    return current as? Activity
+}
+
+private class EmulationSurfaceView(context: Context) : SurfaceView(context) {
+    var requestedRefreshRate: Float = 0f
+        private set
+    private var frameGenerationRefreshRate: Float = 0f
+    private var lowLatencyMode: Boolean = false
+    private var lastReportedDisplayRefreshRate: Float = Float.NaN
+    private val lowLatencyRefreshMonitor = object : Runnable {
+        override fun run() {
+            if (!isAttachedToWindow || (frameGenerationRefreshRate <= 0f && !lowLatencyMode)) return
+            refreshRequestedRate(forceSurfaceUpdate = false)
+            postDelayed(this, 1_000L)
+        }
+    }
+
+    fun applyRequestedRefreshRate(
+        value: Float,
+        lowLatencyEnabled: Boolean = false,
+        forceSurfaceUpdate: Boolean = false
+    ) {
+        val newFrameGenerationRate = value.takeIf { it.isFinite() && it > 0f }
+            ?.coerceAtMost(240f) ?: 0f
+        val preferenceChanged = frameGenerationRefreshRate != newFrameGenerationRate ||
+            lowLatencyMode != lowLatencyEnabled
+        frameGenerationRefreshRate = newFrameGenerationRate
+        lowLatencyMode = lowLatencyEnabled
+        removeCallbacks(lowLatencyRefreshMonitor)
+        if (preferenceChanged || forceSurfaceUpdate) {
+            refreshRequestedRate(forceSurfaceUpdate)
+        }
+        if ((lowLatencyMode || frameGenerationRefreshRate > 0f) && isAttachedToWindow) {
+            postDelayed(lowLatencyRefreshMonitor, 1_000L)
+        }
+    }
+
+    fun currentDisplayRefreshRate(): Float = (display?.refreshRate ?: 0f)
+        .takeIf { it.isFinite() && it > 1f }
+        ?: 0f
+
+    fun reapplyRequestedRefreshRate() {
+        refreshRequestedRate(forceSurfaceUpdate = true)
+    }
+
+    private fun resolveRequestedRate(): Float {
+        if (frameGenerationRefreshRate > 0f) return frameGenerationRefreshRate
+        if (!lowLatencyMode) return 0f
+        val currentDisplay = display ?: return 0f
+        val activeMode = currentDisplay.mode
+        val nominalRate = runCatching { NativeApp.getNominalFrameRate() }
+            .getOrDefault(0f)
+            .takeIf { it in 20f..120f }
+            ?: 60f
+        return LowLatencyRefreshRate.requested(
+            nominalGameRate = nominalRate,
+            activeWidth = activeMode.physicalWidth,
+            activeHeight = activeMode.physicalHeight,
+            modes = currentDisplay.supportedModes.map { mode ->
+                FrameGenerationPresentationMode(
+                    id = mode.modeId,
+                    width = mode.physicalWidth,
+                    height = mode.physicalHeight,
+                    refreshRate = mode.refreshRate
+                )
+            }
+        )
+    }
+
+    private fun refreshRequestedRate(forceSurfaceUpdate: Boolean) {
+        val actualDisplayRate = currentDisplayRefreshRate()
+        if (lastReportedDisplayRefreshRate.isNaN() ||
+            kotlin.math.abs(lastReportedDisplayRefreshRate - actualDisplayRate) >= 0.1f
+        ) {
+            runCatching { NativeApp.setDisplayRefreshRate(actualDisplayRate) }
+            lastReportedDisplayRefreshRate = actualDisplayRate
+        }
+        val normalized = resolveRequestedRate()
+        val changed = requestedRefreshRate != normalized
+        requestedRefreshRate = normalized
+
+        if (changed) {
+            context.findActivity()?.window?.let { window ->
+                val attributes = window.attributes
+                val currentDisplay = display ?: window.decorView.display
+                val activeMode = currentDisplay?.mode
+                val preferredModeId = if (frameGenerationRefreshRate > 0f && normalized > 0f &&
+                    currentDisplay != null && activeMode != null
+                ) {
+                    FrameGenerationRefreshRate.preferredDisplayModeId(
+                        requestedRate = normalized,
+                        activeWidth = activeMode.physicalWidth,
+                        activeHeight = activeMode.physicalHeight,
+                        modes = currentDisplay.supportedModes.map { mode ->
+                            FrameGenerationPresentationMode(
+                                id = mode.modeId,
+                                width = mode.physicalWidth,
+                                height = mode.physicalHeight,
+                                refreshRate = mode.refreshRate
+                            )
+                        }
+                    )
+                } else {
+                    0
+                }
+                if (attributes.preferredRefreshRate != normalized ||
+                    attributes.preferredDisplayModeId != preferredModeId
+                ) {
+                    attributes.preferredDisplayModeId = preferredModeId
+                    attributes.preferredRefreshRate = normalized
+                    window.attributes = attributes
+                }
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            holder.surface.isValid && (changed || forceSurfaceUpdate)
+        ) {
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    holder.surface.setFrameRate(
+                        normalized,
+                        Surface.FRAME_RATE_COMPATIBILITY_DEFAULT,
+                        Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    holder.surface.setFrameRate(normalized, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun fpsOverlayMetricLiveOptions(): List<Pair<Int, String>> = listOf(
@@ -879,35 +1029,59 @@ fun EmulationScreen(
         }
     }
 
+    val requestedFrameGenerationRate = FrameGenerationRefreshRate.requested(
+        FrameGenerationSettings(
+            enabled = uiState.frameGenerationEnabled,
+            multiplier = uiState.frameGenerationMultiplier,
+            performanceMode = uiState.frameGenerationPerformance,
+            flowScalePercent = uiState.frameGenerationFlowScale,
+            targetRefreshRate = uiState.frameGenerationTargetRate
+        )
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Game surface
         AndroidView(
             factory = { ctx ->
-                SurfaceView(ctx).apply {
-                    isClickable = false
-                    isFocusable = false
-                    isFocusableInTouchMode = false
-                    setZOrderOnTop(false)
-                    setZOrderMediaOverlay(false)
-                    holder.setFormat(PixelFormat.OPAQUE)
-                    holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) {
-                            try { EmulatorBridge.onSurfaceCreated() } catch (_: Exception) { }
-                        }
+                EmulationSurfaceView(ctx).also { surfaceView ->
+                    surfaceView.applyRequestedRefreshRate(
+                        requestedFrameGenerationRate,
+                        lowLatencyEnabled = uiState.lowLatencyMode
+                    )
+                    surfaceView.apply {
+                        isClickable = false
+                        isFocusable = false
+                        isFocusableInTouchMode = false
+                        setZOrderOnTop(false)
+                        setZOrderMediaOverlay(false)
+                        holder.setFormat(PixelFormat.OPAQUE)
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) {
+                                try { EmulatorBridge.onSurfaceCreated() } catch (_: Exception) { }
+                            }
 
-                        override fun surfaceChanged(
-                            holder: SurfaceHolder,
-                            format: Int,
-                            width: Int,
-                            height: Int
-                        ) {
-                            try { EmulatorBridge.onSurfaceChanged(holder.surface, width, height) } catch (_: Exception) { }
-                        }
+                            override fun surfaceChanged(
+                                holder: SurfaceHolder,
+                                format: Int,
+                                width: Int,
+                                height: Int
+                            ) {
+                                reapplyRequestedRefreshRate()
+                                try {
+                                    EmulatorBridge.onSurfaceChanged(
+                                        holder.surface,
+                                        width,
+                                        height,
+                                        currentDisplayRefreshRate()
+                                    )
+                                } catch (_: Exception) { }
+                            }
 
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            try { EmulatorBridge.onSurfaceDestroyed() } catch (_: Exception) { }
-                        }
-                    })
+                            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                try { EmulatorBridge.onSurfaceDestroyed() } catch (_: Exception) { }
+                            }
+                        })
+                    }
                 }
             },
             modifier = Modifier
@@ -929,7 +1103,16 @@ fun EmulationScreen(
                         }
                     }
                     false
-                }
+                },
+            update = { surfaceView ->
+                surfaceView.applyRequestedRefreshRate(
+                    requestedFrameGenerationRate,
+                    lowLatencyEnabled = uiState.lowLatencyMode
+                )
+            },
+            onRelease = { surfaceView ->
+                surfaceView.applyRequestedRefreshRate(0f, lowLatencyEnabled = false)
+            }
         )
 
         // SurfaceView can retain the previous game's final buffer across a fast restart.
@@ -1421,6 +1604,7 @@ fun EmulationScreen(
                     onSetEeCycleSkip = { viewModel.setEeCycleSkip(it) },
                     onSetFrameSkip = { viewModel.setFrameSkip(it) },
                     onSetSkipDuplicateFrames = { viewModel.setSkipDuplicateFrames(it) },
+                    onSetLowLatencyMode = { viewModel.setLowLatencyMode(it) },
                     onSetFrameLimitEnabled = { viewModel.setFrameLimitEnabled(it) },
                     onSetTargetFps = { viewModel.setTargetFps(it) },
                     onSetTextureFiltering = { viewModel.setTextureFiltering(it) },
@@ -2892,6 +3076,7 @@ private fun EmulationSidebarMenu(
     onSetEeCycleSkip: (Int) -> Unit,
     onSetFrameSkip: (Int) -> Unit,
     onSetSkipDuplicateFrames: (Boolean) -> Unit,
+    onSetLowLatencyMode: (Boolean) -> Unit,
     onSetFrameLimitEnabled: (Boolean) -> Unit,
     onSetTargetFps: (Int) -> Unit,
     onSetTextureFiltering: (Int) -> Unit,
@@ -3836,6 +4021,14 @@ private fun EmulationSidebarMenu(
                             onCheckedChange = onSetFastCdvd,
                             helpText = stringResource(R.string.settings_help_fast_cdvd),
                             onResetToDefault = { onSetFastCdvd(globalDefaults.enableFastCdvd) }
+                        )
+
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_low_latency_mode),
+                            checked = uiState.lowLatencyMode,
+                            onCheckedChange = onSetLowLatencyMode,
+                            helpText = stringResource(R.string.settings_help_low_latency_mode),
+                            onResetToDefault = { onSetLowLatencyMode(globalDefaults.lowLatencyMode) }
                         )
 
                         SettingsToggle(

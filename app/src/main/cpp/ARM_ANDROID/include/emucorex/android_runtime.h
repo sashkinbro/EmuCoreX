@@ -43,9 +43,9 @@ public:
 	void SetFrameLimitEnabled(bool enabled);
 	void SetTurboModeEnabled(bool enabled);
 	void ReloadPatches();
-	void SetNativeSurface(void* window, int width, int height);
+	void SetNativeSurface(void* window, int width, int height, float refresh_rate);
 	void ClearSurface();
-	bool GetNativeSurface(void** window, int* width, int* height) const;
+	bool GetNativeSurface(void** window, int* width, int* height, float* refresh_rate) const;
 
 	bool StartVm(std::string path, bool boot_elf, int probe_steps, bool boot_irx = false);
 	bool ChangeDisc(std::string path);
@@ -101,6 +101,7 @@ private:
 	void* native_window_ = nullptr;
 	int surface_width_ = 0;
 	int surface_height_ = 0;
+	float surface_refresh_rate_ = 0.0f;
 	std::string current_path_;
 	RuntimeSettings settings_;
 	std::thread vm_thread_;

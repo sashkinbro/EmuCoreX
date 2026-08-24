@@ -2477,4 +2477,7 @@
     <string name="frame_generation_requirements_ready">راه‌اندازی کامل شد. تولید فریم را می‌توان سراسری یا برای هر بازی فعال کرد.</string>
     <string name="frame_generation_requirements">نیازمندی‌ها: رندرر Vulkan، ‏Adreno 7xx یا جدیدتر، مؤلفه پشتیبانی و Lossless.dll ارائه‌شده توسط کاربر. بازی باید نرخ فریم پایه پایداری داشته باشد.</string>
     <string name="frame_generation_settings_value">نصب و پیکربندی</string>
+    <string name="settings_low_latency_mode">حالت تأخیر کم</string>
+    <string name="settings_low_latency_mode_desc">از صف بدون فریم GS استفاده می‌کند و حالت نمایش پربسامد هماهنگ را درخواست می‌کند.</string>
+    <string name="settings_help_low_latency_mode">از صف شدن پیشاپیش فریم‌ها در رشته GS جلوگیری می‌کند و برای کاهش تأخیر کنترلر تا نمایشگر، مضرب مناسبی از نرخ بازی را برمی‌گزیند. اگر زمان‌بندی فریم ناپایدار شد آن را خاموش کنید.</string>
 </resources>

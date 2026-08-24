@@ -67,6 +67,9 @@ object EmulatorBridge {
     private var lastSurfaceHeight: Int = 0
 
     @Volatile
+    private var lastSurfaceRefreshRate: Float = 0f
+
+    @Volatile
     private var surfaceEventVersion: Long = 0
 
     @Volatile
@@ -352,6 +355,7 @@ object EmulatorBridge {
         eeCycleSkip: Int = 0,
         frameSkip: Int = 0,
         skipDuplicateFrames: Boolean = true,
+        lowLatencyMode: Boolean = false,
         frameLimitEnabled: Boolean = true,
         vSyncEnabled: Boolean = false,
         fastForwardSpeed: Float = AppPreferences.DEFAULT_FAST_FORWARD_SPEED,
@@ -643,6 +647,7 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/CPU/Recompiler", "fpuCorrectAddSub", "bool", fpuCorrectAddSub.toString()))
                 add(frameSkipOp(frameSkip))
                 add(settingOp("EmuCore/GS", "SkipDuplicateFrames", "bool", skipDuplicateFrames.toString()))
+                add(settingOp("EmuCore/GS", "VsyncQueueSize", "int", if (lowLatencyMode) "0" else "2"))
                 add(settingOp("EmuCore/GS", "filter", "int", textureFiltering.toString()))
                 add(settingOp("EmuCore/GS", "TriFilter", "int", trilinearFiltering.toString()))
                 add(settingOp("EmuCore/GS", "accurate_blending_unit", "int", blendingAccuracy.toString()))
@@ -1252,6 +1257,10 @@ object EmulatorBridge {
         setSetting("EmuCore/GS", "SkipDuplicateFrames", "bool", enabled.toString())
     }
 
+    suspend fun setLowLatencyMode(enabled: Boolean) {
+        setSetting("EmuCore/GS", "VsyncQueueSize", "int", if (enabled) "0" else "2")
+    }
+
     suspend fun setFrameSkip(value: Int) {
         performRuntimeOps(listOf(frameSkipOp(value)))
     }
@@ -1317,13 +1326,15 @@ object EmulatorBridge {
         }
     }
 
-    fun onSurfaceChanged(surface: Surface, width: Int, height: Int) {
+    fun onSurfaceChanged(surface: Surface, width: Int, height: Int, refreshRate: Float) {
         if (!isNativeLoaded) return
         val eventVersion = ++surfaceEventVersion
-        Log.i(TAG, "onSurfaceChanged: width=$width height=$height valid=${surface.isValid} eventVersion=$eventVersion")
+        val safeRefreshRate = refreshRate.takeIf { it.isFinite() && it > 0f }?.coerceAtMost(240f) ?: 0f
+        Log.i(TAG, "onSurfaceChanged: width=$width height=$height refreshRate=$safeRefreshRate valid=${surface.isValid} eventVersion=$eventVersion")
         lastSurface = surface
         lastSurfaceWidth = width
         lastSurfaceHeight = height
+        lastSurfaceRefreshRate = safeRefreshRate
         NativeApp.setCrashContextString("emu_surface_state", "changed")
         NativeApp.setCrashContextInt("emu_surface_width", width)
         NativeApp.setCrashContextInt("emu_surface_height", height)
@@ -1335,7 +1346,7 @@ object EmulatorBridge {
                 return@launchSerial
             }
             try {
-                NativeApp.onNativeSurfaceChanged(surface, width, height)
+                NativeApp.onNativeSurfaceChanged(surface, width, height, safeRefreshRate)
                 Log.i(TAG, "onSurfaceChanged: native callback done")
             } catch (e: Exception) {
                 Log.e(TAG, "onSurfaceChanged: native callback failed", e)
@@ -1350,6 +1361,7 @@ object EmulatorBridge {
         lastSurface = null
         lastSurfaceWidth = 0
         lastSurfaceHeight = 0
+        lastSurfaceRefreshRate = 0f
         Log.i(TAG, "onSurfaceDestroyed: called, version $oldVersion -> $surfaceEventVersion")
         NativeApp.setCrashContextString("emu_surface_state", "destroyed")
         NativeApp.logCrashBreadcrumb("surfaceDestroyed")
@@ -1369,6 +1381,7 @@ object EmulatorBridge {
         val surface = lastSurface ?: return
         val width = lastSurfaceWidth
         val height = lastSurfaceHeight
+        val refreshRate = lastSurfaceRefreshRate
         if (!surface.isValid || width <= 0 || height <= 0) {
             Log.w(TAG, "rebindSurface: skipped (valid=${surface.isValid} w=$width h=$height)")
             return
@@ -1376,7 +1389,7 @@ object EmulatorBridge {
         Log.i(TAG, "rebindSurface: width=$width height=$height")
         NativeApp.logCrashBreadcrumb("rebindSurface width=$width height=$height")
         try {
-            NativeApp.onNativeSurfaceChanged(surface, width, height)
+            NativeApp.onNativeSurfaceChanged(surface, width, height, refreshRate)
         } catch (_: Exception) { }
     }
 

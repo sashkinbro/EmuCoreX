@@ -5,6 +5,7 @@
 
 #include "Config.h"
 #include "GS/GS.h"
+#include "VMManager.h"
 
 #include "common/Console.h"
 #include "common/FileSystem.h"
@@ -52,6 +53,7 @@ namespace GSLsfg
 		std::atomic<bool> s_caps_known{false};
 		std::atomic<bool> s_is_vulkan{false};
 		std::atomic<u32> s_adreno_generation{0};
+		std::atomic<float> s_host_refresh_rate{0.0f};
 
 		// Sticky: a device that failed to initialise once will fail the same way every frame,
 		// and retrying inside the present path would turn one bad init into a per-frame stall.
@@ -80,6 +82,13 @@ namespace GSLsfg
 		s_is_vulkan.store(is_vulkan, std::memory_order_relaxed);
 		s_adreno_generation.store(adreno_generation, std::memory_order_relaxed);
 		s_caps_known.store(true, std::memory_order_release);
+	}
+
+	void SetHostRefreshRate(float refresh_rate)
+	{
+		s_host_refresh_rate.store(
+			(std::isfinite(refresh_rate) && refresh_rate > 1.0f) ? std::min(refresh_rate, 240.0f) : 0.0f,
+			std::memory_order_relaxed);
 	}
 
 	void SetDllPath(const std::string& path)
@@ -664,6 +673,9 @@ namespace GSLsfg
 		VkExtent2D s_processing_extent = {};
 		VkFormat s_format = VK_FORMAT_UNDEFINED;
 		u64 s_frame_index = 0;
+		u32 s_requested_setting_multiplier = 0;
+		u32 s_runtime_multiplier_limit = 4;
+		u32 s_generation_deadline_misses = 0;
 
 		// The one-second display-rate window. Reset with everything else in Shutdown so a stale
 		// number cannot outlive the session it came from.
@@ -1225,7 +1237,42 @@ namespace GSLsfg
 			return false;
 		}
 
-		multiplier = std::clamp<u32>(multiplier, 2, 4);
+		const u32 requested_multiplier = std::clamp<u32>(multiplier, 2, 4);
+		if (requested_multiplier != s_requested_setting_multiplier)
+		{
+			s_requested_setting_multiplier = requested_multiplier;
+			s_runtime_multiplier_limit = requested_multiplier;
+			s_generation_deadline_misses = 0;
+		}
+		multiplier = requested_multiplier;
+		// This backend has a fixed generation count: a 3x context computes both synthetic
+		// frames even when adaptive cadence later presents only one. Do not create more work
+		// per real frame than the active display can consume. Otherwise FIFO eventually fills,
+		// vkAcquireNextImageKHR waits its full 50 ms, and a healthy 50/60 FPS game collapses to
+		// roughly 18-20 FPS. The UI range remains untouched; a higher physical refresh mode will
+		// automatically permit the requested multiplier on the next renderer bring-up.
+		if (VMManager::HasValidVM())
+		{
+			const float reported_host_rate = s_host_refresh_rate.load(std::memory_order_relaxed);
+			const std::optional<float> host_rate = (reported_host_rate > 1.0f) ?
+				std::optional<float>(reported_host_rate) : GSGetHostRefreshRate();
+			const float game_rate = VMManager::GetFrameRate();
+			if (host_rate.has_value() && host_rate.value() > 1.0f && game_rate > 1.0f)
+			{
+				const u32 display_capacity = static_cast<u32>(
+					std::floor((host_rate.value() + 1.0f) / game_rate));
+				if (display_capacity < 2)
+					return false;
+				multiplier = std::min(multiplier, display_capacity);
+			}
+		}
+		multiplier = std::min(multiplier, s_runtime_multiplier_limit);
+		if (multiplier < 2)
+		{
+			if (s_active)
+				Shutdown();
+			return false;
+		}
 		const u8 flow_scale_percent = std::clamp<u8>(GSConfig.LsfgFlowScale, 25, 100);
 		const VkExtent2D output_extent = {swap_chain->GetWidth(), swap_chain->GetHeight()};
 		const VkFormat format = swap_chain->GetTextureFormat();
@@ -1400,9 +1447,17 @@ namespace GSLsfg
 			// resume interpolation only after the worker has completed.
 			s_frame_index = 0;
 			ResetAdaptiveCadence();
+			if (++s_generation_deadline_misses >= 3 && s_multiplier > 2)
+			{
+				s_generation_deadline_misses = 0;
+				s_runtime_multiplier_limit = (s_multiplier > 2) ? (s_multiplier - 1) : 2;
+				Console.WarningFmt("@@EMUCOREX_LSFG@@ {}x missed the real-frame deadline; reducing the runtime generation load",
+					s_multiplier);
+			}
 			NoteFramesDisplayed(1, 0);
 			return false;
 		}
+		s_generation_deadline_misses = 0;
 
 		// Nothing new to interpolate between. Present this frame normally and drop history so the
 		// first frame after a gap cannot be blended with content from before it.

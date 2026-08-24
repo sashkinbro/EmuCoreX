@@ -2803,6 +2803,15 @@ private fun SettingsContent(
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
+                            title = stringResource(R.string.settings_low_latency_mode),
+                            subtitle = stringResource(R.string.settings_low_latency_mode_desc),
+                            checked = uiState.lowLatencyMode,
+                            onCheckedChange = viewModel::setLowLatencyMode,
+                            helpText = stringResource(R.string.settings_help_low_latency_mode),
+                            onResetToDefault = { viewModel.setLowLatencyMode(defaults.lowLatencyMode) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_skip_duplicate_frames),
                             subtitle = stringResource(R.string.settings_skip_duplicate_frames_desc),
                             checked = uiState.skipDuplicateFrames,

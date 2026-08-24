@@ -2484,4 +2484,7 @@
     <string name="frame_generation_requirements_ready">Konfiguracja zakończona. Funkcję można włączać globalnie i dla poszczególnych gier.</string>
     <string name="frame_generation_requirements">Wymagania: renderer Vulkan, Adreno 7xx lub nowszy, komponent obsługi i Lossless.dll dostarczony przez użytkownika. Gra musi utrzymywać stabilną bazową liczbę klatek.</string>
     <string name="frame_generation_settings_value">Zainstaluj i skonfiguruj</string>
+    <string name="settings_low_latency_mode">Tryb niskiego opóźnienia</string>
+    <string name="settings_low_latency_mode_desc">Używa zerowej kolejki klatek GS i żąda pasującego trybu o wysokiej częstotliwości odświeżania.</string>
+    <string name="settings_help_low_latency_mode">Zapobiega kolejkowaniu klatek z wyprzedzeniem przez wątek GS i wybiera równą wielokrotność częstotliwości gry, aby zmniejszyć opóźnienie od kontrolera do ekranu. Wyłącz, jeśli płynność klatek stanie się nierówna.</string>
 </resources>

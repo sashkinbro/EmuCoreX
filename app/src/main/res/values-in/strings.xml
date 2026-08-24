@@ -2476,4 +2476,7 @@
     <string name="frame_generation_requirements_ready">Penyiapan selesai. Pembuatan frame dapat diaktifkan secara global atau per game.</string>
     <string name="frame_generation_requirements">Persyaratan: renderer Vulkan, Adreno 7xx atau lebih baru, komponen dukungan, dan Lossless.dll dari pengguna. Game harus menjaga frame rate dasar yang stabil.</string>
     <string name="frame_generation_settings_value">Pasang dan konfigurasikan</string>
+    <string name="settings_low_latency_mode">Mode latensi rendah</string>
+    <string name="settings_low_latency_mode_desc">Menggunakan antrean GS tanpa frame tertunda dan meminta mode layar refresh tinggi yang sesuai.</string>
+    <string name="settings_help_low_latency_mode">Mencegah thread GS mengantrekan frame lebih awal dan memilih kelipatan bersih dari laju game untuk mengurangi jeda dari pengontrol ke layar. Nonaktifkan jika pacing frame menjadi tidak stabil.</string>
 </resources>

@@ -374,7 +374,9 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool)
 	void* window = nullptr;
 	int width = 0;
 	int height = 0;
-	const bool has_surface = emucorex::android::AndroidRuntime::Instance().GetNativeSurface(&window, &width, &height);
+	float refresh_rate = 0.0f;
+	const bool has_surface = emucorex::android::AndroidRuntime::Instance().GetNativeSurface(
+		&window, &width, &height, &refresh_rate);
 
 	WindowInfo info;
 	info.type = (has_surface && window) ? WindowInfo::Type::Android : WindowInfo::Type::Surfaceless;
@@ -382,7 +384,7 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool)
 	info.surface_width = static_cast<u32>(std::max(width, 0));
 	info.surface_height = static_cast<u32>(std::max(height, 0));
 	info.surface_scale = (width > 0 && height > 0) ? (static_cast<float>(std::max(width, height)) / 800.0f) : 1.0f;
-	info.surface_refresh_rate = 60.0f;
+	info.surface_refresh_rate = refresh_rate;
 	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "AcquireRenderWindow: type=%s window=%p size=%dx%d",
 		info.type == WindowInfo::Type::Android ? "Android" : "Surfaceless", window, width, height);
 	return info;
