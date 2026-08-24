@@ -56,6 +56,7 @@ import androidx.compose.material.icons.automirrored.rounded.ExitToApp
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -166,6 +167,7 @@ import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverCompatibility
+import com.sbro.emucorex.core.FrameGenerationManager
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.core.PerformanceProfiles
@@ -253,6 +255,7 @@ fun SettingsScreen(
     onOpenLanguageScreen: (() -> Unit)? = null,
     onOpenMemoryCardManager: (() -> Unit)? = null,
     onOpenGpuDriverManager: (() -> Unit)? = null,
+    onOpenFrameGeneration: (() -> Unit)? = null,
     onOpenGameDbBrowser: (() -> Unit)? = null,
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
     onOpenThemeManager: (() -> Unit)? = null,
@@ -573,6 +576,7 @@ fun SettingsScreen(
                 },
                 onOpenMemoryCardManager = onOpenMemoryCardManager,
                 onOpenGpuDriverManager = onOpenGpuDriverManager,
+                onOpenFrameGeneration = onOpenFrameGeneration,
                 onOpenGameDbBrowser = onOpenGameDbBrowser,
                 onOpenControlsLayoutEditor = onOpenControlsLayoutEditor,
                 onOpenThemeManager = onOpenThemeManager,
@@ -1147,6 +1151,7 @@ private fun SettingsContent(
     modifier: Modifier = Modifier,
     onOpenMemoryCardManager: (() -> Unit)? = null,
     onOpenGpuDriverManager: (() -> Unit)? = null,
+    onOpenFrameGeneration: (() -> Unit)? = null,
     onOpenGameDbBrowser: (() -> Unit)? = null,
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
     onOpenThemeManager: (() -> Unit)? = null,
@@ -1368,6 +1373,14 @@ private fun SettingsContent(
                                 label = stringResource(R.string.settings_gpu_driver_manager_title),
                                 value = activeDriverName ?: stringResource(R.string.settings_gpu_driver_system),
                                 onClick = onOpenGpuDriverManager ?: {}
+                            )
+                        }
+                        if (FrameGenerationManager.supportsCurrentHardware()) {
+                            SettingsItem(
+                                icon = Icons.Rounded.AutoAwesome,
+                                label = stringResource(R.string.frame_generation_title),
+                                value = stringResource(R.string.frame_generation_settings_value),
+                                onClick = onOpenFrameGeneration ?: {}
                             )
                         }
                         if (GpuHardwareProfiles.isMediaTekHardware() && mediatekAngleAvailable) {

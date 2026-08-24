@@ -82,6 +82,7 @@ import com.sbro.emucorex.ui.settings.ControlsLayoutEditorHostScreen
 import com.sbro.emucorex.ui.settings.PerGameSettingsManagerScreen
 import com.sbro.emucorex.ui.settings.SettingsScreen
 import com.sbro.emucorex.ui.settings.SettingsViewModel
+import com.sbro.emucorex.ui.settings.FrameGenerationScreen
 import com.sbro.emucorex.ui.settings.NetworkModesScreen
 import com.sbro.emucorex.ui.textures.TextureManagerScreen
 import com.sbro.emucorex.ui.theme.ThemeManagerScreen
@@ -175,6 +176,9 @@ object MemoryCardManagerRoute
 
 @Serializable
 data class GpuDriverSettingsRoute(val gamePath: String? = null)
+
+@Serializable
+object FrameGenerationSettingsRoute
 
 @Serializable
 data class GameDbBrowserRoute(val query: String? = null)
@@ -879,6 +883,11 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenFrameGeneration = {
+                            navController.navigate(FrameGenerationSettingsRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         onOpenGameDbBrowser = {
                             navController.navigate(GameDbBrowserRoute()) {
                                 launchSingleTop = true
@@ -1007,6 +1016,10 @@ fun AppNavigation(
                     },
                     viewModel = settingsViewModel
                 )
+            }
+
+            composable<FrameGenerationSettingsRoute> {
+                FrameGenerationScreen(onBackClick = { navController.popBackStack() })
             }
 
             composable<GameDbBrowserRoute> { backStackEntry ->

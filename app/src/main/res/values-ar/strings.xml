@@ -2437,4 +2437,33 @@
     <string name="namco_guide_step_covers">الأغلفة — تستخدم صور الأركيد تنسيق PNG. يطابق المصدر المدمج معرّف NM مع Libretro MAME، ويمكن للمصدر المخصص استضافة NM00004.png أو NM00004.jpg.</string>
     <string name="namco_guide_settings_desc">دليل كامل لـ BIOS والمجلدات والتشغيل والعملات والأغلفة.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">توليد الإطارات</string>
+    <string name="frame_generation_subtitle">تكامل Lossless Scaling</string>
+    <string name="frame_generation_import_failed">تعذر استيراد Lossless.dll</string>
+    <string name="frame_generation_download_failed">تعذر تنزيل مكوّن الدعم</string>
+    <string name="frame_generation_dll_ready">ملف Lossless.dll جاهز</string>
+    <string name="frame_generation_warning_title">ميزة تجريبية</string>
+    <string name="frame_generation_warning_body">لا يتحمل EmuCoreX مسؤولية استخدام هذه الأداة. استخدمها على مسؤوليتك. قد تظهر تشوهات بصرية أو أداء غير مستقر أو أعطال أو زيادة في تأخر الإدخال واستهلاك البطارية.</string>
+    <string name="frame_generation_component_title">دعم EmuCoreX LSFG</string>
+    <string name="frame_generation_component_desc">نزّل مكوّن دعم LSFG لتطبيق EmuCoreX. لا يتضمن ملفات Lossless Scaling.</string>
+    <string name="frame_generation_component_installed">تم تثبيت مكوّن الدعم v%1$d</string>
+    <string name="frame_generation_download">تنزيل المكوّن</string>
+    <string name="frame_generation_dll_title">ملف Lossless.dll الخاص بك</string>
+    <string name="frame_generation_dll_installed">تم تثبيت نسخة خاصة موثّقة. يمكن نقل الملف الأصلي أو حذفه.</string>
+    <string name="frame_generation_dll_desc">اشتر Lossless Scaling من Steam ثم اختر Lossless.dll من تثبيتك القانوني. لا ينزّل EmuCoreX هذا الملف ولا يشاركه.</string>
+    <string name="frame_generation_choose_dll">اختيار ‎.dll</string>
+    <string name="frame_generation_open_steam">فتح Steam</string>
+    <string name="frame_generation_enable">تمكين توليد الإطارات</string>
+    <string name="frame_generation_ready">جاهز لألعاب Vulkan</string>
+    <string name="frame_generation_locked">أكمل خطوتي الإعداد</string>
+    <string name="frame_generation_multiplier">مضاعف الإطارات</string>
+    <string name="frame_generation_flow_scale">دقة التدفق البصري</string>
+    <string name="frame_generation_performance">وضع الأداء (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">يستخدم مسار التظليل الأخف عند توفره. موصى به للأجهزة المحمولة.</string>
+    <string name="frame_generation_target_rate">معدل تحديث مستهدف تكيفي</string>
+    <string name="frame_generation_fixed">ثابت</string>
+    <string name="frame_generation_flow_hint" formatted="false">يضبط الوضع التلقائي optical flow وفق دقة اللعبة وهو الخيار الموصى به. استخدم 25% أو 50% أو 75% للضبط اليدوي فقط.</string>
+    <string name="frame_generation_requirements_ready">اكتمل الإعداد. يمكن تمكين توليد الإطارات عامة أو لكل لعبة.</string>
+    <string name="frame_generation_requirements">المتطلبات: عارض Vulkan وAdreno 7xx أو أحدث ومكوّن الدعم وLossless.dll يقدمه المستخدم. يجب أن تحافظ اللعبة على معدل إطارات أساسي ثابت.</string>
+    <string name="frame_generation_settings_value">التثبيت والإعداد</string>
 </resources>

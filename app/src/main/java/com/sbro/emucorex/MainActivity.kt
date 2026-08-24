@@ -50,8 +50,6 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val TAG = "MainActivity"
-private const val LIGHT_NAVIGATION_BAR_SCRIM = 0x04000000
-private const val DARK_NAVIGATION_BAR_SCRIM = 0x0A000000
 private const val IN_APP_REVIEW_HOME_SETTLE_DELAY_MS = 750L
 
 open class MainActivity : ComponentActivity() {
@@ -268,14 +266,15 @@ open class MainActivity : ComponentActivity() {
     }
 
     private fun applyEdgeToEdge() {
+        window.isNavigationBarContrastEnforced = false
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 Color.TRANSPARENT,
                 Color.TRANSPARENT
             ),
             navigationBarStyle = SystemBarStyle.auto(
-                LIGHT_NAVIGATION_BAR_SCRIM,
-                DARK_NAVIGATION_BAR_SCRIM
+                Color.TRANSPARENT,
+                Color.TRANSPARENT
             )
         )
     }

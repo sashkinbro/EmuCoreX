@@ -2437,4 +2437,33 @@
     <string name="namco_guide_step_covers">Обложки — Аркадные изображения используют формат PNG. Встроенный источник сопоставляет ID NM с Libretro MAME; собственный источник может содержать NM00004.png или NM00004.jpg.</string>
     <string name="namco_guide_settings_desc">Полная инструкция по BIOS, папкам, запуску, монетам и обложкам.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">Генерация кадров</string>
+    <string name="frame_generation_subtitle">Интеграция Lossless Scaling</string>
+    <string name="frame_generation_import_failed">Не удалось импортировать Lossless.dll</string>
+    <string name="frame_generation_download_failed">Не удалось загрузить компонент поддержки</string>
+    <string name="frame_generation_dll_ready">Lossless.dll готов</string>
+    <string name="frame_generation_warning_title">Экспериментальная функция</string>
+    <string name="frame_generation_warning_body">EmuCoreX не несет ответственности за использование этого инструмента. Вы используете его на свой риск. Возможны визуальные артефакты, нестабильная работа, вылеты, увеличение задержки управления и расхода батареи.</string>
+    <string name="frame_generation_component_title">Поддержка EmuCoreX LSFG</string>
+    <string name="frame_generation_component_desc">Загрузите компонент поддержки LSFG для EmuCoreX. Файлы Lossless Scaling в него не входят.</string>
+    <string name="frame_generation_component_installed">Компонент поддержки v%1$d установлен</string>
+    <string name="frame_generation_download">Загрузить компонент</string>
+    <string name="frame_generation_dll_title">Ваш Lossless.dll</string>
+    <string name="frame_generation_dll_installed">Проверенная закрытая копия установлена. Исходный файл можно переместить или удалить.</string>
+    <string name="frame_generation_dll_desc">Купите Lossless Scaling в Steam, затем выберите Lossless.dll из своей законно полученной установки. EmuCoreX не загружает и не распространяет этот файл.</string>
+    <string name="frame_generation_choose_dll">Выбрать .dll</string>
+    <string name="frame_generation_open_steam">Открыть Steam</string>
+    <string name="frame_generation_enable">Включить генерацию кадров</string>
+    <string name="frame_generation_ready">Готово для игр Vulkan</string>
+    <string name="frame_generation_locked">Завершите оба шага установки</string>
+    <string name="frame_generation_multiplier">Множитель кадров</string>
+    <string name="frame_generation_flow_scale">Разрешение оптического потока</string>
+    <string name="frame_generation_performance">Режим производительности (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">Использует облегченный путь шейдеров, если он доступен. Рекомендуется для мобильных устройств.</string>
+    <string name="frame_generation_target_rate">Адаптивная целевая частота</string>
+    <string name="frame_generation_fixed">Фиксировано</string>
+    <string name="frame_generation_flow_hint" formatted="false">Авто подстраивает optical flow под разрешение игры и рекомендуется по умолчанию. 25%, 50% и 75% используйте только для ручной настройки.</string>
+    <string name="frame_generation_requirements_ready">Настройка завершена. Генерацию кадров можно включать глобально и для отдельных игр.</string>
+    <string name="frame_generation_requirements">Требования: рендерер Vulkan, Adreno 7xx или новее, компонент поддержки и предоставленный пользователем Lossless.dll. Игра должна держать стабильную базовую частоту кадров.</string>
+    <string name="frame_generation_settings_value">Установить и настроить</string>
 </resources>

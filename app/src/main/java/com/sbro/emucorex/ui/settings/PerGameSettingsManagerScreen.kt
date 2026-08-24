@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Save
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GpuDriverCompatibility
 import com.sbro.emucorex.core.GpuDriverManager
+import com.sbro.emucorex.core.FrameGenerationManager
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.RendererDefaults
 import androidx.compose.material.icons.rounded.Tune
@@ -337,7 +338,8 @@ fun PerGameSettingsManagerScreen(
                         IconButton(onClick = { showTopBarMenu = true }) {
                             Icon(
                                 imageVector = Icons.Rounded.MoreVert,
-                                contentDescription = stringResource(R.string.settings_more_options)
+                                contentDescription = stringResource(R.string.settings_more_options),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         DropdownMenu(
@@ -2692,6 +2694,7 @@ private fun GpuBackendProfileControls(
     }
     val isMediaTek = remember { GpuHardwareProfiles.isMediaTekHardware() }
     val bundledAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
+    val frameGenerationReady = remember(context) { FrameGenerationManager(context).snapshot().isReady }
 
     if (supportsCustomDrivers) {
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -2752,6 +2755,46 @@ private fun GpuBackendProfileControls(
                     )
                 )
             }
+        )
+    }
+
+    if (frameGenerationReady) {
+        ToggleRow(
+            title = stringResource(R.string.frame_generation_enable),
+            checked = draft.frameGenerationEnabled,
+            onCheckedChange = { onDraftChange(draft.copy(frameGenerationEnabled = it)) },
+            helpText = stringResource(R.string.frame_generation_requirements_ready),
+            onResetToDefault = { onDraftChange(draft.copy(frameGenerationEnabled = defaultProfile.frameGenerationEnabled)) }
+        )
+        SelectionRow(
+            title = stringResource(R.string.frame_generation_multiplier),
+            options = listOf(2 to "×2", 3 to "×3", 4 to "×4"),
+            selectedValue = draft.frameGenerationMultiplier,
+            onSelected = { onDraftChange(draft.copy(frameGenerationMultiplier = it)) },
+            onResetToDefault = { onDraftChange(draft.copy(frameGenerationMultiplier = defaultProfile.frameGenerationMultiplier)) }
+        )
+        SelectionRow(
+            title = stringResource(R.string.frame_generation_flow_scale),
+            options = listOf(25, 50, 75).map { it to "$it%" } +
+                listOf(100 to stringResource(R.string.settings_auto)),
+            selectedValue = draft.frameGenerationFlowScale,
+            onSelected = { onDraftChange(draft.copy(frameGenerationFlowScale = it)) },
+            helpText = stringResource(R.string.frame_generation_flow_hint),
+            onResetToDefault = { onDraftChange(draft.copy(frameGenerationFlowScale = defaultProfile.frameGenerationFlowScale)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.frame_generation_performance),
+            checked = draft.frameGenerationPerformance,
+            onCheckedChange = { onDraftChange(draft.copy(frameGenerationPerformance = it)) },
+            helpText = stringResource(R.string.frame_generation_performance_desc),
+            onResetToDefault = { onDraftChange(draft.copy(frameGenerationPerformance = defaultProfile.frameGenerationPerformance)) }
+        )
+        SelectionRow(
+            title = stringResource(R.string.frame_generation_target_rate),
+            options = listOf(0 to stringResource(R.string.frame_generation_fixed), 60 to "60 Hz", 90 to "90 Hz", 120 to "120 Hz", 144 to "144 Hz"),
+            selectedValue = draft.frameGenerationTargetRate,
+            onSelected = { onDraftChange(draft.copy(frameGenerationTargetRate = it)) },
+            onResetToDefault = { onDraftChange(draft.copy(frameGenerationTargetRate = defaultProfile.frameGenerationTargetRate)) }
         )
     }
 

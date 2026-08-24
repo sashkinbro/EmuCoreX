@@ -6,6 +6,7 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 #include "GS/Renderers/Vulkan/VKSwapChain.h"
@@ -38,6 +39,7 @@
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include <utility>
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -750,6 +752,16 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
 	SetMobileDriverProfile(gpu_profile_selection.driver);
 	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
+
+	u8 adreno_generation = 0;
+	switch (gpu_profile_selection.gpu.architecture)
+	{
+		case MobileGpuArchitecture::Adreno7xx: adreno_generation = 7; break;
+		case MobileGpuArchitecture::Adreno8xx: adreno_generation = 8; break;
+		case MobileGpuArchitecture::AdrenoX: adreno_generation = 9; break;
+		default: break;
+	}
+	GSLsfg::NoteRendererCapability(true, adreno_generation);
 
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
 		!UsesMobileDriverWorkaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout);
@@ -1563,6 +1575,15 @@ void GSDeviceVK::SubmitCommandBuffer(VKSwapChain* present_swap_chain)
 
 	if (present_swap_chain)
 	{
+		const bool has_new_frame = std::exchange(m_present_has_new_frame, false);
+		if (GSLsfg::IsActive() &&
+			GSLsfg::PresentWithGeneration(m_present_queue, present_swap_chain,
+				present_swap_chain->GetRenderingFinishedSemaphore(), has_new_frame))
+		{
+			present_swap_chain->AcquireNextImage();
+			return;
+		}
+
 		const VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, nullptr, 1,
 			present_swap_chain->GetRenderingFinishedSemaphorePtr(), 1, present_swap_chain->GetSwapChainPtr(),
 			present_swap_chain->GetCurrentImageIndexPtr(), nullptr};
@@ -2466,6 +2487,7 @@ void GSDeviceVK::Destroy()
 	// Free the filter chain before the device goes away — it owns Vulkan objects created
 	// against m_device, so tearing the device down first would leak/UB them.
 	DestroyShaderChain();
+	GSLsfg::Shutdown();
 
 	EndRenderPass();
 	if (GetCurrentCommandBuffer() != VK_NULL_HANDLE)
@@ -2496,6 +2518,10 @@ void GSDeviceVK::Destroy()
 bool GSDeviceVK::UpdateWindow()
 {
 	DEBUG_GS_LOG(ANDROID_LOG_INFO, "UpdateWindow: destroying old surface and acquiring new window");
+	// The pipelined LSFG path may retain the previous real swapchain image for one frame.
+	// Drain it while the old swapchain is still valid; destroying the surface first would leave
+	// the pending presentation holding a dead VkSwapchainKHR.
+	GSLsfg::Shutdown();
 	DestroySurface();
 
 	if (!AcquireWindow(false))
@@ -2569,6 +2595,7 @@ void GSDeviceVK::ResizeWindow(u32 new_window_width, u32 new_window_height, float
 	}
 
 	// make sure previous frames are presented
+	GSLsfg::Shutdown();
 	WaitForGPUIdle();
 
 	if (!m_swap_chain->ResizeSwapChain(new_window_width, new_window_height, new_window_scale))
@@ -2653,6 +2680,8 @@ void GSDeviceVK::SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
 
 GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 {
+	m_present_has_new_frame = false;
+
 	EndRenderPass();
 
 	// Check if the device was lost.
@@ -2774,6 +2803,12 @@ void GSDeviceVK::EndPresent()
 	m_is_presenting = false;
 	m_swap_chain->GetCurrentTexture()->TransitionToLayout(cmdbuffer, GSTextureVK::Layout::PresentSrc);
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
+
+	GSLsfg::SetDllPath(GSConfig.LsfgDllPath);
+	if (GSConfig.LsfgEnabled && GSLsfg::IsAvailable())
+		GSLsfg::Initialize(m_swap_chain.get(), GSConfig.LsfgMultiplier);
+	else if (GSLsfg::IsActive())
+		GSLsfg::Shutdown();
 
 	SubmitCommandBuffer(m_swap_chain.get());
 	MoveToNextCommandBuffer();

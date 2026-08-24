@@ -288,6 +288,14 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 		return it != present_modes.end();
 	};
 
+	// MAILBOX drops intermediate generated frames and IMMEDIATE tears them in.
+	// FIFO is therefore part of enabling frame generation, not merely a quality
+	// preference.
+	if (GSConfig.LsfgEnabled && *vsync_mode != GSVSyncMode::FIFO)
+	{
+		*vsync_mode = GSVSyncMode::FIFO;
+	}
+
 #if defined(__ANDROID__)
 	// r54p1 on Mali-G57 can run the producer ahead of Android's BufferQueue in
 	// MAILBOX/IMMEDIATE modes, eventually returning NO_BUFFER_AVAILABLE. FIFO is
@@ -395,16 +403,24 @@ bool VKSwapChain::CreateSwapChain()
 
 	// Select number of images in swap chain, we prefer one buffer in the background to work on in triple-buffered mode.
 	// maxImageCount can be zero, in which case there isn't an upper limit on the number of buffers.
-	const u32 preferred_image_count =
+	u32 preferred_image_count =
 #if defined(__ANDROID__)
 		3;
 #else
 		(m_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) ? 3 : 2;
 #endif
+	if (GSConfig.LsfgEnabled)
+	{
+		const u32 extra = std::max<u32>(GSConfig.LsfgMultiplier, 2u) - 1u;
+		preferred_image_count =
+			std::max(preferred_image_count, surface_capabilities.minImageCount + extra);
+	}
 	u32 image_count = std::clamp<u32>(
 		preferred_image_count, surface_capabilities.minImageCount,
 		(surface_capabilities.maxImageCount == 0) ? std::numeric_limits<u32>::max() : surface_capabilities.maxImageCount);
 	const u32 requested_image_count = image_count;
+	m_extra_acquirable_images = (image_count > surface_capabilities.minImageCount) ?
+		(image_count - surface_capabilities.minImageCount) : 0u;
 	DEV_LOG("Creating a swap chain with {} images in present mode {}", image_count, PresentModeToString(m_present_mode));
 
 	// Determine the dimensions of the swap chain. Values of -1 indicate the size we specify here

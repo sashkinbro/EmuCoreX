@@ -17,6 +17,11 @@ data class PerGameSettings(
     val renderer: Int = EmulatorBridge.AUTO_RENDERER,
     val gpuDriverType: Int = 0,
     val customDriverPath: String? = null,
+    val frameGenerationEnabled: Boolean = false,
+    val frameGenerationMultiplier: Int = 2,
+    val frameGenerationPerformance: Boolean = true,
+    val frameGenerationFlowScale: Int = 100,
+    val frameGenerationTargetRate: Int = 0,
     val mediatekAngleOpenGl: Boolean = false,
     val upscaleMultiplier: Float = 1f,
     val aspectRatio: Int = 1,
@@ -272,6 +277,11 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         renderer = optInt("renderer", RendererDefaults.AUTO).let(::sanitizeRendererValue),
         gpuDriverType = optInt("gpuDriverType", 0).let { if (it == 1) 1 else 0 },
         customDriverPath = optString("customDriverPath").takeIf { it.isNotBlank() },
+        frameGenerationEnabled = optBoolean("frameGenerationEnabled", false),
+        frameGenerationMultiplier = optInt("frameGenerationMultiplier", 2).coerceIn(2, 4),
+        frameGenerationPerformance = optBoolean("frameGenerationPerformance", true),
+        frameGenerationFlowScale = ((optInt("frameGenerationFlowScale", 100).coerceIn(25, 100) + 12) / 25) * 25,
+        frameGenerationTargetRate = optInt("frameGenerationTargetRate", 0).coerceIn(0, 240),
         mediatekAngleOpenGl = optBoolean("mediatekAngleOpenGl", false),
         upscaleMultiplier = readUpscaleMultiplier(),
         aspectRatio = optInt("aspectRatio", 1).let(::sanitizeAspectRatioValue),
@@ -454,6 +464,11 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("renderer")) put("renderer", sanitizeRendererValue(renderer))
         if (shouldWrite("gpuDriverType")) put("gpuDriverType", if (gpuDriverType == 1) 1 else 0)
         if (shouldWrite("customDriverPath")) put("customDriverPath", customDriverPath)
+        if (shouldWrite("frameGenerationEnabled")) put("frameGenerationEnabled", frameGenerationEnabled)
+        if (shouldWrite("frameGenerationMultiplier")) put("frameGenerationMultiplier", frameGenerationMultiplier.coerceIn(2, 4))
+        if (shouldWrite("frameGenerationPerformance")) put("frameGenerationPerformance", frameGenerationPerformance)
+        if (shouldWrite("frameGenerationFlowScale")) put("frameGenerationFlowScale", ((frameGenerationFlowScale.coerceIn(25, 100) + 12) / 25) * 25)
+        if (shouldWrite("frameGenerationTargetRate")) put("frameGenerationTargetRate", frameGenerationTargetRate.coerceIn(0, 240))
         if (shouldWrite("mediatekAngleOpenGl")) put("mediatekAngleOpenGl", mediatekAngleOpenGl)
         if (shouldWrite("upscaleMultiplier")) put("upscaleMultiplier", upscaleMultiplier.toDouble())
         if (shouldWrite("aspectRatio")) put("aspectRatio", sanitizeAspectRatioValue(aspectRatio))

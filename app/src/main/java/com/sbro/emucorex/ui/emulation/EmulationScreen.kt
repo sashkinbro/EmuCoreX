@@ -156,6 +156,7 @@ import com.sbro.emucorex.core.AndroidTouchHaptics
 import com.sbro.emucorex.core.AndroidGyroscopeInput
 import com.sbro.emucorex.core.AndroidTouchHaptics.ButtonPhase
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.FrameGenerationSettings
 import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
@@ -1405,6 +1406,7 @@ fun EmulationScreen(
                     onOpenControlsEditor = { showControlsEditor = true },
                     onOpenGamepadMapping = { showGamepadMappingDialog = true },
                     onSetRenderer = { viewModel.setRenderer(it) },
+                    onSetFrameGeneration = viewModel::setFrameGeneration,
                     onSetUpscale = { viewModel.setUpscale(it) },
                     onSetAspectRatio = { viewModel.setAspectRatio(it) },
                     onSetDisplayCrop = { viewModel.setDisplayCrop(it) },
@@ -2875,6 +2877,7 @@ private fun EmulationSidebarMenu(
     onOpenControlsEditor: () -> Unit,
     onOpenGamepadMapping: () -> Unit,
     onSetRenderer: (Int) -> Unit,
+    onSetFrameGeneration: (FrameGenerationSettings) -> Unit,
     onSetUpscale: (Float) -> Unit,
     onSetAspectRatio: (Int) -> Unit,
     onSetDisplayCrop: (DisplayCrop) -> Unit,
@@ -3910,6 +3913,92 @@ private fun EmulationSidebarMenu(
                             helpText = stringResource(R.string.settings_help_renderer),
                             onResetToDefault = { onSetRenderer(globalDefaults.renderer) }
                         )
+
+                        if (uiState.frameGenerationReady) {
+                            SettingsToggle(
+                                title = stringResource(R.string.frame_generation_enable),
+                                checked = uiState.frameGenerationEnabled,
+                                onCheckedChange = {
+                                    onSetFrameGeneration(
+                                        FrameGenerationSettings(
+                                            enabled = it,
+                                            multiplier = uiState.frameGenerationMultiplier,
+                                            performanceMode = uiState.frameGenerationPerformance,
+                                            flowScalePercent = uiState.frameGenerationFlowScale,
+                                            targetRefreshRate = uiState.frameGenerationTargetRate
+                                        )
+                                    )
+                                },
+                                helpText = stringResource(R.string.frame_generation_requirements_ready)
+                            )
+                            LiveChipsSelectionRow(
+                                title = stringResource(R.string.frame_generation_multiplier),
+                                options = listOf(2 to "×2", 3 to "×3", 4 to "×4"),
+                                currentValue = uiState.frameGenerationMultiplier,
+                                onValueChange = {
+                                    onSetFrameGeneration(
+                                        FrameGenerationSettings(
+                                            enabled = uiState.frameGenerationEnabled,
+                                            multiplier = it,
+                                            performanceMode = uiState.frameGenerationPerformance,
+                                            flowScalePercent = uiState.frameGenerationFlowScale,
+                                            targetRefreshRate = uiState.frameGenerationTargetRate
+                                        )
+                                    )
+                                }
+                            )
+                            LiveChipsSelectionRow(
+                                title = stringResource(R.string.frame_generation_flow_scale),
+                                options = listOf(25, 50, 75).map { it to "$it%" } +
+                                    listOf(100 to stringResource(R.string.settings_auto)),
+                                currentValue = uiState.frameGenerationFlowScale,
+                                onValueChange = {
+                                    onSetFrameGeneration(
+                                        FrameGenerationSettings(
+                                            enabled = uiState.frameGenerationEnabled,
+                                            multiplier = uiState.frameGenerationMultiplier,
+                                            performanceMode = uiState.frameGenerationPerformance,
+                                            flowScalePercent = it,
+                                            targetRefreshRate = uiState.frameGenerationTargetRate
+                                        )
+                                    )
+                                },
+                                helpText = stringResource(R.string.frame_generation_flow_hint)
+                            )
+                            SettingsToggle(
+                                title = stringResource(R.string.frame_generation_performance),
+                                checked = uiState.frameGenerationPerformance,
+                                onCheckedChange = {
+                                    onSetFrameGeneration(
+                                        FrameGenerationSettings(
+                                            enabled = uiState.frameGenerationEnabled,
+                                            multiplier = uiState.frameGenerationMultiplier,
+                                            performanceMode = it,
+                                            flowScalePercent = uiState.frameGenerationFlowScale,
+                                            targetRefreshRate = uiState.frameGenerationTargetRate
+                                        )
+                                    )
+                                },
+                                helpText = stringResource(R.string.frame_generation_performance_desc)
+                            )
+                            LiveChipsSelectionRow(
+                                title = stringResource(R.string.frame_generation_target_rate),
+                                options = listOf(0 to stringResource(R.string.frame_generation_fixed)) +
+                                    listOf(60, 90, 120, 144).map { it to "$it Hz" },
+                                currentValue = uiState.frameGenerationTargetRate,
+                                onValueChange = {
+                                    onSetFrameGeneration(
+                                        FrameGenerationSettings(
+                                            enabled = uiState.frameGenerationEnabled,
+                                            multiplier = uiState.frameGenerationMultiplier,
+                                            performanceMode = uiState.frameGenerationPerformance,
+                                            flowScalePercent = uiState.frameGenerationFlowScale,
+                                            targetRefreshRate = it
+                                        )
+                                    )
+                                }
+                            )
+                        }
 
                         val maxUpscaleMultiplier = remember(uiState.renderer) {
                             EmulatorBridge.getMaxUpscaleMultiplier(uiState.renderer)
@@ -6020,7 +6109,7 @@ private fun buildPerformanceAnnotatedText(text: String, speedPercent: Float): An
         addRepeatedStyle(
             text,
             listOf(
-                "EmuCoreX", "FPS:", "VPS:", "Speed:", "Target:",
+                "EmuCoreX", "FPS:", "VPS:", "LSFG:", "Speed:", "Target:",
                 "Frame:", "GS Queue:", "Res:", "CPU:", "GPU:",
                 "Audio:", "EE:", "GS:", "VU:", "SW-", "VRAM:"
             ),
@@ -6034,6 +6123,7 @@ private fun buildPerformanceAnnotatedText(text: String, speedPercent: Float): An
         addLineValueStyle(text, "Speed:", speedColor)
         addLineValueStyle(text, "FPS:", Color(0xFFB9F7CF), stopAt = " | ")
         addLineValueStyle(text, "VPS:", Color(0xFFB9F7CF), stopAt = " | ")
+        addLineValueStyle(text, "LSFG:", Color(0xFFB9F7CF))
         addLineValueStyle(text, "Target:", Color(0xFFB9F7CF), stopAt = " | ")
     }
 }

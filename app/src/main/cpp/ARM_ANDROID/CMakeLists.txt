@@ -213,6 +213,11 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	# RetroArch .slangp shader chains. Optional for contributor builds without Rust;
 	# release builders install cargo and get the pinned, reproducible runtime.
 	add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/third_party/librashader" "${CMAKE_CURRENT_BINARY_DIR}/third_party/librashader")
+	# Use the isolated lsfg-vk-android backend. It builds frame generation into
+	# its own shared object so its private volk dispatch table cannot corrupt PCSX2's Vulkan
+	# loader. The shaders still come exclusively from the user's imported Lossless.dll.
+	set(EMUCOREX_ENABLE_LSFG ON CACHE BOOL "" FORCE)
+	add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/third_party/lsfg" "${CMAKE_CURRENT_BINARY_DIR}/third_party/lsfg")
 	set_property(TARGET freesurround PROPERTY CXX_STANDARD 20)
 	set_property(TARGET freesurround PROPERTY CXX_STANDARD_REQUIRED ON)
 	add_subdirectory("${PCSX2_UPSTREAM_DIR}/3rdparty/demangler" "${CMAKE_CURRENT_BINARY_DIR}/upstream/demangler" EXCLUDE_FROM_ALL)
@@ -234,6 +239,11 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	if(EMUCOREX_HAVE_LIBRASHADER)
 		target_link_libraries(PCSX2_FLAGS INTERFACE librashader)
 		target_compile_definitions(PCSX2_FLAGS INTERFACE ARMSX2_HAS_LIBRASHADER=1)
+	endif()
+	if(EMUCOREX_HAVE_LSFG)
+		target_link_libraries(PCSX2_FLAGS INTERFACE ${EMUCOREX_LSFG_LIBRARIES})
+		target_include_directories(PCSX2_FLAGS INTERFACE ${EMUCOREX_LSFG_INCLUDE})
+		target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_HAS_LSFG=1)
 	endif()
 	target_include_directories(PCSX2 PRIVATE
 		"${CMAKE_CURRENT_LIST_DIR}/include"
@@ -361,4 +371,7 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 		target_link_libraries(emucore PRIVATE librashader)
 	endif()
 	add_dependencies(emucore main_hook file_redirect_hook gsl_alloc_hook hook_impl)
+	if(EMUCOREX_HAVE_LSFG)
+		add_dependencies(emucore emucorex_lsfg)
+	endif()
 endif()

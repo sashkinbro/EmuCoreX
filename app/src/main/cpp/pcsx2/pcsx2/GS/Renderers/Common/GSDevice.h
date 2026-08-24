@@ -1026,6 +1026,9 @@ protected:
 	WindowInfo m_window_info;
 	GSVSyncMode m_vsync_mode = GSVSyncMode::Disabled;
 	bool m_allow_present_throttle = false;
+	// True only when the current presentation contains a freshly-rendered game
+	// frame. LSFG uses this to avoid inventing motion for pause-menu redraws.
+	bool m_present_has_new_frame = false;
 	u64 m_last_frame_displayed_time = 0;
 
 	GSTexture* m_merge = nullptr;
@@ -1170,6 +1173,8 @@ public:
 	/// Returns false if the window was completely occluded. If frame_skip is set, the frame won't be
 	/// displayed, but the GPU command queue will still be flushed.
 	virtual PresentResult BeginPresent(bool frame_skip) = 0;
+
+	void NotePresentHasNewFrame() { m_present_has_new_frame = true; }
 
 	/// Presents the frame to the display.
 	virtual void EndPresent() = 0;

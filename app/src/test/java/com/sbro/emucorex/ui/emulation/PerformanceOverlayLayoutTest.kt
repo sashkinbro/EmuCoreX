@@ -54,6 +54,55 @@ class PerformanceOverlayLayoutTest {
     }
 
     @Test
+    fun lsfgDisplayRateStaysBesideBaseFpsInDetailedMonitoring() {
+        val layout = buildPerformanceOverlayLayout(
+            "FPS: 44.00 [P] | VPS: 50.00\nLSFG: 87.50\nSpeed: 100% | Target: 100%",
+            PerformanceOverlayMetrics.FPS or PerformanceOverlayMetrics.SPEED
+        )
+
+        assertEquals(listOf("FPS:44.00[P]", "LSFG:87.50", "Speed:100%"), layout.mainLines)
+    }
+
+    @Test
+    fun fpsOnlyMonitoringShowsTheGeneratedDisplayRateAsOneNumber() {
+        val layout = buildPerformanceOverlayLayout(
+            "FPS: 44.00 [P] | VPS: 50.00\nLSFG: 87.50\nSpeed: 100% | Target: 100%",
+            PerformanceOverlayMetrics.FPS
+        )
+
+        assertEquals(listOf("FPS:87.50[LSFG]"), layout.mainLines)
+    }
+
+    @Test
+    fun fpsOnlyMonitoringKeepsBaseFpsUntilLsfgHasANumericRate() {
+        val starting = buildPerformanceOverlayLayout(
+            "FPS: 44.00 [P] | VPS: 50.00\nLSFG: starting",
+            PerformanceOverlayMetrics.FPS
+        )
+        val disabled = buildPerformanceOverlayLayout("FPS: 44.00 [P] | VPS: 50.00", PerformanceOverlayMetrics.FPS)
+
+        assertEquals(listOf("FPS:44.00[P]"), starting.mainLines)
+        assertEquals(listOf("FPS:44.00[P]"), disabled.mainLines)
+    }
+
+    @Test
+    fun simpleCounterUsesNumericLsfgRateAndNeverStatusText() {
+        assertEquals(87.5f, effectivePerformanceFps(44f, "LSFG: 87.50"))
+        assertEquals(44f, effectivePerformanceFps(44f, "LSFG: starting"))
+        assertEquals(44f, effectivePerformanceFps(44f, "LSFG: failed"))
+    }
+
+    @Test
+    fun lsfgLineIsHiddenWhenFpsMetricIsNotSelected() {
+        val layout = buildPerformanceOverlayLayout(
+            "FPS: 44.00 [P] | VPS: 50.00\nLSFG: 87.50",
+            PerformanceOverlayMetrics.VPS
+        )
+
+        assertEquals(listOf("VPS:50.00"), layout.mainLines)
+    }
+
+    @Test
     fun rendererAndVramCanBeSelectedIndependently() {
         val rendererOnly = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.RENDERER)
         val vramOnly = buildPerformanceOverlayLayout(fullSnapshot, PerformanceOverlayMetrics.VRAM)

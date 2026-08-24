@@ -938,6 +938,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				PresentLocalMultiplayerFrame(current, src_uv, draw_rect,
 					use_sgsr ? PresentShader::SGSR : s_tv_shader_indices[GSConfig.TVShader], present_shader_parameter,
 					use_sgsr ? false : (GSConfig.LinearPresent != GSPostBilinearMode::Off));
+				g_gs_device->NotePresentHasNewFrame();
 			}
 
 			EndPresentFrame();

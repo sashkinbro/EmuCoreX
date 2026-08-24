@@ -3,6 +3,7 @@
 
 #include "GS/GS.h"
 #include "GS/Renderers/Common/GSRenderer.h"
+#include "GS/Renderers/Vulkan/GSLsfg.h"
 #include "MTGS.h"
 #include "common/FileSystem.h"
 #include "common/HostSys.h"
@@ -583,6 +584,11 @@ extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_getMaxUp
 	if (!adapters.empty())
 		max_multiplier = std::max<u32>(adapters.front().max_upscale_multiplier, 1);
 	return static_cast<jint>(max_multiplier);
+}
+extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_validateLosslessDll(
+	JNIEnv* env, jclass, jstring path)
+{
+	return GSLsfg::LooksLikeLosslessDll(JStringToString(env, path)) ? JNI_TRUE : JNI_FALSE;
 }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_renderGpu(JNIEnv*, jclass, jint value) { AndroidRuntime::Instance().SetSetting("EmuCore/GS", "Renderer", "int", std::to_string(value)); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setCustomDriverPath(JNIEnv* env, jclass, jstring path) { AndroidRuntime::Instance().SetSetting("EmuCoreX", "CustomDriverPath", "string", JStringToString(env, path)); }

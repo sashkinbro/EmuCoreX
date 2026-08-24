@@ -2434,4 +2434,33 @@
     <string name="namco_guide_step_covers">封面 — 街机图片使用 PNG。内置来源将 NM ID 与 Libretro MAME 图片匹配；自定义来源可提供 NM00004.png 或 NM00004.jpg。</string>
     <string name="namco_guide_settings_desc">BIOS、文件夹、启动、投币和封面的完整说明。</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">帧生成</string>
+    <string name="frame_generation_subtitle">Lossless Scaling 集成</string>
+    <string name="frame_generation_import_failed">无法导入 Lossless.dll</string>
+    <string name="frame_generation_download_failed">无法下载支持组件</string>
+    <string name="frame_generation_dll_ready">Lossless.dll 已就绪</string>
+    <string name="frame_generation_warning_title">实验性功能</string>
+    <string name="frame_generation_warning_body">EmuCoreX 不对使用此工具承担责任。请自行承担风险。可能出现画面伪影、运行不稳定、崩溃、输入延迟和耗电量增加。</string>
+    <string name="frame_generation_component_title">EmuCoreX LSFG 支持</string>
+    <string name="frame_generation_component_desc">下载适用于 EmuCoreX 的 LSFG 支持组件。其中不包含 Lossless Scaling 文件。</string>
+    <string name="frame_generation_component_installed">已安装支持组件 v%1$d</string>
+    <string name="frame_generation_download">下载组件</string>
+    <string name="frame_generation_dll_title">您的 Lossless.dll</string>
+    <string name="frame_generation_dll_installed">已安装经过验证的私有副本。原文件可以移动或删除。</string>
+    <string name="frame_generation_dll_desc">请在 Steam 购买 Lossless Scaling，然后从合法安装中选择 Lossless.dll。EmuCoreX 不会下载或共享此文件。</string>
+    <string name="frame_generation_choose_dll">选择 .dll</string>
+    <string name="frame_generation_open_steam">打开 Steam</string>
+    <string name="frame_generation_enable">启用帧生成</string>
+    <string name="frame_generation_ready">可用于 Vulkan 游戏</string>
+    <string name="frame_generation_locked">请完成两个设置步骤</string>
+    <string name="frame_generation_multiplier">帧倍数</string>
+    <string name="frame_generation_flow_scale">光流分辨率</string>
+    <string name="frame_generation_performance">性能模式（LSFG 3.1p）</string>
+    <string name="frame_generation_performance_desc">可用时采用较轻的着色器路径。建议移动设备使用。</string>
+    <string name="frame_generation_target_rate">自适应目标刷新率</string>
+    <string name="frame_generation_fixed">固定</string>
+    <string name="frame_generation_flow_hint" formatted="false">自动会根据游戏分辨率调整 optical flow，建议使用。25%、50% 和 75% 仅用于手动调节。</string>
+    <string name="frame_generation_requirements_ready">设置完成。现在可全局或按游戏启用帧生成。</string>
+    <string name="frame_generation_requirements">要求：Vulkan 渲染器、Adreno 7xx 或更新型号、支持组件以及用户提供的 Lossless.dll。游戏必须保持稳定的基础帧率。</string>
+    <string name="frame_generation_settings_value">安装并配置</string>
 </resources>

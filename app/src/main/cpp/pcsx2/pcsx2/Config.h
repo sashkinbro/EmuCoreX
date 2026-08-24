@@ -920,6 +920,24 @@ struct Pcsx2Config
 		bool ShaderChainEnabled = false;
 		std::string ShaderChainPreset;
 
+		// LSFG — Lossless Scaling frame generation, inserted into the Vulkan present path.
+		// Off unless the user both enables it AND supplies their own Lossless.dll: the
+		// interpolation shaders are read out of that file at runtime and nothing about them
+		// ships with EMUCOREX. Vulkan + Adreno 7xx and newer only; every one of these is
+		// inert in a build where the Android LSFG implementation is not compiled in.
+		bool LsfgEnabled = false;
+		u8 LsfgMultiplier = 2; // frames displayed per rendered frame: 2 = one interpolated
+		std::string LsfgDllPath;
+		// LSFG 3.1p, a lighter shader family than 3.1. Default on: this runs on a phone GPU
+		// that is already presenting the game, and the cheaper pipeline is what makes the
+		// feature pay for itself there. Falls back to 3.1 when the user's DLL predates 3.1p.
+		bool LsfgPerformance = true;
+		// Optical-flow resolution, as a percentage of the presented image (25..100). Lower is
+		// cheaper and blurrier. Handed to the library as a DIVISOR — see GSLsfg.cpp.
+		u8 LsfgFlowScale = 100;
+		// Target output rate in Hz for adaptive pacing; 0 keeps the multiplier fixed.
+		u16 LsfgTargetRate = 0;
+
 		u8 CAS_Sharpness = 50;
 		u8 ShadeBoost_Brightness = DEFAULT_SHADEBOOST_BRIGHTNESS;
 		u8 ShadeBoost_Contrast = DEFAULT_SHADEBOOST_CONTRAST;

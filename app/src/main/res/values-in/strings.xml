@@ -2447,4 +2447,33 @@
     <string name="namco_guide_step_covers">Sampul — Gambar arkade memakai PNG. Sumber bawaan mencocokkan ID NM dengan Libretro MAME; sumber khusus dapat menyediakan NM00004.png atau NM00004.jpg.</string>
     <string name="namco_guide_settings_desc">Panduan lengkap BIOS, folder, peluncuran, koin, dan sampul.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">Pembuatan frame</string>
+    <string name="frame_generation_subtitle">Integrasi Lossless Scaling</string>
+    <string name="frame_generation_import_failed">Lossless.dll tidak dapat diimpor</string>
+    <string name="frame_generation_download_failed">Komponen dukungan tidak dapat diunduh</string>
+    <string name="frame_generation_dll_ready">Lossless.dll siap</string>
+    <string name="frame_generation_warning_title">Fitur eksperimental</string>
+    <string name="frame_generation_warning_body">EmuCoreX tidak bertanggung jawab atas penggunaan alat ini. Gunakan dengan risiko Anda sendiri. Artefak visual, kinerja tidak stabil, crash, latensi input lebih tinggi, dan konsumsi baterai dapat terjadi.</string>
+    <string name="frame_generation_component_title">Dukungan LSFG EmuCoreX</string>
+    <string name="frame_generation_component_desc">Unduh komponen dukungan LSFG untuk EmuCoreX. File Lossless Scaling tidak disertakan.</string>
+    <string name="frame_generation_component_installed">Komponen dukungan v%1$d terpasang</string>
+    <string name="frame_generation_download">Unduh komponen</string>
+    <string name="frame_generation_dll_title">Lossless.dll Anda</string>
+    <string name="frame_generation_dll_installed">Salinan privat terverifikasi telah terpasang. File asli dapat dipindahkan atau dihapus.</string>
+    <string name="frame_generation_dll_desc">Beli Lossless Scaling di Steam, lalu pilih Lossless.dll dari instalasi legal Anda. EmuCoreX tidak mengunduh atau membagikan file ini.</string>
+    <string name="frame_generation_choose_dll">Pilih .dll</string>
+    <string name="frame_generation_open_steam">Buka Steam</string>
+    <string name="frame_generation_enable">Aktifkan pembuatan frame</string>
+    <string name="frame_generation_ready">Siap untuk game Vulkan</string>
+    <string name="frame_generation_locked">Selesaikan kedua langkah penyiapan</string>
+    <string name="frame_generation_multiplier">Pengali frame</string>
+    <string name="frame_generation_flow_scale">Resolusi aliran optik</string>
+    <string name="frame_generation_performance">Mode performa (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">Menggunakan jalur shader yang lebih ringan jika tersedia. Disarankan untuk perangkat seluler.</string>
+    <string name="frame_generation_target_rate">Refresh target adaptif</string>
+    <string name="frame_generation_fixed">Tetap</string>
+    <string name="frame_generation_flow_hint" formatted="false">Otomatis menyesuaikan optical flow dengan resolusi game dan direkomendasikan. Gunakan 25%, 50%, atau 75% hanya untuk penyetelan manual.</string>
+    <string name="frame_generation_requirements_ready">Penyiapan selesai. Pembuatan frame dapat diaktifkan secara global atau per game.</string>
+    <string name="frame_generation_requirements">Persyaratan: renderer Vulkan, Adreno 7xx atau lebih baru, komponen dukungan, dan Lossless.dll dari pengguna. Game harus menjaga frame rate dasar yang stabil.</string>
+    <string name="frame_generation_settings_value">Pasang dan konfigurasikan</string>
 </resources>

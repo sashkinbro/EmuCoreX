@@ -2448,4 +2448,33 @@
     <string name="namco_guide_step_covers">جلدها — تصاویر آرکید PNG هستند. منبع داخلی شناسه NM را با Libretro MAME تطبیق می‌دهد؛ منبع سفارشی می‌تواند NM00004.png یا NM00004.jpg داشته باشد.</string>
     <string name="namco_guide_settings_desc">راهنمای کامل BIOS، پوشه‌ها، اجرا، سکه و جلدها.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">تولید فریم</string>
+    <string name="frame_generation_subtitle">یکپارچه‌سازی Lossless Scaling</string>
+    <string name="frame_generation_import_failed">وارد کردن Lossless.dll ممکن نشد</string>
+    <string name="frame_generation_download_failed">دریافت مؤلفه پشتیبانی ممکن نشد</string>
+    <string name="frame_generation_dll_ready">Lossless.dll آماده است</string>
+    <string name="frame_generation_warning_title">ویژگی آزمایشی</string>
+    <string name="frame_generation_warning_body">EmuCoreX مسئولیتی در قبال استفاده از این ابزار ندارد. استفاده با مسئولیت شماست. احتمال آرتیفکت تصویری، ناپایداری، توقف برنامه، تأخیر ورودی بیشتر و مصرف باتری وجود دارد.</string>
+    <string name="frame_generation_component_title">پشتیبانی EmuCoreX LSFG</string>
+    <string name="frame_generation_component_desc">مؤلفه پشتیبانی LSFG را برای EmuCoreX دریافت کنید. فایل‌های Lossless Scaling همراه آن نیستند.</string>
+    <string name="frame_generation_component_installed">مؤلفه پشتیبانی v%1$d نصب شد</string>
+    <string name="frame_generation_download">دریافت مؤلفه</string>
+    <string name="frame_generation_dll_title">Lossless.dll شما</string>
+    <string name="frame_generation_dll_installed">یک نسخه خصوصی تأییدشده نصب است. فایل اصلی را می‌توان جابه‌جا یا حذف کرد.</string>
+    <string name="frame_generation_dll_desc">Lossless Scaling را از Steam بخرید و Lossless.dll را از نصب قانونی خود انتخاب کنید. EmuCoreX این فایل را دریافت یا منتشر نمی‌کند.</string>
+    <string name="frame_generation_choose_dll">انتخاب ‎.dll</string>
+    <string name="frame_generation_open_steam">باز کردن Steam</string>
+    <string name="frame_generation_enable">فعال‌سازی تولید فریم</string>
+    <string name="frame_generation_ready">آماده برای بازی‌های Vulkan</string>
+    <string name="frame_generation_locked">هر دو مرحله راه‌اندازی را کامل کنید</string>
+    <string name="frame_generation_multiplier">ضریب فریم</string>
+    <string name="frame_generation_flow_scale">وضوح جریان نوری</string>
+    <string name="frame_generation_performance">حالت کارایی (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">در صورت وجود از مسیر سبک‌تر شیدر استفاده می‌کند. برای موبایل پیشنهاد می‌شود.</string>
+    <string name="frame_generation_target_rate">نرخ نوسازی هدف تطبیقی</string>
+    <string name="frame_generation_fixed">ثابت</string>
+    <string name="frame_generation_flow_hint" formatted="false">حالت خودکار optical flow را با وضوح بازی تنظیم می‌کند و پیشنهاد می‌شود. از 25%، 50% یا 75% فقط برای تنظیم دستی استفاده کنید.</string>
+    <string name="frame_generation_requirements_ready">راه‌اندازی کامل شد. تولید فریم را می‌توان سراسری یا برای هر بازی فعال کرد.</string>
+    <string name="frame_generation_requirements">نیازمندی‌ها: رندرر Vulkan، ‏Adreno 7xx یا جدیدتر، مؤلفه پشتیبانی و Lossless.dll ارائه‌شده توسط کاربر. بازی باید نرخ فریم پایه پایداری داشته باشد.</string>
+    <string name="frame_generation_settings_value">نصب و پیکربندی</string>
 </resources>

@@ -2453,4 +2453,33 @@
     <string name="namco_guide_step_covers">Obaly — Arkádové obrázky používají PNG. Vestavěný zdroj přiřazuje ID NM k Libretro MAME; vlastní zdroj může hostovat NM00004.png nebo NM00004.jpg.</string>
     <string name="namco_guide_settings_desc">Úplný návod k BIOSu, složkám, spuštění, mincím a obalům.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">Generování snímků</string>
+    <string name="frame_generation_subtitle">Integrace Lossless Scaling</string>
+    <string name="frame_generation_import_failed">Lossless.dll se nepodařilo importovat</string>
+    <string name="frame_generation_download_failed">Komponentu podpory se nepodařilo stáhnout</string>
+    <string name="frame_generation_dll_ready">Lossless.dll je připraven</string>
+    <string name="frame_generation_warning_title">Experimentální funkce</string>
+    <string name="frame_generation_warning_body">EmuCoreX nenese odpovědnost za použití tohoto nástroje. Používáte jej na vlastní riziko. Mohou se objevit obrazové artefakty, nestabilita, pády, vyšší vstupní latence a spotřeba baterie.</string>
+    <string name="frame_generation_component_title">Podpora EmuCoreX LSFG</string>
+    <string name="frame_generation_component_desc">Stáhněte podpůrnou komponentu LSFG pro EmuCoreX. Soubory Lossless Scaling nejsou součástí.</string>
+    <string name="frame_generation_component_installed">Komponenta podpory v%1$d je nainstalována</string>
+    <string name="frame_generation_download">Stáhnout komponentu</string>
+    <string name="frame_generation_dll_title">Váš Lossless.dll</string>
+    <string name="frame_generation_dll_installed">Ověřená soukromá kopie je nainstalována. Původní soubor lze přesunout nebo odstranit.</string>
+    <string name="frame_generation_dll_desc">Kupte Lossless Scaling na Steamu a vyberte Lossless.dll z legálně získané instalace. EmuCoreX tento soubor nestahuje ani nesdílí.</string>
+    <string name="frame_generation_choose_dll">Vybrat .dll</string>
+    <string name="frame_generation_open_steam">Otevřít Steam</string>
+    <string name="frame_generation_enable">Zapnout generování snímků</string>
+    <string name="frame_generation_ready">Připraveno pro hry Vulkan</string>
+    <string name="frame_generation_locked">Dokončete oba kroky nastavení</string>
+    <string name="frame_generation_multiplier">Násobitel snímků</string>
+    <string name="frame_generation_flow_scale">Rozlišení optického toku</string>
+    <string name="frame_generation_performance">Výkonnostní režim (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">Použije lehčí cestu shaderů, je-li dostupná. Doporučeno pro mobilní zařízení.</string>
+    <string name="frame_generation_target_rate">Adaptivní cílová frekvence</string>
+    <string name="frame_generation_fixed">Pevná</string>
+    <string name="frame_generation_flow_hint" formatted="false">Auto přizpůsobí optical flow rozlišení hry a je doporučené. Hodnoty 25%, 50% a 75% používejte jen pro ruční ladění.</string>
+    <string name="frame_generation_requirements_ready">Nastavení je dokončeno. Funkci lze zapnout globálně i pro jednotlivé hry.</string>
+    <string name="frame_generation_requirements">Požadavky: renderer Vulkan, Adreno 7xx nebo novější, komponenta podpory a uživatelem dodaný Lossless.dll. Hra musí udržet stabilní základní frekvenci.</string>
+    <string name="frame_generation_settings_value">Nainstalovat a nastavit</string>
 </resources>

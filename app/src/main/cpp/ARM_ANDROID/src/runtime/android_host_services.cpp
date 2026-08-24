@@ -8,6 +8,7 @@
 #include "pcsx2/Counters.h"
 #include "pcsx2/GS/GS.h"
 #include "pcsx2/GS/Renderers/Common/GSDevice.h"
+#include "pcsx2/GS/Renderers/Vulkan/GSLsfg.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
@@ -457,6 +458,10 @@ void Host::OnPerformanceMetricsUpdated()
 	else
 		AppendFormat(line, "FPS: N/A | VPS: %.2f", vps);
 	AppendLine(overlay, line);
+
+	const std::string lsfg_status = GSLsfg::GetStatusText();
+	if (!lsfg_status.empty())
+		AppendLine(overlay, lsfg_status);
 
 	line.clear();
 	AppendFormat(line, "Speed: %.0f%%", std::round(speed));

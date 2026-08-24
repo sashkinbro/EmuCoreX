@@ -48,6 +48,7 @@ public:
 	__fi u32 GetImageCount() const { return static_cast<u32>(m_images.size()); }
 	__fi const GSTextureVK* GetCurrentTexture() const { return m_images[m_current_image].get(); }
 	__fi GSTextureVK* GetCurrentTexture() { return m_images[m_current_image].get(); }
+	__fi VkImage GetImage(u32 index) const { return m_images[index]->GetImage(); }
 	__fi VkSemaphore GetImageAvailableSemaphore() const
 	{
 		return m_semaphores[m_current_semaphore].available_semaphore;
@@ -66,6 +67,8 @@ public:
 	}
 
 	VkFormat GetTextureFormat() const;
+	/// Number of images that can be acquired in addition to the real frame.
+	__fi u32 GetExtraAcquirableImages() const { return m_extra_acquirable_images; }
 	VkResult AcquireNextImage();
 	void ReleaseCurrentImage();
 	void ResetImageAcquireResult();
@@ -100,6 +103,7 @@ private:
 	VkSwapchainKHR m_swap_chain = VK_NULL_HANDLE;
 
 	std::vector<std::unique_ptr<GSTextureVK>> m_images;
+	u32 m_extra_acquirable_images = 0;
 	std::array<ImageSemaphores, NUM_SEMAPHORES> m_semaphores = {};
 
 	u32 m_current_image = 0;

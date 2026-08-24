@@ -2432,4 +2432,33 @@
     <string name="namco_guide_step_covers">カバー — アーケード画像はPNGです。内蔵ソースはNM IDをLibretro MAME画像に対応付け、カスタムソースではNM00004.pngまたはNM00004.jpgを配置できます。</string>
     <string name="namco_guide_settings_desc">BIOS、フォルダー、起動、コイン、カバーの完全ガイド。</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">フレーム生成</string>
+    <string name="frame_generation_subtitle">Lossless Scaling 統合</string>
+    <string name="frame_generation_import_failed">Lossless.dll をインポートできませんでした</string>
+    <string name="frame_generation_download_failed">サポートコンポーネントをダウンロードできませんでした</string>
+    <string name="frame_generation_dll_ready">Lossless.dll の準備完了</string>
+    <string name="frame_generation_warning_title">試験的な機能</string>
+    <string name="frame_generation_warning_body">EmuCoreX はこのツールの使用について責任を負いません。自己責任で使用してください。映像の乱れ、不安定な動作、クラッシュ、入力遅延やバッテリー消費の増加が発生する可能性があります。</string>
+    <string name="frame_generation_component_title">EmuCoreX LSFG サポート</string>
+    <string name="frame_generation_component_desc">EmuCoreX 用の LSFG サポートコンポーネントをダウンロードします。Lossless Scaling のファイルは含まれません。</string>
+    <string name="frame_generation_component_installed">サポートコンポーネント v%1$d をインストール済み</string>
+    <string name="frame_generation_download">コンポーネントをダウンロード</string>
+    <string name="frame_generation_dll_title">所有する Lossless.dll</string>
+    <string name="frame_generation_dll_installed">検証済みのプライベートコピーをインストール済みです。元のファイルは移動または削除できます。</string>
+    <string name="frame_generation_dll_desc">Steam で Lossless Scaling を購入し、正規のインストールから Lossless.dll を選択してください。EmuCoreX はこのファイルをダウンロードまたは共有しません。</string>
+    <string name="frame_generation_choose_dll">.dll を選択</string>
+    <string name="frame_generation_open_steam">Steam を開く</string>
+    <string name="frame_generation_enable">フレーム生成を有効化</string>
+    <string name="frame_generation_ready">Vulkan ゲームで使用可能</string>
+    <string name="frame_generation_locked">2 つのセットアップを完了してください</string>
+    <string name="frame_generation_multiplier">フレーム倍率</string>
+    <string name="frame_generation_flow_scale">オプティカルフロー解像度</string>
+    <string name="frame_generation_performance">パフォーマンスモード（LSFG 3.1p）</string>
+    <string name="frame_generation_performance_desc">利用可能な場合は軽量なシェーダーパスを使います。モバイル端末に推奨です。</string>
+    <string name="frame_generation_target_rate">適応型ターゲット更新頻度</string>
+    <string name="frame_generation_fixed">固定</string>
+    <string name="frame_generation_flow_hint" formatted="false">自動はゲーム解像度に合わせて optical flow を調整する推奨設定です。25%、50%、75% は手動調整時のみ使用してください。</string>
+    <string name="frame_generation_requirements_ready">セットアップ完了。全体またはゲームごとにフレーム生成を有効化できます。</string>
+    <string name="frame_generation_requirements">要件：Vulkan レンダラー、Adreno 7xx 以降、サポートコンポーネント、ユーザー所有の Lossless.dll。ゲームが安定した基本フレームレートを維持する必要があります。</string>
+    <string name="frame_generation_settings_value">インストールと設定</string>
 </resources>

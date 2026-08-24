@@ -137,6 +137,7 @@ object NativeApp {
     @JvmStatic external fun setAspectRatio(type: Int)
     @JvmStatic external fun renderUpscalemultiplier(value: Float)
     @JvmStatic external fun getMaxUpscaleMultiplier(renderer: Int): Int
+    @JvmStatic external fun validateLosslessDll(path: String): Boolean
     @Suppress("unused") // Exported JNI entry point retained for renderer compatibility.
     @JvmStatic external fun renderGpu(value: Int)
     @JvmStatic external fun setCustomDriverPath(path: String)

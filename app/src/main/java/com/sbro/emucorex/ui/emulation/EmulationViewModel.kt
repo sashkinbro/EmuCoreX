@@ -21,6 +21,8 @@ import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.GpuDriverManager
+import com.sbro.emucorex.core.FrameGenerationManager
+import com.sbro.emucorex.core.FrameGenerationSettings
 import com.sbro.emucorex.core.GsHackDefaults
 import com.sbro.emucorex.core.MobileSocNameMapper
 import com.sbro.emucorex.core.NativeApp
@@ -182,6 +184,12 @@ data class EmulationUiState(
     val statusMessage: String? = null,
     val currentSlot: Int = 1,
     val renderer: Int = RendererDefaults.defaultForHardware(),
+    val frameGenerationReady: Boolean = false,
+    val frameGenerationEnabled: Boolean = false,
+    val frameGenerationMultiplier: Int = 2,
+    val frameGenerationPerformance: Boolean = true,
+    val frameGenerationFlowScale: Int = 100,
+    val frameGenerationTargetRate: Int = 0,
     val upscale: Float = 1f,
     val aspectRatio: Int = 1,
     val localMultiplayerMode: Int = AppPreferences.LOCAL_MULTIPLAYER_OFF,
@@ -401,6 +409,12 @@ private data class LiveRuntimeSnapshot(
     val confirmSaveLoadActions: Boolean,
     val backButtonExitsGame: Boolean,
     val renderer: Int,
+    val frameGenerationReady: Boolean,
+    val frameGenerationEnabled: Boolean,
+    val frameGenerationMultiplier: Int,
+    val frameGenerationPerformance: Boolean,
+    val frameGenerationFlowScale: Int,
+    val frameGenerationTargetRate: Int,
     val upscale: Float,
     val aspectRatio: Int,
     val localMultiplayerMode: Int,
@@ -509,6 +523,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private val cheatRepository = CheatRepository(application)
     private val memoryCardRepository = MemoryCardRepository(application, preferences)
     private val perGameSettingsRepository = PerGameSettingsRepository(application)
+    private val frameGenerationManager = FrameGenerationManager(application)
     private val compatibilityRepository = Pcsx2CompatibilityRepository(application)
     private val gameRepository = GameRepository()
     private val playerProfileRepository = PlayerProfileRepository(application)
@@ -1415,9 +1430,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val fps = parts[0].toFloatOrNull() ?: return
         val speedPercent = parts[1].toFloatOrNull() ?: return
         val overlayText = replacePerformanceCpuName(parts[2], performanceCpuName)
+        val displayedFps = if (state.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
+            effectivePerformanceFps(fps, overlayText)
+        } else {
+            fps
+        }
         _uiState.value = state.copy(
             performanceOverlayText = overlayText,
-            fps = "%.1f".format(fps),
+            fps = "%.1f".format(displayedFps),
             speedPercent = speedPercent
         )
     }
@@ -1661,6 +1681,27 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode
                 )
 
+                val frameGenerationManager = FrameGenerationManager(getApplication())
+                val frameGenerationProfile = path
+                    ?.takeIf { !bootToBios && !autotestMode }
+                    ?.let(perGameSettingsRepository::get)
+                    ?.takeIf { profile ->
+                        profile.providedKeys == null || "frameGenerationEnabled" in profile.providedKeys
+                    }
+                if (frameGenerationProfile != null) {
+                    frameGenerationManager.applySettingsToNative(
+                        FrameGenerationSettings(
+                            enabled = frameGenerationProfile.frameGenerationEnabled,
+                            multiplier = frameGenerationProfile.frameGenerationMultiplier,
+                            performanceMode = frameGenerationProfile.frameGenerationPerformance,
+                            flowScalePercent = frameGenerationProfile.frameGenerationFlowScale,
+                            targetRefreshRate = frameGenerationProfile.frameGenerationTargetRate
+                        )
+                    )
+                } else {
+                    frameGenerationManager.applyToNative()
+                }
+
                 _uiState.value = _uiState.value.copy(
                     statusMessage = "status_loading_game"
                 )
@@ -1787,6 +1828,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     confirmSaveLoadActions = liveRuntime.confirmSaveLoadActions,
                     backButtonExitsGame = liveRuntime.backButtonExitsGame,
                     renderer = liveRuntime.renderer,
+                    frameGenerationReady = liveRuntime.frameGenerationReady,
+                    frameGenerationEnabled = liveRuntime.frameGenerationEnabled,
+                    frameGenerationMultiplier = liveRuntime.frameGenerationMultiplier,
+                    frameGenerationPerformance = liveRuntime.frameGenerationPerformance,
+                    frameGenerationFlowScale = liveRuntime.frameGenerationFlowScale,
+                    frameGenerationTargetRate = liveRuntime.frameGenerationTargetRate,
                     upscale = liveRuntime.upscale,
                     aspectRatio = liveRuntime.aspectRatio,
                     localMultiplayerMode = liveRuntime.localMultiplayerMode,
@@ -2535,6 +2582,33 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
             EmulatorBridge.setRenderer(renderer)
             updateCrashContext()
+        }
+    }
+
+    fun setFrameGeneration(settings: FrameGenerationSettings) {
+        viewModelScope.launch {
+            val setup = frameGenerationManager.snapshot()
+            val normalized = settings.copy(
+                enabled = settings.enabled && setup.isReady,
+                multiplier = settings.multiplier.coerceIn(2, 4),
+                flowScalePercent = FrameGenerationManager.normalizeFlowScale(settings.flowScalePercent),
+                targetRefreshRate = settings.targetRefreshRate.coerceIn(0, 240)
+            )
+            val newState = _uiState.value.copy(
+                frameGenerationReady = setup.isReady,
+                frameGenerationEnabled = normalized.enabled,
+                frameGenerationMultiplier = normalized.multiplier,
+                frameGenerationPerformance = normalized.performanceMode,
+                frameGenerationFlowScale = normalized.flowScalePercent,
+                frameGenerationTargetRate = normalized.targetRefreshRate
+            )
+            val hasPerGameProfile = activePerGameKey() != null
+            persistRuntimeState(newState) {
+                frameGenerationManager.updateSettings(normalized)
+            }
+            if (hasPerGameProfile) {
+                frameGenerationManager.applySettingsToNative(normalized, setup)
+            }
         }
     }
 
@@ -3684,11 +3758,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(gameSettingsProfileActive = false, gamepadBindingsByPad = emptyMap())
         viewModelScope.launch {
             val settings = preferences.settingsSnapshot.first()
+            val frameGeneration = frameGenerationManager.snapshot()
+            frameGenerationManager.applyToNative(frameGeneration)
             _uiState.value = _uiState.value
                 .withOverlayLayoutSnapshot(preferences.overlayLayoutSnapshot.first())
                 .copy(
                     touchControlVisualStyle = settings.touchControlVisualStyle,
                     touchControlPressEffect = settings.touchControlPressEffect,
+                    frameGenerationReady = frameGeneration.isReady,
+                    frameGenerationEnabled = frameGeneration.settings.enabled,
+                    frameGenerationMultiplier = frameGeneration.settings.multiplier,
+                    frameGenerationPerformance = frameGeneration.settings.performanceMode,
+                    frameGenerationFlowScale = frameGeneration.settings.flowScalePercent,
+                    frameGenerationTargetRate = frameGeneration.settings.targetRefreshRate,
                     gameSettingsProfileActive = false,
                     gamepadStickDeadzone = settings.gamepadStickDeadzone,
                     gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
@@ -3852,12 +3934,19 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun loadLiveRuntimeSnapshot(): LiveRuntimeSnapshot {
         val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
         val settings = preferences.settingsSnapshot.first()
+        val frameGeneration = frameGenerationManager.snapshot()
         return LiveRuntimeSnapshot(
             showFps = settings.showFps,
             fpsOverlayMode = settings.fpsOverlayMode,
             confirmSaveLoadActions = settings.confirmSaveLoadActions,
             backButtonExitsGame = settings.backButtonExitsGame,
             renderer = settings.renderer,
+            frameGenerationReady = frameGeneration.isReady,
+            frameGenerationEnabled = frameGeneration.settings.enabled,
+            frameGenerationMultiplier = frameGeneration.settings.multiplier,
+            frameGenerationPerformance = frameGeneration.settings.performanceMode,
+            frameGenerationFlowScale = frameGeneration.settings.flowScalePercent,
+            frameGenerationTargetRate = frameGeneration.settings.targetRefreshRate,
             upscale = settings.upscaleMultiplier,
             aspectRatio = settings.aspectRatio,
             localMultiplayerMode = settings.localMultiplayerMode,
@@ -4085,6 +4174,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             autoSaveOnExit = pick("autoSaveOnExit", autoSaveOnExit) { autoSaveOnExit },
             autoLoadOnStart = pick("autoLoadOnStart", autoLoadOnStart) { autoLoadOnStart },
             renderer = pick("renderer", renderer) { renderer },
+            frameGenerationEnabled = pick("frameGenerationEnabled", frameGenerationEnabled) { frameGenerationEnabled },
+            frameGenerationMultiplier = pick("frameGenerationMultiplier", frameGenerationMultiplier) { frameGenerationMultiplier },
+            frameGenerationPerformance = pick("frameGenerationPerformance", frameGenerationPerformance) { frameGenerationPerformance },
+            frameGenerationFlowScale = pick("frameGenerationFlowScale", frameGenerationFlowScale) { frameGenerationFlowScale },
+            frameGenerationTargetRate = pick("frameGenerationTargetRate", frameGenerationTargetRate) { frameGenerationTargetRate },
             upscale = pick("upscaleMultiplier", upscale) { upscaleMultiplier },
             aspectRatio = pick("aspectRatio", aspectRatio) { aspectRatio },
             localMultiplayerMode = pick("localMultiplayerMode", localMultiplayerMode) { localMultiplayerMode },
@@ -4160,6 +4254,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         gameTitle: String,
         gameSerial: String?
     ): PerGameSettings {
+        val globalFrameGeneration = frameGenerationManager.snapshot().settings
         val globalShowFps = preferences.showFps.first()
         val globalFpsOverlayMode = preferences.fpsOverlayMode.first()
         val globalEnableInstantVu1 = preferences.enableInstantVu1.first()
@@ -4203,6 +4298,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gameTitle = gameTitle,
             gameSerial = gameSerial,
             renderer = renderer,
+            frameGenerationEnabled = frameGenerationEnabled,
+            frameGenerationMultiplier = frameGenerationMultiplier,
+            frameGenerationPerformance = frameGenerationPerformance,
+            frameGenerationFlowScale = frameGenerationFlowScale,
+            frameGenerationTargetRate = frameGenerationTargetRate,
             upscaleMultiplier = upscale,
             aspectRatio = aspectRatio,
             localMultiplayerMode = localMultiplayerMode,
@@ -4298,6 +4398,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
         val providedKeys = buildSet {
             if (renderer != preferences.renderer.first()) add("renderer")
+            if (frameGenerationEnabled != globalFrameGeneration.enabled) add("frameGenerationEnabled")
+            if (frameGenerationMultiplier != globalFrameGeneration.multiplier) add("frameGenerationMultiplier")
+            if (frameGenerationPerformance != globalFrameGeneration.performanceMode) add("frameGenerationPerformance")
+            if (frameGenerationFlowScale != globalFrameGeneration.flowScalePercent) add("frameGenerationFlowScale")
+            if (frameGenerationTargetRate != globalFrameGeneration.targetRefreshRate) add("frameGenerationTargetRate")
             if (upscale != preferences.upscaleMultiplier.first()) add("upscaleMultiplier")
             if (aspectRatio != preferences.aspectRatio.first()) add("aspectRatio")
             if (localMultiplayerMode != preferences.localMultiplayerMode.first()) add("localMultiplayerMode")

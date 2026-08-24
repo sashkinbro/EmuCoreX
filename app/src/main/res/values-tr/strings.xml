@@ -2433,4 +2433,33 @@
     <string name="namco_guide_step_covers">Kapaklar — Arcade görselleri PNG kullanır. Yerleşik kaynak NM kimliğini Libretro MAME ile eşler; özel kaynak NM00004.png veya NM00004.jpg barındırabilir.</string>
     <string name="namco_guide_settings_desc">BIOS, klasörler, başlatma, jetonlar ve kapaklar için tam kılavuz.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">Kare oluşturma</string>
+    <string name="frame_generation_subtitle">Lossless Scaling entegrasyonu</string>
+    <string name="frame_generation_import_failed">Lossless.dll içe aktarılamadı</string>
+    <string name="frame_generation_download_failed">Destek bileşeni indirilemedi</string>
+    <string name="frame_generation_dll_ready">Lossless.dll hazır</string>
+    <string name="frame_generation_warning_title">Deneysel özellik</string>
+    <string name="frame_generation_warning_body">EmuCoreX bu aracın kullanımından sorumlu değildir. Riski size aittir. Görsel bozulmalar, kararsız performans, çökmeler, daha yüksek giriş gecikmesi ve pil tüketimi oluşabilir.</string>
+    <string name="frame_generation_component_title">EmuCoreX LSFG desteği</string>
+    <string name="frame_generation_component_desc">EmuCoreX için LSFG destek bileşenini indirin. Lossless Scaling dosyaları dahil değildir.</string>
+    <string name="frame_generation_component_installed">Destek bileşeni v%1$d kuruldu</string>
+    <string name="frame_generation_download">Bileşeni indir</string>
+    <string name="frame_generation_dll_title">Lossless.dll dosyanız</string>
+    <string name="frame_generation_dll_installed">Doğrulanmış özel kopya kuruldu. Özgün dosya taşınabilir veya silinebilir.</string>
+    <string name="frame_generation_dll_desc">Lossless Scaling’i Steam’den satın alın ve yasal kurulumunuzdaki Lossless.dll dosyasını seçin. EmuCoreX bu dosyayı indirmez veya paylaşmaz.</string>
+    <string name="frame_generation_choose_dll">.dll seç</string>
+    <string name="frame_generation_open_steam">Steam’i aç</string>
+    <string name="frame_generation_enable">Kare oluşturmayı etkinleştir</string>
+    <string name="frame_generation_ready">Vulkan oyunları için hazır</string>
+    <string name="frame_generation_locked">Her iki kurulum adımını tamamlayın</string>
+    <string name="frame_generation_multiplier">Kare çarpanı</string>
+    <string name="frame_generation_flow_scale">Optik akış çözünürlüğü</string>
+    <string name="frame_generation_performance">Performans modu (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">Varsa daha hafif gölgelendirici yolunu kullanır. Mobil cihazlar için önerilir.</string>
+    <string name="frame_generation_target_rate">Uyarlanabilir hedef yenileme</string>
+    <string name="frame_generation_fixed">Sabit</string>
+    <string name="frame_generation_flow_hint" formatted="false">Otomatik, optical flow çözünürlüğünü oyuna göre ayarlar ve önerilir. 25%, 50% veya 75% değerlerini yalnızca elle ayarlama için kullanın.</string>
+    <string name="frame_generation_requirements_ready">Kurulum tamamlandı. Kare oluşturma genel olarak veya oyun başına etkinleştirilebilir.</string>
+    <string name="frame_generation_requirements">Gereksinimler: Vulkan işleyici, Adreno 7xx veya yenisi, destek bileşeni ve kullanıcının sağladığı Lossless.dll. Oyun kararlı bir temel kare hızı sağlamalıdır.</string>
+    <string name="frame_generation_settings_value">Kur ve yapılandır</string>
 </resources>

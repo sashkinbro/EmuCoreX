@@ -2433,4 +2433,33 @@
     <string name="namco_guide_step_covers">कवर — आर्केड चित्र PNG में होते हैं। अंतर्निहित स्रोत NM ID को Libretro MAME से मिलाता है; कस्टम स्रोत NM00004.png या NM00004.jpg रख सकता है।</string>
     <string name="namco_guide_settings_desc">BIOS, फ़ोल्डर, शुरुआत, सिक्के और कवर की पूरी मार्गदर्शिका।</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">फ़्रेम जनरेशन</string>
+    <string name="frame_generation_subtitle">Lossless Scaling एकीकरण</string>
+    <string name="frame_generation_import_failed">Lossless.dll आयात नहीं हो सका</string>
+    <string name="frame_generation_download_failed">सहायता कंपोनेंट डाउनलोड नहीं हो सका</string>
+    <string name="frame_generation_dll_ready">Lossless.dll तैयार है</string>
+    <string name="frame_generation_warning_title">प्रायोगिक सुविधा</string>
+    <string name="frame_generation_warning_body">EmuCoreX इस टूल के उपयोग के लिए जिम्मेदार नहीं है। इसे अपने जोखिम पर उपयोग करें। दृश्य आर्टिफ़ैक्ट, अस्थिर प्रदर्शन, क्रैश, अधिक इनपुट विलंब और बैटरी खपत संभव है।</string>
+    <string name="frame_generation_component_title">EmuCoreX LSFG सहायता</string>
+    <string name="frame_generation_component_desc">EmuCoreX के लिए LSFG सहायता कंपोनेंट डाउनलोड करें। Lossless Scaling की फ़ाइलें इसमें शामिल नहीं हैं।</string>
+    <string name="frame_generation_component_installed">सहायता कंपोनेंट v%1$d इंस्टॉल है</string>
+    <string name="frame_generation_download">कंपोनेंट डाउनलोड करें</string>
+    <string name="frame_generation_dll_title">आपकी Lossless.dll</string>
+    <string name="frame_generation_dll_installed">सत्यापित निजी प्रति इंस्टॉल है। मूल फ़ाइल को हटाया या स्थानांतरित किया जा सकता है।</string>
+    <string name="frame_generation_dll_desc">Steam पर Lossless Scaling खरीदें और अपनी वैध इंस्टॉलेशन से Lossless.dll चुनें। EmuCoreX इस फ़ाइल को डाउनलोड या साझा नहीं करता।</string>
+    <string name="frame_generation_choose_dll">.dll चुनें</string>
+    <string name="frame_generation_open_steam">Steam खोलें</string>
+    <string name="frame_generation_enable">फ़्रेम जनरेशन चालू करें</string>
+    <string name="frame_generation_ready">Vulkan गेम के लिए तैयार</string>
+    <string name="frame_generation_locked">सेटअप के दोनों चरण पूरे करें</string>
+    <string name="frame_generation_multiplier">फ़्रेम गुणक</string>
+    <string name="frame_generation_flow_scale">ऑप्टिकल-फ़्लो रिज़ॉल्यूशन</string>
+    <string name="frame_generation_performance">परफ़ॉर्मेंस मोड (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">उपलब्ध होने पर हल्के शेडर पथ का उपयोग करता है। मोबाइल के लिए अनुशंसित।</string>
+    <string name="frame_generation_target_rate">अनुकूली लक्ष्य रिफ़्रेश दर</string>
+    <string name="frame_generation_fixed">स्थिर</string>
+    <string name="frame_generation_flow_hint" formatted="false">ऑटो गेम रिज़ॉल्यूशन के अनुसार optical flow समायोजित करता है और अनुशंसित है। 25%, 50% या 75% केवल मैन्युअल ट्यूनिंग के लिए उपयोग करें।</string>
+    <string name="frame_generation_requirements_ready">सेटअप पूरा हुआ। फ़्रेम जनरेशन को सभी या अलग-अलग गेम के लिए चालू किया जा सकता है।</string>
+    <string name="frame_generation_requirements">आवश्यकताएँ: Vulkan रेंडरर, Adreno 7xx या नया, सहायता कंपोनेंट और उपयोगकर्ता की Lossless.dll। गेम की मूल फ़्रेम दर स्थिर होनी चाहिए।</string>
+    <string name="frame_generation_settings_value">इंस्टॉल और कॉन्फ़िगर करें</string>
 </resources>

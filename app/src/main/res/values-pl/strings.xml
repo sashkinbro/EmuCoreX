@@ -2455,4 +2455,33 @@
     <string name="namco_guide_step_covers">Okładki — Grafiki arcade używają PNG. Wbudowane źródło dopasowuje ID NM do Libretro MAME; własne źródło może udostępniać NM00004.png lub NM00004.jpg.</string>
     <string name="namco_guide_settings_desc">Pełna instrukcja BIOS-u, folderów, uruchamiania, monet i okładek.</string>
     <string name="settings_namco_arcade_tab">Namco Arcade</string>
+    <string name="frame_generation_title">Generowanie klatek</string>
+    <string name="frame_generation_subtitle">Integracja Lossless Scaling</string>
+    <string name="frame_generation_import_failed">Nie udało się zaimportować Lossless.dll</string>
+    <string name="frame_generation_download_failed">Nie udało się pobrać komponentu obsługi</string>
+    <string name="frame_generation_dll_ready">Lossless.dll jest gotowy</string>
+    <string name="frame_generation_warning_title">Funkcja eksperymentalna</string>
+    <string name="frame_generation_warning_body">EmuCoreX nie odpowiada za użycie tego narzędzia. Używasz go na własne ryzyko. Mogą wystąpić artefakty, niestabilna wydajność, awarie, większe opóźnienie sterowania i zużycie baterii.</string>
+    <string name="frame_generation_component_title">Obsługa EmuCoreX LSFG</string>
+    <string name="frame_generation_component_desc">Pobierz komponent obsługi LSFG dla EmuCoreX. Pliki Lossless Scaling nie są dołączone.</string>
+    <string name="frame_generation_component_installed">Komponent obsługi v%1$d jest zainstalowany</string>
+    <string name="frame_generation_download">Pobierz komponent</string>
+    <string name="frame_generation_dll_title">Twój Lossless.dll</string>
+    <string name="frame_generation_dll_installed">Zainstalowano zweryfikowaną prywatną kopię. Oryginalny plik można przenieść lub usunąć.</string>
+    <string name="frame_generation_dll_desc">Kup Lossless Scaling na Steam, a następnie wybierz Lossless.dll z legalnie uzyskanej instalacji. EmuCoreX nie pobiera ani nie udostępnia tego pliku.</string>
+    <string name="frame_generation_choose_dll">Wybierz .dll</string>
+    <string name="frame_generation_open_steam">Otwórz Steam</string>
+    <string name="frame_generation_enable">Włącz generowanie klatek</string>
+    <string name="frame_generation_ready">Gotowe dla gier Vulkan</string>
+    <string name="frame_generation_locked">Ukończ oba kroki konfiguracji</string>
+    <string name="frame_generation_multiplier">Mnożnik klatek</string>
+    <string name="frame_generation_flow_scale">Rozdzielczość przepływu optycznego</string>
+    <string name="frame_generation_performance">Tryb wydajności (LSFG 3.1p)</string>
+    <string name="frame_generation_performance_desc">Używa lżejszej ścieżki shaderów, gdy jest dostępna. Zalecane na urządzeniach mobilnych.</string>
+    <string name="frame_generation_target_rate">Adaptacyjna częstotliwość docelowa</string>
+    <string name="frame_generation_fixed">Stała</string>
+    <string name="frame_generation_flow_hint" formatted="false">Auto dopasowuje optical flow do rozdzielczości gry i jest zalecane. Używaj 25%, 50% lub 75% tylko do ręcznego strojenia.</string>
+    <string name="frame_generation_requirements_ready">Konfiguracja zakończona. Funkcję można włączać globalnie i dla poszczególnych gier.</string>
+    <string name="frame_generation_requirements">Wymagania: renderer Vulkan, Adreno 7xx lub nowszy, komponent obsługi i Lossless.dll dostarczony przez użytkownika. Gra musi utrzymywać stabilną bazową liczbę klatek.</string>
+    <string name="frame_generation_settings_value">Zainstaluj i skonfiguruj</string>
 </resources>
