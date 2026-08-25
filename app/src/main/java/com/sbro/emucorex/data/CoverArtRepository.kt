@@ -24,19 +24,21 @@ class CoverArtRepository(context: Context) {
         private const val TAG = "CoverArtRepository"
         const val DEFAULT_COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
         const val DEFAULT_COVER_3D_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d"
-        const val DEFAULT_ARCADE_COVER_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Logos"
+        const val DEFAULT_ARCADE_COVER_BASE_URL = "https://raw.githubusercontent.com/sashkinbro/EmuCoreX-Arcade-Covers/main/covers"
         private const val DEFAULT_PS2_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_2/master/Named_Boxarts"
         private const val DEFAULT_PSP_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_Portable/master/Named_Boxarts"
+        private const val LEGACY_MAME_LOGO_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Logos"
         private const val CONNECT_TIMEOUT_MS = 10000
         private const val READ_TIMEOUT_MS = 15000
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
-        private const val ARCADE_COVER_SOURCE_REVISION = 3
+        private const val ARCADE_COVER_SOURCE_REVISION = 4
 
         private data class ArcadeCoverAsset(val baseUrl: String, val fileName: String)
 
-        private fun mameLogo(fileName: String) = ArcadeCoverAsset(DEFAULT_ARCADE_COVER_BASE_URL, fileName)
+        private fun mameLogo(fileName: String) = ArcadeCoverAsset(LEGACY_MAME_LOGO_BASE_URL, fileName)
         private fun ps2BoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PS2_BOXART_BASE_URL, fileName)
         private fun pspBoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PSP_BOXART_BASE_URL, fileName)
+        private fun arcadeCover(fileName: String) = ArcadeCoverAsset(DEFAULT_ARCADE_COVER_BASE_URL, fileName)
 
         // PCSX2 exposes the Namco game ID as the serial. Libretro's maintained MAME
         // artwork uses display names rather than NM IDs. Prefer a matching portrait
@@ -67,7 +69,36 @@ class CoverArtRepository(context: Context) {
             "NM00039" to ps2BoxArt("MotoGP (Japan).png"),
             "NM00042" to ps2BoxArt("Sengoku Basara X (Japan, Korea).png"),
             "NM00047" to mameLogo("Ace Driver 3_ Final Turn.png"),
-            "NM00048" to ps2BoxArt("Fate-Unlimited Codes (Japan).png")
+            "NM00048" to ps2BoxArt("Fate-Unlimited Codes (Japan).png"),
+            // 28 missing covers hosted on EmuCoreX-Arcade-Covers (600x900 PNG 2:3)
+            "NM00014" to arcadeCover("NM00014.png"),
+            "NM00017" to arcadeCover("NM00017.png"),
+            "NM00020" to arcadeCover("NM00020.png"),
+            "NM00022" to arcadeCover("NM00022.png"),
+            "NM00023" to arcadeCover("NM00023.png"),
+            "NM00024" to arcadeCover("NM00024.png"),
+            "NM00028" to arcadeCover("NM00028.png"),
+            "NM00029" to arcadeCover("NM00029.png"),
+            "NM00030" to arcadeCover("NM00030.png"),
+            "NM00033" to arcadeCover("NM00033.png"),
+            "NM00034" to arcadeCover("NM00034.png"),
+            "NM00035" to arcadeCover("NM00035.png"),
+            "NM00036" to arcadeCover("NM00036.png"),
+            "NM00037" to arcadeCover("NM00037.png"),
+            "NM00038" to arcadeCover("NM00038.png"),
+            "NM00040" to arcadeCover("NM00040.png"),
+            "NM00041" to arcadeCover("NM00041.png"),
+            "NM00043" to arcadeCover("NM00043.png"),
+            "NM00044" to arcadeCover("NM00044.png"),
+            "NM00045" to arcadeCover("NM00045.png"),
+            "NM00046" to arcadeCover("NM00046.png"),
+            "NM00051" to arcadeCover("NM00051.png"),
+            "NM00052" to arcadeCover("NM00052.png"),
+            "NM00053" to arcadeCover("NM00053.png"),
+            "NM00054" to arcadeCover("NM00054.png"),
+            "NM00056" to arcadeCover("NM00056.png"),
+            "NM00057" to arcadeCover("NM00057.png"),
+            "NM10003" to arcadeCover("NM10003.png")
         )
 
         internal fun hasDefaultArcadeCover(serial: String): Boolean =
