@@ -25,73 +25,65 @@ class CoverArtRepository(context: Context) {
         const val DEFAULT_COVER_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
         const val DEFAULT_COVER_3D_BASE_URL = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/3d"
         const val DEFAULT_ARCADE_COVER_BASE_URL = "https://raw.githubusercontent.com/sashkinbro/EmuCoreX-Arcade-Covers/main/covers"
-        private const val DEFAULT_PS2_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_2/master/Named_Boxarts"
-        private const val DEFAULT_PSP_BOXART_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/Sony_-_PlayStation_Portable/master/Named_Boxarts"
-        private const val LEGACY_MAME_LOGO_BASE_URL = "https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Logos"
         private const val CONNECT_TIMEOUT_MS = 10000
         private const val READ_TIMEOUT_MS = 15000
         private const val MISS_TTL_MS = 7L * 24L * 60L * 60L * 1000L // 7 days
-        private const val ARCADE_COVER_SOURCE_REVISION = 4
+        private const val ARCADE_COVER_SOURCE_REVISION = 5
 
         private data class ArcadeCoverAsset(val baseUrl: String, val fileName: String)
 
-        private fun mameLogo(fileName: String) = ArcadeCoverAsset(LEGACY_MAME_LOGO_BASE_URL, fileName)
-        private fun ps2BoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PS2_BOXART_BASE_URL, fileName)
-        private fun pspBoxArt(fileName: String) = ArcadeCoverAsset(DEFAULT_PSP_BOXART_BASE_URL, fileName)
         private fun arcadeCover(fileName: String) = ArcadeCoverAsset(DEFAULT_ARCADE_COVER_BASE_URL, fileName)
 
-        // PCSX2 exposes the Namco game ID as the serial. Libretro's maintained MAME
-        // artwork uses display names rather than NM IDs. Prefer a matching portrait
-        // retail box art because the library cards use a 2:3 cover ratio. Keep exact
-        // MAME logos only for arcade-exclusive titles without a truthful box-art match.
+        // All Namco System 246/256 titles are hosted as 600x900 PNG in EmuCoreX-Arcade-Covers.
         private val ARCADE_COVER_ASSETS = mapOf(
-            "NM00001" to ps2BoxArt("Ridge Racer V (Japan).png"),
-            "NM00002" to ps2BoxArt("Bloody Roar 3 (Japan) (v2.01).png"),
-            "NM00003" to ps2BoxArt("Vampire Night (Japan).png"),
-            "NM00004" to ps2BoxArt("Tekken 4 (Japan, Asia).png"),
-            "NM00005" to ps2BoxArt("Wangan Midnight (Japan).png"),
-            "NM00006" to ps2BoxArt("Smash Court Pro Tournament (Japan).png"),
-            "NM00007" to ps2BoxArt("Soulcalibur II (Japan).png"),
-            "NM00008" to ps2BoxArt("Wangan Midnight (Japan).png"),
-            "NM00010" to ps2BoxArt("Battle Gear 3 (Japan).png"),
-            "NM00011" to ps2BoxArt("Pride (Japan).png"),
-            "NM00012" to ps2BoxArt("Time Crisis 3 (Japan).png"),
-            "NM00015" to ps2BoxArt("Battle Gear 3 (Japan, Asia).png"),
-            "NM00016" to mameLogo("Zoids Infinity EX Plus (ver. 2.10).png"),
-            "NM00018" to ps2BoxArt("Capcom Fighting Jam (Japan).png"),
-            "NM00019" to ps2BoxArt("Tekken 5 (Japan, Asia).png"),
-            "NM00021" to mameLogo("Cobra_ The Arcade (CBR1 Ver. B).png"),
-            "NM00025" to mameLogo("Zoids Infinity EX Plus (ver. 2.10).png"),
-            "NM00026" to pspBoxArt("Tekken - Dark Resurrection (Asia) (En) (v1.02).png"),
-            "NM00027" to ps2BoxArt("Super Dragon Ball Z (Japan).png"),
-            "NM00031" to ps2BoxArt("Soulcalibur III (Japan) (v2.00).png"),
-            "NM00032" to mameLogo("Time Crisis 4 (World, TSF1002-NA-A).png"),
-            "NM00039" to ps2BoxArt("MotoGP (Japan).png"),
-            "NM00042" to ps2BoxArt("Sengoku Basara X (Japan, Korea).png"),
-            "NM00047" to mameLogo("Ace Driver 3_ Final Turn.png"),
-            "NM00048" to ps2BoxArt("Fate-Unlimited Codes (Japan).png"),
-            // 28 missing covers hosted on EmuCoreX-Arcade-Covers (600x900 PNG 2:3)
+            "NM00001" to arcadeCover("NM00001.png"),
+            "NM00002" to arcadeCover("NM00002.png"),
+            "NM00003" to arcadeCover("NM00003.png"),
+            "NM00004" to arcadeCover("NM00004.png"),
+            "NM00005" to arcadeCover("NM00005.png"),
+            "NM00006" to arcadeCover("NM00006.png"),
+            "NM00007" to arcadeCover("NM00007.png"),
+            "NM00008" to arcadeCover("NM00008.png"),
+            "NM00009" to arcadeCover("NM00009.png"),
+            "NM00010" to arcadeCover("NM00010.png"),
+            "NM00011" to arcadeCover("NM00011.png"),
+            "NM00012" to arcadeCover("NM00012.png"),
+            "NM00013" to arcadeCover("NM00013.png"),
             "NM00014" to arcadeCover("NM00014.png"),
+            "NM00015" to arcadeCover("NM00015.png"),
+            "NM00016" to arcadeCover("NM00016.png"),
             "NM00017" to arcadeCover("NM00017.png"),
+            "NM00018" to arcadeCover("NM00018.png"),
+            "NM00019" to arcadeCover("NM00019.png"),
             "NM00020" to arcadeCover("NM00020.png"),
+            "NM00021" to arcadeCover("NM00021.png"),
             "NM00022" to arcadeCover("NM00022.png"),
             "NM00023" to arcadeCover("NM00023.png"),
             "NM00024" to arcadeCover("NM00024.png"),
+            "NM00025" to arcadeCover("NM00025.png"),
+            "NM00026" to arcadeCover("NM00026.png"),
+            "NM00027" to arcadeCover("NM00027.png"),
             "NM00028" to arcadeCover("NM00028.png"),
             "NM00029" to arcadeCover("NM00029.png"),
             "NM00030" to arcadeCover("NM00030.png"),
+            "NM00031" to arcadeCover("NM00031.png"),
+            "NM00032" to arcadeCover("NM00032.png"),
             "NM00033" to arcadeCover("NM00033.png"),
             "NM00034" to arcadeCover("NM00034.png"),
             "NM00035" to arcadeCover("NM00035.png"),
             "NM00036" to arcadeCover("NM00036.png"),
             "NM00037" to arcadeCover("NM00037.png"),
             "NM00038" to arcadeCover("NM00038.png"),
+            "NM00039" to arcadeCover("NM00039.png"),
             "NM00040" to arcadeCover("NM00040.png"),
             "NM00041" to arcadeCover("NM00041.png"),
+            "NM00042" to arcadeCover("NM00042.png"),
             "NM00043" to arcadeCover("NM00043.png"),
             "NM00044" to arcadeCover("NM00044.png"),
             "NM00045" to arcadeCover("NM00045.png"),
             "NM00046" to arcadeCover("NM00046.png"),
+            "NM00047" to arcadeCover("NM00047.png"),
+            "NM00048" to arcadeCover("NM00048.png"),
             "NM00051" to arcadeCover("NM00051.png"),
             "NM00052" to arcadeCover("NM00052.png"),
             "NM00053" to arcadeCover("NM00053.png"),
@@ -261,14 +253,12 @@ class CoverArtRepository(context: Context) {
             ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
         val baseUrl = configuredBase ?: DEFAULT_ARCADE_COVER_BASE_URL
         val candidates = buildList {
-            // Custom mirrors can use the stable NM game ID directly.
-            if (configuredBase != null) {
-                add("$baseUrl/$serial.png")
-                add("$baseUrl/$serial.jpg")
-            }
+            // Try stable NM ID directly from default/custom arcade repo first, fallback to mapped asset.
+            add("$baseUrl/$serial.png")
+            add("$baseUrl/$serial.jpg")
             ARCADE_COVER_ASSETS[serial]?.let { asset ->
-                val assetBaseUrl = configuredBase ?: asset.baseUrl
-                add("$assetBaseUrl/${Uri.encode(asset.fileName)}")
+                val fallbackUrl = "${asset.baseUrl}/${Uri.encode(asset.fileName)}"
+                if (fallbackUrl !in this) add(fallbackUrl)
             }
         }.distinct()
 
@@ -288,13 +278,8 @@ class CoverArtRepository(context: Context) {
         if (normalizedSerial.startsWith("NM") && normalizedSerial.length == 7) {
             val configuredBase = AppPreferences(context).getArcadeCoverDownloadBaseUrlSync()
                 ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
-            return if (configuredBase != null) {
-                "$configuredBase/$normalizedSerial.png"
-            } else {
-                ARCADE_COVER_ASSETS[normalizedSerial]?.let { asset ->
-                    "${asset.baseUrl}/${Uri.encode(asset.fileName)}"
-                }
-            }
+            val baseUrl = configuredBase ?: DEFAULT_ARCADE_COVER_BASE_URL
+            return "$baseUrl/$normalizedSerial.png"
         }
         val style = resolveCoverArtStyle(styleOverride)
         val baseUrl = if (style == AppPreferences.COVER_ART_STYLE_3D) {
