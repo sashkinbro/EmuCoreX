@@ -68,4 +68,24 @@ class MobileSocNameMapperTest {
         assertEquals("MediaTek", MobileSocNameMapper.resolve("MT9999"))
         assertEquals("Unknown SoC", MobileSocNameMapper.resolve("future_platform"))
     }
+
+    @Test
+    fun doesNotUseAllwinnerDeviceBrandAsTheProcessorName() {
+        assertEquals("Unknown SoC", MobileSocNameMapper.resolve("Allwinner"))
+        assertEquals(
+            "Unknown SoC",
+            MobileSocNameMapper.resolve(
+                socModel = null,
+                hardware = "unknown",
+                manufacturer = "Allwinner",
+                model = "Allwinner Game Console"
+            )
+        )
+    }
+
+    @Test
+    fun keepsExactAllwinnerSocMappings() {
+        assertEquals("Allwinner H618", MobileSocNameMapper.resolve("Allwinner H618"))
+        assertEquals("Allwinner H313/H616/H618/H700 family", MobileSocNameMapper.resolve("sun50iw9"))
+    }
 }

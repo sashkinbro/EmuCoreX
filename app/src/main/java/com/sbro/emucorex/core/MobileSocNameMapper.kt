@@ -427,6 +427,8 @@ object MobileSocNameMapper {
             resolveKnownCode(candidate)?.let { return it }
         }
 
+        // Some TV boxes expose Allwinner only as device/vendor branding. Exact Allwinner SoC
+        // identifiers are resolved above; do not present that generic branding as a CPU model.
         val readable = candidates.firstOrNull(::isReadableMarketingName)
         if (readable != null) return cleanDisplayName(readable)
 
@@ -464,7 +466,7 @@ object MobileSocNameMapper {
         val normalized = value.lowercase(Locale.US)
         return listOf(
             "snapdragon", "dimensity", "helio", "exynos", "tensor", "kirin",
-            "unisoc", "spreadtrum", "rockchip", "allwinner", "allwiner", "amlogic", "tegra"
+            "unisoc", "spreadtrum", "rockchip", "amlogic", "tegra"
         ).any(normalized::contains)
     }
 
@@ -481,8 +483,6 @@ object MobileSocNameMapper {
             identifiers.any { it.startsWith("HI") || it.startsWith("KIRIN") } || vendor.contains("HISILICON") -> "Kirin"
             identifiers.any { it.startsWith("UMS") } || vendor.contains("UNISOC") || vendor.contains("SPREADTRUM") -> "Unisoc"
             identifiers.any { it.startsWith("RK") } || vendor.contains("ROCKCHIP") -> "Rockchip"
-            identifiers.any { it.startsWith("SUN") || it.startsWith("ALLWINNER") || it.startsWith("ALLWINER") } ||
-                vendor.contains("ALLWINNER") || vendor.contains("ALLWINER") -> "Allwinner"
             vendor.contains("AMLOGIC") -> "Amlogic"
             identifiers.any { it.startsWith("TEGRA") } || vendor.contains("NVIDIA") -> "NVIDIA Tegra"
             else -> null
