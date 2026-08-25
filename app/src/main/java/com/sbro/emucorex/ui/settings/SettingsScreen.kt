@@ -2405,7 +2405,7 @@ private fun SettingsContent(
                             selectedValue = uiState.coverArtStyle,
                             onSelect = viewModel::setCoverArtStyle,
                             helpText = stringResource(R.string.settings_help_cover_art_style),
-                            onResetToDefault = { viewModel.setCoverArtStyle(AppPreferences.COVER_ART_STYLE_DEFAULT) }
+                            onResetToDefault = { viewModel.setCoverArtStyle(AppPreferences.COVER_ART_STYLE_3D) }
                         )
                         SettingsItem(
                             icon = Icons.Rounded.Link,

@@ -121,7 +121,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var coverArtStyleInitialized = false
     private var coverBaseUrlInitialized = false
     private var coverCacheRevisionInitialized = false
-    private var currentCoverArtStyle = AppPreferences.COVER_ART_STYLE_DEFAULT
+    private var currentCoverArtStyle = AppPreferences.COVER_ART_STYLE_3D
     private var currentCoverDownloadBaseUrl: String? = null
     private val scanMutex = Mutex()
     private var deferredLibraryScan: DeferredLibraryScan? = null

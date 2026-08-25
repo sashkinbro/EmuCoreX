@@ -63,7 +63,7 @@ QString SettingsStore::emulatorDataPath() const
     return m_settings.value("paths/data", QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)).toString();
 }
 bool SettingsStore::compactSidebar() const { return m_settings.value("appearance/compactSidebar", false).toBool(); }
-int SettingsStore::coverArtStyle() const { return m_settings.value("library/coverArtStyle", 1).toInt(); }
+int SettingsStore::coverArtStyle() const { return m_settings.value("library/coverArtStyle", 2).toInt(); }
 int SettingsStore::performanceProfile() const { return m_settings.value("emulation/performanceProfile", 0).toInt(); }
 double SettingsStore::gridScale() const { return m_settings.value("appearance/gridScale", 1.0).toDouble(); }
 double SettingsStore::fontScale() const { return m_settings.value("appearance/fontScale", 1.0).toDouble(); }

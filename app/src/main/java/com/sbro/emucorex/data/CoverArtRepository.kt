@@ -272,7 +272,7 @@ class CoverArtRepository(context: Context) {
 
     fun buildPublicCoverUrl(
         serial: String?,
-        styleOverride: Int? = AppPreferences.COVER_ART_STYLE_DEFAULT
+        styleOverride: Int? = AppPreferences.COVER_ART_STYLE_3D
     ): String? {
         val normalizedSerial = normalizeSerial(serial) ?: return null
         if (normalizedSerial.startsWith("NM") && normalizedSerial.length == 7) {

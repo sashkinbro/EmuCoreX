@@ -9,7 +9,7 @@ Item {
     property url source
     property var sources: []
     property int sourceIndex: 0
-    property int coverStyle: 1
+    property int coverStyle: 2
     property real cornerRadius: 16
     property string fallbackIcon: "library"
     property alias status: artwork.status

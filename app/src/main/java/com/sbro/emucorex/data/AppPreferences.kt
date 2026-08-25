@@ -129,7 +129,7 @@ data class SettingsSnapshot(
     val emulatorDataPath: String? = null,
     val coverDownloadBaseUrl: String? = null,
     val arcadeCoverDownloadBaseUrl: String? = null,
-    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DEFAULT,
+    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_3D,
     val setupComplete: Boolean = false,
     val enableFastBoot: Boolean = true,
     val eeCycleRate: Int = PerformanceProfiles.safeConfig.eeCycleRate,
@@ -1580,7 +1580,8 @@ class AppPreferences(private val context: Context) {
         when (prefs[COVER_ART_STYLE]) {
             COVER_ART_STYLE_DISABLED -> COVER_ART_STYLE_DISABLED
             COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
-            else -> COVER_ART_STYLE_DEFAULT
+            COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+            else -> COVER_ART_STYLE_3D
         }
     }
 
@@ -1600,7 +1601,8 @@ class AppPreferences(private val context: Context) {
                 when (prefs[COVER_ART_STYLE]) {
                     COVER_ART_STYLE_DISABLED -> COVER_ART_STYLE_DISABLED
                     COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
-                    else -> COVER_ART_STYLE_DEFAULT
+                    COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                    else -> COVER_ART_STYLE_3D
                 }
             }.first()
         }
@@ -1751,7 +1753,8 @@ class AppPreferences(private val context: Context) {
                 coverArtStyle = when (prefs[COVER_ART_STYLE]) {
                     COVER_ART_STYLE_DISABLED -> COVER_ART_STYLE_DISABLED
                     COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
-                    else -> COVER_ART_STYLE_DEFAULT
+                    COVER_ART_STYLE_DEFAULT -> COVER_ART_STYLE_DEFAULT
+                    else -> COVER_ART_STYLE_3D
                 },
                 setupComplete = prefs[ONBOARDING_COMPLETED] ?: false,
                 enableFastBoot = prefs[ENABLE_FAST_BOOT] ?: true,
@@ -3641,7 +3644,7 @@ class AppPreferences(private val context: Context) {
             put("emulatorDataPath", prefs[EMULATOR_DATA_PATH])
             put("coverDownloadBaseUrl", prefs[COVER_DOWNLOAD_BASE_URL])
             put("arcadeCoverDownloadBaseUrl", prefs[ARCADE_COVER_DOWNLOAD_BASE_URL])
-            put("coverArtStyle", prefs[COVER_ART_STYLE] ?: COVER_ART_STYLE_DEFAULT)
+            put("coverArtStyle", prefs[COVER_ART_STYLE] ?: COVER_ART_STYLE_3D)
             put("onboardingCompleted", prefs[ONBOARDING_COMPLETED] ?: false)
             put("languageTag", prefs[LANGUAGE_TAG])
             put("aspectRatio", normalizeAspectRatioPreference(prefs[ASPECT_RATIO]))
@@ -3997,7 +4000,7 @@ class AppPreferences(private val context: Context) {
             json.optString("arcadeCoverDownloadBaseUrl").takeIf { it.isNotBlank() }?.let {
                 prefs[ARCADE_COVER_DOWNLOAD_BASE_URL] = it.trim().trimEnd('/')
             } ?: prefs.remove(ARCADE_COVER_DOWNLOAD_BASE_URL)
-            prefs[COVER_ART_STYLE] = when (json.optInt("coverArtStyle", COVER_ART_STYLE_DEFAULT)) {
+            prefs[COVER_ART_STYLE] = when (json.optInt("coverArtStyle", COVER_ART_STYLE_3D)) {
                 COVER_ART_STYLE_DISABLED -> COVER_ART_STYLE_DISABLED
                 COVER_ART_STYLE_3D -> COVER_ART_STYLE_3D
                 else -> COVER_ART_STYLE_DEFAULT

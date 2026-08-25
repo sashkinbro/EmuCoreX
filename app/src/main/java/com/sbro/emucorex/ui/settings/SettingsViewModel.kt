@@ -165,7 +165,7 @@ data class SettingsUiState(
     val sdCardDataPath: String? = null,
     val coverDownloadBaseUrl: String? = null,
     val arcadeCoverDownloadBaseUrl: String? = null,
-    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_DEFAULT,
+    val coverArtStyle: Int = AppPreferences.COVER_ART_STYLE_3D,
     val biosValid: Boolean = false,
     val setupComplete: Boolean = false,
     val appVersion: String = "1.0.0",
