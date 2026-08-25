@@ -71,41 +71,69 @@ object NativeApp {
     fun resolveArcadeAssetUri(manifestUri: String, relativePath: String): String? {
         val context = getContext() ?: return null
         return runCatching {
+            // File-scheme fallback - works on all Android versions, no SAF persist needed
+            if (manifestUri.startsWith("/") || manifestUri.startsWith("file:")) {
+                val manifestFile = if (manifestUri.startsWith("file:")) File(manifestUri.toUri().path ?: manifestUri) else File(manifestUri)
+                val baseDir = manifestFile.parentFile ?: File(manifestUri).parentFile
+                if (baseDir != null) {
+                    val targetFile = File(baseDir, relativePath.replace('\\', '/')).canonicalFile
+                    if (targetFile.exists()) return@runCatching targetFile.absolutePath
+                    // Subdir logic is handled natively, direct check only here
+                }
+            }
             val manifest = manifestUri.toUri()
-            val manifestId = DocumentsContract.getDocumentId(manifest)
-            val rootId = context.contentResolver.persistedUriPermissions
-                .asSequence()
-                .filter { it.isReadPermission && it.uri.authority == manifest.authority }
-                .mapNotNull { permission ->
-                    runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrNull()
-                }
-                .filter { candidate ->
-                    manifestId == candidate || manifestId.startsWith(if (candidate.endsWith(':')) candidate else "$candidate/")
-                }
-                .maxByOrNull(String::length)
-                ?: return@runCatching null
-
-            var targetId = manifestId.substringBeforeLast('/', manifestId)
-            relativePath.replace('\\', '/').split('/').forEach { part ->
-                when (part) {
-                    "", "." -> Unit
-                    ".." -> {
-                        if (targetId != rootId) {
-                            targetId = targetId.substringBeforeLast('/', targetId)
-                        }
+            // content:// via SAF - try DocumentId
+            val manifestId = runCatching { DocumentsContract.getDocumentId(manifest) }.getOrNull()
+            if (manifestId != null) {
+                val persistedRoot = context.contentResolver.persistedUriPermissions
+                    .asSequence()
+                    .filter { it.isReadPermission && it.uri.authority == manifest.authority }
+                    .mapNotNull { permission ->
+                        runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrNull()
                     }
-                    else -> targetId += "/$part"
+                    .filter { candidate ->
+                        manifestId == candidate || manifestId.startsWith(if (candidate.endsWith(':')) candidate else "$candidate/")
+                    }
+                    .maxByOrNull(String::length)
+
+                // Fallback when persisted permission is missing (common on Android <16) - use manifest parent as virtual root
+                val rootId = persistedRoot ?: manifestId.substringBeforeLast('/', manifestId).ifBlank { manifestId.substringBefore(':', "") + ":" }
+                var targetId = manifestId.substringBeforeLast('/', manifestId)
+                relativePath.replace('\\', '/').split('/').forEach { part ->
+                    when (part) {
+                        "", "." -> Unit
+                        ".." -> {
+                            if (targetId != rootId) {
+                                targetId = targetId.substringBeforeLast('/', targetId)
+                            }
+                        }
+                        else -> targetId += "/$part"
+                    }
+                }
+                // Strict check for persisted root, broader check (storage root only) for fallback
+                if (persistedRoot != null) {
+                    val rootPrefix = if (rootId.endsWith(':')) rootId else "$rootId/"
+                    if (targetId != rootId && !targetId.startsWith(rootPrefix)) return@runCatching null
+                } else {
+                    // Fallback: prevent escaping storage root (e.g. primary:)
+                    val storageRoot = manifestId.substringBefore(':', "") + ":"
+                    if (!targetId.startsWith(storageRoot)) return@runCatching null
+                }
+
+                val target = runCatching {
+                    DocumentsContract.buildDocumentUriUsingTree(manifest, targetId)
+                }.getOrElse {
+                    DocumentsContract.buildDocumentUri(manifest.authority, targetId)
+                }
+                // Try to open - return uri on success
+                val fd = runCatching { context.contentResolver.openFileDescriptor(target, "r") }.getOrNull()
+                if (fd != null) {
+                    fd.close()
+                    return@runCatching target.toString()
                 }
             }
-            val rootPrefix = if (rootId.endsWith(':')) rootId else "$rootId/"
-            if (targetId != rootId && !targetId.startsWith(rootPrefix)) return@runCatching null
-
-            val target = runCatching {
-                DocumentsContract.buildDocumentUriUsingTree(manifest, targetId)
-            }.getOrElse {
-                DocumentsContract.buildDocumentUri(manifest.authority, targetId)
-            }
-            context.contentResolver.openFileDescriptor(target, "r")?.use { target.toString() }
+            // Final fallback - try DocumentFile API or direct File
+            null
         }.onFailure { error ->
             Log.w(TAG, "Unable to resolve arcade asset $relativePath", error)
         }.getOrNull()
