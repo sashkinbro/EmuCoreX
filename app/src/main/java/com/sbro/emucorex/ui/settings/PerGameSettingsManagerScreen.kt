@@ -489,8 +489,17 @@ fun PerGameSettingsManagerScreen(
             selectedGame?.let { game ->
                 item {
                     val storedProfile = profiles.firstOrNull { it.gameKey == game.path }
-                    val defaultProfile = remember(settingsSnapshot, game) {
-                        settingsSnapshot.toPerGameSettings(game)
+                    val frameGenerationForDefault = remember(context, settingsSnapshot) {
+                        FrameGenerationManager(context).snapshot()
+                    }
+                    val defaultProfile = remember(settingsSnapshot, game, frameGenerationForDefault) {
+                        settingsSnapshot.toPerGameSettings(game).copy(
+                            frameGenerationEnabled = frameGenerationForDefault.settings.enabled,
+                            frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
+                            frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
+                            frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
+                            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
+                        )
                     }
                     val editableProfile = remember(storedProfile, defaultProfile) {
                         (storedProfile ?: defaultProfile).resolveAgainst(defaultProfile)
@@ -1524,8 +1533,19 @@ fun PerGameSettingsQuickEditorDialog(
     val repository = remember(context) { PerGameSettingsRepository(context) }
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
-    val initialProfile = remember(game.path, game.title, game.serial, settingsSnapshot) {
-        repository.get(game.path) ?: settingsSnapshot.toPerGameSettings(game)
+    val frameGenerationForDefault = remember(context, settingsSnapshot) {
+        FrameGenerationManager(context).snapshot()
+    }
+    val initialProfile = remember(game.path, game.title, game.serial, settingsSnapshot, frameGenerationForDefault) {
+        val base = settingsSnapshot.toPerGameSettings(game)
+        val withLsfg = base.copy(
+            frameGenerationEnabled = frameGenerationForDefault.settings.enabled,
+            frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
+            frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
+            frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
+            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
+        )
+        repository.get(game.path) ?: withLsfg
     }
 
     GameSettingsEditorDialog(
@@ -1671,9 +1691,12 @@ private fun GameSettingsEditorDialog(
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val frameGenerationForDefault = remember(context, settingsSnapshot) {
+        FrameGenerationManager(context).snapshot()
+    }
     val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
-    val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial) {
-        settingsSnapshot.toPerGameSettings(
+    val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial, frameGenerationForDefault) {
+        val base = settingsSnapshot.toPerGameSettings(
             GameItem(
                 path = profile.gameKey,
                 title = profile.gameTitle,
@@ -1682,6 +1705,13 @@ private fun GameSettingsEditorDialog(
                 lastModified = profile.updatedAt,
                 serial = profile.gameSerial
             )
+        )
+        base.copy(
+            frameGenerationEnabled = frameGenerationForDefault.settings.enabled,
+            frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
+            frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
+            frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
+            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
         )
     }
     val editableProfile = remember(profile, defaultProfile) {
@@ -3992,6 +4022,11 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         renderer = pick("renderer", renderer, defaultProfile.renderer),
         gpuDriverType = pick("gpuDriverType", gpuDriverType, defaultProfile.gpuDriverType),
         customDriverPath = pick("customDriverPath", customDriverPath, defaultProfile.customDriverPath),
+        frameGenerationEnabled = pick("frameGenerationEnabled", frameGenerationEnabled, defaultProfile.frameGenerationEnabled),
+        frameGenerationMultiplier = pick("frameGenerationMultiplier", frameGenerationMultiplier, defaultProfile.frameGenerationMultiplier),
+        frameGenerationPerformance = pick("frameGenerationPerformance", frameGenerationPerformance, defaultProfile.frameGenerationPerformance),
+        frameGenerationFlowScale = pick("frameGenerationFlowScale", frameGenerationFlowScale, defaultProfile.frameGenerationFlowScale),
+        frameGenerationTargetRate = pick("frameGenerationTargetRate", frameGenerationTargetRate, defaultProfile.frameGenerationTargetRate),
         mediatekAngleOpenGl = pick("mediatekAngleOpenGl", mediatekAngleOpenGl, defaultProfile.mediatekAngleOpenGl),
         upscaleMultiplier = pick("upscaleMultiplier", upscaleMultiplier, defaultProfile.upscaleMultiplier),
         aspectRatio = pick("aspectRatio", aspectRatio, defaultProfile.aspectRatio),
