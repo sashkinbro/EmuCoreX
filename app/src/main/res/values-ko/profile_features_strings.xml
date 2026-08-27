@@ -15,4 +15,6 @@
     <string name="profile_unblock_player">Unblock</string>
     <string name="profile_recent_events">Recent events</string>
     <string name="profile_event_achievement">Achievement unlocked</string>
+    <string name="profile_device_delete">기기 삭제</string>
+    <string name="profile_device_deleted">기기가 삭제되었습니다</string>
 </resources>

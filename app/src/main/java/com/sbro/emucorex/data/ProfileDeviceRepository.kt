@@ -136,7 +136,7 @@ class ProfileDeviceRepository(context: Context) {
                     return@addSnapshotListener
                 }
                 trySend(snapshot?.documents.orEmpty().mapNotNull { it.toPlayerDevice() }
-                    .hideMigratedDuplicates()
+                    .deduplicateDevices()
                     .sortedWith(compareByDescending<PlayerDevice> { it.isCurrent }.thenByDescending { it.lastSeenAtMs ?: 0L }))
             }
         awaitClose { registration.remove() }
@@ -148,22 +148,28 @@ class ProfileDeviceRepository(context: Context) {
         val local = currentDevice()
         val existing = ref.document(local.deviceId).get().await()
         val allDevices = ref.get().await().documents
-        val legacyDuplicates = allDevices.filter { document ->
+        // Clean up any hardware duplicates (reinstalls) regardless of stable prefix
+        val hardwareDuplicates = allDevices.filter { document ->
             document.id != local.deviceId &&
-                !document.id.startsWith(STABLE_ID_PREFIX) &&
                 document.toPlayerDevice()?.sameHardwareProfile(local) == true
         }
+        val legacyDuplicates = hardwareDuplicates.filter { !it.id.startsWith(STABLE_ID_PREFIX) }
+        val stableDuplicates = hardwareDuplicates.filter { it.id.startsWith(STABLE_ID_PREFIX) }
+        // For random-ID installs (ANDROID_ID empty) all duplicates are legacy;
+        // for stable installs, keep the stable one and remove old random ones.
+        // If multiple stable duplicates exist (should not happen), keep only current.
         val isPublic = existing.getBoolean(FIELD_PUBLIC) == true ||
-            legacyDuplicates.any { it.getBoolean(FIELD_PUBLIC) == true }
+            hardwareDuplicates.any { it.getBoolean(FIELD_PUBLIC) == true }
         val current = local.copy(isPublic = isPublic)
         val data = current.toPrivateMap(uid, includeCreatedAt = !existing.exists())
         val previousCurrent = allDevices.filter { it.getBoolean(FIELD_CURRENT) == true }
-        val legacyDuplicateIds = legacyDuplicates.mapTo(mutableSetOf()) { it.id }
+        val duplicateIds = hardwareDuplicates.mapTo(mutableSetOf()) { it.id }
         firestore.runBatch { batch ->
-            previousCurrent.filter { it.id != current.deviceId && it.id !in legacyDuplicateIds }.forEach { document ->
+            previousCurrent.filter { it.id != current.deviceId && it.id !in duplicateIds }.forEach { document ->
                 batch.set(document.reference, mapOf(FIELD_CURRENT to false), SetOptions.merge())
             }
-            legacyDuplicates.forEach { document -> batch.delete(document.reference) }
+            // Remove reinstall duplicates to keep only unique hardware
+            hardwareDuplicates.forEach { document -> batch.delete(document.reference) }
             batch.set(ref.document(current.deviceId), data, SetOptions.merge())
             if (isPublic) {
                 batch.set(
@@ -174,6 +180,17 @@ class ProfileDeviceRepository(context: Context) {
             }
         }.await()
         return current
+    }
+
+    suspend fun deleteDevice(deviceId: String) {
+        val uid = auth.currentUser?.uid ?: return
+        // Prevent deleting the current device via manual call - UI should block this,
+        // but guard here to avoid accidental removal of active session device
+        val local = currentDevice()
+        if (deviceId == local.deviceId) return
+        firestore.collection(USERS).document(uid).collection(DEVICES).document(deviceId).delete().await()
+        // If deleted device was public, clear public profile device visibility
+        // (public device will be re-set on next register if needed)
     }
 
     suspend fun setPublic(deviceId: String, isPublic: Boolean) {
@@ -250,12 +267,22 @@ class ProfileDeviceRepository(context: Context) {
         )
     }
 
-    private fun List<PlayerDevice>.hideMigratedDuplicates(): List<PlayerDevice> {
+    private fun List<PlayerDevice>.deduplicateDevices(): List<PlayerDevice> {
+        // Hide legacy random IDs when a stable android_ device with same hardware exists
         val stableProfiles = filter { it.deviceId.startsWith(STABLE_ID_PREFIX) }
-        return filter { device ->
+        val afterMigration = filter { device ->
             device.deviceId.startsWith(STABLE_ID_PREFIX) || stableProfiles.none { it.sameHardwareProfile(device) }
+        }
+        // Deduplicate reinstalls: same hardware (manufacturer+model+soc+gpu+ram) -> keep most recent
+        val sorted = afterMigration.sortedWith(compareByDescending<PlayerDevice> { it.isCurrent }.thenByDescending { it.lastSeenAtMs ?: 0L })
+        val seenHardware = mutableSetOf<String>()
+        return sorted.filter { device ->
+            val key = "${device.manufacturer.lowercase()}|${device.model.lowercase()}|${device.soc.lowercase()}|${device.gpuFamily.lowercase()}|${device.ramMb}"
+            if (key in seenHardware) false else { seenHardware.add(key); true }
         }.distinctBy(PlayerDevice::deviceId)
     }
+
+    private fun List<PlayerDevice>.hideMigratedDuplicates(): List<PlayerDevice> = deduplicateDevices()
 
     private fun PlayerDevice.sameHardwareProfile(other: PlayerDevice): Boolean =
         manufacturer.equals(other.manufacturer, ignoreCase = true) &&

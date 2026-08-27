@@ -53,4 +53,6 @@
     <string name="profile_unblock_player">Розблокувати</string>
     <string name="profile_recent_events">Останні події</string>
     <string name="profile_event_achievement">Досягнення розблоковано</string>
+    <string name="profile_device_delete">Видалити пристрій</string>
+    <string name="profile_device_deleted">Пристрій видалено</string>
 </resources>

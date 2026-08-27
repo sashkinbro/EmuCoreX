@@ -211,6 +211,7 @@ fun ProfileScreen(
             devices = uiState.devices,
             isLoading = uiState.isFeatureActionLoading,
             onSetPublic = viewModel::setDevicePublic,
+            onDelete = viewModel::deleteDevice,
             onDismiss = { showDevices = false }
         )
     }
@@ -1319,6 +1320,7 @@ private fun ProfileDevicesDialog(
     devices: List<PlayerDevice>,
     isLoading: Boolean,
     onSetPublic: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     ProfileFeatureDialog(title = stringResource(R.string.profile_devices_title), onDismiss = onDismiss) {
@@ -1328,7 +1330,7 @@ private fun ProfileDevicesDialog(
         }
         devices.forEach { device ->
             Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(9.dp))
@@ -1336,12 +1338,22 @@ private fun ProfileDevicesDialog(
                         if (device.isCurrent) Text(stringResource(R.string.profile_device_current), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     }
                     Text(listOf(device.soc, device.gpuFamily, device.androidVersion).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    OutlinedButton(
-                        enabled = !isLoading,
-                        onClick = { onSetPublic(device.deviceId, !device.isPublic) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(stringResource(if (device.isPublic) R.string.profile_device_make_private else R.string.profile_device_make_public))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            enabled = !isLoading,
+                            onClick = { onSetPublic(device.deviceId, !device.isPublic) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(stringResource(if (device.isPublic) R.string.profile_device_make_private else R.string.profile_device_make_public))
+                        }
+                        if (!device.isCurrent) {
+                            IconButton(
+                                enabled = !isLoading,
+                                onClick = { onDelete(device.deviceId) }
+                            ) {
+                                Icon(Icons.Rounded.Delete, contentDescription = stringResource(R.string.profile_device_delete), tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             }
@@ -3298,6 +3310,7 @@ private fun profileMessageRes(key: String): Int = when (key) {
     "profile_pro_updated" -> R.string.profile_pro_updated
     "profile_device_public" -> R.string.profile_device_public_done
     "profile_device_private" -> R.string.profile_device_private_done
+    "profile_device_deleted" -> R.string.profile_device_deleted
     "profile_cloud_saved" -> R.string.profile_cloud_saved
     "profile_cloud_restored" -> R.string.profile_cloud_restored
     "profile_cloud_deleted" -> R.string.profile_cloud_deleted

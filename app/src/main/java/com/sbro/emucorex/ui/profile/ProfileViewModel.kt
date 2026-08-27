@@ -226,6 +226,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         deviceRepository.setPublic(deviceId, visible)
     }
 
+    fun deleteDevice(deviceId: String) = runFeatureAction("profile_device_deleted") {
+        deviceRepository.deleteDevice(deviceId)
+    }
+
     fun refreshCloudProfiles() {
         if (_uiState.value.account == null) return
         viewModelScope.launch {
