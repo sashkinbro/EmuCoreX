@@ -455,7 +455,7 @@ fun VectorDpadCluster(
     onDirectionsChange: ((Set<OverlayDpadDirection>) -> Unit)? = null
 ) {
     var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
-    var activePointerId by remember { mutableIntStateOf(MotionEvent.INVALID_POINTER_ID) }
+    var activePointerId by remember { mutableStateOf<Long?>(null) }
     var activeDirections by remember { mutableStateOf(emptySet<OverlayDpadDirection>()) }
     val currentDirections by rememberUpdatedState(activeDirections)
     val currentOnDirectionsChange by rememberUpdatedState(onDirectionsChange)
@@ -483,46 +483,44 @@ fun VectorDpadCluster(
     }
 
     fun resetDirections() {
-        activePointerId = MotionEvent.INVALID_POINTER_ID
+        activePointerId = null
         setDirections(emptySet())
     }
 
+    // Replaced pointerInteropFilter with pointerInput for reliable multitouch tracking
+    // and better compatibility with Samsung OneUI / Android 16 where interop may miss events
     val pointerModifier = if (interactive && onDirectionsChange != null) {
-        Modifier.pointerInteropFilter { event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                    if (activePointerId == MotionEvent.INVALID_POINTER_ID) {
-                        val index = event.actionIndex
-                        activePointerId = event.getPointerId(index)
-                        setDirections(directionsFromPosition(event.getX(index), event.getY(index)))
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_MOVE -> {
-                    val index = event.findPointerIndex(activePointerId)
-                    if (index >= 0) {
-                        setDirections(directionsFromPosition(event.getX(index), event.getY(index)))
-                        true
+        Modifier.pointerInput(interactive) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val currentId = activePointerId
+                    if (currentId == null) {
+                        val down = event.changes.firstOrNull { change ->
+                            change.pressed && !change.previousPressed && !change.isConsumed &&
+                                change.position.x in 0f..bounds.width &&
+                                change.position.y in 0f..bounds.height
+                        }
+                        if (down != null) {
+                            activePointerId = down.id.value
+                            setDirections(directionsFromPosition(down.position.x, down.position.y))
+                            down.consume()
+                        }
                     } else {
-                        false
+                        val activeChange = event.changes.firstOrNull { it.id.value == currentId }
+                        if (activeChange == null) {
+                            // Pointer vanished without explicit up (cancel) - reset to avoid stuck direction
+                            resetDirections()
+                        } else if (!activeChange.pressed) {
+                            resetDirections()
+                            activeChange.consume()
+                        } else {
+                            setDirections(directionsFromPosition(activeChange.position.x, activeChange.position.y))
+                            activeChange.consume()
+                        }
+                        // Ignore additional pointers while one is already active for this dpad
                     }
                 }
-
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                    val pointerId = event.getPointerId(event.actionIndex)
-                    if (pointerId == activePointerId) {
-                        resetDirections()
-                    }
-                    true
-                }
-
-                MotionEvent.ACTION_CANCEL -> {
-                    resetDirections()
-                    true
-                }
-
-                else -> activePointerId != MotionEvent.INVALID_POINTER_ID
             }
         }
     } else {
@@ -758,12 +756,8 @@ fun VectorAnalogStick(
         }
     }
     val isActivelyPressed = pressed || activePointerId != null
-    val pressScale = animatedPressScale(
-        pressed = isActivelyPressed,
-        effect = pressEffect,
-        growScale = 1.12f,
-        label = "vector_analog_stick_scale"
-    )
+    // Disable stick scaling on press/drag to keep thumb travel precise and avoid visual jitter
+    val pressScale = 1f
     val glowProgress by animateFloatAsState(
         targetValue = if (isActivelyPressed && pressEffect == TouchControlPressEffect.GLOW) 1f else 0f,
         animationSpec = tween(durationMillis = 110),

@@ -124,6 +124,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
@@ -2717,12 +2718,12 @@ private fun TouchButtonGroup(
         longPressJobs.remove(pointerId)?.cancel()
         val activeTarget = longPressActiveTargets.remove(pointerId)
         if (activeTarget != null && !longPressActiveTargets.containsValue(activeTarget)) {
-            specById[activeTarget]?.onLongPressChange?.invoke(false)
+            currentSpecById[activeTarget]?.onLongPressChange?.invoke(false)
         }
     }
 
     fun startLongPress(pointerId: Long, targetId: String) {
-        val spec = specById[targetId] ?: return
+        val spec = currentSpecById[targetId] ?: return
         if (!spec.hasLongPressAction()) return
         longPressJobs.remove(pointerId)?.cancel()
         longPressJobs[pointerId] = coroutineScope.launch {
@@ -2751,7 +2752,7 @@ private fun TouchButtonGroup(
 
         if (oldTarget != null) {
             activeTargets.remove(pointerId)
-            val oldSpec = specById[oldTarget]
+            val oldSpec = currentSpecById[oldTarget]
             if (oldSpec?.hasLongPressAction() == true) {
                 cancelLongPress(pointerId)
             } else if (oldSpec?.hasTapToHoldAction() == true) {
@@ -2772,7 +2773,7 @@ private fun TouchButtonGroup(
         if (newTarget != null) {
             val alreadyActive = activeTargets.containsValue(newTarget)
             activeTargets[pointerId] = newTarget
-            val newSpec = specById[newTarget]
+            val newSpec = currentSpecById[newTarget]
             if (!alreadyActive && newSpec?.haptics != false) {
                 onTouchHaptic(ButtonPhase.PRESS)
             }
@@ -2826,105 +2827,84 @@ private fun TouchButtonGroup(
                 IntOffset(groupRect.left.roundToInt(), groupRect.top.roundToInt())
             }
             .size(groupWidth, groupHeight)
-            .pointerInteropFilter { event ->
-                when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index).toLong()
-                        val x = event.getX(index) + groupRect.left
-                        val y = event.getY(index) + groupRect.top
-                        val target = hitTarget(x, y)
-
-                        when {
-                            target != null -> {
-                                downTargets[pointerId] = target
-                                updatePointerTarget(pointerId, target)
-                                true
-                            }
-
-                            touchscreenRightStick && gesturePointerId == null -> {
-                                gesturePointerId = pointerId
-                                gestureOrigin = Offset(event.getX(index), event.getY(index))
-                                true
-                            }
-
-                            else -> activeTargets.isNotEmpty() || gesturePointerId != null
-                        }
-                    }
-
-                    MotionEvent.ACTION_MOVE -> {
-                        var handled = false
-                        for (index in 0 until event.pointerCount) {
-                            val pointerId = event.getPointerId(index).toLong()
-                            val pointerX = event.getX(index)
-                            val pointerY = event.getY(index)
-                            if (downTargets.containsKey(pointerId)) {
-                                updatePointerTarget(
-                                    pointerId = pointerId,
-                                    newTarget = hitTarget(
-                                        pointerX + groupRect.left,
-                                        pointerY + groupRect.top
+            // Use Compose pointerInput instead of pointerInteropFilter:
+            // - pointerInput delivers proper per-pointer press/move/release events and cancellation
+            // - pointerInteropFilter could miss ACTION_UP under rapid multitouch / Samsung OneUI
+            //   which caused stuck keys and completely dead overlay on some devices (e.g., Samsung S26)
+            .pointerInput(layoutKey, touchscreenRightStick) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { change ->
+                            val pointerId = change.id.value
+                            val isDown = change.pressed && !change.previousPressed
+                            val isUp = !change.pressed && change.previousPressed
+                            if (isDown && !change.isConsumed) {
+                                val target = hitTarget(change.position.x, change.position.y)
+                                if (target != null) {
+                                    downTargets[pointerId] = target
+                                    updatePointerTarget(pointerId, target)
+                                    change.consume()
+                                } else if (touchscreenRightStick && gesturePointerId == null) {
+                                    gesturePointerId = pointerId
+                                    gestureOrigin = change.position
+                                    change.consume()
+                                }
+                            } else if (isUp) {
+                                val downTarget = downTargets.remove(pointerId)
+                                if (downTarget != null) {
+                                    val upTarget = hitTarget(change.position.x, change.position.y)
+                                    val downSpec = currentSpecById[downTarget]
+                                    val consumedByLongPress = longPressActiveTargets[pointerId] == downTarget
+                                    updatePointerTarget(pointerId, null)
+                                    if (downTarget == upTarget) {
+                                        if (downSpec?.hasLongPressAction() == true) {
+                                            if (!consumedByLongPress) sendShortTap(downSpec)
+                                        } else if (downSpec?.hasTapToHoldAction() == true) {
+                                            toggleLatchedTarget(downSpec)
+                                        } else {
+                                            downSpec?.onClick?.invoke()
+                                        }
+                                    }
+                                    change.consume()
+                                } else if (gesturePointerId == pointerId) {
+                                    releaseTouchscreenRightStick()
+                                    change.consume()
+                                }
+                            } else if (change.pressed) {
+                                if (downTargets.containsKey(pointerId)) {
+                                    val newTarget = hitTarget(change.position.x, change.position.y)
+                                    updatePointerTarget(pointerId, newTarget)
+                                    change.consume()
+                                } else if (gesturePointerId == pointerId) {
+                                    val value = calculateRightStickGestureValue(
+                                        deltaX = change.position.x - gestureOrigin.x,
+                                        deltaY = change.position.y - gestureOrigin.y,
+                                        radiusPx = gestureRadiusPx
                                     )
-                                )
-                                handled = true
-                            } else if (gesturePointerId == pointerId) {
-                                val value = calculateRightStickGestureValue(
-                                    deltaX = pointerX - gestureOrigin.x,
-                                    deltaY = pointerY - gestureOrigin.y,
-                                    radiusPx = gestureRadiusPx
-                                )
-                                updateRightAnalogStick(
-                                    x = if (currentInvertRightStickHorizontal) -value.x else value.x,
-                                    y = if (currentInvertRightStick) -value.y else value.y,
-                                    sensitivity = currentTouchscreenRightStickSensitivity,
-                                    onPadInput = currentOnPadInput
-                                )
-                                handled = true
-                            }
-                        }
-                        handled
-                    }
-
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                        val index = event.actionIndex
-                        val pointerId = event.getPointerId(index).toLong()
-                        val downTarget = downTargets.remove(pointerId)
-                        if (downTarget != null) {
-                            val upTarget = hitTarget(
-                                event.getX(index) + groupRect.left,
-                                event.getY(index) + groupRect.top
-                            )
-                            val downSpec = specById[downTarget]
-                            val consumedByLongPress = longPressActiveTargets[pointerId] == downTarget
-                            updatePointerTarget(pointerId, null)
-                            if (downTarget == upTarget) {
-                                if (downSpec?.hasLongPressAction() == true) {
-                                    if (!consumedByLongPress) sendShortTap(downSpec)
-                                } else if (downSpec?.hasTapToHoldAction() == true) {
-                                    toggleLatchedTarget(downSpec)
-                                } else {
-                                    downSpec?.onClick?.invoke()
+                                    updateRightAnalogStick(
+                                        x = if (currentInvertRightStickHorizontal) -value.x else value.x,
+                                        y = if (currentInvertRightStick) -value.y else value.y,
+                                        sensitivity = currentTouchscreenRightStickSensitivity,
+                                        onPadInput = currentOnPadInput
+                                    )
+                                    change.consume()
                                 }
                             }
-                            true
-                        } else if (gesturePointerId == pointerId) {
+                        }
+                        // Stuck-key guard: clean up pointers that disappeared without explicit up (missed cancel)
+                        val presentIds = event.changes.map { it.id.value }.toSet()
+                        val staleActive = activeTargets.keys.filter { it !in presentIds }
+                        if (staleActive.isNotEmpty()) {
+                            staleActive.forEach { pid ->
+                                updatePointerTarget(pid, null, emitReleaseHaptic = false)
+                                downTargets.remove(pid)
+                            }
+                        }
+                        if (gesturePointerId != null && gesturePointerId !in presentIds) {
                             releaseTouchscreenRightStick()
-                            true
-                        } else {
-                            activeTargets.isNotEmpty() || gesturePointerId != null
                         }
                     }
-
-                    MotionEvent.ACTION_CANCEL -> {
-                        activeTargets.keys.toList().forEach { pointerId ->
-                            updatePointerTarget(pointerId, null, emitReleaseHaptic = false)
-                        }
-                        downTargets.clear()
-                        releaseTouchscreenRightStick()
-                        true
-                    }
-
-                    else -> false
                 }
             }
     ) {
