@@ -125,19 +125,81 @@ object NativeApp {
                 }.getOrElse {
                     DocumentsContract.buildDocumentUri(manifest.authority, targetId)
                 }
-                // Try to open - return uri on success
+                // Primary path: try direct FD (fast on Android 15/16)
                 val fd = runCatching { context.contentResolver.openFileDescriptor(target, "r") }.getOrNull()
                 if (fd != null) {
                     fd.close()
                     return@runCatching target.toString()
                 }
+                // Code branch for Android 14- where persisted permission is missing:
+                // enumerate via DocumentsContract child listing which works with the temporary
+                // grant from the picker, without requiring persistedUriPermission.
+                val fallbackUri = resolveViaChildEnumeration(context, manifest, manifestId, relativePath)
+                if (fallbackUri != null) return@runCatching fallbackUri
             }
-            // Final fallback - try DocumentFile API or direct File
-            null
+            // Final fallback - try direct File if somehow accessible
+            resolveViaChildEnumeration(context, manifestUri.toUri(), runCatching { DocumentsContract.getDocumentId(manifestUri.toUri()) }.getOrNull() ?: "", relativePath)
         }.onFailure { error ->
             Log.w(TAG, "Unable to resolve arcade asset $relativePath", error)
         }.getOrNull()
     }
+
+    private fun resolveViaChildEnumeration(context: Context, manifestUri: android.net.Uri, manifestId: String, relativePath: String): String? {
+        return runCatching {
+            if (manifestId.isBlank()) return@runCatching null
+            val manifestParentId = manifestId.substringBeforeLast('/', "")
+            if (manifestParentId.isEmpty()) return@runCatching null
+            val treeUri = when {
+                DocumentsContract.isTreeUri(manifestUri) -> manifestUri
+                else -> {
+                    val persistedTree = context.contentResolver.persistedUriPermissions.firstOrNull { perm ->
+                        perm.isReadPermission && perm.uri.authority == manifestUri.authority &&
+                            runCatching { DocumentsContract.getTreeDocumentId(perm.uri) }.getOrNull()?.let { treeId ->
+                                manifestParentId == treeId || manifestParentId.startsWith(if (treeId.endsWith(':')) treeId else "$treeId/")
+                            } == true
+                    }?.uri
+                    persistedTree ?: manifestUri
+                }
+            }
+            var currentId = manifestParentId
+            val parts = relativePath.replace('\\', '/').split('/').filter { it.isNotEmpty() && it != "." }
+            for (part in parts) {
+                if (part == "..") {
+                    val rootCheck = currentId.substringBefore(':', "")
+                    val parent = currentId.substringBeforeLast('/', "")
+                    currentId = if (parent.isEmpty() || parent == rootCheck) "$rootCheck:" else parent
+                    continue
+                }
+                val nextId = findChildDocumentId(context, treeUri, currentId, part) ?: return@runCatching null
+                currentId = nextId
+            }
+            val target = runCatching { DocumentsContract.buildDocumentUriUsingTree(treeUri, currentId) }
+                .getOrElse { DocumentsContract.buildDocumentUri(manifestUri.authority ?: "", currentId) }
+            val fd = runCatching { context.contentResolver.openFileDescriptor(target, "r") }.getOrNull()
+            if (fd != null) {
+                fd.close()
+                return@runCatching target.toString()
+            }
+            null
+        }.getOrNull()
+    }
+
+    private fun findChildDocumentId(context: Context, treeUri: android.net.Uri, parentId: String, displayName: String): String? {
+        val childrenUri = runCatching { DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId) }.getOrNull() ?: return null
+        val cursor = runCatching {
+            context.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+        }.getOrNull() ?: return null
+        cursor.use {
+            while (it.moveToNext()) {
+                val name = it.getString(1) ?: continue
+                if (name.equals(displayName, ignoreCase = true)) {
+                    return it.getString(0)
+                }
+            }
+        }
+        return null
+    }
+
     @Suppress("unused") // Exported JNI entry point retained for native data-root reloads.
     @JvmStatic external fun reloadDataRoot(path: String)
     @JvmStatic external fun setSystemCaBundlePath(path: String)
