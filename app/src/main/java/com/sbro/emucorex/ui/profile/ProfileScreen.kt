@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -175,6 +176,8 @@ fun ProfileScreen(
     val topInset = appScreenTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val selectedTab = rememberSaveable { mutableIntStateOf(0) }
+    // Preserve scroll position for leaderboard/top-1000 list when navigating to a profile and back
+    val mainListState = rememberLazyListState()
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     var showProCustomization by rememberSaveable { mutableStateOf(false) }
     var showDevices by rememberSaveable { mutableStateOf(false) }
@@ -326,6 +329,7 @@ fun ProfileScreen(
             } else {
                 Box(modifier = Modifier.weight(1f)) {
                     LazyColumn(
+                        state = mainListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = ScreenHorizontalPadding,
