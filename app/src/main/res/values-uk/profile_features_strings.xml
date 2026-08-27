@@ -20,13 +20,13 @@
     <string name="profile_device_public_done">Пристрій тепер видно у вашому профілі.</string>
     <string name="profile_device_private_done">Пристрій приховано з вашого профілю.</string>
     <string name="profile_cloud_title">Налаштування емулятора у хмарі</string>
-    <string name="profile_cloud_description">Збережіть до 5 іменованих профілів. Синхронізуються лише переносимі налаштування емулятора та окремих ігор; шляхи до ігор, BIOS, карт пам’яті й власних драйверів залишаються на пристрої.</string>
+    <string name="profile_cloud_description">Збережіть до 5 іменованих профілів. Синхронізуються лише переносимі налаштування емулятора та окремих ігор. Ігри, BIOS, швидкі збереження (save states), карти пам’яті та шляхи до власних драйверів не синхронізуються й залишаються на пристрої.</string>
     <string name="profile_cloud_name">Назва профілю</string>
     <string name="profile_cloud_save_current">Зберегти поточні налаштування</string>
     <string name="profile_cloud_version">Застосунок %1$s · ядро %2$s</string>
     <string name="profile_cloud_restore">Відновити</string>
     <string name="profile_cloud_confirm_restore">Підтвердити відновлення</string>
-    <string name="profile_cloud_restore_warning">Це замінить налаштування емулятора та окремих ігор на цьому пристрої. Бібліотека, BIOS і збереження не зміняться.</string>
+    <string name="profile_cloud_restore_warning">Це замінить налаштування емулятора та окремих ігор на цьому пристрої. Ігри, BIOS, швидкі збереження (save states) і карти пам’яті не зміняться.</string>
     <string name="profile_cloud_delete">Видалити хмарний профіль</string>
     <string name="profile_cloud_saved">Налаштування емулятора збережено у профілі.</string>
     <string name="profile_cloud_restored">Налаштування емулятора відновлено. Перезапустіть активну гру, щоб застосувати їх.</string>
