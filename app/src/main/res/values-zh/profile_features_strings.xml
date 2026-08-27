@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">删除设备</string>
     <string name="profile_device_deleted">设备已删除</string>
+    <string name="profile_friend_remove_title">移除好友？</string>
+    <string name="profile_friend_remove_confirm">将 %1$s 从好友中移除？</string>
+    <string name="profile_achievements_empty">尚未解锁任何成就</string>
 </resources>

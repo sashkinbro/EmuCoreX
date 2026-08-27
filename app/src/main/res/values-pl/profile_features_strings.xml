@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Usuń urządzenie</string>
     <string name="profile_device_deleted">Urządzenie usunięte</string>
+    <string name="profile_friend_remove_title">Usunąć znajomego?</string>
+    <string name="profile_friend_remove_confirm">Usunąć %1$s ze znajomych?</string>
+    <string name="profile_achievements_empty">Nie odblokowano jeszcze osiągnięć</string>
 </resources>

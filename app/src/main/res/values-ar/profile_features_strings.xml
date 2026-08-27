@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">حذف الجهاز</string>
     <string name="profile_device_deleted">تم حذف الجهاز</string>
+    <string name="profile_friend_remove_title">حذف الصديق؟</string>
+    <string name="profile_friend_remove_confirm">هل تريد إزالة %1$s من الأصدقاء؟</string>
+    <string name="profile_achievements_empty">لا توجد إنجازات مفتوحة بعد</string>
 </resources>

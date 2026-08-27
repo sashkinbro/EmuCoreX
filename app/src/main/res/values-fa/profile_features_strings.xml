@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">حذف دستگاه</string>
     <string name="profile_device_deleted">دستگاه حذف شد</string>
+    <string name="profile_friend_remove_title">حذف دوست؟</string>
+    <string name="profile_friend_remove_confirm">%1$s را از دوستان حذف کنیم؟</string>
+    <string name="profile_achievements_empty">هنوز موفقیتی باز نشده است</string>
 </resources>

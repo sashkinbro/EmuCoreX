@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Cihazı sil</string>
     <string name="profile_device_deleted">Cihaz silindi</string>
+    <string name="profile_friend_remove_title">Arkadaşı sil?</string>
+    <string name="profile_friend_remove_confirm">%1$s adlı kişiyi arkadaşlardan sil?</string>
+    <string name="profile_achievements_empty">Henüz açılmamış başarı yok</string>
 </resources>

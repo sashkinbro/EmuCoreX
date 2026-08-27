@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Excluir dispositivo</string>
     <string name="profile_device_deleted">Dispositivo removido</string>
+    <string name="profile_friend_remove_title">Remover amigo?</string>
+    <string name="profile_friend_remove_confirm">Remover %1$s dos amigos?</string>
+    <string name="profile_achievements_empty">Nenhuma conquista desbloqueada ainda</string>
 </resources>

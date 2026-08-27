@@ -55,4 +55,7 @@
     <string name="profile_event_achievement">Досягнення розблоковано</string>
     <string name="profile_device_delete">Видалити пристрій</string>
     <string name="profile_device_deleted">Пристрій видалено</string>
+    <string name="profile_friend_remove_title">Видалити з друзів?</string>
+    <string name="profile_friend_remove_confirm">Видалити %1$s з друзів?</string>
+    <string name="profile_achievements_empty">Поки немає розблокованих досягнень</string>
 </resources>

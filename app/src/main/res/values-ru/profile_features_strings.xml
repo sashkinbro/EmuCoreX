@@ -20,4 +20,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Удалить устройство</string>
     <string name="profile_device_deleted">Устройство удалено</string>
+    <string name="profile_friend_remove_title">Удалить из друзей?</string>
+    <string name="profile_friend_remove_confirm">Удалить %1$s из друзей?</string>
+    <string name="profile_achievements_empty">Пока нет разблокированных достижений</string>
 </resources>

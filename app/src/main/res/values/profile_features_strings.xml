@@ -55,4 +55,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Delete device</string>
     <string name="profile_device_deleted">Device removed</string>
+    <string name="profile_friend_remove_title">Remove friend?</string>
+    <string name="profile_friend_remove_confirm">Remove %1$s from friends?</string>
+    <string name="profile_achievements_empty">No achievements unlocked yet</string>
 </resources>

@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">डिवाइस हटाएं</string>
     <string name="profile_device_deleted">डिवाइस हटा दिया गया</string>
+    <string name="profile_friend_remove_title">मित्र हटाएं?</string>
+    <string name="profile_friend_remove_confirm">%1$s को मित्रों से हटाएं?</string>
+    <string name="profile_achievements_empty">अभी तक कोई उपलब्धि अनलॉक नहीं हुई</string>
 </resources>

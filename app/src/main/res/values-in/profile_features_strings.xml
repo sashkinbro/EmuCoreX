@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Hapus perangkat</string>
     <string name="profile_device_deleted">Perangkat dihapus</string>
+    <string name="profile_friend_remove_title">Hapus teman?</string>
+    <string name="profile_friend_remove_confirm">Hapus %1$s dari daftar teman?</string>
+    <string name="profile_achievements_empty">Belum ada pencapaian yang terbuka</string>
 </resources>

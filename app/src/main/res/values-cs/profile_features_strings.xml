@@ -17,4 +17,7 @@
     <string name="profile_event_achievement">Achievement unlocked</string>
     <string name="profile_device_delete">Odstranit zařízení</string>
     <string name="profile_device_deleted">Zařízení odstraněno</string>
+    <string name="profile_friend_remove_title">Odstranit přítele?</string>
+    <string name="profile_friend_remove_confirm">Odstranit %1$s z přátel?</string>
+    <string name="profile_achievements_empty">Zatím žádné odemčené úspěchy</string>
 </resources>

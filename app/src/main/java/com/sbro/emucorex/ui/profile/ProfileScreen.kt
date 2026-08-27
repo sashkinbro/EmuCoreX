@@ -66,6 +66,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Leaderboard
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonAdd
@@ -80,6 +81,8 @@ import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.FilterChip
@@ -1253,13 +1256,37 @@ private fun ProfileFriendsDialog(
     ProfileFeatureDialog(title = stringResource(R.string.profile_friends_title), onDismiss = onDismiss) {
         if (accepted.isEmpty()) Text(stringResource(R.string.profile_friends_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
         accepted.forEach { relation ->
+            var showMenu by remember { mutableStateOf(false) }
+            var showConfirm by remember { mutableStateOf(false) }
+            if (showConfirm) {
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { showConfirm = false },
+                    title = { Text(stringResource(R.string.profile_friend_remove_title)) },
+                    text = { Text(stringResource(R.string.profile_friend_remove_confirm, profiles[relation.otherUid]?.displayName ?: relation.otherUid.take(8))) },
+                    confirmButton = {
+                        TextButton(enabled = !isLoading, onClick = { showConfirm = false; onRemove(relation.id) }) {
+                            Text(stringResource(R.string.profile_friend_remove_action), color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    dismissButton = { TextButton(onClick = { showConfirm = false }) { Text(stringResource(R.string.cancel)) } }
+                )
+            }
             SocialIdentityRow(
                 uid = relation.otherUid,
                 profile = profiles[relation.otherUid],
                 onOpen = { onOpenProfile(relation.otherUid) },
                 action = {
-                    TextButton(enabled = !isLoading, onClick = { onRemove(relation.id) }) {
-                        Text(stringResource(R.string.profile_friend_remove_action))
+                    Box {
+                        IconButton(enabled = !isLoading, onClick = { showMenu = true }) {
+                            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.profile_friend_remove_title))
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.profile_friend_remove_action), color = MaterialTheme.colorScheme.error) },
+                                onClick = { showMenu = false; showConfirm = true },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
                     }
                 }
             )
@@ -1306,7 +1333,8 @@ private fun SocialIdentityRow(
         onClick = onOpen ?: {},
         enabled = onOpen != null,
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(Icons.Rounded.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -1333,7 +1361,7 @@ private fun ProfileDevicesDialog(
             Text(stringResource(R.string.profile_devices_empty), style = MaterialTheme.typography.bodyMedium)
         }
         devices.forEach { device ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -1393,7 +1421,7 @@ private fun CloudProfilesDialog(
             modifier = Modifier.fillMaxWidth()
         ) { Text(stringResource(R.string.profile_cloud_save_current)) }
         profiles.forEach { profile ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)) {
+            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(profile.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                     Text(stringResource(R.string.profile_cloud_version, profile.appVersion, profile.coreVersion), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
