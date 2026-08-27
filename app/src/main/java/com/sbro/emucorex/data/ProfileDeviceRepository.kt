@@ -155,11 +155,16 @@ class ProfileDeviceRepository(context: Context) {
         }
         val legacyDuplicates = hardwareDuplicates.filter { !it.id.startsWith(STABLE_ID_PREFIX) }
         val stableDuplicates = hardwareDuplicates.filter { it.id.startsWith(STABLE_ID_PREFIX) }
-        // For random-ID installs (ANDROID_ID empty) all duplicates are legacy;
-        // for stable installs, keep the stable one and remove old random ones.
-        // If multiple stable duplicates exist (should not happen), keep only current.
-        val isPublic = existing.getBoolean(FIELD_PUBLIC) == true ||
-            hardwareDuplicates.any { it.getBoolean(FIELD_PUBLIC) == true }
+        // Default to visible: if no device is public yet, make current public (first install and reinstalls)
+        // This ensures every user has at least one visible device by default, but still allows manual hide afterwards
+        // (hide will be respected until next reinstall/new device, when it will become public again)
+        val anyPublicExists = allDevices.any { it.getBoolean(FIELD_PUBLIC) == true }
+        val isPublic = when {
+            !anyPublicExists -> true
+            existing.exists() -> existing.getBoolean(FIELD_PUBLIC) == true
+            hardwareDuplicates.any { it.getBoolean(FIELD_PUBLIC) == true } -> true
+            else -> false
+        }
         val current = local.copy(isPublic = isPublic)
         val data = current.toPrivateMap(uid, includeCreatedAt = !existing.exists())
         val previousCurrent = allDevices.filter { it.getBoolean(FIELD_CURRENT) == true }
