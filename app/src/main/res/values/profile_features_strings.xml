@@ -20,13 +20,13 @@
     <string name="profile_device_public_done">Device is visible in your profile.</string>
     <string name="profile_device_private_done">Device was hidden from your profile.</string>
     <string name="profile_cloud_title">Emulator settings in cloud</string>
-    <string name="profile_cloud_description">Save up to 5 named profiles. Only portable emulator and per-game settings are synced. Games, BIOS, save states (quick saves), memory cards and custom driver paths are not synced and stay on this device.</string>
+    <string name="profile_cloud_description">Save up to 5 named profiles. Only your emulator and per-game settings are synced. Your games, BIOS files, save states (quick saves), memory card files and custom drivers stay only on this device and are not synced.</string>
     <string name="profile_cloud_name">Profile name</string>
     <string name="profile_cloud_save_current">Save current settings</string>
     <string name="profile_cloud_version">App %1$s · core %2$s</string>
     <string name="profile_cloud_restore">Restore</string>
     <string name="profile_cloud_confirm_restore">Confirm restore</string>
-    <string name="profile_cloud_restore_warning">This replaces the emulator and per-game settings on this device. Your games, BIOS, save states (quick saves) and memory cards are not changed.</string>
+    <string name="profile_cloud_restore_warning">This replaces the emulator and per-game settings on this device. Your games, BIOS files, save states and memory cards will not be changed.</string>
     <string name="profile_cloud_delete">Delete cloud profile</string>
     <string name="profile_cloud_saved">Emulator settings saved to your profile.</string>
     <string name="profile_cloud_restored">Emulator settings restored. Restart a running game to apply them.</string>
