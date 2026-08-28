@@ -1471,10 +1471,14 @@ static void recCFC2_emit_oaknut()
 
 static void recCFC2()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_TRANSFER_RECOMPILE) && !defined(CP2_CFC2_RECOMPILE)
+	recCOP2InterpreterCall(CFC2);
+#else
 	if (recCOP2TryInterpTransfer(CFC2))
 		return;
 
 	recCFC2_emit_oaknut();
+#endif
 }
 
 static void recCTC2Store32_emit_oaknut(oak::WReg value, s64 offset)
@@ -1511,10 +1515,10 @@ static void recCTC2WriteStatus_emit_oaknut(int xmmtemp)
 	oakAsm->MOV(OAK_WSCRATCH, OAK_WSCRATCH2);
 	oakAsm->LSR(OAK_WSCRATCH2, OAK_WSCRATCH, 3);
 	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH2, 0x18);
-	oakAsm->LSL(oak::util::W4, OAK_WSCRATCH, 11);
+	oakAsm->LSR(oak::util::W4, OAK_WSCRATCH, 11);
 	oakAsm->AND(oak::util::W4, oak::util::W4, 0x1800);
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, oak::util::W4);
-	oakAsm->LSL(OAK_WSCRATCH, OAK_WSCRATCH, 14);
+	oakAsm->LSR(OAK_WSCRATCH, OAK_WSCRATCH, 14);
 	oakAsm->MOV(oak::util::W4, 0x3cf0000);
 	oakAsm->AND(OAK_WSCRATCH, OAK_WSCRATCH, oak::util::W4);
 	oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH2, OAK_WSCRATCH);
@@ -1559,6 +1563,9 @@ static void recCTC2WriteNormalVI_emit_oaknut(int vireg)
 	{
 		recCTC2MoveRtToW_emit_oaknut(oakWRegister(vireg));
 		oakAsm->UXTH(oakWRegister(vireg), oakWRegister(vireg));
+		// Also store to memory for VU0 microcode (reads VI[] from memory).
+		// EEINST_VIUSEDTEST doesn't track VU0 reads, so X86 cache would hide the update from VU0.
+		recCTC2Store32_emit_oaknut(oakWRegister(vireg), static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[0].VI[_Rd_].UL)));
 	}
 	else
 	{
@@ -1611,6 +1618,14 @@ static void recCTC2_emit_oaknut()
 
 	if (!_Rd_)
 		return;
+
+	// [WORKAROUND] CTC2: keep VI writes etc on interpreter, only FBRST/CMSAR1/R/STATUS on JIT
+	// VI1 (and VI 0-15) JIT hangs even with memory-only fix - deeper sync issue
+	if (_Rd_ != REG_FBRST && _Rd_ != REG_CMSAR1 && _Rd_ != REG_R && _Rd_ != REG_STATUS_FLAG)
+	{
+		recCOP2InterpreterCall(CTC2);
+		return;
+	}
 
 	if (!(cpuRegs.code & 1))
 	{
@@ -1675,9 +1690,9 @@ static void recCTC2_emit_oaknut()
 			// sVU's COP2 has a comment that "Donald Duck" needs this too...
 			if (_Rd_ < REG_STATUS_FLAG)
 			{
-				// Little bit nasty, but optimal codegen.
-				const int vireg = _allocIfUsedVItoX86(_Rd_, MODE_WRITE);
-				recCTC2WriteNormalVI_emit_oaknut(vireg);
+				// Force memory-only path for CTC2 VI writes (no X86 cache).
+				// Previous fix (register+memory) still hung, try pure memory.
+				recCTC2WriteNormalVI_emit_oaknut(-1);
 			}
 			else
 			{
@@ -1698,10 +1713,14 @@ static void recCTC2_emit_oaknut()
 
 static void recCTC2()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_TRANSFER_RECOMPILE) && !defined(CP2_CTC2_RECOMPILE)
+	recCOP2InterpreterCall(CTC2);
+#else
 	if (recCOP2TryInterpTransfer(CTC2))
 		return;
 
 	recCTC2_emit_oaknut();
+#endif
 }
 
 static void recMoveQ_emit_oaknut(int dst, int src)
@@ -1785,10 +1804,14 @@ static void recQMFC2_emit_oaknut()
 
 static void recQMFC2()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_TRANSFER_RECOMPILE) && !defined(CP2_QMFC2_RECOMPILE)
+	recCOP2InterpreterCall(QMFC2);
+#else
 	if (recCOP2TryInterpTransfer(QMFC2))
 		return;
 
 	recQMFC2_emit_oaknut();
+#endif
 }
 
 static void recQMTC2_emit_oaknut()
@@ -1845,10 +1868,14 @@ static void recQMTC2_emit_oaknut()
 
 static void recQMTC2()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_TRANSFER_RECOMPILE) && !defined(CP2_QMTC2_RECOMPILE)
+	recCOP2InterpreterCall(QMTC2);
+#else
 	if (recCOP2TryInterpTransfer(QMTC2))
 		return;
 
 	recQMTC2_emit_oaknut();
+#endif
 }
 
 //------------------------------------------------------------------
@@ -1920,7 +1947,7 @@ void recCOP2()
 	recCOP2t[_Rs_]();
 }
 
-#if defined(LOADSTORE_RECOMPILE) && defined(CP2_RECOMPILE)
+#if defined(LOADSTORE_RECOMPILE) && (defined(CP2_RECOMPILE) || defined(CP2_LQC2_RECOMPILE))
 
 /*********************************************************
 * Load and store for COP2 (VU0 unit)                     *
@@ -2105,19 +2132,29 @@ void recSQC2()
 }
 
 #else
-//namespace Interp = R5900::Interpreter::OpcodeImpl;
+// LQC2/SQC2 not recompiled - provide interpreter fallback
+namespace Interp = R5900::Interpreter::OpcodeImpl;
 
-//REC_FUNC(LQC2);
-//REC_FUNC(SQC2);
+REC_FUNC(LQC2);
+REC_FUNC(SQC2);
 
 #endif
 
 } // namespace OpcodeImpl
 } // namespace Dynarec
 } // namespace R5900
-void recCOP2_BC2() { recCOP2_BC2t[_Rt_](); }
+void recCOP2_BC2() {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_BC2_RECOMPILE)
+	recCall(R5900::Interpreter::OpcodeImpl::COP2);
+#else
+	recCOP2_BC2t[_Rt_]();
+#endif
+}
 void recCOP2_SPEC1()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_SPEC1_RECOMPILE)
+	recCall(R5900::Interpreter::OpcodeImpl::COP2);
+#else
 	if (g_pCurInstInfo->info & (EEINST_COP2_SYNC_VU0 | EEINST_COP2_FINISH_VU0))
 		mVUFinishVU0();
 
@@ -2125,12 +2162,16 @@ void recCOP2_SPEC1()
 		return;
 
 	recCOP2SPECIAL1t[_Funct_]();
-
+#endif
 }
 void recCOP2_SPEC2()
 {
+#if !defined(CP2_RECOMPILE) && !defined(CP2_SPEC2_RECOMPILE)
+	recCall(R5900::Interpreter::OpcodeImpl::COP2);
+#else
 	if (recCOP2TryInterpSPEC2())
 		return;
 
 	recCOP2SPECIAL2t[(cpuRegs.code & 3) | ((cpuRegs.code >> 4) & 0x7c)]();
+#endif
 }

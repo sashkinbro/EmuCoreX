@@ -1603,6 +1603,8 @@ namespace EmuFolders
 
 //------------ EE Recompiler defines - Comment to disable a recompiler ---------------
 
+// [EXCLUSION DEBUG] COP2 disabled, all others enabled.
+// Bug is confirmed in COP2/VU0 macro mode recompilation.
 #define SHIFT_RECOMPILE // Speed majorly reduced if disabled
 #define BRANCH_RECOMPILE // Speed extremely reduced if disabled - more then shift
 
@@ -1621,7 +1623,20 @@ namespace EmuFolders
 #define MMI3_RECOMPILE
 #define FPU_RECOMPILE
 #define CP0_RECOMPILE
-#define CP2_RECOMPILE
+#define CP2_RECOMPILE  // <-- FIXED: VI write now goes to memory, STATUS shift fixed
+
+// [EXCLUSION DEBUG] COP2 sub-group macros for narrowing down the bug.
+// When CP2_RECOMPILE is off, these control individual sub-families.
+// Enable one at a time to find the culprit.
+#define CP2_LQC2_RECOMPILE      // LQC2/SQC2 - VU0 memory load/store
+#define CP2_BC2_RECOMPILE       // BC2 branches - VU0 flag branches
+#define CP2_TRANSFER_RECOMPILE  // all transfers
+#define CP2_CFC2_RECOMPILE      // CFC2 - read VU0 ctrl regs to EE
+#define CP2_CTC2_RECOMPILE      // CTC2 - write EE regs to VU0 ctrl
+#define CP2_QMFC2_RECOMPILE     // QMFC2 - read VU0 VF regs to EE (128-bit)
+#define CP2_QMTC2_RECOMPILE     // QMTC2 - write EE regs to VU0 VF (128-bit)
+#define CP2_SPEC1_RECOMPILE  // VADDx/VMULx/VMAXx/VMADDx etc.
+#define CP2_SPEC2_RECOMPILE  // VDIV/VSQRT/VMOVE/VLQI/VSQI etc.
 
 // You can't recompile ARITHMETICIMM without ARITHMETIC.
 #ifndef ARITHMETIC_RECOMPILE
