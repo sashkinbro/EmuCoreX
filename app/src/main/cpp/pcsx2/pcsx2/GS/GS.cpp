@@ -830,16 +830,36 @@ void GSgetStats(SmallStringBase& info)
 	}
 	else
 	{
-		info.format("{} HW | {} PRIM | {} DRW | {} DRWC | {} BAR | {} RP | {} RB | {} TC | {} TU",
-			api_name,
-			(int)pm.Get(GSPerfMon::Prim),
-			(int)pm.Get(GSPerfMon::Draw),
-			(int)std::ceil(pm.Get(GSPerfMon::DrawCalls)),
-			(int)std::ceil(pm.Get(GSPerfMon::Barriers)),
-			(int)std::ceil(pm.Get(GSPerfMon::RenderPasses)),
-			(int)std::ceil(pm.Get(GSPerfMon::Readbacks)),
-			(int)std::ceil(pm.Get(GSPerfMon::TextureCopies)),
-			(int)std::ceil(pm.Get(GSPerfMon::TextureUploads)));
+		if (!GSConfig.HWROV)
+		{
+			info.format("{} HW | {} PRIM | {} DRW | {} DRWC | {} BAR | {} RP | {} RB | {} TC | {} TU",
+				api_name,
+				(int)pm.Get(GSPerfMon::Prim),
+				(int)pm.Get(GSPerfMon::Draw),
+				(int)std::ceil(pm.Get(GSPerfMon::DrawCalls)),
+				(int)std::ceil(pm.Get(GSPerfMon::Barriers)),
+				(int)std::ceil(pm.Get(GSPerfMon::RenderPasses)),
+				(int)std::ceil(pm.Get(GSPerfMon::Readbacks)),
+				(int)std::ceil(pm.Get(GSPerfMon::TextureCopies)),
+				(int)std::ceil(pm.Get(GSPerfMon::TextureUploads)));
+		}
+		else
+		{
+			// Add ROV stats along standard stats.
+			info.format("{} HW | {} PRIM | {} DRW | {}/{} DRWC | {}/{} BAR | {} RP | {} RB | {}/{} TC | {} TU",
+				api_name,
+				(int)pm.Get(GSPerfMon::Prim),
+				(int)pm.Get(GSPerfMon::Draw),
+				(int)std::ceil(pm.Get(GSPerfMon::DrawCalls)),
+				(int)std::ceil(pm.Get(GSPerfMon::DrawCallsROV)),
+				(int)std::ceil(pm.Get(GSPerfMon::Barriers)),
+				(int)std::ceil(pm.Get(GSPerfMon::BarriersROV)),
+				(int)std::ceil(pm.Get(GSPerfMon::RenderPasses)),
+				(int)std::ceil(pm.Get(GSPerfMon::Readbacks)),
+				(int)std::ceil(pm.Get(GSPerfMon::TextureCopies)),
+				(int)std::ceil(pm.Get(GSPerfMon::TextureCopiesROV)),
+				(int)std::ceil(pm.Get(GSPerfMon::TextureUploads)));
+		}
 	}
 }
 
@@ -1014,7 +1034,7 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 		g_gs_renderer->PurgeTextureCache(true, false, true);
 	}
 
-	if (GSConfig.OsdShowGPU != old_config.OsdShowGPU)
+	if (GSConfig.OsdShowGPU && !old_config.OsdShowGPU)
 	{
 #ifdef __ANDROID__
 		GSConfig.OsdShowGPU = emucorex::android::IsPerformanceGpuTimingRequested() &&
@@ -1024,6 +1044,12 @@ void GSUpdateConfig(const Pcsx2Config::GSOptions& new_config)
 		if (!g_gs_device->SetGPUTimingEnabled(GSConfig.OsdShowGPU))
 			GSConfig.OsdShowGPU = false;
 #endif
+	}
+
+	if (GSConfig.OsdShowGPUStats != old_config.OsdShowGPUStats)
+	{
+		if (!g_gs_device->SetGPUPipelineStatisticsEnabled(GSConfig.OsdShowGPUStats))
+			GSConfig.OsdShowGPUStats = false;
 	}
 }
 
@@ -1488,12 +1514,12 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 					return;
 
 				static constexpr std::array<const char*, static_cast<u8>(AccBlendLevel::MaxCount)> s_blending_option_names = {{
-					TRANSLATE_NOOP("Hotkeys", "Minimum"),
-					TRANSLATE_NOOP("Hotkeys", "Basic"),
-					TRANSLATE_NOOP("Hotkeys", "Medium"),
-					TRANSLATE_NOOP("Hotkeys", "High"),
-					TRANSLATE_NOOP("Hotkeys", "Full"),
-					TRANSLATE_NOOP("Hotkeys", "Maximum"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "Minimum"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "Basic"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "Medium"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "High"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "Full"),
+					TRANSLATE_NOOP("Hotkeys_BlendAcc", "Maximum"),
 				}};
 
 				const AccBlendLevel new_blend_mode = static_cast<AccBlendLevel>(

@@ -19,10 +19,9 @@ class GSTexture11 final : public GSTexture
 	wil::com_ptr_nothrow<ID3D11UnorderedAccessView> m_uav;
 	wil::com_ptr_nothrow<ID3D11DepthStencilView> m_read_only_dsv;
 	D3D11_TEXTURE2D_DESC m_desc;
-
 public:
 	explicit GSTexture11(wil::com_ptr_nothrow<ID3D11Texture2D> texture, const D3D11_TEXTURE2D_DESC& desc,
-		GSTexture::Type type, GSTexture::Format format);
+		Usage usage, Format format);
 
 	static DXGI_FORMAT GetDXGIFormat(Format format);
 

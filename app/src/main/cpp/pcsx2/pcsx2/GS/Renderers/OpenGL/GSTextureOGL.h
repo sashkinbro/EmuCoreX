@@ -28,13 +28,13 @@ private:
 	u32 m_int_shift = 0;
 
 public:
-	explicit GSTextureOGL(Type type, int width, int height, int levels, Format format);
+	explicit GSTextureOGL(Usage usage, int width, int height, int levels, Format format);
 	~GSTextureOGL() override;
 
 	__fi GLenum GetIntFormat() const { return m_int_format; }
-	__fi GLenum GetGLFormat() const { return m_gl_format; }
 	__fi GLenum GetIntType() const { return m_int_type; }
 	__fi u32 GetIntShift() const { return m_int_shift; }
+	__fi u32 GetGLFormat() const { return m_gl_format; }
 
 	void* GetNativeHandle() const override;
 
@@ -57,6 +57,7 @@ public:
 	}
 
 	__fi u32 GetID() { return m_texture_id; }
+	__fi u32 GetGLFormat() { return m_gl_format; }
 };
 
 class GSDownloadTextureOGL final : public GSDownloadTexture

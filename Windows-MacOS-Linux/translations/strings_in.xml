@@ -575,7 +575,7 @@
     <string name="settings_about">Tentang</string>
     <string name="settings_version">Versi</string>
     <string name="settings_emulator_core">Inti Emulasi</string>
-    <string name="settings_emulator_core_desc">Berbasis PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">Berbasis PCSX2 (2.8.0)</string>
     <string name="settings_about_app">Tentang EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX adalah pustaka dan peluncur PlayStation 2 yang dibangun di sekitar inti emulasi berbasis PCSX2, dengan penyiapan cepat, navigasi bersih, dan pengalaman yang ramah pengguna seluler (genggam).</string>
     <string name="settings_about_studio">Pengembang</string>

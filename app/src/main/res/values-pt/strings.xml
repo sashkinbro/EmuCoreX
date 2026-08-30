@@ -236,7 +236,7 @@
     <string name="settings_about">Sobre</string>
     <string name="settings_version">Versão</string>
     <string name="settings_emulator_core">Núcleo de Emulação</string>
-    <string name="settings_emulator_core_desc">Baseado no PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">Baseado no PCSX2 (2.8.0)</string>
     <string name="settings_about_app">Sobre o EmuCoreX</string>
     <string name="settings_about_app_desc">O EmuCoreX é uma biblioteca e inicializador de PlayStation 2 construído em torno de um núcleo de emulação baseado no PCSX2, com configuração rápida, navegação limpa e uma experiência amigável para dispositivos portáteis.</string>
     <string name="settings_about_studio">Desenvolvedor</string>

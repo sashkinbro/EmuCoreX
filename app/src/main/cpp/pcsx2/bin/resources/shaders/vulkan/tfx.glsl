@@ -15,7 +15,7 @@ layout(std140, set = 0, binding = 0) uniform cb0
 	vec2 TextureOffset;
 	vec2 PointSize;
 	uint MaxDepth;
-	uint pad_cb0;
+	float LineAA1Width;
 };
 
 layout(location = 0) out VSOutput
@@ -154,6 +154,110 @@ ProcessedVertex load_vertex(uint index)
 	vtx.t.z = a_f.r;
 
 	return vtx;
+}
+
+// Convert XY from NDC to GS pixel coordinates (i.e. 1.0 = 1 GS pixel).
+vec2 get_xy_unscaled(vec2 xy)
+{
+	return round(xy / VertexScale) / 16.0f;
+}
+
+// Get the XY deltas in GS pixel coordinates, using first vertex as the origin.
+mat2 get_xy_deltas_unscaled(ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2)
+{
+	vec2 xy0 = get_xy_unscaled(v0.p.xy);
+	vec2 xy1 = get_xy_unscaled(v1.p.xy);
+	vec2 xy2 = get_xy_unscaled(v2.p.xy);
+	return mat2(xy1 - xy0, xy2 - xy0);
+}
+
+// Get the AA1 outward expand direction to the edge formed by the first two vertices.
+// This is up or down for shallow (X dominant) edges, and right or left for steep (Y dominant) edges.
+// Similar expansion to line AA1 except instead of expanding on both sides of the line,
+// expand on on the side towards the outside of the triangle.
+vec2 get_aa1_triangle_expand_dir(ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2)
+{
+	mat2 xy_deltas = get_xy_deltas_unscaled(v0, v1, v2);
+	vec2 line_delta = xy_deltas[0];
+	vec2 line_opposite = xy_deltas[1];
+
+	vec2 line_normal = vec2(line_delta.y, -line_delta.x);
+	vec2 line_expand = abs(line_delta.x) >= abs(line_delta.y) ? vec2(0.0f, 1.0f) : vec2(1.0f, 0.0f);
+
+	if ((dot(line_expand, line_normal) >= 0.0f) == (dot(line_opposite, line_normal) >= 0.0f))
+	{
+		// Expand direction point towards the interior so flip it.
+		line_expand = -line_expand;
+	}
+
+	return line_expand;
+}
+
+mat2 get_inverse(mat2 mat, float det)
+{
+	return mat2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1 / det);
+}
+
+// Extrapolate triangle attributes from the first vertex along the given direction.
+// dp_mat is derived from the input vertices, it is passed in to avoid recomputing.
+void extrapolate_aa1_triangle_edge(inout ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2, mat2 dp_mat, vec2 dp)
+{
+	// Get texture deltas
+	#if VS_TME
+		#if VS_FST
+			mat2 dt = mat2(v1.ti.zw - v0.ti.zw, v2.ti.zw - v0.ti.zw);
+		#else
+			mat2 dt = mat2(v1.t.xy - v0.t.xy, v2.t.xy - v0.t.xy);
+		#endif
+	#endif
+
+	// Get color delta if interpolating
+	#if VS_IIP
+		mat2x4 dc = mat2x4(v1.c - v0.c, v2.c - v0.c);
+	#endif
+
+	vec2 dz = vec2(v1.p.z - v0.p.z, v2.p.z - v0.p.z); // Z deltas
+
+	vec2 df = vec2(v1.t.z - v0.t.z, v2.t.z - v0.t.z); // Fog deltas
+
+	vec2 dq = vec2(v1.t.w - v0.t.w, v2.t.w - v0.t.w); // Q deltas
+
+	// To prevent unstable extrapolation, do not extrapolate if the
+	// minimum perpendicular length of the triangle is < 2 pixels.
+	float dp_det = determinant(dp_mat); // Twice signed triangle area.
+	float len0 = length(dp_mat[0]);
+	float len1 = length(dp_mat[1]);
+	float len2 = length(dp_mat[1] - dp_mat[0]);
+	float min_perp_length = abs(dp_det) / max(max(len0, len1), len2);
+
+	// Get the position -> barycentric weight matrix
+	mat2 inv_dp_mat = get_inverse(dp_mat, dp_det);
+
+	vec2 weights = min_perp_length < 2 ? vec2(0) : inv_dp_mat * dp;
+
+	v0.p.xy += dp * PointSize; // Extrapolate position
+
+	// Extrapolate texture coords
+	#if VS_TME
+		#if VS_FST
+			v0.ti.zw += dt * weights;
+			v0.ti.xy = v0.ti.zw * TextureScale;
+		#else
+			v0.t.xy += dt * weights;
+			v0.ti.zw = v0.t.xy / TextureScale;
+			v0.t.w += dot(dq, weights);
+		#endif
+	#endif
+
+	// Extrapolate and clamp color
+	#if VS_IIP
+		v0.c += dc * weights;
+		v0.c = clamp(v0.c, vec4(0), vec4(255));
+	#endif
+
+	v0.p.z += dot(dz, weights); // Extrapolate depth
+
+	v0.t.z += dot(df, weights); // Extrapolate fog
 }
 
 void main()
@@ -333,6 +437,12 @@ void main()
 #define PS_FEEDBACK_LOOP_IS_NEEDED_RT (PS_TEX_IS_FB == 1 || AFAIL_NEEDS_RT || PS_FBMASK || SW_BLEND_NEEDS_RT || SW_AD_TO_HW || (PS_DATE >= 5) || PS_COLOR_FEEDBACK)
 #define PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH (PS_DEPTH_FEEDBACK && (AFAIL_NEEDS_DEPTH || ZTST_NEEDS_DEPTH))
 
+#define PS_RETURN_COLOR_ROV (!PS_NO_COLOR && PS_ROV_COLOR)
+#define PS_RETURN_COLOR (!PS_NO_COLOR && !PS_ROV_COLOR)
+#define PS_RETURN_DEPTH_ROV (PS_ROV_DEPTH == PS_ROV_DEPTH_READ_WRITE)
+#define PS_RETURN_DEPTH (ZWRITE && !PS_ROV_DEPTH)
+#define PS_ROV_EARLYDEPTHSTENCIL (PS_ROV_COLOR && !PS_ROV_DEPTH && !ZWRITE)
+
 #define NEEDS_TEX (PS_TFX != 4)
 
 layout(std140, set = 0, binding = 1) uniform cb1
@@ -355,6 +465,12 @@ layout(std140, set = 0, binding = 1) uniform cb1
 	mat4 DitherMatrix;
 	float ScaledScaleFactor;
 	float RcpScaleFactor;
+	float _pad0_cb1;
+	float _pad1_cb1;
+	float LineCovScale;
+	float _pad2_cb1;
+	float _pad3_cb1;
+	float _pad4_cb1;
 };
 
 layout(location = 0) in VSOutput
@@ -368,11 +484,27 @@ layout(location = 0) in VSOutput
 	#endif
 } vsIn;
 
-#if !PS_NO_COLOR && !PS_NO_COLOR1
-layout(location = 0, index = 0) out vec4 o_col0;
-layout(location = 0, index = 1) out vec4 o_col1;
-#elif !PS_NO_COLOR
-layout(location = 0) out vec4 o_col0;
+#if PS_RETURN_COLOR
+	#if !PS_NO_COLOR1
+		layout(location = 0, index = 0) out vec4 o_col0;
+		layout(location = 0, index = 1) out vec4 o_col1;
+	#elif !PS_NO_COLOR
+		layout(location = 0) out vec4 o_col0;
+	#endif
+#elif PS_RETURN_COLOR_ROV
+	vec4 o_col0;
+#endif
+
+#if PS_ROV_COLOR
+	layout(set = 1, binding = 5, rgba8) uniform restrict coherent image2D RtImageRov;
+	vec4 rov_rt_value;
+	vec4 sample_from_rt() { return rov_rt_value; }
+#endif
+
+#if PS_ROV_DEPTH
+	layout(set = 1, binding = 6, r32f) uniform restrict coherent image2D DepthImageRov;
+	float rov_depth_value;
+	float sample_from_depth() { return rov_depth_value; }
 #endif
 
 #if NEEDS_TEX
@@ -382,27 +514,27 @@ layout(set = 1, binding = 1) uniform texture2D Palette;
 
 #if PS_FEEDBACK_LOOP_IS_NEEDED_RT || PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH
 	#if defined(DISABLE_TEXTURE_BARRIER) || defined(HAS_FEEDBACK_LOOP_LAYOUT)
-		#if PS_FEEDBACK_LOOP_IS_NEEDED_RT
+		#if (PS_FEEDBACK_LOOP_IS_NEEDED_RT && !PS_ROV_COLOR)
 			layout(set = 1, binding = 2) uniform texture2D RtSampler;
 			vec4 sample_from_rt() { return texelFetch(RtSampler, ivec2(gl_FragCoord.xy), 0); }
 		#endif
-		#if PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH
+		#if (PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH && !PS_ROV_DEPTH)
 			layout(set = 1, binding = 4) uniform texture2D DepthSampler;
-			vec4 sample_from_depth() { return texelFetch(DepthSampler, ivec2(gl_FragCoord.xy), 0); }
+			float sample_from_depth() { return texelFetch(DepthSampler, ivec2(gl_FragCoord.xy), 0).r; }
 		#endif
 	#else
 		// Must consider each case separately since the input attachment indices must be consecutive.
-		#if PS_FEEDBACK_LOOP_IS_NEEDED_RT && PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH
+		#if (PS_FEEDBACK_LOOP_IS_NEEDED_RT && !PS_ROV_COLOR) && (PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH && !PS_ROV_DEPTH)
 			layout(input_attachment_index = 0, set = 1, binding = 2) uniform subpassInput RtSampler;
 			layout(input_attachment_index = 1, set = 1, binding = 4) uniform subpassInput DepthSampler;
 			vec4 sample_from_rt() { return subpassLoad(RtSampler); }
-			vec4 sample_from_depth() { return subpassLoad(DepthSampler); }
-		#elif PS_FEEDBACK_LOOP_IS_NEEDED_RT
+			float sample_from_depth() { return subpassLoad(DepthSampler).r; }
+		#elif (PS_FEEDBACK_LOOP_IS_NEEDED_RT && !PS_ROV_COLOR)
 			layout(input_attachment_index = 0, set = 1, binding = 2) uniform subpassInput RtSampler;
 			vec4 sample_from_rt() { return subpassLoad(RtSampler); }
-		#elif PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH
+		#elif (PS_FEEDBACK_LOOP_IS_NEEDED_DEPTH && !PS_ROV_DEPTH)
 			layout(input_attachment_index = 0, set = 1, binding = 4) uniform subpassInput DepthSampler;
-			vec4 sample_from_depth() { return subpassLoad(DepthSampler); }
+			float sample_from_depth() { return subpassLoad(DepthSampler).r; }
 		#endif
 	#endif
 #endif
@@ -718,7 +850,7 @@ vec4 sample_depth(vec2 st, ivec2 pos)
 	}
 	#elif (PS_DEPTH_FMT == 1)
 	{
-		// Based on ps_convert_float32_rgba8 of convert
+		// Based on ps_convert_depth32_rgba8 of convert
 
 		// Convert a vec32 depth texture into a RGBA color texture
 		uint d = uint(fetch_c(uv).r * exp2(32.0f));
@@ -726,7 +858,7 @@ vec4 sample_depth(vec2 st, ivec2 pos)
 	}
 	#elif (PS_DEPTH_FMT == 2)
 	{
-		// Based on ps_convert_float16_rgb5a1 of convert
+		// Based on ps_convert_depth16_rgb5a1 of convert
 
 		// Convert a vec32 (only 16 lsb) depth into a RGB5A1 color texture
 		uint d = uint(fetch_c(uv).r * exp2(32.0f));
@@ -1208,7 +1340,7 @@ void ps_blend(inout vec4 Color, inout vec4 As_rgba)
 		#elif PS_BLEND_MIX == 1
 			Color.rgb = ((A - B) * C_clamped + D) - (124.0f/256.0f);
 		#else
-				Color.rgb = trunc((A - B) * C + D);
+			Color.rgb = trunc((A - B) * C + D);
 		#endif
 
 		#if PS_BLEND_HW == 1
@@ -1282,6 +1414,24 @@ void ps_blend(inout vec4 Color, inout vec4 As_rgba)
 	#endif
 }
 
+#if PS_ROV_COLOR || PS_ROV_DEPTH
+layout(pixel_interlock_ordered) in;
+#endif
+
+#if PS_ROV_EARLYDEPTHSTENCIL
+layout(early_fragment_tests) in;
+#endif
+
+#if PS_ROV_COLOR || PS_ROV_DEPTH
+	#define DISCARD { rov_discard_color = true; rov_discard_depth = true; }
+	#define DISCARD_COLOR rov_discard_color = true
+	#define DISCARD_DEPTH rov_discard_depth = true
+#else
+	#define DISCARD discard
+	#define DISCARD_COLOR o_col0 = sample_from_rt()
+	#define DISCARD_DEPTH input_z = sample_from_depth()
+#endif
+
 void main()
 {
 	float input_z = gl_FragCoord.z;
@@ -1304,7 +1454,7 @@ void main()
 #if PS_SCANMSK & 2
 	// fail depth test on prohibited lines
 	if ((int(gl_FragCoord.y) & 1) == (PS_SCANMSK & 1))
-		discard;
+		DISCARD;
 #endif
 #if PS_DATE >= 5
 
@@ -1332,7 +1482,7 @@ void main()
 #endif
 
 	if (bad) {
-		discard;
+		DISCARD;
 	}
 
 #endif		// PS_DATE >= 5
@@ -1343,7 +1493,7 @@ void main()
 	// the bad alpha value so we must keep it.
 
 	if (gl_PrimitiveID > stencil_ceil) {
-		discard;
+		DISCARD;
 	}
 #endif
 
@@ -1356,9 +1506,10 @@ void main()
 
 	bool atst_pass = atst(C);
 
-#if PS_AFAIL == AFAIL_KEEP
-	if (!atst_pass)
-		discard;
+#if PS_ATST != PS_ATST_NONE && PS_AFAIL == AFAIL_KEEP
+	if (!atst_pass) {
+		DISCARD;
+	}
 #endif
 
 #if SW_AD_TO_HW
@@ -1450,6 +1601,7 @@ void main()
 		alpha_blend.a = float(atst_pass);
 	#endif
 
+	// Output color scaling
 	#if !PS_NO_COLOR
 		#if PS_RTA_CORRECTION
 			o_col0.a = C.a / 128.0f;
@@ -1491,6 +1643,13 @@ void main()
 	
 	#if PS_ZWRITE
 		gl_FragDepth = input_z;
+	#elif PS_RETURN_DEPTH_ROV
+		if (!rov_discard_depth)
+			imageStore(DepthImageRov, ivec2(gl_FragCoord.xy), vec4(input_z, 0, 0, 1.0f));
+	#endif
+
+	#if PS_ROV_COLOR || PS_ROV_DEPTH
+		endInvocationInterlockARB();
 	#endif
 #endif // PS_DATE
 }

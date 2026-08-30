@@ -6,15 +6,15 @@ Audit baseline: RetroAchievements Hardcore Compliance Requirements and the
 ## Integration provenance
 
 - Android RetroAchievements behavior is tracked in this directory.
-- The overlay is based on PCSX2 `v2.7.316`, commit
-  `53e3838c1dd59f611fa3d2fd36915903a1304c6e`.
+- The overlay is based on PCSX2 `v2.8.0`, commit
+  `c10a5c9ad951c517dc48b722b5b84eb9bf7fdb42`.
 - CMake removes the upstream `Achievements.cpp` translation unit and builds
   `pcsx2_achievements_android.cpp` instead.
 - SHA-256 guards fail configuration if the pinned upstream
   `Achievements.cpp`, `Achievements.h`, or `Host.cpp` is changed without
   rebasing and reviewing the Android overlay.
 - RetroAchievements HTTP requests use the EmuCoreX identity
-  `EmuCoreX/v<version> (Android) pcsx2/v2.7.316`.
+  `EmuCoreX/v<version> (Android) pcsx2/v2.8.0`.
 
 ## Code compliance matrix
 
@@ -99,7 +99,7 @@ These must be corrected before the application is submitted:
   transfer details, or a complete GDPR basis. RetroAchievements processing and
   Google Play Billing are also not described.
 - The public website still describes the core as PCSX2 `2.7.217`, while this
-  pinned integration and client identity use PCSX2 `2.7.316`.
+  pinned integration and client identity use PCSX2 `2.8.0`.
 - A public Free-versus-Pro matrix and complete shipped-dependency/license page
   were not found on the public website.
 

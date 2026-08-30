@@ -396,6 +396,8 @@ static const char* s_gs_hw_fix_names[] = {
 	"minimumBlendingLevel",
 	"maximumBlendingLevel",
 	"recommendedBlendingLevel",
+	"recommendedAccurateAlphaTest",
+	"recommendedHWAA1",
 	"getSkipCount",
 	"beforeDraw",
 	"moveHandler",
@@ -937,6 +939,48 @@ void GameDatabaseSchema::GameEntry::applyGSHardwareFixes(Pcsx2Config::GSOptions&
 			}
 			break;
 
+			case GSHWFixId::RecommendedAccurateAlphaTest:
+			{
+				if (!is_sw_renderer && value >= 0 && value <= 1 &&
+					static_cast<int>(config.HWAccurateAlphaTest) < value)
+				{
+					Host::AddKeyedOSDMessage("HWAlphaTestWarning",
+						fmt::format(TRANSLATE_FS("GameDatabase",
+										"{0} Accurate Alpha Test is currently disabled.\n"
+										"This game recommends enabling Accurate Alpha Test.\n"
+										"You can enable it in Game Properties to improve graphical\n"
+										"accuracy, but this may increase system requirements."),
+							ICON_FA_PAINTBRUSH),
+						Host::OSD_WARNING_DURATION);
+				}
+				else
+				{
+					Host::RemoveKeyedOSDMessage("HWAlphaTestWarning");
+				}
+			}
+			break;
+
+			case GSHWFixId::RecommendedHWAA1:
+			{
+				if (!is_sw_renderer && value >= 0 && value <= 1 &&
+					static_cast<int>(config.HWAA1) < value)
+				{
+					Host::AddKeyedOSDMessage("HWAA1Warning",
+						fmt::format(TRANSLATE_FS("GameDatabase",
+										"{0} AA1 is currently disabled.\n"
+										"This game recommends enabling AA1.\n"
+										"You can enable it in Game Properties to improve graphical\n"
+										"accuracy, but this may increase system requirements."),
+							ICON_FA_PAINTBRUSH),
+						Host::OSD_WARNING_DURATION);
+				}
+				else
+				{
+					Host::RemoveKeyedOSDMessage("HWAA1Warning");
+				}
+			}
+			break;
+
 			case GSHWFixId::GetSkipCount:
 				config.GetSkipCountFunctionId = static_cast<s16>(value);
 				break;
@@ -988,7 +1032,7 @@ void GameDatabase::initDatabase()
 	const ryml::csubstr yaml = ryml::to_csubstr(*buffer);
 
 	Error error;
-	std::optional<ryml::Tree> tree = ParseYAMLFromString(yaml, ryml::to_csubstr(name), &error);
+	std::optional<ryml::Tree> tree = ParseYAMLFromString(yaml, ryml::to_csubstr(name), &error, true);
 	if (!tree.has_value())
 	{
 		Console.ErrorFmt("GameDB: Failed to parse game database file {}:", path);

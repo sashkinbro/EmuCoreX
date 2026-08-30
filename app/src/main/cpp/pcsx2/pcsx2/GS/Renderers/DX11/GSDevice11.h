@@ -83,11 +83,17 @@ public:
 private:
 	enum : u32
 	{
+		TEXTURE_TEXTURE = 0,
+		TEXTURE_PALETTE = 1,
+		TEXTURE_RT = 2,
+		TEXTURE_PRIMID = 3,
+		TEXTURE_DEPTH = 4,
 		MAX_TEXTURES = 5,
 		MAX_SAMPLERS = 1,
 		VERTEX_BUFFER_SIZE = 32 * 1024 * 1024,
 		INDEX_BUFFER_SIZE = 16 * 1024 * 1024,
 		NUM_TIMESTAMP_QUERIES = 5,
+		NUM_PIPELINE_STATISTICS_QUERIES = 5,
 	};
 
 	void SetFeatures(IDXGIAdapter1* adapter);
@@ -102,8 +108,13 @@ private:
 	void PopTimestampQuery();
 	void KickTimestampQuery();
 
-	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const bool linear) override;
-	void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, bool linear, const InterlaceConstantBuffer& cb) override;
+	bool CreatePipelineStatisticsQueries();
+	void DestroyPipelineStatisticsQueries();
+	void PopPipelineStatisticsQuery();
+	void KickPipelineStatisticsQuery();
+
+	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) override;
+	void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) override;
 	void DoFXAA(GSTexture* sTex, GSTexture* dTex) override;
 	void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) override;
 
@@ -127,6 +138,8 @@ private:
 	wil::com_ptr_nothrow<ID3D11Buffer> m_expand_ib;
 	wil::com_ptr_nothrow<ID3D11ShaderResourceView> m_expand_vb_srv;
 
+	GSTexture* m_null_texture;
+
 	D3D_FEATURE_LEVEL m_feature_level = D3D_FEATURE_LEVEL_10_0;
 	u32 m_vb_pos = 0; // bytes
 	u32 m_ib_pos = 0; // indices/sizeof(u32)
@@ -138,6 +151,7 @@ private:
 	bool m_is_exclusive_fullscreen = false;
 	bool m_conservative_depth = false;
 	bool m_rgba16_unorm_hw_blend = false;
+	bool m_uav_texture = false;
 
 	struct
 	{
@@ -173,17 +187,35 @@ private:
 	bool m_timestamp_query_started = false;
 	bool m_gpu_timing_enabled = false;
 
+	std::array<wil::com_ptr_nothrow<ID3D11Query>, NUM_PIPELINE_STATISTICS_QUERIES> m_pipeline_statistics_queries = {};
+	GPUPipelineStatistics m_accumulated_gpu_pipeline_statistics{};
+	u8 m_read_pipeline_statistics_query = 0;
+	u8 m_write_pipeline_statistics_query = 0;
+	u8 m_waiting_pipeline_statistics_queries = 0;
+	bool m_gpu_pipeline_statistics_enabled = false;
+	bool m_pipeline_statistics_query_started = false;
+
 	struct
 	{
 		wil::com_ptr_nothrow<ID3D11InputLayout> il;
 		wil::com_ptr_nothrow<ID3D11VertexShader> vs;
-		wil::com_ptr_nothrow<ID3D11PixelShader> ps[static_cast<int>(ShaderConvert::Count)];
+		std::vector<wil::com_ptr_nothrow<ID3D11PixelShader>> ps;
 		wil::com_ptr_nothrow<ID3D11SamplerState> ln;
 		wil::com_ptr_nothrow<ID3D11SamplerState> pt;
 		wil::com_ptr_nothrow<ID3D11DepthStencilState> dss;
 		wil::com_ptr_nothrow<ID3D11DepthStencilState> dss_write;
 		std::array<wil::com_ptr_nothrow<ID3D11BlendState>, 16> bs;
 	} m_convert;
+
+	ID3D11PixelShader* GetConvertShader(ShaderConvertSelector shader) const
+	{
+		return m_convert.ps[shader.Index()].get();
+	}
+
+	ID3D11PixelShader* GetConvertShader(ShaderConvert shader) const
+	{
+		return m_convert.ps[ShaderConvertSelector(shader).Index()].get();
+	}
 
 	struct
 	{
@@ -261,9 +293,9 @@ private:
 	std::string m_tfx_source;
 
 protected:
+	using GSDevice::DoStretchRect; // Suppress overloaded virtual function warning
 	virtual void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-		GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear) override;
-
+		ShaderConvertSelector shader, Filter filter) override;
 public:
 	GSDevice11();
 	~GSDevice11() override;
@@ -302,20 +334,20 @@ public:
 	void PopDebugGroup() override;
 	void InsertDebugMessage(DebugMessageCategory category, const char* fmt, ...) override;
 
-	GSTexture* CreateSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format) override;
+	GSTexture* CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format) override;
 	std::unique_ptr<GSDownloadTexture> CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format) override;
 
 	void CommitClear(GSTexture* t);
 
 	void CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY) override;
 
-	void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ID3D11PixelShader* ps, ID3D11Buffer* ps_cb, bool linear);
-	void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ID3D11PixelShader* ps, ID3D11Buffer* ps_cb, ID3D11BlendState* bs, bool linear);
-	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, bool linear) override;
+	void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ID3D11PixelShader* ps, ID3D11Buffer* ps_cb, Filter filter);
+	void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ID3D11PixelShader* ps, ID3D11Buffer* ps_cb, ID3D11BlendState* bs, Filter filter);
+	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, Filter filter) override;
 	void UpdateCLUTTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize) override;
 	void ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM) override;
 	void FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect) override;
-	void DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvert shader) override;
+	void DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader) override;
 	void DoMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, const GSVector2& ds);
 
 	void SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox);
@@ -343,7 +375,8 @@ public:
 
 	void OMSetDepthStencilState(ID3D11DepthStencilState* dss, u8 sref);
 	void OMSetBlendState(ID3D11BlendState* bs, u8 bf);
-	void OMSetRenderTargets(GSTexture* rt, GSTexture* ds, const GSVector4i* scissor = nullptr, ID3D11DepthStencilView* read_only_dsv = nullptr);
+	void OMSetRenderTargets(GSTexture* rt, GSTexture* ds_as_rt, GSTexture* ds, GSTexture* rt_uav = nullptr, GSTexture* ds_uav = nullptr,
+		const GSVector4i* scissor = nullptr, ID3D11DepthStencilView* read_only_dsv = nullptr);
 	void SetViewport(const GSVector2i& viewport);
 	void SetScissor(const GSVector4i& scissor);
 
@@ -354,6 +387,12 @@ public:
 	void SetupOM(OMDepthStencilSelector dssel, OMBlendSelector bsel, u8 afix);
 
 	void RenderHW(GSHWDrawConfig& config) override;
+
+	void FeedbackCopyAndBind(const GSHWDrawConfig& config,
+		GSTexture* rt, GSTexture* rt_clone, GSTexture* ds, GSTexture* ds_clone, const GSVector4i& copyarea);
+	void FeedbackCopyAndBind(const GSHWDrawConfig& config,
+		GSTexture* rt, GSTexture* rt_clone, GSTexture* ds, GSTexture* ds_clone,
+		const GSVector4i& copyarea, const GSVector4i& samplearea);
 	void SendHWDraw(const GSHWDrawConfig& config,
 		GSTexture* draw_rt_clone, GSTexture* draw_rt, GSTexture* draw_ds_clone, GSTexture* draw_ds,
 		const bool one_barrier, const bool full_barrier, const bool skip_first_barrier);

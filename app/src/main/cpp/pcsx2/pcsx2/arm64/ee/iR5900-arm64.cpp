@@ -1658,8 +1658,8 @@ void recMemcheck(u32 op, u32 bits, bool store)
 {
 	iFlushCall(FLUSH_EVERYTHING | FLUSH_PC);
 
-	// compute accessed address
-	_eeMoveGPRtoR(EE_HOST_RAX, (op >> 21) & 0x1F);
+	// Do not preload the register: this path calls outside the JIT and the cache can be clobbered.
+	_eeMoveGPRtoR(EE_HOST_RAX, (op >> 21) & 0x1F, false);
 	recMemcheckAdjustAddress_emit_oaknut(static_cast<s16>(op), bits);
 
 	recMemcheckStandardizeAddress_emit_oaknut();

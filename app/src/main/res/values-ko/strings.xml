@@ -389,7 +389,7 @@
     <string name="settings_about">정보</string>
     <string name="settings_version">버전</string>
     <string name="settings_emulator_core">에뮬레이션 코어</string>
-    <string name="settings_emulator_core_desc">PCSX2 기반 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">PCSX2 기반 (2.8.0)</string>
     <string name="settings_about_app">EmuCoreX 정보</string>
     <string name="settings_about_app_desc">EmuCoreX는 빠른 설정, 깔끔한 내비게이션, 핸드헬드 기기에 친화적인 경험을 제공하며 PCSX2 기반 에뮬레이션 코어를 중심으로 구축된 PlayStation 2 라이브러리 및 런처입니다.</string>
     <string name="settings_about_studio">개발자</string>

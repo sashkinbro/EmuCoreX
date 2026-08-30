@@ -29,10 +29,10 @@ class PerformanceOverlayLayoutTest {
         val layout = buildPerformanceOverlayLayout(
             fullSnapshot,
             PerformanceOverlayMetrics.DEFAULT,
-            "EmuCoreX-0.2.6 | 119 | v2.7.316"
+            "EmuCoreX-0.2.6 | 119 | v2.8.0"
         )
 
-        assertEquals("EmuCoreX-0.2.6|119|v2.7.316", layout.mainLines[0])
+        assertEquals("EmuCoreX-0.2.6|119|v2.8.0", layout.mainLines[0])
         assertEquals("FPS:59.94[P]|VPS:60.00", layout.mainLines[1])
         assertEquals("Speed:100%|Target:100%", layout.mainLines[2])
         assertTrue(layout.mainLines.any { it.startsWith("CPU:") })
@@ -134,12 +134,12 @@ class PerformanceOverlayLayoutTest {
         val layout = buildPerformanceOverlayLayout(
             fullSnapshot,
             PerformanceOverlayMetrics.HOST_CPU or PerformanceOverlayMetrics.HOST_GPU,
-            "EmuCoreX-0.2.6 | 119 | v2.7.316"
+            "EmuCoreX-0.2.6 | 119 | v2.8.0"
         )
 
         assertEquals(
             listOf(
-                "EmuCoreX-0.2.6|119|v2.7.316",
+                "EmuCoreX-0.2.6|119|v2.8.0",
                 "CPU:Snapdragon 8 Gen 3|31.5%",
                 "GPU:Adreno 750|82.4%(13.73ms)"
             ),

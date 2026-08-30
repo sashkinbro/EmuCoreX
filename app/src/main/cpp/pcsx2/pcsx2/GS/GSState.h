@@ -166,16 +166,11 @@ protected:
 	struct
 	{
 		GSVertex* buff;
-		u32 head, tail, next, maxcount; // head: first vertex, tail: last vertex + 1, next: last indexed + 1
-		u32 xy_tail;
-		GSVector4i xy[4];
-		GSVector4i xyhead;
 	} m_draw_vertex = {};
 
 	struct
 	{
 		u16* buff;
-		u32 tail;
 	} m_draw_index = {};
 
 	void UpdateContext();
@@ -249,10 +244,10 @@ public:
 	struct GSUploadQueue
 	{
 		GIFRegBITBLTBUF blit;
-		GSVector4i rect;
 		u64 draw;
-		bool zero_clear;
+		GSVector4i rect;
 		EEGS_TransferType transfer_type;
+		bool zero_clear = false;
 	};
 
 	enum NoGapsType
@@ -516,8 +511,10 @@ public:
 	bool TrianglesAreQuadsImpl();
 	bool TrianglesAreQuads(bool shuffle_check = false);
 	template <u32 primclass>
-	PRIM_OVERLAP GetPrimitiveOverlapDrawlistImpl(bool save_drawlist = false, bool save_bbox = false, float bbox_scale = 1.0f);
-	PRIM_OVERLAP GetPrimitiveOverlapDrawlist(bool save_drawlist = false, bool save_bbox = false, float bbox_scale = 1.0f);
+	PRIM_OVERLAP GetPrimitiveOverlapDrawlistImpl(bool save_drawlist = false, bool save_bbox = false,
+		float bbox_scale = 1.0f, u32* max_size = nullptr);
+	PRIM_OVERLAP GetPrimitiveOverlapDrawlist(bool save_drawlist = false, bool save_bbox = false,
+		float bbox_scale = 1.0f, u32* max_size = nullptr);
 	PRIM_OVERLAP PrimitiveOverlap(bool save_drawlist = false);
 	bool SpriteDrawWithoutGaps();
 	void CalculatePrimitiveCoversWithoutGaps();

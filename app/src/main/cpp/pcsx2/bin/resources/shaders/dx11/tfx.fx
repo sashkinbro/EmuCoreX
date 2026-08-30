@@ -83,6 +83,12 @@
 #define SW_BLEND_NEEDS_RT (SW_BLEND && (PS_BLEND_A == 1 || PS_BLEND_B == 1 || PS_BLEND_C == 1 || PS_BLEND_D == 1))
 #define SW_AD_TO_HW (PS_BLEND_C == 1 && PS_A_MASKED)
 
+#define PS_RETURN_COLOR_ROV (!PS_NO_COLOR && PS_ROV_COLOR)
+#define PS_RETURN_COLOR (!PS_NO_COLOR && !PS_ROV_COLOR)
+#define PS_RETURN_DEPTH_ROV (PS_ROV_DEPTH == PS_ROV_DEPTH_READ_WRITE)
+#define PS_RETURN_DEPTH (ZWRITE && !PS_ROV_DEPTH)
+#define PS_ROV_EARLYDEPTHSTENCIL (PS_ROV_COLOR && !PS_ROV_DEPTH && !ZWRITE)
+
 struct VS_INPUT
 {
 	float2 st : TEXCOORD0;
@@ -143,9 +149,21 @@ struct PS_OUTPUT
 
 Texture2D<float4> Texture : register(t0);
 Texture2D<float4> Palette : register(t1);
+#if !PS_ROV_COLOR
 Texture2D<float4> RtTexture : register(t2);
+#endif
 Texture2D<float> PrimMinTexture : register(t3);
 SamplerState TextureSampler : register(s0);
+
+#if PS_ROV_COLOR
+RasterizerOrderedTexture2D<unorm float4> RtTextureRov : register(u0);
+static float4 rov_rt_value;
+#endif
+
+#if PS_ROV_DEPTH
+RasterizerOrderedTexture2D<float> DepthTextureRov : register(u1);
+static float rov_depth_value;
+#endif
 
 #ifdef DX12
 cbuffer cb1 : register(b1)
@@ -170,6 +188,12 @@ cbuffer cb1
 	float4x4 DitherMatrix;
 	float ScaledScaleFactor;
 	float RcpScaleFactor;
+	float _pad0_cb1;
+	float _pad1_cb1;
+	float LineCovScale;
+	float _pad2_cb1;
+	float _pad3_cb1;
+	float _pad4_cb1;
 };
 
 float4 sample_c(float2 uv, float uv_w)
@@ -379,7 +403,7 @@ float4x4 sample_4p(uint4 u)
 int fetch_raw_depth(int2 xy)
 {
 #if PS_TEX_IS_FB == 1
-	float4 col = RtTexture.Load(int3(xy, 0));
+	float4 col = RtLoad(xy);
 #else
 	float4 col = Texture.Load(int3(xy, 0));
 #endif
@@ -389,7 +413,7 @@ int fetch_raw_depth(int2 xy)
 float4 fetch_raw_color(int2 xy)
 {
 #if PS_TEX_IS_FB == 1
-	return RtTexture.Load(int3(xy, 0));
+	return RtLoad(xy);
 #else
 	return Texture.Load(int3(xy, 0));
 #endif
@@ -398,7 +422,7 @@ float4 fetch_raw_color(int2 xy)
 float4 fetch_c(int2 uv)
 {
 #if PS_TEX_IS_FB == 1
-	return RtTexture.Load(int3(uv, 0));
+	return RtLoad(uv);
 #else
 	return Texture.Load(int3(uv, 0));
 #endif
@@ -484,7 +508,7 @@ float4 sample_depth(float2 st, float2 pos)
 	}
 	else if (PS_DEPTH_FMT == 1)
 	{
-		// Based on ps_convert_float32_rgba8 of convert
+		// Based on ps_convert_depth32_rgba8 of convert
 
 		// Convert a FLOAT32 depth texture into a RGBA color texture
 		uint d = uint(fetch_c(uv).r * exp2(32.0f));
@@ -492,7 +516,7 @@ float4 sample_depth(float2 st, float2 pos)
 	}
 	else if (PS_DEPTH_FMT == 2)
 	{
-		// Based on ps_convert_float16_rgb5a1 of convert
+		// Based on ps_convert_depth16_rgb5a1 of convert
 
 		// Convert a FLOAT32 (only 16 lsb) depth into a RGB5A1 color texture
 		uint d = uint(fetch_c(uv).r * exp2(32.0f));
@@ -804,7 +828,7 @@ void ps_fbmask(inout float4 C, float2 pos_xy)
 	if (PS_FBMASK)
 	{
 		float multi = PS_COLCLIP_HW ? 65535.0f : 255.0f;
-		float4 RT = trunc(RtTexture.Load(int3(pos_xy, 0)) * multi + 0.1f);
+		float4 RT = trunc(RtLoad(int2(pos_xy)) * multi + 0.1f);
 		C = (float4)(((uint4)C & ~FbMask) | ((uint4)RT & FbMask));
 	}
 }
@@ -880,7 +904,7 @@ void ps_blend(inout float4 Color, inout float4 As_rgba, float2 pos_xy)
 			As_rgba.rgb = (float3)1.0f;
 		}
 
-		float4 RT = SW_BLEND_NEEDS_RT ? RtTexture.Load(int3(pos_xy, 0)) : (float4)0.0f;
+		float4 RT = SW_BLEND_NEEDS_RT ? RtLoad(int2(pos_xy)) : (float4)0.0f;
 
 		if (PS_SHUFFLE && SW_BLEND_NEEDS_RT)
 		{
@@ -1013,7 +1037,25 @@ void ps_blend(inout float4 Color, inout float4 As_rgba, float2 pos_xy)
 	}
 }
 
+#if PS_ROV_EARLYDEPTHSTENCIL
+[earlydepthstencil]
+#endif
+
+#if PS_ROV_COLOR || PS_ROV_DEPTH
+	#define DISCARD { rov_discard_color = true; rov_discard_depth = true; }
+	#define DISCARD_COLOR rov_discard_color = true
+	#define DISCARD_DEPTH rov_discard_depth = true
+#else
+	#define DISCARD discard
+	#define DISCARD_COLOR o_col0 = RtLoad(input.p.xy)
+	#define DISCARD_DEPTH input.p.z = DepthLoad(input.p.xy)
+#endif
+
+#if (PS_RETURN_COLOR || PS_RETURN_DEPTH)
 PS_OUTPUT ps_main(PS_INPUT input)
+#else
+void ps_main(PS_INPUT input)
+#endif
 {
 	float4 C = ps_color(input);
 	bool atst_pass = atst(C);
@@ -1022,8 +1064,6 @@ PS_OUTPUT ps_main(PS_INPUT input)
 	if (!atst_pass)
 		discard;
 #endif
-
-	PS_OUTPUT output;
 
 	if (PS_SCANMSK & 2)
 	{
@@ -1043,7 +1083,7 @@ PS_OUTPUT ps_main(PS_INPUT input)
 	float4 alpha_blend = (float4)0.0f;
 	if (SW_AD_TO_HW)
 	{
-		float4 RT = PS_RTA_CORRECTION ? trunc(RtTexture.Load(int3(input.p.xy, 0)) * 128.0f + 0.1f) : trunc(RtTexture.Load(int3(input.p.xy, 0)) * 255.0f + 0.1f);
+		float4 RT = PS_RTA_CORRECTION ? trunc(RtLoad(input.p.xy) * 128.0f + 0.1f) : trunc(RtLoad(input.p.xy) * 255.0f + 0.1f);
 		alpha_blend = (float4)(RT.a / 128.0f);
 	}
 	else
@@ -1071,17 +1111,29 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		discard;
 #endif
 
+	// Output values
+#if !PS_NO_COLOR
+	#if PS_DATE == 1 || PS_DATE == 2
+		float o_col0;
+	#else
+		float4 o_col0;
+		#if !PS_NO_COLOR1
+			float4 o_col1;
+		#endif
+	#endif
+#endif
+
 	// Get first primitive that will write a failling alpha value
 #if PS_DATE == 1
 	// DATM == 0
 	// Pixel with alpha equal to 1 will failed (128-255)
-	output.c = (C.a > 127.5f) ? float(input.primid) : float(0x7FFFFFFF);
+	o_col0 = (C.a > 127.5f) ? float(input.primid) : float(0x7FFFFFFF);
 
 #elif PS_DATE == 2
 
 	// DATM == 1
 	// Pixel with alpha equal to 0 will failed (0-127)
-	output.c = (C.a < 127.5f) ? float(input.primid) : float(0x7FFFFFFF);
+	o_col0 = (C.a < 127.5f) ? float(input.primid) : float(0x7FFFFFFF);
 
 #else
 	// Not primid DATE setup
@@ -1159,11 +1211,12 @@ PS_OUTPUT ps_main(PS_INPUT input)
 	alpha_blend.a = float(atst_pass);
 #endif
 
+	// Output color scaling
 #if !PS_NO_COLOR
-	output.c0.a = PS_RTA_CORRECTION ? C.a / 128.0f : C.a / 255.0f;
-	output.c0.rgb = PS_COLCLIP_HW ? float3(C.rgb / 65535.0f) : C.rgb / 255.0f;
+	o_col0.a = PS_RTA_CORRECTION ? C.a / 128.0f : C.a / 255.0f;
+	o_col0.rgb = PS_COLCLIP_HW ? float3(C.rgb / 65535.0f) : C.rgb / 255.0f;
 #if !PS_NO_COLOR1
-	output.c1 = alpha_blend;
+	o_col1 = alpha_blend;
 #endif
 #endif // !PS_NO_COLOR
 
@@ -1173,7 +1226,9 @@ PS_OUTPUT ps_main(PS_INPUT input)
 	output.depth = min(input.p.z, MaxDepthPS);
 #endif
 
+#if (PS_RETURN_COLOR || PS_RETURN_DEPTH)
 	return output;
+#endif
 }
 
 #endif // PIXEL_SHADER
@@ -1283,6 +1338,110 @@ VS_INPUT load_vertex(uint index)
 	vert.uv = uint2(raw.UV & 0xFFFFu, raw.UV >> 16);
 	vert.f = float4(float(raw.FOG & 0xFFu), float((raw.FOG >> 8) & 0xFFu), float((raw.FOG >> 16) & 0xFFu), float(raw.FOG >> 24)) / 255.0f;
 	return vert;
+}
+
+// Convert XY from NDC to GS pixel coordinates (i.e. 1.0 = 1 GS pixel).
+float2 get_xy_unscaled(float2 xy)
+{
+	return round(xy / VertexScale) / 16.0f;
+}
+
+// Get the XY deltas in GS pixel coordinates, using first vertex as the origin.
+float2x2 get_xy_deltas_unscaled(VS_OUTPUT v0, VS_OUTPUT v1, VS_OUTPUT v2)
+{
+	float2 xy0 = get_xy_unscaled(v0.p.xy);
+	float2 xy1 = get_xy_unscaled(v1.p.xy);
+	float2 xy2 = get_xy_unscaled(v2.p.xy);
+	return float2x2(xy1 - xy0, xy2 - xy0);
+}
+
+// Get the AA1 outward expand direction to the edge formed by the first two vertices.
+// This is up or down for shallow (X dominant) edges, and right or left for steep (Y dominant) edges.
+// Similar expansion to line AA1 except instead of expanding on both sides of the line,
+// expand on on the side towards the outside of the triangle.
+float2 get_aa1_triangle_expand_dir(VS_OUTPUT v0, VS_OUTPUT v1, VS_OUTPUT v2)
+{
+	float2x2 xy_deltas = get_xy_deltas_unscaled(v0, v1, v2);
+	float2 line_delta = xy_deltas[0];
+	float2 line_opposite = xy_deltas[1];
+
+	float2 line_normal = float2(line_delta.y, -line_delta.x);
+	float2 line_expand = abs(line_delta.x) >= abs(line_delta.y) ? float2(0.0f, 1.0f) : float2(1.0f, 0.0f);
+
+	if ((dot(line_expand, line_normal) >= 0.0f) == (dot(line_opposite, line_normal) >= 0.0f))
+	{
+		// Expand direction point towards the interior so flip it.
+		line_expand = -line_expand;
+	}
+
+	return line_expand;
+}
+
+float2x2 get_inverse(float2x2 mat, float det)
+{
+	return float2x2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1 / det);
+}
+
+// Extrapolate triangle attributes from the first vertex along the given direction.
+// dp_mat is derived from the input vertices, it is passed in to avoid recomputing.
+void extrapolate_aa1_triangle_edge(inout VS_OUTPUT v0, VS_OUTPUT v1, VS_OUTPUT v2, float2x2 dp_mat, float2 dp)
+{
+	// Get texture deltas
+	#if VS_TME
+		#if VS_FST
+			float2x2 dt = float2x2(v1.ti.zw - v0.ti.zw, v2.ti.zw - v0.ti.zw);
+		#else
+			float2x2 dt = float2x2(v1.t.xy - v0.t.xy, v2.t.xy - v0.t.xy);
+		#endif
+	#endif
+
+	// Get color delta if interpolating
+	#if VS_IIP
+		float2x4 dc = float2x4(v1.c - v0.c, v2.c - v0.c);
+	#endif
+
+	float2 dz = float2(v1.p.z - v0.p.z, v2.p.z - v0.p.z); // Z deltas
+
+	float2 df = float2(v1.t.z - v0.t.z, v2.t.z - v0.t.z); // Fog deltas
+
+	float2 dq = float2(v1.t.w - v0.t.w, v2.t.w - v0.t.w); // Q deltas
+
+	// To prevent unstable extrapolation, do not extrapolate if the
+	// minimum perpendicular length of the triangle is < 2 pixels.
+	float dp_det = determinant(dp_mat); // Twice signed triangle area.
+	float len0 = length(dp_mat[0]);
+	float len1 = length(dp_mat[1]);
+	float len2 = length(dp_mat[1] - dp_mat[0]);
+	float min_perp_length = abs(dp_det) / max(max(len0, len1), len2);
+
+	// Get the position -> barycentric weight matrix
+	float2x2 inv_dp_mat = get_inverse(dp_mat, dp_det);
+
+	float2 weights = min_perp_length < 2 ? 0 : mul(dp, inv_dp_mat);
+
+	v0.p.xy += dp * PointSize; // Extrapolate position
+
+	// Extrapolate texture coords
+	#if VS_TME
+		#if VS_FST
+			v0.ti.zw += mul(weights, dt);
+			v0.ti.xy = v0.ti.zw * TextureScale;
+		#else
+			v0.t.xy += mul(weights, dt);
+			v0.ti.zw = v0.t.xy / TextureScale;
+			v0.t.w += dot(weights, dq);
+		#endif
+	#endif
+
+	// Extrapolate and clamp color
+	#if VS_IIP
+		v0.c += mul(weights, dc);
+		v0.c = clamp(v0.c, 0, 255);
+	#endif
+
+	v0.p.z += dot(weights, dz); // Extrapolate depth
+
+	v0.t.z += dot(weights, df); // Extrapolate fog
 }
 
 VS_OUTPUT vs_main_expand(uint vid : SV_VertexID)

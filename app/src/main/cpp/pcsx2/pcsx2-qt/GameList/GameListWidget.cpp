@@ -22,7 +22,10 @@
 #include <QtCore/QSortFilterProxyModel>
 #include <QtCore/QDir>
 #include <QtCore/QString>
+#include <QtGui/QColor>
+#include <QtGui/QImage>
 #include <QtGui/QPainter>
+#include <QtGui/QPalette>
 #include <QtGui/QPixmap>
 #include <QtGui/QPixmapCache>
 #include <QtGui/QWheelEvent>
@@ -191,6 +194,29 @@ namespace
 
 				painter->drawPixmap(rect.topLeft() + icon_top_left, highlighted_icon);
 			}
+			// Recolor the icon based on the custom background color
+			else if (index.column() == GameListModel::Column_Type)
+			{
+				// Fetch pixmap from cache or construct a new one.
+				const QColor color = option.palette.color(QPalette::Text);
+				const QString key = QString::fromStdString(fmt::format("type-{:016X}-{:08X}", icon.cacheKey(), color.rgba()));
+
+				QPixmap tinted_icon;
+				if (!QPixmapCache::find(key, &tinted_icon))
+				{
+					QImage img = icon.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+					QPainter tinted_painter(&img);
+					tinted_painter.setCompositionMode(QPainter::CompositionMode_SourceAtop);
+					tinted_painter.fillRect(0, 0, img.width(), img.height(), color);
+					tinted_painter.end();
+
+					tinted_icon = QPixmap(QPixmap::fromImage(img));
+					QPixmapCache::insert(key, tinted_icon);
+				}
+
+				painter->drawPixmap(rect.topLeft() + icon_top_left, tinted_icon);
+			}
 			else
 			{
 				painter->drawPixmap(rect.topLeft() + icon_top_left, icon);
@@ -213,7 +239,8 @@ void GameListWidget::initialize()
 {
 	const float cover_scale = Host::GetBaseFloatSettingValue("UI", "GameListCoverArtScale", 0.45f);
 	const bool show_cover_titles = Host::GetBaseBoolSettingValue("UI", "GameListShowCoverTitles", true);
-	m_model = new GameListModel(cover_scale, show_cover_titles, devicePixelRatioF(), this);
+	const bool show_full_cover_titles = Host::GetBaseBoolSettingValue("UI", "GameListShowFullCoverTitles", true);
+	m_model = new GameListModel(cover_scale, show_cover_titles, show_full_cover_titles, devicePixelRatioF(), this);
 	m_model->updateCacheSize(width(), height());
 
 	m_sort_model = new GameListSortModel(m_model);
@@ -242,6 +269,7 @@ void GameListWidget::initialize()
 	connect(m_ui.viewGameGrid, &QPushButton::clicked, this, &GameListWidget::showGameGrid);
 	connect(m_ui.gridScale, &QSlider::valueChanged, this, &GameListWidget::gridIntScale);
 	connect(m_ui.viewGridTitles, &QPushButton::toggled, this, &GameListWidget::setShowCoverTitles);
+	connect(m_ui.viewFullGridTitles, &QPushButton::toggled, this, &GameListWidget::setShowFullCoverTitles);
 	connect(m_ui.filterType, &QComboBox::currentIndexChanged, this, [this](int index) {
 		m_sort_model->setFilterType((index == 0) ? GameList::EntryType::Count : static_cast<GameList::EntryType>(index - 1));
 	});
@@ -322,6 +350,7 @@ void GameListWidget::initialize()
 	m_list_view->setFrameStyle(QFrame::NoFrame);
 	m_list_view->setVerticalScrollMode(QAbstractItemView::ScrollMode::ScrollPerPixel);
 	m_list_view->verticalScrollBar()->setSingleStep(15);
+	m_list_view->setWordWrap(show_full_cover_titles);
 	onCoverScaleChanged();
 
 	connect(m_list_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
@@ -383,6 +412,9 @@ void GameListWidget::setCustomBackground()
 		}
 	}
 
+	// Invalidate frame cache so the next animated frame triggers full reprocessing
+	m_background_last_size = QSize();
+
 	// If there is no valid background then reset fallback to default UI state
 	if (!m_background_movie)
 	{
@@ -391,10 +423,19 @@ void GameListWidget::setCustomBackground()
 		m_table_view->viewport()->setAutoFillBackground(true);
 		m_list_view->viewport()->setAutoFillBackground(true);
 
+		m_ui.stack->setPalette(QPalette());
+		m_background_text_color = QColor();
+		m_empty_widget->setPalette(QPalette());
+		m_empty_widget->setAutoFillBackground(false);
+
 		m_ui.stack->update();
 		m_table_view->setAlternatingRowColors(true);
 		return;
 	}
+
+	// Cache all frames for small images so loops don't keep re-decoding
+	if (const s64 file_size = FileSystem::GetPathFileSize(path.c_str()); file_size > 0 && file_size < 25 * 1024 * 1024)
+		m_background_movie->setCacheMode(QMovie::CacheAll);
 
 	// Retrieve scaling setting
 	m_background_scaling = QtUtils::ScalingMode::Fit;
@@ -415,45 +456,79 @@ void GameListWidget::setCustomBackground()
 	m_background_opacity = Host::GetBaseFloatSettingValue("UI", "GameListBackgroundOpacity", 100.0f);
 
 	// Selected Custom background is valid, connect the signals and start animation in gamelist
-	connect(m_background_movie, &QMovie::frameChanged, this, &GameListWidget::processBackgroundFrames, Qt::UniqueConnection);
+	connect(m_background_movie, &QMovie::frameChanged, this, &GameListWidget::processBackgroundFrames);
 	m_ui.stack->setAutoFillBackground(false);
 
 	m_table_view->viewport()->setAutoFillBackground(false);
 	m_list_view->viewport()->setAutoFillBackground(false);
-	updateCustomBackgroundState(true);
+	m_background_movie->start();
+	updateCustomBackgroundState();
 	m_table_view->setAlternatingRowColors(false);
 	processBackgroundFrames();
 }
 
-void GameListWidget::updateCustomBackgroundState(const bool force_start)
+void GameListWidget::updateCustomBackgroundState()
 {
 	if (m_background_movie && m_background_movie->isValid())
-	{
-		if ((isVisible() && (isActiveWindow() || force_start)) && qGuiApp->applicationState() == Qt::ApplicationActive)
-			m_background_movie->setPaused(false);
-		else
-			m_background_movie->setPaused(true);
-	}
+		m_background_movie->setPaused(!(isVisible() && qGuiApp->applicationState() == Qt::ApplicationActive));
 }
 
 void GameListWidget::processBackgroundFrames()
 {
-	if (m_background_movie && m_background_movie->isValid() && isVisible())
-	{
-		const int widget_width = m_ui.stack->width();
-		const int widget_height = m_ui.stack->height();
+	if (!m_background_movie || !m_background_movie->isValid() || !isVisible())
+		return;
 
-		if (widget_width <= 0 || widget_height <= 0)
-			return;
+	const QSize widget_size(m_ui.stack->width(), m_ui.stack->height());
+	if (widget_size.isEmpty())
+		return;
 
-		QPixmap pm = m_background_movie->currentPixmap();
-		const qreal dpr = devicePixelRatioF();
+	const int frame_number = m_background_movie->currentFrameNumber();
+	const qreal dpr = devicePixelRatioF();
 
-		QtUtils::resizeAndScalePixmap(&pm, widget_width, widget_height, dpr, m_background_scaling, m_background_opacity);
+	if (frame_number == m_background_last_frame && widget_size == m_background_last_size && qFuzzyCompare(dpr, m_background_last_dpr))
+		return;
 
-		m_background_pixmap = std::move(pm);
-		m_ui.stack->update();
-	}
+	QPixmap pm = m_background_movie->currentPixmap();
+	updateBackgroundTextColor(pm);
+	QtUtils::resizeAndScalePixmap(&pm, widget_size.width(), widget_size.height(), dpr, m_background_scaling, m_background_opacity);
+
+	m_background_pixmap = std::move(pm);
+	m_background_last_frame = frame_number;
+	m_background_last_size = widget_size;
+	m_background_last_dpr = dpr;
+	m_ui.stack->update();
+}
+
+void GameListWidget::updateBackgroundTextColor(const QPixmap& frame)
+{
+	if (frame.isNull())
+		return;
+
+	const QImage sampled = frame.scaled(32, 32, Qt::IgnoreAspectRatio, Qt::FastTransformation).toImage();
+	const QColor average = sampled.scaled(1, 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).pixelColor(0, 0);
+	const QColor base = qApp->palette().color(QPalette::Base);
+	const qreal coverage = average.alphaF() * std::clamp(m_background_opacity / 100.0f, 0.0f, 1.0f);
+	const qreal brightness = qGray(average.rgb()) * coverage + qGray(base.rgb()) * (1.0 - coverage);
+	const QColor text_color = (brightness > 127.5) ? Qt::black : Qt::white;
+
+	if (m_background_text_color == text_color)
+		return;
+	m_background_text_color = text_color;
+
+	QColor highlight_color = qApp->palette().color(QPalette::Highlight);
+	highlight_color.setAlpha(128);
+	const QColor empty_backdrop_color = (text_color == Qt::black) ? QColor(255, 255, 255, 128) : QColor(0, 0, 0, 128);
+
+	QPalette palette;
+	palette.setColor(QPalette::Text, text_color);
+	palette.setColor(QPalette::WindowText, text_color);
+	palette.setColor(QPalette::Highlight, highlight_color);
+	m_ui.stack->setPalette(palette);
+
+	QPalette empty_palette;
+	empty_palette.setColor(QPalette::Window, empty_backdrop_color);
+	m_empty_widget->setPalette(empty_palette);
+	m_empty_widget->setAutoFillBackground(true);
 }
 
 bool GameListWidget::isShowingGameList() const
@@ -469,6 +544,11 @@ bool GameListWidget::isShowingGameGrid() const
 bool GameListWidget::getShowGridCoverTitles() const
 {
 	return m_model->getShowCoverTitles();
+}
+
+bool GameListWidget::getShowGridFullCoverTitles() const
+{
+	return m_model->getShowFullCoverTitles();
 }
 
 void GameListWidget::refresh(bool invalidate_cache, bool popup_on_error)
@@ -499,6 +579,8 @@ void GameListWidget::cancelRefresh()
 void GameListWidget::reloadThemeSpecificImages()
 {
 	m_model->reloadThemeSpecificImages();
+	m_background_last_size = QSize();
+	processBackgroundFrames();
 }
 
 void GameListWidget::onRefreshProgress(const QString& status, int current, int total)
@@ -654,6 +736,9 @@ void GameListWidget::refreshGridCovers()
 
 void GameListWidget::showGameList()
 {
+	Host::SetBaseBoolSettingValue("UI", "GameListGridView", false);
+	Host::CommitBaseSettingChanges();
+
 	if (m_ui.stack->currentIndex() == 0 || m_model->rowCount() == 0)
 	{
 		// We can click the toolbar multiple times, so keep it correct.
@@ -661,8 +746,6 @@ void GameListWidget::showGameList()
 		return;
 	}
 
-	Host::SetBaseBoolSettingValue("UI", "GameListGridView", false);
-	Host::CommitBaseSettingChanges();
 	m_ui.stack->setCurrentIndex(0);
 	setFocusProxy(m_ui.stack->currentWidget());
 	resizeTableViewColumnsToFit();
@@ -672,6 +755,9 @@ void GameListWidget::showGameList()
 
 void GameListWidget::showGameGrid()
 {
+	Host::SetBaseBoolSettingValue("UI", "GameListGridView", true);
+	Host::CommitBaseSettingChanges();
+
 	if (m_ui.stack->currentIndex() == 1 || m_model->rowCount() == 0)
 	{
 		// We can click the toolbar multiple times, so keep it correct.
@@ -679,8 +765,6 @@ void GameListWidget::showGameGrid()
 		return;
 	}
 
-	Host::SetBaseBoolSettingValue("UI", "GameListGridView", true);
-	Host::CommitBaseSettingChanges();
 	m_ui.stack->setCurrentIndex(1);
 	setFocusProxy(m_ui.stack->currentWidget());
 	updateToolbar();
@@ -701,9 +785,24 @@ void GameListWidget::setShowCoverTitles(bool enabled)
 	emit layoutChange();
 }
 
+void GameListWidget::setShowFullCoverTitles(bool enabled)
+{
+	if (m_model->getShowFullCoverTitles() == enabled)
+		return;
+
+	Host::SetBaseBoolSettingValue("UI", "GameListShowFullCoverTitles", enabled);
+	Host::CommitBaseSettingChanges();
+	m_model->setShowFullCoverTitles(enabled);
+	m_list_view->setWordWrap(enabled);
+	if (isShowingGameGrid())
+		m_model->refresh();
+	updateToolbar();
+	emit layoutChange();
+}
+
 void GameListWidget::updateToolbar()
 {
-	const bool grid_view = isShowingGameGrid();
+	const bool grid_view = Host::GetBaseBoolSettingValue("UI", "GameListGridView", false);
 	{
 		QSignalBlocker sb(m_ui.viewGameGrid);
 		m_ui.viewGameGrid->setChecked(grid_view);
@@ -717,11 +816,16 @@ void GameListWidget::updateToolbar()
 		m_ui.viewGridTitles->setChecked(m_model->getShowCoverTitles());
 	}
 	{
+		QSignalBlocker sb(m_ui.viewFullGridTitles);
+		m_ui.viewFullGridTitles->setChecked(m_model->getShowFullCoverTitles());
+	}
+	{
 		QSignalBlocker sb(m_ui.gridScale);
 		m_ui.gridScale->setValue(static_cast<int>(m_model->getCoverScale() * 100.0f));
 	}
 
 	m_ui.viewGridTitles->setEnabled(grid_view);
+	m_ui.viewFullGridTitles->setEnabled(grid_view && m_model->getShowCoverTitles());
 	m_ui.gridScale->setEnabled(grid_view);
 }
 
@@ -729,6 +833,7 @@ void GameListWidget::showEvent(QShowEvent* event)
 {
 	QWidget::showEvent(event);
 	updateCustomBackgroundState();
+	processBackgroundFrames();
 }
 
 void GameListWidget::hideEvent(QHideEvent* event)
@@ -765,11 +870,8 @@ bool GameListWidget::eventFilter(QObject* watched, QEvent* event)
 		if (!m_background_pixmap.isNull())
 		{
 			QPainter painter(m_ui.stack);
-			const auto* paint_event = static_cast<QPaintEvent*>(event);
-			painter.save();
-			painter.setClipRect(paint_event->rect());
-			painter.drawTiledPixmap(m_ui.stack->rect(), m_background_pixmap);
-			painter.restore();
+			painter.setClipRect(static_cast<QPaintEvent*>(event)->rect());
+			painter.drawPixmap(0, 0, m_background_pixmap);
 			return true;
 		}
 	}

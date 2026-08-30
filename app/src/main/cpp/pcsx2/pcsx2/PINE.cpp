@@ -4,11 +4,11 @@
 #include "BuildVersion.h"
 #include "Common.h"
 #include "Host.h"
-#include "Memory.h"
 #include "Elfheader.h"
 #include "SaveState.h"
 #include "PINE.h"
 #include "VMManager.h"
+#include "vtlb.h"
 #include "common/Error.h"
 #include "common/Threading.h"
 
@@ -384,11 +384,22 @@ std::vector<u8>& PINEServer::MakeFailIPC(std::vector<u8>& ret_buffer, uint32_t s
 bool PINEServer::AcceptClient()
 {
 	s_msgsock = accept(s_sock, 0, 0);
-	if (s_msgsock >= 0)
+	if (s_msgsock < 0)
 	{
-		// Gross C-style cast, but SOCKET is a handle on Windows.
-		Console.WriteLn("PINE: New client with FD %d connected.", (int)s_msgsock);
-		return true;
+		// everything else is non recoverable in our scope
+		// we also mark as recoverable socket errors where it would block a
+		// non blocking socket, even though our socket is blocking, in case
+		// we ever have to implement a non blocking socket.
+#ifdef _WIN32
+		const int errno_w = WSAGetLastError();
+		if (!(errno_w == WSAECONNRESET || errno_w == WSAEINTR || errno_w == WSAEINPROGRESS || errno_w == WSAEMFILE || errno_w == WSAEWOULDBLOCK) && s_sock != INVALID_SOCKET)
+			Console.Error("PINE: accept() returned error %d", errno_w);
+#else
+		if (!(errno == ECONNABORTED || errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) && s_sock >= 0)
+			Console.Error("PINE: accept() returned error %d", errno);
+#endif
+
+		return false;
 	}
 
 #ifdef __APPLE__
@@ -396,20 +407,9 @@ bool PINEServer::AcceptClient()
 	setsockopt(s_msgsock, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof(nosigpipe));
 #endif
 
-	// everything else is non recoverable in our scope
-	// we also mark as recoverable socket errors where it would block a
-	// non blocking socket, even though our socket is blocking, in case
-	// we ever have to implement a non blocking socket.
-#ifdef _WIN32
-	const int errno_w = WSAGetLastError();
-	if (!(errno_w == WSAECONNRESET || errno_w == WSAEINTR || errno_w == WSAEINPROGRESS || errno_w == WSAEMFILE || errno_w == WSAEWOULDBLOCK) && s_sock != INVALID_SOCKET)
-		Console.Error("PINE: accept() returned error %d", errno_w);
-#else
-	if (!(errno == ECONNABORTED || errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) && s_sock >= 0)
-		Console.Error("PINE: accept() returned error %d", errno);
-#endif
-
-	return false;
+	// Gross C-style cast, but SOCKET is a handle on Windows.
+	Console.WriteLn("PINE: New client with FD %d connected.", (int)s_msgsock);
+	return true;
 }
 
 void PINEServer::MainLoop()
@@ -538,7 +538,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 4, ret_cnt, 1, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				const u8 res = memRead8(a);
+				const u8 res = vtlb_ramRead<mem8_t>(a);
 				ToResultVector(ret_buffer, res, ret_cnt);
 				ret_cnt += 1;
 				buf_cnt += 4;
@@ -551,7 +551,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 4, ret_cnt, 2, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				const u16 res = memRead16(a);
+				const u16 res = vtlb_ramRead<mem16_t>(a);
 				ToResultVector(ret_buffer, res, ret_cnt);
 				ret_cnt += 2;
 				buf_cnt += 4;
@@ -564,7 +564,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 4, ret_cnt, 4, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				const u32 res = memRead32(a);
+				const u32 res = vtlb_ramRead<mem32_t>(a);
 				ToResultVector(ret_buffer, res, ret_cnt);
 				ret_cnt += 4;
 				buf_cnt += 4;
@@ -577,7 +577,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 4, ret_cnt, 8, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				const u64 res = memRead64(a);
+				const u64 res = vtlb_ramRead<mem64_t>(a);
 				ToResultVector(ret_buffer, res, ret_cnt);
 				ret_cnt += 8;
 				buf_cnt += 4;
@@ -590,7 +590,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 1 + 4, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				memWrite8(a, FromSpan<u8>(buf, buf_cnt + 4));
+				vtlb_ramWrite<mem8_t>(a, FromSpan<u8>(buf, buf_cnt + 4));
 				buf_cnt += 5;
 				break;
 			}
@@ -601,7 +601,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 2 + 4, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				memWrite16(a, FromSpan<u16>(buf, buf_cnt + 4));
+				vtlb_ramWrite<mem16_t>(a, FromSpan<u16>(buf, buf_cnt + 4));
 				buf_cnt += 6;
 				break;
 			}
@@ -612,7 +612,7 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 4 + 4, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				memWrite32(a, FromSpan<u32>(buf, buf_cnt + 4));
+				vtlb_ramWrite<mem32_t>(a, FromSpan<u32>(buf, buf_cnt + 4));
 				buf_cnt += 8;
 				break;
 			}
@@ -623,14 +623,12 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 				if (!SafetyChecks(buf_cnt, 8 + 4, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
 				const u32 a = FromSpan<u32>(buf, buf_cnt);
-				memWrite64(a, FromSpan<u64>(buf, buf_cnt + 4));
+				vtlb_ramWrite<mem64_t>(a, FromSpan<u64>(buf, buf_cnt + 4));
 				buf_cnt += 12;
 				break;
 			}
 			case MsgVersion:
 			{
-				if (!VMManager::HasValidVM())
-					goto error;
 				u32 size = strlen(BuildVersion::GitRev) + 7;
 				if (!SafetyChecks(buf_cnt, 0, ret_cnt, size + 4, buf_size)) [[unlikely]]
 					goto error;

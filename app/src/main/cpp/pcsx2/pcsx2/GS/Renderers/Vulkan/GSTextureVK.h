@@ -33,15 +33,17 @@ public:
 
 	~GSTextureVK() override;
 
-	static std::unique_ptr<GSTextureVK> Create(Type type, Format format, int width, int height, int levels);
+	static std::unique_ptr<GSTextureVK> Create(Usage usage, Format format, int width, int height, int levels);
 	static std::unique_ptr<GSTextureVK> Adopt(
-		VkImage image, Type type, Format format, int width, int height, int levels, VkFormat vk_format);
+		VkImage image, Usage usage, Format format, int width, int height, int levels, VkFormat vk_format);
 
 	void Destroy(bool defer);
 
 	__fi VkImage GetImage() const { return m_image; }
 	__fi VkImageView GetView() const { return m_view; }
 	__fi Layout GetLayout() const { return m_layout; }
+	bool IsShaderWriteMode() const override { return GetLayout() == Layout::ReadWriteImage; }
+
 	__fi VkFormat GetVkFormat() const { return m_vk_format; }
 
 	VkImageLayout GetVkLayout() const;
@@ -70,6 +72,8 @@ public:
 	void TransitionSubresourcesToLayout(
 		VkCommandBuffer command_buffer, int start_level, int num_levels, Layout old_layout, Layout new_layout);
 
+	static VkFramebuffer CreateNullFramebuffer(u32 w, u32 h);
+
 	/// Framebuffers are lazily allocated.
 	VkFramebuffer GetFramebuffer(bool feedback_loop);
 
@@ -79,7 +83,7 @@ public:
 	__fi void SetUseFenceCounter(u64 counter) { m_use_fence_counter = counter; }
 
 private:
-	GSTextureVK(Type type, Format format, int width, int height, int levels, VkImage image, VmaAllocation allocation,
+	GSTextureVK(Usage usage, Format format, int width, int height, int levels, VkImage image, VmaAllocation allocation,
 		VkImageView view, VkFormat vk_format);
 
 	VkCommandBuffer GetCommandBufferForUpdate();

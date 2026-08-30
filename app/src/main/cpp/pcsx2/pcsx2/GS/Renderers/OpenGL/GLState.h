@@ -49,7 +49,6 @@ namespace GLState
 	extern bool ds_written; // Depth Stencil written
 
 	extern GLuint tex_unit[8]; // shader input texture
-	extern GLuint64 tex_handle[8]; // shader input texture
 
 	extern u32 UpdateDrawBuffers();
 	extern void Clear();

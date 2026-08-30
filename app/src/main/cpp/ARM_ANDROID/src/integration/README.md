@@ -4,7 +4,7 @@ This directory contains the complete Android-specific RetroAchievements integrat
 
 ## Source layout
 
-- `pcsx2_achievements_android.cpp` is the Android overlay for PCSX2 `v2.7.316` (`53e3838c1dd59f611fa3d2fd36915903a1304c6e`). CMake removes the upstream `Achievements.cpp` translation unit and builds this tracked overlay instead.
+- `pcsx2_achievements_android.cpp` is the Android overlay for PCSX2 `v2.8.0` (`c10a5c9ad951c517dc48b722b5b84eb9bf7fdb42`). CMake removes the upstream `Achievements.cpp` translation unit and builds this tracked overlay instead.
 - `retro_achievements_android.cpp` owns the JNI bridge, current-state notifications, stable EmuCoreX user-agent, and Android Hardcore policy helpers.
 - `include/emucorex/retro_achievements_android.h` is the shared boundary used by the Android runtime and the PCSX2 host callbacks.
 
@@ -17,7 +17,7 @@ The local `app/src/main/cpp/PCSX2` checkout is not the source of EmuCoreX-specif
 - Loading or resuming a save state is blocked using the authoritative native `rc_client` Hardcore state. Creating save states remains allowed.
 - Cheats, memory editing, input playback/TAS, frame advance, rewind, and slow motion are unavailable while Hardcore is active.
 - Rich Presence and leaderboards remain enabled; notification popups may be hidden independently without disabling evaluation.
-- The RetroAchievements server sees the unique stable client identity `EmuCoreX/v<app-version> (Android) pcsx2/v2.7.316`.
+- The RetroAchievements server sees the unique stable client identity `EmuCoreX/v<app-version> (Android) pcsx2/v2.8.0`.
 
 When updating PCSX2, rebase the overlay against the new upstream commit and update both the CMake version constants and this file in the same change.
 

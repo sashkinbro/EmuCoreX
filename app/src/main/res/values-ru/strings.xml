@@ -242,7 +242,7 @@
     <string name="settings_about">О приложении</string>
     <string name="settings_version">Версия</string>
     <string name="settings_emulator_core">Ядро эмуляции</string>
-    <string name="settings_emulator_core_desc">На базе PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">На базе PCSX2 (2.8.0)</string>
     <string name="settings_about_app">Об EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX — это библиотека и лаунчер PlayStation 2 с ядром эмуляции на базе PCSX2, созданные для быстрой настройки, удобной навигации и комфортной игры на портативных устройствах.</string>
     <string name="settings_about_studio">Разработчик</string>

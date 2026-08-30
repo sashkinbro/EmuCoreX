@@ -62,6 +62,7 @@ OSDSettingsWidget::OSDSettingsWidget(SettingsWindow* settings_dialog, QWidget* p
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showUsageCPU, "EmuCore/GS", "OsdShowCPU", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showUsageGPU, "EmuCore/GS", "OsdShowGPU", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showDebugGPU, "EmuCore/GS", "OsdShowGPUDebug", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showStatsGPU, "EmuCore/GS", "OsdShowGPUStats", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showStatusIndicators, "EmuCore/GS", "OsdShowIndicators", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showFrameTimes, "EmuCore/GS", "OsdShowFrameTimes", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showHardwareInfo, "EmuCore/GS", "OsdShowHardwareInfo", false);
@@ -73,11 +74,11 @@ OSDSettingsWidget::OSDSettingsWidget(SettingsWindow* settings_dialog, QWidget* p
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showVideoCapture, "EmuCore/GS", "OsdShowVideoCapture", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showInputRec, "EmuCore/GS", "OsdShowInputRec", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.showTextureReplacements, "EmuCore/GS", "OsdShowTextureReplacements", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.warnAboutUnsafeSettings, "EmuCore", "OsdWarnAboutUnsafeSettings", true);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.warnAboutUnsafeSettings, "EmuCore", "WarnAboutUnsafeSettings", true);
 
 #ifndef _WIN32
 	// Currently DX12 only
-	m_ui.showDebugGPU->deleteLater();
+	m_ui.showDebugGPU->setVisible(false);
 #endif
 
 	connect(m_ui.showSettings, &QCheckBox::checkStateChanged, this, &OSDSettingsWidget::onOsdShowSettingsToggled);
@@ -127,6 +128,8 @@ OSDSettingsWidget::OSDSettingsWidget(SettingsWindow* settings_dialog, QWidget* p
 	dialog()->registerWidgetHelp(m_ui.showDebugGPU, tr("Show GPU Debug Info"),
 		tr("Unchecked"), tr("Shows debug information about the renderer."));
 #endif
+	dialog()->registerWidgetHelp(m_ui.showDebugGPU, tr("Show GPU Pipeline Statistics"),
+		tr("Unchecked"), tr("Shows GPU vertex shader and pixels shader invocations."));
 	dialog()->registerWidgetHelp(m_ui.showFrameTimes, tr("Show Frame Times"), tr("Unchecked"),
 		tr("Displays a graph showing the average frametimes."));
 
@@ -243,6 +246,7 @@ void OSDSettingsWidget::onPerformancePosChanged()
 	m_ui.showGSStats->setEnabled(enabled);
 	m_ui.showUsageCPU->setEnabled(enabled);
 	m_ui.showUsageGPU->setEnabled(enabled);
+	m_ui.showStatsGPU->setEnabled(enabled);
 	m_ui.showStatusIndicators->setEnabled(enabled);
 	m_ui.showFrameTimes->setEnabled(enabled);
 	m_ui.showHardwareInfo->setEnabled(enabled);
@@ -255,7 +259,7 @@ void OSDSettingsWidget::onOsdShowSettingsToggled()
 	m_ui.showPatches->setEnabled(enabled);
 }
 
-void OSDSettingsWidget::onSelectAllClicked()
+void OSDSettingsWidget::setAllCheckboxes(bool checked)
 {
 	const QList<QCheckBox*> checkboxes = {
 		m_ui.showSpeedPercentages,
@@ -265,32 +269,7 @@ void OSDSettingsWidget::onSelectAllClicked()
 		m_ui.showGSStats,
 		m_ui.showUsageCPU,
 		m_ui.showUsageGPU,
-		m_ui.showStatusIndicators,
-		m_ui.showFrameTimes,
-		m_ui.showHardwareInfo,
-		m_ui.showVersion,
-		m_ui.showSettings,
-		m_ui.showPatches,
-		m_ui.showInputs,
-		m_ui.showVideoCapture,
-		m_ui.showInputRec,
-		m_ui.showTextureReplacements,
-		m_ui.warnAboutUnsafeSettings};
-
-	for (QCheckBox* checkbox : checkboxes)
-		checkbox->setChecked(true);
-}
-
-void OSDSettingsWidget::onDeselectAllClicked()
-{
-	const QList<QCheckBox*> checkboxes = {
-		m_ui.showSpeedPercentages,
-		m_ui.showFPS,
-		m_ui.showVPS,
-		m_ui.showResolution,
-		m_ui.showGSStats,
-		m_ui.showUsageCPU,
-		m_ui.showUsageGPU,
+		m_ui.showStatsGPU,
 		m_ui.showFrameTimes,
 		m_ui.showHardwareInfo,
 		m_ui.showVersion,
@@ -300,13 +279,27 @@ void OSDSettingsWidget::onDeselectAllClicked()
 		m_ui.showTextureReplacements};
 
 	for (QCheckBox* checkbox : checkboxes)
-		checkbox->setChecked(false);
+		checkbox->setChecked(checked);
+
+#ifdef _WIN32
+	m_ui.showDebugGPU->setChecked(checked);
+#endif
 
 	// Keep these checked
 	m_ui.showStatusIndicators->setChecked(true);
 	m_ui.showVideoCapture->setChecked(true);
 	m_ui.showInputRec->setChecked(true);
 	m_ui.warnAboutUnsafeSettings->setChecked(true);
+}
+
+void OSDSettingsWidget::onSelectAllClicked()
+{
+	setAllCheckboxes(true);
+}
+
+void OSDSettingsWidget::onDeselectAllClicked()
+{
+	setAllCheckboxes(false);
 }
 
 #include "moc_OSDSettingsWidget.cpp"

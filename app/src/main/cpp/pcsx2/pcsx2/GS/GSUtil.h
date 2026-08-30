@@ -6,6 +6,7 @@
 #include "GS.h"
 #include "GSRegs.h"
 #include "GSPerfMon.h"
+#include <climits>
 
 class GSUtil
 {
@@ -27,6 +28,8 @@ public:
 	static const char* GetTCCName(u32 tcc);
 	static const char* GetACName(u32 ac);
 	static const char* GetPerfMonCounterName(GSPerfMon::counter_t counter, bool hw = true);
+
+	static bool IsValidPSM(int psm);
 
 	static const u32* HasSharedBitsPtr(u32 dpsm);
 	static bool HasSharedBits(u32 spsm, const u32* ptr);

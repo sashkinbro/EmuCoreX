@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-// Android RetroAchievements overlay for PCSX2 v2.7.316
-// (upstream commit 53e3838c1dd59f611fa3d2fd36915903a1304c6e).
+// Android RetroAchievements overlay for PCSX2 v2.8.0
+// (upstream commit c10a5c9ad951c517dc48b722b5b84eb9bf7fdb42).
 // Kept in ARM_ANDROID so the shipped integration is visible and reproducible
 // without modifying the local upstream checkout.
 

@@ -185,6 +185,7 @@ PAPX-90020:
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     halfPixelOffset: 2 # Aligns post effects.
     nativeScaling: 1 # Fixes post effects.
+    textureInsideRT: 1 # Fixes post shuffles.
 PAPX-90201:
   name: "ファンタビジョン [体験版]"
   name-sort: "ふぁんたびじょん [たいけんばん]"
@@ -200,8 +201,7 @@ PAPX-90203:
   name-sort: "ぐらんつーりすも 2000 [たいけんばん]"
   name-en: "Gran Turismo 2000 [Trial]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
+  gsHWFixes: &gran-turismo-3-gs-fixes
     halfPixelOffset: 5 # Fixes edge bleed and lines.
     autoFlush: 1 # Fixes missing lens flare and intensity.
     getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
@@ -227,25 +227,19 @@ PAPX-90207:
   name-sort: "ぐらんつーりすも 3 A-Spec おーとばっくすげんていりぷれいしあたー"
   name-en: "Gran Turismo 3 - A-Spec - Autobacs Gentei Replay Theater"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PAPX-90208:
   name: "GRAN TURISMO 3 - A-Spec - リプレイシアター"
   name-sort: "ぐらんつーりすも 3 A-Spec りぷれいしあたー"
   name-en: "Gran Turismo 3 - A-Spec - Replay Theater"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PAPX-90209:
   name: "GRAN TURISMO 3 - A-Spec - Netz TOYOTA - リプレイシアターディスク"
   name-sort: "ぐらんつーりすも 3 A-Spec ねっつとよたりぷれいしあたーでぃすく"
   name-en: "Gran Turismo 3 - A-Spec - Netz TOYOTA - Replay Theater Disc"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PAPX-90210:
   name: "やっぱ RPGでしょ。 [オリジナルムービーディスク]"
   name-sort: "やっぱ あーるぴーじーでしょ [おりじなるむーびーでぃすく]"
@@ -419,11 +413,7 @@ PAPX-90504:
   name-sort: "ぐらんつーりすも こんせぷと えあとれっく たーぼ すぺしゃるえでぃしょん [たいけんばん]"
   name-en: "Gran Turismo Concept - Airtrek Turbo Special Edition [Trial]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PAPX-90505:
   name: "2002 夏のオススメソフト おためしDisc"
   name-sort: "2002 なつのおすすめそふと おためしでぃすく"
@@ -449,15 +439,17 @@ PAPX-90507:
   name-en: "Official Demo Disc 2003"
   region: "NTSC-J"
 PAPX-90508:
-  name: "GRAN TURISMO 4 - LUPO CUP Training Version"
-  name-sort: "ぐらんつーりすも 4 るぽ かっぷ とれいにんぐ ばーじょん"
-  name-en: "GRAN TURISMO 4 - LUPO CUP Training Version"
+  name: "GRAN TURISMO Concept - LUPO CUP Training Version"
+  name-sort: "ぐらんつーりすも こんせぷと るぽ かっぷ とれいにんぐ ばーじょん"
+  name-en: "Gran Turismo Concept - LUPO CUP Training Version"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
+PAPX-90509:
+  name: "GRAN TURISMO Concept - LUPO CUP Training Version 2"
+  name-sort: "ぐらんつーりすも こんせぷと るぽ かっぷ とれいにんぐ ばーじょん 2"
+  name-en: "Gran Turismo Concept - LUPO CUP Training Version 2"
+  region: "NTSC-J"
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PAPX-90511:
   name: "SIREN [体験版]"
   name-sort: "さいれん [たいけんばん]"
@@ -470,15 +462,11 @@ PAPX-90511:
 PAPX-90512:
   name: "GRAN TURISMO 4 - TOYOTA Prius [体験版]"
   name-sort: "ぐらんつーりすも 4 - とよた ぷりうす [たいけんばん]"
-  name-en: "GRAN TURISMO 4 - TOYOTA Prius [Trial]"
+  name-en: "Gran Turismo 4 - TOYOTA Prius [Trial]"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
+  gsHWFixes: &gran-turismo-4-prologue-gs-fixes
+    <<: *gran-turismo-3-gs-fixes
     recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
 PAPX-90514:
   name: "冬のオススメソフト おためしDISC"
   name-sort: "ふゆのおすすめそふとおためしでぃすく"
@@ -535,11 +523,11 @@ PAPX-90523:
   name-sort: "ぐらんつーりすも 4 - おんらいんじっけんばーじょん"
   name-en: "Gran Turismo 4 - Online Test Version"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
+  clampModes: &gran-turismo-4-clamp-modes
+    vuClampMode: 2 # In GT4, text in GT mode works. In TT, fixes SPS in TT Mode menu caused by the moving tooltips.
+  gsHWFixes: &gran-turismo-4-gs-fixes
+    <<: *gran-turismo-4-prologue-gs-fixes
     halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
 PAPX-90524:
   name: "ワイルドアームズ ザ フィフスヴァンガード [体験版]"
   name-sort: "わいるどあーむず ざ ふぃふすゔぁんがーど [たいけんばん]"
@@ -684,20 +672,20 @@ PBPX-95501:
 PBPX-95502:
   name: "GRAN TURISMO 3 - A-Spec [本体同梱版]"
   name-sort: "ぐらんつーりすも 3 - A-Spec [ほんたいどうこんばん]"
-  name-en: "GRAN TURISMO 3 - A-Spec [PS2 Bundle]"
+  name-en: "Gran Turismo 3 - A-Spec [PS2 Bundle]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
+  memcardFilters:
+    - "PBPX-95502"
+    - "SCPS-15009"
 PBPX-95503:
   name: "Gran Turismo 3 - A-Spec [PS2 Bundle]"
   region: "NTSC-U"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
   memcardFilters:
     - "PBPX-95503"
     - "SCUS-97102"
+    - "SCUS-97512"
 PBPX-95506:
   name: "PlayStation 2 - Demo Disc 2001"
   region: "PAL-M5"
@@ -754,20 +742,12 @@ PBPX-95523:
   name-sort: "ぐらんつーりすも 4 ぷろろーぐ [ほんたいどうこんばん]"
   name-en: "Gran Turismo 4 Prologue [PS2 Bundle]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
-  # vuClampMode = 2  Text in GT mode works.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
 PBPX-95524:
   name: "Gran Turismo 4 Prologue [PlayStation 2 Racing Pack]"
   region: "NTSC-C"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
-  # vuClampMode = 2  Text in GT mode works.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
 PBPX-95525:
   name: "ファイナルファンタジーⅫ [本体同梱版]"
   name-sort: "ふぁいなるふぁんたじー 12 [ほんたいどうこんばん]"
@@ -776,17 +756,13 @@ PBPX-95525:
 PBPX-95601:
   name: "GRAN TURISMO 4 [本体同梱版]"
   name-sort: "ぐらんつーりすも 4 [ほんたいどうこんばん]"
-  name-en: "GRAN TURISMO 4 [PS2 Bundle]"
+  name-en: "Gran Turismo 4 [PS2 Bundle]"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -830,10 +806,9 @@ PCPX-96306:
 PCPX-96309:
   name: "GRAN TURISMO 3 Netz TOYOTA [Demo]"
   name-sort: "ぐらんつーりすも 3 ねっつ とよた [Demo]"
-  name-en: "GRAN TURISMO 3 Netz TOYOTA [Demo]"
+  name-en: "Gran Turismo 3 Netz TOYOTA [Demo]"
   region: "NTSC-J"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96310:
   name: "エクストリーム・レーシング SSX [体験版]"
   name-sort: "えくすとりーむ れーしんぐ SSX [たいけんばん]"
@@ -848,17 +823,13 @@ PCPX-96311:
   name-sort: "ぐらんつーりすも 3 てんとうしゆうでぃすくVol.1"
   name-en: "Gran Turismo 3 Trial Disk Volume 1"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96312:
   name: "GRAN TURISMO 3 - A-Spec - [オートバックス店頭試遊ディスク]"
   name-sort: "ぐらんつーりすも 3 A-Spec おーとばっくすてんとうしゆうでぃすく"
   name-en: "Gran Turismo 3 - A-Spec - Autobacs Tentou Shiyuu Disc"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96314:
   name: "スカイオデッセイ [体験版]"
   name-sort: "すかいおでっせい [たいけんばん]"
@@ -989,8 +960,7 @@ PCPX-96609:
   name-sort: "ぐらんつーりすも 3 - A-Spec - てんとうしゆう Disc Vol. 2"
   name-en: "Gran Turismo 3 - A-Spec - Tentou Shiyuu Disc Vol. 2"
   region: "NTSC-J"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96610:
   name: "見る見る 2001年2月度受注号"
   name-sort: "みるみる 2001ねん 2がつどじゅちゅうごう"
@@ -1064,9 +1034,7 @@ PCPX-96624:
   name-sort: "ぐらんつーりすも こんせぷと 2001 Tokyo"
   name-en: "Gran Turismo - Concept 2001 Tokyo"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96625:
   name: "プレプレ2 VOLUME.4"
   name-sort: "ぷれぷれ2 VOLUME. 4"
@@ -1113,15 +1081,11 @@ PCPX-96633:
   name-en: "Play-Pre 2 Volume 7 - 2003 April - CM Collection"
   region: "NTSC-J"
 PCPX-96634:
-  name: "GRAN TURISMO - SUBARU ドライビングシミュレーターVer."
+  name: "GRAN TURISMO - SUBARU ドライビングシミュレーターVersion"
   name-sort: "ぐらんつーりすも すばるどらいびんぐしみゅれーたーばーじょん"
-  name-en: "Gran Tourismo - SUBARU Driving Simulator ver."
+  name-en: "Gran Turismo - SUBARU Driving Simulator Version"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 PCPX-96635:
   name: "プレプレ2 VOLUME.8"
   name-sort: "ぷれぷれ2 VOLUME. 8"
@@ -1155,16 +1119,11 @@ PCPX-96646:
 PCPX-96649:
   name: "GRAN TURISMO 4 [体験版]"
   name-sort: "ぐらんつーりすも 4 [たいけんばん]"
-  name-en: "Gran Tourismo 4 [Trial]"
+  name-en: "Gran Turismo 4 [Trial]"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 PCPX-96653:
   name: "ラチェット&クランク3 突撃！ガラクチック★レンジャーズ [店頭体験版]"
   name-sort: "らちぇっとあんどくらんく3 とつげき！がらくちっくれんじゃーず [てんとうたいけんばん]"
@@ -1205,10 +1164,8 @@ PCPX-96660:
   name-sort: "つーりすと とろふぃー [Demo]"
   name-en: "Tourist Trophy [Demo]"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 PCPX-98017:
   name: "ラチェット&クランク4th ギリギリ銀河のギガバトル [体験版]"
   name-sort: "らちぇっとあんどくらんく4th ぎりぎりぎんがのぎがばとる [たいけんばん]"
@@ -1232,6 +1189,8 @@ PCPX-98042:
   region: "NTSC-J"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 PDPX-99109:
   name: "DVD Player Version 3.04"
   name-sort: "DVDぷれーやー Version 3.04"
@@ -1390,18 +1349,27 @@ SCAJ-20010:
   region: "NTSC-Unk"
   gsHWFixes:
     textureInsideRT: 1 # Fixes inside RT shuffling.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SCAJ-20011:
   name: "Silent Line - Armored Core"
   region: "NTSC-HK"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
     - "SCAJ-20011"
-    - "SCPS-55014"
-    - "SLPS-25112"
-    - "SLPS-25169"
-    - "SLPS-73417"
-    - "SLPS-73420"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
 SCAJ-20012:
   name: "Venus & Braves"
   region: "NTSC-Unk"
@@ -1587,6 +1555,7 @@ SCAJ-20048:
   name-en: "R:Racing Evolution"
   region: "NTSC-J"
   gsHWFixes:
+    halfPixelOffset: 4 # Aligns bloom and shadows.
     alignSprite: 1 # Fixes vertical lines.
 SCAJ-20050:
   name: "Fatal Frame II - Crimson Butterfly"
@@ -1612,6 +1581,7 @@ SCAJ-20055:
     vuClampMode: 3 # Stops car from falling through track.
   gsHWFixes:
     textureInsideRT: 1 # Fixes broken splitscreen mode.
+    halfPixelOffset: 4 # Fixes misaligned blur in replays.
 SCAJ-20056:
   name: "Bujingai"
   region: "NTSC-Unk"
@@ -1657,11 +1627,9 @@ SCAJ-20066:
   name: "Gran Turismo 4 Prologue"
   region: "NTSC-Unk"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -1672,7 +1640,6 @@ SCAJ-20066:
     - "SCPS-19304"
     - "SCPS-15009"
     - "SCPS-55007"
-  # vuClampMode = 2  Text in GT mode works.
 SCAJ-20067:
   name: "Gungrave O.D."
   region: "NTSC-Unk"
@@ -1734,28 +1701,30 @@ SCAJ-20076:
   name: "Armored Core - Nexus [Disc 1]"
   region: "NTSC-Unk"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SCAJ-20011" # Silent Line
+    - "SCAJ-20076" # Nexus (Disc 1)
+    - "SCAJ-20077" # Nexus (Disc 2)
 SCAJ-20077:
   name: "Armored Core - Nexus [Disc 2]"
   region: "NTSC-Unk"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SCAJ-20011" # Silent Line
+    - "SCAJ-20076" # Nexus (Disc 1)
+    - "SCAJ-20077" # Nexus (Disc 2)
 SCAJ-20078:
   name: "Kuon"
   region: "NTSC-Unk"
@@ -1910,11 +1879,17 @@ SCAJ-20105:
   name: "Armored Core - Nine Breaker"
   region: "NTSC-Unk"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
-    cpuSpriteRenderBW: 2 # Fixes broken water on "Upper Sea" level.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
     cpuSpriteRenderLevel: 2 # Needed for above.
-  dynaPatches:
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SCAJ-20076" # Nexus (Disc 1)
+    - "SCAJ-20077" # Nexus (Disc 2)
+    - "SCAJ-20105" # Nine Breaker
+  dynaPatches: # Fix stuck enemies. (author=Berylskid)
     - pattern:
         - { offset: 0x0, value: 0x3C023E4C }
         - { offset: 0x4, value: 0x3442CCCD }
@@ -1943,6 +1918,7 @@ SCAJ-20109:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters:
     - "SCAJ-20109"
     - "SCAJ-20052"
@@ -1955,6 +1931,8 @@ SCAJ-20110:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SCAJ-20111:
   name: "Crash Bandicoot 5"
   region: "NTSC-Unk"
@@ -2028,7 +2006,12 @@ SCAJ-20121:
   name: "Armored Core - Formula Front"
   region: "NTSC-Unk"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
 SCAJ-20122:
   name: "Swords of Destiny"
   region: "NTSC-Unk"
@@ -2189,9 +2172,17 @@ SCAJ-20143:
   name: "Armored Core - Last Raven"
   region: "NTSC-Unk"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SCAJ-20076" # Nexus (Disc 1)
+    - "SCAJ-20077" # Nexus (Disc 2)
+    - "SCAJ-20105" # Nine Breaker
+    - "SCAJ-20143" # Last Raven
 SCAJ-20144:
   name: "Zhuo Hou La 3"
   region: "NTSC-C"
@@ -2394,10 +2385,8 @@ SCAJ-20170:
   name: "Tourist Trophy"
   region: "NTSC-C"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCAJ-20171:
   name: "絶体絶命都市2 - 凍てついた記憶たち"
   name-sort: "ぜったいぜつめいとし いてついたきおくたち"
@@ -2486,6 +2475,8 @@ SCAJ-20181:
   region: "NTSC-Unk"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCAJ-20182:
   name: "Tales of Destiny"
   region: "NTSC-Unk"
@@ -2590,6 +2581,8 @@ SCAJ-20198:
   region: "NTSC-Unk"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCAJ-20199:
   name: "Tekken 5 [PlayStation2 the Best]"
   region: "NTSC-Unk"
@@ -2645,6 +2638,7 @@ SCAJ-25047:
   name: "Dororo"
   region: "NTSC-Unk"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SCAJ-30001:
   name: "Xenosaga Episode I - Der Wille zur Macht [PlayStation2 the Best]"
@@ -2685,15 +2679,13 @@ SCAJ-30006:
   name-sort: "ぐらんつーりすも 4"
   name-en: "Gran Turismo 4"
   region: "NTSC-J"
+  clampModes: *gran-turismo-4-clamp-modes
   roundModes:
     eeRoundMode: 3 # Using chop for both normal+div fixes crash in B5 license test.
     eeDivRoundMode: 3 # See above.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -2708,26 +2700,21 @@ SCAJ-30007:
   name: "Gran Turismo 4"
   region: "NTSC-C"
   compat: 5
+  clampModes: *gran-turismo-4-clamp-modes
   roundModes:
     eeRoundMode: 3 # Using chop for both normal+div fixes crash in B5 license test.
     eeDivRoundMode: 3 # See above.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCAJ-30008:
   name: "Gran Turismo 4 [PlayStation2 the Best]"
   region: "NTSC-C"
+  clampModes: *gran-turismo-4-clamp-modes
   roundModes:
     eeRoundMode: 3 # Using chop for both normal+div fixes crash in B5 license test.
     eeDivRoundMode: 3 # See above.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -2823,6 +2810,10 @@ SCCS-40011:
   region: "NTSC-C"
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SCCS-40012:
   name: "格斗擂台4 进化版"
   name-sort: "Gedou Leitai 4 Jinhuaban"
@@ -2885,11 +2876,8 @@ SCCS-60002:
   name-sort: "Paoche Langmanlu 4"
   name-en: "Gran Turismo 4 [Review Copy]"
   region: "NTSC-C"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCED-50041:
   name: "Tekken Tag Tournament [Demo]"
   region: "PAL-E"
@@ -3297,11 +3285,7 @@ SCED-51351:
 SCED-51352:
   name: "Gran Turismo - Nissan Micra Edition [Demo]"
   region: "PAL-E"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCED-51359:
   name: "Official PlayStation 2 Magazine Demo 27"
   region: "PAL-M5"
@@ -3865,11 +3849,7 @@ SCED-52452:
 SCED-52455:
   name: "Gran Turismo Special Edition 2004 Geneva Version"
   region: "PAL-E"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
-  # vuClampMode = 2  Text in GT mode works.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
 SCED-52461:
   name: "SingStar [Press Kit]"
   region: "PAL-E"
@@ -3892,11 +3872,7 @@ SCED-52549:
 SCED-52578:
   name: "Gran Turismo 4 BMW 1 Series Virtual Drive Dealership [Demo]"
   region: "PAL-M5"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCED-52580:
   name: "Magazine Ufficiale PlayStation 2 Italia 06/04"
   region: "PAL-I"
@@ -3909,11 +3885,7 @@ SCED-52619:
 SCED-52681:
   name: "Gran Turismo 4 BMW 1 Series Virtual Drive [Demo]"
   region: "PAL-M11"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCED-52687:
   name: "Formula One 04 [Demo]"
   region: "PAL-M11"
@@ -4854,9 +4826,7 @@ SCES-50294:
   name: "Gran Turismo 3 - A-Spec"
   region: "PAL-M5"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCES-50295:
   name: "Dark Cloud"
   region: "PAL-M5"
@@ -4884,7 +4854,7 @@ SCES-50360:
   name: "Twisted Metal - Black"
   region: "PAL-M5"
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCES-50361:
   name: "Jak and Daxter - The Precursor Legacy"
@@ -5124,8 +5094,7 @@ SCES-50858:
   name: "Gran Turismo - Concept 2002 Tokyo-Geneva"
   region: "PAL-M6"
   compat: 5
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
   memcardFilters:
     - "SCES-50858"
     - "SCES-50294"
@@ -5412,7 +5381,7 @@ SCES-51480:
   name: "Twisted Metal - Black Online"
   region: "PAL-M5"
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCES-51513:
   name: "EyeToy - Play"
@@ -5559,13 +5528,8 @@ SCES-51719:
   name: "Gran Turismo 4"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
     - "SCES-51719"
     - "SCES-52438"
@@ -5824,15 +5788,11 @@ SCES-52438:
   name: "Gran Turismo 4 Prologue"
   region: "PAL-M5"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
   memcardFilters:
     - "SCES-51719"
     - "SCES-52438"
     - "SCES-50294"
-  # vuClampMode = 2  Text in GT mode works.
 SCES-52456:
   name: "Ratchet & Clank 3"
   region: "PAL-M5"
@@ -5845,6 +5805,7 @@ SCES-52456:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters: # Reads Ratchet 1 & 2 data.
     - "SCES-52456"
     - "SCES-51607"
@@ -6188,10 +6149,8 @@ SCES-53372:
   name: "Tourist Trophy - The Real Riding Simulator"
   region: "PAL-M5"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCES-53397:
   name: "SingStar - Popworld Events Code"
   region: "PAL-Unk"
@@ -6601,6 +6560,8 @@ SCES-54535:
   region: "PAL-M11"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCES-54538:
   name: "Eyetoy - Play Astro Zoo"
   region: "PAL-M15"
@@ -7372,11 +7333,7 @@ SCKA-20020:
 SCKA-20022:
   name: "Gran Turismo 4 - Prologue" # No listed Korean name on ReDump
   region: "NTSC-K"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
-  # vuClampMode = 2  Text in GT mode works.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
 SCKA-20023:
   name: "제로 ~붉은 나비~"
   name-sort: "Zero: Bulgeun Nabi"
@@ -7435,8 +7392,7 @@ SCKA-20028:
 SCKA-20029:
   name: "Gran Turismo Concept - 2002 Tokyo-Seoul [PlayStation 2 BigHit Series]" # No listed Korean name on ReDump
   region: "NTSC-K"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCKA-20030:
   name: "슬라이 쿠퍼 - 전설의 비법서를 찾아서 [PlayStation 2 BigHit Series]"
   name-sort: "Sly Cooper - Jeonseolui Bibeobseoreul Chajaseo [PlayStation 2 BigHit Series]"
@@ -7501,6 +7457,7 @@ SCKA-20037:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters:
     - "SCKA-20037"
     - "SCKA-20011"
@@ -7587,15 +7544,17 @@ SCKA-20047:
   name-en: "Armored Core - Nine Breaker"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
-    cpuSpriteRenderBW: 2 # Fixes broken water on "Upper Sea" level.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
     cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCKA-20047"
-    - "SLKA-25201"
-    - "SLKA-25202"
-  dynaPatches:
+    - "SLKA-25201" # Nexus (Disc 1)
+    - "SLKA-25202" # Nexus (Disc 2)
+    - "SCKA-20047" # Nine Breaker
+  dynaPatches: # Fix stuck enemies. (author=Berylskid)
     - pattern:
         - { offset: 0x0, value: 0x3C023E4C }
         - { offset: 0x4, value: 0x3442CCCD }
@@ -8314,13 +8273,8 @@ SCKA-24012:
 SCKA-30001:
   name: "Gran Turismo 4" # No listed Korean name on ReDump
   region: "NTSC-K"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCKA-30002:
   name: "GOD OF WAR 영혼의 반역자"
   name-sort: "God of War: Yeonghonui Banyeokja"
@@ -8341,13 +8295,8 @@ SCKA-30003:
 SCKA-30004:
   name: "Gran Turismo 4 [PlayStation 2 BigHit Series]" # No listed Korean name on ReDump
   region: "NTSC-K"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCKA-30005:
   name: "로그 갤럭시"
   name-en: "Rogue Galaxy"
@@ -8447,11 +8396,7 @@ SCPM-85301:
   name-sort: "ぐらんつーりすも こんせぷと こぺん すぺしゃるえでぃしょん [Demo]"
   name-en: "Gran Turismo Concept - Copen Special Edition [Demo]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPM-85302:
   name: "みんなのGOLF オンライン"
   name-sort: "みんなのごるふ おんらいん"
@@ -8467,11 +8412,7 @@ SCPM-85304:
   name-sort: "ぐらんつーりすも 4 ふぁーすとぷれびゅー"
   name-en: "Gran Turismo 4 - First Preview -"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPN-60101:
   name: "PlayStation BB Navigator - Version 0.10 [Prerelease] [Disc 1]"
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.10 [Prerelease] [Disc 1]"
@@ -8784,18 +8725,17 @@ SCPS-15009:
   name-sort: "ぐらんつーりすも3 A-spec"
   name-en: "Gran Turismo 3 - A-Spec"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
+  memcardFilters:
+    - "PBPX-95502"
+    - "SCPS-15009"
 SCPS-15010:
   name: "GRAN TURISMO Concept 2001 Tokyo"
   name-sort: "ぐらんつーりすも こんせぷと 2001 Tokyo"
   name-en: "Gran Turismo - Concept 2001 Tokyo"
   region: "NTSC-J"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-15011:
   name: "EXTERMINATION"
   name-sort: "エクスターミネーション"
@@ -9132,11 +9072,9 @@ SCPS-15055:
   name-sort: "ぐらんつーりすも 4 ぷろろーぐ"
   name-en: "Gran Turismo 4 Prologue"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -9147,7 +9085,6 @@ SCPS-15055:
     - "SCPS-19304"
     - "SCPS-15009"
     - "SCPS-55007"
-  # vuClampMode = 2  Text in GT mode works.
 SCPS-15056:
   name: "ラチェット&クランク2 ガガガ！銀河のコマンドーっす"
   name-sort: "らちぇっとあんどくらんく2 ががが！ぎんがのこまんどーっす"
@@ -9226,6 +9163,7 @@ SCPS-15064:
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     halfPixelOffset: 2 # Aligns post effects.
     nativeScaling: 1 # Fixes post effects.
+    textureInsideRT: 1 # Fixes post shuffles.
   patches:
     A5768F53:
       content: |-
@@ -9393,6 +9331,7 @@ SCPS-15084:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters:
     - "SCPS-15084"
     - "SCPS-15056"
@@ -9606,10 +9545,8 @@ SCPS-15105:
   name-sort: "つーりすと とろふぃー"
   name-en: "Tourist Trophy - The Real Riding Simulator"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-15106:
   name: "SIREN2"
   name-sort: "さいれん2"
@@ -9699,6 +9636,8 @@ SCPS-15113:
   region: "NTSC-J"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCPS-15114:
   name: "機甲装兵アーモダイン"
   name-sort: "きこうそうへいあーもだいん"
@@ -9745,6 +9684,7 @@ SCPS-15119:
     - OPHFlagHack # Special moves "Bankai" hang otherwise.
   gsHWFixes:
     preloadFrameData: 1 # Fixes removed bloom.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SCPS-15120:
   name: "ラチェット&クランク5 激突！ドデカ銀河のミリミリ軍団"
   name-sort: "らちぇっとあんどくらんく5 げきとつ！どでかぎんがのみりみりぐんだん"
@@ -9761,17 +9701,13 @@ SCPS-17001:
   name-en: "Gran Turismo 4"
   region: "NTSC-J"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
+  clampModes: *gran-turismo-4-clamp-modes
   roundModes:
     eeRoundMode: 3 # Using chop for both normal+div fixes crash in B5 license test.
     eeDivRoundMode: 3 # See above.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -9796,37 +9732,29 @@ SCPS-17008:
   name-sort: "ぐらんつーりすも ないき りみてっどえでぃしょん [8inch]"
   name-en: "Nike - Gran Turismo [Limited Edition - 8 inch]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-17009:
   name: "NIKE/ GRAN TURISMO Limited Edition [9inch]"
   name-sort: "ぐらんつーりすも ないき りみてっどえでぃしょん [9inch]"
   name-en: "Nike - Gran Turismo [Limited Edition - 9 inch]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-17010:
   name: "NIKE/ GRAN TURISMO Limited Edition [10inch]"
   name-sort: "ぐらんつーりすも ないき りみてっどえでぃしょん [10inch]"
   name-en: "Nike - Gran Turismo [Limited Edition - 10 inch]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-17011:
   name: "NIKE/ GRAN TURISMO Limited Edition [11inch]"
   name-sort: "ぐらんつーりすも ないき りみてっどえでぃしょん [11inch]"
   name-en: "Nike - Gran Turismo [Limited Edition - 11 inch]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-17013:
   name: "ローグギャラクシー ディレクターズカット"
   name-sort: "ろーぐぎゃらくしー でぃれくたーずかっと"
@@ -9982,9 +9910,7 @@ SCPS-19208:
   name-sort: "ぐらんつーりすも Concept 2001 Tokyo [PlayStation2 the Best]"
   name-en: "Gran Turismo - Concept 2001 Tokyo [PlayStation2 the Best]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-19209:
   name: "ぼくのなつやすみ2 海の冒険篇 [PlayStation2 the Best]"
   name-sort: "ぼくのなつやすみ2 うみのぼうけんへん [PlayStation2 the Best]"
@@ -10051,14 +9977,10 @@ SCPS-19252:
   name-sort: "ぐらんつーりすも 4 [PlayStation2 the Best]"
   name-en: "Gran Turismo 4 [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -10121,11 +10043,9 @@ SCPS-19304:
   name-sort: "ぐらんつーりすも 4 ぷろろーぐ [PlayStation2 the Best]"
   name-en: "Gran Turismo 4 Prologue [PlayStation2 the Best]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
   memcardFilters:
+    - "PBPX-95502"
     - "SCAJ-20066"
     - "SCAJ-30006"
     - "SCAJ-30007"
@@ -10136,7 +10056,6 @@ SCPS-19304:
     - "SCPS-19304"
     - "SCPS-15009"
     - "SCPS-55007"
-  # vuClampMode = 2  Text in GT mode works.
 SCPS-19305:
   name: "SIREN [PlayStation2 the Best]"
   name-sort: "さいれん [PlayStation2 the Best]"
@@ -10187,6 +10106,7 @@ SCPS-19309:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
 SCPS-19310:
   name: "ラチェット&クランク [PlayStation2 the Best]"
   name-sort: "らちぇっとあんどくらんく [PlayStation2 the Best]"
@@ -10364,10 +10284,8 @@ SCPS-19324:
   name-sort: "つーりすと とろふぃー [PlayStation2 the Best]"
   name-en: "Tourist Trophy - The Real Riding Simulator [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCPS-19325:
   name: "サルゲッチュ ミリオンモンキーズ [PlayStation2 the Best]"
   name-sort: "さるげっちゅ みりおんもんきーず [PlayStation2 the Best]"
@@ -10439,6 +10357,8 @@ SCPS-19332:
   region: "NTSC-J"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCPS-19333:
   name: "ワイルドアームズ ザ フィフスヴァンガード [PlayStation2 the Best]"
   name-sort: "わいるどあーむず ざ ふぃふすゔぁんがーど [PlayStation2 the Best]"
@@ -10585,9 +10505,7 @@ SCPS-55005:
   name-sort: "ぐらんつーりすも こんせぷと 2001 Tokyo"
   name-en: "Gran Turismo - Concept 2001 Tokyo"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-55006:
   name: "ワイルドアームズ アドヴァンスドサード"
   name-sort: "わいるどあーむず あどゔぁんすどさーど"
@@ -10599,11 +10517,9 @@ SCPS-55006:
 SCPS-55007:
   name: "GRAN TURISMO 3 - A-Spec"
   name-sort: "ぐらんつーりすも 3 - A-Spec"
-  name-en: "GRAN TURISMO 3 - A-Spec"
+  name-en: "Gran Turismo 3 - A-Spec"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-55008:
   name: "サンダーストライカー"
   name-sort: "さんだーすとらいかー"
@@ -10644,9 +10560,19 @@ SCPS-55014:
   name-en: "Armored Core 3"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
 SCPS-55015:
   name: "絶体絶命都市"
   name-sort: "ぜったいぜつめいとし"
@@ -10718,12 +10644,17 @@ SCPS-55024:
   region: "NTSC-J"
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SCPS-55024"
-    - "SLPS-25007"
-    - "SLPS-25040"
-    - "SLPS-73403"
-    - "SLPS-73411"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
 SCPS-55025:
   name: "E.O.E ～崩壊の前夜～"
   name-sort: "E.O.E ほうかいのぜんや"
@@ -10923,15 +10854,13 @@ SCPS-55902:
   name-sort: "ぐらんつーりすも - こんせぷと 2002 Tokyo-Geneva"
   name-en: "Gran Turismo - Concept 2002 Tokyo-Geneva"
   region: "NTSC-J"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-55903:
   name: "GRAN TURISMO - Concept 2002 Tokyo-Geneva"
   name-sort: "ぐらんつーりすも - こんせぷと 2002 Tokyo-Geneva"
   name-en: "Gran Turismo - Concept 2002 Tokyo-Geneva"
   region: "NTSC-J"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-56001:
   name: "이코"
   name-en: "Ico"
@@ -10971,8 +10900,7 @@ SCPS-56004:
 SCPS-56005:
   name: "Gran Turismo Concept - 2002 Tokyo-Seoul" # No listed Korean name on ReDump
   region: "NTSC-K"
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-56006:
   name: "철권　４"
   name-en: "Tekken 4"
@@ -11055,9 +10983,7 @@ SCPS-72001:
   name-sort: "ぐらんつーりすも3 A-spec [MEGA HITS!]"
   name-en: "Gran Turismo 3 - A-Spec [MEGA HITS!]"
   region: "NTSC-J"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCPS-72002:
   name: "みんなのGOLF 3 [MEGA HITS!]"
   name-sort: "みんなのごるふ 3 [MEGA HITS!]"
@@ -11095,11 +11021,8 @@ SCUS-90174:
 SCUS-90682:
   name: "Gran Turismo 4"
   region: "NTSC-U"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCUS-94346:
   name: "SingStar - Latino"
   region: "NTSC-U"
@@ -11117,15 +11040,17 @@ SCUS-97101:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCUS-97102:
   name: "Gran Turismo 3 - A-Spec"
   region: "NTSC-U"
   compat: 5
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
+  memcardFilters:
+    - "PBPX-95503"
+    - "SCUS-97102"
+    - "SCUS-97512"
 SCUS-97104:
   name: "ATV Offroad Fury"
   region: "NTSC-U"
@@ -11185,9 +11110,7 @@ SCUS-97114:
 SCUS-97115:
   name: "Gran Turismo 3 - A-Spec [Demo]"
   region: "NTSC-U"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCUS-97116:
   name: "Kiosk Disc 2.1"
   region: "NTSC-U"
@@ -11380,7 +11303,7 @@ SCUS-97164:
   name: "Twisted Metal - Black [Demo]"
   region: "NTSC-U"
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCUS-97165:
   name: "Official U.S. PlayStation Magazine Demo Disc 051"
@@ -11448,7 +11371,7 @@ SCUS-97179:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCUS-97181:
   name: "Official U.S. PlayStation Magazine Demo Disc 055"
@@ -11493,14 +11416,14 @@ SCUS-97195:
   name: "Twisted Metal - Black Online"
   region: "NTSC-U"
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCUS-97196:
   name: "Twisted Metal - Black Online"
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness.
+    minimumBlendingLevel: 4 # Fixes menu text brightness.
     halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
 SCUS-97197:
   name: "War of the Monsters"
@@ -11618,11 +11541,9 @@ SCUS-97218:
   name: "Kiosk Demo Disc 2.6"
   region: "NTSC-U"
 SCUS-97219:
-  name: "Gran Turismo 3 - A-Spec - Nissan 350Z Edition"
+  name: "Gran Turismo Concept - Nissan 350Z Edition"
   region: "NTSC-U"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-3-gs-fixes
   memcardFilters:
     - "SCUS-97219"
     - "SCUS-97102"
@@ -11979,14 +11900,10 @@ SCUS-97328:
   name: "Gran Turismo 4"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters: # Allows car imports from GT3 or something.
+    - "PBPX-95503"
     - "SCUS-97328"
     - "SCUS-97436"
     - "SCUS-97102"
@@ -12069,6 +11986,7 @@ SCUS-97353:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters:
     - "SCUS-97353"
     - "SCUS-97268"
@@ -12188,11 +12106,7 @@ SCUS-97383:
 SCUS-97384:
   name: "Gran Turismo Special Edition 2004 Toyota [Demo]"
   region: "NTSC-U"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  gsHWFixes: *gran-turismo-4-prologue-gs-fixes
 SCUS-97392:
   name: "NBA '06 featuring The Life Vol.1 [Demo]"
   region: "NTSC-U"
@@ -12302,6 +12216,7 @@ SCUS-97411:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
 SCUS-97412:
   name: "Jak 3 [Demo]"
   region: "NTSC-U"
@@ -12325,6 +12240,7 @@ SCUS-97413:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
 SCUS-97414:
   name: "EyeToy - AntiGrav"
   region: "NTSC-U"
@@ -12419,14 +12335,10 @@ SCUS-97432:
 SCUS-97436:
   name: "Gran Turismo 4 [Online Public Beta]"
   region: "NTSC-U"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
   memcardFilters:
+    - "PBPX-95503"
     - "SCUS-97328"
     - "SCUS-97436"
     - "SCUS-97102"
@@ -12642,13 +12554,8 @@ SCUS-97482:
 SCUS-97483:
   name: "Gran Turismo 4 MX-5 Edition [Demo]"
   region: "NTSC-U"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    autoFlush: 1 # Helps lens flare and sun occlusion somewhat but doesn't full fix it.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCUS-97484:
   name: "Sly 3 - Honor Among Thieves [E3 Demo]"
   region: "NTSC-U"
@@ -12771,10 +12678,8 @@ SCUS-97502:
   name: "Tourist Trophy"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    vuClampMode: 2 # Fixes SPS in TT Mode menu caused by the moving tooltips.
-  gsHWFixes:
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCUS-97503:
   name: "MLB '06 - The Show [Demo]"
   region: "NTSC-U"
@@ -12825,11 +12730,10 @@ SCUS-97512:
   name: "Gran Turismo 3 - A-Spec [Greatest Hits]"
   region: "NTSC-U"
   memcardFilters:
-    - "SCUS-97512"
+    - "PBPX-95503"
     - "SCUS-97102"
-  gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves banding in car showcase as well as car brightness and sheen.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+    - "SCUS-97512"
+  gsHWFixes: *gran-turismo-3-gs-fixes
 SCUS-97513:
   name: "Ratchet & Clank 2 - Going Commando [Greatest Hits]"
   region: "NTSC-U"
@@ -12884,6 +12788,7 @@ SCUS-97518:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
   memcardFilters:
     - "SCUS-97518"
     - "SCUS-97513"
@@ -13031,11 +12936,8 @@ SCUS-97560:
 SCUS-97563:
   name: "Gran Turismo 4"
   region: "NTSC-U"
-  clampModes:
-    vuClampMode: 2 # Text in GT mode works.
-  gsHWFixes:
-    halfPixelOffset: 4 # Fixes weird edge shadows and depth bleed which happens on the edge as well.
-    getSkipCount: "GSC_PolyphonyDigitalGames" # Fixes post-processing.
+  clampModes: *gran-turismo-4-clamp-modes
+  gsHWFixes: *gran-turismo-4-gs-fixes
 SCUS-97564:
   name: "Jampack Demo Disc Vol.15 [T-Rated]"
   region: "NTSC-U"
@@ -13136,6 +13038,8 @@ SCUS-97610:
   compat: 5
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCUS-97611:
   name: "SingStar - Amped"
   region: "NTSC-U"
@@ -13163,6 +13067,8 @@ SCUS-97619:
   region: "NTSC-U"
   roundModes:
     vu1RoundMode: 1 # Fixes the display of scores and text ingame.
+  gsHWFixes:
+    accurateAlphaTest: 1 # Fixes UI rendering.
 SCUS-97620:
   name: "Syphon Filter - Dark Mirror [Demo]"
   region: "NTSC-U"
@@ -13176,7 +13082,8 @@ SCUS-97621:
   clampModes:
     vu1ClampMode: 3 # Fixes missing textures.
   gsHWFixes:
-    recommendedBlendingLevel: 4 # Fixes menu text brightness and smoke effects.
+    minimumBlendingLevel: 4 # Fixes menu text brightness and smoke effects.
+    halfPixelOffset: 4 # Fixes misaligned blur during Darkside special.
   gameFixes:
     - VUSyncHack # Fixes black doors on vehicles.
   patches:
@@ -13414,6 +13321,7 @@ SLAJ-25047:
   name: "Dororo"
   region: "NTSC-C-J"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLAJ-25048:
   name: "Sengoku Musou Moushouden"
@@ -13536,6 +13444,7 @@ SLAJ-25075:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLAJ-25075"
     - "SLPM-66232"
@@ -13612,6 +13521,7 @@ SLAJ-25091:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLAJ-25091"
     # Most Wanted save grants extra money.
@@ -13744,6 +13654,8 @@ SLED-50489:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
     cpuSpriteRenderBW: 4 # Fixes textures.
+    halfPixelOffset: 4 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-50587:
   name: "Top Gun - Combat Zones [Demo]"
   region: "PAL-E"
@@ -13779,6 +13691,8 @@ SLED-51012:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
     cpuSpriteRenderBW: 4 # Fixes textures.
+    halfPixelOffset: 4 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-51047:
   name: "Red Faction II"
   region: "PAL-Unk"
@@ -13935,6 +13849,7 @@ SLED-51975:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
     PCRTCOverscan: 1 # Fixes image alignment.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-51987:
   name: "Kya - Dark Lineage"
   region: "PAL-Unk"
@@ -14063,6 +13978,7 @@ SLED-52736:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-52851:
   name: "TOCA Race Driver 2"
   region: "PAL-Unk"
@@ -14100,8 +14016,12 @@ SLED-52890:
     nativeScaling: 1 # Fixes misaligned bloom.
     mipmap: 0 # Currently totally breaks player uniform rendering if mipmapping is enabled.
 SLED-52891:
-  name: "Rocky Legends"
-  region: "PAL-Unk"
+  name: "Rocky Legends [Demo]"
+  region: "PAL-E"
+  speedHacks:
+    instantVU1: 0 # Fixes graphical issues on character models.
+  gsHWFixes:
+    preloadFrameData: 1 # Fixes background FMV flicker.
 SLED-52899:
   name: "Killzone [Bonus Disc]"
   region: "PAL-M5"
@@ -14296,6 +14216,7 @@ SLED-53650:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-53664:
   name: "FIFA 06 - Demo Pre-Release Version"
   region: "PAL-E"
@@ -14427,6 +14348,8 @@ SLED-53977:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLED-53980:
   name: "Urban Chaos - Riot Response [Demo]"
   region: "PAL-E"
@@ -14467,6 +14390,7 @@ SLED-54312:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLED-54315:
   name: "LEGO Star Wars II - The Original Trilogy [Demo]"
   region: "PAL-M5"
@@ -14780,8 +14704,9 @@ SLES-50079:
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
   gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves sky rendering.
-    textureInsideRT: 1 # Fixes texture corruption.
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SLES-50080:
   name: "NBA Hoopz"
   region: "PAL-M3"
@@ -14814,6 +14739,8 @@ SLES-50113:
   name: "Ring of Red"
   region: "PAL-M3"
   compat: 5
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes FMV lines.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLES-50114:
@@ -15292,6 +15219,14 @@ SLES-50276:
   name: "The Gift"
   name-sort: "Gift, The"
   region: "PAL-E"
+  patches:
+    CC76CD02:
+      content: |-
+        // Sound RPC races because of shared send/receive buffers with badly
+        // placed wait loop, fix by forcing all sound rpc to be synchronous.
+        // Ideal fix would be moving the rpc wait loop though.
+        author=Ziemas
+        patch=0,EE,002159e0,word,00000000
 SLES-50277:
   name: "Red Faction"
   region: "PAL-E"
@@ -15329,6 +15264,8 @@ SLES-50288:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
     cpuSpriteRenderBW: 4 # Fixes textures.
+    halfPixelOffset: 4 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-50296:
   name: "Gift"
   region: "PAL-F"
@@ -16223,6 +16160,7 @@ SLES-50731:
   clampModes:
     vuClampMode: 2 # White textures.
   gsHWFixes:
+    drawBuffering: 1 # Reduces draws and improves performance.
     recommendedBlendingLevel: 3 # Improves road quality.
     halfPixelOffset: 2 # Fixes depth line and blur.
 SLES-50735:
@@ -16764,6 +16702,10 @@ SLES-50905:
   region: "PAL-E"
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   # Save import option was removed from PAL release.
 SLES-50906:
   name: "Master Rallye"
@@ -17371,7 +17313,7 @@ SLES-51192:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51193:
   name: "Harry Potter et la Chambre des Secrets"
   region: "PAL-F"
@@ -17380,7 +17322,7 @@ SLES-51193:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51194:
   name: "Harry Potter und die Kammer des Schreckens"
   region: "PAL-G"
@@ -17389,7 +17331,7 @@ SLES-51194:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51195:
   name: "Harry Potter y la Cámara Secreta"
   region: "PAL-S"
@@ -17398,7 +17340,7 @@ SLES-51195:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51196:
   name: "Harry Potter e La Camera dei Secreti"
   region: "PAL-I"
@@ -17407,7 +17349,7 @@ SLES-51196:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51197:
   name: "FIFA 2003"
   region: "PAL-M7"
@@ -17463,7 +17405,7 @@ SLES-51214:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51215:
   name: "Harry Potter og Mysteriekammeret"
   region: "PAL-NO"
@@ -17472,7 +17414,7 @@ SLES-51215:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51216:
   name: "Harry Potter ja Salaisuuksien Kammio"
   region: "PAL-FI"
@@ -17481,7 +17423,7 @@ SLES-51216:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51217:
   name: "Harry Potter och Hemligheternas Kammare"
   region: "PAL-SW"
@@ -17490,7 +17432,7 @@ SLES-51217:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51218:
   name: "Harry Potter en de Geheime Kamer"
   region: "PAL-NL"
@@ -17499,7 +17441,7 @@ SLES-51218:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51219:
   name: "Harry Potter ea Camara dos Segredos"
   region: "PAL-P"
@@ -17508,7 +17450,7 @@ SLES-51219:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLES-51220:
   name: "TY the Tasmanian Tiger"
   region: "PAL-M5"
@@ -17723,14 +17665,16 @@ SLES-51286:
   name: "X-Men 2 - Wolverine's Revenge"
   region: "PAL-E"
   gsHWFixes:
-    halfPixelOffset: 2 # Fixes upscaling lines.
+    halfPixelOffset: 4 # Fixes upscaling lines.
     autoFlush: 2 # Fixes sun penetration.
+    textureInsideRT: 1 # Fixes missing lighting in some rooms.
 SLES-51287:
   name: "X-Men 2 - La Vengeance de Wolverine"
   region: "PAL-F"
   gsHWFixes:
-    halfPixelOffset: 2 # Fixes upscaling lines.
+    halfPixelOffset: 4 # Fixes upscaling lines.
     autoFlush: 2 # Fixes sun penetration.
+    textureInsideRT: 1 # Fixes missing lighting in some rooms.
 SLES-51289:
   name: "Gunfighter 2 - Legend of Jesse James"
   region: "PAL-M5"
@@ -18030,9 +17974,12 @@ SLES-51399:
   name: "Armored Core 3"
   region: "PAL-E"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLES-50079" # Armored Core 2
+    - "SLES-50905" # Another Age
+    - "SLES-51399" # Armored Core 3
 SLES-51400:
   name: "Tenchu - Wrath of Heaven"
   region: "PAL-S"
@@ -18084,8 +18031,6 @@ SLES-51434:
   region: "PAL-M5"
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -18299,8 +18244,9 @@ SLES-51548:
   name: "X-Men 2 - Wolverine's Revenge"
   region: "PAL-M3"
   gsHWFixes:
-    halfPixelOffset: 2 # Fixes upscaling lines.
+    halfPixelOffset: 4 # Fixes upscaling lines.
     autoFlush: 2 # Fixes sun penetration.
+    textureInsideRT: 1 # Fixes missing lighting in some rooms.
 SLES-51553:
   name: "Chaos Legion"
   region: "PAL-M5"
@@ -18658,6 +18604,8 @@ SLES-51713:
 SLES-51714:
   name: "BCV - Battle Construction Vehicles"
   region: "PAL-E"
+  gsHWFixes:
+    recommendedHWAA1: 1 # Fixes line thickness on vehicles and buildings.
 SLES-51715:
   name: "The Seed - War Zone"
   name-sort: "Seed, The - War Zone"
@@ -19386,6 +19334,7 @@ SLES-51967:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
     PCRTCOverscan: 1 # Fixes image alignment.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-51968:
   name: "Nickelodeon SpongeBob SquarePants - Battle for Bikini Bottom"
   region: "PAL-E"
@@ -19625,12 +19574,14 @@ SLES-52047:
   compat: 5
   gsHWFixes:
     halfPixelOffset: 1 # Fixes vertical lines, font and others.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-52048:
   name: "The Sims - Bustin' Out"
   name-sort: "Sims, The - Bustin' Out"
   region: "PAL-M5"
   gsHWFixes:
     halfPixelOffset: 1 # Fixes vertical lines, font and others.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-52055:
   name: "Harry Potter and the Philosopher's Stone"
   region: "PAL-M11"
@@ -19926,10 +19877,13 @@ SLES-52203:
   region: "PAL-E"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SLES-51399"
-    - "SLES-52203"
+    - "SLES-50079" # Armored Core 2
+    - "SLES-50905" # Another Age
+    - "SLES-51399" # Armored Core 3
+    - "SLES-52203" # Silent Line
 SLES-52204:
   name: "UFC Sudden Impact"
   region: "PAL-E"
@@ -20045,6 +19999,8 @@ SLES-52275:
   name: "Way of the Samurai 2"
   region: "PAL-M3"
   compat: 5
+  gsHWFixes:
+    roundSprite: 2 # Fixes UI lines.
 SLES-52276:
   name: "187 - Ride or Die"
   region: "PAL-M5"
@@ -20183,6 +20139,9 @@ SLES-52309:
   name: "R - Racing"
   region: "PAL-M5"
   compat: 5
+  gsHWFixes:
+    halfPixelOffset: 4 # Aligns bloom and shadows.
+    alignSprite: 1 # Fixes vertical lines.
 SLES-52310:
   name: "Energy Airforce"
   region: "PAL-E"
@@ -20963,6 +20922,9 @@ SLES-52584:
   name: "Burnout 3 - Takedown"
   region: "PAL-M4"
   compat: 5
+  memcardFilters: # Used for storage of network information on the memory card.
+    - "SLES-52584"
+    - "PSCD-20001"
   clampModes:
     vuClampMode: 3 # Fixes buggy lighting in the garage.
   gsHWFixes:
@@ -21454,6 +21416,7 @@ SLES-52725:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-52726:
   name: "NBA Live 2005"
   region: "PAL-F"
@@ -21551,6 +21514,7 @@ SLES-52755:
   name: "Blood Will Tell - Tezuka Osamu's Dororo"
   region: "PAL-M5"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLES-52760:
   name: "Pro Evolution Soccer 4"
@@ -21560,6 +21524,8 @@ SLES-52761:
   name: "Rocky - Legends"
   region: "PAL-M3"
   compat: 5
+  speedHacks:
+    instantVU1: 0 # Fixes graphical issues on character models.
   gsHWFixes:
     preloadFrameData: 1 # Fixes background FMV flicker.
 SLES-52766:
@@ -21922,9 +21888,10 @@ SLES-52888:
   name: "Brothers in Arms - Road to Hill 30"
   region: "PAL-M5"
   gsHWFixes:
+    recommendedBlendingLevel: 3 # Fixes ground shading.
     halfPixelOffset: 5 # Reduces ghosting on objects.
     nativeScaling: 2 # Helps smooth out ghosting.
-    recommendedBlendingLevel: 3 # Fixes ground shading.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-52889:
   name: "Disney's Winnie the Pooh Rumbly Tumbly Adventure"
   region: "PAL-M6"
@@ -22092,10 +22059,10 @@ SLES-52939:
   name: "Airborne Troops - Countdown to D-Day"
   region: "PAL-M4"
 SLES-52940:
-  name: "S.L.A.I. Steel Lancer Arena International"
+  name: "S.L.A.I. - Steel Lancer Arena International"
   region: "PAL-M3"
   gsHWFixes:
-    halfPixelOffset: 4 # Fixes double image and aligns glow effects.
+    halfPixelOffset: 5 # Fixes double image and aligns glow effects.
 SLES-52941:
   name: "Gungrave - Overdose"
   region: "PAL-M3"
@@ -23547,7 +23514,8 @@ SLES-53434:
   name: "Red Baron"
   region: "PAL-M3"
   gsHWFixes:
-    textureInsideRT: 1 # Fixes trees.
+    textureInsideRT: 1 # Fixes trees and half screen issue.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLES-53435:
   name: "SAS Anti-Terror Force"
   region: "PAL-M3"
@@ -24118,6 +24086,7 @@ SLES-53557:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-53557"
     - "SLES-53558"
@@ -24133,6 +24102,7 @@ SLES-53558:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-53557"
     - "SLES-53558"
@@ -24148,6 +24118,7 @@ SLES-53559:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-53557"
     - "SLES-53558"
@@ -24993,15 +24964,17 @@ SLES-53819:
   name: "Armored Core - Nine Breaker"
   region: "PAL-E"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
-    cpuSpriteRenderBW: 2 # Fixes broken water on "Upper Sea" level.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
     cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLES-53819"
-    - "SLES-82036"
-    - "SLES-82037"
-  dynaPatches:
+    - "SLES-82036" # Nexus (Disc 1)
+    - "SLES-82037" # Nexus (Disc 2)
+    - "SLES-53819" # Nine Breaker
+  dynaPatches: # Fix stuck enemies. (author=Berylskid)
     - pattern:
         - { offset: 0x0, value: 0x3C023E4C }
         - { offset: 0x4, value: 0x3442CCCD }
@@ -25013,17 +24986,20 @@ SLES-53820:
   name: "Armored Core - Last Raven"
   region: "PAL-E"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLES-82036" # Nexus (Disc 1)
+    - "SLES-82037" # Nexus (Disc 2)
+    - "SLES-53819" # Nine Breaker
+    - "SLES-53820" # Last Raven
 SLES-53821:
   name: "Radio Helicopter II"
   region: "PAL-E"
-  patches:
-    9A695202:
-      content: |-
-        comment=Patch that nops a branch instruction causing a freeze.
-        patch=1,EE,001799AC,word,00000000
 SLES-53824:
   name: "Trapt"
   region: "PAL-E"
@@ -25112,6 +25088,7 @@ SLES-53857:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-53557"
     - "SLES-53558"
@@ -25153,6 +25130,10 @@ SLES-53869:
   name: "Crazy Frog Racer"
   region: "PAL-M5"
   compat: 5
+  gsHWFixes:
+    deinterlace: 9 # Game requires AdaptiveBFF de-interlacing.
+    halfPixelOffset: 5 # Aligns shadows.
+    nativeScaling: 1 # Aligns post-processing.
 SLES-53870:
   name: "Devil Kings"
   region: "PAL-M5"
@@ -25414,6 +25395,8 @@ SLES-53974:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLES-53976:
   name: "Evolution GT"
   region: "PAL-M5"
@@ -25835,6 +25818,7 @@ SLES-54138:
     preloadFrameData: 1 # Fixes menu graphics.
     autoFlush: 1 # Fixes motion blur.
     minimumBlendingLevel: 2 # Improves post effects.
+    limit24BitDepth: 2 # Fixes icon brightness.
 SLES-54139:
   name: "Earache - Extreme Metal Racing"
   region: "PAL-E"
@@ -26390,6 +26374,7 @@ SLES-54321:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54321"
     - "SLES-54322"
@@ -26410,6 +26395,7 @@ SLES-54322:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54321"
     - "SLES-54322"
@@ -26430,6 +26416,7 @@ SLES-54323:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54321"
     - "SLES-54322"
@@ -26450,6 +26437,7 @@ SLES-54324:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54321"
     - "SLES-54322"
@@ -26487,6 +26475,7 @@ SLES-54335:
     preloadFrameData: 1 # Fixes menu graphics.
     autoFlush: 1 # Fixes motion blur.
     minimumBlendingLevel: 2 # Improves post effects.
+    limit24BitDepth: 2 # Fixes icon brightness.
 SLES-54336:
   name: "Lumines Plus"
   region: "PAL-M5"
@@ -27118,6 +27107,7 @@ SLES-54492:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54402"
     - "SLES-54492"
@@ -27137,6 +27127,7 @@ SLES-54493:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLES-54402"
     - "SLES-54492"
@@ -31315,20 +31306,30 @@ SLES-82036:
   name: "Armored Core - Nexus [Disc 1]"
   region: "PAL-M5"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLES-82036"
-    - "SLES-82037"
+    - "SLES-52203" # Silent Line
+    - "SLES-82036" # Nexus (Disc 1)
+    - "SLES-82037" # Nexus (Disc 2)
 SLES-82037:
   name: "Armored Core - Nexus [Disc 2]"
   region: "PAL-M5"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLES-82036"
-    - "SLES-82037"
+    - "SLES-52203" # Silent Line
+    - "SLES-82036" # Nexus (Disc 1)
+    - "SLES-82037" # Nexus (Disc 2)
 SLES-82038:
   name: "Onimusha - Dawn of Dreams [Disc 1 of 2]"
   region: "PAL-M5"
@@ -31885,10 +31886,12 @@ SLKA-25041:
   name-en: "Armored Core 3 - Silent Line"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SLKA-25041"
-    - "SLPM-67524"
+    - "SLPM-67524" # Armored Core 3
+    - "SLKA-25041" # Silent Line
+    - "SLKA-29011" # Silent Line
 SLKA-25042:
   name: "타마마유 이야기 2" # Undumped on ReDump as of 2025-08-28
   name-sort: "Tamamayu Iyagi 2"
@@ -32011,8 +32014,6 @@ SLKA-25065:
   region: "NTSC-K"
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -32332,6 +32333,7 @@ SLKA-25136:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLKA-25137:
   name: "심즈 - 세상 밖으로"
   name-sort: "Sims, The - Bustin' Out"
@@ -32339,6 +32341,7 @@ SLKA-25137:
   region: "NTSC-K"
   gsHWFixes:
     halfPixelOffset: 1 # Fixes vertical lines, font and others.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLKA-25138:
   name: ".hack//악성변이 Vol.2"
   name-sort: ".hack Mutation Vol. 2"
@@ -32529,6 +32532,9 @@ SLKA-25176:
   name: "펌프 잇 업 익시드"
   name-en: "Pump It Up - Exceed"
   region: "NTSC-K"
+  gsHWFixes:
+    cpuSpriteRenderBW: 4 # Fixes graphical corruption in musical notes.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLKA-25180:
   name: "스플린터 셀 - 판도라 투머로우"
   name-en: "Tom Clancy's Splinter Cell - Pandora Tomorrow"
@@ -32639,21 +32645,33 @@ SLKA-25201:
   name-en: "Armored Core - Nexus [Disc 1 of 2]"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLKA-25201"
-    - "SLKA-25202"
+    - "SLKA-25041" # Silent Line
+    - "SLKA-29011" # Silent Line
+    - "SLKA-25201" # Nexus (Disc 1)
+    - "SLKA-25202" # Nexus (Disc 2)
 SLKA-25202:
   name: "아머드 코어 넥서스 [Disc 2 of 2]" # Undumped on ReDump as of 2025-08-28
   name-en: "Armored Core - Nexus [Disc 2 of 2]"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLKA-25201"
-    - "SLKA-25202"
+    - "SLKA-25041" # Silent Line
+    - "SLKA-29011" # Silent Line
+    - "SLKA-25201" # Nexus (Disc 1)
+    - "SLKA-25202" # Nexus (Disc 2)
 SLKA-25203:
   name: "World Soccer Winning Eleven 8" # No listed Korean name on ReDump
   region: "NTSC-K"
@@ -32816,6 +32834,7 @@ SLKA-25225:
   region: "NTSC-K"
   compat: 5
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLKA-25226:
   name: "인크레더블"
@@ -32886,6 +32905,7 @@ SLKA-25241:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLKA-25242:
   name: "파이트 나이트 라운드 2"
   name-en: "Fight Night Round 2"
@@ -32975,6 +32995,10 @@ SLKA-25255:
   name-sort: "Mobile Suit Gundam Seed - Kkeunnaji Anneun Naeillo"
   name-en: "Mobile Suit Gundam Seed - Never Ending Tomorrow"
   region: "NTSC-K"
+SLKA-25256:
+  name: "UEFA 챔피언스 리그 2006-2007"
+  name-en: "UEFA Champions League 2006-2007"
+  region: "NTSC-K"
 SLKA-25257:
   name: "풍운　막말전" # Undumped on ReDump as of 2025-08-28
   name-en: "Fu-un Bakumatsu-den"
@@ -33045,7 +33069,12 @@ SLKA-25270:
   name-en: "Armored Core - Formula Front"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
 SLKA-25271:
   name: "해리포터와 불사조 기사단"
   name-en: "Harry Potter and the Order of the Phoenix"
@@ -33080,9 +33109,10 @@ SLKA-25277:
   name-en: "Brothers in Arms - Road to Hill 30"
   region: "NTSC-K"
   gsHWFixes:
+    recommendedBlendingLevel: 3 # Fixes ground shading.
     halfPixelOffset: 5 # Reduces ghosting on objects.
     nativeScaling: 2 # Helps smooth out ghosting.
-    recommendedBlendingLevel: 3 # Fixes ground shading.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLKA-25278:
   name: "MVP 베이스볼 2005"
   name-en: "MVP Baseball 2005"
@@ -33198,7 +33228,7 @@ SLKA-25299:
 SLKA-25300:
   name: "디지털 데빌 사가: 아바탈 튜너 [Special Package]"
   name-en: "Digital Devil Saga - Avatar Tuner [Special Package]"
-  region: "NTSC-J-K"
+  region: "NTSC-K"
   compat: 5
   gameFixes:
     - EETimingHack
@@ -33424,6 +33454,7 @@ SLKA-25334:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLKA-25334"
     - "SLKA-25241" # Underground 2 save grants extra money.
@@ -34225,7 +34256,12 @@ SLKA-29011:
   name-en: "Armored Core 3 - Silent Line [BANG]"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLPM-67524" # Armored Core 3
+    - "SLKA-25041" # Silent Line
+    - "SLKA-29011" # Silent Line
 SLKA-29012:
   name: "타임 스플리터즈 2 [BANG]" # Undumped on ReDump as of 2025-08-28
   name-en: "TimeSplitters 2 [BANG]"
@@ -34335,6 +34371,7 @@ SLPM-55003:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLPM-55003"
     - "SLPM-65766" # Underground 2 save grants extra money.
@@ -34671,6 +34708,7 @@ SLPM-55061:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLPM-55061"
     # Most Wanted save grants extra money.
@@ -35946,6 +35984,8 @@ SLPM-60122:
   name-sort: "りんぐ おぶ れっど [たいけんばん]"
   name-en: "Ring of Red [Trial]"
   region: "NTSC-J"
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes FMV lines.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPM-60123:
@@ -36387,6 +36427,7 @@ SLPM-60216:
   name-en: "R:Racing Evolution [Trial]"
   region: "NTSC-J"
   gsHWFixes:
+    halfPixelOffset: 4 # Aligns bloom and shadows.
     alignSprite: 1 # Fixes vertical lines.
 SLPM-60217:
   name: "タイムクライシス3 [店頭体験版]"
@@ -36510,6 +36551,7 @@ SLPM-60248:
   name-en: "Dororo [Trial]"
   region: "NTSC-J"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLPM-60250:
   name: "ニード・フォー・スピード アンダーグラウンド2 [体験版]"
@@ -36519,6 +36561,7 @@ SLPM-60250:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-60251:
   name: "Devil May Cry 3 [体験版]"
   name-sort: "でびる めい くらい 3 [たいけんばん]"
@@ -37321,18 +37364,44 @@ SLPM-61118:
   name-en: "Armored Core - Last Raven [Famitsu Limited Trial]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPM-61119:
   name: "アーマード・コア ラストレイヴン [体験版]"
   name-sort: "あーまーどこあ らすとれいゔん [たいけんばん]"
   name-en: "Armored Core - Last Raven [Trial]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPM-61120:
   name: "ドラッグ オン ドラグーン2 ～封印の紅 背徳の黒～ [体験版]"
   name-sort: "どらっぐ おん どらぐーん2 ～ふういんのあか はいとくのくろ～ [たいけんばん]"
@@ -37694,6 +37763,8 @@ SLPM-62013:
   name-sort: "りんぐ おぶ れっど"
   name-en: "Ring of Red"
   region: "NTSC-J"
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes FMV lines.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPM-62015:
@@ -38051,6 +38122,8 @@ SLPM-62091:
   name-sort: "りんぐ おぶ れっど [KONAMI The BEST]"
   name-en: "Ring of Red [KONAMI The BEST]"
   region: "NTSC-J"
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes FMV lines.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPM-62092:
@@ -38785,7 +38858,7 @@ SLPM-62241:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLPM-62242:
   name: "撞球 ビリヤードマスター2"
   name-sort: "どうきゅう びりやーどますたー2"
@@ -40081,6 +40154,8 @@ SLPM-62490:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLPM-62491:
   name: "ロックマン パワーバトルファイターズ"
   name-sort: "ろっくまん ぱわーばとるふぁいたーず"
@@ -40205,7 +40280,7 @@ SLPM-62513:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLPM-62514:
   name: "シムピープル ～お茶の間劇場～ [EA BEST HITS]"
   name-sort: "しむぴーぷる おちゃのまげきじょう [EA BEST HITS]"
@@ -40794,11 +40869,6 @@ SLPM-62624:
   name-sort: "ぷちこぷたー2"
   name-en: "Petit Copter 2"
   region: "NTSC-J"
-  patches:
-    9A695202:
-      content: |-
-        comment=Patch that nops a branch instruction causing a freeze.
-        patch=1,EE,001799B8,word,00000000
 SLPM-62625:
   name: "鬼浜爆走愚連隊 激闘編"
   name-sort: "おにはまばくそうぐれんたい げきとうへん"
@@ -41668,7 +41738,7 @@ SLPM-64528:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLPM-64532:
   name: "디지털 홈즈"
   name-en: "Digital Holmes"
@@ -42768,7 +42838,9 @@ SLPM-65181:
   clampModes:
     vuClampMode: 2 # White textures.
   gsHWFixes:
-    halfPixelOffset: 1 # Fixes blurriness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    recommendedBlendingLevel: 3 # Improves road quality.
+    halfPixelOffset: 2 # Fixes depth line and blur.
 SLPM-65183:
   name: "auto modellista モデムパック バージョン"
   name-sort: "おーともでりすた もでむぱっく ばーじょん"
@@ -43120,6 +43192,7 @@ SLPM-65234:
   region: "NTSC-J"
   gsHWFixes:
     textureInsideRT: 1 # Fixes inside RT shuffling.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-65235:
   name: "ニュールーマニア ポロリ青春"
   name-sort: "にゅーるーまにあ ぽろりせいしゅん"
@@ -43256,8 +43329,6 @@ SLPM-65257:
   compat: 5
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -43927,6 +43998,9 @@ SLPM-65374:
   gsHWFixes:
     recommendedBlendingLevel: 5 # Alleviates color banding also the cockpit and missile shadows are darker if enabled.
     autoFlush: 2 # Corrects post-processing effect on jet exhausts.
+  memcardFilters:
+    - SLPM-65177 # Energy Airforce (previous title)
+    - SLPM-65374 # aimStrike
 SLPM-65375:
   name: "真・三國無双3 & 真・三國無双3 猛将伝 [ディスク 1] [プレミアムパック]"
   name-sort: "しんさんごくむそう3 & しんさんごくむそう3 もうしょうでん [でぃすく 1] [ぷれみあむぱっく]"
@@ -43960,6 +44034,8 @@ SLPM-65380:
   name-sort: "さむらいどう2 WAY OF THE SAMURAI 2"
   name-en: "Samurai Dou 2"
   region: "NTSC-J"
+  gsHWFixes:
+    roundSprite: 2 # Fixes UI lines.
 SLPM-65381:
   name: "きまぐれストロベリーカフェ"
   name-sort: "きまぐれすとろべりーかふぇ"
@@ -44273,6 +44349,7 @@ SLPM-65434:
     vuClampMode: 3 # Stops car from falling through track.
   gsHWFixes:
     textureInsideRT: 1 # Fixes broken splitscreen mode.
+    halfPixelOffset: 4 # Fixes misaligned blur in replays.
 SLPM-65435:
   name: "北へ。～Diamond Dust～"
   name-sort: "きたへ Diamond Dust"
@@ -44509,6 +44586,7 @@ SLPM-65471:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-65472:
   name: "TrainSimulator＋電車でGO！ 東京急行編"
   name-sort: "とれいんしみゅれーたー＋でんしゃでごー とうきょうきゅうこうへん"
@@ -44549,6 +44627,7 @@ SLPM-65479:
   region: "NTSC-J"
   gsHWFixes:
     halfPixelOffset: 1 # Fixes vertical lines, font and others.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-65480:
   name: "michigan"
   name-sort: "みしがん"
@@ -44633,7 +44712,7 @@ SLPM-65495:
 SLPM-65496:
   name: "ハイパーストリートファイターⅡ アニバーサリーエディション"
   name-sort: "はいぱーすとりーとふぁいたー2 あにばーさりーえでぃしょん"
-  name-en: "Hyper Street Fighter"
+  name-en: "Hyper Street Fighter II - The Anniversary Edition"
   region: "NTSC-J"
 SLPM-65497:
   name: "ワールドサッカーウイニングイレブン7 インターナショナル プレミアムパッケージ supported by アディダス"
@@ -44811,6 +44890,7 @@ SLPM-65526:
   name-en: "Dororo"
   region: "NTSC-J"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLPM-65527:
   name: "FIFA トータルフットボール"
@@ -45285,6 +45365,7 @@ SLPM-65614:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-65615:
   name: "ドカポンDX -わたる世界はオニだらけ-"
   name-sort: "どかぽんDX -わたるせかいはおにだらけ-"
@@ -45332,8 +45413,6 @@ SLPM-65622:
   region: "NTSC-J"
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -46212,6 +46291,7 @@ SLPM-65766:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-65767:
   name: "NBA STARTING FIVE 2005"
   name-sort: "NBA すたーてぃんぐ ふぁいぶ 2005"
@@ -46340,12 +46420,12 @@ SLPM-65790:
     nativeScaling: 4 # Fixes post lighting.
     getSkipCount: "GSC_MetalGearSolid3" # Fixes depth of field blur.
 SLPM-65791:
-  name: "S.L.A.I -STEEL LANCER ARENA INTERNATIONAL-"
+  name: "S.L.A.I. -STEEL LANCER ARENA INTERNATIONAL-"
   name-sort: "すれい -すてぃーる らんさー ありーな いんたーなしょなる-"
   name-en: "S.L.A.I. - Steel Lancer Arena International"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 4 # Fixes double image and aligns glow effects.
+    halfPixelOffset: 5 # Fixes double image and aligns glow effects.
 SLPM-65793:
   name: "SSX3 [EA BEST HITS]"
   name-sort: "SSX3 [EA BEST HITS]"
@@ -46882,6 +46962,8 @@ SLPM-65884:
   name-sort: "りもーとこんとろーるだんでぃSF"
   name-en: "Remote Control Dandy SF"
   region: "NTSC-J"
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes health bar flickering in tutorial level.
 SLPM-65885:
   name: "RUMBLE ROSES"
   name-sort: "らんぶるろーず"
@@ -46911,6 +46993,8 @@ SLPM-65888:
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
     PCRTCOverscan: 1 # Fixes offscreen image.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLPM-65889:
   name: "家族計画～心の絆～"
   name-sort: "かぞくけいかく こころのきずな"
@@ -47674,8 +47758,6 @@ SLPM-66018:
   region: "NTSC-J"
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -47696,6 +47778,8 @@ SLPM-66019:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
     cpuSpriteRenderBW: 4 # Fixes textures.
+    halfPixelOffset: 4 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-66020:
   name: "サイオプス サイキック・オペレーション"
   name-sort: "さいおぷす さいきっく・おぺれーしょん"
@@ -47818,9 +47902,10 @@ SLPM-66042:
   name-en: "Brothers in Arms - Road to Hill 30"
   region: "NTSC-J"
   gsHWFixes:
+    recommendedBlendingLevel: 3 # Fixes ground shading.
     halfPixelOffset: 5 # Reduces ghosting on objects.
     nativeScaling: 2 # Helps smooth out ghosting.
-    recommendedBlendingLevel: 3 # Fixes ground shading.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-66043:
   name: "レーシングゲーム「注意!!!!」"
   name-sort: "れーしんぐげーむ「ちゅうい!!!!」"
@@ -47870,6 +47955,7 @@ SLPM-66051:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-66052:
   name: "巫女舞 ～永遠の想い～"
   name-sort: "みこまい えいえんのおもい"
@@ -48909,6 +48995,7 @@ SLPM-66207:
   name-en: "Dororo [Sega the Best 2800]"
   region: "NTSC-J"
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLPM-66208:
   name: "サクラ大戦Ⅴ EPISODE 0 ～荒野のサムライ娘～ [SEGA THE BEST 2800]"
@@ -49103,6 +49190,7 @@ SLPM-66232:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLAJ-25075"
     - "SLPM-66232"
@@ -49283,6 +49371,8 @@ SLPM-66260:
   name-sort: "りもーとこんとろーるだんでぃSF [KONAMI The BEST]"
   name-en: "Remote Control Dandy SF [KONAMI The BEST]"
   region: "NTSC-J"
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes health bar flickering in tutorial level.
 SLPM-66261:
   name: "OZ -オズ- [KONAMI The BEST]"
   name-sort: "おず [KONAMI The BEST]"
@@ -50693,6 +50783,8 @@ SLPM-66481:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLPM-66482:
   name: "ときめきメモリアル Girl's Side 2nd Kiss [リピート生産版]"
   name-sort: "ときめきめもりある がーるずさいど 2nd Kiss [りぴーとせいさんばん]"
@@ -51163,6 +51255,7 @@ SLPM-66562:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLAJ-25075"
     - "SLPM-66232"
@@ -51217,9 +51310,10 @@ SLPM-66568:
   name-en: "Brothers in Arms - Road to Hill 30 [Ubisoft Best]"
   region: "NTSC-J"
   gsHWFixes:
+    recommendedBlendingLevel: 3 # Fixes ground shading.
     halfPixelOffset: 5 # Reduces ghosting on objects.
     nativeScaling: 2 # Helps smooth out ghosting.
-    recommendedBlendingLevel: 3 # Fixes ground shading.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-66569:
   name: "シークレット・オブ・エヴァンゲリオン [通常版]"
   name-sort: "しーくれっと おぶ えゔぁんげりおん [つうじょうばん]"
@@ -51527,6 +51621,7 @@ SLPM-66617:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLPM-66617"
     # Most Wanted save grants extra money.
@@ -52381,6 +52476,8 @@ SLPM-66748:
   gameFixes:
     - DMABusyHack
     - SoftwareRendererFMVHack # Vertical lines in FMV.
+  gsHWFixes:
+    roundSprite: 1 # Fixes misalignment of textures in the Pause Menu.
 SLPM-66749:
   name: "ウィザードリィ エクス2 ～無限の学徒～ [ワンダープライス]"
   name-sort: "うぃざーどりぃ えくす2 むげんのがくと [わんだーぷらいす]"
@@ -53093,6 +53190,7 @@ SLPM-66869:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLPM-66869"
     # Most Wanted save grants extra money.
@@ -53597,6 +53695,7 @@ SLPM-66960:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-66961:
   name: "EA:SY！1980 BLACK"
   name-sort: "ブラック [EA:SY! 1980]"
@@ -53781,6 +53880,10 @@ SLPM-66994:
   gameFixes:
     - DMABusyHack
     - SoftwareRendererFMVHack # Vertical lines in FMV.
+  gsHWFixes:
+    roundSprite: 1 # Fixes misalignment of textures in the Pause Menu.
+  memcardFilters:
+    - SLPM-66748 # Original Version
 SLPM-66995:
   name: "beatmania Ⅱ DX 14 - Gold"
   name-sort: "びーとまにあ 2 DX 14 - Gold"
@@ -54068,9 +54171,12 @@ SLPM-67524:
   name-en: "Armored Core 3"
   region: "NTSC-K"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLES-50079" # Armored Core 2
+    - "SLES-50905" # Another Age
+    - "SLES-51399" # Armored Core 3
 SLPM-67525:
   name: "메달　오브　아너　프론트라인"
   name-en: "Medal of Honor - Frontline"
@@ -54091,6 +54197,7 @@ SLPM-67527:
   clampModes:
     vuClampMode: 2 # White textures.
   gsHWFixes:
+    drawBuffering: 1 # Reduces draws and improves performance.
     recommendedBlendingLevel: 3 # Improves road quality.
     halfPixelOffset: 2 # Fixes depth line and blur.
 SLPM-67528:
@@ -54198,7 +54305,7 @@ SLPM-68005:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLPM-68007:
   name: "カラオケレボリューション用マイク同梱お試しディスク"
   name-sort: "からおけれぼりゅーしょんようまいくどうこんおためしでぃすく"
@@ -54347,17 +54454,22 @@ SLPM-68520:
   name-en: "Armored Core - Last Raven [Champion Special Edition]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
-    - "SLPS-25408"
-    - "SLPS-25462"
-    - "SLPS-73247"
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPM-68521:
   name: ".hack//frägment [先行リリース版]"
   name-sort: "どっとはっく fragment [せんこうりりーすばん]"
@@ -55129,6 +55241,7 @@ SLPM-74405:
   region: "NTSC-J"
   gameFixes:
     - EETimingHack # Stops crash after intro movie.
+    - InstantDMAHack # Stops hang when entering Sword Select screen.
 SLPM-74406:
   name: "WRC ～WORLD RALLY CHAMPIONSHIP～ [PlayStation2 the Best]"
   name-sort: "WRC ～わーるど らりー ちゃんぴおんしっぷ～ [PlayStation2 the Best]"
@@ -55197,6 +55310,14 @@ SLPM-74416:
   region: "NTSC-J"
   gameFixes:
     - SoftwareRendererFMVHack # Fixes brightness and striped lines in FMVs.
+SLPM-74419:
+  name: "爆走デコトラ伝説 ～男花道夢浪漫～ [PlayStation2 the Best]"
+  name-sort: "ばくそうでことらでんせつ おとこはなみちゆめろまん [PlayStation2 the Best]"
+  name-en: "Bakusou Dekotora Densetsu - Otoko Hanamichi Yume Roman [PlayStation2 the Best]"
+  region: "NTSC-J"
+  gsHWFixes:
+    textureInsideRT: 1 # Fixes inside RT shuffling.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPM-74420:
   name: "頭文字D Special Stage [PlayStation2 the Best]"
   name-sort: "いにしゃるD すぺしゃる すてーじ [PlayStation2 the Best]"
@@ -55336,6 +55457,8 @@ SLPS-20013:
   name-sort: "ぷらいまる いめーじ vol.1"
   name-en: "Primal Image Vol.01"
   region: "NTSC-J"
+  gsHWFixes:
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLPS-20015:
   name: "鉄拳タッグトーナメント"
   name-sort: "てっけんたっぐとーなめんと"
@@ -56431,7 +56554,7 @@ SLPS-20234:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLPS-20237:
   name: "Saikyou Toudai Shougi 3"
   region: "NTSC-J"
@@ -57849,6 +57972,8 @@ SLPS-25004:
   name-en: "Kensetsu Juuki Kenka Battle - Buchigire Kongou!!"
   region: "NTSC-J"
   compat: 5
+  gsHWFixes:
+    recommendedHWAA1: 1 # Fixes line thickness on vehicles and buildings.
 SLPS-25005:
   name: "ロックンメガステージ"
   name-sort: "ろっくんめがすてーじ"
@@ -57868,8 +57993,9 @@ SLPS-25007:
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
   gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves sky rendering.
-    textureInsideRT: 1 # Fixes texture corruption.
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SLPS-25008:
   name: "魔術士オーフェン - Sorcerous Stabber ORPHEN"
   name-sort: "まじゅつしおーふぇん - Sorcerous Stabber ORPHEN"
@@ -58078,12 +58204,17 @@ SLPS-25040:
   compat: 5
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SCPS-55024"
-    - "SLPS-25007"
-    - "SLPS-25040"
-    - "SLPS-73403"
-    - "SLPS-73411"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
 SLPS-25041:
   name: "シャドウハーツ"
   name-sort: "しゃどうはーつ"
@@ -58520,9 +58651,19 @@ SLPS-25112:
   region: "NTSC-J"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
 SLPS-25113:
   name: "絶体絶命都市"
   name-sort: "ぜったいぜつめいとし"
@@ -58855,14 +58996,21 @@ SLPS-25169:
   name-en: "Armored Core 3 - Silent Line"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SCAJ-20011"
-    - "SCPS-55014"
-    - "SLPS-25112"
-    - "SLPS-25169"
-    - "SLPS-73417"
-    - "SLPS-73420"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
 SLPS-25170:
   name: "SDガンダム - G GENERATION-NEO"
   name-sort: "SDがんだむ じー じぇねれーしょん ねお"
@@ -59595,6 +59743,7 @@ SLPS-25300:
   name-en: "R:Racing Evolution"
   region: "NTSC-J"
   gsHWFixes:
+    halfPixelOffset: 4 # Aligns bloom and shadows.
     alignSprite: 1 # Fixes vertical lines.
 SLPS-25301:
   name: "ミッシングパーツ side A the TANTEI stories"
@@ -59820,30 +59969,38 @@ SLPS-25338:
   name-en: "Armored Core - Nexus [Disc 1]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
 SLPS-25339:
   name: "アーマード・コア ネクサス [DISC 2]"
   name-sort: "あーまーどこあ ねくさす [DISC 2]"
   name-en: "Armored Core - Nexus [Disc 2]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
 SLPS-25340:
   name: "ミッシングパーツ side B the TANTEI stories"
   name-sort: "みっしんぐぱーつ side B the TANTEI stories"
@@ -60199,6 +60356,8 @@ SLPS-25394:
   name-sort: "あなざーせんちゅりーずえぴそーど"
   name-en: "Another Century's Episode"
   region: "NTSC-J"
+  gsHWFixes:
+    textureInsideRT: 1 # Fixes broken effect rendering.
 SLPS-25395:
   name: "センチメンタルプレリュード"
   name-sort: "せんちめんたるぷれりゅーど"
@@ -60294,19 +60453,19 @@ SLPS-25408:
   name-en: "Armored Core - Nine Breaker"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
-    cpuSpriteRenderBW: 2 # Fixes broken water on "Upper Sea" level.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
     cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLPS-25408"
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
-  dynaPatches:
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+  dynaPatches: # Fix stuck enemies. (author=Berylskid)
     - pattern:
         - { offset: 0x0, value: 0x3C023E4C }
         - { offset: 0x4, value: 0x3442CCCD }
@@ -60636,24 +60795,34 @@ SLPS-25461:
   name-en: "Armored Core - Formula Front"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
 SLPS-25462:
   name: "アーマード・コア ラストレイヴン"
   name-sort: "あーまーどこあ らすとれいゔん"
   name-en: "Armored Core - Last Raven"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
-    - "SLPS-25408"
-    - "SLPS-25462"
-    - "SLPS-73247"
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPS-25463:
   name: "マイホームをつくろう2！匠"
   name-sort: "まいほーむをつくろう2 たくみ"
@@ -62309,9 +62478,22 @@ SLPS-25730:
   name-en: "Armored Core - Last Raven [Machine Side Box]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPS-25731:
   name: "アーマード・コア 2 [MACHINE SIDE BOX]"
   name-sort: "あーまーどこあ2 [MACHINE SIDE BOX]"
@@ -62320,17 +62502,28 @@ SLPS-25731:
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
   gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves sky rendering.
-    textureInsideRT: 1 # Fixes texture corruption.
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SLPS-25732:
   name: "アーマード・コア 3 [MACHINE SIDE BOX]"
   name-sort: "あーまーどこあ3 [MACHINE SIDE BOX]"
   name-en: "Armored Core 3 [MACHINE SIDE BOX]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
 SLPS-25733:
   name: "スーパーロボット大戦OG ORIGINAL GENERATIONS"
   name-sort: "すーぱーろぼっとたいせんOG ORIGINAL GENERATIONS"
@@ -64032,30 +64225,38 @@ SLPS-73202:
   name-en: "Armored Core - Nexus [Disc 1] [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
 SLPS-73203:
   name: "アーマード・コア ネクサス [DISC 2] [PlayStation2 the Best]"
   name-sort: "あーまーどこあ ねくさす [DISC 2] [PlayStation2 the Best]"
   name-en: "Armored Core - Nexus [Disc 2] [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SCAJ-20076"
-    - "SCAJ-20077"
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
 SLPS-73204:
   name: "絶体絶命都市 [PlayStation2 the Best]"
   name-sort: "ぜったいぜつめいとし [PlayStation2 the Best]"
@@ -64284,6 +64485,8 @@ SLPS-73227:
   name-sort: "あなざーせんちゅりーずえぴそーど [PlayStation2 the Best]"
   name-en: "Another Century's Episode [PlayStation2 the Best]"
   region: "NTSC-J"
+  gsHWFixes:
+    textureInsideRT: 1 # Fixes broken effect rendering.
 SLPS-73228:
   name: "風雲　幕末伝 [PlayStation2 the Best]"
   name-sort: "ふううんばくまつでん [PlayStation2 the Best]"
@@ -64479,17 +64682,22 @@ SLPS-73247:
   name-en: "Armored Core - Last Raven [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLPS-25338"
-    - "SLPS-25339"
-    - "SLPS-73202"
-    - "SLPS-73203"
-    - "SLPS-25408"
-    - "SLPS-25462"
-    - "SLPS-73247"
+    - "SLPS-25338" # Nexus (Disc 1)
+    - "SLPS-73202" # Nexus (Disc 1)
+    - "SLPS-25339" # Nexus (Disc 2)
+    - "SLPS-73203" # Nexus (Disc 2)
+    - "SLPS-25408" # Nine Breaker
+    - "SLPS-25462" # Last Raven
+    - "SLPS-25730" # Last Raven
+    - "SLPS-68520" # Last Raven
+    - "SLPS-73247" # Last Raven
 SLPS-73248:
   name: "影牢Ⅱ -Dark illusion- [PlayStation2 the Best]"
   name-sort: "かげろう2 -Dark illusion- [PlayStation2 the Best]"
@@ -64636,6 +64844,9 @@ SLPS-73270:
   name-sort: "すーぱーろぼっとたいせんZ [PlayStation2 the Best]"
   name-en: "Super Robot Taisen Z [PlayStation2 the Best]"
   region: "NTSC-J"
+  memcardFilters:
+    - "SLPS-73270"
+    - "SLPS-25887"
 SLPS-73401:
   name: "はじめの一歩 VICTORIOUS BOXERS ～CHAMPIONSHIP VERSION～ [PlayStation2 the Best]"
   name-sort: "はじめのいっぽ VICTORIOUS BOXERS CHAMPIONSHIP VERSION [PlayStation2 the Best]"
@@ -64655,8 +64866,9 @@ SLPS-73403:
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
   gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves sky rendering.
-    textureInsideRT: 1 # Fixes texture corruption.
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SLPS-73404:
   name: "風のクロノア2 ～世界が望んだ忘れもの～PlayStation 2 the Best"
   name-sort: "かぜのくろのあ2 せかいがのぞんだわすれもの [PlayStation2 the Best]"
@@ -64723,12 +64935,17 @@ SLPS-73411:
   region: "NTSC-J"
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SCPS-55024"
-    - "SLPS-25007"
-    - "SLPS-25040"
-    - "SLPS-73403"
-    - "SLPS-73411"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
 SLPS-73412:
   name: "ヴァンパイアナイト [PlayStation2 the Best]"
   name-sort: "ゔぁんぱいあないと [PlayStation2 the Best]"
@@ -64759,8 +64976,19 @@ SLPS-73417:
   name-en: "Armored Core 3 [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
 SLPS-73418:
   name: "シャドウハーツ [PlayStation2 the Best]"
   name-sort: "しゃどうはーつ [PlayStation2 the Best]"
@@ -64783,14 +65011,21 @@ SLPS-73420:
   name-en: "Armored Core 3 - Silent Line [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
   memcardFilters:
-    - "SCAJ-20011"
-    - "SCPS-55014"
-    - "SLPS-25112"
-    - "SLPS-25169"
-    - "SLPS-73417"
-    - "SLPS-73420"
+    - "SLPS-25007" # Armored Core 2
+    - "SLPS-25731" # Armored Core 2
+    - "SLPS-73403" # Armored Core 2
+    - "SLPS-25040" # Another Age
+    - "SLPS-73411" # Another Age
+    - "SCPS-55024" # Another Age
+    - "SLPS-25112" # Armored Core 3
+    - "SLPS-25732" # Armored Core 3
+    - "SLPS-73417" # Armored Core 3
+    - "SCPS-55014" # Armored Core 3
+    - "SLPS-25169" # Silent Line
+    - "SLPS-73420" # Silent Line
 SLPS-73421:
   name: "天誅 参 [PlayStation2 the Best]"
   name-sort: "てんちゅう3 [PlayStation2 the Best]"
@@ -64915,8 +65150,9 @@ SLUS-20014:
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
   gsHWFixes:
-    recommendedBlendingLevel: 3 # Improves sky rendering.
-    textureInsideRT: 1 # Fixes texture corruption.
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
 SLUS-20015:
   name: "Eternal Ring"
   region: "NTSC-U"
@@ -65382,6 +65618,8 @@ SLUS-20145:
   name: "Ring of Red"
   region: "NTSC-U"
   compat: 5
+  gameFixes:
+    - SoftwareRendererFMVHack # Fixes FMV lines.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20146:
@@ -65883,9 +66121,13 @@ SLUS-20249:
   region: "NTSC-U"
   clampModes:
     eeClampMode: 2 # Fixes Abnormal AI behavior.
-  memcardFilters: # Can import data from regular Armored Core 2.
-    - "SLUS-20249"
-    - "SLUS-20014"
+  gsHWFixes:
+    minimumBlendingLevel: 4 # Fixes cloud rendering.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLUS-20014" # Armored Core 2
+    - "SLUS-20249" # Another Age
 SLUS-20250:
   name: "Stuntman"
   region: "NTSC-U"
@@ -65894,6 +66136,8 @@ SLUS-20250:
     - BlitInternalFPSHack # Fixes internal FPS detection.
   gsHWFixes:
     cpuSpriteRenderBW: 4 # Fixes textures.
+    halfPixelOffset: 4 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-20251:
   name: "Harvest Moon - Save the Homeland"
   region: "NTSC-U"
@@ -66311,8 +66555,9 @@ SLUS-20337:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 2 # Fixes upscaling lines.
+    halfPixelOffset: 4 # Fixes upscaling lines.
     autoFlush: 2 # Fixes sun penetration.
+    textureInsideRT: 1 # Fixes missing lighting in some rooms.
 SLUS-20339:
   name: "Bass Fishing Duel - Sega Sports"
   region: "NTSC-U"
@@ -66435,6 +66680,7 @@ SLUS-20362:
   clampModes:
     vuClampMode: 2 # White textures.
   gsHWFixes:
+    drawBuffering: 1 # Reduces draws and improves performance.
     recommendedBlendingLevel: 3 # Improves road quality.
     halfPixelOffset: 2 # Fixes depth line and blur.
 SLUS-20363:
@@ -66843,9 +67089,12 @@ SLUS-20435:
   name: "Armored Core 3"
   region: "NTSC-U"
   gsHWFixes:
-    halfPixelOffset: 4 # Corrects positioning of reflections on suit's surfaces.
-    roundSprite: 2 # Reduces garbage on the UI whilst upscaling.
-    mergeSprite: 1 # Fixes incorrect blur when Round Sprite is enabled.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLUS-20014" # Armored Core 2
+    - "SLUS-20249" # Another Age
+    - "SLUS-20435" # Armored Core 3
 SLUS-20436:
   name: "Guilty Gear X2"
   region: "NTSC-U"
@@ -67586,7 +67835,7 @@ SLUS-20576:
   gsHWFixes:
     recommendedBlendingLevel: 4 # Fixes missing lighting effects.
     textureInsideRT: 1 # Fixes right side shadow lookup.
-    halfPixelOffset: 4 # Fixes misaligned lighting and other effects.
+    halfPixelOffset: 5 # Fixes misaligned lighting and other effects.
 SLUS-20577:
   name: "Drome Racers"
   region: "NTSC-U"
@@ -67833,8 +68082,6 @@ SLUS-20622:
   compat: 5
   clampModes:
     vuClampMode: 2 # Fixes some lighting/shadow artefacts (most light sources like the Flashlight are unaffected).
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes blackscreen when FMV.
   gsHWFixes:
     minimumBlendingLevel: 4 # Fixes brightness menu transparancy effects and text.
     deinterlace: 9 # Fixes incorrect field order in FMVs.
@@ -67957,10 +68204,13 @@ SLUS-20644:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects positioning of reflections on suit's surfaces.
-  memcardFilters: # Can import data from AC3.
-    - "SLUS-20435"
-    - "SLUS-20644"
+    drawBuffering: 1 # Reduces draws and improves performance.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+  memcardFilters:
+    - "SLUS-20014" # Armored Core 2
+    - "SLUS-20249" # Another Age
+    - "SLUS-20435" # Armored Core 3
+    - "SLUS-20644" # Silent Line
 SLUS-20645:
   name: "Time Crisis 3 [with Guncon]"
   region: "NTSC-U"
@@ -68373,6 +68623,7 @@ SLUS-20721:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    halfPixelOffset: 4 # Aligns bloom and shadows.
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20722:
   name: "Maximo vs. Army of Zin"
@@ -68746,6 +68997,7 @@ SLUS-20782:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    textureInsideRT: 1 # Fixes broken shuffles.
     minimumBlendingLevel: 2 # Fixes dark font to more bright like software mode.
 SLUS-20784:
   name: "The Italian Job"
@@ -68878,6 +69130,7 @@ SLUS-20811:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-20812:
   name: "Dynasty Warriors 4 - Xtreme Legends"
   region: "NTSC-U"
@@ -69008,6 +69261,7 @@ SLUS-20842:
   compat: 5
   gsHWFixes:
     halfPixelOffset: 1 # Fixes vertical lines, font and others.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-20843:
   name: "Dead to Rights II"
   region: "NTSC-U"
@@ -69304,6 +69558,8 @@ SLUS-20890:
   name: "Rocky - Legends"
   region: "NTSC-U"
   compat: 5
+  speedHacks:
+    instantVU1: 0 # Fixes graphical issues on character models.
   gsHWFixes:
     preloadFrameData: 1 # Fixes background FMV flicker.
 SLUS-20891:
@@ -69335,6 +69591,8 @@ SLUS-20893:
   name: "Way of the Samurai 2"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    roundSprite: 2 # Fixes UI lines.
 SLUS-20894:
   name: "Worms 3D"
   region: "NTSC-U"
@@ -69795,11 +70053,11 @@ SLUS-20968:
   name: "Karaoke Revolution Volume 2"
   region: "NTSC-U"
 SLUS-20969:
-  name: "S.L.A.I. - Steel Lancer Arena International - Phantom Crash"
+  name: "S.L.A.I. - Steel Lancer Arena International"
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 4 # Fixes double image and aligns glow effects.
+    halfPixelOffset: 5 # Fixes double image and aligns glow effects.
 SLUS-20970:
   name: "Rumble Roses"
   region: "NTSC-U"
@@ -69907,11 +70165,16 @@ SLUS-20986:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLUS-20986"
-    - "SLUS-21079"
+    - "SLUS-20644" # Silent Line
+    - "SLUS-20986" # Nexus (Disc 1)
+    - "SLUS-21079" # Nexus (Disc 2)
 SLUS-20987:
   name: "Pool Paradise"
   region: "NTSC-U"
@@ -70343,6 +70606,9 @@ SLUS-21050:
   name: "Burnout 3 - Takedown"
   region: "NTSC-U"
   compat: 5
+  memcardFilters: # Used for storage of network information on the memory card.
+    - "SLUS-21050"
+    - "PSCD-10088"
   clampModes:
     vuClampMode: 3 # Fixes buggy lighting in the garage.
   gsHWFixes:
@@ -70436,6 +70702,7 @@ SLUS-21065:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-21066:
   name: "The Urbz - Sims in the City"
   name-sort: "Urbz, The - Sims in the City"
@@ -70505,11 +70772,16 @@ SLUS-21079:
   name: "Armored Core - Nexus [Disc 2]"
   region: "NTSC-U"
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
   memcardFilters:
-    - "SLUS-20986"
-    - "SLUS-21079"
+    - "SLUS-20644" # Silent Line
+    - "SLUS-20986" # Nexus (Disc 1)
+    - "SLUS-21079" # Nexus (Disc 2)
 SLUS-21080:
   name: "Samurai Warriors - Xtreme Legends"
   region: "NTSC-U"
@@ -70803,6 +71075,9 @@ SLUS-21131:
   name: "Pump It Up - Exceed"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    cpuSpriteRenderBW: 4 # Fixes graphical corruption in musical notes.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLUS-21132:
   name: "Stella Deus - The Gate of Eternity"
   region: "NTSC-U"
@@ -70989,9 +71264,10 @@ SLUS-21163:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    recommendedBlendingLevel: 3 # Fixes ground shading.
     halfPixelOffset: 5 # Reduces ghosting on objects.
     nativeScaling: 2 # Helps smooth out ghosting.
-    recommendedBlendingLevel: 3 # Fixes ground shading.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-21164:
   name: "Namco Museum - 50th Anniversary"
   region: "NTSC-U"
@@ -71210,15 +71486,17 @@ SLUS-21200:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 5 # Fixes misaligned blur.
-    recommendedBlendingLevel: 3 # Fixes level brightness.
-    cpuSpriteRenderBW: 2 # Fixes broken water on "Upper Sea" level.
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
     cpuSpriteRenderLevel: 2 # Needed for above.
-  memcardFilters: # Can import data from AC:Nexus.
-    - "SLUS-21200"
-    - "SLUS-20986"
-    - "SLUS-21079"
-  dynaPatches:
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLUS-20986" # Nexus (Disc 1)
+    - "SLUS-21079" # Nexus (Disc 2)
+    - "SLUS-21200" # Nine Breaker
+  dynaPatches: # Fix stuck enemies. (author=Berylskid)
     - pattern:
         - { offset: 0x0, value: 0x3C023E4C }
         - { offset: 0x4, value: 0x3442CCCD }
@@ -71269,6 +71547,8 @@ SLUS-21207:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLUS-21208:
   name: "Tony Hawk's American Wasteland"
   region: "NTSC-U"
@@ -71612,6 +71892,7 @@ SLUS-21257:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLUS-21257"
     - "SLUS-21065" # Underground 2 save grants extra money.
@@ -71699,6 +71980,7 @@ SLUS-21267:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLUS-21267"
     - "SLUS-21351"
@@ -72147,6 +72429,8 @@ SLUS-21327:
   name: "Atelier Iris 2 - The Azoth of Destiny"
   region: "NTSC-U"
   compat: 5
+  gameFixes:
+    - SoftwareRendererFMVHack # Flickering in FMV.
   gsHWFixes:
     roundSprite: 1 # Fixes font artifacts for health and other sprites.
     texturePreloading: 0 # Improves performance and prevents it disabling itself regardless.
@@ -72214,14 +72498,17 @@ SLUS-21338:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    halfPixelOffset: 2 # Corrects shadow alignment and reduces blurriness.
-    recommendedBlendingLevel: 3 # Fixes level and map menu brightness.
-    preloadFrameData: 1 # Fixes glowing emblems.
-  memcardFilters: # Convert savegames from AC: Nexus and AC: Nine Breaker.
-    - "SLUS-21338"
-    - "SLUS-21200"
-    - "SLUS-20986"
-    - "SLUS-21079"
+    minimumBlendingLevel: 3 # Fixes level brightness.
+    drawBuffering: 1 # Reduces draws and improves performance.
+    cpuSpriteRenderBW: 2 # Fixes water mipmaps.
+    cpuSpriteRenderLevel: 2 # Needed for above.
+    halfPixelOffset: 2 # Fixes misaligned blur.
+    nativeScaling: 2 # Fixes border glow.
+  memcardFilters:
+    - "SLUS-20986" # Nexus (Disc 1)
+    - "SLUS-21079" # Nexus (Disc 2)
+    - "SLUS-21200" # Nine Breaker
+    - "SLUS-21338" # Last Raven
 SLUS-21339:
   name: "Puzzle Challenge - Crosswords and More!"
   region: "NTSC-U"
@@ -72260,6 +72547,7 @@ SLUS-21344:
     preloadFrameData: 1 # Fixes menu graphics.
     autoFlush: 1 # Fixes motion blur.
     minimumBlendingLevel: 2 # Improves post effects.
+    limit24BitDepth: 2 # Fixes icon brightness.
 SLUS-21345:
   name: "Grandia III [Disc 2 of 2]"
   region: "NTSC-U"
@@ -72324,6 +72612,7 @@ SLUS-21351:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLUS-21267"
     - "SLUS-21351"
@@ -73298,6 +73587,7 @@ SLUS-21493:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLUS-21493"
     # Most Wanted save grants extra money.
@@ -73314,6 +73604,7 @@ SLUS-21494:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
   memcardFilters:
     - "SLUS-21494"
     # Most Wanted save grants extra money.
@@ -75831,6 +76122,7 @@ SLUS-28061:
     preloadFrameData: 1 # Fixes menu graphics.
     autoFlush: 1 # Fixes motion blur.
     minimumBlendingLevel: 2 # Improves post effects.
+    limit24BitDepth: 2 # Fixes icon brightness.
 SLUS-28062:
   name: "Dance Factory [Trade Demo]"
   region: "NTSC-U"
@@ -76110,6 +76402,7 @@ SLUS-29073:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves reflection quality.
     halfPixelOffset: 2 # Fixes misaligned post-processing.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-29074:
   name: "DDRMAX2 Dance Dance Revolution [Demo]"
   region: "NTSC-U"
@@ -76280,6 +76573,7 @@ SLUS-29118:
   gsHWFixes:
     halfPixelOffset: 5 # Fixes depth lines and reduces blur.
     nativeScaling: 1 # Aligns post effects.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-29123:
   name: "Ghost in the Shell - Stand Alone Complex [Demo]"
   region: "NTSC-U"
@@ -76341,7 +76635,7 @@ SLUS-29132:
   name: "S.L.A.I. - Steel Lancer Arena International - Phantom Crash [Public Beta Vol.1.0]"
   region: "NTSC-U"
   gsHWFixes:
-    halfPixelOffset: 4 # Fixes double image and aligns glow effects.
+    halfPixelOffset: 5 # Fixes double image and aligns glow effects.
 SLUS-29133:
   name: "Namco Transmission Demo Disc Vol.2"
   region: "NTSC-U"
@@ -76458,6 +76752,7 @@ SLUS-29155:
     nativeScaling: 2 # Fixes post effects.
     cpuCLUTRender: 1 # Final colour adjustment LUT.
     gpuTargetCLUT: 1 # Fixes sun penetrating bridges (along with HPO special).
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-29156:
   name: "Marvel Nemesis - Rise of the Imperfects [Demo]"
   region: "NTSC-U"
@@ -76469,6 +76764,8 @@ SLUS-29157:
     halfPixelOffset: 2 # Sharpens world in far distances, aligns some bloom better.
     roundSprite: 1 # Fixes font artifacts.
     nativeScaling: 2 # Fixes background DOF blur in battles.
+    cpuSpriteRenderBW: 1 # Fixes water and other sprite errors.
+    cpuSpriteRenderLevel: 2 # Needed for above.
 SLUS-29159:
   name: "One Piece - Grand Battle [Demo]"
   region: "NTSC-U"
@@ -76624,6 +76921,7 @@ SLUS-29188:
     preloadFrameData: 1 # Fixes menu graphics.
     autoFlush: 1 # Fixes motion blur.
     minimumBlendingLevel: 2 # Improves post effects.
+    limit24BitDepth: 2 # Fixes icon brightness.
 SLUS-29189:
   name: "FIFA World Cup - Germany 2006 [Demo]"
   region: "NTSC-U"
@@ -76653,6 +76951,7 @@ SLUS-29193:
   gsHWFixes:
     recommendedBlendingLevel: 3 # Fixes car headlights and persistent trails.
     halfPixelOffset: 2 # Fixes depth line.
+    drawBuffering: 1 # Reduces draws and improves performance.
 SLUS-29194:
   name: "FIFA 07 [Demo]"
   region: "NTSC-U"
@@ -76787,6 +77086,7 @@ TCES-52456:
     halfPixelOffset: 4 # Aligns post bloom.
     nativeScaling: 1 # Fixes light blooms.
     autoFlush: 2 # Helps fix misaligned bloom.
+    recommendedAccurateAlphaTest: 1 # Fixes shadows and glasses alpha.
 TCES-52582:
   name: "Everybody's Golf 4 [Beta Trial Code]"
   region: "PAL-E"
@@ -77139,6 +77439,8 @@ TLES-52781:
 TLES-52940:
   name: "S.L.A.I. - Steel Lancer Arena International Beta Trial Code"
   region: "PAL-E"
+  gsHWFixes:
+    halfPixelOffset: 5 # Fixes double image and aligns glow effects.
 TLES-53544:
   name: "Pro Evolution Soccer 5 Beta Trial Code"
   region: "PAL-E"

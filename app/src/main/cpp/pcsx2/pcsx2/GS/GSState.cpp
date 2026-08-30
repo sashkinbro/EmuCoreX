@@ -824,12 +824,12 @@ void GSState::DumpTransferList(const std::string& filename)
 			(*file) << std::endl;
 
 		// clear, EE->GS, or GS->GS
-		(*file) << LIST_ITEM << "type: " << (transfer.zero_clear ? "clear" : ((transfer.transfer_type == EEGS_TransferType::EE_to_GS) ? "EE_to_GS" : "GS_to_GS")) << std::endl;
+		(*file) << LIST_ITEM << "type: " << ((transfer.transfer_type == EEGS_TransferType::Clear) ? "clear" : ((transfer.transfer_type == EEGS_TransferType::EE_to_GS) ? "EE_to_GS" : "GS_to_GS")) << std::endl;
 
 		// Dump BITBLTBUF
 		(*file) << INDENT << "BITBLTBUF: " << OPEN_MAP;
 
-		const bool gs_to_gs = (transfer.transfer_type == EEGS_TransferType::GS_to_GS) && !transfer.zero_clear;
+		const bool gs_to_gs = (transfer.transfer_type == EEGS_TransferType::GS_to_GS) && transfer.transfer_type != EEGS_TransferType::Clear;
 
 		if (gs_to_gs)
 		{
@@ -875,11 +875,11 @@ void GSState::DumpTransferImages()
 		const GSUploadQueue& transfer = m_draw_transfers[i];
 
 		std::string filename;
-		if ((transfer.transfer_type == EEGS_TransferType::EE_to_GS) || transfer.zero_clear)
+		if ((transfer.transfer_type == EEGS_TransferType::EE_to_GS) || transfer.transfer_type == EEGS_TransferType::Clear)
 		{
 			// clear or EE->GS: only the destination info is relevant.
 			filename = GetDrawDumpPath("%05lld_transfer%02d_%s_%04x_%d_%s_%d_%d_%d_%d.png",
-				s_n, transfer_n++, (transfer.zero_clear ? "clear" : "EE_to_GS"), transfer.blit.DBP, transfer.blit.DBW,
+				s_n, transfer_n++, ((transfer.transfer_type == EEGS_TransferType::Clear) ? "clear" : "EE_to_GS"), transfer.blit.DBP, transfer.blit.DBW,
 				GSUtil::GetPSMName(transfer.blit.DPSM), transfer.rect.x, transfer.rect.y, transfer.rect.z, transfer.rect.w);
 		}
 		else
@@ -2099,7 +2099,8 @@ void GSState::FlushPrim()
 
 		if (tail > head)
 		{
-			switch (PRIM->PRIM)
+			// NOTE: Do not use PRIM->PRIM as the previous environment may have been restored and it may have changed from strip to fan, which messes up the backup.
+			switch (m_env.PRIM.PRIM)
 			{
 				case GS_POINTLIST:
 					pxAssert(0);
@@ -2239,7 +2240,7 @@ void GSState::FlushPrim()
 
 			// If it's a Triangle fan the XY buffer needs to be updated to point to the correct head vert
 			// Jak 3 shadows get spikey (with autoflush) if you don't.
-			if (PRIM->PRIM == GS_TRIANGLEFAN)
+			if (m_env.PRIM.PRIM == GS_TRIANGLEFAN)
 			{
 				for (u32 i = 0; i < unused; i++)
 				{
@@ -2425,6 +2426,9 @@ void GSState::CheckWriteOverlap(bool req_write, bool req_read)
 
 	if (req_write)
 	{
+		const u32 write_start_bp = GSLocalMemory::GetStartBlockAddress(blit.DBP, blit.DBW, blit.DPSM, write_rect);
+		const u32 write_end_bp = ((GSLocalMemory::GetEndBlockAddress(blit.DBP, blit.DBW, blit.DPSM, write_rect) + 1) + (GS_BLOCKS_PER_PAGE - 1)) & ~(GS_BLOCKS_PER_PAGE - 1);
+
 		// Invalid the CLUT if it crosses paths.
 		m_mem.m_clut.InvalidateRange(write_start_bp, write_end_bp);
 	}
@@ -2461,12 +2465,11 @@ void GSState::Write(const u8* mem, int len)
 			m_draw_transfers.pop_back();
 			transfer.rect = transfer.rect.runion(r);
 			transfer.draw = s_n;
-			transfer.zero_clear = false;
 			m_draw_transfers.push_back(transfer);
 		}
 		else
 		{
-			const GSUploadQueue new_transfer = {blit, r, s_n, false, EEGS_TransferType::EE_to_GS};
+			const GSUploadQueue new_transfer = {blit, s_n, r, EEGS_TransferType::EE_to_GS};
 			m_draw_transfers.push_back(new_transfer);
 		}
 
@@ -2539,7 +2542,7 @@ void GSState::InitReadFIFO(u8* mem, int len)
 	// Read the image all in one go.
 	m_mem.ReadImageX(m_tr.x, m_tr.y, m_tr.buff, m_tr.total, m_env.BITBLTBUF, m_env.TRXPOS, m_env.TRXREG);
 
-	if (GSConfig.SaveRT && GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()))
+	if (GSConfig.SaveTransferImages && GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()))
 	{
 		const std::string s(GetDrawDumpPath(
 			"%05lld_read_%05x_%d_%s_%d_%d_%d_%d.bmp",
@@ -2672,12 +2675,11 @@ void GSState::Move()
 		m_draw_transfers.pop_back();
 		transfer.rect = transfer.rect.runion(r);
 		transfer.draw = s_n;
-		transfer.zero_clear = false;
 		m_draw_transfers.push_back(transfer);
 	}
 	else
 	{
-		const GSUploadQueue new_transfer = {m_env.BITBLTBUF, r, s_n, false, EEGS_TransferType::GS_to_GS};
+		const GSUploadQueue new_transfer = {m_env.BITBLTBUF, s_n, r, EEGS_TransferType::GS_to_GS};
 		m_draw_transfers.push_back(new_transfer);
 	}
 
@@ -3422,10 +3424,8 @@ void GSState::UpdateContext()
 
 void GSState::UpdateScissor()
 {
-	m_scissor_cull_min = m_context->scissor.cull.xyxy();
-	m_scissor_cull_max = m_context->scissor.cull.zwzw();
 	m_xyof = m_context->scissor.xyof;
-	m_scissor_invalid = !m_context->scissor.in.gt32(m_context->scissor.in.zwzw()).allfalse();
+	m_scissor_invalid = m_context->scissor.in.rempty();
 }
 
 void GSState::UpdateVertexKick()
@@ -3446,54 +3446,42 @@ void GSState::UpdateVertexKick()
 	m_fpGIFPackedRegHandlersC[GIF_REG_STQRGBAXYZ2] = m_fpGIFPackedRegHandlerSTQRGBAXYZ2[prim];
 }
 
+static void GrowBuffer(void** pbuff, size_t old_size, size_t new_size, bool vertices)
+{
+	void* new_buff = _aligned_malloc(new_size, 32);
+	if (!new_buff)
+	{
+		Console.Error("GS: failed to allocate %zu bytes for %s.", new_size, vertices ? "vertices" : "indices");
+		pxFailRel("Memory allocation failed");
+	}
+	if (*pbuff)
+	{
+		if (old_size)
+		{
+			std::memcpy(new_buff, *pbuff, old_size);
+		}
+		_aligned_free(*pbuff);
+	}
+	*pbuff = new_buff;
+}
+
+template <typename T>
+static void GrowBuffer(T** pbuff, size_t old_count, size_t new_count)
+{
+	static_assert(std::is_same_v<T, GSVertex> || std::is_same_v<T, u16>, "For use with indices or vertices");
+	GrowBuffer(reinterpret_cast<void**>(pbuff), old_count * sizeof(T), new_count * sizeof(T), std::is_same_v<T, GSVertex>);
+}
+
 void GSState::GrowVertexBuffer()
 {
 	const u32 maxcount = std::max<u32>(m_vertex.maxcount * 3 / 2, 10000);
-	const u32 old_vertex_size = sizeof(GSVertex) * m_vertex.tail;
-	const u32 new_vertex_size = sizeof(GSVertex) * maxcount;
-	const u32 old_index_size = sizeof(u16) * m_index.tail;
-	const u32 new_index_size = sizeof(u16) * maxcount * 6; // Worst case index list is a list of points with vs expansion, 6 indices per point
+	const u32 new_index_count = maxcount * 6; // Worst case is a point list with VS expansion.
 
-	// Structure describing buffers to reallocate
-	struct AllocDesc
-	{
-		void** pbuff;
-		u32 old_size;
-		u32 new_size;
-	};
-	const std::array<AllocDesc, 5> alloc_desc = {{
-		{reinterpret_cast<void**>(&m_vertex.buff),      old_vertex_size, new_vertex_size},
-		// discard contents of buff_copy by setting old_size = 0
-		{reinterpret_cast<void**>(&m_vertex.buff_copy), 0,               new_vertex_size},
-		{reinterpret_cast<void**>(&m_draw_vertex.buff), old_vertex_size, new_vertex_size},
-		{reinterpret_cast<void**>(&m_index.buff),       old_index_size,  new_index_size},
-		{reinterpret_cast<void**>(&m_draw_index.buff),  old_index_size,  new_index_size}
-	}};
-
-	// For logging
-	u32 total_size = 0;
-	for (const auto& desc : alloc_desc)
-		total_size += desc.new_size;
-
-	// Reallocate each of the needed buffers
-	for (const auto [pbuff, old_size, new_size] : alloc_desc)
-	{
-		void* new_buff = _aligned_malloc(new_size, 32);
-		if (!new_buff)
-		{
-			Console.Error("GS: failed to allocate %zu bytes for vertices and indices.", total_size);
-			pxFailRel("Memory allocation failed");
-		}
-		if (*pbuff)
-		{
-			if (old_size)
-			{
-				std::memcpy(new_buff, *pbuff, old_size);
-			}
-			_aligned_free(*pbuff);
-		}
-		*pbuff = new_buff;
-	}
+	GrowBuffer(&m_vertex.buff, m_vertex.tail, maxcount);
+	GrowBuffer(&m_vertex.buff_copy, 0, maxcount);
+	GrowBuffer(&m_draw_vertex.buff, m_vertex.tail, maxcount);
+	GrowBuffer(&m_index.buff, m_index.tail, new_index_count);
+	GrowBuffer(&m_draw_index.buff, m_index.tail, new_index_count);
 
 	m_vertex.maxcount = maxcount - 3; // -3 to have some space at the end of the buffer before DrawingKick can grow it
 }
@@ -3871,7 +3859,7 @@ bool GSState::TrianglesAreQuads(bool shuffle_check)
 }
 
 template<u32 primclass>
-GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlist, bool save_bbox, float bbox_scale)
+GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlist, bool save_bbox, float bbox_scale, u32* max_size)
 {
 	const GSVector4i xyof = m_context->scissor.xyof.xyxy();
 
@@ -3927,6 +3915,7 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 	PRIM_OVERLAP overlap = PRIM_OVERLAP_NO;
 	bool check_quads = (primclass == GS_TRIANGLE_CLASS);
 
+	u32 drawlist_size = 0;
 	u32 i = 0;
 	u32 skip = 0; // Number of indices to skip if we have the bbox from the previous iteration.
 	
@@ -4320,6 +4309,17 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 		{
 			m_drawlist.push_back((j - i) / n); // Prim count
 		}
+		else if (max_size)
+		{
+			// If the max size pointer is passed it means we just want to peek at
+			// the drawlist size up to the given limit to avoid unecessary work.
+			drawlist_size++;
+			if (drawlist_size >= *max_size)
+			{
+				*max_size = drawlist_size;
+				return drawlist_size > 0 ? PRIM_OVERLAP_YES : PRIM_OVERLAP_UNKNOW;
+			}
+		}
 		else if (j < count)
 		{
 			return PRIM_OVERLAP_YES; // Early exit if not saving drawlist.
@@ -4333,21 +4333,27 @@ GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlistImpl(bool save_drawlis
 		all = bbox;
 		i = j;
 	}
+
+	if (max_size)
+	{
+		*max_size = drawlist_size;
+	}
+
 	return overlap;
 }
 
-GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlist(bool save_drawlist, bool save_bbox, float bbox_scale)
+GSState::PRIM_OVERLAP GSState::GetPrimitiveOverlapDrawlist(bool save_drawlist, bool save_bbox, float bbox_scale, u32* max_size)
 {
 	switch (m_vt.m_primclass)
 	{
 		case GS_POINT_CLASS:
-			return GetPrimitiveOverlapDrawlistImpl<GS_POINT_CLASS>(save_drawlist, save_bbox, bbox_scale);
+			return GetPrimitiveOverlapDrawlistImpl<GS_POINT_CLASS>(save_drawlist, save_bbox, bbox_scale, max_size);
 		case GS_LINE_CLASS:
-			return GetPrimitiveOverlapDrawlistImpl<GS_LINE_CLASS>(save_drawlist, save_bbox, bbox_scale);
+			return GetPrimitiveOverlapDrawlistImpl<GS_LINE_CLASS>(save_drawlist, save_bbox, bbox_scale, max_size);
 		case GS_TRIANGLE_CLASS:
-			return GetPrimitiveOverlapDrawlistImpl<GS_TRIANGLE_CLASS>(save_drawlist, save_bbox, bbox_scale);
+			return GetPrimitiveOverlapDrawlistImpl<GS_TRIANGLE_CLASS>(save_drawlist, save_bbox, bbox_scale, max_size);
 		case GS_SPRITE_CLASS:
-			return GetPrimitiveOverlapDrawlistImpl<GS_SPRITE_CLASS>(save_drawlist, save_bbox, bbox_scale);
+			return GetPrimitiveOverlapDrawlistImpl<GS_SPRITE_CLASS>(save_drawlist, save_bbox, bbox_scale, max_size);
 		default:
 			pxFail("Invalid primclass."); // Impossible.
 			return PRIM_OVERLAP_UNKNOW;
@@ -4376,7 +4382,7 @@ bool GSState::SpriteDrawWithoutGaps()
 	const GSVertex* v = &m_vertex.buff[0];
 	const int first_dpY = v[1].XYZ.Y - v[0].XYZ.Y;
 	const int first_dpX = v[1].XYZ.X - v[0].XYZ.X;
-
+	const u32 next_count = m_vertex.next;
 	// Horizontal Match.
 	if (((first_dpX + 8) >> 4) == m_r_no_scissor.z)
 	{
@@ -5140,6 +5146,7 @@ template <u32 prim, bool auto_flush>
 __forceinline void GSState::VertexKick(u32 skip)
 {
 	constexpr u32 n = NumIndicesForPrim(prim);
+	constexpr int primclass = GSUtil::GetPrimClass(prim);
 	static_assert(n > 0);
 
 	pxAssert(m_vertex.tail < m_vertex.maxcount + 3);
@@ -5207,73 +5214,66 @@ __forceinline void GSState::VertexKick(u32 skip)
 	// Skip draws when scissor is out of range (i.e. bottom-right is less than top-left), since everything will get clipped.
 	skip |= static_cast<u32>(m_scissor_invalid);
 
-	GSVector4i pmin, pmax;
+	GSVector4i bbox;
 	if (skip == 0)
 	{
 		const GSVector4i v0 = m_vertex.xy[(xy_tail - 1) & 3];
 		const GSVector4i v1 = m_vertex.xy[(xy_tail - 2) & 3];
 		const GSVector4i v2 = (prim == GS_TRIANGLEFAN) ? m_vertex.xyhead : m_vertex.xy[(xy_tail - 3) & 3];
 
-		switch (prim)
+		if constexpr (n == 1)
 		{
-			case GS_POINTLIST:
-				pmin = v0;
-				pmax = v0;
-				break;
-			case GS_LINELIST:
-			case GS_LINESTRIP:
-			case GS_SPRITE:
-				pmin = v0.min_i32(v1);
-				pmax = v0.max_i32(v1);
-				break;
-			case GS_TRIANGLELIST:
-			case GS_TRIANGLESTRIP:
-			case GS_TRIANGLEFAN:
-				pmin = v0.min_i32(v1.min_i32(v2));
-				pmax = v0.max_i32(v1.max_i32(v2));
-				break;
-			default:
-				break;
+			bbox = v0;
+		}
+		else if constexpr (n == 2)
+		{
+			bbox = v0.runion(v1);
+		}
+		else if constexpr (n == 3)
+		{
+			bbox = v0.runion(v1).runion(v2);
 		}
 
-		GSVector4i test = pmax.lt32(m_scissor_cull_min) | pmin.gt32(m_scissor_cull_max);
-
-		switch (prim)
+		if constexpr (primclass == GS_TRIANGLE_CLASS || primclass == GS_SPRITE_CLASS)
 		{
-			case GS_TRIANGLELIST:
-			case GS_TRIANGLESTRIP:
-			case GS_TRIANGLEFAN:
-			case GS_SPRITE:
+			if (m_nativeres)
 			{
-				// Discard degenerate triangles which don't cover at least one pixel. Since the vertices are in native
-				// resolution space, we can use the integer locations. When upscaling, we can't, because a primitive which
-				// does not span a single pixel at 1x may span multiple pixels at higher resolutions.
-				const GSVector4i degen_test = pmin.eq32(pmax);
-				test |= m_nativeres ? degen_test.zwzw() : degen_test;
+				// For triangles and sprites at native res take the interior pixel centers.
+				const GSVector4i interior = (bbox + GSVector4i(0xF, 0xF, -1, -1)) & GSVector4i(~0xF);
+				bbox = interior + GSVector4i(0, 0, 1, 1); // +1 to bottom/right so empty test works correctly.
 			}
-			break;
-			default:
-				break;
+			else
+			{
+				// For upscaling, remove bottom/right subtexels.
+				bbox -= ((bbox & GSVector4i(0xF)) == GSVector4i(0)) & GSVector4i(0, 0, 1, 1);
+			}
+
+			// For AA1 triangles and lines, expand the bounds by 1 pixel on all sides.
+			// Note: redundant check for the AA1 flag to avoid calling a function if not needed.
+			if (PRIM->AA1 && IsCoverageAlphaSupported())
+			{
+				bbox += GSVector4i(-0x10, -0x10, 0x10, 0x10);
+			}
 		}
 
-		switch (prim)
+		// Do scissor test.
+		const GSVector4i bbox_ex = bbox + GSVector4i(0, 0, 1, 1); // Exclusive coords for the scissor test.
+		const GSVector4i& scissor = m_context->scissor.cull;
+		u32 test = static_cast<u32>(!bbox_ex.rintersects(scissor));
+
+		// Test for empty bbox.
+		if constexpr (primclass == GS_TRIANGLE_CLASS || primclass == GS_SPRITE_CLASS)
 		{
-			case GS_TRIANGLELIST:
-			case GS_TRIANGLESTRIP:
-			case GS_TRIANGLEFAN:
-				test = (test | v0.eq64(v1)) | (v1.eq64(v2) | v0.eq64(v2));
-				break;
-			default:
-				break;
+			test |= static_cast<u32>(bbox.rempty());
 		}
 
-#ifndef ARCH_ARM64
-		// We only care about the xy passing the skip test. zw is the offset coordinates for native culling.
-		skip |= test.mask() & 0xff;
-#else
-		// mask() is slow on ARM, so just pull the bits out instead, thankfully we only care about the first 4 bytes.
-		skip |= (static_cast<u64>(test.extract64<0>()) & UINT64_C(0x8080808080808080)) != 0;
-#endif
+		// Test for degenerate triangle.
+		if constexpr (primclass == GS_TRIANGLE_CLASS)
+		{
+			test |= static_cast<u32>(v0.eq(v1)) | static_cast<u32>(v1.eq(v2)) | static_cast<u32>(v0.eq(v2));
+		}
+
+		skip |= test;
 	}
 
 	if (skip != 0)
@@ -5394,13 +5394,12 @@ __forceinline void GSState::VertexKick(u32 skip)
 			ASSUME(0);
 	}
 
-	// Update rectangle for the current draw. We can use the re-integer coordinates from min/max here.
-	const GSVector4i draw_min = pmin.zwzw();
-	const GSVector4i draw_max = pmax;
-	if (m_vertex.tail != n)
-		temp_draw_rect = temp_draw_rect.min_i32(draw_min).blend32<12>(temp_draw_rect.max_i32(draw_max));
+	// Update the current draw rectangle using exclusive pixel endpoints.
+	const GSVector4i draw_rect = bbox.sra32<4>() + GSVector4i(0, 0, 1, 1);
+	if (m_index.tail != n)
+		temp_draw_rect = temp_draw_rect.runion(draw_rect);
 	else
-		temp_draw_rect = draw_min.blend32<12>(draw_max);
+		temp_draw_rect = draw_rect;
 	temp_draw_rect = temp_draw_rect.rintersect(m_context->scissor.in);
 
 	constexpr u32 max_vertices = MaxVerticesForPrim(prim);

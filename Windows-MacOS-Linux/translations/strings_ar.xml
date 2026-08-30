@@ -392,7 +392,7 @@
     <string name="settings_about">حول</string>
     <string name="settings_version">الإصدار</string>
     <string name="settings_emulator_core">نواة المحاكاة</string>
-    <string name="settings_emulator_core_desc">مبني على PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">مبني على PCSX2 (2.8.0)</string>
     <string name="settings_about_app">حول EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX عبارة عن مكتبة ومشغل ألعاب PlayStation 2 مبني حول نواة محاكاة PCSX2، مع إعداد سريع، وتنقل نظيف، وتجربة مناسبة للأجهزة المحمولة.</string>
     <string name="settings_about_studio">المطور</string>

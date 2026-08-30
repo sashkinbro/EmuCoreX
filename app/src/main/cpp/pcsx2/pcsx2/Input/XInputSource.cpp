@@ -79,7 +79,7 @@ static const char* s_button_names[XInputSource::NUM_BUTTONS] = {
 	"B", // XINPUT_GAMEPAD_B
 	"X", // XINPUT_GAMEPAD_X
 	"Y", // XINPUT_GAMEPAD_Y
-	"Guide", // XINPUT_GAMEPAD_GUIDE
+	"Xbox", // XINPUT_GAMEPAD_GUIDE
 };
 
 static const u16 s_button_masks[XInputSource::NUM_BUTTONS] = {
@@ -387,7 +387,7 @@ TinyString XInputSource::ConvertKeyToIcon(InputBindingKey key)
 {
 	TinyString ret;
 
-	if (key.source_type == InputSourceType::SDL)
+	if (key.source_type == InputSourceType::XInput)
 	{
 		if (key.source_subtype == InputSubclass::ControllerAxis)
 		{
@@ -513,8 +513,11 @@ void XInputSource::CheckForStateChanges(u32 index, const XINPUT_STATE& new_state
 #define CHECK_AXIS(field, axis, min_value, max_value) \
 	if (ogp.field != ngp.field) \
 	{ \
-		InputManager::InvokeEvents(MakeGenericControllerAxisKey(InputSourceType::XInput, index, axis), \
-			static_cast<float>(ngp.field) / ((ngp.field < 0) ? min_value : max_value)); \
+		const float value = static_cast<float>(ngp.field) / ((ngp.field < 0) ? min_value : max_value); \
+		InputManager::InvokeEvents(MakeGenericControllerAxisKey(InputSourceType::XInput, index, axis), value, \
+			GenericInputBinding::Unknown, \
+			s_xinput_generic_binding_axis_mapping[axis][0], \
+			s_xinput_generic_binding_axis_mapping[axis][1]); \
 	}
 
 	// Y axes is inverted in XInput when compared to SDL.
@@ -560,7 +563,11 @@ void XInputSource::CheckForStateChangesSCP(u32 index, const SCP_EXTN& new_state)
 #define CHECK_AXIS(field, mult) \
 	if (ogp.field != ngp.field) \
 	{ \
-		InputManager::InvokeEvents(MakeGenericControllerAxisKey(InputSourceType::XInput, index, axis), ngp.field* mult); \
+		const float value = ngp.field * mult; \
+		InputManager::InvokeEvents(MakeGenericControllerAxisKey(InputSourceType::XInput, index, axis), value, \
+			GenericInputBinding::Unknown, \
+			s_xinput_generic_binding_axis_mapping[axis][0], \
+			s_xinput_generic_binding_axis_mapping[axis][1]); \
 	} \
 	axis++;
 

@@ -236,7 +236,7 @@
     <string name="settings_about">關於</string>
     <string name="settings_version">版本</string>
     <string name="settings_emulator_core">模擬器核心</string>
-    <string name="settings_emulator_core_desc">基於 PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">基於 PCSX2 (2.8.0)</string>
     <string name="settings_about_app">關於 EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX 是一個 PlayStation 2 遊戲庫與啟動器，基於 PCSX2 模擬器核心打造，提供快速設定、簡潔導覽以及適合掌機的體驗。</string>
     <string name="settings_about_studio">開發者</string>

@@ -7,6 +7,7 @@
 #include "GS/Renderers/Metal/GSDeviceMTL.h"
 #include "GS/Renderers/Metal/GSTextureMTL.h"
 #include "GS/GSPerfMon.h"
+#include "GS/GSShaderCompileIndicator.h"
 
 #include "common/Console.h"
 #include "common/HostSys.h"
@@ -420,14 +421,15 @@ void GSDeviceMTL::BeginRenderPass(NSString* name, GSTexture* color, MTLLoadActio
 		} \
 	}
 
-	CHECK_CLEAR(mc, color_load, color_clear, GetUNormClearColor)
-	CHECK_CLEAR(md, depth_load, depth_clear, GetClearDepth)
-#undef CHECK_CLEAR
+	// Depth and stencil might be the same, so do all invalidation checks before resetting invalidation
+	GSVector4 color_clear = GetRTLoadInfo(mc, &color_load);
+	GSVector4 depth_clear = GetRTLoadInfo(md, &depth_load);
+
 	// Stencil and depth are one texture, stencil clears aren't supported
 	if (ms && ms->GetState() == GSTexture::State::Invalidated)
 		stencil_load = MTLLoadActionDontCare;
-	needs_new |= mc && color_load   == MTLLoadActionClear;
-	needs_new |= md && depth_load   == MTLLoadActionClear;
+	needs_new |= mc && color_load == MTLLoadActionClear;
+	needs_new |= md && depth_load == MTLLoadActionClear;
 
 	// Reset texture state
 	if (mc) mc->SetState(GSTexture::State::Dirty);
@@ -442,14 +444,6 @@ void GSDeviceMTL::BeginRenderPass(NSString* name, GSTexture* color, MTLLoadActio
 			[m_current_render.encoder setLabel:name];
 		}
 		return;
-	}
-
-	m_encoders_in_current_cmdbuf++;
-
-	if (m_late_texture_upload_encoder)
-	{
-		[m_late_texture_upload_encoder endEncoding];
-		m_late_texture_upload_encoder = nullptr;
 	}
 
 	int idx = 0;
@@ -471,7 +465,7 @@ void GSDeviceMTL::BeginRenderPass(NSString* name, GSTexture* color, MTLLoadActio
 		md->m_last_write = m_current_draw;
 		desc.depthAttachment.texture = md->GetTexture();
 		if (depth_load == MTLLoadActionClear)
-			desc.depthAttachment.clearDepth = depth_clear;
+			desc.depthAttachment.clearDepth = depth_clear.x;
 		desc.depthAttachment.loadAction = depth_load;
 	}
 	if (ms)
@@ -482,7 +476,7 @@ void GSDeviceMTL::BeginRenderPass(NSString* name, GSTexture* color, MTLLoadActio
 		desc.stencilAttachment.loadAction = stencil_load;
 	}
 
-	EndRenderPass();
+	PrepareBeginRenderPass();
 	m_current_render.encoder = MRCRetain([GetRenderCmdBuf() renderCommandEncoderWithDescriptor:desc]);
 	m_current_render.name = (__bridge void*)name;
 	[m_current_render.encoder setLabel:name];
@@ -493,6 +487,61 @@ void GSDeviceMTL::BeginRenderPass(NSString* name, GSTexture* color, MTLLoadActio
 	m_current_render.depth_target = depth;
 	m_current_render.stencil_target = stencil;
 	pxAssertRel(m_current_render.encoder, "Failed to create render encoder!");
+}
+
+void GSDeviceMTL::BeginFullROV(NSString* name, uint32_t width, uint32_t height)
+{
+	bool needs_new = !m_current_render.is_full_rov()
+	              || width  > m_current_render.full_rov_size.w
+	              || height > m_current_render.full_rov_size.h;
+
+	if (!needs_new)
+	{
+		if (m_current_render.name != (__bridge void*)name)
+		{
+			m_current_render.name = (__bridge void*)name;
+			[m_current_render.encoder setLabel:name];
+		}
+		return;
+	}
+
+	if (m_current_render.is_full_rov())
+	{
+		// Render was too small.  Don't let it shrink in one dimension while growing in the other.
+		width  = std::max(width,  m_current_render.full_rov_size.w);
+		height = std::max(height, m_current_render.full_rov_size.h);
+	}
+
+	m_current_render.full_rov_size.w = width;
+	m_current_render.full_rov_size.h = height;
+
+	MTLRenderPassDescriptor* desc = m_full_rov_render_pass_desc;
+	[desc setRenderTargetWidth:width];
+	[desc setRenderTargetHeight:height];
+
+	if (m_dev.features.rov_requires_rt && (width > m_rov_dummy_texture_size.w || height > m_rov_dummy_texture_size.h))
+	{
+		m_rov_dummy_texture_size.w = std::max(m_rov_dummy_texture_size.w, width);
+		m_rov_dummy_texture_size.h = std::max(m_rov_dummy_texture_size.h, height);
+		MTLTextureDescriptor* tdesc = [MTLTextureDescriptor
+			texture2DDescriptorWithPixelFormat:MTLPixelFormatR8Unorm
+			                             width:m_rov_dummy_texture_size.w
+			                            height:m_rov_dummy_texture_size.h
+			                         mipmapped:NO];
+		[tdesc setUsage:MTLTextureUsageRenderTarget];
+		[tdesc setStorageMode:MTLStorageModePrivate];
+		id<MTLTexture> tex = m_rov_dummy_texture = MRCTransfer([m_dev.dev newTextureWithDescriptor:tdesc]);
+		[tex setLabel:@"ROV Dummy Texture"];
+		[[[desc colorAttachments] objectAtIndexedSubscript:0] setTexture:tex];
+	}
+
+	PrepareBeginRenderPass();
+	m_current_render.encoder = MRCRetain([GetRenderCmdBuf() renderCommandEncoderWithDescriptor:desc]);
+	m_current_render.name = (__bridge void*)name;
+	[m_current_render.encoder setLabel:name];
+	if (!m_dev.features.unified_memory)
+		[m_current_render.encoder waitForFence:m_draw_sync_fence
+		                          beforeStages:MTLRenderStageVertex];
 }
 
 void GSDeviceMTL::FrameCompleted()
@@ -506,7 +555,7 @@ static constexpr MTLPixelFormat ConvertPixelFormat(GSTexture::Format format)
 {
 	switch (format)
 	{
-		case GSTexture::Format::Float32:      return MTLPixelFormatR32Float;
+		case GSTexture::Format::DepthColor:   return MTLPixelFormatR32Float;
 		case GSTexture::Format::PrimID:       return MTLPixelFormatR32Float;
 		case GSTexture::Format::UInt32:       return MTLPixelFormatR32Uint;
 		case GSTexture::Format::UInt16:       return MTLPixelFormatR16Uint;
@@ -524,8 +573,10 @@ static constexpr MTLPixelFormat ConvertPixelFormat(GSTexture::Format format)
 	}
 }
 
-GSTexture* GSDeviceMTL::CreateSurface(GSTexture::Type type, int width, int height, int levels, GSTexture::Format format)
+GSTexture* GSDeviceMTL::CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format)
 { @autoreleasepool {
+	pxAssert(GSTexture::ValidateUsageAndFormat(usage, format));
+
 	MTLPixelFormat fmt = ConvertPixelFormat(format);
 	pxAssertRel(format != GSTexture::Format::Invalid, "Can't create surface of this format!");
 
@@ -539,38 +590,43 @@ GSTexture* GSDeviceMTL::CreateSurface(GSTexture::Type type, int width, int heigh
 		[desc setMipmapLevelCount:levels];
 
 	[desc setStorageMode:MTLStorageModePrivate];
-	switch (type)
+
+	MTLTextureUsage mtl_usage = MTLTextureUsageShaderRead;
+	bool needs_rov_tex = false;
+
+	if (GSTexture::IsRenderTargetOrDepthStencil(usage))
+		mtl_usage |= MTLTextureUsageRenderTarget;
+
+	if ((usage & GSTexture::FeedbackTarget) == GSTexture::FeedbackTarget)
 	{
-		case GSTexture::Type::Texture:
-			[desc setUsage:MTLTextureUsageShaderRead];
-			break;
-		case GSTexture::Type::RenderTarget:
-			if (m_dev.features.slow_color_compression)
-				[desc setUsage:MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget | MTLTextureUsagePixelFormatView]; // Force color compression off by including PixelFormatView
-			else
-				[desc setUsage:MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget];
-			break;
-		case GSTexture::Type::RWTexture:
-			[desc setUsage:MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite];
-			break;
-		default:
-			[desc setUsage:MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget];
+		if (m_dev.features.slow_color_compression)
+			mtl_usage |= MTLTextureUsagePixelFormatView; // Force color compression off by including PixelFormatView
 	}
+
+	if (usage == GSTexture::ShaderWriteTarget && format == GSTexture::Format::Color && m_dev.features.rov_requires_r32)
+	{
+		// Need to make an R32 view of the texture for ROV
+		mtl_usage |= MTLTextureUsagePixelFormatView;
+		needs_rov_tex = true;
+	}
+
+	if (GSTexture::IsShaderWrite(usage))
+		mtl_usage |= MTLTextureUsageShaderWrite;
+
+	[desc setUsage:mtl_usage];
 
 	MRCOwned<id<MTLTexture>> tex = MRCTransfer([m_dev.dev newTextureWithDescriptor:desc]);
 	if (tex)
 	{
-		GSTextureMTL* t = new GSTextureMTL(this, tex, type, format);
-		switch (type)
+		MRCOwned<id<MTLTexture>> rov_tex = needs_rov_tex ? MRCTransfer([tex newTextureViewWithPixelFormat:MTLPixelFormatR32Uint]) : nil;
+		GSTextureMTL* t = new GSTextureMTL(this, tex, rov_tex, usage, format);
+		if (GSTexture::IsRenderTarget(usage))
 		{
-			case GSTexture::Type::RenderTarget:
-				ClearRenderTarget(t, 0);
-				break;
-			case GSTexture::Type::DepthStencil:
-				ClearDepth(t, 0.0f);
-				break;
-			default:
-				break;
+			ClearRenderTarget(t, 0);
+		}
+		else if (GSTexture::IsDepthStencil(usage))
+		{
+			ClearDepth(t, 0.0f);
 		}
 		return t;
 	}
@@ -580,7 +636,7 @@ GSTexture* GSDeviceMTL::CreateSurface(GSTexture::Type type, int width, int heigh
 	}
 }}
 
-void GSDeviceMTL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const bool linear)
+void GSDeviceMTL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE, const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter)
 { @autoreleasepool {
 	id<MTLCommandBuffer> cmdbuf = GetRenderCmdBuf();
 	GSScopedDebugGroupMTL dbg(cmdbuf, @"DoMerge");
@@ -602,12 +658,12 @@ void GSDeviceMTL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex,
 	{
 		// 2nd output is enabled and selected. Copy it to destination so we can blend it with 1st output
 		// Note: value outside of dRect must contains the background color (c)
-		StretchRect(sTex[1], sRect[1], dTex, dRect[1], ShaderConvert::COPY, linear);
+		StretchRect(sTex[1], sRect[1], dTex, dRect[1], ShaderConvert::COPY, filter);
 	}
 
 	// Save 2nd output
 	if (feedback_write_2) // FIXME I'm not sure dRect[1] is always correct
-		DoStretchRect(dTex, full_r, sTex[2], dRect[1], m_convert_pipeline[static_cast<int>(ShaderConvert::YUV)], linear, LoadAction::DontCareIfFull, &cb_yuv, sizeof(cb_yuv));
+		DoStretchRect(dTex, full_r, sTex[2], dRect[1], GetConvertPipeline(ShaderConvert::YUV), filter, LoadAction::DontCareIfFull, &cb_yuv, sizeof(cb_yuv));
 
 	if (feedback_write_2_but_blend_bg)
 		ClearRenderTarget(dTex, c);
@@ -621,26 +677,27 @@ void GSDeviceMTL::DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex,
 		if (PMODE.MMOD == 1)
 		{
 			// Blend with a constant alpha
-			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], pipeline, linear, LoadAction::Load, &cb_c, sizeof(cb_c));
+			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], pipeline, filter, LoadAction::Load, &cb_c, sizeof(cb_c));
 		}
 		else
 		{
 			// Blend with 2 * input alpha
-			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], pipeline, linear, LoadAction::Load, nullptr, 0);
+			DoStretchRect(sTex[0], sRect[0], dTex, dRect[0], pipeline, filter, LoadAction::Load, nullptr, 0);
 		}
 	}
 
 	if (feedback_write_1) // FIXME I'm not sure dRect[0] is always correct
-		StretchRect(dTex, full_r, sTex[2], dRect[0], ShaderConvert::YUV, linear);
+		StretchRect(dTex, full_r, sTex[2], dRect[0], ShaderConvert::YUV, filter);
 }}
 
-void GSDeviceMTL::DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, bool linear, const InterlaceConstantBuffer& cb)
+void GSDeviceMTL::DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb)
 { @autoreleasepool {
 	id<MTLCommandBuffer> cmdbuf = GetRenderCmdBuf();
 	GSScopedDebugGroupMTL dbg(cmdbuf, @"DoInterlace");
 
 	const bool can_discard = shader == ShaderInterlace::WEAVE || shader == ShaderInterlace::MAD_BUFFER;
-	DoStretchRect(sTex, sRect, dTex, dRect, m_interlace_pipeline[static_cast<int>(shader)], linear, !can_discard ? LoadAction::DontCareIfFull : LoadAction::Load, &cb, sizeof(cb));
+	DoStretchRect(sTex, sRect, dTex, dRect, m_interlace_pipeline[static_cast<int>(shader)], filter,
+		!can_discard ? LoadAction::DontCareIfFull : LoadAction::Load, &cb, sizeof(cb));
 }}
 
 void GSDeviceMTL::DoFXAA(GSTexture* sTex, GSTexture* dTex)
@@ -695,6 +752,7 @@ MRCOwned<id<MTLFunction>> GSDeviceMTL::LoadShader(NSString* name)
 
 MRCOwned<id<MTLRenderPipelineState>> GSDeviceMTL::MakePipeline(MTLRenderPipelineDescriptor* desc, id<MTLFunction> vertex, id<MTLFunction> fragment, NSString* name)
 {
+	const GSShaderCompileIndicator::CompileTimer compile_timer;
 	[desc setLabel:name];
 	[desc setVertexFunction:vertex];
 	[desc setFragmentFunction:fragment];
@@ -711,6 +769,7 @@ MRCOwned<id<MTLRenderPipelineState>> GSDeviceMTL::MakePipeline(MTLRenderPipeline
 
 MRCOwned<id<MTLComputePipelineState>> GSDeviceMTL::MakeComputePipeline(id<MTLFunction> compute, NSString* name)
 {
+	const GSShaderCompileIndicator::CompileTimer compile_timer;
 	MRCOwned<MTLComputePipelineDescriptor*> desc = MRCTransfer([MTLComputePipelineDescriptor new]);
 	[desc setLabel:name];
 	[desc setComputeFunction:compute];
@@ -983,6 +1042,17 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		[[desc   depthAttachment] setStoreAction:MTLStoreActionStore];
 		[[desc stencilAttachment] setStoreAction:MTLStoreActionStore];
 	}
+	if (m_features.rov)
+	{
+		m_full_rov_render_pass_desc = MRCTransfer([MTLRenderPassDescriptor new]);
+		[m_full_rov_render_pass_desc setDefaultRasterSampleCount:1];
+		if (m_dev.features.rov_requires_rt)
+		{
+			MTLRenderPassColorAttachmentDescriptor* color0 = [[m_full_rov_render_pass_desc colorAttachments] objectAtIndexedSubscript:0];
+			[color0 setLoadAction:MTLLoadActionDontCare];
+			[color0 setStoreAction:MTLStoreActionDontCare];
+		}
+	}
 
 	// Init samplers
 	m_sampler_hw[SamplerSelector::Linear().key] = CreateSampler(m_dev.dev, SamplerSelector::Linear());
@@ -1111,97 +1181,54 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		NSString* name = [NSString stringWithFormat:@"ps_interlace%zu", i];
 		m_interlace_pipeline[i] = MakePipeline(pdesc, vs_convert, LoadShader(name), name);
 	}
-	for (size_t i = 0; i < std::size(m_convert_pipeline); i++)
+
+	m_convert_pipeline.resize(ShaderConvertSelector::NUM_TOTAL_SHADERS);
+	for (u32 i = 0; i < ShaderConvertSelector::NUM_TOTAL_SHADERS; i++)
 	{
-		ShaderConvert conv = static_cast<ShaderConvert>(i);
-		NSString* name = [NSString stringWithCString:shaderName(conv) encoding:NSUTF8StringEncoding];
-		switch (conv)
+		const ShaderConvertSelector shader = ShaderConvertSelector::Get(i);
+		if (ConvertShaderNotNeeded(shader.Shader()))
+			continue;
+		NSString* shader_name = [NSString stringWithCString:shader.EntryPoint() encoding:NSUTF8StringEncoding];
+		if (shader.DepthOutput())
 		{
-			case ShaderConvert::Count:
-			case ShaderConvert::DATM_0:
-			case ShaderConvert::DATM_1:
-			case ShaderConvert::DATM_0_RTA_CORRECTION:
-			case ShaderConvert::DATM_1_RTA_CORRECTION:
-			case ShaderConvert::CLUT_4:
-			case ShaderConvert::CLUT_8:
-			case ShaderConvert::COLCLIP_INIT:
-			case ShaderConvert::COLCLIP_RESOLVE:
-				continue;
-			case ShaderConvert::FLOAT32_TO_32_BITS:
-				pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::UInt32);
-				pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
-				break;
-			case ShaderConvert::FLOAT32_TO_16_BITS:
-			case ShaderConvert::RGBA8_TO_16_BITS:
-				pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::UInt16);
-				pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
-				break;
-			case ShaderConvert::DEPTH_COPY:
-			case ShaderConvert::FLOAT32_TO_FLOAT24:
-			case ShaderConvert::FLOAT32_COLOR_TO_DEPTH:
-			case ShaderConvert::RGBA8_TO_FLOAT32:
-			case ShaderConvert::RGBA8_TO_FLOAT24:
-			case ShaderConvert::RGBA8_TO_FLOAT16:
-			case ShaderConvert::RGB5A1_TO_FLOAT16:
-			case ShaderConvert::RGBA8_TO_FLOAT32_BILN:
-			case ShaderConvert::RGBA8_TO_FLOAT24_BILN:
-			case ShaderConvert::RGBA8_TO_FLOAT16_BILN:
-			case ShaderConvert::RGB5A1_TO_FLOAT16_BILN:
-				pdesc.colorAttachments[0].pixelFormat = MTLPixelFormatInvalid;
-				pdesc.depthAttachmentPixelFormat = ConvertPixelFormat(GSTexture::Format::DepthStencil);
-				break;
-			case ShaderConvert::COPY:
-			case ShaderConvert::DOWNSAMPLE_COPY:
-			case ShaderConvert::RGBA_TO_8I: // Yes really
-			case ShaderConvert::RGB5A1_TO_8I:
-			case ShaderConvert::RTA_CORRECTION:
-			case ShaderConvert::RTA_DECORRECTION:
-			case ShaderConvert::TRANSPARENCY_FILTER:
-			case ShaderConvert::FLOAT32_TO_RGBA8:
-			case ShaderConvert::FLOAT32_TO_RGB8:
-			case ShaderConvert::FLOAT16_TO_RGB5A1:
-			case ShaderConvert::YUV:
-				pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::Color);
-				pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
-				break;
-			case ShaderConvert::FLOAT32_DEPTH_TO_COLOR:
-				pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::Float32);
-				pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
-				break;
+			pdesc.colorAttachments[0].pixelFormat = MTLPixelFormatInvalid;
+			pdesc.depthAttachmentPixelFormat = ConvertPixelFormat(GSTexture::Format::DepthStencil);
 		}
-		const u32 scmask = ShaderConvertWriteMask(conv);
+		else
+		{
+			pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(shader.OutputFormat());
+			pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
+		}
+		NSString* name = shader_name;
+		if (shader.VariableWriteMask())
+			name = [name stringByAppendingString:[NSString stringWithFormat:@" Mask=%x", shader.Mask()]];
+		if (shader.Biln())
+			name = [name stringByAppendingString:@" Biln"];
+		if (shader.Float32Output())
+			name = [name stringByAppendingString:shader.DepthOutput() ? @" → Depth" : @" → Float"];
+
+		const u32 scmask = shader.Mask();
 		MTLColorWriteMask mask = MTLColorWriteMaskNone;
 		if (scmask & 1) mask |= MTLColorWriteMaskRed;
 		if (scmask & 2) mask |= MTLColorWriteMaskGreen;
 		if (scmask & 4) mask |= MTLColorWriteMaskBlue;
 		if (scmask & 8) mask |= MTLColorWriteMaskAlpha;
 		pdesc.colorAttachments[0].writeMask = mask;
-		m_convert_pipeline[i] = MakePipeline(pdesc, vs_convert, LoadShader(name), name);
+		setFnConstantB(m_fn_constants, shader.Biln(),        GSMTLConstantIndex_BILN);
+		setFnConstantB(m_fn_constants, shader.DepthOutput(), GSMTLConstantIndex_DEPTH_OUT);
+		m_convert_pipeline[shader.Index()] = MakePipeline(pdesc, vs_convert, LoadShader(shader_name), name);
 	}
 	pdesc.colorAttachments[0].writeMask = MTLColorWriteMaskAll;
 	pdesc.depthAttachmentPixelFormat = MTLPixelFormatInvalid;
 	for (size_t i = 0; i < std::size(m_present_pipeline); i++)
 	{
 		PresentShader conv = static_cast<PresentShader>(i);
-		NSString* name = [NSString stringWithCString:shaderName(conv) encoding:NSUTF8StringEncoding];
+		NSString* name = [NSString stringWithCString:ShaderEntryPoint(conv) encoding:NSUTF8StringEncoding];
 		pdesc.colorAttachments[0].pixelFormat = layer_px_fmt;
-		m_present_pipeline[i] = MakePipeline(pdesc, vs_convert, LoadShader(name), [NSString stringWithFormat:@"present_%s", shaderName(conv) + 3]);
+		m_present_pipeline[i] = MakePipeline(pdesc, vs_convert, LoadShader(name), [NSString stringWithFormat:@"present_%s", ShaderEntryPoint(conv) + 3]);
 	}
 
 	pdesc.colorAttachments[0].pixelFormat = ConvertPixelFormat(GSTexture::Format::Color);
-	for (size_t i = 0; i < std::size(m_convert_pipeline_copy_mask); i++)
-	{
-		MTLColorWriteMask mask = MTLColorWriteMaskNone;
-		if (i & 1) mask |= MTLColorWriteMaskRed;
-		if (i & 2) mask |= MTLColorWriteMaskGreen;
-		if (i & 4) mask |= MTLColorWriteMaskBlue;
-		if (i & 8) mask |= MTLColorWriteMaskAlpha;
-		NSString* name = [NSString stringWithFormat:@"copy_%s%s%s%s%s",
-		                  i & 1 ? "r" : "", i & 2 ? "g" : "", i & 4 ? "b" : "", i & 8 ? "a" : "", i & 16 ? "_rta" : ""];
-		pdesc.colorAttachments[0].writeMask = mask;
-		m_convert_pipeline_copy_mask[i] = MakePipeline(pdesc, vs_convert, i & 16 ? ps_copy_rta_correct : ps_copy, name);
-	}
-
 	pdesc.colorAttachments[0].blendingEnabled = YES;
 	pdesc.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
 	pdesc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
@@ -1263,6 +1290,19 @@ bool GSDeviceMTL::UpdateWindow()
 }
 
 bool GSDeviceMTL::SupportsExclusiveFullscreen() const { return false; }
+
+static const char* GetROVString(const GSMTLDevice::Features& features)
+{
+	if (!features.rov)
+		return "Unsupported";
+	if (features.rov_requires_r32 && features.rov_requires_rt)
+		return "With R32 Reinterpret and RT Texture";
+	if (features.rov_requires_r32)
+		return "With R32 Reinterpret";
+	if (features.rov_requires_rt)
+		return "With RT Texture";
+	return "Supported";
+}
 
 std::string GSDeviceMTL::GetDriverInfo() const
 { @autoreleasepool {
@@ -1546,7 +1586,7 @@ void GSDeviceMTL::BeginStretchRect(NSString* name, GSTexture* dTex, MTLLoadActio
 	MRESetDSS(dsel);
 }
 
-void GSDeviceMTL::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, id<MTLRenderPipelineState> pipeline, bool linear, LoadAction load_action, const void* frag_uniform, size_t frag_uniform_len)
+void GSDeviceMTL::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, id<MTLRenderPipelineState> pipeline, std::optional<Filter> filter, LoadAction load_action, const void* frag_uniform, size_t frag_uniform_len)
 {
 	FlushClears(sTex);
 
@@ -1567,7 +1607,8 @@ void GSDeviceMTL::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTextu
 	if (frag_uniform && frag_uniform_len)
 		[m_current_render.encoder setFragmentBytes:frag_uniform length:frag_uniform_len atIndex:GSMTLBufferIndexUniforms];
 
-	MRESetSampler(linear ? SamplerSelector::Linear() : SamplerSelector::Point());
+	if (filter)
+		MRESetSampler(*filter == Biln ? SamplerSelector::Linear() : SamplerSelector::Point());
 
 	DrawStretchRect(sRect, dRect, GSVector2(static_cast<float>(ds.x), static_cast<float>(ds.y)));
 }
@@ -1612,18 +1653,15 @@ void GSDeviceMTL::RenderCopy(GSTexture* sTex, id<MTLRenderPipelineState> pipelin
 }
 
 void GSDeviceMTL::DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-	GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear)
+	ShaderConvertSelector shader, Filter filter)
 { @autoreleasepool {
 
-	const LoadAction load_action = (cms.wrgba == 0xf) ? LoadAction::DontCareIfFull : LoadAction::Load;
-	id<MTLRenderPipelineState> pipeline;
-	if (HasVariableWriteMask(shader))
-		pipeline = m_convert_pipeline_copy_mask[GetShaderIndexForMask(shader, cms.wrgba)];
-	else
-		pipeline = m_convert_pipeline[static_cast<int>(shader)];
-	pxAssertRel(pipeline, fmt::format("No pipeline for {}", shaderName(shader)).c_str());
+	const LoadAction load_action = (shader.Mask() == 0xf) ? LoadAction::DontCareIfFull : LoadAction::Load;
+	id<MTLRenderPipelineState> pipeline = GetConvertPipeline(shader);
+	pxAssertRel(pipeline, fmt::format("No pipeline for {}", ShaderEntryPoint(shader.Shader())).c_str());
+	std::optional<Filter> filter_if_needed = shader.SupportsBilinear() ? std::nullopt : std::make_optional(filter);
 
-	DoStretchRect(sTex, sRect, dTex, dRect, pipeline, linear, load_action, nullptr, 0);
+	DoStretchRect(sTex, sRect, dTex, dRect, pipeline, filter_if_needed, load_action, nullptr, 0);
 }}
 
 static_assert(sizeof(DisplayConstantBuffer) == sizeof(GSMTLPresentPSUniform));
@@ -1636,7 +1674,7 @@ static_assert(offsetof(DisplayConstantBuffer, SourceResolution)    == offsetof(G
 static_assert(offsetof(DisplayConstantBuffer, RcpSourceResolution) == offsetof(GSMTLPresentPSUniform, rcp_source_resolution));
 static_assert(offsetof(DisplayConstantBuffer, TimeAndPad.x)        == offsetof(GSMTLPresentPSUniform, time));
 
-void GSDeviceMTL::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, bool linear)
+void GSDeviceMTL::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, Filter filter)
 { @autoreleasepool {
 	GSVector2i ds = dTex ? dTex->GetSize() : GetWindowSize();
 	DisplayConstantBuffer cb;
@@ -1647,26 +1685,26 @@ void GSDeviceMTL::PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture
 
 	if (dTex)
 	{
-		DoStretchRect(sTex, sRect, dTex, dRect, pipe, linear, LoadAction::DontCareIfFull, &cb, sizeof(cb));
+		DoStretchRect(sTex, sRect, dTex, dRect, pipe, filter, LoadAction::DontCareIfFull, &cb, sizeof(cb));
 	}
 	else
 	{
 		// !dTex → Use current draw encoder
 		[m_current_render.encoder setRenderPipelineState:pipe];
-		[m_current_render.encoder setFragmentSamplerState:m_sampler_hw[linear ? SamplerSelector::Linear().key : SamplerSelector::Point().key] atIndex:0];
+		[m_current_render.encoder setFragmentSamplerState:m_sampler_hw[filter == Biln ? SamplerSelector::Linear().key : SamplerSelector::Point().key] atIndex:0];
 		[m_current_render.encoder setFragmentTexture:static_cast<GSTextureMTL*>(sTex)->GetTexture() atIndex:0];
 		[m_current_render.encoder setFragmentBytes:&cb length:sizeof(cb) atIndex:GSMTLBufferIndexUniforms];
 		DrawStretchRect(sRect, dRect, GSVector2(static_cast<float>(ds.x), static_cast<float>(ds.y)));
 	}
 }}
 
-void GSDeviceMTL::DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvert shader)
+void GSDeviceMTL::DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader)
 { @autoreleasepool {
 	BeginStretchRect(@"MultiStretchRect", dTex, MTLLoadActionLoad);
 
 	id<MTLRenderPipelineState> pipeline = nullptr;
 	GSTexture* sTex = rects[0].src;
-	bool linear = rects[0].linear;
+	Filter filter = rects[0].filter;
 	u8 wmask = rects[0].wmask.wrgba;
 
 	const GSVector2 ds(static_cast<float>(dTex->GetWidth()), static_cast<float>(dTex->GetHeight()));
@@ -1682,16 +1720,14 @@ void GSDeviceMTL::DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_r
 		const u32 end = i * 4;
 		const u32 vertex_count = end - start;
 		const u32 index_count = vertex_count + (vertex_count >> 1); // 6 indices per 4 vertices
-		pxAssert(HasVariableWriteMask(shader) || wmask == 0xf);
-		id<MTLRenderPipelineState> new_pipeline = wmask == 0xf ? m_convert_pipeline[static_cast<int>(shader)]
-		                                                       : m_convert_pipeline_copy_mask[GetShaderIndexForMask(shader, wmask)];
+		id<MTLRenderPipelineState> new_pipeline = GetConvertPipeline(shader.SetMask(wmask));
 		if (new_pipeline != pipeline)
 		{
 			pipeline = new_pipeline;
-			pxAssertRel(pipeline, fmt::format("No pipeline for {}", shaderName(shader)).c_str());
+			pxAssertRel(pipeline, fmt::format("No pipeline for {}", ShaderEntryPoint(shader.Shader())).c_str());
 			MRESetPipeline(pipeline);
 		}
-		MRESetSampler(linear ? SamplerSelector::Linear() : SamplerSelector::Point());
+		MRESetSampler(filter == Biln ? SamplerSelector::Linear() : SamplerSelector::Point());
 		MRESetTexture(sTex, GSMTLTextureIndexNonHW);
 		[enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
 		                indexCount:index_count
@@ -1707,11 +1743,11 @@ void GSDeviceMTL::DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_r
 	for (u32 i = 0; i < num_rects; i++)
 	{
 		const MultiStretchRect& rect = rects[i];
-		if (rect.src != sTex || rect.linear != linear || rect.wmask.wrgba != wmask)
+		if (rect.src != sTex || rect.filter != filter || rect.wmask.wrgba != wmask)
 		{
 			flush(i);
 			sTex = rect.src;
-			linear = rect.linear;
+			filter = rect.filter;
 			wmask = rect.wmask.wrgba;
 		}
 		*write++ = CalcStrechRectPoints(rect.src_rect, rect.dst_rect, ds);
@@ -1735,27 +1771,27 @@ void GSDeviceMTL::UpdateCLUTTexture(GSTexture* sTex, float sScale, u32 offsetX, 
 void GSDeviceMTL::ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM)
 { @autoreleasepool {
 	const ShaderConvert shader = ((SPSM & 0xE) == 0) ? ShaderConvert::RGBA_TO_8I : ShaderConvert::RGB5A1_TO_8I;
-	id<MTLRenderPipelineState> pipeline = m_convert_pipeline[static_cast<int>(shader)];
+	id<MTLRenderPipelineState> pipeline = GetConvertPipeline(shader);
 	if (!pipeline)
 		[NSException raise:@"StretchRect Missing Pipeline" format:@"No pipeline for %d", static_cast<int>(shader)];
 
 	GSMTLIndexedConvertPSUniform uniform = { sScale, SBW, DBW, SPSM };
 
 	const GSVector4 dRect(0, 0, dTex->GetWidth(), dTex->GetHeight());
-	DoStretchRect(sTex, GSVector4::zero(), dTex, dRect, pipeline, false, LoadAction::DontCareIfFull, &uniform, sizeof(uniform));
+	DoStretchRect(sTex, GSVector4::zero(), dTex, dRect, pipeline, Nearest, LoadAction::DontCareIfFull, &uniform, sizeof(uniform));
 }}
 
 void GSDeviceMTL::FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect)
 { @autoreleasepool {
 	const ShaderConvert shader = ShaderConvert::DOWNSAMPLE_COPY;
-	id<MTLRenderPipelineState> pipeline = m_convert_pipeline[static_cast<int>(shader)];
+	id<MTLRenderPipelineState> pipeline = GetConvertPipeline(shader);
 	if (!pipeline)
 		[NSException raise:@"StretchRect Missing Pipeline" format:@"No pipeline for %d", static_cast<int>(shader)];
 
 	GSMTLDownsamplePSUniform uniform = { {static_cast<uint>(clamp_min.x), static_cast<uint>(clamp_min.x)}, downsample_factor,
 	  static_cast<float>(downsample_factor * downsample_factor), (GSConfig.UserHacks_NativeScaling > GSNativeScaling::Aggressive) ? 2.0f : 1.0f };
 
-	DoStretchRect(sTex, GSVector4::zero(), dTex, dRect, pipeline, false, LoadAction::DontCareIfFull, &uniform, sizeof(uniform));
+	DoStretchRect(sTex, GSVector4::zero(), dTex, dRect, pipeline, Nearest, LoadAction::DontCareIfFull, &uniform, sizeof(uniform));
 }}
 
 void GSDeviceMTL::FlushClears(GSTexture* tex)
@@ -1973,14 +2009,21 @@ static void textureBarrier(id<MTLRenderCommandEncoder> enc)
 
 void GSDeviceMTL::MRESetTexture(GSTexture* tex, int pos)
 {
-	if (tex == m_current_render.tex[pos])
+	if (!tex || tex == m_current_render.tex[pos])
 		return;
 	m_current_render.tex[pos] = tex;
-	if (GSTextureMTL* mtex = static_cast<GSTextureMTL*>(tex))
-	{
-		[m_current_render.encoder setFragmentTexture:mtex->GetTexture() atIndex:pos];
-		mtex->m_last_read = m_current_draw;
-	}
+	GSTextureMTL* mtex = static_cast<GSTextureMTL*>(tex);
+	[m_current_render.encoder setFragmentTexture:mtex->GetTexture() atIndex:pos];
+	mtex->m_last_read = m_current_draw;
+}
+
+void GSDeviceMTL::MRESetTexture(id<MTLTexture> tex, int pos)
+{
+	GSTexture* gstex = reinterpret_cast<GSTexture*>(tex); // No one actually dereferences this
+	if (!tex || gstex == m_current_render.tex[pos])
+		return;
+	m_current_render.tex[pos] = gstex;
+	[m_current_render.encoder setFragmentTexture:tex atIndex:pos];
 }
 
 void GSDeviceMTL::MRESetVertices(id<MTLBuffer> buffer, size_t offset)
@@ -2012,6 +2055,7 @@ void GSDeviceMTL::MRESetScissor(const GSVector4i& scissor)
 
 void GSDeviceMTL::MREClearScissor()
 {
+	assert(!m_current_render.is_full_rov());
 	if (!m_current_render.has.scissor)
 		return;
 	m_current_render.has.scissor = false;
@@ -2137,6 +2181,15 @@ void GSDeviceMTL::MREInitHWDraw(GSHWDrawConfig& config, const Map& verts)
 	MRESetVertices(verts.gpu_buffer, verts.gpu_offset);
 }
 
+__fi void GSDeviceMTL::PrepareROVTexture(GSTexture** ptex)
+{
+	GSTextureMTL* tex = static_cast<GSTextureMTL*>(*ptex);
+	FlushClears(tex);
+	tex->m_last_read  = m_current_draw;
+	tex->m_last_write = m_current_draw;
+	*ptex = nullptr;
+}
+
 void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 { @autoreleasepool {
 	if (config.tex && (config.ds == config.tex || config.rt == config.tex))
@@ -2193,7 +2246,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 			config.colclip_update_area = config.drawarea;
 			
 			GSVector2i size = config.rt->GetSize();
-			rt = colclip_rt = CreateRenderTarget(size.x, size.y, GSTexture::Format::ColorClip, false);
+			rt = colclip_rt = CreateFeedbackTarget(size.x, size.y, GSTexture::Format::ColorClip, false);
 			
 			g_gs_device->SetColorClipTexture(colclip_rt);
 			
@@ -2264,7 +2317,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 	}
 
 	// Try to reduce render pass restarts
-	if (!config.ds && m_current_render.color_target == rt && stencil == m_current_render.stencil_target && m_current_render.depth_target != config.tex)
+	if (!config.ps.HasColorROV() && !config.ds && m_current_render.color_target == rt && stencil == m_current_render.stencil_target && m_current_render.depth_target != config.tex)
 		config.ds = m_current_render.depth_target;
 	if (!rt && config.ds == m_current_render.depth_target && m_current_render.color_target != config.tex)
 		rt = m_current_render.color_target;
@@ -2284,7 +2337,9 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 	if (usesStencil(config.destination_alpha))
 		[mtlenc setStencilReferenceValue:1];
 	MREInitHWDraw(config, allocation);
-	if (config.require_one_barrier || config.require_full_barrier)
+	if (config.ps.HasColorROV() && m_dev.features.rov_requires_r32)
+		MRESetTexture(reinterpret_cast<GSTextureMTL*>(rt)->GetROVTexture(), GSMTLTextureIndexRenderTarget);
+	else if (config.require_one_barrier || config.require_full_barrier || config.ps.HasColorROV())
 		MRESetTexture(rt, GSMTLTextureIndexRenderTarget);
 	if (primid_tex)
 		MRESetTexture(primid_tex, GSMTLTextureIndexPrimIDs);

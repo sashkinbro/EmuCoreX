@@ -112,7 +112,7 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* settings_dialog
 	dialog()->registerWidgetHelp(m_ui.eeCycleRate, tr("EE Cycle Rate"), tr("100% (Normal Speed)"),
 		tr("Higher values may increase internal framerate in games, but will increase CPU requirements substantially. "
 		   "Lower values will reduce the CPU load allowing lightweight games to run full speed on weaker CPUs."));
-	dialog()->registerWidgetHelp(m_ui.eeCycleSkipping, tr("EE Cycle Skip"), tr("Disabled"),
+	dialog()->registerWidgetHelp(m_ui.eeCycleSkipping, tr("EE Cycle Skipping"), tr("Disabled"),
 		tr("Makes the emulated Emotion Engine skip cycles. "
 		   //: SOTC = Shadow of the Colossus. A game's title, should not be translated unless an official translation exists.
 		   "Helps a small subset of games like SOTC. Most of the time it's harmful to performance."));
@@ -150,7 +150,7 @@ EmulationSettingsWidget::EmulationSettingsWidget(SettingsWindow* settings_dialog
 	dialog()->registerWidgetHelp(m_ui.useVSyncForTiming, tr("Use Host VSync Timing"), tr("Unchecked"),
 		tr("When synchronizing with the host refresh rate, this option disables PCSX2's internal frame timing and uses the host instead. "
 		   "Can result in smoother frame pacing, <strong>but at the cost of increased input latency</strong>."));
-	dialog()->registerWidgetHelp(m_ui.skipPresentingDuplicateFrames, tr("Skip Presenting Duplicate Frames"), tr("Unchecked"),
+	dialog()->registerWidgetHelp(m_ui.skipPresentingDuplicateFrames, tr("Skip Presenting Duplicate Frames"), tr("Checked"),
 		tr("Detects when idle frames are being presented in 25/30fps games, and skips presenting those frames. The frame is still "
 		   "rendered, it just means the GPU has more time to complete it (this is NOT frame skipping). Can smooth out frame time "
 		   "fluctuations when the CPU/GPU are near maximum utilization, but makes frame pacing more inconsistent and can increase "
@@ -262,20 +262,14 @@ void EmulationSettingsWidget::onOptimalFramePacingChanged()
 	const QSignalBlocker sb(m_ui.maxFrameLatency);
 
 	std::optional<int> value;
-	bool optimal = false;
 	if (m_ui.optimalFramePacing->checkState() != Qt::PartiallyChecked)
-	{
-		optimal = m_ui.optimalFramePacing->isChecked();
-		value = optimal ? 0 : DEFAULT_FRAME_LATENCY;
-	}
-	else
-	{
-		value = dialog()->getEffectiveIntValue("EmuCore/GS", "VsyncQueueSize", DEFAULT_FRAME_LATENCY);
-		optimal = (value == 0);
-	}
+		value = m_ui.optimalFramePacing->isChecked() ? 0 : DEFAULT_FRAME_LATENCY;
+
+	const int latency = value.value_or(Host::GetBaseIntSettingValue("EmuCore/GS", "VsyncQueueSize", DEFAULT_FRAME_LATENCY));
+	const bool optimal = (latency == 0);
 
 	m_ui.maxFrameLatency->setMinimum(optimal ? 0 : 1);
-	m_ui.maxFrameLatency->setValue(optimal ? 0 : DEFAULT_FRAME_LATENCY);
+	m_ui.maxFrameLatency->setValue(latency);
 	m_ui.maxFrameLatency->setEnabled(!dialog()->isPerGameSettings() && !m_ui.optimalFramePacing->isChecked());
 
 	dialog()->setIntSettingValue("EmuCore/GS", "VsyncQueueSize", value);
@@ -300,7 +294,7 @@ void EmulationSettingsWidget::updateOptimalFramePacing()
 	}
 
 	m_ui.maxFrameLatency->setMinimum(optimal ? 0 : 1);
-	m_ui.maxFrameLatency->setValue(optimal ? 0 : value);
+	m_ui.maxFrameLatency->setValue(value);
 }
 
 void EmulationSettingsWidget::updateUseVSyncForTimingEnabled()

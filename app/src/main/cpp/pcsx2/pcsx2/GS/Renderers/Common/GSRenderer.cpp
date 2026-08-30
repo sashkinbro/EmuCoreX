@@ -50,7 +50,7 @@ static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4& sr
 	const int mode = std::clamp(GSConfig.LocalMultiplayerMode, 0, 4);
 	if (mode == 0)
 	{
-		g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect, shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, src_uv, nullptr, draw_rect, shader, shader_parameter, BilnIf(linear));
 		return;
 	}
 
@@ -63,13 +63,13 @@ static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4& sr
 
 	if (mode == 1)
 	{
-		g_gs_device->PresentRect(current, src_uv, nullptr, left, shader, shader_parameter, linear);
-		g_gs_device->PresentRect(current, src_uv, nullptr, right, shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, src_uv, nullptr, left, shader, shader_parameter, BilnIf(linear));
+		g_gs_device->PresentRect(current, src_uv, nullptr, right, shader, shader_parameter, BilnIf(linear));
 	}
 	else if (mode == 2)
 	{
-		g_gs_device->PresentRect(current, src_uv, nullptr, top, shader, shader_parameter, linear);
-		g_gs_device->PresentRect(current, src_uv, nullptr, bottom, shader, shader_parameter, linear);
+		g_gs_device->PresentRect(current, src_uv, nullptr, top, shader, shader_parameter, BilnIf(linear));
+		g_gs_device->PresentRect(current, src_uv, nullptr, bottom, shader, shader_parameter, BilnIf(linear));
 	}
 	else
 	{
@@ -77,9 +77,9 @@ static void PresentLocalMultiplayerFrame(GSTexture* current, const GSVector4& sr
 		const GSVector4 first(src_uv.x, src_uv.y, src_uv.z, middle_v);
 		const GSVector4 second(src_uv.x, middle_v, src_uv.z, src_uv.w);
 		g_gs_device->PresentRect(current, mode == 3 ? first : second, nullptr, top,
-			shader, shader_parameter, linear);
+			shader, shader_parameter, BilnIf(linear));
 		g_gs_device->PresentRect(current, mode == 3 ? second : first, nullptr, bottom,
-			shader, shader_parameter, linear);
+			shader, shader_parameter, BilnIf(linear));
 	}
 }
 
@@ -943,8 +943,9 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 			EndPresentFrame();
 
-			if (GSConfig.OsdShowGPU || GSDumpReplayer::IsReplayingDump())
-				PerformanceMetrics::OnGPUPresent(g_gs_device->GetAndResetAccumulatedGPUTime());
+			const float gpu_time = g_gs_device->GetAndResetAccumulatedGPUTime();
+			GPUPipelineStatistics gpu_stats = g_gs_device->GetAndResetAccumulatedGPUPipelineStatistics();
+			PerformanceMetrics::OnGPUPresent(gpu_time, gpu_stats.vs_invocations, gpu_stats.ps_invocations);
 		}
 
 		PerformanceMetrics::Update(registers_written, fb_sprite_frame, false);
@@ -1061,7 +1062,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				GSTexture* temp = g_gs_device->CreateRenderTarget(size.x, size.y, GSTexture::Format::Color, false);
 				if (temp)
 				{
-					g_gs_device->StretchRect(current, temp, GSVector4(0, 0, size.x, size.y));
+					g_gs_device->StretchRect(current, temp, GSVector4(0, 0, size.x, size.y), ShaderConvert::COPY, Biln);
 					GSCapture::DeliverVideoFrame(temp);
 					g_gs_device->Recycle(temp);
 				}
@@ -1337,7 +1338,7 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 		if (dl)
 		{
 			const GSVector4i rc(0, 0, draw_width, draw_height);
-			g_gs_device->StretchRect(current, src_uv, rt, GSVector4(rc), ShaderConvert::TRANSPARENCY_FILTER);
+			g_gs_device->StretchRect(current, src_uv, rt, GSVector4(rc), ShaderConvert::TRANSPARENCY_FILTER, Biln);
 			dl->CopyFromTexture(rc, rt, rc, 0);
 			dl->Flush();
 

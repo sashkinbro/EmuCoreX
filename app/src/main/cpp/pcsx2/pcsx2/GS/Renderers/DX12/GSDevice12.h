@@ -56,6 +56,44 @@ public:
 		D3D12_RESOURCE_DESC desc;
 	};
 
+	enum class ResourceType
+	{
+		SRV, // Shader resource view
+		FBL, // Feedback loop
+		UAV, // Unordered access
+	};
+
+	D3D12DescriptorHandle GetResourceDescriptor(GSTexture12* tex, ResourceType type) const
+	{
+		switch (type)
+		{
+			case ResourceType::SRV:
+				return tex->GetSRVDescriptor();
+			case ResourceType::FBL:
+				return m_enhanced_barriers ? tex->GetSRVDescriptor() : tex->GetFBLDescriptor();
+			case ResourceType::UAV:
+				return tex->GetUAVDescriptor();
+			default:
+				pxFailRel("Impossible.");
+				return D3D12DescriptorHandle{ 0, 0 };
+		}
+	}
+
+	static constexpr GSTexture12::ResourceState GetResourceState(ResourceType type)
+	{
+		switch (type)
+		{
+			case ResourceType::SRV:
+			case ResourceType::FBL:
+				return GSTexture12::ResourceState::PixelShaderResource;
+			case ResourceType::UAV:
+				return GSTexture12::ResourceState::PixelShaderUAV;
+			default:
+				pxFailRel("Impossible.");
+				return static_cast<GSTexture12::ResourceState>(-1);
+		}
+	}
+
 	__fi IDXGIAdapter1* GetAdapter() const { return m_adapter.get(); }
 	__fi ID3D12Device* GetDevice() const { return m_device.get(); }
 	__fi ID3D12CommandQueue* GetCommandQueue() const { return m_command_queue.get(); }
@@ -96,7 +134,6 @@ public:
 	D3D12DescriptorHeapManager& GetRTVHeapManager() { return m_rtv_heap_manager; }
 	D3D12DescriptorHeapManager& GetDSVHeapManager() { return m_dsv_heap_manager; }
 	D3D12DescriptorHeapManager& GetSamplerHeapManager() { return m_sampler_heap_manager; }
-	const D3D12DescriptorHandle& GetNullSRVDescriptor() const { return m_null_srv_descriptor; }
 	D3D12StreamBuffer& GetTextureStreamBuffer() { return m_texture_stream_buffer; }
 
 	// Root signature access.
@@ -114,6 +151,9 @@ public:
 
 	/// Test for support for the specified texture format.
 	bool SupportsTextureFormat(DXGI_FORMAT format);
+
+	/// Test for UAV support for the specified texture format.
+	bool IsTextureFormatUAVCapable(DXGI_FORMAT format);
 
 	// Partial depth copies require ProgrammableSamplePositions tier 1.
 	bool SupportsProgrammableSamplePositions();
@@ -150,6 +190,14 @@ public:
 		const std::function<void(void*)>& fill_callback);
 
 private:
+	// For pipeline statistics
+	enum class QueryState
+	{
+		None,
+		Querying,
+		Ready,
+	};
+
 	struct CommandListResources
 	{
 		std::array<ComPtr<ID3D12CommandAllocator>, 2> command_allocators;
@@ -161,6 +209,7 @@ private:
 		u64 ready_fence_value = 0;
 		bool init_command_list_used = false;
 		bool has_timestamp_query = false;
+		QueryState pipeline_statistics_query = QueryState::None;
 	};
 
 	void LoadAgilitySDK();
@@ -169,6 +218,7 @@ private:
 	bool CreateDescriptorHeaps();
 	bool CreateCommandLists();
 	bool CreateTimestampQuery();
+	bool CreatePipelineStatisticsQuery();
 	void MoveToNextCommandList();
 	void DestroyPendingResources(CommandListResources& cmdlist);
 
@@ -193,11 +243,16 @@ private:
 	bool m_gpu_timing_enabled = false;
 	bool m_programmable_sample_positions = false;
 
+	ComPtr<ID3D12QueryHeap> m_pipeline_statistics_query_heap;
+	ComPtr<ID3D12Resource> m_pipeline_statistics_query_buffer;
+	ComPtr<D3D12MA::Allocation> m_pipeline_statistics_query_allocation;
+	GPUPipelineStatistics m_accumulated_gpu_pipeline_statistics{};
+	bool m_gpu_pipeline_statistics_enabled = false;
+
 	D3D12DescriptorHeapManager m_descriptor_heap_manager;
 	D3D12DescriptorHeapManager m_rtv_heap_manager;
 	D3D12DescriptorHeapManager m_dsv_heap_manager;
 	D3D12DescriptorHeapManager m_sampler_heap_manager;
-	D3D12DescriptorHandle m_null_srv_descriptor;
 
 	D3D_FEATURE_LEVEL m_feature_level = D3D_FEATURE_LEVEL_11_0;
 
@@ -223,14 +278,13 @@ public:
 		GSHWDrawConfig::VSSelector vs;
 		GSHWDrawConfig::DepthStencilSelector dss;
 		GSHWDrawConfig::ColorMaskSelector cms;
-		u8 pad;
 
 		__fi bool operator==(const PipelineSelector& p) const { return BitEqual(*this, p); }
 		__fi bool operator!=(const PipelineSelector& p) const { return !BitEqual(*this, p); }
 
 		__fi PipelineSelector() { std::memset(this, 0, sizeof(*this)); }
 	};
-	static_assert(sizeof(PipelineSelector) == 24, "Pipeline selector is 24 bytes");
+	static_assert(sizeof(PipelineSelector) == 32, "Pipeline selector is 32 bytes");
 
 	struct PipelineSelectorHash
 	{
@@ -281,11 +335,14 @@ public:
 		TEXTURE_RT = 2,
 		TEXTURE_PRIMID = 3,
 		TEXTURE_DEPTH = 4,
+		TEXTURE_RT_UAV = 5,
+		TEXTURE_DEPTH_UAV = 6,
 
 		NUM_TFX_CONSTANT_BUFFERS = 2,
 		NUM_TFX_TEXTURES = 2,
 		NUM_TFX_RT_TEXTURES = 3,
-		NUM_TOTAL_TFX_TEXTURES = NUM_TFX_TEXTURES + NUM_TFX_RT_TEXTURES,
+		NUM_TFX_UAV_TEXTURES = 2,
+		NUM_TOTAL_TFX_TEXTURES = NUM_TFX_TEXTURES + NUM_TFX_RT_TEXTURES + NUM_TFX_UAV_TEXTURES,
 		NUM_TFX_SAMPLERS = 1,
 		NUM_UTILITY_TEXTURES = 1,
 		NUM_UTILITY_SAMPLERS = 1,
@@ -342,17 +399,26 @@ private:
 
 	std::unordered_map<u32, D3D12DescriptorHandle> m_samplers;
 
-	std::array<ComPtr<ID3D12PipelineState>, static_cast<int>(ShaderConvert::Count)> m_convert{};
+	std::vector<ComPtr<ID3D12PipelineState>> m_convert;
 	std::array<ComPtr<ID3D12PipelineState>, static_cast<int>(PresentShader::Count)> m_present{};
-	std::array<ComPtr<ID3D12PipelineState>, 32> m_color_copy{};
 	std::array<ComPtr<ID3D12PipelineState>, 2> m_merge{};
 	std::array<ComPtr<ID3D12PipelineState>, NUM_INTERLACE_SHADERS> m_interlace{};
 	std::array<ComPtr<ID3D12PipelineState>, 2> m_colclip_setup_pipelines{}; // [depth]
 	std::array<ComPtr<ID3D12PipelineState>, 2> m_colclip_finish_pipelines{}; // [depth]
-	std::array<std::array<ComPtr<ID3D12PipelineState>, 4>, 2> m_date_image_setup_pipelines{}; // [depth][datm]
+	std::array<std::array<ComPtr<ID3D12PipelineState>, 4>, 2> m_primid_image_setup_pipelines{}; // [depth][datm]
 	ComPtr<ID3D12PipelineState> m_fxaa_pipeline;
 	ComPtr<ID3D12PipelineState> m_shadeboost_pipeline;
 	ComPtr<ID3D12PipelineState> m_imgui_pipeline;
+
+	ID3D12PipelineState* GetConvertPipeline(ShaderConvertSelector shader) const
+	{
+		return m_convert[shader.Index()].get();
+	}
+
+	ID3D12PipelineState* GetConvertPipeline(ShaderConvert shader) const
+	{
+		return m_convert[ShaderConvertSelector(shader).Index()].get();
+	}
 
 	std::unordered_map<u32, ComPtr<ID3DBlob>> m_tfx_vertex_shaders;
 	std::unordered_map<GSHWDrawConfig::PSSelector, ComPtr<ID3DBlob>, GSHWDrawConfig::PSSelectorHash>
@@ -371,7 +437,7 @@ private:
 	std::string m_tfx_source;
 
 	void LookupNativeFormat(GSTexture::Format format, DXGI_FORMAT* d3d_format, DXGI_FORMAT* srv_format,
-		DXGI_FORMAT* rtv_format, DXGI_FORMAT* dsv_format) const;
+		DXGI_FORMAT* rtv_format, DXGI_FORMAT* dsv_format, DXGI_FORMAT* uav_format) const;
 
 	u32 GetSwapChainBufferCount() const;
 	bool CreateSwapChain();
@@ -379,13 +445,12 @@ private:
 	void DestroySwapChainRTVs();
 	void DestroySwapChain();
 
-	GSTexture* CreateSurface(
-		GSTexture::Type type, int width, int height, int levels, GSTexture::Format format) override;
+	GSTexture* CreateSurface(GSTexture::Usage usage, int width, int height, int levels, GSTexture::Format format) override;
 
 	void DoMerge(GSTexture* sTex[3], GSVector4* sRect, GSTexture* dTex, GSVector4* dRect, const GSRegPMODE& PMODE,
-		const GSRegEXTBUF& EXTBUF, u32 c, const bool linear) final;
+		const GSRegEXTBUF& EXTBUF, u32 c, const Filter filter) final;
 	void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-		ShaderInterlace shader, bool linear, const InterlaceConstantBuffer& cb) final;
+		ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) final;
 	void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) final;
 	void DoFXAA(GSTexture* sTex, GSTexture* dTex) final;
 
@@ -425,9 +490,11 @@ private:
 	void DestroyResources();
 
 protected:
+	using GSDevice::DoStretchRect; // Suppress overloaded virtual function warning
 	virtual void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-		GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear) override;
-
+		ShaderConvertSelector shader, Filter filter) override;
+	virtual void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, const GSVector4& dRect,
+		PresentShader shader, Filter filter) override;
 public:
 	GSDevice12();
 	~GSDevice12() override;
@@ -454,6 +521,9 @@ public:
 	bool SetGPUTimingEnabled(bool enabled) override;
 	float GetAndResetAccumulatedGPUTime() override;
 
+	bool SetGPUPipelineStatisticsEnabled(bool enabled) override;
+	GPUPipelineStatistics GetAndResetAccumulatedGPUPipelineStatistics() override;
+
 	void PushDebugGroup(const char* fmt, ...) override;
 	void PopDebugGroup() override;
 	void InsertDebugMessage(DebugMessageCategory category, const char* fmt, ...) override;
@@ -467,7 +537,7 @@ public:
 	void CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY) override;
 
 	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-		PresentShader shader, float shaderTime, bool linear) override;
+		PresentShader shader, float shaderTime, Filter filter) override;
 	void UpdateCLUTTexture(
 		GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize) override;
 	void ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM,
@@ -475,13 +545,13 @@ public:
 	void FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect) override;
 
 	void DrawMultiStretchRects(
-		const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvert shader) override;
-	void DoMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture12* dTex, ShaderConvert shader);
+		const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvertSelector shader) override;
+	void DoMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture12* dTex, ShaderConvertSelector shader);
 
 	void BeginRenderPassForStretchRect(
 		GSTexture12* dTex, const GSVector4i& dtex_rc, const GSVector4i& dst_rc, bool allow_discard = true);
 	void DoStretchRect(GSTexture12* sTex, const GSVector4& sRect, GSTexture12* dTex, const GSVector4& dRect,
-		const ID3D12PipelineState* pipeline, bool linear, bool allow_discard);
+		const ID3D12PipelineState* pipeline, Filter filter, bool allow_discard);
 	void DrawStretchRect(const GSVector4& sRect, const GSVector4& dRect, const GSVector2i& ds);
 
 	void SetupDATE(GSTexture* rt, GSTexture* ds, SetDATM datm, const GSVector4i& bbox);
@@ -490,11 +560,12 @@ public:
 	void IASetVertexBuffer(const void* vertex, size_t stride, size_t count);
 	void IASetIndexBuffer(const void* index, size_t count);
 
-	void PSSetShaderResource(int i, GSTexture* sr, bool check_state, bool feedback = false);
+	void PSSetShaderResource(int i, GSTexture* sr, bool check_state, ResourceType type = ResourceType::SRV);
 	void PSSetSampler(GSHWDrawConfig::SamplerSelector sel);
+	void PSSetROVs(GSTexture* rt, GSTexture* ds, bool write_rt, bool write_ds);
 
 	void OMSetRenderTargets(GSTexture* rt, GSTexture* ds, GSTexture* ds_as_rt, const GSVector4i& scissor,
-		bool depth_read = false);
+		bool depth_read = false, const GSVector2i& viewport_size = {});
 
 	void SetVSConstantBuffer(const GSHWDrawConfig::VSConstantBuffer& cb);
 	void SetPSConstantBuffer(const GSHWDrawConfig::PSConstantBuffer& cb);
@@ -502,8 +573,8 @@ public:
 
 	void RenderHW(GSHWDrawConfig& config) override;
 	void SendHWDraw(const PipelineSelector& pipe, const GSHWDrawConfig& config, GSTexture12* draw_rt,
-		GSTexture12* draw_ds, const bool feedback_rt, const bool feedback_depth, const bool one_barrier,
-		const bool full_barrier);
+		GSTexture12* draw_ds, GSTexture12* draw_rt_rov, GSTexture12* draw_ds_rov,
+		const bool feedback_rt, const bool feedback_depth, const bool one_barrier, const bool full_barrier);
 
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config);
 	void UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config);

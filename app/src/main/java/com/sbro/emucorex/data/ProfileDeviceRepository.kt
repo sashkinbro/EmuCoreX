@@ -52,7 +52,7 @@ data class PublicPlayerDevice(
 object ProfileDeviceInfoProvider {
     private const val PREFS = "profile_device"
     private const val DEVICE_ID = "device_id"
-    const val CORE_VERSION = "2.7.316"
+    const val CORE_VERSION = "2.8.0"
 
     fun current(context: Context, isPublic: Boolean = false): PlayerDevice {
         val appContext = context.applicationContext

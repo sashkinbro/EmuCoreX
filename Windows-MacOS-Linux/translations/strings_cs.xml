@@ -611,7 +611,7 @@
     <string name="settings_about">O aplikaci</string>
     <string name="settings_version">Verze</string>
     <string name="settings_emulator_core">Jádro emulace</string>
-    <string name="settings_emulator_core_desc">Založeno na PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">Založeno na PCSX2 (2.8.0)</string>
     <string name="settings_about_app">O aplikaci EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX je knihovna a spouštěč pro PlayStation 2 postavený na emulačním jádře PCSX2. Nabízí rychlé nastavení, čistou navigaci a prostředí optimalizované pro handheldy.</string>
     <string name="settings_about_studio">Vývojář</string>

@@ -100,6 +100,22 @@ static std::atomic_bool s_imgui_wants_text{false};
 
 static bool s_gamepad_swap_noth_west = false;
 
+struct ControllerNavState
+{
+	bool dpad_h_held = false;
+	bool dpad_v_held = false;
+
+	struct AxisState
+	{
+		float x = 0.0f, y = 0.0f;
+		bool x_neg_active = false, x_pos_active = false;
+		bool y_neg_active = false, y_pos_active = false;
+	};
+	AxisState left_stick;
+	AxisState right_stick;
+};
+static std::unordered_map<u32, ControllerNavState> s_controller_nav_states;
+
 // mapping of host key -> imgui key
 static std::unordered_map<u32, ImGuiKey> s_imgui_key_map;
 
@@ -151,6 +167,21 @@ bool ImGuiManager::Initialize()
 	io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasTextures | ImGuiBackendFlags_HasGamepad;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
 	io.KeyRepeatDelay = 0.5f;
+#ifdef __APPLE__
+	// For macOS we should use the standard macOS text editing shortcuts
+	io.ConfigMacOSXBehaviors = true;
+#endif
+
+	ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+	platform_io.Platform_GetClipboardTextFn = [](ImGuiContext* ctx) -> const char* {
+		static thread_local std::string s_clipboard_text;
+		s_clipboard_text = Host::GetTextFromClipboard();
+		return s_clipboard_text.c_str();
+	};
+	platform_io.Platform_SetClipboardTextFn = [](ImGuiContext* ctx, const char* text) {
+		if (text)
+			Host::CopyTextToClipboard(text);
+	};
 
 	g.ConfigNavWindowingKeyNext = ImGuiKey_None;
 	g.ConfigNavWindowingKeyPrev = ImGuiKey_None;
@@ -251,6 +282,9 @@ void ImGuiManager::WindowResized()
 
 	// Scale might have changed as a result of window resize.
 	RequestScaleUpdate();
+
+	if (GImGui->NavWindow != nullptr)
+		ImGui::NavInitWindow(GImGui->NavWindow, true);
 }
 
 void ImGuiManager::RequestScaleUpdate()
@@ -413,10 +447,10 @@ void ImGuiManager::SetKeyMap()
 	static constexpr KeyMapping mapping[] = {{ImGuiKey_LeftArrow, "Left"}, {ImGuiKey_RightArrow, "Right"}, {ImGuiKey_UpArrow, "Up"},
 		{ImGuiKey_DownArrow, "Down"}, {ImGuiKey_PageUp, "PageUp"}, {ImGuiKey_PageDown, "PageDown"}, {ImGuiKey_Home, "Home"},
 		{ImGuiKey_End, "End"}, {ImGuiKey_Insert, "Insert"}, {ImGuiKey_Delete, "Delete"}, {ImGuiKey_Backspace, "Backspace"},
-		{ImGuiKey_Space, "Space"}, {ImGuiKey_Enter, "Return"}, {ImGuiKey_Escape, "Escape"}, {ImGuiKey_LeftCtrl, "LeftCtrl", "Ctrl"},
-		{ImGuiKey_LeftShift, "LeftShift", "Shift"}, {ImGuiKey_LeftAlt, "LeftAlt", "Alt"}, {ImGuiKey_LeftSuper, "LeftSuper", "Super"},
+		{ImGuiKey_Space, "Space"}, {ImGuiKey_Enter, "Return"}, {ImGuiKey_Escape, "Escape"}, {ImGuiKey_LeftCtrl, "LeftCtrl", "Control"},
+		{ImGuiKey_LeftShift, "LeftShift", "Shift"}, {ImGuiKey_LeftAlt, "LeftAlt", "Alt"}, {ImGuiKey_LeftSuper, "Meta", "Super_L"},
 		{ImGuiKey_RightCtrl, "RightCtrl"}, {ImGuiKey_RightShift, "RightShift"}, {ImGuiKey_RightAlt, "RightAlt"},
-		{ImGuiKey_RightSuper, "RightSuper"}, {ImGuiKey_Menu, "Menu"}, {ImGuiKey_0, "0"}, {ImGuiKey_1, "1"}, {ImGuiKey_2, "2"},
+		{ImGuiKey_RightSuper, "Super_R"}, {ImGuiKey_Menu, "Menu"}, {ImGuiKey_0, "0"}, {ImGuiKey_1, "1"}, {ImGuiKey_2, "2"},
 		{ImGuiKey_3, "3"}, {ImGuiKey_4, "4"}, {ImGuiKey_5, "5"}, {ImGuiKey_6, "6"}, {ImGuiKey_7, "7"}, {ImGuiKey_8, "8"}, {ImGuiKey_9, "9"},
 		{ImGuiKey_A, "A"}, {ImGuiKey_B, "B"}, {ImGuiKey_C, "C"}, {ImGuiKey_D, "D"}, {ImGuiKey_E, "E"}, {ImGuiKey_F, "F"}, {ImGuiKey_G, "G"},
 		{ImGuiKey_H, "H"}, {ImGuiKey_I, "I"}, {ImGuiKey_J, "J"}, {ImGuiKey_K, "K"}, {ImGuiKey_L, "L"}, {ImGuiKey_M, "M"}, {ImGuiKey_N, "N"},
@@ -524,7 +558,15 @@ static u32 GetFontIndex(const ImGuiManager::FontInfo& font)
 {
 	if (!font.face_name)
 		return 0; // No face name selected
-#define RET_IF_ERR(x) do { if ((x) != FT_Err_Ok) [[unlikely]] { assert(0); return 0; } } while (0)
+#define RET_IF_ERR(x) \
+	do \
+	{ \
+		if ((x) != FT_Err_Ok) [[unlikely]] \
+		{ \
+			assert(0); \
+			return 0; \
+		} \
+	} while (0)
 	if (!s_ft_lib)
 		RET_IF_ERR(FT_Init_FreeType(&s_ft_lib));
 	u32 face_idx = 0;
@@ -914,7 +956,7 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 	const float padding = std::ceil(8.0f * scale);
 	const float rounding = std::ceil(5.0f * scale);
 	const float max_width = s_window_width - (margin + padding) * 2.0f;
-	
+
 	float position_y = margin;
 	switch (GSConfig.OsdMessagesPos)
 	{
@@ -923,20 +965,20 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		case OsdOverlayPos::TopRight:
 			position_y = margin;
 			break;
-			
+
 		case OsdOverlayPos::CenterLeft:
 		case OsdOverlayPos::Center:
 		case OsdOverlayPos::CenterRight:
 			position_y = s_window_height * 0.5f;
 			break;
-			
+
 		case OsdOverlayPos::BottomLeft:
 		case OsdOverlayPos::BottomCenter:
 		case OsdOverlayPos::BottomRight:
 			// For bottom positions, start from the bottom and let messages stack upward
 			position_y = s_window_height - margin;
 			break;
-			
+
 		case OsdOverlayPos::None:
 		default:
 			position_y = margin;
@@ -1008,16 +1050,16 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		const ImVec2 text_size(
 			font->CalcTextSizeA(font_size, max_width, max_width, msg.text.c_str(), msg.text.c_str() + msg.text.length()));
 		const ImVec2 size(text_size.x + padding * 2.0f, text_size.y + padding * 2.0f);
-		
+
 		// For bottom positions, adjust actual_y to try to account for message height
 		float final_y = actual_y;
-		if (GSConfig.OsdMessagesPos == OsdOverlayPos::BottomLeft || 
-		    GSConfig.OsdMessagesPos == OsdOverlayPos::BottomCenter || 
-		    GSConfig.OsdMessagesPos == OsdOverlayPos::BottomRight)
+		if (GSConfig.OsdMessagesPos == OsdOverlayPos::BottomLeft ||
+			GSConfig.OsdMessagesPos == OsdOverlayPos::BottomCenter ||
+			GSConfig.OsdMessagesPos == OsdOverlayPos::BottomRight)
 		{
 			final_y = actual_y - size.y;
 		}
-		
+
 		const ImVec2 base_pos = CalculateOSDPosition(GSConfig.OsdMessagesPos, margin, size, s_window_width, s_window_height);
 		const ImVec2 pos(base_pos.x, final_y);
 		const ImVec4 text_rect(pos.x + padding, pos.y + padding, pos.x + size.x - padding, pos.y + size.y - padding);
@@ -1027,11 +1069,11 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0x48, 0x48, 0x48, opacity), rounding);
 		dl->AddText(font, font_size, ImVec2(text_rect.x, text_rect.y), IM_COL32(0xff, 0xff, 0xff, opacity), msg.text.c_str(),
 			msg.text.c_str() + msg.text.length(), max_width, &text_rect);
-		
+
 		// Stack direction depends on the position upward for bottom positions, downward for others
-		if (GSConfig.OsdMessagesPos == OsdOverlayPos::BottomLeft || 
-		    GSConfig.OsdMessagesPos == OsdOverlayPos::BottomCenter || 
-		    GSConfig.OsdMessagesPos == OsdOverlayPos::BottomRight)
+		if (GSConfig.OsdMessagesPos == OsdOverlayPos::BottomLeft ||
+			GSConfig.OsdMessagesPos == OsdOverlayPos::BottomCenter ||
+			GSConfig.OsdMessagesPos == OsdOverlayPos::BottomRight)
 		{
 			position_y -= (size.y + spacing); // Stack upward for bottom positions
 		}
@@ -1051,13 +1093,17 @@ void ImGuiManager::RenderOSD()
 	// acquire for IO.MousePos.
 	std::atomic_thread_fence(std::memory_order_acquire);
 
-	// Don't draw OSD when we're just running big picture.
-	if (VMManager::HasValidVM())
-		RenderOverlays();
-
 	const Common::Timer::Value current_time = Common::Timer::GetCurrentValue();
 	AcquirePendingOSDMessages(current_time);
-	DrawOSDMessages(current_time);
+
+	if (!FullscreenUI::HasActiveWindow())
+	{
+		// Don't draw OSD when we're just running big picture.
+		if (VMManager::HasValidVM())
+			RenderOverlays();
+
+		DrawOSDMessages(current_time);
+	}
 
 	// Cursors are always last.
 	DrawSoftwareCursors();
@@ -1158,19 +1204,50 @@ bool ImGuiManager::ProcessPointerAxisEvent(InputBindingKey key, float value)
 	return s_imgui_wants_mouse.load(std::memory_order_acquire);
 }
 
+static ImGuiKey GetModifierForKey(ImGuiKey key)
+{
+	static constexpr std::pair<ImGuiKey, ImGuiKey> modifier_map[] = {
+		{ImGuiKey_LeftCtrl, ImGuiMod_Ctrl},
+		{ImGuiKey_RightCtrl, ImGuiMod_Ctrl},
+		{ImGuiKey_LeftShift, ImGuiMod_Shift},
+		{ImGuiKey_RightShift, ImGuiMod_Shift},
+		{ImGuiKey_LeftAlt, ImGuiMod_Alt},
+		{ImGuiKey_RightAlt, ImGuiMod_Alt},
+		{ImGuiKey_LeftSuper, ImGuiMod_Super},
+		{ImGuiKey_RightSuper, ImGuiMod_Super},
+	};
+
+	for (const auto& [k, mod] : modifier_map)
+	{
+		if (key == k)
+			return mod;
+	}
+
+	return ImGuiKey_None;
+}
+
 bool ImGuiManager::ProcessHostKeyEvent(InputBindingKey key, float value)
 {
-	decltype(s_imgui_key_map)::iterator iter;
-	if (!ImGui::GetCurrentContext() || (iter = s_imgui_key_map.find(key.data)) == s_imgui_key_map.end())
+	if (!ImGui::GetCurrentContext())
+		return false;
+
+	const auto iter = s_imgui_key_map.find(key.data);
+	if (iter == s_imgui_key_map.end())
 		return false;
 
 	// still update state anyway
-	MTGS::RunOnGSThread([imkey = iter->second, down = (value != 0.0f)]() { ImGui::GetIO().AddKeyEvent(imkey, down); });
+	MTGS::RunOnGSThread([imkey = iter->second, down = (value != 0.0f)]() {
+		ImGuiIO& io = ImGui::GetIO();
+		io.AddKeyEvent(imkey, down);
+
+		if (const ImGuiKey mod = GetModifierForKey(imkey); mod != ImGuiKey_None)
+			io.AddKeyEvent(mod, down);
+	});
 
 	return s_imgui_wants_keyboard.load(std::memory_order_acquire);
 }
 
-bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, InputLayout layout, float value)
+bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, InputLayout layout, float value, u32 controller_id)
 {
 	static constexpr ImGuiKey key_map[] = {
 		ImGuiKey_None, // Unknown,
@@ -1178,15 +1255,15 @@ bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, InputLayout
 		ImGuiKey_GamepadDpadRight, // DPadRight
 		ImGuiKey_GamepadDpadLeft, // DPadLeft
 		ImGuiKey_GamepadDpadDown, // DPadDown
-		ImGuiKey_None, // LeftStickUp
-		ImGuiKey_None, // LeftStickRight
-		ImGuiKey_None, // LeftStickDown
-		ImGuiKey_None, // LeftStickLeft
+		ImGuiKey_GamepadDpadUp, // LeftStickUp
+		ImGuiKey_GamepadDpadRight, // LeftStickRight
+		ImGuiKey_GamepadDpadDown, // LeftStickDown
+		ImGuiKey_GamepadDpadLeft, // LeftStickLeft
 		ImGuiKey_GamepadL3, // L3
-		ImGuiKey_None, // RightStickUp
-		ImGuiKey_None, // RightStickRight
-		ImGuiKey_None, // RightStickDown
-		ImGuiKey_None, // RightStickLeft
+		ImGuiKey_GamepadDpadUp, // RightStickUp
+		ImGuiKey_GamepadDpadRight, // RightStickRight
+		ImGuiKey_GamepadDpadDown, // RightStickDown
+		ImGuiKey_GamepadDpadLeft, // RightStickLeft
 		ImGuiKey_GamepadR3, // R3
 		ImGuiKey_GamepadFaceUp, // Triangle
 		ImGuiKey_GamepadFaceRight, // Circle
@@ -1207,6 +1284,21 @@ bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, InputLayout
 	if (static_cast<u32>(key) >= std::size(key_map) || key_map[static_cast<u32>(key)] == ImGuiKey_None)
 		return false;
 
+	// Ignore diagonal D-pad input — neither direction fires when both axes are held simultaneously.
+	const bool is_dpad_h = (key == GenericInputBinding::DPadLeft || key == GenericInputBinding::DPadRight);
+	const bool is_dpad_v = (key == GenericInputBinding::DPadUp || key == GenericInputBinding::DPadDown);
+	if (is_dpad_h || is_dpad_v)
+	{
+		ControllerNavState& nav = s_controller_nav_states[controller_id];
+		if (is_dpad_h)
+			nav.dpad_h_held = (value > 0.0f);
+		else
+			nav.dpad_v_held = (value > 0.0f);
+
+		if (nav.dpad_h_held && nav.dpad_v_held)
+			return false;
+	}
+
 	MTGS::RunOnGSThread(
 		[key = key_map[static_cast<u32>(key)], value, layout]() mutable {
 			if (s_gamepad_swap_noth_west)
@@ -1222,6 +1314,81 @@ bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, InputLayout
 		});
 
 	return s_imgui_wants_keyboard.load(std::memory_order_acquire);
+}
+
+void ImGuiManager::ProcessGenericAxisEvent(GenericInputBinding negative_key, GenericInputBinding positive_key, InputLayout layout, float value, u32 controller_id)
+{
+	// Hysteresis prevents wobble: activate at 0.5, release at 0.2.
+	static constexpr float ACTIVATE_THRESHOLD = 0.5f;
+	static constexpr float RELEASE_THRESHOLD = 0.2f;
+
+	// Ignore diagonal input and track binary state per direction to suppress duplicate events.
+	using AxisState = ControllerNavState::AxisState;
+	ControllerNavState& nav = s_controller_nav_states[controller_id];
+
+	AxisState* state = nullptr;
+	bool is_x_axis = false;
+	if (negative_key == GenericInputBinding::LeftStickLeft)
+	{
+		state = &nav.left_stick;
+		state->x = value;
+		is_x_axis = true;
+	}
+	else if (negative_key == GenericInputBinding::LeftStickUp)
+	{
+		state = &nav.left_stick;
+		state->y = value;
+		is_x_axis = false;
+	}
+	else if (negative_key == GenericInputBinding::RightStickLeft)
+	{
+		state = &nav.right_stick;
+		state->x = value;
+		is_x_axis = true;
+	}
+	else if (negative_key == GenericInputBinding::RightStickUp)
+	{
+		state = &nav.right_stick;
+		state->y = value;
+		is_x_axis = false;
+	}
+
+	float suppressed_value = value;
+	if (state)
+	{
+		const float other = is_x_axis ? state->y : state->x;
+		if (std::abs(other) > std::abs(value))
+			suppressed_value = 0.0f;
+	}
+
+	// Treat as binary like the D-pad: either fully pressed or released, with a deadzone.
+	bool* neg_active_ptr = state ? (is_x_axis ? &state->x_neg_active : &state->y_neg_active) : nullptr;
+	bool* pos_active_ptr = state ? (is_x_axis ? &state->x_pos_active : &state->y_pos_active) : nullptr;
+
+	if (negative_key != GenericInputBinding::Unknown)
+	{
+		const bool currently_active = neg_active_ptr ? *neg_active_ptr : false;
+		const float threshold = currently_active ? RELEASE_THRESHOLD : ACTIVATE_THRESHOLD;
+		const bool active = suppressed_value < -threshold;
+		if (!neg_active_ptr || active != currently_active)
+		{
+			if (neg_active_ptr)
+				*neg_active_ptr = active;
+			ProcessGenericInputEvent(negative_key, layout, active ? 1.0f : 0.0f, controller_id);
+		}
+	}
+	if (positive_key != GenericInputBinding::Unknown)
+	{
+		const bool currently_active = pos_active_ptr ? *pos_active_ptr : false;
+		const float threshold = currently_active ? RELEASE_THRESHOLD : ACTIVATE_THRESHOLD;
+		const bool active = suppressed_value > threshold;
+		if (!pos_active_ptr || active != currently_active)
+		{
+			if (pos_active_ptr)
+				*pos_active_ptr = active;
+			ProcessGenericInputEvent(positive_key, layout, active ? 1.0f : 0.0f, controller_id);
+		}
+	}
 }
 
 void ImGuiManager::SwapGamepadNorthWest(bool value)

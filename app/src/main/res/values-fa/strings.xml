@@ -572,7 +572,7 @@
     <string name="settings_about">درباره</string>
     <string name="settings_version">نسخه</string>
     <string name="settings_emulator_core">هسته شبیه‌سازی</string>
-    <string name="settings_emulator_core_desc">بر پایه PCSX2 (2.7.316)</string>
+    <string name="settings_emulator_core_desc">بر پایه PCSX2 (2.8.0)</string>
     <string name="settings_about_app">درباره EmuCoreX</string>
     <string name="settings_about_app_desc">EmuCoreX یک کتابخانه و راه‌انداز PlayStation 2 است که پیرامون هسته شبیه‌سازی بر پایه PCSX2 ساخته شده، با راه‌اندازی سریع، پیمایش تمیز و تجربه‌ای سازگار با دستگاه‌های دستی.</string>
     <string name="settings_about_studio">توسعه‌دهنده</string>

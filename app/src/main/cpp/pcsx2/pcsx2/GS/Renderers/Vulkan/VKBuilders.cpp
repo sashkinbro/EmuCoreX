@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Vulkan/VKBuilders.h"
+#include "GS/GSShaderCompileIndicator.h"
 
 #include "common/Assertions.h"
 #include "common/Console.h"
@@ -279,6 +280,8 @@ void Vulkan::GraphicsPipelineBuilder::Clear()
 VkPipeline Vulkan::GraphicsPipelineBuilder::Create(
 	VkDevice device, VkPipelineCache pipeline_cache, bool clear /* = true */)
 {
+	const GSShaderCompileIndicator::CompileTimer compile_timer;
+
 	VkPipeline pipeline;
 	VkResult res = vkCreateGraphicsPipelines(device, pipeline_cache, 1, &m_ci, nullptr, &pipeline);
 	if (res != VK_SUCCESS)
@@ -593,6 +596,8 @@ void Vulkan::ComputePipelineBuilder::Clear()
 VkPipeline Vulkan::ComputePipelineBuilder::Create(
 	VkDevice device, VkPipelineCache pipeline_cache /*= VK_NULL_HANDLE*/, bool clear /*= true*/)
 {
+	const GSShaderCompileIndicator::CompileTimer compile_timer;
+
 	VkPipeline pipeline;
 	VkResult res = vkCreateComputePipelines(device, pipeline_cache, 1, &m_ci, nullptr, &pipeline);
 	if (res != VK_SUCCESS)
@@ -744,7 +749,7 @@ void Vulkan::DescriptorSetUpdateBuilder::PushUpdate(
 }
 
 void Vulkan::DescriptorSetUpdateBuilder::AddImageDescriptorWrite(VkDescriptorSet set, u32 binding, VkImageView view,
-	VkImageLayout layout /*= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL*/)
+	VkImageLayout layout /*= VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL*/, bool storage_image /*= false*/)
 {
 	pxAssert(m_num_writes < MAX_WRITES && m_num_image_infos < MAX_IMAGE_INFOS);
 
@@ -758,7 +763,7 @@ void Vulkan::DescriptorSetUpdateBuilder::AddImageDescriptorWrite(VkDescriptorSet
 	dw.dstSet = set;
 	dw.dstBinding = binding;
 	dw.descriptorCount = 1;
-	dw.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+	dw.descriptorType = storage_image ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	dw.pImageInfo = &ii;
 }
 

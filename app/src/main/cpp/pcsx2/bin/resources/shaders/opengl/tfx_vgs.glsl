@@ -12,8 +12,9 @@ layout(std140, binding = 1) uniform cb20
 	vec2  TextureOffset;
 
 	vec2  PointSize;
+
 	uint  MaxDepth;
-	uint  pad_cb20;
+	float LineAA1Width;
 };
 
 #ifdef VERTEX_SHADER
@@ -163,6 +164,110 @@ ProcessedVertex load_vertex(uint index)
 	vtx.t_float.z = i_f.x;
 
 	return vtx;
+}
+
+// Convert XY from NDC to GS pixel coordinates (i.e. 1.0 = 1 GS pixel).
+vec2 get_xy_unscaled(vec2 xy)
+{
+	return round(xy / VertexScale) / 16.0f;
+}
+
+// Get the XY deltas in GS pixel coordinates, using first vertex as the origin.
+mat2 get_xy_deltas_unscaled(ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2)
+{
+	vec2 xy0 = get_xy_unscaled(v0.p.xy);
+	vec2 xy1 = get_xy_unscaled(v1.p.xy);
+	vec2 xy2 = get_xy_unscaled(v2.p.xy);
+	return mat2(xy1 - xy0, xy2 - xy0);
+}
+
+// Get the AA1 outward expand direction to the edge formed by the first two vertices.
+// This is up or down for shallow (X dominant) edges, and right or left for steep (Y dominant) edges.
+// Similar expansion to line AA1 except instead of expanding on both sides of the line,
+// expand on on the side towards the outside of the triangle.
+vec2 get_aa1_triangle_expand_dir(ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2)
+{
+	mat2 xy_deltas = get_xy_deltas_unscaled(v0, v1, v2);
+	vec2 line_delta = xy_deltas[0];
+	vec2 line_opposite = xy_deltas[1];
+
+	vec2 line_normal = vec2(line_delta.y, -line_delta.x);
+	vec2 line_expand = abs(line_delta.x) >= abs(line_delta.y) ? vec2(0.0f, 1.0f) : vec2(1.0f, 0.0f);
+
+	if ((dot(line_expand, line_normal) >= 0.0f) == (dot(line_opposite, line_normal) >= 0.0f))
+	{
+		// Expand direction point towards the interior so flip it.
+		line_expand = -line_expand;
+	}
+
+	return line_expand;
+}
+
+mat2 get_inverse(mat2 mat, float det)
+{
+	return mat2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1 / det);
+}
+
+// Extrapolate triangle attributes from the first vertex along the given direction.
+// dp_mat is derived from the input vertices, it is passed in to avoid recomputing.
+void extrapolate_aa1_triangle_edge(inout ProcessedVertex v0, ProcessedVertex v1, ProcessedVertex v2, mat2 dp_mat, vec2 dp)
+{
+	// Get texture deltas
+	#if VS_TME
+		#if VS_FST
+			mat2 dt = mat2(v1.t_int.zw - v0.t_int.zw, v2.t_int.zw - v0.t_int.zw);
+		#else
+			mat2 dt = mat2(v1.t_float.xy - v0.t_float.xy, v2.t_float.xy - v0.t_float.xy);
+		#endif
+	#endif
+
+	// Get color delta if interpolating
+	#if VS_IIP
+		mat2x4 dc = mat2x4(v1.c - v0.c, v2.c - v0.c);
+	#endif
+
+	vec2 dz = vec2(v1.p.z - v0.p.z, v2.p.z - v0.p.z); // Z deltas
+
+	vec2 df = vec2(v1.t_float.z - v0.t_float.z, v2.t_float.z - v0.t_float.z); // Fog deltas
+
+	vec2 dq = vec2(v1.t_float.w - v0.t_float.w, v2.t_float.w - v0.t_float.w); // Q deltas
+
+	// To prevent unstable extrapolation, do not extrapolate if the
+	// minimum perpendicular length of the triangle is < 2 pixels.
+	float dp_det = determinant(dp_mat); // Twice signed triangle area.
+	float len0 = length(dp_mat[0]);
+	float len1 = length(dp_mat[1]);
+	float len2 = length(dp_mat[1] - dp_mat[0]);
+	float min_perp_length = abs(dp_det) / max(max(len0, len1), len2);
+
+	// Get the position -> barycentric weight matrix
+	mat2 inv_dp_mat = get_inverse(dp_mat, dp_det);
+
+	vec2 weights = min_perp_length < 2 ? vec2(0) : inv_dp_mat * dp;
+
+	v0.p.xy += dp * PointSize; // Extrapolate position
+
+	// Extrapolate texture coords
+	#if VS_TME
+		#if VS_FST
+			v0.t_int.zw += dt * weights;
+			v0.t_int.xy = v0.t_int.zw * TextureScale;
+		#else
+			v0.t_float.xy += dt * weights;
+			v0.t_int.zw = v0.t_float.xy / TextureScale;
+			v0.t_float.w += dot(dq, weights);
+		#endif
+	#endif
+
+	// Extrapolate and clamp color
+	#if VS_IIP
+		v0.c += dc * weights;
+		v0.c = clamp(v0.c, vec4(0), vec4(255));
+	#endif
+
+	v0.p.z += dot(dz, weights); // Extrapolate depth
+
+	v0.t_float.z += dot(df, weights); // Extrapolate fog
 }
 
 void main()

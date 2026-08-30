@@ -82,7 +82,6 @@ bool GSHwHack::GSC_IRem(GSRendererHW& r, int& skip)
 			int horizontal_offset = page_offset % std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.x;
 
 			GSVector4i draw_size = GSVector4i(0, 0, 64, 32) + GSVector4i(horizontal_offset, vertical_offset, horizontal_offset, vertical_offset);
-			rt->UnscaleRTAlpha();
 
 			// We need the original red back now for the next channel shuffle.
 			GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
@@ -102,10 +101,7 @@ bool GSHwHack::GSC_IRem(GSRendererHW& r, int& skip)
 			config.ps.rta_source_correction = 0;
 			config.ps.tfx = TFX_DECAL;
 			config.ps.tcc = true;
-			r.EndHLEHardwareDraw(true);
-
-			rt->m_alpha_min = 0;
-			rt->m_alpha_max = 255;
+			r.EndHLEHardwareDraw(false);
 
 			rt = nullptr;
 			src = nullptr;
@@ -170,7 +166,6 @@ bool GSHwHack::GSC_IRem(GSRendererHW& r, int& skip)
 				int horizontal_offset = page_offset % std::max(rt->m_TEX0.TBW, 1U) * rt_psm.pgs.x;
 
 				draw_size = draw_size + GSVector4i(horizontal_offset, vertical_offset, horizontal_offset, vertical_offset);
-				rt->UnscaleRTAlpha();
 
 				// Shuffle the blue channel in to red, but swap them, we'll need the original red later.
 				GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
@@ -190,10 +185,7 @@ bool GSHwHack::GSC_IRem(GSRendererHW& r, int& skip)
 				config.ps.rta_source_correction = 0;
 				config.ps.tfx = TFX_DECAL;
 				config.ps.tcc = true;
-				r.EndHLEHardwareDraw(true);
-
-				rt->m_alpha_min = 0;
-				rt->m_alpha_max = 255;
+				r.EndHLEHardwareDraw(false);
 
 				rt = nullptr;
 				src = nullptr;
@@ -1166,14 +1158,14 @@ bool GSHwHack::OI_SonicUnleashed(GSRendererHW& r, GSTexture* rt, GSTexture* ds, 
 		rt_again->m_valid.y /= 2;
 		rt_again->m_valid.w /= 2;
 		rt_again->m_TEX0.PSM = PSMCT32;
-		GSTexture* tex = g_gs_device->CreateRenderTarget(rt_again->m_unscaled_size.x * rt_again->m_scale, rt_again->m_unscaled_size.y * rt_again->m_scale, GSTexture::Format::Color, false);
+		GSTexture* tex = g_gs_device->CreateCompatible(rt_again->m_texture,
+			static_cast<int>(rt_again->m_unscaled_size.x * rt_again->m_scale),
+			static_cast<int>(rt_again->m_unscaled_size.y * rt_again->m_scale), false);
 
 		if (!tex)
 			return false;
 
-
-		g_gs_device->StretchRect(rt_again->m_texture, source_rect, tex, dRect, ShaderConvert::COPY, false);
-
+		g_gs_device->StretchRectAuto(rt_again->m_texture, source_rect, tex, dRect, Nearest);
 
 		g_gs_device->Recycle(rt_again->m_texture);
 		rt_again->m_texture = tex;
@@ -1203,7 +1195,7 @@ bool GSHwHack::OI_SonicUnleashed(GSRendererHW& r, GSTexture* rt, GSTexture* ds, 
 	// This is kind of a bodge because the game confuses everything since the source is really 16bit and it assumes it's really drawing 16bit on the copy back, resizing the target.
 	const GSVector4 dRect(0, 0, copy_size.x, copy_size.y);
 
-	g_gs_device->StretchRect(src->m_texture, sRect, rt, dRect, true, true, true, false);
+	g_gs_device->StretchRectAutoMask(src->m_texture, sRect, rt, dRect, true, true, true, false);
 
 	return false;
 }
@@ -1389,8 +1381,10 @@ bool GSHwHack::MV_Growlanser(GSRendererHW& r)
 
 	GL_INS("MV_Growlanser: %x -> %x %dx%d", RSBP, RDBP, src->GetUnscaledWidth(), src->GetUnscaledHeight());
 
-	g_gs_device->StretchRect(src->GetTexture(), GSVector4(rc) / GSVector4(src->GetUnscaledSize()).xyxy(),
-		dst->GetTexture(), GSVector4(rc) * GSVector4(dst->GetScale()), ShaderConvert::RGBA8_TO_FLOAT32, false);
+	g_gs_device->StretchRectAuto(
+		src->GetTexture(), GSVector4(rc) / GSVector4(src->GetUnscaledSize()).xyxy(),
+		dst->GetTexture(), GSVector4(rc) * GSVector4(dst->GetScale()),
+		Nearest);
 
 	s_last_hacked_move_n = r.s_n;
 	return true;

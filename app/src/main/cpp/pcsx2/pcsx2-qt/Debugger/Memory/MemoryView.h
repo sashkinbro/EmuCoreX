@@ -6,6 +6,7 @@
 #include "ui_MemoryView.h"
 
 #include "Debugger/DebuggerView.h"
+#include "Debugger/NavigationHistoryStack.h"
 
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/DisassemblyManager.h"
@@ -50,15 +51,15 @@ private:
 	QWidget* parent;
 	MemoryViewType displayType = MemoryViewType::BYTE;
 	bool littleEndian = true;
-	u32 rowCount;
-	u32 rowVisible;
-	s32 rowHeight;
+	u32 rowCount = 0;
+	u32 rowVisible = 0;
+	s32 rowHeight = 0;
 
 	// Stuff used for selection handling
 	// This gets set every paint and depends on the window size / current display mode (1byte,2byte,etc)
-	s32 valuexAxis; // Where the hexadecimal view begins
-	s32 textXAxis; // Where the text view begins
-	s32 row1YAxis; // Where the first row starts
+	s32 valuexAxis = 0; // Where the hexadecimal view begins
+	s32 textXAxis = 0; // Where the text view begins
+	s32 row1YAxis = 0; // Where the first row starts
 	s32 segmentXAxis[16]; // Where the segments begin
 	bool selectedText = false; // Whether the user has clicked on text or hex
 
@@ -89,11 +90,13 @@ public:
 	{
 	}
 
-	u32 startAddress;
-	u32 selectedAddress;
-	s32 selectedIndex;
+	u32 startAddress = 0;
+	u32 selectedAddress = 0;
+	s32 selectedIndex = 0;
 
-	void UpdateStartAddress(u32 start);
+	NavigationHistoryStack<u32> navigation_history;
+
+	void UpdateStartAddress(u32 start, NavigationHistoryOperation history_operation);
 	void UpdateSelectedAddress(u32 selected, bool page = false);
 	void DrawTable(QPainter& painter, const QPalette& palette, s32 height, DebugInterface& cpu);
 	void SelectAt(QPoint pos);
@@ -135,6 +138,12 @@ public:
 
 	void toJson(JsonValueWrapper& json) override;
 	bool fromJson(const JsonValueWrapper& json) override;
+
+	bool supportsNavigation() override;
+	bool canNavigateBack() override;
+	bool canNavigateForward() override;
+	void navigateBack() override;
+	void navigateForward() override;
 
 protected:
 	void paintEvent(QPaintEvent* event) override;

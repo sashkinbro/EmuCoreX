@@ -98,6 +98,9 @@ private:
 	bool TextureCoversWithoutGapsNotEqual();
 	bool Is8PixelReverseSprite(const GSVertex& v0, const GSVertex& v1);
 
+	using PS_ATST = GSShader::PS_ATST;
+	using PS_AFAIL = GSShader::PS_AFAIL;
+
 	enum class CLUTDrawTestResult
 	{
 		NotCLUTDraw,
@@ -207,7 +210,7 @@ private:
 	void DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Target* ds, GSTextureCache::Source* tex, const TextureMinMaxResult& tmm);
 
 	void ResetStates();
-	void HandleProvokingVertexFirst();
+	void HandleFlatShadedVertices();
 	void SetupIA(float target_scale, float sx, float sy, bool req_vert_backup, const bool no_rt);
 	void EmulateTextureShuffleAndFbmask(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
 	u32 EmulateChannelShuffle(GSTextureCache::Target* src, bool test_only, GSTextureCache::Target* rt = nullptr);
@@ -225,7 +228,7 @@ private:
 
 	void EmulateZbuffer(const GSTextureCache::Target* ds);
 	void EmulateAA1();
-	static void GetAlphaTestConfigPS(const u32 atst, const u8 aref, const bool invert_test, u32& ps_atst_out, float& aref_out);
+	static void GetAlphaTestConfigPS(const u32 atst, const u8 aref, const bool invert_test, PS_ATST& ps_atst_out, float& aref_out);
 	void EmulateAlphaTest(DATEOptions& date_options);
 	void EmulateAlphaTestSecondPass();
 	void ConfigureDepthFeedback(bool rov_depth = false);
@@ -328,7 +331,7 @@ private:
 
 	GSVector2i m_lod = {};
 
-	GIFRegALPHA m_optimized_blend = {};
+	GIFRegALPHA m_optimized_blend = {}; // Save for ROV setup
 
 	GSHWDrawConfig m_conf = {};
 	HWCachedCtx m_cached_ctx;
@@ -356,7 +359,7 @@ public:
 	void ExpandLineIndices();
 	void ConvertSpriteTextureShuffle(u32& process_rg, u32& process_ba, bool& shuffle_across, GSTextureCache::Target* rt, GSTextureCache::Source* tex);
 	GSVector4 RealignTargetTextureCoordinate(const GSTextureCache::Source* tex);
-	GSVector4i ComputeBoundingBox(const GSVector2i& rtsize, float rtscale);
+	GSVector4i ComputeBoundingBoxRT(const GSVector2i& rtsize, float rtscale);
 	GSVector4i ComputeBoundingBoxTex(const GSVector2i& texsize, const GSVector4i& coverage, const GSVector4i& region, float texscale);
 	void MergeSprite(GSTextureCache::Source* tex);
 	float GetTextureScaleFactor() override;

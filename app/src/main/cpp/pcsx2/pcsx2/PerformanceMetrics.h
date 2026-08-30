@@ -21,7 +21,7 @@ namespace PerformanceMetrics
 	void Clear();
 	void Reset();
 	void Update(bool gs_register_write, bool fb_blit, bool is_skipping_present);
-	void OnGPUPresent(float gpu_time);
+	void OnGPUPresent(float gpu_time, u64 vs_invocations, u64 ps_invocations);
 
 	/// Enables per-thread CPU time sampling for non-native telemetry consumers.
 	/// Native OSD CPU metrics always override this gate while visible.
@@ -69,6 +69,8 @@ namespace PerformanceMetrics
 
 	float GetGPUUsage();
 	float GetGPUAverageTime();
+	double GetGPUAverageVSInvocations();
+	double GetGPUAveragePSInvocations();
 
 	const FrameTimeHistory& GetFrameTimeHistory();
 	u32 GetFrameTimeHistoryPos();

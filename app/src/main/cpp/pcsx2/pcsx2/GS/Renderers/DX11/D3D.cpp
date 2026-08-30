@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Config.h"
+#include "GS/GSShaderCompileIndicator.h"
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/Renderers/DX11/D3D.h"
 #include "GS/GSExtra.h"
@@ -19,7 +20,7 @@
 
 #include <array>
 #include <d3d11.h>
-#include <d3d12.h>
+#include <directx/d3d12.h>
 #include <d3dcompiler.h>
 #include <fstream>
 
@@ -466,28 +467,54 @@ GSRendererType D3D::GetPreferredRenderer()
 	}
 }
 
-wil::com_ptr_nothrow<ID3DBlob> D3D::CompileShader(D3D::ShaderType type, D3D_FEATURE_LEVEL feature_level, bool debug,
+const char* D3D::ShaderModelToCacheString(D3D::ShaderModel shader_model)
+{
+	switch (shader_model)
+	{
+		case ShaderModel::SM40:
+			return "sm40";
+		case ShaderModel::SM41:
+			return "sm41";
+		case ShaderModel::SM50:
+			return "sm50";
+		case ShaderModel::SM51:
+			return "sm51";
+		default:
+			return "unk";
+	}
+}
+
+wil::com_ptr_nothrow<ID3DBlob> D3D::CompileShader(D3D::ShaderType type, D3D::ShaderModel shader_model, bool debug,
 	const std::string_view code, const D3D_SHADER_MACRO* macros /* = nullptr */,
 	const char* entry_point /* = "main" */)
 {
+	const GSShaderCompileIndicator::CompileTimer compile_timer;
+
 	const char* target;
-	switch (feature_level)
+	switch (shader_model)
 	{
-		case D3D_FEATURE_LEVEL_10_0:
+		case ShaderModel::SM40:
 		{
 			static constexpr std::array<const char*, 4> targets = {{"vs_4_0", "ps_4_0", "cs_4_0"}};
 			target = targets[static_cast<int>(type)];
 		}
 		break;
 
-		case D3D_FEATURE_LEVEL_11_0:
+		case ShaderModel::SM41:
+		{
+			static constexpr std::array<const char*, 4> targets = {{"vs_4_1", "ps_4_1", "cs_4_1"}};
+			target = targets[static_cast<int>(type)];
+		}
+		break;
+
+		case ShaderModel::SM50:
 		{
 			static constexpr std::array<const char*, 4> targets = {{"vs_5_0", "ps_5_0", "cs_5_0"}};
 			target = targets[static_cast<int>(type)];
 		}
 		break;
 
-		case D3D_FEATURE_LEVEL_11_1:
+		case ShaderModel::SM51:
 		default:
 		{
 			static constexpr std::array<const char*, 4> targets = {{"vs_5_1", "ps_5_1", "cs_5_1"}};

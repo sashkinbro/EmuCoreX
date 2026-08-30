@@ -11,6 +11,11 @@ void cpuinfo_arm_decode_vendor_uarch(
 #endif /* CPUINFO_ARCH_ARM */
 	enum cpuinfo_vendor vendor[RESTRICT_STATIC 1],
 	enum cpuinfo_uarch uarch[RESTRICT_STATIC 1]) {
+	/* Ensure the out-parameters are always initialized, including for
+	 * implementers that are not handled in the switch below. */
+	*vendor = cpuinfo_vendor_unknown;
+	*uarch = cpuinfo_uarch_unknown;
+
 	switch (midr_get_implementer(midr)) {
 		case 'A':
 			*vendor = cpuinfo_vendor_arm;
@@ -141,17 +146,20 @@ void cpuinfo_arm_decode_vendor_uarch(
 				case 0xD87: /* Cortex-A725 */
 					*uarch = cpuinfo_uarch_cortex_a725;
 					break;
-				case 0xD8C:
-					*uarch = cpuinfo_uarch_lumex_c1_ultra;
-					break;
-				case 0xD90:
-					*uarch = cpuinfo_uarch_lumex_c1_premium;
+				case 0xD8A:
+					*uarch = cpuinfo_uarch_lumex_c1_nano;
 					break;
 				case 0xD8B:
 					*uarch = cpuinfo_uarch_lumex_c1_pro;
 					break;
-				case 0xD8A:
-					*uarch = cpuinfo_uarch_lumex_c1_nano;
+				case 0xD8C:
+					*uarch = cpuinfo_uarch_lumex_c1_ultra;
+					break;
+				case 0xD8F: /* Cortex-A320 */
+					*uarch = cpuinfo_uarch_cortex_a320;
+					break;
+				case 0xD90:
+					*uarch = cpuinfo_uarch_lumex_c1_premium;
 					break;
 				default:
 					switch (midr_get_part(midr) >> 8) {
@@ -433,6 +441,50 @@ void cpuinfo_arm_decode_vendor_uarch(
 						" ignored",
 						midr_get_variant(midr),
 						midr_get_part(midr));
+			}
+			break;
+		case 'a':
+			*vendor = cpuinfo_vendor_apple;
+			switch (midr_get_part(midr)) {
+				case 0x022:
+				case 0x024:
+				case 0x028:
+					*uarch = cpuinfo_uarch_icestorm;
+					break;
+				case 0x023:
+				case 0x025:
+				case 0x029:
+					*uarch = cpuinfo_uarch_firestorm;
+					break;
+				case 0x032:
+				case 0x034:
+				case 0x038:
+					*uarch = cpuinfo_uarch_blizzard;
+					break;
+				case 0x033:
+				case 0x035:
+				case 0x039:
+					*uarch = cpuinfo_uarch_avalanche;
+					break;
+				case 0x042:
+				case 0x044:
+				case 0x048:
+					*uarch = cpuinfo_uarch_coll_sawtooth;
+					break;
+				case 0x043:
+				case 0x045:
+				case 0x049:
+					*uarch = cpuinfo_uarch_coll_everest;
+					break;
+				case 0x052:
+					*uarch = cpuinfo_uarch_donan_sawtooth;
+					break;
+				case 0x053:
+					*uarch = cpuinfo_uarch_donan_everest;
+					break;
+				default:
+					cpuinfo_log_warning(
+						"unknown Apple CPU part 0x%03" PRIx32 " ignored", midr_get_part(midr));
 			}
 			break;
 #if CPUINFO_ARCH_ARM

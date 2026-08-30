@@ -392,7 +392,7 @@
     <string name="settings_about">Hakkında</string>
     <string name="settings_version">Sürüm</string>
     <string name="settings_emulator_core">Emülasyon Çekirdeği</string>
-    <string name="settings_emulator_core_desc">PCSX2 tabanlı (2.7.316)</string>
+    <string name="settings_emulator_core_desc">PCSX2 tabanlı (2.8.0)</string>
     <string name="settings_about_app">EmuCoreX Hakkında</string>
     <string name="settings_about_app_desc">EmuCoreX, hızlı kurulum, temiz gezinme ve el konsolu dostu bir deneyim sunan, PCSX2 tabanlı bir emülasyon çekirdeği etrafında oluşturulmuş bir PlayStation 2 kütüphanesi ve başlatıcısıdır.</string>
     <string name="settings_about_studio">Geliştirici</string>

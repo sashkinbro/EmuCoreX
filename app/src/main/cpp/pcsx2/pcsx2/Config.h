@@ -384,9 +384,8 @@ enum class GSDumpCompressionMethod : u8
 enum class SavestateCompressionMethod : u8
 {
 	Uncompressed = 0,
-	Deflate64 = 1,
-	Zstandard = 2,
-	LZMA2 = 3
+	Deflate = 1,
+	Zstandard = 2
 };
 
 enum class SavestateCompressionLevel : u8
@@ -792,6 +791,7 @@ struct Pcsx2Config
 					OsdShowCPU : 1,
 					OsdShowGPU : 1,
 					OsdShowGPUDebug : 1,
+					OsdShowGPUStats : 1,
 					OsdShowIndicators : 1,
 					OsdShowFrameTimes : 1,
 					OsdShowHardwareInfo : 1,
@@ -810,7 +810,7 @@ struct Pcsx2Config
 					PreloadFrameWithGSData : 1,
 					Mipmap : 1,
 					HWMipmap : 1,
-					HWAccurateAlphaTest: 1,
+					HWAccurateAlphaTest : 1,
 					HWAA1 : 1,
 					HWROV : 1,
 					HWROVLogging : 1,

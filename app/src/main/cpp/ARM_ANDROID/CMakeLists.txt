@@ -40,14 +40,14 @@ function(emucorex_verify_upstream_file relative_path expected_sha256)
 	file(SHA256 "${_path}" _actual_sha256)
 	if(NOT _actual_sha256 STREQUAL expected_sha256)
 		message(FATAL_ERROR
-			"PCSX2 upstream file ${relative_path} does not match v2.7.316. "
+			"PCSX2 upstream file ${relative_path} does not match v2.8.0. "
 			"Rebase ARM_ANDROID/src/integration before changing the pinned source. "
 			"Expected ${expected_sha256}, got ${_actual_sha256}.")
 	endif()
 endfunction()
 
-emucorex_verify_upstream_file("pcsx2/Achievements.cpp" "80f6bbdf45e7604dc30ab02d18c8008a606fa8cb29d2859ad0193633a11f08c2")
-emucorex_verify_upstream_file("pcsx2/Achievements.h" "dbdcfe13a8e583ca9f691b4c94d0812a632fa6412bc9d68c0d5cc829b83b5c5c")
+emucorex_verify_upstream_file("pcsx2/Achievements.cpp" "42a9b7db072c04b6799cde71d37d703b79f2dc0557c29b6b92628599bf7630da")
+emucorex_verify_upstream_file("pcsx2/Achievements.h" "9cdcb4d7957a2af743f2d8fcb3de42433b35f75b209d25a60ab1eb1bbf3442ff")
 emucorex_verify_upstream_file("pcsx2/Host.cpp" "4c6b27e56f8c1887f8c7411348cf667070b8aad9a2266cf8a76246c315e839e4")
 
 if(EMUCOREX_LINK_UPSTREAM_PCSX2)
@@ -75,14 +75,14 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 	endif()
 	file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/common/include")
 	file(WRITE "${CMAKE_BINARY_DIR}/common/include/svnrev.h"
-		"#define GIT_HASH \"53e3838c1dd59f611fa3d2fd36915903a1304c6e\"\n"
-		"#define GIT_TAG \"v2.7.316\"\n"
-		"#define GIT_DATE \"2026-05-06\"\n"
-		"#define GIT_REV \"v2.7.316\"\n"
+		"#define GIT_HASH \"c10a5c9ad951c517dc48b722b5b84eb9bf7fdb42\"\n"
+		"#define GIT_TAG \"v2.8.0\"\n"
+		"#define GIT_DATE \"2026-08-28\"\n"
+		"#define GIT_REV \"v2.8.0\"\n"
 		"#define GIT_TAGGED_COMMIT 1\n"
 		"#define GIT_TAG_HI 2\n"
-		"#define GIT_TAG_MID 7\n"
-		"#define GIT_TAG_LO 316\n"
+		"#define GIT_TAG_MID 8\n"
+		"#define GIT_TAG_LO 0\n"
 	)
 
 	function(fixup_file_properties target)
@@ -352,8 +352,8 @@ if(EMUCOREX_HAS_CAPSTONE)
 endif()
 target_compile_definitions(emucore
 	PRIVATE
-		EMUCOREX_PCSX2_TAG="v2.7.316"
-		EMUCOREX_PCSX2_COMMIT="53e3838c1dd59f611fa3d2fd36915903a1304c6e"
+		EMUCOREX_PCSX2_TAG="v2.8.0"
+		EMUCOREX_PCSX2_COMMIT="c10a5c9ad951c517dc48b722b5b84eb9bf7fdb42"
 		EMUCOREX_HAS_OAKNUT=${EMUCOREX_HAS_OAKNUT}
 		EMUCOREX_HAS_CAPSTONE=${EMUCOREX_HAS_CAPSTONE}
 )

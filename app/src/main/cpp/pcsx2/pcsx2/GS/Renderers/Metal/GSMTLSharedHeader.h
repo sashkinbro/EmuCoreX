@@ -135,6 +135,11 @@ struct GSMTLMainPSUniform
 	matrix_float4x4 dither_matrix;
 
 	vector_float4 scale_factor;
+
+	float line_cov_scale;
+	float _pad0;
+	float _pad1;
+	float _pad2;
 };
 
 enum GSMTLAttributes
@@ -158,6 +163,8 @@ enum class GSMTLExpandType : unsigned char
 
 enum GSMTLFnConstants
 {
+	GSMTLConstantIndex_BILN,
+	GSMTLConstantIndex_DEPTH_OUT,
 	GSMTLConstantIndex_CAS_SHARPEN_ONLY,
 	GSMTLConstantIndex_FRAMEBUFFER_FETCH,
 	GSMTLConstantIndex_FST,

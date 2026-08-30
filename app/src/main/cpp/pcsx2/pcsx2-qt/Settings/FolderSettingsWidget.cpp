@@ -19,12 +19,12 @@ FolderSettingsWidget::FolderSettingsWidget(SettingsWindow* settings_dialog, QWid
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.organizeSnapshotsByGame, "EmuCore/GS", "OrganizeScreenshotsByGame", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.organizeVideoDumpByGame, "EmuCore/GS", "OrganizeVideoCaptureByGame", false);
 	SettingWidgetBinder::BindWidgetToFolderSetting(sif, m_ui.saveStates, m_ui.saveStatesBrowse, m_ui.saveStatesOpen, m_ui.saveStatesReset,
-		"Folders", "SaveStates", Path::Combine(EmuFolders::DataRoot, "sstates"));
+		"Folders", "Savestates", Path::Combine(EmuFolders::DataRoot, "sstates"));
 	SettingWidgetBinder::BindWidgetToFolderSetting(sif, m_ui.videoDumpingDirectory, m_ui.videoDumpingDirectoryBrowse, m_ui.videoDumpingDirectoryOpen, m_ui.videoDumpingDirectoryReset,
 		"Folders", "Videos", Path::Combine(EmuFolders::DataRoot, "videos"));
-	dialog()->registerWidgetHelp(m_ui.organizeSnapshotsByGame, tr("Organize Snapshots by Game"), tr("Unchecked"),
+	dialog()->registerWidgetHelp(m_ui.organizeSnapshotsByGame, tr("Save Snapshots in Game-Specific Folders"), tr("Unchecked"),
 		tr("Saves snapshots to per-game subfolders instead of a shared folder."));
-	dialog()->registerWidgetHelp(m_ui.organizeVideoDumpByGame, tr("Organize Video Recordings by Game"), tr("Unchecked"),
+	dialog()->registerWidgetHelp(m_ui.organizeVideoDumpByGame, tr("Save Video Recordings in Game-Specific Folders"), tr("Unchecked"),
 		tr("Saves video recordings to per-game subfolders instead of a shared folder."));
 }
 

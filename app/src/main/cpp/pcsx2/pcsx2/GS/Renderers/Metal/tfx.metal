@@ -135,6 +135,13 @@ struct MainPSIn
 	float4 fc [[flat, function_constant(NOT_IIP)]];
 };
 
+struct MainResult
+{
+	float4 c0;
+	float4 c1;
+	float depth;
+};
+
 struct MainPSOut
 {
 	float4 c0 [[color(0), index(0), function_constant(PS_COLOR0)]];
@@ -210,6 +217,119 @@ static MainVSIn load_vertex(GSMTLMainVertex base)
 	out.uv = uint2(base.uv);
 	out.f = float4(static_cast<float>(base.fog) / 255.f);
 	return out;
+}
+
+// Convert XY from NDC to GS pixel coordinates (i.e. 1.0 = 1 GS pixel).
+static float2 get_xy_unscaled(float2 xy, constant GSMTLMainVSUniform& cb [[buffer(GSMTLBufferIndexHWUniforms)]])
+{
+	return round(xy / cb.vertex_scale) / 16.0f;
+}
+
+// Get the XY deltas in GS pixel coordinates, using first vertex as the origin.
+static float2x2 get_xy_deltas_unscaled(thread const MainVSOut& v0, thread const MainVSOut& v1, thread const MainVSOut& v2,
+	constant GSMTLMainVSUniform& cb [[buffer(GSMTLBufferIndexHWUniforms)]])
+{
+	float2 xy0 = get_xy_unscaled(v0.p.xy, cb);
+	float2 xy1 = get_xy_unscaled(v1.p.xy, cb);
+	float2 xy2 = get_xy_unscaled(v2.p.xy, cb);
+	return float2x2(xy1 - xy0, xy2 - xy0);
+}
+
+// Get the AA1 outward expand direction to the edge formed by the first two vertices.
+// This is up or down for shallow (X dominant) edges, and right or left for steep (Y dominant) edges.
+// Similar expansion to line AA1 except instead of expanding on both sides of the line,
+// expand on on the side towards the outside of the triangle.
+float2 get_aa1_triangle_expand_dir(thread const MainVSOut& v0, thread const MainVSOut& v1, thread const MainVSOut& v2,
+	constant GSMTLMainVSUniform& cb [[buffer(GSMTLBufferIndexHWUniforms)]])
+{
+	float2x2 xy_deltas = get_xy_deltas_unscaled(v0, v1, v2, cb);
+	float2 line_delta = xy_deltas[0];
+	float2 line_opposite = xy_deltas[1];
+
+	float2 line_normal = float2(line_delta.y, -line_delta.x);
+	float2 line_expand = abs(line_delta.x) >= abs(line_delta.y) ? float2(0.0f, 1.0f) : float2(1.0f, 0.0f);
+
+	if ((dot(line_expand, line_normal) >= 0.0f) == (dot(line_opposite, line_normal) >= 0.0f))
+	{
+		// Expand direction point towards the interior so flip it.
+		line_expand = -line_expand;
+	}
+
+	return line_expand;
+}
+
+float2x2 get_inverse(const thread float2x2& mat, float det)
+{
+	return float2x2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1 / det);
+}
+
+// Extrapolate triangle attributes from the first vertex along the given direction.
+// dp_mat is derived from the input vertices, it is passed in to avoid recomputing.
+void extrapolate_aa1_triangle_edge(thread MainVSOut& v0, thread const MainVSOut& v1, thread const MainVSOut& v2,
+	thread const float2x2& dp_mat, float2 dp, constant GSMTLMainVSUniform& cb [[buffer(GSMTLBufferIndexHWUniforms)]])
+{
+	// Get texture deltas
+	float2x2 dt;
+	if (FST)
+	{
+		dt = float2x2(v1.ti.zw - v0.ti.zw, v2.ti.zw - v0.ti.zw);
+	}
+	else
+	{
+		dt = float2x2(v1.t.xy - v0.t.xy, v2.t.xy - v0.t.xy);
+	}
+
+	// Get color delta if interpolating
+	float2x4 dc;
+	if (IIP)
+	{
+		dc = float2x4(v1.c - v0.c, v2.c - v0.c);
+	}
+
+	float2 dz = float2(v1.p.z - v0.p.z, v2.p.z - v0.p.z); // Z deltas
+
+	float2 df = float2(v1.t.z - v0.t.z, v2.t.z - v0.t.z); // Fog deltas
+
+	float2 dq = float2(v1.t.w - v0.t.w, v2.t.w - v0.t.w); // Q deltas
+
+	// To prevent unstable extrapolation, do not extrapolate if the
+	// minimum perpendicular length of the triangle is < 2 pixels.
+	float dp_det = determinant(dp_mat); // Twice signed triangle area.
+	float len0 = length(dp_mat[0]);
+	float len1 = length(dp_mat[1]);
+	float len2 = length(dp_mat[1] - dp_mat[0]);
+	float min_perp_length = abs(dp_det) / max(max(len0, len1), len2);
+
+	// Get the position -> barycentric weight matrix
+	float2x2 inv_dp_mat = get_inverse(dp_mat, dp_det);
+
+	float2 weights = min_perp_length < 2 ? 0 : inv_dp_mat * dp;
+
+	v0.p.xy += dp * cb.point_size; // Extrapolate position
+
+	// Extrapolate texture coords
+	if (FST)
+	{
+			v0.ti.zw += dt * weights;
+			v0.ti.xy = v0.ti.zw * cb.texture_scale;
+	}
+	else
+	{
+		v0.t.xy += dt * weights;
+		v0.ti.zw = v0.t.xy / cb.texture_scale;
+		v0.t.w += dot(dq, weights);
+	}
+
+	// Extrapolate and clamp color
+	if (IIP)
+	{
+		v0.c += dc * weights;
+		v0.c = clamp(v0.c, 0, 255);
+	}
+
+	v0.p.z += dot(dz, weights); // Extrapolate depth
+
+	v0.t.z += dot(df, weights); // Extrapolate fog
 }
 
 vertex MainVSOut vs_main_expand(
@@ -295,10 +415,36 @@ struct PSMain
 	sampler tex_sampler;
 	float4 current_color;
 	uint prim_id;
+	bool color_discarded = false;
+	bool depth_discarded = false;
 	const thread MainPSIn& in;
 	constant GSMTLMainPSUniform& cb;
 
 	PSMain(const thread MainPSIn& in, constant GSMTLMainPSUniform& cb): in(in), cb(cb) {}
+
+	void discard()
+	{
+		if (PS_ROV_COLOR || PS_ROV_DEPTH != ROV_DEPTH::NONE)
+			color_discarded = depth_discarded = true;
+		else
+			discard_fragment();
+	}
+
+	void discard_color(thread float4& output)
+	{
+		if (PS_ROV_COLOR)
+			color_discarded = true;
+		else
+			output = current_color;
+	}
+
+	void discard_depth(thread float& output)
+	{
+		if (PS_ROV_DEPTH == ROV_DEPTH::READ_WRITE)
+			depth_discarded = true;
+		else
+			output = current_depth;
+	}
 
 	template <typename... Args>
 	float4 sample_tex(Args... args)
@@ -1053,14 +1199,14 @@ struct PSMain
 		}
 	}
 
-	MainPSOut ps_main()
+	MainResult ps_main()
 	{
 		MainPSOut out = {};
 
 		if (PS_SCANMSK & 2)
 		{
 			if ((uint(in.p.y) & 1) == (PS_SCANMSK & 1))
-				discard_fragment();
+				discard();
 		}
 
 		if (PS_DATE >= 5)
@@ -1070,7 +1216,7 @@ struct PSMain
 			bool bad = PS_RTA_CORRECTION ? ((PS_DATE & 3) == 1 ? (rt_a > (254.5f / 255.f)) : (rt_a < (254.5f / 255.f))) : ((PS_DATE & 3) == 1 ? (rt_a > 0.5) : (rt_a < 0.5));
 
 			if (bad)
-				discard_fragment();
+				discard();
 		}
 
 		if (PS_DATE == 3)
@@ -1079,7 +1225,7 @@ struct PSMain
 			// Note prim_id == stencil_ceil will be the primitive that will update
 			// the bad alpha value so we must keep it.
 			if (float(prim_id) > stencil_ceil)
-				discard_fragment();
+				discard();
 		}
 
 		float4 C = ps_color();
@@ -1202,14 +1348,14 @@ struct PSMain
 		if (PS_AFAIL == 3) // RGB_ONLY
 			alpha_blend.a = float(atst_pass);
 
-		if (PS_COLOR0)
+		if (!PS_NO_COLOR)
 		{
 			out.c0.a = PS_RTA_CORRECTION ? C.a / 128.f : C.a / 255.f;
 			out.c0.rgb = PS_COLCLIP_HW ? float3(C.rgb / 65535.f) : C.rgb / 255.f;
 			if (PS_AFAIL == 3 && !PS_COLOR1 && !atst_pass) // Doing RGB_ONLY without COLOR1
 				out.c0.a = current_color.a;
 		}
-		if (PS_COLOR1)
+		if (!PS_NO_COLOR1)
 			out.c1 = alpha_blend;
 		
 		float depth_value = PS_ZFLOOR ? (floor(in.p.z * exp2(32.0f)) * exp2(-32.0f)) : in.p.z;
@@ -1268,18 +1414,78 @@ fragment MainPSOut ps_main(
 
 	if (NEEDS_RT)
 	{
+		if (PS_ROV_COLOR)
+		{
+			if (ROV_NEEDS_R32)
+				main.current_color = unpack_unorm4x8_to_float(rt_u32.read(coord).x);
+			else
+				main.current_color = rt_rov.read(coord);
+		}
+		else
+		{
 #if FBFETCH_SUPPORT
 		main.current_color = HAS_FBFETCH ? rt_fbf : rt.read(uint2(in.p.xy));
 #else
 		main.current_color = rt.read(uint2(in.p.xy));
 #endif
+		}
 	}
 	else
 	{
 		main.current_color = 0;
 	}
 
-	return main.ps_main();
+	MainResult out = main.ps_main();
+	if (PS_ROV_DEPTH == ROV_DEPTH::READ_WRITE && !main.depth_discarded)
+		ds_rov.write(out.depth, coord);
+	if (PS_ROV_COLOR && !main.color_discarded)
+	{
+		if (!PS_FBMASK)
+			out.c0 = select(out.c0, main.current_color, cb.fbmask == 0xff);
+		if (ROV_NEEDS_R32)
+			rt_u32.write(pack_float_to_unorm4x8(out.c0), coord);
+		else
+			rt_rov.write(out.c0, coord);
+	}
+	return out;
+}
+
+// Metal doesn't let you toggle eft with function constants so we need a separate function for it
+[[early_fragment_tests]]
+fragment void ps_main_rov_eft(
+	MainPSIn in [[stage_in]],
+	constant GSMTLMainPSUniform& cb [[buffer(GSMTLBufferIndexHWUniforms)]],
+	sampler s [[sampler(0)]],
+	texture2d<float> tex     [[texture(GSMTLTextureIndexTex),     function_constant(PS_TEX_IS_COLOR)]],
+	depth2d<float>   depth   [[texture(GSMTLTextureIndexTex),     function_constant(PS_TEX_IS_DEPTH)]],
+	texture2d<float> palette [[texture(GSMTLTextureIndexPalette), function_constant(PS_HAS_PALETTE)]],
+	texture2d<float, access::read_write> rt_rov [[texture(GSMTLTextureIndexRenderTarget), raster_order_group(0), function_constant(NEEDS_RT_ROV)]],
+	texture2d<uint,  access::read_write> rt_u32 [[texture(GSMTLTextureIndexRenderTarget), raster_order_group(0), function_constant(NEEDS_RT_U32)]])
+{
+	PSMain main(in, cb);
+	main.tex_sampler = s;
+	if (PS_TEX_IS_COLOR)
+		main.tex = tex;
+	else
+		main.tex_depth = depth;
+	if (PS_HAS_PALETTE)
+		main.palette = palette;
+
+	uint2 coord = uint2(in.p.xy);
+	if (ROV_NEEDS_R32)
+		main.current_color = unpack_unorm4x8_to_float(rt_u32.read(coord).x);
+	else
+		main.current_color = rt_rov.read(coord);
+	MainPSOut out = main.ps_main();
+	if (!main.color_discarded)
+	{
+		if (!PS_FBMASK)
+			out.c0 = select(out.c0, main.current_color, cb.fbmask == 0xff);
+		if (ROV_NEEDS_R32)
+			rt_u32.write(pack_float_to_unorm4x8(out.c0), coord);
+		else
+			rt_rov.write(out.c0, coord);
+	}
 }
 
 #if PRIMID_SUPPORT

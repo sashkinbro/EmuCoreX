@@ -36,6 +36,7 @@ enum cpuinfo_arm_chipset_vendor {
 	cpuinfo_arm_chipset_vendor_texas_instruments,
 	cpuinfo_arm_chipset_vendor_unisoc,
 	cpuinfo_arm_chipset_vendor_wondermedia,
+	cpuinfo_arm_chipset_vendor_google,
 	cpuinfo_arm_chipset_vendor_max,
 };
 
@@ -45,6 +46,7 @@ enum cpuinfo_arm_chipset_series {
 	cpuinfo_arm_chipset_series_qualcomm_msm,
 	cpuinfo_arm_chipset_series_qualcomm_apq,
 	cpuinfo_arm_chipset_series_qualcomm_snapdragon,
+	cpuinfo_arm_chipset_series_qualcomm_sm,
 	cpuinfo_arm_chipset_series_mediatek_mt,
 	cpuinfo_arm_chipset_series_samsung_exynos,
 	cpuinfo_arm_chipset_series_hisilicon_k3v,
@@ -72,6 +74,7 @@ enum cpuinfo_arm_chipset_series {
 	cpuinfo_arm_chipset_series_unisoc_t,
 	cpuinfo_arm_chipset_series_unisoc_ums,
 	cpuinfo_arm_chipset_series_wondermedia_wm,
+	cpuinfo_arm_chipset_series_google_tensor,
 	cpuinfo_arm_chipset_series_max,
 };
 
