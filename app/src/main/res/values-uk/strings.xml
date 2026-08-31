@@ -1147,7 +1147,7 @@
     <string name="texture_manager_loading">Завантаження пакетів текстур…</string>
     <string name="texture_manager_options">Параметри виконання</string>
     <string name="texture_manager_enable_replacements">Завантажувати текстури для заміни</string>
-    <string name="texture_manager_enable_replacements_desc">Використовувати файли PNG та DDS з папки з серійним номером кожної гри.</string>
+    <string name="texture_manager_enable_replacements_desc">Використовувати файли PNG та DDS / KTX2 з папки з серійним номером кожної гри.</string>
     <string name="texture_manager_async_loading">Асинхронне завантаження</string>
     <string name="texture_manager_async_loading_desc">Завантажувати текстури для заміни в робочому потоці під час гри.</string>
     <string name="texture_manager_precache">Передкешування замін</string>
@@ -2650,4 +2650,26 @@
     <string name="home_hidden_show">Показати</string>
     <string name="home_hidden_show_all">Показати всі</string>
     <string name="home_hidden_update_failed">Не вдалося змінити видимість елементів. Спробуйте ще раз.</string>
+    <string name="texture_opt_title">Стиснення текстур</string>
+    <string name="texture_opt_description">Виберіть формат для нових імпортів і завантажень. Встановлені пакети не зміняться.</string>
+    <string name="texture_opt_none">Без конвертації</string>
+    <string name="texture_opt_quality_help">Більші блоки ASTC потребують менше GPU-пам\'яті, але можуть втрачати дрібні деталі. 4×4 — акцент на якості; 6×6 — баланс розміру й деталей; 8×8 і більше — сильніше стиснення. Кодування потребує часу й заряду. Щоб змінити якість оптимізованого пакета, імпортуйте оригінал знову.</string>
+    <string name="texture_opt_original_quality">Зберегти оригінальні PNG/DDS без додаткової втрати якості.</string>
+    <string name="texture_opt_memory">%1$s біт/піксель · приблизно %2$s%% пам\'яті RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d текстур · %3$d%%</string>
+    <string name="texture_opt_eta">Залишилося: %1$s</string>
+    <string name="texture_opt_elapsed">Минуло: %1$s</string>
+    <string name="texture_opt_skipped">%1$d текстур збережено в оригінальному форматі.</string>
+    <string name="texture_opt_failed_safe">Встановлення не вдалося. Попередній пакет збережено. Перевірте вільне місце й доступ до архіву та повторіть.</string>
+    <string name="texture_opt_background">Діалог можна закрити. Робота триватиме у фоні.</string>
+    <string name="texture_opt_resume">Продовжити</string>
+    <string name="texture_opt_preparing">Підготовка текстур</string>
+    <string name="texture_opt_running">Оптимізація текстур</string>
+    <string name="texture_opt_waiting">Очікування закриття гри</string>
+    <string name="texture_opt_optimize">Оптимізувати пакет</string>
+    <string name="texture_opt_choose_quality">Спочатку виберіть якість ASTC у налаштуваннях стиснення.</string>
+    <string name="texture_opt_busy">Інша операція з текстурами вже виконується або призупинена.</string>
+    <string name="texture_opt_unsupported">Пристрій не підтримує ASTC. Виберіть режим без конвертації.</string>
+    <string name="texture_opt_paused_hint">Прогрес збережено. Продовжуйте, коли буде зручно.</string>
+    <string name="texture_opt_original_required">Щоб змінити стиснення, імпортуйте оригінальний пакет знову. Уже стиснені текстури повторно не стискаються.</string>
 </resources>

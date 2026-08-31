@@ -784,7 +784,7 @@
     <string name="texture_manager_loading">در حال بارگذاری بسته‌های بافت…</string>
     <string name="texture_manager_options">گزینه‌های زمان اجرا</string>
     <string name="texture_manager_enable_replacements">بارگذاری بافت‌های جایگزین</string>
-    <string name="texture_manager_enable_replacements_desc">استفاده از فایل‌های PNG و DDS از پوشه سریال هر بازی.</string>
+    <string name="texture_manager_enable_replacements_desc">استفاده از فایل‌های PNG و DDS / KTX2 از پوشه سریال هر بازی.</string>
     <string name="texture_manager_async_loading">بارگذاری ناهمگام (Async)</string>
     <string name="texture_manager_async_loading_desc">بارگذاری بافت‌های جایگزین در یک رشته کاری در حین اجرای بازی.</string>
     <string name="texture_manager_precache">پیش‌بارگذاری جایگزین‌ها</string>
@@ -2661,4 +2661,26 @@
     <string name="home_hidden_show">نمایش</string>
     <string name="home_hidden_show_all">نمایش همه</string>
     <string name="home_hidden_update_failed">تغییر وضعیت نمایش موارد ممکن نشد. دوباره تلاش کنید.</string>
+    <string name="texture_opt_title">فشرده‌سازی بافت</string>
+    <string name="texture_opt_description">قالب واردکردن و دانلودهای جدید را انتخاب کنید. بسته‌های نصب‌شده تغییر نمی‌کنند.</string>
+    <string name="texture_opt_none">بدون تبدیل</string>
+    <string name="texture_opt_quality_help">بلوک‌های بزرگ‌تر ASTC حافظهٔ گرافیکی کمتری مصرف می‌کنند اما ممکن است جزئیات را از دست بدهند. 4×4 کیفیت‌محور است؛ 6×6 اندازه و جزئیات را متعادل می‌کند؛ 8×8 و بزرگ‌تر فشرده‌تر است. رمزگذاری زمان و باتری مصرف می‌کند. برای تغییر کیفیت، اصل بسته را دوباره وارد کنید.</string>
+    <string name="texture_opt_original_quality">نگهداری PNG/DDS اصلی بدون افت کیفیت اضافی.</string>
+    <string name="texture_opt_memory">%1$s بیت/پیکسل · حدود %2$s%% حافظهٔ RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d بافت · %3$d%%</string>
+    <string name="texture_opt_eta">زمان باقی‌مانده: %1$s</string>
+    <string name="texture_opt_elapsed">زمان سپری‌شده: %1$s</string>
+    <string name="texture_opt_skipped">%1$d بافت در قالب اصلی نگه داشته شد.</string>
+    <string name="texture_opt_failed_safe">نصب ناموفق بود. بستهٔ قبلی حفظ شد. فضای آزاد و دسترسی به بایگانی را بررسی و دوباره تلاش کنید.</string>
+    <string name="texture_opt_background">می‌توانید این پنجره را ببندید. کار در پس‌زمینه ادامه می‌یابد.</string>
+    <string name="texture_opt_resume">ادامه</string>
+    <string name="texture_opt_preparing">در حال آماده‌سازی بافت‌ها</string>
+    <string name="texture_opt_running">در حال بهینه‌سازی بافت‌ها</string>
+    <string name="texture_opt_waiting">در انتظار بسته‌شدن بازی</string>
+    <string name="texture_opt_optimize">بهینه‌سازی بسته</string>
+    <string name="texture_opt_choose_quality">ابتدا کیفیت ASTC را در تنظیمات فشرده‌سازی انتخاب کنید.</string>
+    <string name="texture_opt_busy">عملیات دیگری برای بافت‌ها در حال اجرا یا متوقف است.</string>
+    <string name="texture_opt_unsupported">این دستگاه از ASTC پشتیبانی نمی‌کند. بدون تبدیل را انتخاب کنید.</string>
+    <string name="texture_opt_paused_hint">پیشرفت ذخیره شد. هر زمان آماده بودید ادامه دهید.</string>
+    <string name="texture_opt_original_required">برای تغییر فشرده‌سازی، بستهٔ اصلی را دوباره وارد کنید. بافت‌های فشرده‌شده دوباره فشرده نمی‌شوند.</string>
 </resources>

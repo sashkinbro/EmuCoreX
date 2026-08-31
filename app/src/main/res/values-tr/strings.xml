@@ -1117,7 +1117,7 @@
     <string name="texture_manager_loading">Doku paketleri yükleniyor…</string>
     <string name="texture_manager_options">Çalışma Zamanı Seçenekleri</string>
     <string name="texture_manager_enable_replacements">Değiştirme dokularını yükle</string>
-    <string name="texture_manager_enable_replacements_desc">Her oyun seri klasöründeki PNG ve DDS dosyalarını kullanın.</string>
+    <string name="texture_manager_enable_replacements_desc">Her oyun seri klasöründeki PNG ve DDS / KTX2 dosyalarını kullanın.</string>
     <string name="texture_manager_async_loading">Eşzamansız yükleme</string>
     <string name="texture_manager_async_loading_desc">Oyun çalışırken değiştirme dokularını bir çalışan iş parçacığına yükleyin.</string>
     <string name="texture_manager_precache">Değiştirmeleri önbelleğe al</string>
@@ -2646,4 +2646,26 @@
     <string name="home_hidden_show">Göster</string>
     <string name="home_hidden_show_all">Tümünü göster</string>
     <string name="home_hidden_update_failed">Öğelerin görünürlüğü değiştirilemedi. Lütfen tekrar deneyin.</string>
+    <string name="texture_opt_title">Doku sıkıştırma</string>
+    <string name="texture_opt_description">Yeni içe aktarımlar ve indirmeler için biçim seçin. Yüklü paketler değişmez.</string>
+    <string name="texture_opt_none">Dönüştürme yok</string>
+    <string name="texture_opt_quality_help">Büyük ASTC blokları daha az GPU belleği kullanır ancak ince ayrıntılar kaybolabilir. 4×4 kaliteye öncelik verir; 6×6 boyut ve ayrıntıyı dengeler; 8×8 ve üstü daha güçlü sıkıştırır. Kodlama zaman ve pil harcar. Kaliteyi değiştirmek için orijinali yeniden içe aktarın.</string>
+    <string name="texture_opt_original_quality">Orijinal PNG/DDS dosyalarını ek kalite kaybı olmadan koruyun.</string>
+    <string name="texture_opt_memory">%1$s bit/piksel · RGBA8 belleğinin yaklaşık %2$s%% kadarı</string>
+    <string name="texture_opt_progress">%1$d / %2$d doku · %3$d%%</string>
+    <string name="texture_opt_eta">Kalan: %1$s</string>
+    <string name="texture_opt_elapsed">Geçen: %1$s</string>
+    <string name="texture_opt_skipped">%1$d doku orijinal biçiminde korundu.</string>
+    <string name="texture_opt_failed_safe">Kurulum başarısız. Önceki paket korundu. Boş alanı ve arşiv erişimini kontrol edip tekrar deneyin.</string>
+    <string name="texture_opt_background">Bu pencereyi kapatabilirsiniz. İşlem arka planda sürer.</string>
+    <string name="texture_opt_resume">Sürdür</string>
+    <string name="texture_opt_preparing">Dokular hazırlanıyor</string>
+    <string name="texture_opt_running">Dokular optimize ediliyor</string>
+    <string name="texture_opt_waiting">Oyunun kapanması bekleniyor</string>
+    <string name="texture_opt_optimize">Paketi optimize et</string>
+    <string name="texture_opt_choose_quality">Önce sıkıştırma ayarlarında bir ASTC kalitesi seçin.</string>
+    <string name="texture_opt_busy">Başka bir doku işlemi çalışıyor veya duraklatılmış.</string>
+    <string name="texture_opt_unsupported">Bu cihaz ASTC desteklemiyor. Dönüştürme yok seçeneğini seçin.</string>
+    <string name="texture_opt_paused_hint">İlerleme kaydedildi. Hazır olduğunuzda devam edin.</string>
+    <string name="texture_opt_original_required">Sıkıştırmayı değiştirmek için orijinal paketi yeniden içe aktarın. Sıkıştırılmış dokular tekrar sıkıştırılmaz.</string>
 </resources>

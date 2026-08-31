@@ -1117,7 +1117,7 @@
     <string name="texture_manager_loading">टेक्सचर पैक्स लोड हो रहे हैं…</string>
     <string name="texture_manager_options">रनटाइम विकल्प</string>
     <string name="texture_manager_enable_replacements">रिप्लेसमेंट टेक्सचर लोड करें</string>
-    <string name="texture_manager_enable_replacements_desc">प्रत्येक गेम सीरियल फ़ोल्डर से PNG और DDS फ़ाइलों का उपयोग करें।</string>
+    <string name="texture_manager_enable_replacements_desc">प्रत्येक गेम सीरियल फ़ोल्डर से PNG और DDS / KTX2 फ़ाइलों का उपयोग करें।</string>
     <string name="texture_manager_async_loading">एसिंक लोडिंग</string>
     <string name="texture_manager_async_loading_desc">गेम चलने के दौरान वर्कर थ्रेड पर रिप्लेसमेंट टेक्सचर लोड करें।</string>
     <string name="texture_manager_precache">रिप्लेसमेंट को प्रीकैश करें</string>
@@ -2646,4 +2646,26 @@
     <string name="home_hidden_show">दिखाएँ</string>
     <string name="home_hidden_show_all">सभी दिखाएँ</string>
     <string name="home_hidden_update_failed">आइटम की दृश्यता नहीं बदली जा सकी। कृपया फिर से कोशिश करें।</string>
+    <string name="texture_opt_title">टेक्सचर संपीड़न</string>
+    <string name="texture_opt_description">नए आयात और डाउनलोड का फ़ॉर्मैट चुनें। पहले से इंस्टॉल पैक नहीं बदलेंगे।</string>
+    <string name="texture_opt_none">रूपांतरण नहीं</string>
+    <string name="texture_opt_quality_help">बड़े ASTC ब्लॉक कम GPU मेमोरी लेते हैं, लेकिन बारीक विवरण खो सकते हैं। 4×4 गुणवत्ता को प्राथमिकता देता है; 6×6 आकार और विवरण का संतुलन है; 8×8 और अधिक में तेज़ संपीड़न होता है। एन्कोडिंग में समय और बैटरी लगती है। गुणवत्ता बदलने के लिए मूल पैक फिर आयात करें।</string>
+    <string name="texture_opt_original_quality">अतिरिक्त गुणवत्ता हानि के बिना मूल PNG/DDS रखें।</string>
+    <string name="texture_opt_memory">%1$s बिट/पिक्सेल · RGBA8 मेमोरी का लगभग %2$s%%</string>
+    <string name="texture_opt_progress">%1$d / %2$d टेक्सचर · %3$d%%</string>
+    <string name="texture_opt_eta">शेष: %1$s</string>
+    <string name="texture_opt_elapsed">बीता समय: %1$s</string>
+    <string name="texture_opt_skipped">%1$d टेक्सचर मूल फ़ॉर्मैट में रखे गए।</string>
+    <string name="texture_opt_failed_safe">इंस्टॉलेशन विफल। पिछला पैक सुरक्षित है। खाली जगह और आर्काइव की पहुँच जाँचकर फिर प्रयास करें।</string>
+    <string name="texture_opt_background">आप यह संवाद बंद कर सकते हैं। काम पृष्ठभूमि में जारी रहेगा।</string>
+    <string name="texture_opt_resume">जारी रखें</string>
+    <string name="texture_opt_preparing">टेक्सचर तैयार हो रहे हैं</string>
+    <string name="texture_opt_running">टेक्सचर अनुकूलित हो रहे हैं</string>
+    <string name="texture_opt_waiting">गेम बंद होने की प्रतीक्षा</string>
+    <string name="texture_opt_optimize">पैक अनुकूलित करें</string>
+    <string name="texture_opt_choose_quality">पहले संपीड़न सेटिंग में ASTC गुणवत्ता चुनें।</string>
+    <string name="texture_opt_busy">टेक्सचर का कोई दूसरा काम चल रहा है या रुका हुआ है।</string>
+    <string name="texture_opt_unsupported">यह डिवाइस ASTC का समर्थन नहीं करता। रूपांतरण नहीं चुनें।</string>
+    <string name="texture_opt_paused_hint">प्रगति सहेज ली गई है। तैयार होने पर जारी रखें।</string>
+    <string name="texture_opt_original_required">संपीड़न बदलने के लिए मूल पैक फिर से आयात करें। पहले से संपीड़ित टेक्सचर दोबारा संपीड़ित नहीं किए जाते।</string>
 </resources>

@@ -125,7 +125,7 @@ object EmulatorStorage {
         return RuntimeDirectories(
             saveStates = directory("sstates"),
             memoryCards = directory("memcards"),
-            textures = directory("textures"),
+            textures = directory("textures").also(com.sbro.emucorex.data.TexturePackTransactions::recover),
             cheats = directory("cheats"),
             patches = directory("patches"),
             logs = directory("logs")

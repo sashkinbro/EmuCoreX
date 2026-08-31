@@ -1070,6 +1070,7 @@ bool GSDeviceOGL::CheckFeatures()
 	}
 
 	m_features.provoking_vertex_last = true;
+	m_features.astc_textures = GLAD_GL_KHR_texture_compression_astc_ldr || GLAD_GL_ES_VERSION_3_2;
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
 	m_features.bptc_textures =
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;

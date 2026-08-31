@@ -1119,7 +1119,7 @@
     <string name="texture_manager_loading">Загрузка пакетов текстур…</string>
     <string name="texture_manager_options">Настройки выполнения</string>
     <string name="texture_manager_enable_replacements">Загружать текстуры для замены</string>
-    <string name="texture_manager_enable_replacements_desc">Использовать файлы PNG и DDS из папки с серийным номером каждой игры.</string>
+    <string name="texture_manager_enable_replacements_desc">Использовать файлы PNG и DDS / KTX2 из папки с серийным номером каждой игры.</string>
     <string name="texture_manager_async_loading">Асинхронная загрузка</string>
     <string name="texture_manager_async_loading_desc">Загружать текстуры для замены в рабочем потоке во время работы игры.</string>
     <string name="texture_manager_precache">Предкэширование замен</string>
@@ -2650,4 +2650,26 @@
     <string name="home_hidden_show">Показать</string>
     <string name="home_hidden_show_all">Показать все</string>
     <string name="home_hidden_update_failed">Не удалось изменить видимость элементов. Попробуйте ещё раз.</string>
+    <string name="texture_opt_title">Сжатие текстур</string>
+    <string name="texture_opt_description">Выберите формат новых импортов и загрузок. Установленные пакеты не изменятся.</string>
+    <string name="texture_opt_none">Без конвертации</string>
+    <string name="texture_opt_quality_help">Большие блоки ASTC занимают меньше GPU-памяти, но могут терять мелкие детали. 4×4 — упор на качество; 6×6 — баланс размера и деталей; 8×8 и больше — сильное сжатие. Кодирование требует времени и заряда. Чтобы изменить качество пакета, импортируйте оригинал снова.</string>
+    <string name="texture_opt_original_quality">Сохранить исходные PNG/DDS без дополнительной потери качества.</string>
+    <string name="texture_opt_memory">%1$s бит/пиксель · около %2$s%% памяти RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d текстур · %3$d%%</string>
+    <string name="texture_opt_eta">Осталось: %1$s</string>
+    <string name="texture_opt_elapsed">Прошло: %1$s</string>
+    <string name="texture_opt_skipped">%1$d текстур сохранено в исходном формате.</string>
+    <string name="texture_opt_failed_safe">Установка не удалась. Предыдущий пакет сохранён. Проверьте свободное место и доступ к архиву и повторите.</string>
+    <string name="texture_opt_background">Диалог можно закрыть. Работа продолжится в фоне.</string>
+    <string name="texture_opt_resume">Продолжить</string>
+    <string name="texture_opt_preparing">Подготовка текстур</string>
+    <string name="texture_opt_running">Оптимизация текстур</string>
+    <string name="texture_opt_waiting">Ожидание закрытия игры</string>
+    <string name="texture_opt_optimize">Оптимизировать пакет</string>
+    <string name="texture_opt_choose_quality">Сначала выберите качество ASTC в настройках сжатия.</string>
+    <string name="texture_opt_busy">Другая операция с текстурами уже выполняется или приостановлена.</string>
+    <string name="texture_opt_unsupported">Устройство не поддерживает ASTC. Выберите режим без конвертации.</string>
+    <string name="texture_opt_paused_hint">Прогресс сохранён. Продолжите, когда будет удобно.</string>
+    <string name="texture_opt_original_required">Чтобы изменить сжатие, импортируйте исходный пакет снова. Уже сжатые текстуры повторно не сжимаются.</string>
 </resources>

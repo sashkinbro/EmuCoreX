@@ -1117,7 +1117,7 @@
     <string name="texture_manager_loading">テクスチャパックを読み込んでいます…</string>
     <string name="texture_manager_options">ランタイムオプション</string>
     <string name="texture_manager_enable_replacements">リプレイスメントテクスチャを読み込む</string>
-    <string name="texture_manager_enable_replacements_desc">各ゲームのシリアルフォルダからPNGおよびDDSファイルを使用します。</string>
+    <string name="texture_manager_enable_replacements_desc">各ゲームのシリアルフォルダからPNGおよびDDS / KTX2ファイルを使用します。</string>
     <string name="texture_manager_async_loading">非同期ロード</string>
     <string name="texture_manager_async_loading_desc">ゲーム実行中にワーカースレッドでリプレイスメントテクスチャを読み込みます。</string>
     <string name="texture_manager_precache">リプレイスメントを事前キャッシュ</string>
@@ -2645,4 +2645,26 @@
     <string name="home_hidden_show">表示</string>
     <string name="home_hidden_show_all">すべて表示</string>
     <string name="home_hidden_update_failed">項目の表示状態を変更できませんでした。もう一度お試しください。</string>
+    <string name="texture_opt_title">テクスチャ圧縮</string>
+    <string name="texture_opt_description">新しいインポートとダウンロードの形式を選択します。インストール済みパックは変更されません。</string>
+    <string name="texture_opt_none">変換しない</string>
+    <string name="texture_opt_quality_help">ASTCのブロックが大きいほどGPUメモリを節約できますが、細部が失われる場合があります。4×4は画質重視、6×6は容量と画質のバランス、8×8以上は高圧縮です。エンコードには時間と電力が必要です。画質を変更するには元のパックを再インポートしてください。</string>
+    <string name="texture_opt_original_quality">追加の画質低下なしで元のPNG/DDSを保持します。</string>
+    <string name="texture_opt_memory">%1$s ビット/ピクセル · RGBA8の約%2$s%%のメモリ</string>
+    <string name="texture_opt_progress">%1$d / %2$d テクスチャ · %3$d%%</string>
+    <string name="texture_opt_eta">残り時間：%1$s</string>
+    <string name="texture_opt_elapsed">経過時間：%1$s</string>
+    <string name="texture_opt_skipped">%1$d 個のテクスチャを元の形式で保持しました。</string>
+    <string name="texture_opt_failed_safe">インストールに失敗しました。以前のパックは保持されています。空き容量とアーカイブへのアクセスを確認して再試行してください。</string>
+    <string name="texture_opt_background">このダイアログを閉じても処理はバックグラウンドで続きます。</string>
+    <string name="texture_opt_resume">再開</string>
+    <string name="texture_opt_preparing">テクスチャを準備中</string>
+    <string name="texture_opt_running">テクスチャを最適化中</string>
+    <string name="texture_opt_waiting">ゲームの終了を待機中</string>
+    <string name="texture_opt_optimize">パックを最適化</string>
+    <string name="texture_opt_choose_quality">まず圧縮設定でASTCの画質を選択してください。</string>
+    <string name="texture_opt_busy">別のテクスチャ処理が実行中または一時停止中です。</string>
+    <string name="texture_opt_unsupported">この端末はASTCに対応していません。変換しないを選択してください。</string>
+    <string name="texture_opt_paused_hint">進行状況は保存されています。準備ができたら再開してください。</string>
+    <string name="texture_opt_original_required">圧縮形式を変更するには、元のパックを再度インポートしてください。圧縮済みのテクスチャは再圧縮しません。</string>
 </resources>

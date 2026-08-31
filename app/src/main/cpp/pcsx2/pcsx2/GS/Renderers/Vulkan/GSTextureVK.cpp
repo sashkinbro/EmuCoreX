@@ -288,14 +288,14 @@ VkCommandBuffer GSTextureVK::GetCommandBufferForUpdate()
 
 void GSTextureVK::CopyTextureDataForUpload(void* dst, const void* src, u32 pitch, u32 upload_pitch, u32 height) const
 {
-	const u32 block_size = GetCompressedBlockSize();
+	const u32 block_size = GetCompressedBlockHeight();
 	const u32 count = (height + (block_size - 1)) / block_size;
 	StringUtil::StrideMemCpy(dst, upload_pitch, src, pitch, std::min(upload_pitch, pitch), count);
 }
 
 VkBuffer GSTextureVK::AllocateUploadStagingBuffer(const void* data, u32 pitch, u32 upload_pitch, u32 height) const
 {
-	const u32 size = upload_pitch * height;
+	const u32 size = CalcUploadSize(height, upload_pitch);
 	const VkBufferCreateInfo bci = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, nullptr, 0, static_cast<VkDeviceSize>(size),
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_SHARING_MODE_EXCLUSIVE, 0, nullptr};
 
@@ -413,7 +413,7 @@ bool GSTextureVK::Update(const GSVector4i& r, const void* data, int pitch, int l
 			m_state = State::Dirty;
 	}
 
-	UpdateFromBuffer(cmdbuf, layer, r.x, r.y, width, height, Common::AlignUpPow2(height, GetCompressedBlockSize()),
+	UpdateFromBuffer(cmdbuf, layer, r.x, r.y, width, height, Common::AlignUp(height, GetCompressedBlockHeight()),
 		CalcUploadRowLengthFromPitch(upload_pitch), buffer, buffer_offset);
 	TransitionToLayout(cmdbuf, Layout::ShaderReadOnly);
 
@@ -496,7 +496,7 @@ void GSTextureVK::Unmap()
 	}
 
 	UpdateFromBuffer(cmdbuf, m_map_level, m_map_area.x, m_map_area.y, width, height,
-		Common::AlignUpPow2(height, GetCompressedBlockSize()), CalcUploadRowLengthFromPitch(pitch), buffer.GetBuffer(),
+		Common::AlignUp(height, GetCompressedBlockHeight()), CalcUploadRowLengthFromPitch(pitch), buffer.GetBuffer(),
 		buffer_offset);
 	TransitionToLayout(cmdbuf, Layout::ShaderReadOnly);
 

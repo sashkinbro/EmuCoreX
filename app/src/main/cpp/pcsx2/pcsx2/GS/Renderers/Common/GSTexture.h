@@ -63,7 +63,21 @@ public:
 		BC2,          ///< BC2, aka DXT2/3 compressed texture for replacements
 		BC3,          ///< BC3, aka DXT4/5 compressed texture for replacements
 		BC7,          ///< BC7, aka BPTC compressed texture for replacements
-		Last = BC7,
+		ASTC4x4,
+		ASTC5x4,
+		ASTC5x5,
+		ASTC6x5,
+		ASTC6x6,
+		ASTC8x5,
+		ASTC8x6,
+		ASTC8x8,
+		ASTC10x5,
+		ASTC10x6,
+		ASTC10x8,
+		ASTC10x10,
+		ASTC12x10,
+		ASTC12x12,
+		Last = ASTC12x12,
 	};
 
 	static bool ValidateUsageAndFormat(Usage usage, Format format);
@@ -134,6 +148,8 @@ public:
 	static bool IsBlockCompressedFormat(Format format);
 	static u32 GetCompressedBytesPerBlock(Format format);
 	static u32 GetCompressedBlockSize(Format format);
+	static u32 GetCompressedBlockHeight(Format format);
+	u32 GetCompressedBlockHeight() const { return GetCompressedBlockHeight(m_format); }
 	static u32 CalcUploadPitch(Format format, u32 width);
 	static u32 CalcUploadRowLengthFromPitch(Format format, u32 pitch);
 	static u32 CalcUploadSize(Format format, u32 height, u32 pitch);
@@ -256,10 +272,10 @@ public:
 	void ClearMipmapGenerationFlag() { m_needs_mipmaps_generated = false; }
 
 	// Typical size of a RGBA texture
-	u32 GetMemUsage() const { return m_size.x * m_size.y * (m_format == Format::UNorm8 ? 1 : 4); }
+	u32 GetMemUsage() const;
 
 	// Helper routines for formats/types
-	static bool IsCompressedFormat(Format format) { return (format >= Format::BC1 && format <= Format::BC7); }
+	static bool IsCompressedFormat(Format format) { return (format >= Format::BC1 && format <= Format::ASTC12x12); }
 };
 
 class GSDownloadTexture

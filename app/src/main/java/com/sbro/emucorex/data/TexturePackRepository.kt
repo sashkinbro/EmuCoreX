@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.sbro.emucorex.core.EmulatorStorage
+import com.sbro.emucorex.core.NativeApp
 import com.sbro.emucorex.data.pcsx2.Pcsx2CompatibilityRepository
 import java.io.File
 import java.io.InputStream
@@ -18,7 +19,8 @@ data class TexturePackInfo(
     val replacementCount: Int,
     val dumpCount: Int,
     val sizeBytes: Long,
-    val lastModifiedAt: Long
+    val lastModifiedAt: Long,
+    val canOptimize: Boolean = true
 )
 
 data class TexturePackSummary(
@@ -32,14 +34,26 @@ data class TexturePackSummary(
 data class TextureImportResult(
     val success: Boolean,
     val importedFiles: Int = 0,
-    val importedSerials: Set<String> = emptySet()
+    val importedSerials: Set<String> = emptySet(),
+    val optimizedFiles: Int = 0,
+    val skippedFiles: Int = 0,
+    val error: String = ""
+)
+
+data class TextureOptimizationProgress(
+    val completed: Int,
+    val total: Int,
+    val optimized: Int,
+    val skipped: Int,
+    val currentName: String
 )
 
 class TexturePackRepository(
     private val context: Context,
-    private val preferences: AppPreferences
+    private val preferences: AppPreferences,
+    private val rootOverride: File? = null
 ) {
-    private val textureExtensions = setOf("png", "dds")
+    private val textureExtensions = setOf("png", "dds", "ktx2")
     private val serialPattern = Regex("[A-Z]{4}[-_ ]?\\d{5}", RegexOption.IGNORE_CASE)
     private val compatibilityRepository = Pcsx2CompatibilityRepository(context.applicationContext)
     private val libraryCacheRepository = GameLibraryCacheRepository(context.applicationContext)
@@ -67,21 +81,35 @@ class TexturePackRepository(
         )
     }
 
-    fun importPackZip(uri: Uri): TextureImportResult {
+    fun importPackZip(
+        uri: Uri,
+        astcBlock: Int = -1,
+        operationId: String = UUID.randomUUID().toString(),
+        progress: (TextureOptimizationProgress) -> Unit = {}
+    ): TextureImportResult {
         val displayName = displayName(uri)
         val input = runCatching { context.contentResolver.openInputStream(uri) }.getOrNull()
             ?: return TextureImportResult(success = false)
-        return input.use { importPackZip(it, displayName) }
+        return input.use { importPackZip(it, displayName, astcBlock = astcBlock, operationId = operationId, progress = progress) }
     }
 
-    fun installRemotePack(archive: File, targetSerial: String): TextureImportResult {
+    fun installRemotePack(
+        archive: File,
+        targetSerial: String,
+        astcBlock: Int = -1,
+        operationId: String = UUID.randomUUID().toString(),
+        progress: (TextureOptimizationProgress) -> Unit = {}
+    ): TextureImportResult {
         if (!archive.isFile) return TextureImportResult(success = false)
         return archive.inputStream().use { input ->
             importPackZip(
                 input = input,
                 displayName = archive.name,
                 targetSerial = targetSerial,
-                replaceExisting = true
+                replaceExisting = true,
+                astcBlock = astcBlock,
+                operationId = operationId,
+                progress = progress
             )
         }
     }
@@ -90,17 +118,24 @@ class TexturePackRepository(
         input: InputStream,
         displayName: String?,
         targetSerial: String? = null,
-        replaceExisting: Boolean = false
+        replaceExisting: Boolean = false,
+        astcBlock: Int = -1,
+        operationId: String = UUID.randomUUID().toString(),
+        progress: (TextureOptimizationProgress) -> Unit = {}
     ): TextureImportResult {
+        require(operationId.matches(Regex("[A-Za-z0-9_-]{1,128}"))) { "Invalid texture operation ID" }
         val normalizedTargetSerial = targetSerial?.let(::normalizeSerial)
         if (targetSerial != null && normalizedTargetSerial == null) return TextureImportResult(success = false)
-        val stagingRoot = File(texturesRoot(), ".texture-import-${UUID.randomUUID()}")
+        val stagingRoot = File(texturesRoot(), ".texture-import-$operationId")
         val fallbackSerial = findSerial(displayName)
         val importedSerials = linkedSetOf<String>()
         val stagedFiles = linkedSetOf<String>()
+        val importedNames = hashSetOf<String>()
         var entryCount = 0
         var totalBytes = 0L
 
+        var optimization = TextureOptimizationProgress(0, 0, 0, 0, "")
+        var complete = false
         return try {
             stagingRoot.mkdirs()
             val canonicalStagingRoot = stagingRoot.canonicalFile
@@ -108,6 +143,7 @@ class TexturePackRepository(
                 while (true) {
                     val entry = zip.nextEntry ?: break
                     try {
+                        progress(TextureOptimizationProgress(0, 0, 0, 0, entry.name))
                         entryCount++
                         require(entryCount <= MAX_ARCHIVE_ENTRIES) { "Texture archive contains too many entries" }
                         if (entry.isDirectory) continue
@@ -131,6 +167,7 @@ class TexturePackRepository(
                             require(totalBytes <= MAX_ARCHIVE_BYTES) { "Texture archive is too large" }
                         }
                         stagedFiles += stagedTarget.canonicalPath
+                        importedNames += stagedTarget.canonicalPath.substringBeforeLast('.').lowercase(Locale.US)
                         importedSerials += serial
                     } finally {
                         zip.closeEntry()
@@ -138,89 +175,229 @@ class TexturePackRepository(
                 }
             }
 
+            progress(TextureOptimizationProgress(0, 0, 0, 0, ""))
+            pruneStaging(canonicalStagingRoot, stagedFiles)
             if (stagedFiles.isEmpty()) {
                 TextureImportResult(success = false)
-            } else if (replaceExisting) {
+            } else {
+                // Manual imports merge into a full staged snapshot so activation is atomic too.
+                if (!replaceExisting) {
+                    importedSerials.forEach { serial ->
+                        val current = replacementsDir(serial)
+                        if (current.isDirectory) {
+                            current.walkTopDown().filter(File::isFile).forEach { source ->
+                                val relative = source.relativeTo(current).invariantSeparatorsPath
+                                val destination = safeChild(File(canonicalStagingRoot, serial), relative.split('/'))
+                                    ?: error("Invalid existing texture path")
+                                if (!destination.exists() && destination.canonicalPath.substringBeforeLast('.').lowercase(Locale.US) !in importedNames) {
+                                    progress(TextureOptimizationProgress(0, 0, 0, 0, source.name))
+                                    require(canonicalStagingRoot.usableSpace > source.length() + MIN_FREE_SPACE_BYTES) { "Not enough free space" }
+                                    destination.parentFile?.mkdirs()
+                                    source.copyTo(destination)
+                                }
+                            }
+                        }
+                    }
+                }
+                if (astcBlock >= 0) {
+                    require(astcBlock in 0..13) { "Invalid ASTC quality" }
+                    require(NativeApp.hasNativeCore && NativeApp.supportsAstcTextures()) {
+                        "ASTC is not supported by this device"
+                    }
+                    optimization = optimizeStaged(canonicalStagingRoot, importedSerials, astcBlock, progress)
+                }
                 importedSerials.forEach { serial ->
+                    progress(optimization)
                     replaceReplacementsAtomically(
                         stagedSerialRoot = File(canonicalStagingRoot, serial),
                         serial = serial
                     )
                 }
+                complete = true
                 TextureImportResult(
                     success = true,
                     importedFiles = stagedFiles.size,
-                    importedSerials = importedSerials
-                )
-            } else {
-                stagedFiles.forEach { stagedPath ->
-                    val staged = File(stagedPath)
-                    val serial = staged.relativeTo(canonicalStagingRoot).invariantSeparatorsPath.substringBefore('/')
-                    val relative = staged.relativeTo(File(canonicalStagingRoot, serial)).invariantSeparatorsPath
-                    val target = safeChild(replacementsDir(serial), relative.split('/'))
-                        ?: error("Invalid staged texture path")
-                    target.parentFile?.mkdirs()
-                    staged.copyTo(target, overwrite = true)
-                }
-                TextureImportResult(
-                    success = true,
-                    importedFiles = stagedFiles.size,
-                    importedSerials = importedSerials
+                    importedSerials = importedSerials,
+                    optimizedFiles = optimization.optimized,
+                    skippedFiles = optimization.skipped
                 )
             }
-        } catch (_: Exception) {
-            TextureImportResult(success = false)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            TextureImportResult(success = false, error = error.message.orEmpty())
         } finally {
-            stagingRoot.deleteRecursively()
+            if (complete) stagingRoot.deleteRecursively()
         }
+    }
+
+    /** Keep reusable conversion checkpoints, but never resurrect files removed from a newer source. */
+    private fun pruneStaging(root: File, expectedFiles: Set<String>) {
+        val convertibleNames = expectedFiles.filter { File(it).extension.lowercase(Locale.US) in setOf("png", "dds") }
+            .map { it.substringBeforeLast('.') }.toHashSet()
+        root.walkTopDown().filter(File::isFile).forEach { file ->
+            if (file.canonicalPath !in expectedFiles) {
+                val baseName = when {
+                    file.name.startsWith('.') && file.name.endsWith(".ktx2.astc-checkpoint") ->
+                        file.name.removePrefix(".").removeSuffix(".ktx2.astc-checkpoint")
+                    file.extension == "ktx2" -> file.nameWithoutExtension
+                    else -> null
+                }
+                if (baseName == null || File(file.parentFile, baseName).canonicalPath !in convertibleNames) {
+                    check(file.delete()) { "Could not clean texture staging" }
+                }
+            }
+        }
+    }
+
+    private fun optimizeStaged(
+        root: File,
+        serials: Set<String>,
+        block: Int,
+        report: (TextureOptimizationProgress) -> Unit
+    ): TextureOptimizationProgress {
+        val mipPattern = Regex("-mip\\d+$", RegexOption.IGNORE_CASE)
+        val inputs = serials.flatMap { serial ->
+            File(root, serial).walkTopDown().filter(File::isFile).filter {
+                it.extension.lowercase(Locale.US) in setOf("png", "dds") &&
+                    !mipPattern.containsMatchIn(it.nameWithoutExtension)
+            }.toList()
+        }.sortedWith(compareBy<File> {
+            // Visit completed checkpoints first on resume, then continue in a stable order.
+            !File(it.parentFile, ".${it.nameWithoutExtension}.ktx2.astc-checkpoint").isFile
+        }.thenBy { it.canonicalPath })
+        var optimized = 0
+        var skipped = 0
+        inputs.forEachIndexed { index, source ->
+            report(TextureOptimizationProgress(index, inputs.size, optimized, skipped, source.name))
+            if (Thread.currentThread().isInterrupted) throw kotlinx.coroutines.CancellationException()
+            val target = File(source.parentFile, source.nameWithoutExtension + ".ktx2")
+            val temporary = File(source.parentFile, target.name + ".part")
+            val checkpoint = File(source.parentFile, ".${target.name}.astc-checkpoint")
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            fun hash(file: File) {
+                file.inputStream().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
+                }
+            }
+            digest.update("astcenc-5.7.0-fast-$block".toByteArray())
+            hash(source)
+            var side = 1
+            while (true) {
+                val mip = File(source.parentFile, "${source.nameWithoutExtension}-mip$side.${source.extension}")
+                if (!mip.isFile) break
+                hash(mip); side++
+            }
+            val fingerprint = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+            val valid = target.isFile && checkpoint.isFile && checkpoint.readText() == fingerprint &&
+                NativeApp.validateOptimizedTexture(target.absolutePath, block)
+            val error = if (valid) null else {
+                target.delete()
+                temporary.delete()
+                require(root.usableSpace > source.length() + MIN_FREE_SPACE_BYTES) { "Not enough free space" }
+                NativeApp.convertTexture(source.absolutePath, temporary.absolutePath, block)
+            }
+            if (valid || (error == null && NativeApp.validateOptimizedTexture(temporary.absolutePath, block))) {
+                if (!valid) {
+                    require(temporary.renameTo(target)) { "Could not activate optimized texture" }
+                    checkpoint.writeText(fingerprint)
+                }
+                source.delete()
+                val mipCount = target.inputStream().use { input ->
+                    val header = ByteArray(44)
+                    check(input.read(header) == header.size)
+                    java.nio.ByteBuffer.wrap(header).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt(40)
+                }
+                var mip = 1
+                while (mip < mipCount) {
+                    val sidecar = File(source.parentFile, "${source.nameWithoutExtension}-mip$mip.${source.extension}")
+                    if (!sidecar.exists()) break
+                    sidecar.delete()
+                    mip++
+                }
+                optimized++
+            } else {
+                temporary.delete()
+                skipped++ // Keep the original file; one unsupported texture must not break a pack.
+            }
+            report(TextureOptimizationProgress(index + 1, inputs.size, optimized, skipped, source.name))
+        }
+        return TextureOptimizationProgress(inputs.size, inputs.size, optimized, skipped, "")
+    }
+
+    fun optimizeInstalled(
+        serial: String,
+        block: Int,
+        operationId: String,
+        progress: (TextureOptimizationProgress) -> Unit
+    ): TextureImportResult {
+        val normalized = normalizeSerial(serial) ?: return TextureImportResult(false)
+        require(operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
+        if (block !in 0..13) return TextureImportResult(false, error = "Choose an ASTC quality first")
+        if (!NativeApp.hasNativeCore || !NativeApp.supportsAstcTextures())
+            return TextureImportResult(false, error = "ASTC is not supported by this device")
+        val original = replacementsDir(normalized)
+        val staging = File(texturesRoot(), ".texture-import-$operationId")
+        val stagedSerial = File(staging, normalized)
+        return try {
+            require(original.isDirectory) { "Texture pack was not found" }
+            val sourceFiles = linkedSetOf<String>()
+            original.walkTopDown().filter(File::isFile).forEach { source ->
+                progress(TextureOptimizationProgress(0, 0, 0, 0, ""))
+                val relative = source.relativeTo(original).invariantSeparatorsPath
+                val destination = safeChild(stagedSerial, relative.split('/')) ?: error("Invalid texture path")
+                destination.parentFile?.mkdirs()
+                require(staging.usableSpace > source.length() + MIN_FREE_SPACE_BYTES) { "Not enough free space" }
+                source.copyTo(destination, overwrite = true)
+                sourceFiles += destination.canonicalPath
+            }
+            pruneStaging(staging, sourceFiles)
+            val result = optimizeStaged(staging, setOf(normalized), block, progress)
+            progress(result)
+            replaceReplacementsAtomically(stagedSerial, normalized)
+            staging.deleteRecursively()
+            TextureImportResult(true, result.total, setOf(normalized), result.optimized, result.skipped)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (error: Exception) { TextureImportResult(false, error = error.message.orEmpty()) }
     }
 
     private fun replaceReplacementsAtomically(stagedSerialRoot: File, serial: String) {
         val root = texturesRoot().canonicalFile
         val targetGame = File(root, serial).canonicalFile
         require(targetGame.parentFile == root) { "Invalid texture target" }
-        targetGame.mkdirs()
-        val target = File(targetGame, "replacements")
-        val backup = File(targetGame, ".replacements-backup-${UUID.randomUUID()}")
-        var oldMoved = false
-        try {
-            if (target.exists()) {
-                require(target.renameTo(backup)) { "Could not prepare texture update" }
-                oldMoved = true
-            }
-            if (!stagedSerialRoot.renameTo(target)) {
-                target.mkdirs()
-                stagedSerialRoot.walkTopDown()
-                    .filter(File::isFile)
-                    .forEach { source ->
-                        val relative = source.relativeTo(stagedSerialRoot).invariantSeparatorsPath
-                        val destination = safeChild(target, relative.split('/'))
-                            ?: error("Invalid staged texture path")
-                        destination.parentFile?.mkdirs()
-                        source.copyTo(destination, overwrite = true)
-                    }
-            }
-            if (backup.exists()) backup.deleteRecursively()
-        } catch (error: Throwable) {
-            if (target.exists()) target.deleteRecursively()
-            if (oldMoved && backup.exists()) backup.renameTo(target)
-            throw error
-        }
+        stagedSerialRoot.walkTopDown().filter { it.isFile && (it.name.endsWith(".astc-checkpoint") || it.name.endsWith(".ktx2.part")) }
+            .forEach { check(it.delete()) { "Could not finish texture staging" } }
+        TexturePackTransactions.activate(targetGame, stagedSerialRoot)
     }
 
     fun deletePack(serial: String): Boolean {
+        if (!TextureInstallCoordinator.mutex.tryLock()) return false
+        try {
         val normalized = normalizeSerial(serial) ?: return false
         val directory = existingGameDir(normalized) ?: return false
         return !directory.exists() || directory.deleteRecursively()
+        } finally { TextureInstallCoordinator.mutex.unlock() }
     }
 
     fun clearDumps(serial: String): Boolean {
+        if (!TextureInstallCoordinator.mutex.tryLock()) return false
+        try {
         val normalized = normalizeSerial(serial) ?: return false
         val game = existingGameDir(normalized) ?: return false
         if (!game.exists()) return true
         val dumps = File(game, "dumps")
         if (!dumps.exists()) return true
         return dumps.deleteRecursively() && dumps.mkdirs()
+        } finally { TextureInstallCoordinator.mutex.unlock() }
+    }
+
+    fun discardOperation(operationId: String) {
+        require(operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
+        val root = texturesRoot().canonicalFile
+        val stage = File(root, ".texture-import-$operationId").canonicalFile
+        require(stage.parentFile == root)
+        stage.deleteRecursively()
     }
 
     private fun buildPackInfo(folder: File, libraryTitles: Map<String, String>): TexturePackInfo? {
@@ -239,7 +416,8 @@ class TexturePackRepository(
             replacementCount = replacementFiles.size,
             dumpCount = dumpFiles.size,
             sizeBytes = allFiles.sumOf { it.length() },
-            lastModifiedAt = allFiles.maxOfOrNull { it.lastModified() } ?: folder.lastModified()
+            lastModifiedAt = allFiles.maxOfOrNull { it.lastModified() } ?: folder.lastModified(),
+            canOptimize = replacementFiles.any { it.extension.lowercase(Locale.US) in setOf("png", "dds") }
         )
     }
 
@@ -258,9 +436,7 @@ class TexturePackRepository(
             .toMap()
     }
 
-    private fun texturesRoot(): File {
-        return EmulatorStorage.texturesDir(context, preferences.getEmulatorDataPathSync())
-    }
+    private fun texturesRoot(): File = rootOverride ?: EmulatorStorage.texturesDir(context, preferences.getEmulatorDataPathSync())
 
     private fun gameDir(serial: String): File {
         return File(texturesRoot(), serial).apply { mkdirs() }

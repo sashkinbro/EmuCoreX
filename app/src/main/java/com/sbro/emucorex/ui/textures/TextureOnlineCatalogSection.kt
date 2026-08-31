@@ -79,7 +79,8 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun TextureOnlineCatalogSection(
-    onInstalled: () -> Unit
+    onInstalled: () -> Unit,
+    onInstall: (RemoteTexturePack, String) -> Unit
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -282,7 +283,7 @@ internal fun TextureOnlineCatalogSection(
                                             ) {
                                                 notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                                             }
-                                            downloadManager.enqueue(pack, serial)
+                                            onInstall(pack, serial)
                                         },
                                         onPause = { task?.let { downloadManager.pause(it.key) } },
                                         onResume = { task?.let { downloadManager.resume(it.key) } },
@@ -619,7 +620,10 @@ private fun TextureDownloadProgress(task: TextureDownloadTask) {
         val downloaded = formatDownloadBytes(task.downloadedBytes)
         val total = formatDownloadBytes(task.totalBytes)
         val speed = formatDownloadBytes(task.bytesPerSecond)
-        val detail = if (task.bytesPerSecond > 0L && task.etaSeconds > 0L) {
+        val detail = if (task.status == TextureDownloadStatus.OPTIMIZING) {
+            stringResource(R.string.texture_opt_progress, task.optimizedCount, task.optimizationTotal, (task.progress * 100).toInt()) +
+                " • " + formatDownloadDuration(task.etaSeconds)
+        } else if (task.bytesPerSecond > 0L && task.etaSeconds > 0L) {
             stringResource(
                 R.string.texture_download_progress_detail,
                 downloaded,
@@ -651,6 +655,7 @@ private fun textureDownloadStatusText(status: TextureDownloadStatus): String = s
         TextureDownloadStatus.PAUSED -> R.string.texture_download_status_paused
         TextureDownloadStatus.WAITING_NETWORK -> R.string.texture_download_status_waiting_network
         TextureDownloadStatus.VERIFYING -> R.string.texture_download_status_verifying
+        TextureDownloadStatus.OPTIMIZING -> R.string.texture_opt_running
         TextureDownloadStatus.INSTALLING -> R.string.texture_download_status_installing
         TextureDownloadStatus.COMPLETED -> R.string.texture_download_status_completed
         TextureDownloadStatus.FAILED -> R.string.texture_download_status_failed
@@ -669,6 +674,7 @@ private enum class DownloadControlState {
 private fun TextureDownloadStatus?.toDownloadControlState(): DownloadControlState = when (this) {
     TextureDownloadStatus.QUEUED,
     TextureDownloadStatus.DOWNLOADING,
+    TextureDownloadStatus.OPTIMIZING,
     TextureDownloadStatus.WAITING_NETWORK -> DownloadControlState.PAUSE
     TextureDownloadStatus.PAUSED -> DownloadControlState.RESUME_CANCEL
     TextureDownloadStatus.FAILED -> DownloadControlState.RETRY_REMOVE

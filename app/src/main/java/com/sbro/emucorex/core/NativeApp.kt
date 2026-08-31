@@ -66,6 +66,10 @@ object NativeApp {
 
     @JvmStatic external fun initialize(path: String, apiVer: Int)
 
+    @JvmStatic external fun convertTexture(source: String, destination: String, block: Int): String?
+    @JvmStatic external fun validateOptimizedTexture(path: String, block: Int): Boolean
+    @JvmStatic external fun supportsAstcTextures(): Boolean
+
     /** Resolves an arcade manifest asset without copying multi-gigabyte CHD images. */
     @JvmStatic
     fun resolveArcadeAssetUri(manifestUri: String, relativePath: String): String? {

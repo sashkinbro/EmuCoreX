@@ -1119,7 +1119,7 @@
     <string name="texture_manager_loading">正在加载纹理包…</string>
     <string name="texture_manager_options">运行选项</string>
     <string name="texture_manager_enable_replacements">加载替换纹理</string>
-    <string name="texture_manager_enable_replacements_desc">使用每个游戏序列号文件夹中的 PNG 和 DDS 文件。</string>
+    <string name="texture_manager_enable_replacements_desc">使用每个游戏序列号文件夹中的 PNG 和 DDS / KTX2 文件。</string>
     <string name="texture_manager_async_loading">异步加载</string>
     <string name="texture_manager_async_loading_desc">在游戏运行时，在工作线程上加载替换纹理。</string>
     <string name="texture_manager_precache">预缓存替换文件</string>
@@ -2647,4 +2647,26 @@
     <string name="home_hidden_show">显示</string>
     <string name="home_hidden_show_all">全部显示</string>
     <string name="home_hidden_update_failed">无法更改项目的显示状态，请重试。</string>
+    <string name="texture_opt_title">纹理压缩</string>
+    <string name="texture_opt_description">选择新导入和下载的格式。已安装的纹理包不会改变。</string>
+    <string name="texture_opt_none">不转换</string>
+    <string name="texture_opt_quality_help">ASTC块越大，占用的GPU内存越少，但可能丢失细节。4×4优先画质，6×6平衡大小与细节，8×8及以上压缩更强。编码需要时间并消耗电量。若要更改已优化纹理包的画质，请重新导入原始文件。</string>
+    <string name="texture_opt_original_quality">保留原始PNG/DDS，不产生额外画质损失。</string>
+    <string name="texture_opt_memory">%1$s 位/像素 · 约占RGBA8内存的%2$s%%</string>
+    <string name="texture_opt_progress">%1$d / %2$d 个纹理 · %3$d%%</string>
+    <string name="texture_opt_eta">剩余时间：%1$s</string>
+    <string name="texture_opt_elapsed">已用时间：%1$s</string>
+    <string name="texture_opt_skipped">%1$d 个纹理保留了原始格式。</string>
+    <string name="texture_opt_failed_safe">安装失败。之前的纹理包已保留。请检查可用空间和压缩包访问权限，然后重试。</string>
+    <string name="texture_opt_background">可以关闭此对话框，任务会在后台继续。</string>
+    <string name="texture_opt_resume">继续</string>
+    <string name="texture_opt_preparing">正在准备纹理</string>
+    <string name="texture_opt_running">正在优化纹理</string>
+    <string name="texture_opt_waiting">等待游戏关闭</string>
+    <string name="texture_opt_optimize">优化纹理包</string>
+    <string name="texture_opt_choose_quality">请先在压缩设置中选择ASTC画质。</string>
+    <string name="texture_opt_busy">已有其他纹理任务正在运行或已暂停。</string>
+    <string name="texture_opt_unsupported">此设备不支持ASTC，请选择不转换。</string>
+    <string name="texture_opt_paused_hint">进度已保存，准备好后即可继续。</string>
+    <string name="texture_opt_original_required">如需更改压缩方式，请重新导入原始材质包。已压缩的纹理不会被再次压缩。</string>
 </resources>

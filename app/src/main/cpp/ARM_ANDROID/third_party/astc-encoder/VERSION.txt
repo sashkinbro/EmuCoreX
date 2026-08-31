@@ -1,0 +1,2 @@
+Arm astc-encoder 5.7.0 (baff485)
+https://github.com/ARM-software/astc-encoder/releases/tag/5.7.0

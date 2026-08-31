@@ -566,6 +566,7 @@ bool GSDeviceVK::SelectDeviceFeatures()
 	m_device_features.wideLines = available_features.wideLines;
 	m_device_features.fragmentStoresAndAtomics = available_features.fragmentStoresAndAtomics;
 	m_device_features.textureCompressionBC = available_features.textureCompressionBC;
+	m_device_features.textureCompressionASTC_LDR = available_features.textureCompressionASTC_LDR;
 	m_device_features.samplerAnisotropy = available_features.samplerAnisotropy;
 	m_device_features.geometryShader = available_features.geometryShader;
 	m_device_features.fragmentStoresAndAtomics = available_features.fragmentStoresAndAtomics;
@@ -3325,6 +3326,14 @@ bool GSDeviceVK::CheckFeatures()
 			has_rov_storage_flags &= ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0);
 	}
 
+	m_features.astc_textures = m_device_features.textureCompressionASTC_LDR;
+	for (int fmt=int(GSTexture::Format::ASTC4x4); fmt<=int(GSTexture::Format::ASTC12x12); fmt++)
+	{
+		VkFormatProperties properties{};
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, LookupNativeFormat(static_cast<GSTexture::Format>(fmt)), &properties);
+		constexpr VkFormatFeatureFlags required = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+		m_features.astc_textures &= (properties.optimalTilingFeatures & required) == required;
+	}
 	m_features.dxt_textures = m_device_features.textureCompressionBC;
 	m_features.bptc_textures = m_device_features.textureCompressionBC;
 
@@ -3439,6 +3448,21 @@ VkFormat GSDeviceVK::LookupNativeFormat(GSTexture::Format format) const
 		VK_FORMAT_BC2_UNORM_BLOCK, // BC2
 		VK_FORMAT_BC3_UNORM_BLOCK, // BC3
 		VK_FORMAT_BC7_UNORM_BLOCK, // BC7
+		VK_FORMAT_ASTC_4x4_UNORM_BLOCK,
+		VK_FORMAT_ASTC_5x4_UNORM_BLOCK,
+		VK_FORMAT_ASTC_5x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_6x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_6x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_8x8_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x5_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x6_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x8_UNORM_BLOCK,
+		VK_FORMAT_ASTC_10x10_UNORM_BLOCK,
+		VK_FORMAT_ASTC_12x10_UNORM_BLOCK,
+		VK_FORMAT_ASTC_12x12_UNORM_BLOCK,
+
 	}};
 
 	return (format == GSTexture::Format::DepthStencil) ?

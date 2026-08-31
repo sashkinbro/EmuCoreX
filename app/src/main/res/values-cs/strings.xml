@@ -848,7 +848,7 @@
     <string name="texture_manager_loading">Načítání balíčků textur…</string>
     <string name="texture_manager_options">Možnosti za běhu (Runtime)</string>
     <string name="texture_manager_enable_replacements">Načíst náhradní textury</string>
-    <string name="texture_manager_enable_replacements_desc">Použít soubory PNG a DDS ze složky každého sériového čísla hry.</string>
+    <string name="texture_manager_enable_replacements_desc">Použít soubory PNG a DDS / KTX2 ze složky každého sériového čísla hry.</string>
     <string name="texture_manager_async_loading">Asynchronní načítání</string>
     <string name="texture_manager_async_loading_desc">Načítat náhradní textury v pracovním vlákně (worker thread) během běhu hry.</string>
     <string name="texture_manager_precache">Ukládat náhrady do mezipaměti (Precache)</string>
@@ -2666,4 +2666,26 @@
     <string name="home_hidden_show">Zobrazit</string>
     <string name="home_hidden_show_all">Zobrazit vše</string>
     <string name="home_hidden_update_failed">Viditelnost položek se nepodařilo změnit. Zkuste to znovu.</string>
+    <string name="texture_opt_title">Komprese textur</string>
+    <string name="texture_opt_description">Vyberte formát nových importů a stažení. Nainstalované balíčky se nezmění.</string>
+    <string name="texture_opt_none">Bez převodu</string>
+    <string name="texture_opt_quality_help">Větší bloky ASTC zabírají méně paměti GPU, ale mohou ztrácet detaily. 4×4 upřednostňuje kvalitu; 6×6 vyvažuje velikost a detaily; od 8×8 je komprese silnější. Kódování vyžaduje čas a baterii. Pro změnu kvality znovu importujte originál.</string>
+    <string name="texture_opt_original_quality">Zachovat původní PNG/DDS bez další ztráty kvality.</string>
+    <string name="texture_opt_memory">%1$s bitů/pixel · přibližně %2$s%% paměti RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d textur · %3$d%%</string>
+    <string name="texture_opt_eta">Zbývá: %1$s</string>
+    <string name="texture_opt_elapsed">Uplynulo: %1$s</string>
+    <string name="texture_opt_skipped">%1$d textur zachováno v původním formátu.</string>
+    <string name="texture_opt_failed_safe">Instalace selhala. Předchozí balíček byl zachován. Zkontrolujte volné místo a přístup k archivu a opakujte akci.</string>
+    <string name="texture_opt_background">Tento dialog můžete zavřít. Práce pokračuje na pozadí.</string>
+    <string name="texture_opt_resume">Pokračovat</string>
+    <string name="texture_opt_preparing">Příprava textur</string>
+    <string name="texture_opt_running">Optimalizace textur</string>
+    <string name="texture_opt_waiting">Čekání na ukončení hry</string>
+    <string name="texture_opt_optimize">Optimalizovat balíček</string>
+    <string name="texture_opt_choose_quality">Nejprve vyberte kvalitu ASTC v nastavení komprese.</string>
+    <string name="texture_opt_busy">Jiná operace s texturami již běží nebo je pozastavena.</string>
+    <string name="texture_opt_unsupported">Toto zařízení nepodporuje ASTC. Zvolte převod vypnout.</string>
+    <string name="texture_opt_paused_hint">Průběh je uložen. Pokračujte, až budete připraveni.</string>
+    <string name="texture_opt_original_required">Chcete-li změnit kompresi, znovu importujte původní balíček. Již komprimované textury se znovu nekomprimují.</string>
 </resources>

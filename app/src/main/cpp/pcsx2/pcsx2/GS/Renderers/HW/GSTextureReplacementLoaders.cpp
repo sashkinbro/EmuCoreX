@@ -10,6 +10,7 @@
 
 #include "GS/Renderers/HW/GSTextureReplacements.h"
 
+#include "common/TextureCodec.h"
 #include <csetjmp>
 #include <png.h>
 
@@ -22,9 +23,12 @@ struct LoaderDefinition
 static bool PNGLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
 static bool DDSLoader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
 
+static bool KTX2Loader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image);
+
 static constexpr LoaderDefinition s_loaders[] = {
 	{"png", PNGLoader},
 	{"dds", DDSLoader},
+	{"ktx2", KTX2Loader},
 };
 
 
@@ -630,4 +634,26 @@ bool DDSLoader(const std::string& filename, GSTextureReplacements::ReplacementTe
 	}
 
 	return true;
+}
+
+static bool KTX2Loader(const std::string& filename, GSTextureReplacements::ReplacementTexture* tex, bool only_base_image)
+{
+    TextureCodec::Image image;
+    std::string error;
+    if (!TextureCodec::Read(filename, image, only_base_image, error) || image.block < 0)
+        return false;
+    if (!g_gs_device->Features().astc_textures && !TextureCodec::Decode(image, error))
+        return false;
+    tex->format = image.block < 0 ? GSTexture::Format::Color :
+        static_cast<GSTexture::Format>(int(GSTexture::Format::ASTC4x4) + image.block);
+    auto& base = image.levels.front();
+    tex->width = base.width; tex->height = base.height;
+    tex->pitch = GSTexture::CalcUploadPitch(tex->format, base.width);
+    tex->data = std::move(base.data);
+    for (size_t i=1; i<image.levels.size(); i++)
+    {
+        auto& mip = image.levels[i];
+        tex->mips.push_back({mip.width, mip.height, GSTexture::CalcUploadPitch(tex->format, mip.width), std::move(mip.data)});
+    }
+    return true;
 }

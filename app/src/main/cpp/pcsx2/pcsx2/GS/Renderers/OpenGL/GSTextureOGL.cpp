@@ -129,6 +129,76 @@ GSTextureOGL::GSTextureOGL(Usage usage, int width, int height, int levels, Forma
 			m_int_shift = 1;
 			break;
 
+		case Format::ASTC4x4:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_4x4;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC5x4:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_5x4;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC5x5:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_5x5;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC6x5:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_6x5;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC6x6:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_6x6;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC8x5:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_8x5;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC8x6:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_8x6;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC8x8:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_8x8;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC10x5:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_10x5;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC10x6:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_10x6;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC10x8:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_10x8;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC10x10:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_10x10;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC12x10:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_12x10;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
+		case Format::ASTC12x12:
+			m_gl_format = m_int_format = GL_COMPRESSED_RGBA_ASTC_12x12;
+			m_int_type = GL_UNSIGNED_BYTE;
+			m_int_shift = 0;
+			break;
 		case Format::Invalid:
 			m_int_format = 0;
 			m_int_type = 0;

@@ -21,6 +21,9 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.sbro.emucorex.R
+import com.sbro.emucorex.core.BackupSessionGate
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.delay
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -44,13 +47,14 @@ enum class TextureDownloadStatus {
     WAITING_NETWORK,
     VERIFYING,
     INSTALLING,
+    OPTIMIZING,
     COMPLETED,
     FAILED,
     CANCELLED;
 
     val isActive: Boolean
         get() = this == QUEUED || this == DOWNLOADING || this == WAITING_NETWORK ||
-            this == VERIFYING || this == INSTALLING
+            this == VERIFYING || this == INSTALLING || this == OPTIMIZING
 }
 
 data class TextureDownloadTask(
@@ -68,10 +72,18 @@ data class TextureDownloadTask(
     val status: TextureDownloadStatus,
     val error: String,
     val updatedAt: Long,
+    val astcBlock: Int = -1,
+    val textureRoot: String = "",
+    val optimizedCount: Int = 0,
+    val optimizationTotal: Int = 0,
+    val optimizationElapsedMs: Long = 0,
+    val skippedCount: Int = 0,
     val parts: List<RemoteTexturePart> = emptyList()
 ) {
     val progress: Float
-        get() = if (totalBytes <= 0L) 0f
+        get() = if (status == TextureDownloadStatus.OPTIMIZING) {
+            if (optimizationTotal > 0) optimizedCount.toFloat() / optimizationTotal else 0f
+        } else if (totalBytes <= 0L) 0f
         else (downloadedBytes.toDouble() / totalBytes.toDouble()).toFloat().coerceIn(0f, 1f)
 }
 
@@ -81,12 +93,16 @@ class TextureDownloadManager(context: Context) {
 
     fun tasks(): List<TextureDownloadTask> = TextureDownloadStore.readAll(appContext)
 
-    fun enqueue(pack: RemoteTexturePack, serial: String) {
+    fun enqueue(pack: RemoteTexturePack, serial: String, quality: Int = TextureOptimizationManager(appContext).block): Boolean {
+        val manual = TextureOptimizationManager(appContext).state()
+        if (manual.active || manual.phase in setOf("paused", "failed")) return false
+        if (tasks().any { it.serial.equals(serial, true) && (it.status.isActive || it.status == TextureDownloadStatus.PAUSED) }) return false
         require(pack.serials.any { it.equals(serial, ignoreCase = true) }) {
             "Texture pack is not compatible with the selected game serial"
         }
-        val task = TextureDownloadStore.createOrReset(appContext, pack, serial)
+        val task = TextureDownloadStore.createOrReset(appContext, pack, serial, quality)
         enqueue(task)
+        return true
     }
 
     fun pause(key: String) {
@@ -128,11 +144,19 @@ class TextureDownloadManager(context: Context) {
         }
         workManager.cancelUniqueWork(workName(key))
         TextureDownloadStore.discardPayload(appContext, key)
+        cleanupStage(key)
     }
 
     fun remove(key: String) {
-        workManager.cancelUniqueWork(workName(key))
+        cancel(key)
         TextureDownloadStore.remove(appContext, key)
+    }
+
+    private fun cleanupStage(key: String) {
+        val task = TextureDownloadStore.read(appContext, key)
+        workManager.enqueue(OneTimeWorkRequestBuilder<TextureOptimizationCleanupWorker>()
+            .setInputData(Data.Builder().putString("id", key).putBoolean("download", true)
+                .putString("root", task?.textureRoot?.takeIf(String::isNotBlank)).build()).build())
     }
 
     private fun enqueue(task: TextureDownloadTask) {
@@ -192,9 +216,37 @@ class TextureDownloadWorker(
             }
             setForeground(foregroundInfo(task))
             val preferences = AppPreferences(applicationContext)
-            val installed = TexturePackRepository(applicationContext, preferences)
-                .installRemotePack(archive, task.serial)
-            if (!installed.success) throw PermanentDownloadException("Texture archive could not be installed")
+            val coroutine = currentCoroutineContext()
+            val previousCompleted = task.optimizedCount
+            val previousTotal = task.optimizationTotal
+            val previousElapsed = task.optimizationElapsedMs
+            val optimizationStart = SystemClock.elapsedRealtime()
+            var lastOptimizationReport = 0L
+            val installed = TextureInstallCoordinator.mutex.withLock {
+                BackupSessionGate.awaitStopped {
+                    coroutine.ensureActive()
+                    TexturePackRepository(applicationContext, preferences, task.textureRoot.takeIf(String::isNotBlank)?.let(::File))
+                        .installRemotePack(archive, task.serial, task.astcBlock, task.key) { progress ->
+                            coroutine.ensureActive()
+                            if (BackupSessionGate.gameBusy) throw TextureGameRequested()
+                            val now = SystemClock.elapsedRealtime()
+                            val elapsed = previousElapsed + now - optimizationStart
+                            val completed = if (progress.total == previousTotal || progress.total == 0) maxOf(previousCompleted, progress.completed) else progress.completed
+                            val total = if (progress.total == 0) previousTotal else progress.total
+                            if (now - lastOptimizationReport < 350 && (progress.total == 0 || progress.completed != progress.total))
+                                return@installRemotePack
+                            lastOptimizationReport = now
+                            task = updateTask(task) { current ->
+                                current.copy(status = if (progress.total > 0) TextureDownloadStatus.OPTIMIZING else TextureDownloadStatus.INSTALLING,
+                                    optimizedCount = completed, optimizationTotal = total, skippedCount = progress.skipped, optimizationElapsedMs = elapsed,
+                                    etaSeconds = if (completed > 0) elapsed * (total - completed) / completed / 1000 else 0)
+                            }
+                            applicationContext.getSystemService(NotificationManager::class.java)
+                                .notify(notificationId(task.key), foregroundInfo(task).notification)
+                        }
+                }
+            }
+            if (!installed.success) throw PermanentDownloadException(installed.error.ifBlank { "Texture archive could not be installed" })
 
             val installState = RemoteContentInstallState(applicationContext)
             installState.removeTexturesForSerial(task.serial)
@@ -211,6 +263,8 @@ class TextureDownloadWorker(
                 )
             }
             Result.success()
+        } catch (waiting: TextureGameRequested) {
+            Result.retry()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (permanent: PermanentDownloadException) {
@@ -465,6 +519,8 @@ class TextureDownloadWorker(
         fallback: TextureDownloadTask,
         transform: (TextureDownloadTask) -> TextureDownloadTask
     ): TextureDownloadTask = TextureDownloadStore.update(applicationContext, fallback.key) { current ->
+        if (current.status == TextureDownloadStatus.PAUSED || current.status == TextureDownloadStatus.CANCELLED)
+            throw CancellationException()
         transform(current).copy(updatedAt = System.currentTimeMillis())
     } ?: fallback
 
@@ -533,6 +589,7 @@ class TextureDownloadWorker(
 
     private fun notificationText(task: TextureDownloadTask): String = when (task.status) {
         TextureDownloadStatus.VERIFYING -> applicationContext.getString(R.string.texture_download_status_verifying)
+        TextureDownloadStatus.OPTIMIZING -> applicationContext.getString(R.string.texture_opt_progress, task.optimizedCount, task.optimizationTotal, (task.progress * 100).toInt())
         TextureDownloadStatus.INSTALLING -> applicationContext.getString(R.string.texture_download_status_installing)
         else -> {
             val speed = formatDownloadBytes(task.bytesPerSecond)
@@ -602,7 +659,7 @@ internal object TextureDownloadStore {
     private const val ARCHIVE = "download.zip"
     private val lock = Any()
 
-    fun createOrReset(context: Context, pack: RemoteTexturePack, serial: String): TextureDownloadTask = synchronized(lock) {
+    fun createOrReset(context: Context, pack: RemoteTexturePack, serial: String, quality: Int): TextureDownloadTask = synchronized(lock) {
         val key = key(pack.id, serial)
         val directory = directory(context, key).apply { mkdirs() }
         val previous = readUnlocked(context, key)
@@ -627,6 +684,8 @@ internal object TextureDownloadStore {
             version = pack.version,
             serial = serial.uppercase(Locale.US),
             downloadUrl = pack.downloadUrl,
+            astcBlock = quality,
+            textureRoot = com.sbro.emucorex.core.EmulatorStorage.texturesDir(context, AppPreferences(context).getEmulatorDataPathSync()).absolutePath,
             sha256 = pack.sha256.uppercase(Locale.US),
             totalBytes = pack.sizeBytes,
             downloadedBytes = downloaded,
@@ -713,6 +772,12 @@ internal object TextureDownloadStore {
                 status = TextureDownloadStatus.valueOf(json.getString("status")),
                 error = json.optString("error"),
                 updatedAt = json.optLong("updatedAt", 0L),
+                astcBlock = json.optInt("astcBlock", -1),
+                textureRoot = json.optString("textureRoot", ""),
+                optimizedCount = json.optInt("optimizedCount", 0),
+                optimizationTotal = json.optInt("optimizationTotal", 0),
+                optimizationElapsedMs = json.optLong("optimizationElapsedMs", 0),
+                skippedCount = json.optInt("skippedCount", 0),
                 parts = json.optJSONArray("parts")?.let { array ->
                     (0 until array.length()).map { index ->
                         val part = array.getJSONObject(index)
@@ -732,6 +797,12 @@ internal object TextureDownloadStore {
         val temporary = File(target.parentFile, "$MANIFEST.tmp")
         val json = JSONObject()
             .put("packId", task.packId)
+        .put("astcBlock", task.astcBlock)
+        .put("textureRoot", task.textureRoot)
+        .put("optimizedCount", task.optimizedCount)
+        .put("optimizationTotal", task.optimizationTotal)
+        .put("optimizationElapsedMs", task.optimizationElapsedMs)
+        .put("skippedCount", task.skippedCount)
             .put("packName", task.packName)
             .put("version", task.version)
             .put("serial", task.serial)

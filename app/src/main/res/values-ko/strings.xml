@@ -1117,7 +1117,7 @@
     <string name="texture_manager_loading">텍스처 팩 로드 중…</string>
     <string name="texture_manager_options">런타임 옵션</string>
     <string name="texture_manager_enable_replacements">교체 텍스처 로드</string>
-    <string name="texture_manager_enable_replacements_desc">각 게임 시리얼 폴더에서 PNG 및 DDS 파일을 사용합니다.</string>
+    <string name="texture_manager_enable_replacements_desc">각 게임 시리얼 폴더에서 PNG 및 DDS / KTX2 파일을 사용합니다.</string>
     <string name="texture_manager_async_loading">비동기 로딩</string>
     <string name="texture_manager_async_loading_desc">게임이 실행되는 동안 작업자 스레드에서 교체 텍스처를 로드합니다.</string>
     <string name="texture_manager_precache">교체 사전 캐시</string>
@@ -2645,4 +2645,26 @@
     <string name="home_hidden_show">표시</string>
     <string name="home_hidden_show_all">모두 표시</string>
     <string name="home_hidden_update_failed">항목의 표시 상태를 변경하지 못했습니다. 다시 시도해 주세요.</string>
+    <string name="texture_opt_title">텍스처 압축</string>
+    <string name="texture_opt_description">새로 가져오거나 다운로드할 팩의 형식을 선택하세요. 설치된 팩은 변경되지 않습니다.</string>
+    <string name="texture_opt_none">변환 안 함</string>
+    <string name="texture_opt_quality_help">ASTC 블록이 클수록 GPU 메모리를 절약하지만 세부 묘사가 손실될 수 있습니다. 4×4는 화질 우선, 6×6은 크기와 화질의 균형, 8×8 이상은 강한 압축입니다. 인코딩에는 시간과 배터리가 필요합니다. 화질을 변경하려면 원본을 다시 가져오세요.</string>
+    <string name="texture_opt_original_quality">추가 화질 손실 없이 원본 PNG/DDS를 유지합니다.</string>
+    <string name="texture_opt_memory">%1$s 비트/픽셀 · RGBA8 메모리의 약 %2$s%%</string>
+    <string name="texture_opt_progress">텍스처 %1$d / %2$d · %3$d%%</string>
+    <string name="texture_opt_eta">남은 시간: %1$s</string>
+    <string name="texture_opt_elapsed">경과 시간: %1$s</string>
+    <string name="texture_opt_skipped">텍스처 %1$d개를 원본 형식으로 유지했습니다.</string>
+    <string name="texture_opt_failed_safe">설치하지 못했습니다. 이전 팩은 보존됩니다. 여유 공간과 압축 파일 접근 권한을 확인하고 다시 시도하세요.</string>
+    <string name="texture_opt_background">이 대화상자를 닫아도 작업은 백그라운드에서 계속됩니다.</string>
+    <string name="texture_opt_resume">계속</string>
+    <string name="texture_opt_preparing">텍스처 준비 중</string>
+    <string name="texture_opt_running">텍스처 최적화 중</string>
+    <string name="texture_opt_waiting">게임 종료 대기 중</string>
+    <string name="texture_opt_optimize">팩 최적화</string>
+    <string name="texture_opt_choose_quality">먼저 압축 설정에서 ASTC 화질을 선택하세요.</string>
+    <string name="texture_opt_busy">다른 텍스처 작업이 실행 중이거나 일시 중지되었습니다.</string>
+    <string name="texture_opt_unsupported">이 기기는 ASTC를 지원하지 않습니다. 변환 안 함을 선택하세요.</string>
+    <string name="texture_opt_paused_hint">진행 상황이 저장되었습니다. 준비되면 계속하세요.</string>
+    <string name="texture_opt_original_required">압축 방식을 변경하려면 원본 팩을 다시 가져오세요. 이미 압축된 텍스처는 다시 압축하지 않습니다.</string>
 </resources>

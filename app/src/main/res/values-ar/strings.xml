@@ -1117,7 +1117,7 @@
     <string name="texture_manager_loading">جاري تحميل حزم الإكساءات…</string>
     <string name="texture_manager_options">خيارات التشغيل</string>
     <string name="texture_manager_enable_replacements">تحميل إكساءات الاستبدال</string>
-    <string name="texture_manager_enable_replacements_desc">استخدام ملفات PNG و DDS من مجلد كل رقم تسلسلي للعبة.</string>
+    <string name="texture_manager_enable_replacements_desc">استخدام ملفات PNG و DDS / KTX2 من مجلد كل رقم تسلسلي للعبة.</string>
     <string name="texture_manager_async_loading">تحميل غير متزامن</string>
     <string name="texture_manager_async_loading_desc">تحميل إكساءات الاستبدال في مسار عمل خلفي أثناء تشغيل اللعبة.</string>
     <string name="texture_manager_precache">تخزين مسبق للاستبدالات</string>
@@ -2650,4 +2650,26 @@
     <string name="home_hidden_show">إظهار</string>
     <string name="home_hidden_show_all">إظهار الكل</string>
     <string name="home_hidden_update_failed">تعذّر تغيير ظهور العناصر. يُرجى المحاولة مجددًا.</string>
+    <string name="texture_opt_title">ضغط الخامات</string>
+    <string name="texture_opt_description">اختر تنسيق الاستيراد والتنزيل الجديد. لن تتغير الحزم المثبتة.</string>
+    <string name="texture_opt_none">بدون تحويل</string>
+    <string name="texture_opt_quality_help">تستخدم كتل ASTC الأكبر ذاكرة رسومية أقل لكنها قد تفقد التفاصيل الدقيقة. يفضل 4×4 الجودة، ويوازن 6×6 الحجم والتفاصيل، ويضغط 8×8 وما فوق بقوة أكبر. يستغرق الترميز وقتًا ويستهلك البطارية. لتغيير الجودة، استورد الأصل مجددًا.</string>
+    <string name="texture_opt_original_quality">الاحتفاظ بملفات PNG/DDS الأصلية دون فقدان إضافي للجودة.</string>
+    <string name="texture_opt_memory">%1$s بت/بكسل · نحو %2$s%% من ذاكرة RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d خامات · %3$d%%</string>
+    <string name="texture_opt_eta">المتبقي: %1$s</string>
+    <string name="texture_opt_elapsed">الوقت المنقضي: %1$s</string>
+    <string name="texture_opt_skipped">تم الاحتفاظ بـ %1$d خامات بتنسيقها الأصلي.</string>
+    <string name="texture_opt_failed_safe">فشل التثبيت. تم الاحتفاظ بالحزمة السابقة. تحقق من المساحة المتاحة والوصول إلى الأرشيف ثم أعد المحاولة.</string>
+    <string name="texture_opt_background">يمكنك إغلاق هذا الحوار. سيستمر العمل في الخلفية.</string>
+    <string name="texture_opt_resume">استئناف</string>
+    <string name="texture_opt_preparing">جارٍ تجهيز الخامات</string>
+    <string name="texture_opt_running">جارٍ تحسين الخامات</string>
+    <string name="texture_opt_waiting">بانتظار إغلاق اللعبة</string>
+    <string name="texture_opt_optimize">تحسين الحزمة</string>
+    <string name="texture_opt_choose_quality">اختر جودة ASTC في إعدادات الضغط أولًا.</string>
+    <string name="texture_opt_busy">هناك عملية خامات أخرى قيد التشغيل أو متوقفة مؤقتًا.</string>
+    <string name="texture_opt_unsupported">هذا الجهاز لا يدعم ASTC. اختر بدون تحويل.</string>
+    <string name="texture_opt_paused_hint">تم حفظ التقدم. استأنف عندما تكون مستعدًا.</string>
+    <string name="texture_opt_original_required">لتغيير الضغط، استورد الحزمة الأصلية مجددًا. لا يُعاد ضغط القوام المضغوط مسبقًا.</string>
 </resources>

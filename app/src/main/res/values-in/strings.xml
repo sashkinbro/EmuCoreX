@@ -784,7 +784,7 @@
     <string name="texture_manager_loading">Memuat paket tekstur…</string>
     <string name="texture_manager_options">Opsi Waktu Proses</string>
     <string name="texture_manager_enable_replacements">Muat tekstur pengganti</string>
-    <string name="texture_manager_enable_replacements_desc">Gunakan file PNG dan DDS dari setiap folder serial game.</string>
+    <string name="texture_manager_enable_replacements_desc">Gunakan file PNG dan DDS / KTX2 dari setiap folder serial game.</string>
     <string name="texture_manager_async_loading">Pemuatan asinkron</string>
     <string name="texture_manager_async_loading_desc">Memuat tekstur pengganti pada thread pekerja saat game berjalan.</string>
     <string name="texture_manager_precache">Penggantian precache</string>
@@ -2660,4 +2660,26 @@
     <string name="home_hidden_show">Tampilkan</string>
     <string name="home_hidden_show_all">Tampilkan semua</string>
     <string name="home_hidden_update_failed">Tidak dapat mengubah visibilitas item. Silakan coba lagi.</string>
+    <string name="texture_opt_title">Kompresi tekstur</string>
+    <string name="texture_opt_description">Pilih format untuk impor dan unduhan baru. Paket terpasang tidak berubah.</string>
+    <string name="texture_opt_none">Tanpa konversi</string>
+    <string name="texture_opt_quality_help">Blok ASTC yang lebih besar memakai lebih sedikit memori GPU tetapi dapat kehilangan detail. 4×4 mengutamakan kualitas; 6×6 menyeimbangkan ukuran dan detail; 8×8 ke atas lebih agresif. Pengodean membutuhkan waktu dan baterai. Untuk mengubah kualitas, impor ulang berkas asli.</string>
+    <string name="texture_opt_original_quality">Simpan PNG/DDS asli tanpa penurunan kualitas tambahan.</string>
+    <string name="texture_opt_memory">%1$s bit/piksel · sekitar %2$s%% memori RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d tekstur · %3$d%%</string>
+    <string name="texture_opt_eta">Tersisa: %1$s</string>
+    <string name="texture_opt_elapsed">Berlalu: %1$s</string>
+    <string name="texture_opt_skipped">%1$d tekstur dipertahankan dalam format asli.</string>
+    <string name="texture_opt_failed_safe">Pemasangan gagal. Paket sebelumnya tetap aman. Periksa ruang kosong dan akses arsip, lalu coba lagi.</string>
+    <string name="texture_opt_background">Dialog ini dapat ditutup. Proses berlanjut di latar belakang.</string>
+    <string name="texture_opt_resume">Lanjutkan</string>
+    <string name="texture_opt_preparing">Menyiapkan tekstur</string>
+    <string name="texture_opt_running">Mengoptimalkan tekstur</string>
+    <string name="texture_opt_waiting">Menunggu game ditutup</string>
+    <string name="texture_opt_optimize">Optimalkan paket</string>
+    <string name="texture_opt_choose_quality">Pilih kualitas ASTC di pengaturan kompresi terlebih dahulu.</string>
+    <string name="texture_opt_busy">Operasi tekstur lain sedang berjalan atau dijeda.</string>
+    <string name="texture_opt_unsupported">Perangkat ini tidak mendukung ASTC. Pilih tanpa konversi.</string>
+    <string name="texture_opt_paused_hint">Progres disimpan. Lanjutkan saat Anda siap.</string>
+    <string name="texture_opt_original_required">Untuk mengubah kompresi, impor kembali paket asli. Tekstur yang sudah dikompresi tidak dikompresi ulang.</string>
 </resources>

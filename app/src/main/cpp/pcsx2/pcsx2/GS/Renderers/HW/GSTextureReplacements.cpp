@@ -499,7 +499,14 @@ void GSTextureReplacements::ReloadReplacementMap()
 			continue;
 
 		DbgCon.WriteLn("Found %ux%u replacement '%.*s'", name->Width(), name->Height(), static_cast<int>(filename.size()), filename.data());
-		s_replacement_texture_filenames.emplace(name.value(), std::move(fd.FileName));
+		auto [it, inserted] = s_replacement_texture_filenames.emplace(name.value(), fd.FileName);
+		if (!inserted)
+		{
+			const auto is_ktx = [](const std::string& path) { return StringUtil::EndsWithNoCase(path, ".ktx2"); };
+			if ((is_ktx(fd.FileName) && !is_ktx(it->second)) ||
+				(is_ktx(fd.FileName) == is_ktx(it->second) && fd.FileName < it->second))
+				it->second = std::move(fd.FileName);
+		}
 
 		// zero out the CLUT hash, because we need this for checking if there's any replacements with this hash when using paltex
 		name->CLUTHash = 0;
@@ -679,6 +686,12 @@ std::pair<u8, u8> GSTextureReplacements::GetBCAlphaMinMax(ReplacementTexture& rt
 
 void GSTextureReplacements::SetReplacementTextureAlphaMinMax(ReplacementTexture& rtex)
 {
+	if (rtex.format >= GSTexture::Format::ASTC4x4 && rtex.format <= GSTexture::Format::ASTC12x12)
+	{
+		// Conservative bounds: compressed alpha must not be read as RGBA or inferred from the source.
+		rtex.alpha_minmax = {0, 255};
+		return;
+	}
 	switch (rtex.format)
 	{
 		case GSTexture::Format::BC1:

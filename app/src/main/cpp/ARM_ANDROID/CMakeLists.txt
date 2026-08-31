@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 
 project(EmuCoreXArmAndroid LANGUAGES C CXX)
+add_subdirectory(third_party/astc-encoder)
 
 set(EMUCOREX_CPP_DIR "${CMAKE_CURRENT_LIST_DIR}/.." CACHE PATH "EmuCoreX native source root")
 set(PCSX2_UPSTREAM_DIR "${EMUCOREX_CPP_DIR}/PCSX2" CACHE PATH "Clean PCSX2 upstream checkout")
@@ -231,6 +232,8 @@ if(EMUCOREX_LINK_UPSTREAM_PCSX2)
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_hostsys.cpp"
 		"${CMAKE_CURRENT_LIST_DIR}/src/platform/android_misc.cpp"
 	)
+	target_sources(common PRIVATE "${PCSX2_UPSTREAM_DIR}/common/TextureCodec.cpp")
+	target_link_libraries(common PUBLIC emucore_astc PNG::PNG)
 	target_include_directories(common PRIVATE "${CMAKE_CURRENT_LIST_DIR}/include")
 	set_property(TARGET common PROPERTY CXX_STANDARD 20)
 	set_property(TARGET common PROPERTY CXX_STANDARD_REQUIRED ON)
@@ -310,6 +313,7 @@ if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/third_party/capstone/CMakeLists.txt")
 endif()
 
 add_library(emucore SHARED
+	src/jni/texture_codec_jni.cpp
 	src/jni/native_app_jni.cpp
 	src/jni/support_jni.cpp
 	src/integration/retro_achievements_android.cpp

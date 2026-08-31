@@ -1119,7 +1119,7 @@
     <string name="texture_manager_loading">Lade Texturpakete…</string>
     <string name="texture_manager_options">Laufzeitoptionen</string>
     <string name="texture_manager_enable_replacements">Ersatztexturen laden</string>
-    <string name="texture_manager_enable_replacements_desc">Verwende PNG- und DDS-Dateien aus jedem Spiel-Seriennummernordner.</string>
+    <string name="texture_manager_enable_replacements_desc">Verwende PNG- und DDS / KTX2-Dateien aus jedem Spiel-Seriennummernordner.</string>
     <string name="texture_manager_async_loading">Asynchrones Laden</string>
     <string name="texture_manager_async_loading_desc">Lade Ersatztexturen über einen Worker-Thread, während das Spiel läuft.</string>
     <string name="texture_manager_precache">Ersatztexturen vorladen (Precache)</string>
@@ -2648,4 +2648,26 @@
     <string name="home_hidden_show">Anzeigen</string>
     <string name="home_hidden_show_all">Alle anzeigen</string>
     <string name="home_hidden_update_failed">Die Sichtbarkeit konnte nicht geändert werden. Bitte versuche es erneut.</string>
+    <string name="texture_opt_title">Texturkomprimierung</string>
+    <string name="texture_opt_description">Format für neue Importe und Downloads wählen. Installierte Pakete bleiben unverändert.</string>
+    <string name="texture_opt_none">Keine Konvertierung</string>
+    <string name="texture_opt_quality_help">Größere ASTC-Blöcke benötigen weniger GPU-Speicher, können aber feine Details verlieren. 4×4 bevorzugt Qualität; 6×6 bietet einen Kompromiss; ab 8×8 wird stärker komprimiert. Die Kodierung kostet Zeit und Akku. Für eine andere Qualität das Original erneut importieren.</string>
+    <string name="texture_opt_original_quality">Originale PNG/DDS ohne zusätzlichen Qualitätsverlust behalten.</string>
+    <string name="texture_opt_memory">%1$s Bit/Pixel · etwa %2$s%% des RGBA8-Speichers</string>
+    <string name="texture_opt_progress">%1$d / %2$d Texturen · %3$d%%</string>
+    <string name="texture_opt_eta">Verbleibend: %1$s</string>
+    <string name="texture_opt_elapsed">Vergangen: %1$s</string>
+    <string name="texture_opt_skipped">%1$d Texturen im Originalformat behalten.</string>
+    <string name="texture_opt_failed_safe">Installation fehlgeschlagen. Das vorherige Paket bleibt erhalten. Freien Speicher und Archivzugriff prüfen und erneut versuchen.</string>
+    <string name="texture_opt_background">Dieser Dialog kann geschlossen werden. Die Arbeit läuft im Hintergrund weiter.</string>
+    <string name="texture_opt_resume">Fortsetzen</string>
+    <string name="texture_opt_preparing">Texturen werden vorbereitet</string>
+    <string name="texture_opt_running">Texturen werden optimiert</string>
+    <string name="texture_opt_waiting">Warten auf das Schließen des Spiels</string>
+    <string name="texture_opt_optimize">Paket optimieren</string>
+    <string name="texture_opt_choose_quality">Zuerst eine ASTC-Qualität in den Komprimierungseinstellungen wählen.</string>
+    <string name="texture_opt_busy">Eine andere Texturverarbeitung läuft bereits oder ist pausiert.</string>
+    <string name="texture_opt_unsupported">Dieses Gerät unterstützt ASTC nicht. Keine Konvertierung wählen.</string>
+    <string name="texture_opt_paused_hint">Der Fortschritt ist gespeichert. Setzen Sie den Vorgang später fort.</string>
+    <string name="texture_opt_original_required">Importieren Sie das Originalpaket erneut, um die Kompression zu ändern. Bereits komprimierte Texturen werden nicht erneut komprimiert.</string>
 </resources>

@@ -26,6 +26,12 @@
 }
 
 -keep,includedescriptorclasses class com.sbro.emucorex.core.NativeApp { *; }
+
+# WorkManager persists these class names across process restarts and app updates.
+# Keep the reflective constructors and stable names, while allowing method optimization.
+-keep,allowoptimization class com.sbro.emucorex.data.Texture*Worker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
 -keep,includedescriptorclasses class com.sbro.emucorex.core.utils.RetroAchievementsBridge { *; }
 -keep,includedescriptorclasses class com.sbro.emucorex.discord.DiscordNative { *; }
 -keep class com.discord.socialsdk.** { *; }

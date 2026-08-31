@@ -846,7 +846,7 @@
     <string name="texture_manager_loading">Wczytywanie paczek tekstur…</string>
     <string name="texture_manager_options">Opcje środowiska uruchomieniowego</string>
     <string name="texture_manager_enable_replacements">Wczytuj tekstury zastępcze</string>
-    <string name="texture_manager_enable_replacements_desc">Używaj plików PNG i DDS z folderu numeru seryjnego danej gry.</string>
+    <string name="texture_manager_enable_replacements_desc">Używaj plików PNG i DDS / KTX2 z folderu numeru seryjnego danej gry.</string>
     <string name="texture_manager_async_loading">Wczytywanie asynchroniczne</string>
     <string name="texture_manager_async_loading_desc">Wczytuj tekstury zastępcze w wątku roboczym w tle, podczas gdy gra jest włączona.</string>
     <string name="texture_manager_precache">Buforuj tekstury (Precache)</string>
@@ -2668,4 +2668,26 @@
     <string name="home_hidden_show">Pokaż</string>
     <string name="home_hidden_show_all">Pokaż wszystkie</string>
     <string name="home_hidden_update_failed">Nie udało się zmienić widoczności elementów. Spróbuj ponownie.</string>
+    <string name="texture_opt_title">Kompresja tekstur</string>
+    <string name="texture_opt_description">Wybierz format nowych importów i pobrań. Zainstalowane pakiety pozostają bez zmian.</string>
+    <string name="texture_opt_none">Bez konwersji</string>
+    <string name="texture_opt_quality_help">Większe bloki ASTC zużywają mniej pamięci GPU, ale mogą tracić szczegóły. 4×4 stawia na jakość; 6×6 równoważy rozmiar i szczegóły; od 8×8 kompresja jest silniejsza. Kodowanie wymaga czasu i baterii. Aby zmienić jakość, ponownie zaimportuj oryginał.</string>
+    <string name="texture_opt_original_quality">Zachowaj oryginalne PNG/DDS bez dodatkowej utraty jakości.</string>
+    <string name="texture_opt_memory">%1$s bitów/piksel · około %2$s%% pamięci RGBA8</string>
+    <string name="texture_opt_progress">%1$d / %2$d tekstur · %3$d%%</string>
+    <string name="texture_opt_eta">Pozostało: %1$s</string>
+    <string name="texture_opt_elapsed">Upłynęło: %1$s</string>
+    <string name="texture_opt_skipped">%1$d tekstur zachowano w oryginalnym formacie.</string>
+    <string name="texture_opt_failed_safe">Instalacja nie powiodła się. Poprzedni pakiet zachowano. Sprawdź wolne miejsce i dostęp do archiwum, a następnie spróbuj ponownie.</string>
+    <string name="texture_opt_background">Możesz zamknąć to okno. Praca będzie kontynuowana w tle.</string>
+    <string name="texture_opt_resume">Wznów</string>
+    <string name="texture_opt_preparing">Przygotowywanie tekstur</string>
+    <string name="texture_opt_running">Optymalizowanie tekstur</string>
+    <string name="texture_opt_waiting">Oczekiwanie na zamknięcie gry</string>
+    <string name="texture_opt_optimize">Optymalizuj pakiet</string>
+    <string name="texture_opt_choose_quality">Najpierw wybierz jakość ASTC w ustawieniach kompresji.</string>
+    <string name="texture_opt_busy">Inna operacja na teksturach już trwa lub jest wstrzymana.</string>
+    <string name="texture_opt_unsupported">To urządzenie nie obsługuje ASTC. Wybierz brak konwersji.</string>
+    <string name="texture_opt_paused_hint">Postęp został zapisany. Wznów w dogodnym momencie.</string>
+    <string name="texture_opt_original_required">Aby zmienić kompresję, ponownie zaimportuj oryginalny pakiet. Już skompresowane tekstury nie są kompresowane ponownie.</string>
 </resources>

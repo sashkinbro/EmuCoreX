@@ -72,7 +72,7 @@ class DriveBackupArchive(private val context: Context) {
             "side-artwork" -> parts.size == 2 && parts[1] == "custom_side_artwork.image"
             "covers" -> parts.size == 2 && parts[1].matches(Regex("[0-9a-f]{40}\\.[a-z0-9]{2,5}"))
             "textures" -> parts.size >= 3 && parts.none { it.equals("dumps", true) || it.startsWith(".") } &&
-                name.substringAfterLast('.').lowercase() in setOf("png", "dds")
+                name.substringAfterLast('.').lowercase() in setOf("png", "dds", "ktx2")
             else -> false
         }
     }

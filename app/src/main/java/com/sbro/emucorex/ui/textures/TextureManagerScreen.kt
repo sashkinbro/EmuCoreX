@@ -59,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.TexturePackInfo
+import com.sbro.emucorex.data.TextureOptimizationManager
+import com.sbro.emucorex.data.TextureDownloadManager
 import com.sbro.emucorex.data.TexturePackRepository
 import com.sbro.emucorex.data.TexturePackSummary
 import com.sbro.emucorex.data.RemoteContentInstallState
@@ -80,6 +82,11 @@ fun TextureManagerScreen(
 ) {
     val context = LocalContext.current
     val preferences = remember(context) { AppPreferences(context) }
+    val optimizationManager = remember(context) { TextureOptimizationManager(context) }
+    val downloadManager = remember(context) { TextureDownloadManager(context) }
+    var optimizationBusy by remember { mutableStateOf(false) }
+    var progressRequest by remember { mutableIntStateOf(0) }
+    var qualityRequest by remember { mutableStateOf<TextureQualityRequest?>(null) }
     val repository = remember(context) { TexturePackRepository(context, preferences) }
     val remoteInstallState = remember(context) { RemoteContentInstallState(context) }
     val scope = rememberCoroutineScope()
@@ -126,29 +133,10 @@ fun TextureManagerScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            isWorking = true
-            val result = try {
-                withContext(Dispatchers.IO) {
-                    runCatching { repository.importPackZip(uri) }
-                        .getOrElse { com.sbro.emucorex.data.TextureImportResult(success = false) }
-                }
-            } finally {
-                isWorking = false
+        qualityRequest = TextureQualityRequest(true, R.string.texture_manager_import_zip) { quality ->
+            if (!optimizationManager.import(uri, quality)) {
+                Toast.makeText(context, context.getString(R.string.texture_opt_busy), Toast.LENGTH_LONG).show()
             }
-            if (result.success) {
-                preferences.setTextureReplacementsEnabled(true)
-            }
-            Toast.makeText(
-                context,
-                if (result.success) {
-                    importSuccessMessage.format(result.importedFiles)
-                } else {
-                    importFailureMessage
-                },
-                Toast.LENGTH_LONG
-            ).show()
-            refresh()
         }
     }
 
@@ -200,6 +188,13 @@ fun TextureManagerScreen(
 
             item {
                 TextureOnlineCatalogSection(
+                    onInstall = { pack, serial ->
+                        qualityRequest = TextureQualityRequest(true, R.string.content_download_install) { quality ->
+                            if (!downloadManager.enqueue(pack, serial, quality)) {
+                                Toast.makeText(context, context.getString(R.string.texture_opt_busy), Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
                     onInstalled = {
                         scope.launch { preferences.setTextureReplacementsEnabled(true) }
                         refresh()
@@ -227,6 +222,11 @@ fun TextureManagerScreen(
                         scope.launch { preferences.setTextureDumpingEnabled(enabled) }
                     }
                 )
+            }
+
+            item {
+                TextureOptimizationPanel(optimizationManager, downloadManager, onFinished = {}, onBusy = {},
+                    showProgressDialogs = false, onShowProgress = { progressRequest++ })
             }
 
             if (isLoading && summary == null) {
@@ -263,7 +263,14 @@ fun TextureManagerScreen(
                 items(summary?.packs.orEmpty(), key = { it.serial }) { pack ->
                     TexturePackCard(
                         pack = pack,
-                        isWorking = isWorking,
+                        isWorking = isWorking || optimizationBusy,
+                        onOptimize = {
+                            qualityRequest = TextureQualityRequest(false, R.string.texture_opt_optimize) { quality ->
+                                if (!optimizationManager.optimize(pack.serial, quality)) {
+                                    Toast.makeText(context, context.getString(R.string.texture_opt_busy), Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        },
                         onDelete = { pendingDelete.value = pack },
                         onClearDumps = { pendingClearDumps.value = pack }
                     )
@@ -271,6 +278,10 @@ fun TextureManagerScreen(
             }
         }
     }
+
+    TextureOptimizationPanel(optimizationManager, downloadManager, onFinished = { refresh() },
+        onBusy = { optimizationBusy = it }, showCard = false, progressRequest = progressRequest,
+        qualityRequest = qualityRequest, onQualityDismiss = { qualityRequest = null })
 
     pendingDelete.value?.let { pack ->
         AlertDialog(
@@ -555,7 +566,8 @@ private fun TexturePackCard(
     pack: TexturePackInfo,
     isWorking: Boolean,
     onDelete: () -> Unit,
-    onClearDumps: () -> Unit
+    onClearDumps: () -> Unit,
+    onOptimize: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -636,10 +648,17 @@ private fun TexturePackCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            if (!pack.canOptimize && pack.replacementCount > 0) {
+                Text(stringResource(R.string.texture_opt_original_required), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (pack.canOptimize) OutlinedButton(onClick = onOptimize, enabled = !isWorking && pack.replacementCount > 0) {
+                    Text(stringResource(R.string.texture_opt_optimize))
+                }
                 OutlinedButton(
                     onClick = onClearDumps,
                     enabled = !isWorking && pack.dumpCount > 0,
