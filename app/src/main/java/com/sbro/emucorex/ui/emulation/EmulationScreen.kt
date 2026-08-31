@@ -1476,7 +1476,7 @@ fun EmulationScreen(
                     centerOffset = uiState.centerOffset,
                     controlLayouts = uiState.controlLayouts,
                     racingMode = uiState.racingMode,
-                    onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                    onToggleSelectedStick = viewModel::toggleSelectedStick,
                     onFastForwardHoldChange = viewModel::setFastForwardHeld,
                     onPadInput = { keyCode, range, pressed ->
                         viewModel.onPadInput(overlayPadIndex, keyCode, range, pressed)
@@ -1491,7 +1491,7 @@ fun EmulationScreen(
                         uiState = uiState,
                         scaleFactor = scaleFactor,
                         alpha = alpha,
-                        onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                        onToggleSelectedStick = viewModel::toggleSelectedStick,
                         onFastForwardHoldChange = viewModel::setFastForwardHeld,
                         onPadInput = viewModel::onPadInput
                     )
@@ -1574,6 +1574,7 @@ fun EmulationScreen(
                     onSetHideOverlayOnGamepad = { viewModel.setHideOverlayOnGamepad(it) },
                     onSetCompactControls = { viewModel.setCompactControls(it) },
                     onSetKeepScreenOn = { viewModel.setKeepScreenOn(it) },
+                    onSetStickToggleTarget = viewModel::setStickToggleTarget,
                     onSetStickScale = { viewModel.setStickScale(it) },
                     onSetLeftStickSensitivity = { viewModel.setLeftStickSensitivity(it) },
                     onSetRightStickSensitivity = { viewModel.setRightStickSensitivity(it) },
@@ -2065,7 +2066,7 @@ private fun LocalMultiplayerTouchControls(
     uiState: EmulationUiState,
     scaleFactor: Float,
     alpha: Float,
-    onToggleLeftInputMode: () -> Unit,
+    onToggleSelectedStick: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
     onPadInput: (Int, Int, Int, Boolean) -> Unit
 ) {
@@ -2080,7 +2081,7 @@ private fun LocalMultiplayerTouchControls(
                 uiState = uiState,
                 scaleFactor = scaleFactor * 0.58f,
                 alpha = alpha,
-                onToggleLeftInputMode = onToggleLeftInputMode,
+                onToggleSelectedStick = onToggleSelectedStick,
                 onFastForwardHoldChange = onFastForwardHoldChange,
                 onPadInput = onPadInput
             )
@@ -2096,7 +2097,7 @@ private fun LocalMultiplayerTouchControls(
                 uiState = uiState,
                 scaleFactor = scaleFactor * 0.58f,
                 alpha = alpha,
-                onToggleLeftInputMode = onToggleLeftInputMode,
+                onToggleSelectedStick = onToggleSelectedStick,
                 onFastForwardHoldChange = {},
                 onPadInput = onPadInput
             )
@@ -2109,7 +2110,7 @@ private fun LocalMultiplayerTouchControls(
                 uiState = uiState,
                 scaleFactor = scaleFactor * 0.50f,
                 alpha = alpha,
-                onToggleLeftInputMode = onToggleLeftInputMode,
+                onToggleSelectedStick = onToggleSelectedStick,
                 onFastForwardHoldChange = onFastForwardHoldChange,
                 onPadInput = onPadInput
             )
@@ -2120,7 +2121,7 @@ private fun LocalMultiplayerTouchControls(
                 uiState = uiState,
                 scaleFactor = scaleFactor * 0.50f,
                 alpha = alpha,
-                onToggleLeftInputMode = onToggleLeftInputMode,
+                onToggleSelectedStick = onToggleSelectedStick,
                 onFastForwardHoldChange = {},
                 onPadInput = onPadInput
             )
@@ -2143,7 +2144,7 @@ private fun LocalMultiplayerTouchZone(
     uiState: EmulationUiState,
     scaleFactor: Float,
     alpha: Float,
-    onToggleLeftInputMode: () -> Unit,
+    onToggleSelectedStick: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
     onPadInput: (Int, Int, Int, Boolean) -> Unit
 ) {
@@ -2179,7 +2180,7 @@ private fun LocalMultiplayerTouchZone(
             centerOffset = uiState.centerOffset,
             controlLayouts = uiState.controlLayouts,
             racingMode = uiState.racingMode,
-            onToggleLeftInputMode = onToggleLeftInputMode,
+            onToggleSelectedStick = onToggleSelectedStick,
             onFastForwardHoldChange = onFastForwardHoldChange,
             onPadInput = { key, range, pressed -> onPadInput(padIndex, key, range, pressed) },
             respectSystemInsets = false
@@ -2237,7 +2238,7 @@ private fun OnScreenControls(
     centerOffset: Pair<Float, Float>,
     controlLayouts: Map<String, OverlayControlLayout>,
     racingMode: Boolean,
-    onToggleLeftInputMode: () -> Unit,
+    onToggleSelectedStick: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
     onPadInput: (Int, Int, Boolean) -> Unit,
     respectSystemInsets: Boolean = true
@@ -2402,7 +2403,7 @@ private fun OnScreenControls(
                     shape = spec.shape,
                     opacity = spec.opacity / 100f,
                     onPressChange = buttonPressHandler(spec.id),
-                    onClick = if (spec.id == "left_input_toggle") onToggleLeftInputMode else null,
+                    onClick = if (spec.id == "left_input_toggle") onToggleSelectedStick else null,
                     tapToHold = racingMode && isRacingTapToHoldButton(spec.id),
                     longPressDelayMs = if (spec.id == "start") TRANSPORT_HOLD_DELAY_MS else 0L,
                     onLongPressChange = if (spec.id == "start") onFastForwardHoldChange else null
@@ -3025,6 +3026,7 @@ private fun EmulationSidebarMenu(
     onSetHideOverlayOnGamepad: (Boolean) -> Unit,
     onSetCompactControls: (Boolean) -> Unit,
     onSetKeepScreenOn: (Boolean) -> Unit,
+    onSetStickToggleTarget: (Int) -> Unit,
     onSetStickScale: (Int) -> Unit,
     onSetLeftStickSensitivity: (Int) -> Unit,
     onSetRightStickSensitivity: (Int) -> Unit,
@@ -3688,6 +3690,18 @@ private fun EmulationSidebarMenu(
                             onValueChange = { onSetOverlayOpacity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_overlay_opacity),
                             onResetToDefault = { onSetOverlayOpacity(overlayDefaults.overlayOpacity) }
+                        )
+
+                        LiveSelectionRow(
+                            title = stringResource(R.string.settings_stick_toggle_target),
+                            options = listOf(
+                                LiveSelectionOption(AppPreferences.STICK_TOGGLE_RIGHT, stringResource(R.string.settings_stick_toggle_right)),
+                                LiveSelectionOption(AppPreferences.STICK_TOGGLE_LEFT, stringResource(R.string.settings_stick_toggle_left))
+                            ),
+                            currentValue = uiState.stickToggleTarget,
+                            onValueChange = onSetStickToggleTarget,
+                            helpText = stringResource(R.string.settings_help_stick_toggle_target),
+                            onResetToDefault = { onSetStickToggleTarget(AppPreferences.DEFAULT_STICK_TOGGLE_TARGET) }
                         )
 
                         LiveSliderRow(

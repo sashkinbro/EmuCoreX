@@ -1867,6 +1867,11 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 a mnoho z řady Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, novější z řady Snapdragon 7 a 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 a 6 Gen 4</string>
+    <string name="settings_stick_toggle_target">Páčka prostředního tlačítka</string>
+    <string name="settings_stick_toggle_right">Pravá páčka</string>
+    <string name="settings_stick_toggle_left">Levá páčka</string>
+    <string name="settings_stick_toggle_button">Přepínání páčky</string>
+    <string name="settings_help_stick_toggle_target">Vyberte páčku na obrazovce, kterou přepíná tlačítko mezi Select a Start. Pravá: skryje nebo zobrazí pravou páčku. Levá: přepíná mezi levou páčkou a směrovým křížem. Fyzické ovladače nejsou ovlivněny.</string>
     <string name="settings_touchscreen_right_stick">Pravá páčka na dotykové obrazovce</string>
     <string name="settings_touchscreen_right_stick_desc">Potažením po volném místě na obrazovce ovládáte virtuální pravou páčku.</string>
     <string name="settings_help_touchscreen_right_stick">Mapuje gesta tažení v nevyužitých oblastech herní obrazovky na osy virtuální pravé páčky, což umožňuje pohyb kamery bez dotyku viditelné páčky. Dotyková tlačítka a viditelné páčky si zachovávají své normální chování.</string>

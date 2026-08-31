@@ -1882,6 +1882,17 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_overlay_opacity),
                             onResetToDefault = { viewModel.setOverlayOpacity(overlayDefaults.overlayOpacity) }
                         )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_stick_toggle_target),
+                            options = listOf(
+                                AppPreferences.STICK_TOGGLE_RIGHT to stringResource(R.string.settings_stick_toggle_right),
+                                AppPreferences.STICK_TOGGLE_LEFT to stringResource(R.string.settings_stick_toggle_left)
+                            ),
+                            selectedValue = uiState.stickToggleTarget,
+                            onSelect = viewModel::setStickToggleTarget,
+                            helpText = stringResource(R.string.settings_help_stick_toggle_target),
+                            onResetToDefault = { viewModel.setStickToggleTarget(AppPreferences.DEFAULT_STICK_TOGGLE_TARGET) }
+                        )
                         ToggleItem(
                             icon = Icons.Rounded.TouchApp,
                             title = stringResource(R.string.settings_touchscreen_right_stick),

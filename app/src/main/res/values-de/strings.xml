@@ -1843,6 +1843,11 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 und viele Modelle der Snapdragon-6/7-Serie</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, aktuelle Snapdragon-7-Serie und 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 und 6 Gen 4</string>
+    <string name="settings_stick_toggle_target">Stick der mittleren Taste</string>
+    <string name="settings_stick_toggle_right">Rechter Stick</string>
+    <string name="settings_stick_toggle_left">Linker Stick</string>
+    <string name="settings_stick_toggle_button">Stick umschalten</string>
+    <string name="settings_help_stick_toggle_target">Wähle den Bildschirm-Stick, den die Taste zwischen Select und Start umschaltet. Rechts: rechten Stick ein- oder ausblenden. Links: zwischen linkem Stick und Steuerkreuz wechseln. Physische Controller bleiben unverändert.</string>
     <string name="settings_touchscreen_right_stick">Rechter Stick per Touchscreen</string>
     <string name="settings_touchscreen_right_stick_desc">Wische über freie Bildschirmbereiche, um den virtuellen rechten Stick zu steuern.</string>
     <string name="settings_help_touchscreen_right_stick">Ordnet Ziehgesten in ungenutzten Bereichen des Spielbildschirms den Achsen des virtuellen rechten Sticks zu. So lässt sich die Kamera bewegen, ohne den sichtbaren Stick zu berühren. Touch-Tasten und sichtbare Sticks funktionieren weiterhin wie gewohnt.</string>

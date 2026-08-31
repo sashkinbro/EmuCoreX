@@ -1343,6 +1343,17 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_racing_mode),
                         onResetToDefault = { onDraftChange(draft.copy(racingMode = defaultProfile.racingMode)) }
                     )
+                    SelectionRow(
+                        title = stringResource(R.string.settings_stick_toggle_target),
+                        options = listOf(
+                            AppPreferences.STICK_TOGGLE_RIGHT to stringResource(R.string.settings_stick_toggle_right),
+                            AppPreferences.STICK_TOGGLE_LEFT to stringResource(R.string.settings_stick_toggle_left)
+                        ),
+                        selectedValue = draft.stickToggleTarget,
+                        onSelected = { onDraftChange(draft.copy(stickToggleTarget = it)) },
+                        helpText = stringResource(R.string.settings_help_stick_toggle_target),
+                        onResetToDefault = { onDraftChange(draft.copy(stickToggleTarget = defaultProfile.stickToggleTarget)) }
+                    )
                     ToggleRow(
                         title = stringResource(R.string.settings_touchscreen_right_stick),
                         checked = draft.touchscreenRightStick,
@@ -1901,6 +1912,17 @@ private fun GameSettingsEditorDialog(
                                 onCheckedChange = { draft = draft.copy(racingMode = it) },
                                 helpText = stringResource(R.string.settings_help_racing_mode),
                                 onResetToDefault = { draft = draft.copy(racingMode = defaultProfile.racingMode) }
+                            )
+                            SelectionRow(
+                                title = stringResource(R.string.settings_stick_toggle_target),
+                                options = listOf(
+                                    AppPreferences.STICK_TOGGLE_RIGHT to stringResource(R.string.settings_stick_toggle_right),
+                                    AppPreferences.STICK_TOGGLE_LEFT to stringResource(R.string.settings_stick_toggle_left)
+                                ),
+                                selectedValue = draft.stickToggleTarget,
+                                onSelected = { draft = draft.copy(stickToggleTarget = it) },
+                                helpText = stringResource(R.string.settings_help_stick_toggle_target),
+                                onResetToDefault = { draft = draft.copy(stickToggleTarget = defaultProfile.stickToggleTarget) }
                             )
                             ToggleRow(
                                 title = stringResource(R.string.settings_touchscreen_right_stick),
@@ -3926,6 +3948,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         touchscreenRightStick = touchscreenRightStick,
         touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
         touchHaptics = touchHaptics,
+        stickToggleTarget = stickToggleTarget,
         touchHapticsPreset = touchHapticsPreset,
         gyroMode = gyroMode,
         gyroSensitivity = gyroSensitivity,
@@ -4046,6 +4069,7 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
             defaultProfile.touchscreenRightStickSensitivity
         ),
         touchHaptics = pick("touchHaptics", touchHaptics, defaultProfile.touchHaptics),
+        stickToggleTarget = pick("stickToggleTarget", stickToggleTarget, defaultProfile.stickToggleTarget),
         touchHapticsPreset = pick("touchHapticsPreset", touchHapticsPreset, defaultProfile.touchHapticsPreset),
         gyroMode = pick("gyroMode", gyroMode, defaultProfile.gyroMode),
         gyroSensitivity = pick("gyroSensitivity", gyroSensitivity, defaultProfile.gyroSensitivity),

@@ -1867,6 +1867,11 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 i wiele serii Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, nowsze z serii Snapdragon 7 oraz 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 oraz 6 Gen 4</string>
+    <string name="settings_stick_toggle_target">Drążek środkowego przycisku</string>
+    <string name="settings_stick_toggle_right">Prawy drążek</string>
+    <string name="settings_stick_toggle_left">Lewy drążek</string>
+    <string name="settings_stick_toggle_button">Przełączanie drążka</string>
+    <string name="settings_help_stick_toggle_target">Wybierz drążek ekranowy przełączany przyciskiem między Select a Start. Prawy: ukrywa lub pokazuje prawy drążek. Lewy: przełącza między lewym drążkiem a krzyżakiem. Nie wpływa to na fizyczne kontrolery.</string>
     <string name="settings_touchscreen_right_stick">Prawa gałka na ekranie dotykowym</string>
     <string name="settings_touchscreen_right_stick_desc">Przesuwaj palcem po wolnej przestrzeni na ekranie, by kontrolować wirtualną prawą gałkę.</string>
     <string name="settings_help_touchscreen_right_stick">Przypisuje gesty przeciągania na niewykorzystanej powierzchni gry do osi prawej gałki, co umożliwia poruszanie kamerą bez konieczności dotykania samej grafiki drążka na ekranie. Przyciski i sam drążek zachowują swoje normalne funkcje.</string>

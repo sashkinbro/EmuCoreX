@@ -33,6 +33,7 @@ data class PerGameSettings(
     val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
     val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
+    val stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
     val gyroSensitivity: Int = AppPreferences.DEFAULT_GYRO_SENSITIVITY,
@@ -313,6 +314,9 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
             AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
         ),
         touchHaptics = optBoolean("touchHaptics", false),
+        stickToggleTarget = AppPreferences.normalizeStickToggleTarget(
+            optInt("stickToggleTarget", AppPreferences.DEFAULT_STICK_TOGGLE_TARGET)
+        ),
         touchHapticsPreset = optInt("touchHapticsPreset", AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET)
             .coerceIn(AppPreferences.TOUCH_HAPTICS_PRESET_SOFT, AppPreferences.TOUCH_HAPTICS_PRESET_STRONG),
         gyroMode = optInt("gyroMode", AppPreferences.GYRO_MODE_OFF).coerceIn(AppPreferences.GYRO_MODE_OFF, AppPreferences.GYRO_MODE_STEERING),
@@ -492,6 +496,9 @@ private fun PerGameSettings.toJson(): JSONObject {
             put("touchscreenRightStickSensitivity", touchscreenRightStickSensitivity)
         }
         if (shouldWrite("touchHaptics")) put("touchHaptics", touchHaptics)
+        if (shouldWrite("stickToggleTarget")) {
+            put("stickToggleTarget", AppPreferences.normalizeStickToggleTarget(stickToggleTarget))
+        }
         if (shouldWrite("touchHapticsPreset")) put("touchHapticsPreset", touchHapticsPreset)
         if (shouldWrite("gyroMode")) put("gyroMode", gyroMode)
         if (shouldWrite("gyroSensitivity")) put("gyroSensitivity", gyroSensitivity)

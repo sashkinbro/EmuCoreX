@@ -44,6 +44,7 @@ import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.resolveShaderChain
+import com.sbro.emucorex.data.toggleStick
 import com.sbro.emucorex.data.TouchControlsLayoutProfile
 import com.sbro.emucorex.data.PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY
 import com.sbro.emucorex.data.saveTouchControlsLayout
@@ -157,6 +158,7 @@ data class EmulationUiState(
     val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
     val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
+    val stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
     val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
@@ -440,6 +442,7 @@ private data class LiveRuntimeSnapshot(
     val touchscreenRightStick: Boolean,
     val touchscreenRightStickSensitivity: Int,
     val touchHaptics: Boolean,
+    val stickToggleTarget: Int,
     val touchHapticsPreset: Int,
     val touchHapticsStrength: Int,
     val touchControlVisualStyle: TouchControlVisualStyle,
@@ -1224,6 +1227,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
         viewModelScope.launch {
+            preferences.stickToggleTarget.collect { value ->
+                val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
+                if (profile == null || profile.providedKeys?.contains("stickToggleTarget") == false) {
+                    _uiState.value = _uiState.value.copy(stickToggleTarget = value)
+                }
+            }
+        }
+        viewModelScope.launch {
             preferences.touchHapticsPreset.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(touchHapticsPreset = value) }
             }
@@ -1923,6 +1934,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     touchscreenRightStick = liveRuntime.touchscreenRightStick,
                     touchscreenRightStickSensitivity = liveRuntime.touchscreenRightStickSensitivity,
                     touchHaptics = liveRuntime.touchHaptics,
+                    stickToggleTarget = liveRuntime.stickToggleTarget,
                     touchHapticsPreset = liveRuntime.touchHapticsPreset,
                     touchHapticsStrength = liveRuntime.touchHapticsStrength,
                     touchControlVisualStyle = liveRuntime.touchControlVisualStyle,
@@ -2448,27 +2460,28 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun setStickToggleTarget(value: Int) {
+        viewModelScope.launch {
+            val target = AppPreferences.normalizeStickToggleTarget(value)
+            persistRuntimeState(_uiState.value.copy(stickToggleTarget = target)) {
+                preferences.setStickToggleTarget(target)
+            }
+        }
+    }
+
+    fun toggleSelectedStick() {
+        viewModelScope.launch {
+            val current = _uiState.value
+            val layout = current.toTouchControlsLayoutProfile().toggleStick(current.stickToggleTarget)
+            persistTouchControlsLayout(current.withTouchControlsLayout(layout))
+        }
+    }
+
     fun toggleLeftInputMode() {
         viewModelScope.launch {
             val current = _uiState.value
-            val updatedLayouts = current.controlLayouts.toMutableMap()
-            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
-            val leftStickLayout = updatedLayouts["left_stick"] ?: defaults["left_stick"] ?: OverlayControlLayout(scale = current.stickScale)
-            val showingStick = leftStickLayout.visible
-
-            updatedLayouts["left_stick"] = leftStickLayout.copy(visible = !showingStick)
-            listOf("dpad_up", "dpad_down", "dpad_left", "dpad_right").forEach { id ->
-                val currentLayout = updatedLayouts[id] ?: defaults[id] ?: OverlayControlLayout()
-                updatedLayouts[id] = currentLayout.copy(visible = showingStick)
-            }
-
-            persistTouchControlsLayout(
-                current.copy(
-                    controlLayouts = updatedLayouts,
-                    dpadOffset = current.lstickOffset,
-                    lstickOffset = current.dpadOffset
-                )
-            )
+            val layout = current.toTouchControlsLayoutProfile().toggleStick(AppPreferences.STICK_TOGGLE_LEFT)
+            persistTouchControlsLayout(current.withTouchControlsLayout(layout))
         }
     }
 
@@ -4000,6 +4013,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             touchscreenRightStick = settings.touchscreenRightStick,
             touchscreenRightStickSensitivity = settings.touchscreenRightStickSensitivity,
             touchHaptics = settings.touchHaptics,
+            stickToggleTarget = settings.stickToggleTarget,
             touchHapticsPreset = settings.touchHapticsPreset,
             touchHapticsStrength = settings.touchHapticsStrength,
             touchControlVisualStyle = settings.touchControlVisualStyle,
@@ -4186,6 +4200,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 touchscreenRightStickSensitivity
             ) { touchscreenRightStickSensitivity },
             touchHaptics = pick("touchHaptics", touchHaptics) { touchHaptics },
+            stickToggleTarget = pick("stickToggleTarget", stickToggleTarget) { stickToggleTarget },
             touchHapticsPreset = pick("touchHapticsPreset", touchHapticsPreset) { touchHapticsPreset },
             touchHapticsStrength = touchHapticsStrength,
             touchControlVisualStyle = profile.touchControlVisualStyle ?: touchControlVisualStyle,
@@ -4306,6 +4321,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
         val globalTouchscreenRightStickSensitivity = preferences.touchscreenRightStickSensitivity.first()
         val globalTouchHaptics = preferences.touchHaptics.first()
+        val globalStickToggleTarget = preferences.stickToggleTarget.first()
         val globalTouchHapticsPreset = preferences.touchHapticsPreset.first()
         val globalTouchControlVisualStyle = preferences.touchControlVisualStyle.first()
         val globalTouchControlPressEffect = preferences.touchControlPressEffect.first()
@@ -4360,6 +4376,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             touchscreenRightStick = touchscreenRightStick,
             touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
             touchHaptics = touchHaptics,
+            stickToggleTarget = stickToggleTarget,
             touchHapticsPreset = touchHapticsPreset,
             touchControlVisualStyle = touchControlVisualStyle.takeIf { it != globalTouchControlVisualStyle },
             touchControlPressEffect = touchControlPressEffect.takeIf { it != globalTouchControlPressEffect },
@@ -4463,6 +4480,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 add("touchscreenRightStickSensitivity")
             }
             if (touchHaptics != globalTouchHaptics) add("touchHaptics")
+            if (stickToggleTarget != globalStickToggleTarget) add("stickToggleTarget")
             if (touchHapticsPreset != globalTouchHapticsPreset) add("touchHapticsPreset")
             if (profile.touchControlVisualStyle != null) add("touchControlVisualStyle")
             if (profile.touchControlPressEffect != null) add("touchControlPressEffect")

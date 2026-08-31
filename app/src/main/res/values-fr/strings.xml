@@ -1843,6 +1843,11 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx : Snapdragon 845/855/865/888 et de nombreux modèles Snapdragon séries 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx : Snapdragon 8 Gen 1/2/3, 8s Gen 3, modèles récents Snapdragon série 7 et 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx : Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 et 6 Gen 4</string>
+    <string name="settings_stick_toggle_target">Stick du bouton central</string>
+    <string name="settings_stick_toggle_right">Stick droit</string>
+    <string name="settings_stick_toggle_left">Stick gauche</string>
+    <string name="settings_stick_toggle_button">Basculer le stick</string>
+    <string name="settings_help_stick_toggle_target">Choisissez le stick à l’écran contrôlé par le bouton entre Select et Start. Droit : masquer ou afficher le stick droit. Gauche : alterner entre le stick gauche et la croix directionnelle. Les manettes physiques ne sont pas affectées.</string>
     <string name="settings_touchscreen_right_stick">Stick droit sur l’écran tactile</string>
     <string name="settings_touchscreen_right_stick_desc">Faites glisser le doigt sur une zone libre de l’écran pour contrôler le stick droit virtuel.</string>
     <string name="settings_help_touchscreen_right_stick">Associe les gestes de glissement dans les zones inutilisées de l’écran de jeu aux axes du stick droit virtuel, afin de déplacer la caméra sans toucher le stick visible. Les boutons tactiles et les sticks visibles conservent leur fonctionnement normal.</string>

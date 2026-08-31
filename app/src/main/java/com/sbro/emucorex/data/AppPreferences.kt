@@ -216,6 +216,7 @@ data class SettingsSnapshot(
     val touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
     val touchscreenRightStickSensitivity: Int = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY,
     val touchHaptics: Boolean = false,
+    val stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
     val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
@@ -338,7 +339,7 @@ class AppPreferences(private val context: Context) {
             "fpsOverlayCorner", "fpsOverlayScale", "fpsOverlayMetrics", "confirmSaveLoadActions",
             "backButtonExitsGame", "compactControls", "keepScreenOn", "overlayScale",
             "overlayOpacity", "overlayShow", "racingMode", "touchscreenRightStick",
-            "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset",
+            "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset", "stickToggleTarget",
             "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
             "gyroInvertX", "gyroInvertY", "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
             "gamepadRightStickSensitivity", "gamepadRightStickUpToR2",
@@ -446,6 +447,13 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
         const val DEFAULT_PAD_VIBRATION_STRENGTH = 100
         const val DEFAULT_TOUCH_HAPTICS_STRENGTH = 60
+        const val STICK_TOGGLE_LEFT = 0
+        const val STICK_TOGGLE_RIGHT = 1
+        const val DEFAULT_STICK_TOGGLE_TARGET = STICK_TOGGLE_RIGHT
+
+        fun normalizeStickToggleTarget(value: Int): Int =
+            if (value == STICK_TOGGLE_LEFT) STICK_TOGGLE_LEFT else STICK_TOGGLE_RIGHT
+
         const val TOUCH_HAPTICS_PRESET_SOFT = 0
         const val TOUCH_HAPTICS_PRESET_BALANCED = 1
         const val TOUCH_HAPTICS_PRESET_CRISP = 2
@@ -693,6 +701,7 @@ class AppPreferences(private val context: Context) {
             booleanPreferencesKey("prefer_external_gamepad_player_one")
         private val HIDE_OVERLAY_ON_GAMEPAD = booleanPreferencesKey("hide_overlay_on_gamepad")
         private val TOUCH_HAPTICS = booleanPreferencesKey("touch_haptics")
+        private val STICK_TOGGLE_TARGET = intPreferencesKey("stick_toggle_target")
         private val TOUCH_HAPTICS_PRESET = intPreferencesKey("touch_haptics_preset")
         private val TOUCH_HAPTICS_STRENGTH = intPreferencesKey("touch_haptics_strength")
         private val GYRO_MODE = intPreferencesKey("gyro_mode")
@@ -1873,6 +1882,7 @@ class AppPreferences(private val context: Context) {
                     TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
                 ),
                 touchHaptics = prefs[TOUCH_HAPTICS] ?: false,
+                stickToggleTarget = normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET),
                 touchHapticsPreset = (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG),
                 touchHapticsStrength = (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100),
                 gyroMode = (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING),
@@ -2121,6 +2131,14 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setTouchHaptics(enabled: Boolean) {
         context.dataStore.edit { it[TOUCH_HAPTICS] = enabled }
+    }
+
+    val stickToggleTarget: Flow<Int> = context.dataStore.data.map { prefs ->
+        normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET)
+    }.distinctUntilChanged()
+
+    suspend fun setStickToggleTarget(value: Int) {
+        context.dataStore.edit { it[STICK_TOGGLE_TARGET] = normalizeStickToggleTarget(value) }
     }
 
     val touchHapticsPreset: Flow<Int> = context.dataStore.data.map { prefs ->
@@ -3727,6 +3745,7 @@ class AppPreferences(private val context: Context) {
                 )
             )
             put("touchHaptics", prefs[TOUCH_HAPTICS] ?: false)
+            put("stickToggleTarget", normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET))
             put("touchHapticsPreset", (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG))
             put("touchHapticsStrength", (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100))
             put("gyroMode", (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING))
@@ -4120,6 +4139,7 @@ class AppPreferences(private val context: Context) {
                 TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX
             )
             prefs[TOUCH_HAPTICS] = json.optBoolean("touchHaptics", false)
+            prefs[STICK_TOGGLE_TARGET] = normalizeStickToggleTarget(json.optInt("stickToggleTarget", DEFAULT_STICK_TOGGLE_TARGET))
             prefs[TOUCH_HAPTICS_PRESET] = json.optInt("touchHapticsPreset", DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG)
             prefs[TOUCH_HAPTICS_STRENGTH] = json.optInt("touchHapticsStrength", DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100)
             prefs[GYRO_MODE] = json.optInt("gyroMode", GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING)

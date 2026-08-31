@@ -2,6 +2,27 @@ package com.sbro.emucorex.data
 
 const val PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY = "touchControlsLayout"
 
+fun TouchControlsLayoutProfile.toggleStick(target: Int): TouchControlsLayoutProfile {
+    val layouts = controlLayouts.toMutableMap()
+    val defaults = AppPreferences.defaultOverlayControlLayouts(stickScale)
+    val toggleLeft = AppPreferences.normalizeStickToggleTarget(target) == AppPreferences.STICK_TOGGLE_LEFT
+    val stickId = if (toggleLeft) "left_stick" else "right_stick"
+    val stick = layouts[stickId] ?: defaults.getValue(stickId)
+    layouts[stickId] = stick.copy(visible = !stick.visible)
+    if (!toggleLeft) return copy(controlLayouts = layouts)
+
+    // Preserve the existing left-stick/D-pad swap, including customized positions.
+    listOf("dpad_up", "dpad_down", "dpad_left", "dpad_right").forEach { id ->
+        val button = layouts[id] ?: defaults.getValue(id)
+        layouts[id] = button.copy(visible = stick.visible)
+    }
+    return copy(
+        controlLayouts = layouts,
+        dpadOffset = lstickOffset,
+        lstickOffset = dpadOffset
+    )
+}
+
 fun OverlayLayoutSnapshot.toTouchControlsLayoutProfile(): TouchControlsLayoutProfile {
     return TouchControlsLayoutProfile(
         dpadOffset = dpadOffset,

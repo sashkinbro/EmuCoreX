@@ -1870,6 +1870,11 @@
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 і багато моделей серій Snapdragon 6/7</string>
     <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, нові моделі серії Snapdragon 7 та 6 Gen 1/3</string>
     <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 та 6 Gen 4</string>
+    <string name="settings_stick_toggle_target">Стік для центральної кнопки</string>
+    <string name="settings_stick_toggle_right">Правий стік</string>
+    <string name="settings_stick_toggle_left">Лівий стік</string>
+    <string name="settings_stick_toggle_button">Перемикання стіка</string>
+    <string name="settings_help_stick_toggle_target">Виберіть, яким екранним стіком керує кнопка між Select і Start. Правий: приховати або показати правий стік. Лівий: перемикатися між лівим стіком і хрестовиною. На фізичні геймпади це не впливає.</string>
     <string name="settings_touchscreen_right_stick">Правий стік на сенсорному екрані</string>
     <string name="settings_touchscreen_right_stick_desc">Проводьте пальцем по вільній частині екрана, щоб керувати віртуальним правим стіком.</string>
     <string name="settings_help_touchscreen_right_stick">Прив’язує жести перетягування у вільних ділянках ігрового екрана до осей віртуального правого стіка, щоб рухати камерою без торкання видимого стіка. Сенсорні кнопки та видимі стіки працюють як зазвичай.</string>

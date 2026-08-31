@@ -597,7 +597,7 @@ private fun controlTitle(controlId: String): String = when (controlId) {
     "cross" -> stringResource(R.string.settings_gamepad_action_cross)
     "right_stick" -> "Right Stick"
     "select" -> stringResource(R.string.settings_gamepad_action_select)
-    "left_input_toggle" -> stringResource(R.string.settings_gamepad_action_left_input_toggle)
+    "left_input_toggle" -> stringResource(R.string.settings_stick_toggle_button)
     "pressure" -> stringResource(R.string.settings_gamepad_action_pressure)
     "start" -> stringResource(R.string.settings_gamepad_action_start)
     "l3" -> stringResource(R.string.settings_gamepad_action_l3)
