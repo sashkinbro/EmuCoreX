@@ -2183,17 +2183,31 @@ void GSDeviceOGL::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r
 	if (dTex->GetState() == GSTexture::State::Cleared && !full_draw_copy)
 		CommitClear(dTex, false);
 
-	if (GLAD_GL_VERSION_4_3 || GLAD_GL_ARB_copy_image)
+	if ((GLAD_GL_VERSION_4_3 || GLAD_GL_ARB_copy_image) && glCopyImageSubData)
 	{
 		glCopyImageSubData(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
 			0, destX, destY, 0, r.width(), r.height(), 1);
 	}
-	else if (GLAD_GL_EXT_copy_image)
+	else if (GLAD_GL_EXT_copy_image && glCopyImageSubDataEXT)
 	{
 		glCopyImageSubDataEXT(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
 			0, destX, destY, 0, r.width(), r.height(), 1);
 	}
-	else if (GLAD_GL_NV_copy_image)
+	// Keep the established EXT path and depth/stencil behavior. Some GLES contexts
+	// expose only core 3.2 or OES copy-image; color copies need not use an FBO there.
+	else if (m_is_gles && !sTex->IsDepthStencil() && !dTex->IsDepthStencil() &&
+		!m_gl_context->IsCopyImageDisabled() && GLAD_GL_ES_VERSION_3_2 && glCopyImageSubData)
+	{
+		glCopyImageSubData(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
+			0, destX, destY, 0, r.width(), r.height(), 1);
+	}
+	else if (!sTex->IsDepthStencil() && !dTex->IsDepthStencil() &&
+		GLAD_GL_OES_copy_image && glCopyImageSubDataOES)
+	{
+		glCopyImageSubDataOES(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
+			0, destX, destY, 0, r.width(), r.height(), 1);
+	}
+	else if (GLAD_GL_NV_copy_image && glCopyImageSubDataNV)
 	{
 		glCopyImageSubDataNV(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
 			0, destX, destY, 0, r.width(), r.height(), 1);

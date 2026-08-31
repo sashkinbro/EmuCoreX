@@ -38,7 +38,7 @@ static bool ShouldPreferESContext()
 #endif
 }
 
-static void DisableBrokenExtensions(const char* gl_vendor, const char* gl_renderer)
+static bool DisableBrokenExtensions(const char* gl_vendor, const char* gl_renderer)
 {
 	if (std::strstr(gl_vendor, "ARM") || std::strstr(gl_renderer, "Mali"))
 	{
@@ -62,12 +62,14 @@ static void DisableBrokenExtensions(const char* gl_vendor, const char* gl_render
 			Console.Warning("Old Mali driver detected, disabling GL_{EXT,OES}_copy_image");
 			GLAD_GL_EXT_copy_image = 0;
 			GLAD_GL_OES_copy_image = 0;
+			return true;
 		}
 		else
 		{
 			Console.Warning("Modern Mali detected (%s), keeping GL_{EXT,OES}_copy_image enabled.", gl_renderer);
 		}
 	}
+	return false;
 }
 
 GLContext::GLContext(const WindowInfo& wi)
@@ -151,7 +153,7 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	const char* gl_vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
 	const char* gl_renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
 	if (gl_vendor && gl_renderer)
-		DisableBrokenExtensions(gl_vendor, gl_renderer);
+		context->m_copy_image_disabled = DisableBrokenExtensions(gl_vendor, gl_renderer);
 
 	return context;
 }

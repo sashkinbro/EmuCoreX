@@ -35,6 +35,7 @@ public:
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_wi; }
 	__fi bool IsGLES() const { return (m_version.profile == Profile::ES); }
+	__fi bool IsCopyImageDisabled() const { return m_copy_image_disabled; }
 	__fi u32 GetSurfaceWidth() const { return m_wi.surface_width; }
 	__fi u32 GetSurfaceHeight() const { return m_wi.surface_height; }
 
@@ -64,4 +65,5 @@ protected:
 
 	WindowInfo m_wi;
 	Version m_version = {};
+	bool m_copy_image_disabled = false;
 };
