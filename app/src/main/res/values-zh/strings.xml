@@ -2640,4 +2640,11 @@
     <string name="drive_transfer_speed">%1$s/秒</string>
     <string name="drive_transfer_remaining">预计还需 %1$s</string>
     <string name="drive_empty_description">已完成的备份会显示在这里。创建第一个备份，将游戏存档和设置保存到您自己的 Google 云端硬盘。</string>
+    <string name="home_game_menu_hide">隐藏</string>
+    <string name="home_game_menu_show_hidden">显示隐藏项</string>
+    <string name="home_hidden_title">隐藏的项目</string>
+    <string name="home_hidden_description">隐藏的项目仍保留在设备上。您可以逐个或一次性将它们全部恢复到游戏库。</string>
+    <string name="home_hidden_show">显示</string>
+    <string name="home_hidden_show_all">全部显示</string>
+    <string name="home_hidden_update_failed">无法更改项目的显示状态，请重试。</string>
 </resources>

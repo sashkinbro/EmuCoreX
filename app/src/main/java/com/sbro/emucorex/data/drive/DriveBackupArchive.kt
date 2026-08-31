@@ -327,7 +327,7 @@ class DriveBackupArchive(private val context: Context) {
         const val FORMAT = "emucorex-drive-backup"
         val ALL_CATEGORIES = setOf("settings", "memory-cards", "save-states", "cheat-files", "patches", "customization", "textures")
         private val JSON_FILES = setOf("settings.json", "per-game.json", "cheats.json")
-        private val LOCAL_KEYS = setOf("biosPath", "gamePath", "gamePaths", "emulatorDataPath", "customDriverPath", "gpuDriverType", "gpuHardwareProfile", "onboardingCompleted", "dev9LocalLinkRoomCode", "dev9LocalLinkPeerId", "dev9LocalLinkAddress", "dev9Dns1", "dev9Dns2", "coverDownloadBaseUrl", "arcadeCoverDownloadBaseUrl")
+        private val LOCAL_KEYS = setOf("hiddenGamePaths", "biosPath", "gamePath", "gamePaths", "emulatorDataPath", "customDriverPath", "gpuDriverType", "gpuHardwareProfile", "onboardingCompleted", "dev9LocalLinkRoomCode", "dev9LocalLinkPeerId", "dev9LocalLinkAddress", "dev9Dns1", "dev9Dns2", "coverDownloadBaseUrl", "arcadeCoverDownloadBaseUrl")
         private val STYLE_KEYS = setOf("themeMode", "customTheme", "customThemeLibrary", "appFontChoice", "appFontScale", "customFontName", "homeGridScale", "homeBackgroundDim", "homeBackgroundType", "homeBackgroundPreset", "emulationSideArtworkDim", "emulationSideArtwork", "touchControlVisualStyle", "touchControlPressEffect", "gameMenuLayoutStyle", "drawerVisualStyle", "coverArtStyle")
         private const val MAX_JSON_BYTES = 32L * 1024 * 1024
         private const val SPACE_RESERVE = 32L * 1024 * 1024

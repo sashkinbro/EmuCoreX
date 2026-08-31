@@ -2656,4 +2656,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">About %1$s remaining</string>
     <string name="drive_empty_description">Your completed backups will appear here. Create your first copy to keep your saves and settings on your Google Drive.</string>
+    <string name="home_game_menu_hide">Hide</string>
+    <string name="home_game_menu_show_hidden">Show hidden</string>
+    <string name="home_hidden_title">Hidden items</string>
+    <string name="home_hidden_description">Hidden items stay on your device. Show them again individually or all at once.</string>
+    <string name="home_hidden_show">Show</string>
+    <string name="home_hidden_show_all">Show all</string>
+    <string name="home_hidden_update_failed">Could not update item visibility. Please try again.</string>
 </resources>

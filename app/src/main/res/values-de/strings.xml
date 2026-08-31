@@ -2641,4 +2641,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Noch etwa %1$s</string>
     <string name="drive_empty_description">Hier erscheinen deine abgeschlossenen Backups. Erstelle dein erstes Backup, um Spielstände und Einstellungen auf deinem Google Drive zu sichern.</string>
+    <string name="home_game_menu_hide">Ausblenden</string>
+    <string name="home_game_menu_show_hidden">Ausgeblendete anzeigen</string>
+    <string name="home_hidden_title">Ausgeblendete Einträge</string>
+    <string name="home_hidden_description">Ausgeblendete Einträge bleiben auf deinem Gerät. Du kannst sie einzeln oder alle auf einmal wieder anzeigen.</string>
+    <string name="home_hidden_show">Anzeigen</string>
+    <string name="home_hidden_show_all">Alle anzeigen</string>
+    <string name="home_hidden_update_failed">Die Sichtbarkeit konnte nicht geändert werden. Bitte versuche es erneut.</string>
 </resources>

@@ -2643,4 +2643,11 @@
     <string name="drive_transfer_speed">%1$s/с</string>
     <string name="drive_transfer_remaining">Ещё примерно %1$s</string>
     <string name="drive_empty_description">Здесь появятся готовые резервные копии. Создайте первую, чтобы сохранить игровые сохранения и настройки на своём Google Диске.</string>
+    <string name="home_game_menu_hide">Скрыть</string>
+    <string name="home_game_menu_show_hidden">Показать скрытые</string>
+    <string name="home_hidden_title">Скрытые элементы</string>
+    <string name="home_hidden_description">Скрытые элементы остаются на устройстве. Их можно вернуть в библиотеку по одному или все сразу.</string>
+    <string name="home_hidden_show">Показать</string>
+    <string name="home_hidden_show_all">Показать все</string>
+    <string name="home_hidden_update_failed">Не удалось изменить видимость элементов. Попробуйте ещё раз.</string>
 </resources>

@@ -46,6 +46,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -73,6 +75,8 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.ViewModule
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
 import androidx.compose.material3.Button
@@ -96,6 +100,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -172,6 +177,13 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showHiddenGames by rememberSaveable { mutableStateOf(false) }
+    val onShowHiddenGames: (() -> Unit)? = if (uiState.hiddenGames.isNotEmpty()) {
+        { showHiddenGames = true }
+    } else null
+    LaunchedEffect(uiState.hiddenGames.isEmpty()) {
+        if (uiState.hiddenGames.isEmpty()) showHiddenGames = false
+    }
     var showWelcomeSupportOptions by remember { mutableStateOf(false) }
     val supportOffers = if (uiState.isProUnlocked && !uiState.isProPurchaseStatusVerified) {
         emptyList()
@@ -346,6 +358,13 @@ fun HomeScreen(
         viewModel.clearProPurchaseMessage()
     }
 
+    val visibilityMessage = uiState.visibilityMessageResId?.let { stringResource(it) }
+    LaunchedEffect(visibilityMessage) {
+        visibilityMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearVisibilityMessage()
+        }
+    }
     var showSortMenu by remember { mutableStateOf(false) }
     LaunchedEffect(uiState.isLoading, uiState.games.size, uiState.recentGames.size, shouldRequestGamepadFocus) {
         if (shouldRequestGamepadFocus && !uiState.isLoading && uiState.games.isNotEmpty()) {
@@ -477,6 +496,8 @@ fun HomeScreen(
                         onLongClickManage = onManageGameClick,
                         onLongClickCreateShortcut = onCreateShortcutClick,
                         onLongClickOpenGameDb = onOpenGameDbClick,
+                        onLongClickHide = { viewModel.setGameHidden(it, true) },
+                        onShowHiddenGames = onShowHiddenGames,
                         onLongClickCustomCover = { game ->
                             gameAwaitingPickerLaunch = game
                         }
@@ -534,7 +555,7 @@ fun HomeScreen(
 
                             if (uiState.games.isEmpty()) {
                                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                                    NoGamesState()
+                                    NoGamesState(onShowHiddenGames = onShowHiddenGames)
                                 }
                             } else {
                                 if (uiState.recentGames.isNotEmpty()) {
@@ -588,6 +609,8 @@ fun HomeScreen(
                                                         onLongClickManage = { onManageGameClick(game) },
                                                         onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                         onLongClickOpenGameDb = { onOpenGameDbClick(game) },
+                                                        onLongClickHide = { viewModel.setGameHidden(game, true) },
+                                                        onShowHiddenGames = onShowHiddenGames,
                                                         onLongClickCustomCover = {
                                                             gameAwaitingPickerLaunch = game
                                                         },
@@ -638,6 +661,8 @@ fun HomeScreen(
                                                                 onLongClickManage = { onManageGameClick(game) },
                                                                 onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                                 onLongClickOpenGameDb = { onOpenGameDbClick(game) },
+                                                                onLongClickHide = { viewModel.setGameHidden(game, true) },
+                                                                onShowHiddenGames = onShowHiddenGames,
                                                                 onLongClickCustomCover = {
                                                                     gameAwaitingPickerLaunch = game
                                                                 }
@@ -654,6 +679,8 @@ fun HomeScreen(
                                                                 onLongClickManage = { onManageGameClick(game) },
                                                                 onLongClickCreateShortcut = { onCreateShortcutClick(game) },
                                                                 onLongClickOpenGameDb = { onOpenGameDbClick(game) },
+                                                                onLongClickHide = { viewModel.setGameHidden(game, true) },
+                                                                onShowHiddenGames = onShowHiddenGames,
                                                                 onLongClickCustomCover = {
                                                                     gameAwaitingPickerLaunch = game
                                                                 }
@@ -687,6 +714,12 @@ fun HomeScreen(
             }
         }
     }
+    if (showHiddenGames && uiState.hiddenGames.isNotEmpty()) HiddenGamesDialog(
+        games = uiState.hiddenGames,
+        onShowGame = { viewModel.setGameHidden(it, false) },
+        onShowAll = viewModel::showAllHiddenGames,
+        onDismiss = { showHiddenGames = false }
+    )
     val canShowWelcomeDialog = !uiState.isBootstrapping &&
         !uiState.isLoading &&
         !uiState.isRefreshing
@@ -1364,7 +1397,7 @@ private fun StatusCard(
 }
 
 @Composable
-internal fun NoGamesState() {
+internal fun NoGamesState(onShowHiddenGames: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1388,11 +1421,16 @@ internal fun NoGamesState() {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = stringResource(R.string.home_empty_search_subtitle),
+                text = stringResource(if (onShowHiddenGames != null) R.string.home_hidden_description else R.string.home_empty_search_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
+            if (onShowHiddenGames != null) FilledTonalButton(onClick = onShowHiddenGames) {
+                Icon(Icons.Rounded.Visibility, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.home_game_menu_show_hidden))
+            }
         }
     }
 }
@@ -1410,6 +1448,8 @@ private fun RecentGameCard(
     onLongClickManage: () -> Unit,
     onLongClickCreateShortcut: () -> Unit,
     onLongClickOpenGameDb: () -> Unit,
+    onLongClickHide: () -> Unit,
+    onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
     compact: Boolean,
     coverScale: Float
@@ -1418,7 +1458,7 @@ private fun RecentGameCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.95f else 1f, tween(100))
-    var showMenu by remember { mutableStateOf(false) }
+    var showMenu by remember(game.path) { mutableStateOf(false) }
     val coverContentScale = if (game.serial?.startsWith("NM") == true) ContentScale.Fit else ContentScale.Crop
 
     Box(
@@ -1501,6 +1541,13 @@ private fun RecentGameCard(
                     showMenu = false
                     onLongClickOpenGameDb()
                 },
+                onHide = {
+                    showMenu = false
+                    onLongClickHide()
+                },
+                onShowHiddenGames = onShowHiddenGames?.let { action ->
+                    { showMenu = false; action() }
+                },
                 onCustomCover = {
                     showMenu = false
                     onLongClickCustomCover()
@@ -1523,13 +1570,15 @@ private fun GameCard(
     onLongClickManage: () -> Unit,
     onLongClickCreateShortcut: () -> Unit,
     onLongClickOpenGameDb: () -> Unit,
+    onLongClickHide: () -> Unit,
+    onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.96f else 1f, tween(100))
-    var showMenu by remember { mutableStateOf(false) }
+    var showMenu by remember(game.path) { mutableStateOf(false) }
     val coverContentScale = if (game.serial?.startsWith("NM") == true) ContentScale.Fit else ContentScale.Crop
     val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val gridCardBorder = if (isLightTheme) {
@@ -1617,6 +1666,13 @@ private fun GameCard(
                     showMenu = false
                     onLongClickOpenGameDb()
                 },
+                onHide = {
+                    showMenu = false
+                    onLongClickHide()
+                },
+                onShowHiddenGames = onShowHiddenGames?.let { action ->
+                    { showMenu = false; action() }
+                },
                 onCustomCover = {
                     showMenu = false
                     onLongClickCustomCover()
@@ -1639,13 +1695,15 @@ private fun GameListCard(
     onLongClickManage: () -> Unit,
     onLongClickCreateShortcut: () -> Unit,
     onLongClickOpenGameDb: () -> Unit,
+    onLongClickHide: () -> Unit,
+    onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(if (isPressed) 0.985f else 1f, tween(100))
-    var showMenu by remember { mutableStateOf(false) }
+    var showMenu by remember(game.path) { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxWidth()) {
         Surface(
@@ -1757,6 +1815,13 @@ private fun GameListCard(
                     showMenu = false
                     onLongClickOpenGameDb()
                 },
+                onHide = {
+                    showMenu = false
+                    onLongClickHide()
+                },
+                onShowHiddenGames = onShowHiddenGames?.let { action ->
+                    { showMenu = false; action() }
+                },
                 onCustomCover = {
                     showMenu = false
                     onLongClickCustomCover()
@@ -1810,6 +1875,65 @@ internal fun CoverPlaceholderArt(
 }
 
 @Composable
+private fun HiddenGamesDialog(
+    games: List<GameItem>,
+    onShowGame: (GameItem) -> Unit,
+    onShowAll: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        showEyebrow = false,
+        icon = { Icon(Icons.Rounded.VisibilityOff, null, tint = MaterialTheme.colorScheme.primary) },
+        title = { Text(stringResource(R.string.home_hidden_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.home_hidden_description), style = MaterialTheme.typography.bodyMedium)
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 340.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(games, key = { it.path }) { game ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        ) {
+                            Row(
+                                Modifier.padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                GameCoverArt(
+                                    coverPath = game.coverArtPath,
+                                    fallbackTitle = game.title,
+                                    modifier = Modifier.width(40.dp).height(58.dp).clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Fit
+                                )
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(game.title, style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(game.fileName, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                                TextButton(onClick = { onShowGame(game) }) {
+                                    Text(stringResource(R.string.home_hidden_show))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onShowAll) { Text(stringResource(R.string.home_hidden_show_all)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } }
+    )
+}
+
+@Composable
 internal fun GameCardContextMenu(
     expanded: Boolean,
     offset: DpOffset,
@@ -1820,7 +1944,9 @@ internal fun GameCardContextMenu(
     onManage: () -> Unit,
     onCreateShortcut: () -> Unit,
     onOpenGameDb: () -> Unit,
-    onCustomCover: () -> Unit
+    onCustomCover: () -> Unit,
+    onHide: () -> Unit,
+    onShowHiddenGames: (() -> Unit)?
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -1870,6 +1996,17 @@ internal fun GameCardContextMenu(
             text = stringResource(R.string.home_game_menu_custom_cover),
             icon = Icons.Rounded.Image,
             onClick = onCustomCover
+        )
+        GameContextMenuDivider()
+        GameContextMenuItem(
+            text = stringResource(R.string.home_game_menu_hide),
+            icon = Icons.Rounded.VisibilityOff,
+            onClick = onHide
+        )
+        if (onShowHiddenGames != null) GameContextMenuItem(
+            text = stringResource(R.string.home_game_menu_show_hidden),
+            icon = Icons.Rounded.Visibility,
+            onClick = onShowHiddenGames
         )
     }
 }

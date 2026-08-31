@@ -2641,4 +2641,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Encore environ %1$s</string>
     <string name="drive_empty_description">Vos sauvegardes terminées apparaîtront ici. Créez la première pour conserver vos parties et vos paramètres sur votre Google Drive.</string>
+    <string name="home_game_menu_hide">Masquer</string>
+    <string name="home_game_menu_show_hidden">Afficher les éléments masqués</string>
+    <string name="home_hidden_title">Éléments masqués</string>
+    <string name="home_hidden_description">Les éléments masqués restent sur votre appareil. Vous pouvez les réafficher individuellement ou tous à la fois.</string>
+    <string name="home_hidden_show">Afficher</string>
+    <string name="home_hidden_show_all">Tout afficher</string>
+    <string name="home_hidden_update_failed">Impossible de modifier la visibilité des éléments. Veuillez réessayer.</string>
 </resources>

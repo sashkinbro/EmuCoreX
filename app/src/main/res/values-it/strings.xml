@@ -2639,4 +2639,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Circa %1$s rimanenti</string>
     <string name="drive_empty_description">Qui appariranno i backup completati. Crea il primo per conservare i salvataggi e le impostazioni sul tuo Google Drive.</string>
+    <string name="home_game_menu_hide">Nascondi</string>
+    <string name="home_game_menu_show_hidden">Mostra elementi nascosti</string>
+    <string name="home_hidden_title">Elementi nascosti</string>
+    <string name="home_hidden_description">Gli elementi nascosti rimangono sul dispositivo. Puoi mostrarli di nuovo singolarmente o tutti insieme.</string>
+    <string name="home_hidden_show">Mostra</string>
+    <string name="home_hidden_show_all">Mostra tutti</string>
+    <string name="home_hidden_update_failed">Impossibile modificare la visibilità degli elementi. Riprova.</string>
 </resources>

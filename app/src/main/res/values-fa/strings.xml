@@ -2654,4 +2654,11 @@
     <string name="drive_transfer_speed">%1$s/ثانیه</string>
     <string name="drive_transfer_remaining">حدود %1$s باقی مانده</string>
     <string name="drive_empty_description">نسخه‌های پشتیبان تکمیل‌شده اینجا نمایش داده می‌شوند. اولین نسخه را ایجاد کنید تا ذخیره‌های بازی و تنظیمات در Google Drive شما نگهداری شوند.</string>
+    <string name="home_game_menu_hide">پنهان کردن</string>
+    <string name="home_game_menu_show_hidden">نمایش موارد پنهان</string>
+    <string name="home_hidden_title">موارد پنهان</string>
+    <string name="home_hidden_description">موارد پنهان در دستگاه شما باقی می‌مانند. می‌توانید آن‌ها را جداگانه یا همه را با هم دوباره نمایش دهید.</string>
+    <string name="home_hidden_show">نمایش</string>
+    <string name="home_hidden_show_all">نمایش همه</string>
+    <string name="home_hidden_update_failed">تغییر وضعیت نمایش موارد ممکن نشد. دوباره تلاش کنید.</string>
 </resources>

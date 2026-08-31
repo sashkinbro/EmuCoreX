@@ -2639,4 +2639,11 @@
     <string name="drive_transfer_speed">%1$s/sn</string>
     <string name="drive_transfer_remaining">Yaklaşık %1$s kaldı</string>
     <string name="drive_empty_description">Tamamlanan yedekler burada görünecek. Oyun kayıtlarını ve ayarlarını kendi Google Drive hesabında saklamak için ilk yedeğini oluştur.</string>
+    <string name="home_game_menu_hide">Gizle</string>
+    <string name="home_game_menu_show_hidden">Gizlenenleri göster</string>
+    <string name="home_hidden_title">Gizlenen öğeler</string>
+    <string name="home_hidden_description">Gizlenen öğeler cihazınızda kalır. Bunları tek tek veya hepsini aynı anda yeniden gösterebilirsiniz.</string>
+    <string name="home_hidden_show">Göster</string>
+    <string name="home_hidden_show_all">Tümünü göster</string>
+    <string name="home_hidden_update_failed">Öğelerin görünürlüğü değiştirilemedi. Lütfen tekrar deneyin.</string>
 </resources>

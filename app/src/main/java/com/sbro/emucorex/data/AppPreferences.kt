@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.EmulatorBridge
@@ -596,6 +597,7 @@ class AppPreferences(private val context: Context) {
         private val PREFER_ENGLISH_GAME_TITLES = booleanPreferencesKey("prefer_english_game_titles")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
         private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
+        private val HIDDEN_GAME_PATHS = stringSetPreferencesKey("hidden_game_paths")
         private const val MAX_RECENT_GAMES = 8
         // Overlay customization
         private val OVERLAY_SCALE = intPreferencesKey("overlay_scale")
@@ -2330,6 +2332,24 @@ class AppPreferences(private val context: Context) {
         prefs[HOME_LIBRARY_VIEW_MODE] ?: 0
     }
 
+    val hiddenGamePaths: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[HIDDEN_GAME_PATHS].orEmpty()
+    }
+
+    suspend fun setGameHidden(path: String, hidden: Boolean) {
+        if (path.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val paths = prefs[HIDDEN_GAME_PATHS].orEmpty()
+            prefs[HIDDEN_GAME_PATHS] = if (hidden) paths + path else paths - path
+        }
+    }
+
+    suspend fun showHiddenGames(paths: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[HIDDEN_GAME_PATHS] = prefs[HIDDEN_GAME_PATHS].orEmpty() - paths
+        }
+    }
+
     suspend fun setHomeLibraryViewMode(mode: Int) {
         context.dataStore.edit { it[HOME_LIBRARY_VIEW_MODE] = mode.coerceIn(0, 2) }
     }
@@ -3685,6 +3705,7 @@ class AppPreferences(private val context: Context) {
             put("preferEnglishGameTitles", prefs[PREFER_ENGLISH_GAME_TITLES] ?: false)
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
+            put("hiddenGamePaths", JSONArray(prefs[HIDDEN_GAME_PATHS].orEmpty().sorted()))
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
             put(
                 "overlayOpacity",
@@ -4076,6 +4097,12 @@ class AppPreferences(private val context: Context) {
             prefs[PREFER_ENGLISH_GAME_TITLES] = json.optBoolean("preferEnglishGameTitles", false)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 2)
+            // Older backups do not contain this preference; keep the current local choices.
+            json.optJSONArray("hiddenGamePaths")?.let { paths ->
+                prefs[HIDDEN_GAME_PATHS] = (0 until paths.length()).mapNotNull { index ->
+                    (paths.opt(index) as? String)?.takeIf { it.isNotBlank() }
+                }.toSet()
+            }
             prefs[OVERLAY_SCALE] = json.optInt("overlayScale", 100)
             prefs[OVERLAY_OPACITY] = json.optInt("overlayOpacity", DEFAULT_OVERLAY_OPACITY)
                 .coerceIn(OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX)

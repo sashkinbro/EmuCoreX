@@ -2641,4 +2641,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Restam cerca de %1$s</string>
     <string name="drive_empty_description">Os backups concluídos aparecerão aqui. Crie o primeiro para guardar seus jogos salvos e configurações no seu Google Drive.</string>
+    <string name="home_game_menu_hide">Ocultar</string>
+    <string name="home_game_menu_show_hidden">Mostrar ocultos</string>
+    <string name="home_hidden_title">Itens ocultos</string>
+    <string name="home_hidden_description">Os itens ocultos permanecem no dispositivo. Você pode exibi-los novamente um por um ou todos de uma vez.</string>
+    <string name="home_hidden_show">Mostrar</string>
+    <string name="home_hidden_show_all">Mostrar todos</string>
+    <string name="home_hidden_update_failed">Não foi possível alterar a visibilidade dos itens. Tente novamente.</string>
 </resources>

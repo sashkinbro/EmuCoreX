@@ -2639,4 +2639,11 @@
     <string name="drive_transfer_speed">%1$s/सेकंड</string>
     <string name="drive_transfer_remaining">लगभग %1$s शेष</string>
     <string name="drive_empty_description">पूरे हो चुके बैकअप यहाँ दिखेंगे। अपने गेम सेव और सेटिंग को अपने Google Drive पर रखने के लिए पहला बैकअप बनाएँ।</string>
+    <string name="home_game_menu_hide">छिपाएँ</string>
+    <string name="home_game_menu_show_hidden">छिपे हुए दिखाएँ</string>
+    <string name="home_hidden_title">छिपे हुए आइटम</string>
+    <string name="home_hidden_description">छिपे हुए आइटम आपके डिवाइस पर रहते हैं। इन्हें अलग-अलग या सभी को एक साथ फिर से दिखाया जा सकता है।</string>
+    <string name="home_hidden_show">दिखाएँ</string>
+    <string name="home_hidden_show_all">सभी दिखाएँ</string>
+    <string name="home_hidden_update_failed">आइटम की दृश्यता नहीं बदली जा सकी। कृपया फिर से कोशिश करें।</string>
 </resources>

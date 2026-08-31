@@ -2659,4 +2659,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Zbývá přibližně %1$s</string>
     <string name="drive_empty_description">Zde se zobrazí dokončené zálohy. Vytvořte první zálohu a uložte své herní pozice a nastavení na svůj Disk Google.</string>
+    <string name="home_game_menu_hide">Skrýt</string>
+    <string name="home_game_menu_show_hidden">Zobrazit skryté</string>
+    <string name="home_hidden_title">Skryté položky</string>
+    <string name="home_hidden_description">Skryté položky zůstávají ve vašem zařízení. Můžete je znovu zobrazit jednotlivě nebo všechny najednou.</string>
+    <string name="home_hidden_show">Zobrazit</string>
+    <string name="home_hidden_show_all">Zobrazit vše</string>
+    <string name="home_hidden_update_failed">Viditelnost položek se nepodařilo změnit. Zkuste to znovu.</string>
 </resources>

@@ -2638,4 +2638,11 @@
     <string name="drive_transfer_speed">%1$s/초</string>
     <string name="drive_transfer_remaining">약 %1$s 남음</string>
     <string name="drive_empty_description">완료된 백업이 여기에 표시됩니다. 첫 백업을 만들어 게임 저장 데이터와 설정을 내 Google Drive에 보관하세요.</string>
+    <string name="home_game_menu_hide">숨기기</string>
+    <string name="home_game_menu_show_hidden">숨긴 항목 보기</string>
+    <string name="home_hidden_title">숨긴 항목</string>
+    <string name="home_hidden_description">숨긴 항목은 기기에 그대로 남아 있습니다. 하나씩 또는 한 번에 모두 다시 표시할 수 있습니다.</string>
+    <string name="home_hidden_show">표시</string>
+    <string name="home_hidden_show_all">모두 표시</string>
+    <string name="home_hidden_update_failed">항목의 표시 상태를 변경하지 못했습니다. 다시 시도해 주세요.</string>
 </resources>

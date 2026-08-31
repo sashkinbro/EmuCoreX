@@ -2653,4 +2653,11 @@
     <string name="drive_transfer_speed">%1$s/dtk</string>
     <string name="drive_transfer_remaining">Sekitar %1$s lagi</string>
     <string name="drive_empty_description">Cadangan yang selesai akan muncul di sini. Buat cadangan pertama untuk menyimpan data permainan dan pengaturan di Google Drive Anda.</string>
+    <string name="home_game_menu_hide">Sembunyikan</string>
+    <string name="home_game_menu_show_hidden">Tampilkan yang tersembunyi</string>
+    <string name="home_hidden_title">Item tersembunyi</string>
+    <string name="home_hidden_description">Item tersembunyi tetap ada di perangkat Anda. Tampilkan kembali satu per satu atau semuanya sekaligus.</string>
+    <string name="home_hidden_show">Tampilkan</string>
+    <string name="home_hidden_show_all">Tampilkan semua</string>
+    <string name="home_hidden_update_failed">Tidak dapat mengubah visibilitas item. Silakan coba lagi.</string>
 </resources>

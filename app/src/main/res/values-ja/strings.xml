@@ -2638,4 +2638,11 @@
     <string name="drive_transfer_speed">%1$s/秒</string>
     <string name="drive_transfer_remaining">残り約 %1$s</string>
     <string name="drive_empty_description">完了したバックアップがここに表示されます。最初のバックアップを作成して、ゲームのセーブデータと設定を自分の Google ドライブに保存しましょう。</string>
+    <string name="home_game_menu_hide">非表示にする</string>
+    <string name="home_game_menu_show_hidden">非表示の項目を表示</string>
+    <string name="home_hidden_title">非表示の項目</string>
+    <string name="home_hidden_description">非表示の項目はデバイスに残ります。個別に、またはすべてまとめてライブラリに戻せます。</string>
+    <string name="home_hidden_show">表示</string>
+    <string name="home_hidden_show_all">すべて表示</string>
+    <string name="home_hidden_update_failed">項目の表示状態を変更できませんでした。もう一度お試しください。</string>
 </resources>

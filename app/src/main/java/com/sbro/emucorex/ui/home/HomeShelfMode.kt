@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,10 +95,19 @@ internal fun HomeShelfMode(
     onLongClickManage: (GameItem) -> Unit,
     onLongClickCreateShortcut: (GameItem) -> Unit,
     onLongClickOpenGameDb: (GameItem) -> Unit,
+    onLongClickHide: (GameItem) -> Unit,
+    onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: (GameItem) -> Unit
 ) {
     if (games.isEmpty()) {
-        NoGamesState()
+        Column(modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            ShelfTopBar(
+                title = androidx.compose.ui.res.stringResource(R.string.shell_library),
+                topInset = topInset, horizontalInset = horizontalInset,
+                onExitShelfMode = onExitShelfMode
+            )
+            NoGamesState(onShowHiddenGames = onShowHiddenGames)
+        }
         return
     }
 
@@ -255,6 +266,8 @@ internal fun HomeShelfMode(
                                 onLongClickManage = { onLongClickManage(game) },
                                 onLongClickCreateShortcut = { onLongClickCreateShortcut(game) },
                                 onLongClickOpenGameDb = { onLongClickOpenGameDb(game) },
+                                onLongClickHide = { onLongClickHide(game) },
+                                onShowHiddenGames = onShowHiddenGames,
                                 onLongClickCustomCover = { onLongClickCustomCover(game) },
                                 onNavigateLeft = {
                                     if (page > 0 && !pagerState.isScrollInProgress) {
@@ -466,6 +479,8 @@ private fun ShelfCoverCard(
     onLongClickManage: () -> Unit,
     onLongClickCreateShortcut: () -> Unit,
     onLongClickOpenGameDb: () -> Unit,
+    onLongClickHide: () -> Unit,
+    onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
     onNavigateLeft: () -> Unit,
     onNavigateRight: () -> Unit
@@ -564,7 +579,9 @@ private fun ShelfCoverCard(
         onManage = { dismissMenu(onLongClickManage) },
         onCreateShortcut = { dismissMenu(onLongClickCreateShortcut) },
         onOpenGameDb = { dismissMenu(onLongClickOpenGameDb) },
-        onCustomCover = { dismissMenu(onLongClickCustomCover) }
+        onCustomCover = { dismissMenu(onLongClickCustomCover) },
+        onHide = { dismissMenu(onLongClickHide) },
+        onShowHiddenGames = onShowHiddenGames?.let { action -> { dismissMenu(action) } }
     )
 }
 

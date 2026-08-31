@@ -3,6 +3,7 @@ package com.sbro.emucorex.ui.home
 import android.app.Activity
 import android.app.Application
 import android.net.Uri
+import com.sbro.emucorex.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.sbro.emucorex.core.BiosValidator
@@ -26,6 +27,7 @@ import com.sbro.emucorex.data.RecentGameEntry
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -59,6 +61,8 @@ enum class HomeLibraryViewMode {
 data class HomeUiState(
     val games: List<GameItem> = emptyList(),
     val recentGames: List<GameItem> = emptyList(),
+    val hiddenGames: List<GameItem> = emptyList(),
+    val visibilityMessageResId: Int? = null,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isBootstrapping: Boolean = true,
@@ -109,6 +113,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val homeBackgroundRepository = HomeBackgroundRepository(application)
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private var allGames: List<GameItem> = emptyList()
+    private var hiddenGamePaths: Set<String> = emptySet()
+    private var visibilityInitialized = false
     private var recentEntries: List<RecentGameEntry> = emptyList()
     private var coverSyncJob: Job? = null
     private var searchJob: Job? = null
@@ -132,6 +138,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            preferences.hiddenGamePaths.distinctUntilChanged().collect { paths ->
+                hiddenGamePaths = paths
+                visibilityInitialized = true
+                publishVisibleGames()
+                updateBootstrapState()
+            }
+        }
         viewModelScope.launch {
             preferences.homeGridScale.collect { scale ->
                 _uiState.value = _uiState.value.copy(homeGridScale = scale)
@@ -641,7 +655,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val state = _uiState.value
         val query = normalizeSearchToken(state.searchQuery)
         val filtered = allGames.filter { game ->
-            !BiosValidator.isLikelyBiosLibraryEntry(
+            game.path !in hiddenGamePaths && !BiosValidator.isLikelyBiosLibraryEntry(
                 fileName = game.fileName,
                 title = game.title,
                 serial = game.serial,
@@ -679,7 +693,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     .thenBy { normalizeSortToken(it.title) }
             )
         }
-        val gamesByPath = allGames.associateBy { it.path }
+        val gamesByPath = filtered.associateBy { it.path }
         val recentGames = recentEntries.mapNotNull { entry ->
             gamesByPath[entry.path]
         }.filter { game ->
@@ -690,8 +704,33 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }.takeIf { state.showRecentGames }.orEmpty()
         _uiState.value = _uiState.value.copy(
             games = sorted,
-            recentGames = recentGames
+            recentGames = recentGames,
+            hiddenGames = allGames.filter { it.path in hiddenGamePaths }.distinctBy { it.path }
+                .sortedWith(compareBy<GameItem> { normalizeSortToken(it.title) }.thenBy { it.path })
         )
+    }
+
+    fun setGameHidden(game: GameItem, hidden: Boolean) = updateVisibility {
+        preferences.setGameHidden(game.path, hidden)
+    }
+
+    fun showAllHiddenGames() {
+        val paths = _uiState.value.hiddenGames.map { it.path }.toSet()
+        updateVisibility { preferences.showHiddenGames(paths) }
+    }
+
+    private fun updateVisibility(update: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { update() }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(visibilityMessageResId = R.string.home_hidden_update_failed)
+            }
+        }
+    }
+
+    fun clearVisibilityMessage() {
+        _uiState.value = _uiState.value.copy(visibilityMessageResId = null)
     }
 
         fun dismissWelcomeDialog() {
@@ -711,7 +750,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun updateBootstrapState() {
         _uiState.value = _uiState.value.copy(
-            isBootstrapping = !(biosInitialized && libraryInitialized)
+            isBootstrapping = !(biosInitialized && libraryInitialized && visibilityInitialized)
         )
     }
 

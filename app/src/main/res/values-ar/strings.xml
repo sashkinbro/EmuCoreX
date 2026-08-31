@@ -2643,4 +2643,11 @@
     <string name="drive_transfer_speed">%1$s/ث</string>
     <string name="drive_transfer_remaining">متبقٍ نحو %1$s</string>
     <string name="drive_empty_description">ستظهر النسخ الاحتياطية المكتملة هنا. أنشئ نسختك الأولى للاحتفاظ بملفات حفظ الألعاب والإعدادات على Google Drive الخاص بك.</string>
+    <string name="home_game_menu_hide">إخفاء</string>
+    <string name="home_game_menu_show_hidden">عرض المخفي</string>
+    <string name="home_hidden_title">العناصر المخفية</string>
+    <string name="home_hidden_description">تبقى العناصر المخفية على جهازك. يمكنك إظهارها مجددًا واحدًا تلو الآخر أو جميعها معًا.</string>
+    <string name="home_hidden_show">إظهار</string>
+    <string name="home_hidden_show_all">إظهار الكل</string>
+    <string name="home_hidden_update_failed">تعذّر تغيير ظهور العناصر. يُرجى المحاولة مجددًا.</string>
 </resources>

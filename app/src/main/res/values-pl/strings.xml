@@ -2661,4 +2661,11 @@
     <string name="drive_transfer_speed">%1$s/s</string>
     <string name="drive_transfer_remaining">Pozostało około %1$s</string>
     <string name="drive_empty_description">Tutaj pojawią się ukończone kopie zapasowe. Utwórz pierwszą, aby przechowywać zapisy gier i ustawienia na swoim Dysku Google.</string>
+    <string name="home_game_menu_hide">Ukryj</string>
+    <string name="home_game_menu_show_hidden">Pokaż ukryte</string>
+    <string name="home_hidden_title">Ukryte elementy</string>
+    <string name="home_hidden_description">Ukryte elementy pozostają na urządzeniu. Możesz przywrócić je do biblioteki pojedynczo lub wszystkie naraz.</string>
+    <string name="home_hidden_show">Pokaż</string>
+    <string name="home_hidden_show_all">Pokaż wszystkie</string>
+    <string name="home_hidden_update_failed">Nie udało się zmienić widoczności elementów. Spróbuj ponownie.</string>
 </resources>
