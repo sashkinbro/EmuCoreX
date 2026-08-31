@@ -4,7 +4,6 @@
 .gradle/
 .kotlin/
 .android/
-.claude/
 
 # Local machine config
 local.properties
@@ -120,6 +119,4 @@ app/src/main/cpp/PCSX2/bin/docs/
 
 # Temporary / backup directories
 /tmp/
-CoreVixlOLD/
-OLDCORE/
 oldcore/

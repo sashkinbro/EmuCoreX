@@ -152,6 +152,7 @@ private:
 
 	std::unique_ptr<GLContext> m_gl_context;
 	bool m_is_gles = false;
+	bool m_has_clip_control = false;
 
 	struct
 	{

@@ -763,14 +763,29 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	// Use DX coordinate convention
 	// ****************************************************************
 
-	// VS gl_position.z => [-1,-1]
-	// FS depth => [0, 1]
-	// because of -1 we loose lot of precision for small GS value
-	// This extension allow FS depth to range from -1 to 1. So
-	// gl_position.z could range from [0, 1]
-	// Change depth convention
-	if (!m_is_gles)
-		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	// Keep GS depth in [0, 1] from the vertex shader through the depth buffer.
+	// Mapping small GS Z values to [-1, 1] first loses low bits and makes nearby
+	// surfaces fight. GLES exposes the same depth convention through EXT. (AI-assisted)
+	m_has_clip_control = false;
+	const bool can_set_clip_control = m_is_gles ? (GLAD_GL_EXT_clip_control && glClipControlEXT) :
+		((GLAD_GL_VERSION_4_5 || GLAD_GL_ARB_clip_control) && glClipControl);
+	if (can_set_clip_control)
+	{
+		if (m_is_gles)
+			glClipControlEXT(GL_LOWER_LEFT_EXT, GL_ZERO_TO_ONE_EXT);
+		else
+			glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+
+		GLint depth_mode = GL_NEGATIVE_ONE_TO_ONE;
+		glGetIntegerv(GL_CLIP_DEPTH_MODE, &depth_mode);
+		m_has_clip_control = (depth_mode == GL_ZERO_TO_ONE);
+	}
+	if (!m_has_clip_control)
+		Console.Warning("GL: Using legacy clip depth; small GS Z values lose precision.");
+#if defined(__ANDROID__)
+	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "OpenGL depth mapping: %s (GLES=%d EXT_clip_control=%d)",
+		m_has_clip_control ? "zero-to-one" : "negative-one-to-one", m_is_gles, GLAD_GL_EXT_clip_control);
+#endif
 
 	// ****************************************************************
 	// HW renderer shader
@@ -1966,7 +1981,7 @@ uvec4 gpu_bitwise_not(uvec4 value)
 		header += "#define PS_HAS_CONSERVATIVE_DEPTH 0\n";
 	}
 
-	if (!m_is_gles && GLAD_GL_ARB_clip_control)
+	if (m_has_clip_control)
 		header += "#define HAS_CLIP_CONTROL 1\n";
 	else
 		header += "#define HAS_CLIP_CONTROL 0\n";
