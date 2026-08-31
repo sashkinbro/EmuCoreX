@@ -976,6 +976,8 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		(rasterization_order_access_feature.rasterizationOrderColorAttachmentAccess == VK_TRUE);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
 		(attachment_feedback_loop_feature.attachmentFeedbackLoopLayout == VK_TRUE);
+	m_optional_extensions.vk_ext_fragment_shader_interlock &=
+		(fragment_shader_interlock_ext_feature.fragmentShaderPixelInterlock == VK_TRUE);
 
 	VkPhysicalDeviceProperties2 properties2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
 
@@ -1195,8 +1197,8 @@ bool GSDeviceVK::CreateCommandBuffers()
 			const VkDescriptorPoolSize frame_pool_sizes[] = {
 				{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAME_TEXTURE_SETS * 2},
 				{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_FRAME_TEXTURE_SETS * 4},
-				{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_FRAME_TEXTURE_SETS},
-				{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 64},
+				{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_FRAME_TEXTURE_SETS * 2},
+				{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_FRAME_TEXTURE_SETS * 2},
 			};
 			const VkDescriptorPoolCreateInfo frame_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 				nullptr, 0, MAX_FRAME_DESCRIPTOR_SETS, static_cast<u32>(std::size(frame_pool_sizes)), frame_pool_sizes};
@@ -2871,6 +2873,7 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	if (fb == VK_NULL_HANDLE)
 		return GSDevice::PresentResult::FrameSkipped;
 
+
 	const VkRenderPassBeginInfo rp = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, nullptr,
 		GetRenderPass(swap_chain_texture->GetVkFormat(), VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_CLEAR,
 			VK_ATTACHMENT_STORE_OP_STORE),
@@ -3343,6 +3346,60 @@ bool GSDeviceVK::CheckFeatures()
 	                 !m_features.framebuffer_fetch;
 
 	return true;
+}
+
+void GSDeviceVK::DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion)
+{
+	pxAssert(offset + count <= (int)m_index.count);
+
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	if (vs_indexing)
+	{
+		SetVSPushConstants(m_vertex.start, m_index.start + offset);
+		vkCmdDraw(GetCurrentCommandBuffer(), count * vs_indexing_expansion, 1, 0, 0);
+	}
+	else
+	{
+		SetVSPushConstants(m_vertex.start);
+		vkCmdDrawIndexed(GetCurrentCommandBuffer(), count, 1, m_index.start + offset, 0, 0);
+	}
+}
+
+void GSDeviceVK::Draw(const GSHWDrawConfig& config, int offset, int count)
+{
+	if (config.vs.expand != GSHWDrawConfig::VSExpand::None)
+	{
+		const bool vs_indexing = config.vs.UseVSExpandIndexBuffer();
+		const u32 vs_indexing_expansion = GetExpansionFactor(config.vs.expand);
+		DrawIndexedPrimitiveVSExpand(offset, count, vs_indexing, vs_indexing_expansion);
+	}
+	else
+	{
+		DrawIndexedPrimitive(offset, count);
+	}
+}
+
+void GSDeviceVK::VSSetIndexBuffer(const void* index, size_t count)
+{
+	UploadIndices(m_expand_index_stream_buffer, index, count);
+}
+
+void GSDeviceVK::SetVSPushConstants(u32 base_vertex, u32 base_index, bool force_update)
+{
+	GSHWDrawConfig::VSPushConstants pc;
+	pc.base_vertex = base_vertex;
+	pc.base_index = base_index;
+
+	if (m_vs_pc_cache.Update(pc) || force_update)
+	{
+		vkCmdPushConstants(GetCurrentCommandBuffer(), m_tfx_pipeline_layout,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
+	}
+}
+
+void GSDeviceVK::Draw(const GSHWDrawConfig& config)
+{
+	Draw(config, 0, m_index.count);
 }
 
 void GSDeviceVK::DrawPrimitive()
@@ -4203,24 +4260,29 @@ void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t cou
 	m_vertex_stream_buffer.CommitMemory(size);
 }
 
-void GSDeviceVK::IASetIndexBuffer(const void* index, size_t count)
+void GSDeviceVK::UploadIndices(VKStreamBuffer& buffer, const void* index, size_t count)
 {
 	const u32 size = sizeof(u16) * static_cast<u32>(count);
-	if (!m_index_stream_buffer.ReserveMemory(size, sizeof(u16)))
+	if (!buffer.ReserveMemory(size, sizeof(u16)))
 	{
 		if (m_is_presenting)
 			ExecuteCommandBufferAndRestartPresent(false, "Uploading bytes to index buffer");
 		else
 			ExecuteCommandBufferAndRestartRenderPass(false, "Uploading bytes to index buffer");
-		if (!m_index_stream_buffer.ReserveMemory(size, sizeof(u16)))
+		if (!buffer.ReserveMemory(size, sizeof(u16)))
 			pxFailRel("Failed to reserve space for vertices");
 	}
 
-	m_index.start = m_index_stream_buffer.GetCurrentOffset() / sizeof(u16);
+	m_index.start = buffer.GetCurrentOffset() / sizeof(u16);
 	m_index.count = count;
 
-	std::memcpy(m_index_stream_buffer.GetCurrentHostPointer(), index, size);
-	m_index_stream_buffer.CommitMemory(size);
+	std::memcpy(buffer.GetCurrentHostPointer(), index, size);
+	buffer.CommitMemory(size);
+}
+
+void GSDeviceVK::IASetIndexBuffer(const void* index, size_t count)
+{
+	UploadIndices(m_index_stream_buffer, index, count);
 
 	SetIndexBuffer(m_index_stream_buffer.GetBuffer());
 }
@@ -4478,6 +4540,11 @@ static void AddShaderHeader(std::stringstream& ss)
 	ss << "#version 460 core\n";
 	ss << "#extension GL_EXT_samplerless_texture_functions : require\n";
 	ss << "#extension GL_ARB_shader_draw_parameters : require\n";
+	if (features.rov)
+	{
+		ss << "#extension GL_ARB_fragment_shader_interlock : require\n";
+		ss << "#extension GL_ARB_shader_image_load_store : require\n";
+	}
 
 	if (!features.texture_barrier)
 		ss << "#define DISABLE_TEXTURE_BARRIER 1\n";
@@ -4625,6 +4692,12 @@ bool GSDeviceVK::CreateBuffers()
 		return false;
 	}
 
+	if (!m_expand_index_stream_buffer.Create(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_features.aa1 ? INDEX_BUFFER_SIZE : 4))
+	{
+		Host::ReportErrorAsync("GS", "Failed to allocate expansion index buffer (VS resource)");
+		return false;
+	}
+
 	if (!m_vertex_uniform_stream_buffer.Create(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VERTEX_UNIFORM_BUFFER_SIZE))
 	{
 		Host::ReportErrorAsync("GS", "Failed to allocate vertex uniform buffer");
@@ -4684,7 +4757,12 @@ bool GSDeviceVK::CreatePipelineLayouts()
 		0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT);
 	dslb.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	if (m_features.vs_expand)
+	{
 		dslb.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT);
+		plb.AddPushConstants(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GSHWDrawConfig::VSPushConstants));
+	}
+	if (m_features.aa1)
+		dslb.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT);
 	if ((m_tfx_ubo_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
 		return false;
 	Vulkan::SetObjectName(dev, m_tfx_ubo_ds_layout, "TFX UBO descriptor layout");
@@ -4701,6 +4779,8 @@ bool GSDeviceVK::CreatePipelineLayouts()
 	dslb.AddBinding(TFX_TEXTURE_RT, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PRIMID, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_DEPTH, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_RT_ROV, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+	dslb.AddBinding(TFX_TEXTURE_DEPTH_ROV, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	if ((m_tfx_texture_ds_layout = dslb.Create(dev)) == VK_NULL_HANDLE)
 		return false;
 	Vulkan::SetObjectName(dev, m_tfx_texture_ds_layout, "TFX texture descriptor layout");
@@ -5538,6 +5618,7 @@ void GSDeviceVK::DestroyResources()
 	m_fragment_uniform_stream_buffer.Destroy(false);
 	m_vertex_uniform_stream_buffer.Destroy(false);
 	m_index_stream_buffer.Destroy(false);
+	m_expand_index_stream_buffer.Destroy(false);
 	m_vertex_stream_buffer.Destroy(false);
 	if (m_expand_index_buffer != VK_NULL_HANDLE)
 		vmaDestroyBuffer(m_allocator, m_expand_index_buffer, m_expand_index_buffer_allocation);
@@ -5694,6 +5775,11 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	AddMacro(ss, "PS_ZTST", sel.ztst);
 	AddMacro(ss, "PS_COLOR_FEEDBACK", sel.color_feedback);
 	AddMacro(ss, "PS_DEPTH_FEEDBACK", sel.depth_feedback);
+	AddMacro(ss, "PS_AA1", static_cast<u32>(sel.aa1));
+	AddMacro(ss, "PS_ABE", sel.abe);
+	AddMacro(ss, "PS_ANISOTROPIC_FILTERING", sel.sw_aniso);
+	AddMacro(ss, "PS_ROV_COLOR", sel.rov_color);
+	AddMacro(ss, "PS_ROV_DEPTH", static_cast<u32>(sel.rov_depth));
 	ss << m_tfx_source;
 
 	VkShaderModule mod = g_vulkan_shader_cache->GetFragmentShader(ss.str());
@@ -6043,6 +6129,11 @@ bool GSDeviceVK::CreatePersistentDescriptorSets()
 	{
 		dsub.AddBufferDescriptorWrite(m_tfx_ubo_descriptor_set, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 			m_vertex_stream_buffer.GetBuffer(), 0, VERTEX_BUFFER_SIZE);
+	}
+	if (m_features.aa1)
+	{
+		dsub.AddBufferDescriptorWrite(m_tfx_ubo_descriptor_set, 3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			m_expand_index_stream_buffer.GetBuffer(), 0, INDEX_BUFFER_SIZE);
 	}
 	dsub.Update(dev);
 	Vulkan::SetObjectName(dev, m_tfx_ubo_descriptor_set, "Persistent TFX UBO set");
@@ -6603,7 +6694,7 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 	if (m_current_pipeline_layout != PipelineLayout::TFX)
 	{
 		m_current_pipeline_layout = PipelineLayout::TFX;
-		flags |= DIRTY_FLAG_TFX_UBO | DIRTY_FLAG_TFX_TEXTURES;
+		flags |= DIRTY_FLAG_TFX_UBO | DIRTY_FLAG_TFX_TEXTURES | DIRTY_FLAG_VS_PUSH_CONSTANTS;
 
 		// Clear out the RT/DS binding if feedback loop isn't on, because it'll be in the wrong state and make
 		// the validation layer cranky. Not a big deal since we need to write it anyway.
@@ -6622,6 +6713,9 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout, 0, 1,
 			&m_tfx_ubo_descriptor_set, NUM_TFX_DYNAMIC_OFFSETS, m_tfx_dynamic_offsets.data());
 	}
+
+	if ((flags & DIRTY_FLAG_VS_PUSH_CONSTANTS) && m_features.vs_expand)
+		SetVSPushConstants(m_vs_pc_cache.base_vertex, m_vs_pc_cache.base_index, true);
 
 	if (flags & DIRTY_FLAG_TFX_TEXTURES)
 	{
@@ -6855,7 +6949,7 @@ GSTextureVK* GSDeviceVK::SetupPrimitiveTrackingDATE(GSHWDrawConfig& config)
 	pipe.ps.no_color = false;
 	pipe.ps.no_color1 = true;
 	if (BindDrawPipeline(pipe))
-		DrawIndexedPrimitive();
+		Draw(config);
 
 	// image is initialized/prepass is done, so finish up and get ready to do the "real" draw
 	EndRenderPass();
@@ -7196,6 +7290,12 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	{
 		PSSetShaderResource(TFX_TEXTURE_DEPTH, nullptr, false);
 	}
+
+	PSSetROVs(draw_rt_rov, draw_ds_rov, config.ps.HasColorOutput(), config.ps.HasDepthROVWrite());
+
+	OMSetRenderTargets(draw_rt, draw_ds, config.scissor,
+		static_cast<FeedbackLoopFlag>(pipe.feedback_loop_flags), rtsize);
+
 	// Begin render pass if new target or out of the area.
 	if (!InRenderPass())
 	{
@@ -7284,7 +7384,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		if (BindDrawPipeline(pipe))
 		{
 			// TODO: This probably should have barriers, in case we want to use it conditionally.
-			DrawIndexedPrimitive();
+			Draw(config);
 		}
 	}
 
@@ -7402,15 +7502,18 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 
 void GSDeviceVK::UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config)
 {
-
 	IASetVertexBuffer(config.verts, sizeof(GSVertex), config.nverts, GetVertexAlignment(config.vs.expand));
-	m_vertex.start *= GetExpansionFactor(config.vs.expand);
 
-	if (config.vs.UseExpandIndexBuffer())
+	if (config.vs.UseFixedExpandIndexBuffer())
 	{
 		m_index.start = 0;
 		m_index.count = config.nindices;
 		SetIndexBuffer(m_expand_index_buffer);
+	}
+	else if (config.vs.UseVSExpandIndexBuffer())
+	{
+		VSSetIndexBuffer(config.indices, config.nindices);
+		SetVSConstantBuffer(config.cb_vs);
 	}
 	else
 	{
@@ -7452,7 +7555,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 {
 	if (!m_features.texture_barrier) [[unlikely]]
 	{
-		DrawIndexedPrimitive();
+		Draw(config);
 		return;
 	}
 
@@ -7506,7 +7609,7 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 			IssueBarriers();
 
 			const u32 count = (*config.drawlist)[n] * indices_per_prim;
-			DrawIndexedPrimitive(p, count);
+			Draw(config, p, count);
 			p += count;
 		}
 
@@ -7520,5 +7623,5 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 	}
 
 
-	DrawIndexedPrimitive();
+	Draw(config);
 }

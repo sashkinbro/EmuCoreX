@@ -1080,6 +1080,45 @@ struct alignas(16) GSHWDrawConfig
 			return true;
 		}
 	};
+	struct alignas(16) VSPushConstants
+	{
+		u32 base_vertex;
+		u32 base_index;
+		u32 _pad0;
+		u32 _pad1;
+
+		__fi VSPushConstants()
+		{
+			memset(static_cast<void*>(this), 0, sizeof(*this));
+		}
+		__fi VSPushConstants(const VSPushConstants& other)
+		{
+			memcpy(static_cast<void*>(this), static_cast<const void*>(&other), sizeof(*this));
+		}
+		__fi VSPushConstants& operator=(const VSPushConstants& other)
+		{
+			new (this) VSPushConstants(other);
+			return *this;
+		}
+		__fi bool operator==(const VSPushConstants& other) const
+		{
+			return BitEqual(*this, other);
+		}
+		__fi bool operator!=(const VSPushConstants& other) const
+		{
+			return !(*this == other);
+		}
+		__fi bool Update(const VSPushConstants& other)
+		{
+			if (*this == other)
+				return false;
+
+			memcpy(static_cast<void*>(this), static_cast<const void*>(&other), sizeof(*this));
+			return true;
+		}
+	};
+	static_assert(sizeof(VSPushConstants) == 16, "VSPushConstants wrong size");
+
 	struct alignas(16) PSConstantBuffer
 	{
 		GSVector4 FogColor_AREF;

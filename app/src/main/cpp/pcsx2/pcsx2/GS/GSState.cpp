@@ -2244,10 +2244,7 @@ void GSState::FlushPrim()
 			{
 				for (u32 i = 0; i < unused; i++)
 				{
-					GSVector4i* RESTRICT vert_ptr = (GSVector4i*)&m_vertex.buff[i];
-					GSVector4i v = vert_ptr[1];
-					v = v.xxxx().u16to32().sub32(m_xyof);
-					v = v.blend32<12>(v.sra32<4>());
+					const GSVector4i v = GetVertexXY(m_vertex.buff[i]).sub32(m_xyof);
 					m_vertex.xy[i & 3] = v;
 					m_vertex.xy_tail = unused;
 				}
@@ -5191,11 +5188,10 @@ __forceinline void GSState::VertexKick(u32 skip)
 
 	// We maintain the X/Y coordinates for the last 4 vertices, as well as the head for triangle fans, so we can compute
 	// the min/max, and cull degenerate triangles, which saves draws in some cases. Why 4? Mod 4 is cheaper than Mod 3.
-	// These vertices are a full vector containing <X_Fixed_Point, Y_Fixed_Point, X_Integer, Y_Integer>. We use the
-	// integer coordinates for culling at native resolution, and the fixed point for all others. The XY offset has to be
-	// applied, then we split it into the fixed/integer portions.
-	const GSVector4i xy_ofs = new_v1.xxxx().u16to32().sub32(m_xyof);
-	const GSVector4i xy = xy_ofs.blend32<12>(xy_ofs.sra32<4>());
+	// The 2.8 rectangle culler expects all four lanes in GS fixed-point units:
+	// <X, Y, X, Y>. Mixing pixel coordinates into Z/W shrinks the upper bounds
+	// by 16 and incorrectly rejects almost every primitive. (AI-assisted)
+	const GSVector4i xy = GetVertexXY(m_v).sub32(m_xyof);
 	m_vertex.xy[xy_tail & 3] = xy;
 
 	// Backup head for triangle fans so we can read it later, otherwise it'll get lost after the 4th vertex.

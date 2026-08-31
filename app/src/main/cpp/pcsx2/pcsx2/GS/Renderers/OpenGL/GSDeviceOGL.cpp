@@ -35,6 +35,9 @@
 #include <android/log.h>
 #endif
 
+static constexpr u32 g_vs_pc_index = 4;
+static constexpr u32 g_vs_ib_index = 3;
+static constexpr u32 VERTEX_PUSH_CONSTANT_BUFFER_SIZE = 1024 * 1024;
 static constexpr u32 g_vs_cb_index        = 1;
 static constexpr u32 g_ps_cb_index        = 0;
 
@@ -464,12 +467,15 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 		m_vertex_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, VERTEX_BUFFER_SIZE);
 		m_index_stream_buffer = GLStreamBuffer::Create(GL_ELEMENT_ARRAY_BUFFER, INDEX_BUFFER_SIZE);
+		m_expand_index_stream_buffer = GLStreamBuffer::Create(GL_ARRAY_BUFFER, INDEX_BUFFER_SIZE);
+		m_vertex_push_constants_stream_buffer = GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_PUSH_CONSTANT_BUFFER_SIZE);
 		m_vertex_uniform_stream_buffer =
 			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, VERTEX_UNIFORM_BUFFER_SIZE);
 		m_fragment_uniform_stream_buffer =
 			GLStreamBuffer::Create(GL_UNIFORM_BUFFER, FRAGMENT_UNIFORM_BUFFER_SIZE);
 		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &m_uniform_buffer_alignment);
-		if (!m_vertex_stream_buffer || !m_index_stream_buffer || !m_vertex_uniform_stream_buffer || !m_fragment_uniform_stream_buffer)
+		if (!m_vertex_stream_buffer || !m_index_stream_buffer || !m_expand_index_stream_buffer ||
+			!m_vertex_uniform_stream_buffer || !m_fragment_uniform_stream_buffer || !m_vertex_push_constants_stream_buffer)
 		{
 			Host::ReportErrorAsync("GS", "Failed to create vertex/index/uniform streaming buffers");
 			return false;
@@ -511,6 +517,14 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, EXPAND_BUFFER_SIZE, expand_data.get(), GL_STATIC_DRAW);
 			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 2, m_vertex_stream_buffer->GetGLBufferId(), 0, VERTEX_BUFFER_SIZE);
 		}
+
+		if (m_features.aa1)
+		{
+			glGenVertexArrays(1, &m_dummy_vao);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, g_vs_ib_index, m_expand_index_stream_buffer->GetGLBufferId(), 0, INDEX_BUFFER_SIZE);
+		}
+
+		VSSetPushConstants(0, 0, true);
 	}
 
 	// ****************************************************************
@@ -726,9 +740,20 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 		for (size_t i = 0; i < std::size(m_date.primid_ps); i++)
 		{
+			// Desktop GLSL preprocessors treat undefined identifiers in #if expressions as zero,
+			// while some GLES drivers reject them and may select the wrong output declaration.
+			// PrimID initialization reads RGBA and writes RGBA, so make its conversion contract
+			// explicit just like the regular conversion shaders above.
+			static constexpr std::string_view primid_macros =
+				"#define HAS_BILN 0\n"
+				"#define HAS_STENCIL_OUTPUT 0\n"
+				"#define HAS_INTEGER_OUTPUT 0\n"
+				"#define HAS_DEPTH_OUTPUT 0\n"
+				"#define HAS_FLOAT32_INPUT 0\n"
+				"#define HAS_FLOAT32_OUTPUT 0\n";
 			const std::string ps(GetShaderSource(
 				fmt::format("ps_primid_image_init_{}", i),
-				GL_FRAGMENT_SHADER, *convert_glsl));
+				GL_FRAGMENT_SHADER, *convert_glsl, primid_macros));
 			m_shader_cache.GetProgram(&m_date.primid_ps[i], m_convert.vs, ps);
 			m_date.primid_ps[i].SetFormattedName("PrimID Destination Alpha Init %d", i);
 		}
@@ -1111,9 +1136,11 @@ bool GSDeviceOGL::CheckFeatures()
 	// Direct depth feedback still requires texture barriers.
 	m_features.depth_feedback = GetOGLDepthFeedbackSupport(m_features.texture_barrier, GSConfig.DepthFeedbackMode);
 
-	if (GLAD_GL_ARB_shader_storage_buffer_object)
+	GLint max_vertex_ssbos = 0;
+	// GLES 3.2 has SSBOs and base-vertex draws in core, without desktop ARB flags. (AI-assisted)
+	const bool gles_vertex_expansion = m_is_gles && GLAD_GL_ES_VERSION_3_2;
+	if (GLAD_GL_ARB_shader_storage_buffer_object || gles_vertex_expansion)
 	{
-		GLint max_vertex_ssbos = 0;
 		glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &max_vertex_ssbos);
 		DevCon.WriteLn("GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS: %d", max_vertex_ssbos);
 		const bool buggy_vs_expand =
@@ -1121,8 +1148,10 @@ bool GSDeviceOGL::CheckFeatures()
 		if (buggy_vs_expand)
 			Console.Warning("GL: Disabling vertex shader expand due to broken NVIDIA driver.");
 		m_features.vs_expand = (!GSConfig.DisableVertexShaderExpand && !buggy_vs_expand && max_vertex_ssbos > 0 &&
-								GLAD_GL_ARB_gpu_shader5);
+								(GLAD_GL_ARB_gpu_shader5 || gles_vertex_expansion));
 	}
+
+	m_features.aa1 = GSConfig.HWAA1 && m_features.vs_expand && max_vertex_ssbos >= 2 && m_features.feedback_loops();
 
 	if (!m_features.vs_expand)
 		Console.Warning("GL: Vertex expansion is not supported. This will reduce performance.");
@@ -1266,6 +1295,10 @@ void GSDeviceOGL::DestroyResources()
 		glDeleteVertexArrays(1, &m_vao);
 
 	m_index_stream_buffer.reset();
+	m_expand_index_stream_buffer.reset();
+	m_vertex_push_constants_stream_buffer.reset();
+	if (m_dummy_vao != 0)
+		glDeleteVertexArrays(1, &m_dummy_vao);
 	m_vertex_stream_buffer.reset();
 	m_texture_upload_buffer.reset();
 	if (m_expand_ibo)
@@ -1956,10 +1989,6 @@ uvec4 gpu_bitwise_not(uvec4 value)
 			pxFail("Incorrect depth feedback support."); // Impossible
 	}
 
-	if (GLAD_GL_ARB_clip_control)
-		header += "#define HAS_CLIP_CONTROL 1\n";
-	else
-		header += "#define HAS_CLIP_CONTROL 0\n";
 
 	// Allow to puts several shader in 1 files
 	switch (type)
@@ -1996,6 +2025,7 @@ std::string GSDeviceOGL::GetVSSource(VSSelector sel)
 	DevCon.WriteLn("GL: Compiling new vertex shader with selector 0x%" PRIX64, sel.key);
 
 	std::string macro = fmt::format("#define VS_FST {}\n", static_cast<u32>(sel.fst))
+		+ fmt::format("#define VS_TME {}\n", static_cast<u32>(sel.tme))
 		+ fmt::format("#define VS_IIP {}\n", static_cast<u32>(sel.iip))
 		+ fmt::format("#define VS_POINT_SIZE {}\n", static_cast<u32>(sel.point_size))
 		+ fmt::format("#define VS_EXPAND {}\n", static_cast<int>(sel.expand));
@@ -2070,19 +2100,9 @@ std::string GSDeviceOGL::GetPSSource(const PSSelector& sel)
 		+ fmt::format("#define PS_ZTST {}\n", sel.ztst)
 		+ fmt::format("#define PS_COLOR_FEEDBACK {}\n", sel.color_feedback)
 		+ fmt::format("#define PS_DEPTH_FEEDBACK {}\n", sel.depth_feedback)
-		+ fmt::format("#define PS_NEEDS_RT {}\n",
-			((sel.tex_is_fb == 1) || (sel.date >= 5) || (sel.afail == GSHWDrawConfig::PS_AFAIL::ZB_ONLY) || (sel.afail == GSHWDrawConfig::PS_AFAIL::RGB_ONLY) ||
-				(!((sel.date == 1) || (sel.date == 2)) &&
-					(sel.fbmask ||
-						((sel.blend_a || sel.blend_b || sel.blend_d) &&
-							((sel.blend_a == 1) || (sel.blend_b == 1) || (sel.blend_c == 1) || (sel.blend_d == 1))) ||
-						((sel.blend_c == 1) && sel.a_masked))) ||
-				sel.color_feedback) ? 1 : 0)
-		+ fmt::format("#define PS_NEEDS_TEX {}\n", (sel.tfx != 4) ? 1 : 0)
-		+ fmt::format("#define PS_NEEDS_DEPTH {}\n",
-			(sel.depth_feedback &&
-				(((sel.afail == GSHWDrawConfig::PS_AFAIL::FB_ONLY) || (sel.afail == GSHWDrawConfig::PS_AFAIL::RGB_ONLY)) ||
-					((sel.ztst == ZTST_GEQUAL) || (sel.ztst == ZTST_GREATER)))) ? 1 : 0)
+		+ fmt::format("#define PS_AA1 {}\n", static_cast<u32>(sel.aa1))
+		+ fmt::format("#define PS_ABE {}\n", sel.abe)
+		+ fmt::format("#define PS_ANISOTROPIC_FILTERING {}\n", sel.sw_aniso)
 	;
 
 	std::string src = GenGlslHeader("ps_main", GL_FRAGMENT_SHADER, macro);
@@ -2906,12 +2926,58 @@ void GSDeviceOGL::IASetVertexBuffer(const void* vertices, size_t count, size_t a
 
 void GSDeviceOGL::IASetIndexBuffer(const void* index, size_t count)
 {
+	SetIndexBuffer(m_index_stream_buffer, index, count);
+}
+
+void GSDeviceOGL::DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion)
+{
+	g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+	if (vs_indexing)
+	{
+		VSSetPushConstants(m_vertex.start, m_index.start + offset);
+		glDrawArrays(m_draw_topology, 0, count * vs_indexing_expansion);
+	}
+	else
+	{
+		VSSetPushConstants(m_vertex.start);
+		glDrawElementsBaseVertex(m_draw_topology, count, GL_UNSIGNED_SHORT,
+			reinterpret_cast<void*>((static_cast<u32>(m_index.start) + static_cast<u32>(offset)) * sizeof(u16)), 0);
+	}
+}
+
+void GSDeviceOGL::Draw(const GSHWDrawConfig& config, int offset, int count)
+{
+	if (config.vs.expand != GSHWDrawConfig::VSExpand::None)
+	{
+		const bool vs_indexing = config.vs.UseVSExpandIndexBuffer();
+		const u32 vs_indexing_expansion = GetExpansionFactor(config.vs.expand);
+		DrawIndexedPrimitiveVSExpand(offset, count, vs_indexing, vs_indexing_expansion);
+	}
+	else
+	{
+		DrawIndexedPrimitive(offset, count);
+	}
+}
+
+
+void GSDeviceOGL::SetIndexBuffer(std::unique_ptr<GLStreamBuffer>& buffer, const void* index, size_t count)
+{
 	const u32 size = static_cast<u32>(count) * sizeof(u16);
-	auto res = m_index_stream_buffer->Map(sizeof(u16), size);
+	auto res = buffer->Map(sizeof(u16), size);
 	m_index.start = res.index_aligned;
 	m_index.count = count;
 	std::memcpy(res.pointer, index, size);
-	m_index_stream_buffer->Unmap(size);
+	buffer->Unmap(size);
+}
+
+void GSDeviceOGL::VSSetIndexBuffer(const void* index, size_t count)
+{
+	SetIndexBuffer(m_expand_index_stream_buffer, index, count);
+}
+
+void GSDeviceOGL::Draw(const GSHWDrawConfig& config)
+{
+	Draw(config, 0, m_index.count);
 }
 
 void GSDeviceOGL::IASetPrimitiveTopology(GLenum topology)
@@ -3399,6 +3465,19 @@ __fi static void WriteToStreamBuffer(GLStreamBuffer* sb, u32 index, u32 align, c
 	glBindBufferRange(GL_UNIFORM_BUFFER, index, sb->GetGLBufferId(), res.buffer_offset, size);
 }
 
+void GSDeviceOGL::VSSetPushConstants(u32 base_vertex, u32 base_index, bool force_update)
+{
+	GSHWDrawConfig::VSPushConstants vs_pc;
+	vs_pc.base_vertex = base_vertex;
+	vs_pc.base_index = base_index;
+
+	if (m_vs_pc_cache.Update(vs_pc) || force_update)
+	{
+		WriteToStreamBuffer(m_vertex_push_constants_stream_buffer.get(), g_vs_pc_index,
+			m_uniform_buffer_alignment, &vs_pc, sizeof(vs_pc));
+	}
+}
+
 GLProgram& GSDeviceOGL::GetTFXProgram(const ProgramSelector& psel)
 {
 	if (m_last_tfx_program && m_last_tfx_program_selector == psel)
@@ -3568,13 +3647,17 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 	}
 
 	IASetVertexBuffer(config.verts, config.nverts, GetVertexAlignment(config.vs.expand));
-	m_vertex.start *= GetExpansionFactor(config.vs.expand);
 
-	if (config.vs.UseExpandIndexBuffer())
+	if (config.vs.UseFixedExpandIndexBuffer())
 	{
 		IASetVAO(m_expand_vao);
 		m_index.start = 0;
 		m_index.count = config.nindices;
+	}
+	else if (config.vs.UseVSExpandIndexBuffer())
+	{
+		IASetVAO(m_dummy_vao); // Unbind vertex buffer from IA to prevent unwanted fetches.
+		VSSetIndexBuffer(config.indices, config.nindices);
 	}
 	else
 	{
@@ -3670,7 +3753,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		SetupOM(dss);
 
 		// Compute primitiveID max that pass the date test (Draw without barrier)
-		DrawIndexedPrimitive();
+		Draw(config);
 
 		psel.ps.date = 3;
 		config.alpha_second_pass.ps.date = 3;
@@ -3805,7 +3888,7 @@ void GSDeviceOGL::RenderHW(GSHWDrawConfig& config)
 		psel.ps.blend_hw = config.blend_multi_pass.blend_hw;
 		psel.ps.dither = config.blend_multi_pass.dither;
 		SetupPipeline(psel);
-		DrawIndexedPrimitive();
+		Draw(config);
 	}
 
 	if (config.alpha_second_pass.enable)
@@ -3961,7 +4044,7 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_cl
 				FeedbackCopyAndBind(config, draw_rt, draw_rt_clone, draw_ds, draw_ds_clone, bbox);
 			}
 
-			DrawIndexedPrimitive(p, count);
+			Draw(config, p, count);
 			p += count;
 		}
 
@@ -3982,7 +4065,7 @@ void GSDeviceOGL::SendHWDraw(const GSHWDrawConfig& config, GSTexture* draw_rt_cl
 		}
 	}
 
-	DrawIndexedPrimitive();
+	Draw(config);
 }
 
 // Note: used as a callback of DebugMessageCallback. Don't change the signature

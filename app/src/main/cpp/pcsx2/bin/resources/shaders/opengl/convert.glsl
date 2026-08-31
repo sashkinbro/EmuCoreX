@@ -35,7 +35,6 @@ layout(binding = 0) uniform sampler2D TextureSampler;
 	layout(location = 0) out uint o_col0;
 	#define OUTPUT o_col0
 #elif HAS_DEPTH_OUTPUT
-	out float gl_FragDepth;
 	#define OUTPUT gl_FragDepth
 #elif HAS_FLOAT32_OUTPUT
 	layout(location = 0) out float o_col0;
@@ -185,11 +184,7 @@ void ps_convert_rgb5a1_16bits()
 void ps_convert_depth32_32bits()
 {
 	// Convert a GL_FLOAT32 depth texture into a 32 bits UINT texture
-#if HAS_CLIP_CONTROL
-	SV_Target1 = uint(exp2(32.0f) * sample_c().r);
-#else
-	SV_Target1 = uint(exp2(24.0f) * sample_c().r);
-#endif
+	OUTPUT = depth_to_uint(sample_c());
 }
 #endif
 
@@ -197,12 +192,7 @@ void ps_convert_depth32_32bits()
 void ps_convert_depth32_rgba8()
 {
 	// Convert a GL_FLOAT32 depth texture into a RGBA color texture
-#if HAS_CLIP_CONTROL
-	uint d = uint(sample_c().r * exp2(32.0f));
-#else
-	uint d = uint(sample_c().r * exp2(24.0f));
-#endif
-	SV_Target0 = vec4(uvec4((d & 0xFFu), ((d >> 8) & 0xFFu), ((d >> 16) & 0xFFu), (d >> 24))) / vec4(255.0);
+	OUTPUT = depth32_to_rgba8(sample_c());
 }
 #endif
 
@@ -210,116 +200,15 @@ void ps_convert_depth32_rgba8()
 void ps_convert_depth16_rgb5a1()
 {
 	// Convert a GL_FLOAT32 (only 16 lsb) depth into a RGB5A1 color texture
-#if HAS_CLIP_CONTROL
-	uint d = uint(sample_c().r * exp2(32.0f));
-#else
-	uint d = uint(sample_c().r * exp2(24.0f));
-#endif
-	SV_Target0 = vec4(gpu_bitwise_and(uvec4(d << 3, d >> 2, d >> 7, d >> 8), uvec4(0xf8, 0xf8, 0xf8, 0x80))) / 255.0f;
+	OUTPUT = depth16_to_rgb5a1(sample_c());
 }
 #endif
 
-float rgba8_to_depth32(vec4 unorm)
-{
-	uvec4 c = uvec4(unorm * vec4(255.5f));
-#if HAS_CLIP_CONTROL
-	return float(c.r | (c.g << 8) | (c.b << 16) | (c.a << 24)) * exp2(-32.0f);
-#else
-	return float(c.r | (c.g << 8) | (c.b << 16) | (c.a << 24)) * exp2(-24.0f);
-#endif
-}
-
-float rgba8_to_depth24(vec4 unorm)
-{
-	uvec3 c = uvec3(unorm.rgb * vec3(255.5f));
-#if HAS_CLIP_CONTROL
-	return float(c.r | (c.g << 8) | (c.b << 16)) * exp2(-32.0f);
-#else
-	return float(c.r | (c.g << 8) | (c.b << 16)) * exp2(-24.0f);
-#endif
-}
-
-float rgba8_to_depth16(vec4 unorm)
-{
-	uvec2 c = uvec2(unorm.rg * vec2(255.5f));
-#if HAS_CLIP_CONTROL
-	return float(c.r | (c.g << 8)) * exp2(-32.0f);
-#else
-	return float(c.r | (c.g << 8)) * exp2(-24.0f);
-#endif
-}
-
-float rgb5a1_to_depth16(vec4 unorm)
-{
-	uvec4 c = uvec4(unorm * vec4(255.5f));
-#if HAS_CLIP_CONTROL
-	return float(((c.r & 0xF8u) >> 3) | ((c.g & 0xF8u) << 2) | ((c.b & 0xF8u) << 7) | ((c.a & 0x80u) << 8)) * exp2(-32.0f);
-#else
-	return float(((c.r & 0xF8u) >> 3) | ((c.g & 0xF8u) << 2) | ((c.b & 0xF8u) << 7) | ((c.a & 0x80u) << 8)) * exp2(-24.0f);
-#endif
-}
-
-#ifdef ps_convert_float32_depth_to_color
-void ps_convert_float32_depth_to_color()
-{
-	SV_Target0 = sample_c().r;
-}
-#endif
-
-#ifdef ps_convert_float32_color_to_depth
-void ps_convert_float32_color_to_depth()
-{
-	gl_FragDepth = sample_c().r;
-}
-#endif
-
-#ifdef ps_convert_float32_float24
-void ps_convert_float32_float24()
+#ifdef ps_convert_depth32_depth24
+void ps_convert_depth32_depth24()
 {
 	// Truncates depth value to 24bits
-#if HAS_CLIP_CONTROL
-	uint d = uint(sample_c().r * exp2(32.0f)) & 0xFFFFFFu;
-	gl_FragDepth = float(d) * exp2(-32.0f);
-#else
-	uint d = uint(sample_c().r * exp2(24.0f)) & 0xFFFFFFu;
-	gl_FragDepth = float(d) * exp2(-24.0f);
-#endif
-}
-#endif
-
-#ifdef ps_convert_rgba8_float32
-void ps_convert_rgba8_float32()
-{
-	// Convert an RGBA texture into a float depth texture
-	gl_FragDepth = rgba8_to_depth32(sample_c());
-}
-#endif
-
-#ifdef ps_convert_rgba8_float24
-void ps_convert_rgba8_float24()
-{
-	// Same as above but without the alpha channel (24 bits Z)
-
-	// Convert an RGBA texture into a float depth texture
-	gl_FragDepth = rgba8_to_depth24(sample_c());
-}
-#endif
-
-#ifdef ps_convert_rgba8_float16
-void ps_convert_rgba8_float16()
-{
-	// Same as above but without the A/B channels (16 bits Z)
-
-	// Convert an RGBA texture into a float depth texture
-	gl_FragDepth = rgba8_to_depth16(sample_c());
-}
-#endif
-
-#ifdef ps_convert_rgb5a1_float16
-void ps_convert_rgb5a1_float16()
-{
-	// Convert an RGB5A1 (saved as RGBA8) color to a 16 bit Z
-	gl_FragDepth = rgb5a1_to_depth16(sample_c());
+	OUTPUT = depth32_to_depth24(sample_c());
 }
 #endif
 
@@ -490,18 +379,14 @@ void ps_convert_rgb5a1_8i()
 	{
 		uint red = (denorm_c.r >> 3) & 0x1Fu;
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
-		float sel0 = float(((green << 5) | red) & 0xFFu) / 255.0f;
-		
-		SV_Target0 = vec4(sel0);
+		o_col0 = vec4(float(((green << 5) | red) & 0xFFu) / 255.0f);
 	}
 	else
 	{
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
 		uint blue = (denorm_c.b >> 3) & 0x1Fu;
 		uint alpha = denorm_c.a & 0x80u;
-		float sel0 = float((alpha | (blue << 2) | (green >> 3)) & 0xFFu) / 255.0f;
-
-		SV_Target0 = vec4(sel0);
+		o_col0 = vec4(float((alpha | (blue << 2) | (green >> 3)) & 0xFFu) / 255.0f);
 	} 
 }
 #endif
@@ -630,7 +515,7 @@ void ps_colclip_init()
 void ps_colclip_resolve()
 {
 	vec4 value = sample_c();
-	SV_Target0 = vec4(vec3(gpu_bitwise_and(uvec3(value.rgb * 65535.0f), uvec3(255u))) / 255.0f, value.a);
+	o_col0 = vec4(vec3(gpu_bitwise_and(uvec3(value.rgb * 65535.0f), uvec3(255u))) / 255.0f, value.a);
 }
 #endif
 

@@ -457,6 +457,7 @@ private:
 
 	VKStreamBuffer m_vertex_stream_buffer;
 	VKStreamBuffer m_index_stream_buffer;
+	VKStreamBuffer m_expand_index_stream_buffer;
 	VKStreamBuffer m_vertex_uniform_stream_buffer;
 	VKStreamBuffer m_fragment_uniform_stream_buffer;
 	VKStreamBuffer m_texture_stream_buffer;
@@ -514,6 +515,7 @@ private:
 	VkPipeline m_imgui_pipeline = VK_NULL_HANDLE;
 
 	GSHWDrawConfig::VSConstantBuffer m_vs_cb_cache;
+	GSHWDrawConfig::VSPushConstants m_vs_pc_cache;
 	GSHWDrawConfig::PSConstantBuffer m_ps_cb_cache;
 
 	std::string m_tfx_source;
@@ -643,6 +645,9 @@ public:
 	void DrawPrimitive();
 	void DrawIndexedPrimitive();
 	void DrawIndexedPrimitive(int offset, int count);
+	void DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion);
+	void Draw(const GSHWDrawConfig& config);
+	void Draw(const GSHWDrawConfig& config, int offset, int count);
 
 	std::unique_ptr<GSDownloadTexture> CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format) override;
 
@@ -674,6 +679,9 @@ public:
 
 	void IASetVertexBuffer(const void* vertex, size_t stride, size_t count, size_t align_multiplier = 1);
 	void IASetIndexBuffer(const void* index, size_t count);
+	void UploadIndices(VKStreamBuffer& buffer, const void* index, size_t count);
+	void VSSetIndexBuffer(const void* index, size_t count);
+	void SetVSPushConstants(u32 base_vertex, u32 base_index = 0, bool force_update = false);
 
 	void PSSetROVs(GSTexture* rt, GSTexture* ds, bool write_rt, bool write_ds);
 	void PSSetShaderResource(int i, GSTexture* sr, bool check_state, ResourceType type = ResourceType::SRV);
@@ -743,17 +751,18 @@ public:
 private:
 	enum DIRTY_FLAG : u32
 	{
-		DIRTY_FLAG_TFX_TEXTURE_0 = (1 << 0), // 0, 1, 2, 3, 4
-		DIRTY_FLAG_TFX_UBO = (1 << 5),
-		DIRTY_FLAG_UTILITY_TEXTURE = (1 << 6),
-		DIRTY_FLAG_BLEND_CONSTANTS = (1 << 7),
-		DIRTY_FLAG_LINE_WIDTH = (1 << 8),
-		DIRTY_FLAG_INDEX_BUFFER = (1 << 9),
-		DIRTY_FLAG_VIEWPORT = (1 << 10),
-		DIRTY_FLAG_SCISSOR = (1 << 11),
-		DIRTY_FLAG_PIPELINE = (1 << 12),
-		DIRTY_FLAG_VS_CONSTANT_BUFFER = (1 << 13),
-		DIRTY_FLAG_PS_CONSTANT_BUFFER = (1 << 14),
+		DIRTY_FLAG_TFX_TEXTURE_0 = (1 << 0), // 0 through 6, including both ROV images.
+		DIRTY_FLAG_TFX_UBO = (1 << 7),
+		DIRTY_FLAG_UTILITY_TEXTURE = (1 << 8),
+		DIRTY_FLAG_BLEND_CONSTANTS = (1 << 9),
+		DIRTY_FLAG_LINE_WIDTH = (1 << 10),
+		DIRTY_FLAG_INDEX_BUFFER = (1 << 11),
+		DIRTY_FLAG_VIEWPORT = (1 << 12),
+		DIRTY_FLAG_SCISSOR = (1 << 13),
+		DIRTY_FLAG_PIPELINE = (1 << 14),
+		DIRTY_FLAG_VS_CONSTANT_BUFFER = (1 << 15),
+		DIRTY_FLAG_PS_CONSTANT_BUFFER = (1 << 16),
+		DIRTY_FLAG_VS_PUSH_CONSTANTS = (1 << 17),
 
 		DIRTY_FLAG_TFX_TEXTURE_TEX = (DIRTY_FLAG_TFX_TEXTURE_0 << 0),
 		DIRTY_FLAG_TFX_TEXTURE_PALETTE = (DIRTY_FLAG_TFX_TEXTURE_0 << 1),
@@ -772,9 +781,12 @@ private:
 		                   DIRTY_FLAG_BLEND_CONSTANTS | DIRTY_FLAG_LINE_WIDTH,
 		DIRTY_TFX_STATE = DIRTY_BASE_STATE | DIRTY_FLAG_TFX_TEXTURES,
 		DIRTY_UTILITY_STATE = DIRTY_BASE_STATE | DIRTY_FLAG_UTILITY_TEXTURE,
-		DIRTY_CONSTANT_BUFFER_STATE = DIRTY_FLAG_VS_CONSTANT_BUFFER | DIRTY_FLAG_PS_CONSTANT_BUFFER,
+		DIRTY_CONSTANT_BUFFER_STATE = DIRTY_FLAG_VS_CONSTANT_BUFFER | DIRTY_FLAG_PS_CONSTANT_BUFFER | DIRTY_FLAG_VS_PUSH_CONSTANTS,
 		ALL_DIRTY_STATE = DIRTY_BASE_STATE | DIRTY_TFX_STATE | DIRTY_UTILITY_STATE | DIRTY_CONSTANT_BUFFER_STATE,
 	};
+
+	static_assert((DIRTY_FLAG_TFX_TEXTURES & (DIRTY_BASE_STATE | DIRTY_CONSTANT_BUFFER_STATE |
+		DIRTY_FLAG_TFX_UBO | DIRTY_FLAG_UTILITY_TEXTURE)) == 0, "TFX texture dirty flags must not alias other state");
 
 	enum class PipelineLayout
 	{

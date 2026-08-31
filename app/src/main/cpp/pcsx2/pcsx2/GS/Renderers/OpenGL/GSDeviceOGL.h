@@ -169,6 +169,9 @@ private:
 
 	std::unique_ptr<GLStreamBuffer> m_vertex_stream_buffer;
 	std::unique_ptr<GLStreamBuffer> m_index_stream_buffer;
+	std::unique_ptr<GLStreamBuffer> m_expand_index_stream_buffer;
+	std::unique_ptr<GLStreamBuffer> m_vertex_push_constants_stream_buffer;
+	GLuint m_dummy_vao = 0;
 	GLuint m_expand_ibo = 0;
 	GLuint m_vao = 0;
 	GLuint m_expand_vao = 0;
@@ -266,6 +269,7 @@ private:
 	bool m_gpu_pipeline_statistics_supported = false;
 
 	GSHWDrawConfig::VSConstantBuffer m_vs_cb_cache;
+	GSHWDrawConfig::VSPushConstants m_vs_pc_cache;
 	GSHWDrawConfig::PSConstantBuffer m_ps_cb_cache;
 
 	std::string m_shader_tfx_vgs;
@@ -378,6 +382,9 @@ public:
 	void DrawPrimitive();
 	void DrawIndexedPrimitive();
 	void DrawIndexedPrimitive(int offset, int count);
+	void DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion);
+	void Draw(const GSHWDrawConfig& config);
+	void Draw(const GSHWDrawConfig& config, int offset, int count);
 
 	std::unique_ptr<GSDownloadTexture> CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format) override;
 
@@ -417,6 +424,9 @@ public:
 	void IASetPrimitiveTopology(GLenum topology);
 	void IASetVertexBuffer(const void* vertices, size_t count, size_t align_multiplier = 1);
 	void IASetIndexBuffer(const void* index, size_t count);
+	void SetIndexBuffer(std::unique_ptr<GLStreamBuffer>& buffer, const void* index, size_t count);
+	void VSSetIndexBuffer(const void* index, size_t count);
+	void VSSetPushConstants(u32 base_vertex, u32 base_index = 0, bool force_update = false);
 
 	void PSSetShaderResource(int i, GSTexture* sr);
 	void PSSetSamplerState(GLuint ss);

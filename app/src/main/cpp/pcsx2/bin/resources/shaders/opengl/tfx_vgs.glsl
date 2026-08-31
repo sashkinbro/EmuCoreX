@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for text editor detection
@@ -19,6 +19,15 @@ layout(std140, binding = 1) uniform cb20
 
 #ifdef VERTEX_SHADER
 
+#ifndef VS_EXPAND_NONE
+#define VS_EXPAND_NONE 0
+#define VS_EXPAND_POINT 1
+#define VS_EXPAND_LINE 2
+#define VS_EXPAND_SPRITE 3
+#define VS_EXPAND_LINE_AA1 4
+#define VS_EXPAND_TRIANGLE_AA1 5
+#endif
+
 out SHADER
 {
 	vec4 t_float;
@@ -28,11 +37,13 @@ out SHADER
 	#else
 		flat vec4 c;
 	#endif
+	float inv_cov; // We use the inverse to make it simpler to interpolate.
+	flat uint interior; // 1 for triangle interior; 0 for edge.
 } VSout;
 
 const float exp_min32 = exp2(-32.0f);
 
-#if VS_EXPAND == 0
+#if VS_EXPAND == VS_EXPAND_NONE
 
 layout(location = 0) in vec2  i_st;
 layout(location = 2) in vec4  i_c;
@@ -73,15 +84,14 @@ void vs_main()
 	// example: 133.0625 (133 + 1/16) should start from line 134, ceil(133.0625 - 0.05) still above 133
 	gl_Position.xy = vec2(i_p) - vec2(0.05f, 0.05f);
 	gl_Position.xy = gl_Position.xy * VertexScale - VertexOffset;
-	gl_Position.w = 1.0f;
 
-#if HAS_CLIP_CONTROL
-	gl_Position.z = float(z) * exp_min32;
-#else
-	// GLES doesn't support ARB_clip_control, so remap it to -1..1. This isn't lossless, but
-	// gets rid of really bad Z-fighting.
-	gl_Position.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
-#endif
+	#if HAS_CLIP_CONTROL
+		gl_Position.z = float(z) * exp_min32;
+	#else
+		gl_Position.z = (float(z) * exp_min32) * 2.0f - 1.0f;
+	#endif
+
+	gl_Position.w = 1.0f;
 
 	texture_coord();
 
@@ -106,8 +116,21 @@ struct RawVertex
 	uint FOG;
 };
 
+layout(std140, binding = 4) uniform cb22
+{
+	uint BaseVertex;
+	uint BaseIndex;
+	uint pad_cb22_0;
+	uint pad_cb22_1;
+};
+
 layout(std140, binding = 2) readonly buffer VertexBuffer {
 	RawVertex vertex_buffer[];
+};
+
+// Warning: use std430 instead of std140 so that the ints are tightly packed.
+layout(std430, binding = 3) readonly buffer IndexBuffer {
+	uint index_buffer[];
 };
 
 struct ProcessedVertex
@@ -118,13 +141,17 @@ struct ProcessedVertex
 	vec4 c;
 };
 
+uint load_index(uint _i)
+{
+	uint i = _i + BaseIndex;
+	// i is even => load lower 16 bits; i odd => load upper 16 bits.
+	uint shift = (i & 1u) << 4u;
+	return (index_buffer[i >> 1u] >> shift) & 0xFFFFu;
+}
+
 ProcessedVertex load_vertex(uint index)
 {
-#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
-	RawVertex rvtx = vertex_buffer[index + gl_BaseVertexARB];
-#else
-	RawVertex rvtx = vertex_buffer[index];
-#endif
+	RawVertex rvtx = vertex_buffer[BaseVertex + index];
 
 	vec2 i_st = rvtx.ST;
 	vec4 i_c = vec4(uvec4(bitfieldExtract(rvtx.RGBA, 0, 8), bitfieldExtract(rvtx.RGBA, 8, 8),
@@ -140,11 +167,13 @@ ProcessedVertex load_vertex(uint index)
 	uint z = min(i_z, MaxDepth);
 	vtx.p.xy = vec2(i_p) - vec2(0.05f, 0.05f);
 	vtx.p.xy = vtx.p.xy * VertexScale - VertexOffset;
-#if HAS_CLIP_CONTROL
-	vtx.p.z = float(z) * exp_min32;
-#else
-	vtx.p.z = min(float(z) * exp2(-23.0f), 2.0f) - 1.0f;
-#endif
+
+	#if HAS_CLIP_CONTROL
+		vtx.p.z = float(z) * exp_min32;
+	#else
+		vtx.p.z = (float(z) * exp_min32) * 2.0f - 1.0f;
+	#endif
+
 	vtx.p.w = 1.0f;
 
 	vec2 uv = vec2(i_uv) - TextureOffset;
@@ -205,7 +234,7 @@ vec2 get_aa1_triangle_expand_dir(ProcessedVertex v0, ProcessedVertex v1, Process
 
 mat2 get_inverse(mat2 mat, float det)
 {
-	return mat2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1 / det);
+	return mat2(mat[1][1], -mat[0][1], -mat[1][0], mat[0][0]) * (1.0f / det);
 }
 
 // Extrapolate triangle attributes from the first vertex along the given direction.
@@ -243,7 +272,7 @@ void extrapolate_aa1_triangle_edge(inout ProcessedVertex v0, ProcessedVertex v1,
 	// Get the position -> barycentric weight matrix
 	mat2 inv_dp_mat = get_inverse(dp_mat, dp_det);
 
-	vec2 weights = min_perp_length < 2 ? vec2(0) : inv_dp_mat * dp;
+	vec2 weights = min_perp_length < 2.0f ? vec2(0) : inv_dp_mat * dp;
 
 	v0.p.xy += dp * PointSize; // Extrapolate position
 
@@ -274,40 +303,44 @@ void main()
 {
 	ProcessedVertex vtx;
 
-#if defined(GL_ARB_shader_draw_parameters) && GL_ARB_shader_draw_parameters
-	uint vid = uint(gl_VertexID - gl_BaseVertexARB);
-#else
 	uint vid = uint(gl_VertexID);
-#endif
 
-#if VS_EXPAND == 1 // Point
+#if VS_EXPAND == VS_EXPAND_POINT
 
 	vtx = load_vertex(vid >> 2);
 
 	vtx.p.x += ((vid & 1u) != 0u) ? PointSize.x : 0.0f;
 	vtx.p.y += ((vid & 2u) != 0u) ? PointSize.y : 0.0f;
 
-#elif VS_EXPAND == 2 // Line
+#elif (VS_EXPAND == VS_EXPAND_LINE) || (VS_EXPAND == VS_EXPAND_LINE_AA1)
 
 	uint vid_base = vid >> 2;
 	bool is_bottom = (vid & 2u) != 0u;
 	bool is_right = (vid & 1u) != 0u;
-	uint vid_other = is_bottom ? vid_base - 1 : vid_base + 1;
+	uint vid_other = is_bottom ? vid_base - 1u : vid_base + 1u;
 	vtx = load_vertex(vid_base);
 	ProcessedVertex other = load_vertex(vid_other);
 
-	vec2 line_vector = normalize(vtx.p.xy - other.p.xy);
-	vec2 line_normal = vec2(line_vector.y, -line_vector.x);
-	vec2 line_width = (line_normal * PointSize) / 2;
-	// line_normal is inverted for bottom point
-	vec2 offset = ((uint(is_bottom) ^ uint(is_right)) != 0u) ? line_width : -line_width;
+	// Use bottom minus top for delta regardless of which vertex we are expanding.
+	vec2 line_delta = is_bottom ? (vtx.p.xy - other.p.xy) : (other.p.xy - vtx.p.xy);
+	vec2 line_vector = normalize(line_delta / VertexScale);
+	vec2 line_expand = vec2(line_vector.y, -line_vector.x);
+#if VS_EXPAND == VS_EXPAND_LINE_AA1
+	line_expand *= 2.0f * LineAA1Width;
+#endif
+	vec2 line_width = (line_expand * PointSize) / 2.0f;
+	vec2 offset = is_right ? line_width : -line_width;
 	vtx.p.xy += offset;
+
+#if VS_EXPAND == VS_EXPAND_LINE_AA1
+	VSout.inv_cov = is_right ? 1.0f : -1.0f;
+#endif
 
 	// Lines will be run as (0 1 2) (1 2 3)
 	// This means that both triangles will have a point based off the top line point as their first point
 	// So we don't have to do anything for !IIP
 
-#elif VS_EXPAND == 3 // Sprite
+#elif VS_EXPAND == VS_EXPAND_SPRITE
 
 	// Sprite points are always in pairs
 	uint vid_base = vid >> 1;
@@ -327,6 +360,102 @@ void main()
 	vtx.p.y = is_bottom ? lt.p.y : vtx.p.y;
 	vtx.t_float.y = is_bottom ? lt.t_float.y : vtx.t_float.y;
 	vtx.t_int.yw = is_bottom ? lt.t_int.yw : vtx.t_int.yw;
+
+#elif VS_EXPAND == VS_EXPAND_TRIANGLE_AA1
+
+	// Triangles with AA1 are expanded as follows:
+	// - Vertices 0-2: Interior of triangle (1 triangle).
+	// - Vertices 3-8: First edge expanded (2 triangles).
+	// - Vertices 9-14: Second edge expanded (2 triangles).
+	// - Vertices 15-20: Third edge expanded (2 triangles).
+	// - Vertices 21-26: First corner cap (2 triangles).
+	// - Vertices 27-32: Second corner cap (2 triangles).
+	// - Vertices 33-38: Third corner cap (2 triangles).
+
+	uint prim_id = vid / 39u;
+	uint prim_offset = vid - 39u * prim_id; // range: 0-38
+	bool interior = prim_offset < 3u;
+	bool edge = 3u <= prim_offset && prim_offset < 21u;
+
+	if (interior)
+	{
+		vtx = load_vertex(load_index(3u * prim_id + prim_offset));
+		VSout.inv_cov = 0.0f; // Full coverage
+		VSout.interior = 1u;
+	}
+	else if (edge)
+	{
+		// Vertex indices for this edge. We need all 3 for determining exterior/interior.
+		uint prim_offset_edges = prim_offset - 3u; // range: 0-17
+		uint i0 = prim_offset_edges / 6u;
+		uint i1 = (i0 >= 2u) ? i0 - 2u : i0 + 1u;
+		uint i2 = (i0 >= 1u) ? i0 - 1u : i0 + 2u;
+		uint edge_offset = prim_offset_edges - 6u * i0; // range: 0-5
+
+		// Note: order of top/bottom, inside/outside is arbitrary,
+		// as long as it assembles into two triangles forming a quad.
+		bool is_bottom = (2u <= edge_offset) && (edge_offset <= 4u);
+		bool is_outside = (edge_offset & 1u) != 0u;
+
+		vtx = load_vertex(load_index(3u * prim_id + (is_bottom ? i1 : i0)));
+		ProcessedVertex other = load_vertex(load_index(3u * prim_id + (is_bottom ? i0 : i1)));
+		ProcessedVertex opposite = load_vertex(load_index(3u * prim_id + i2));
+
+		mat2 pos_deltas = get_xy_deltas_unscaled(vtx, other, opposite);
+
+		vec2 expand_dir = is_outside ? get_aa1_triangle_expand_dir(vtx, other, opposite) : vec2(0);
+
+		// Do actual extrapolation, or no-op if expand_dir == 0.
+		extrapolate_aa1_triangle_edge(vtx, other, opposite, pos_deltas, expand_dir);
+
+		VSout.inv_cov = is_outside ? 1.0f : 0.0f; // No coverage on outside, otherwise full.
+
+		VSout.interior = 0u;
+	}
+	else // Corner cap
+	{
+		// Vertex indices for this cap. We need all 3 for determining exterior/interior.
+		uint prim_offset_cap = prim_offset - 21u; // range: 0-17
+		uint i0 = prim_offset_cap / 6u;
+		uint i1 = (i0 >= 2u) ? i0 - 2u : i0 + 1u;
+		uint i2 = (i0 >= 1u) ? i0 - 1u : i0 + 2u;
+		uint cap_offset = prim_offset_cap - 6u * i0; // range: 0-5
+
+		bool is_near_corner = cap_offset == 0u || cap_offset == 3u;
+		bool is_far_corner = cap_offset == 2u || cap_offset == 5u;
+		bool is_first_tri = cap_offset < 3u;
+
+		// First triangle is on the side of vertex i1 and second is on the side of vertex i2.
+		vtx = load_vertex(load_index(3u * prim_id + i0));
+		ProcessedVertex other = load_vertex(load_index(3u * prim_id + (is_first_tri ? i1 : i2)));
+		ProcessedVertex opposite = load_vertex(load_index(3u * prim_id + (is_first_tri ? i2 : i1)));
+
+		mat2 pos_deltas = get_xy_deltas_unscaled(vtx, other, opposite);
+
+		// Get the edge expansion directions of both incident edges.
+		vec2 edge_expand_dir_0 = get_aa1_triangle_expand_dir(vtx, other, opposite);
+		vec2 edge_expand_dir_1 = get_aa1_triangle_expand_dir(vtx, opposite, other);
+
+		// Check if the corner is already filled by the expanded edges.
+		// This happens if the expand directions are the same.
+		// If so we output a degenerate triangle at this corner.
+		bool corner_filled = all(equal(edge_expand_dir_0, edge_expand_dir_1));
+
+		// Nothing if corner is filled, otherwise opposite to the bisector of the corner angle.
+		vec2 far_corner_dir = corner_filled ? vec2(0) : -normalize((pos_deltas[0] + pos_deltas[1]) / 2.0f);
+
+		// Determine the expand direction.
+		vec2 expand_dir = is_near_corner ? vec2(0) :       // No extrapolation
+		                  is_far_corner ? far_corner_dir : // Opposite to the angle bisector of corner
+		                  edge_expand_dir_0;               // Standard AA1 edge expansion
+
+		// Do the actual extrapolation (no-op if expand_dir == 0).
+		extrapolate_aa1_triangle_edge(vtx, other, opposite, pos_deltas, expand_dir);
+
+		VSout.inv_cov = is_near_corner ? 0.0f : 1.0f; // Full coverage at near corner, otherwise none.
+
+		VSout.interior = 0u;
+	}
 
 #endif
 
