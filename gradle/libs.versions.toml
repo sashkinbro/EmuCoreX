@@ -24,9 +24,16 @@ room = "2.8.4"
 ksp = "2.3.10"
 coil = "3.5.0"
 browser = "1.10.0"
-webrtc = "144.7559.12"
+webrtc = "144.7559.14"
+credentials = "1.6.0"
+googleId = "1.2.0"
+googleAuth = "22.0.0"
 
 [libraries]
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+google-identity = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleId" }
+google-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "googleAuth" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

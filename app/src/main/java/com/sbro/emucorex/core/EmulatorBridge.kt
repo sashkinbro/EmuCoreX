@@ -781,7 +781,9 @@ object EmulatorBridge {
         Log.i(TAG, "startEmulation requested pathType=$pathType bootSmoke=$bootSmokeProbe vmActive=$isVmActive")
         val shouldAutoProgressiveScanHold = shouldStartAutoProgressiveScanHold(path, bootSmokeProbe, allowBiosBoot)
 
-        return runSerial {
+        return BackupSessionGate.start(active = { isVmActive }) {
+            getContext()?.let { com.sbro.emucorex.data.drive.DriveBackupArchive(it).recoverPending() }
+            runSerial {
             isVmActive = true
             shutdownRequested = false
             val result = try {
@@ -821,6 +823,7 @@ object EmulatorBridge {
             NativeApp.logCrashBreadcrumb("startEmulation finished result=$result")
             Log.i(TAG, "startEmulation finished result=$result")
             result
+            }
         }
     }
 
@@ -965,6 +968,11 @@ object EmulatorBridge {
             isVmActive = false
             shutdownRequested = false
             DocumentPathResolver.releasePreparedLaunchHandles()
+        }
+        // A failed native shutdown must never unlock memory-card backup while the VM still owns it.
+        if (!runCatching { NativeApp.hasValidVm() }.getOrDefault(true)) {
+            BackupSessionGate.stopped()
+            getContext()?.let { com.sbro.emucorex.data.drive.DriveBackupWork.afterGame(it) }
         }
     }
 

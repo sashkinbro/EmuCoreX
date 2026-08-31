@@ -305,6 +305,10 @@ tasks.matching { it.name == "mergeReleaseJniLibFolders" }.configureEach {
 }
 
 dependencies {
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.identity)
+    implementation(libs.google.auth)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)

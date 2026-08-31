@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.sbro.emucorex.core.EmulatorStorage
+import com.sbro.emucorex.core.BackupSessionGate
+import com.sbro.emucorex.data.drive.DriveBackupArchive
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
@@ -25,7 +27,12 @@ class SettingsBackupRepository(
     suspend fun backup(destination: Uri, includeSaveStates: Boolean = false): Boolean {
         return runCatching {
             val output = context.contentResolver.openOutputStream(destination) ?: return@runCatching false
-            output.use { writeBackup(it, includeSaveStates) }
+            output.use {
+                BackupSessionGate.whileStopped {
+                    DriveBackupArchive(context).recoverPending()
+                    writeBackup(it, includeSaveStates)
+                }
+            }
             true
         }.onFailure { error ->
             Log.e(TAG, "Unable to export settings backup", error)
@@ -35,7 +42,12 @@ class SettingsBackupRepository(
     suspend fun restore(source: Uri): Boolean {
         return runCatching {
             val input = context.contentResolver.openInputStream(source) ?: return@runCatching false
-            input.use { restoreBackup(it) }
+            input.use {
+                BackupSessionGate.whileStopped {
+                    DriveBackupArchive(context).recoverPending()
+                    restoreBackup(it)
+                }
+            }
             true
         }.onFailure { error ->
             Log.e(TAG, "Unable to restore settings backup", error)

@@ -1395,17 +1395,29 @@ private fun ProfileDevicesDialog(
 }
 
 @Composable
-private fun CloudProfilesDialog(
-    profiles: List<CloudEmulatorProfile>,
-    isLoading: Boolean,
-    onSave: (String, String?) -> Unit,
-    onRestore: (String) -> Unit,
-    onDelete: (String) -> Unit,
-    onDismiss: () -> Unit
+internal fun CloudProfilesDialog(
+    profiles: List<CloudEmulatorProfile> = emptyList(),
+    isLoading: Boolean = false,
+    onSave: (String, String?) -> Unit = { _, _ -> },
+    onRestore: (String) -> Unit = {},
+    onDelete: (String) -> Unit = {},
+    onDismiss: () -> Unit,
+    firebaseAvailable: Boolean = true,
+    initialDrive: Boolean = false
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var pendingRestore by rememberSaveable { mutableStateOf<String?>(null) }
+    var cloudTab by rememberSaveable { mutableIntStateOf(if (initialDrive) 1 else 0) }
     ProfileFeatureDialog(title = stringResource(R.string.profile_cloud_title), onDismiss = onDismiss) {
+        if (firebaseAvailable) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = cloudTab == 0, onClick = { cloudTab = 0 }, label = { Text(stringResource(R.string.drive_settings_tab)) })
+            FilterChip(selected = cloudTab == 1, onClick = { cloudTab = 1 }, label = { Text(stringResource(R.string.drive_title)) })
+        }
+        if (cloudTab == 1 || !firebaseAvailable) {
+            DriveBackupPanel()
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.action_close)) }
+            return@ProfileFeatureDialog
+        }
         Text(stringResource(R.string.profile_cloud_description), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(
             value = name,
@@ -1479,14 +1491,14 @@ private fun ProfileFeatureDialog(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(20.dp).widthIn(max = 620.dp).heightIn(max = 720.dp),
+            modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().padding(20.dp).heightIn(max = 720.dp),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             border = profileCardBorder()
         ) {
             Column(
-                modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 content = {
                     Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
@@ -3329,7 +3341,7 @@ private fun ProfileTab.icon() = when (this) {
 }
 
 @Composable
-private fun profileCardBorder(alpha: Float = 0.58f): BorderStroke {
+internal fun profileCardBorder(alpha: Float = 0.58f): BorderStroke {
     return BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = alpha))
 }
 

@@ -204,6 +204,8 @@ import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.SettingsBackupRepository
+import com.sbro.emucorex.ui.profile.CloudProfilesDialog
+import androidx.compose.material.icons.rounded.CloudSync
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.ShaderPackInstallStage
 import com.sbro.emucorex.data.TouchControlPressEffect
@@ -275,6 +277,7 @@ fun SettingsScreen(
     var showTopBarMenu by remember { mutableStateOf(false) }
     val showResetAllSettingsDialog = remember { mutableStateOf(false) }
     var showBackupExportDialog by rememberSaveable { mutableStateOf(false) }
+    var showDriveBackupDialog by rememberSaveable { mutableStateOf(false) }
     var includeSaveStatesInBackup by rememberSaveable { mutableStateOf(false) }
     val showCoverUrlDialog = remember { mutableStateOf(false) }
     var editingArcadeCoverUrl by remember { mutableStateOf(false) }
@@ -563,6 +566,7 @@ fun SettingsScreen(
                     showBackupExportDialog = true
                 },
                 launchSettingsBackupImport = { settingsBackupImporter.launch(arrayOf("application/zip", "*/*")) },
+                launchCloudBackup = { showDriveBackupDialog = true },
                 openLanguageSheet = openLanguageSheet,
                 onRequestGamepadBinding = { padIndex, actionId ->
                     pendingGamepadPadIndex = padIndex
@@ -740,6 +744,10 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    if (showDriveBackupDialog) {
+        CloudProfilesDialog(onDismiss = { showDriveBackupDialog = false }, firebaseAvailable = false, initialDrive = true)
     }
 
     if (showBackupExportDialog) {
@@ -1143,6 +1151,7 @@ private fun SettingsContent(
     onClearCoverCache: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
+    launchCloudBackup: () -> Unit,
     openLanguageSheet: () -> Unit,
     onRequestGamepadBinding: (Int, String) -> Unit,
     onSearchResultSelected: (SettingsTab) -> Unit,
@@ -2434,6 +2443,12 @@ private fun SettingsContent(
                             label = stringResource(R.string.settings_backup_restore_title),
                             value = stringResource(R.string.settings_backup_restore_desc),
                             onClick = launchSettingsBackupImport
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.CloudSync,
+                            label = stringResource(R.string.drive_title),
+                            value = stringResource(R.string.drive_private),
+                            onClick = launchCloudBackup
                         )
                     }
                 }
@@ -5332,6 +5347,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Arcade, R.string.settings_arcade_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_backup_export_title),
         entry(SettingsTab.Library, R.string.settings_backup_restore_title),
+        entry(SettingsTab.Library, R.string.drive_title),
         entry(SettingsTab.Emulation, R.string.settings_show_fps),
         entry(SettingsTab.Emulation, R.string.settings_fps_overlay_mode),
         entry(SettingsTab.Emulation, R.string.settings_fps_overlay_position),
