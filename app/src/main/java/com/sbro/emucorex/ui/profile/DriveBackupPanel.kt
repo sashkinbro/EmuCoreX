@@ -90,7 +90,10 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
         }
         if (settings.connected) {
             DriveSection {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                         modifier = Modifier.size(56.dp), border = profileCardBorder()) {
                         Box(contentAlignment = Alignment.Center) {
@@ -108,11 +111,25 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                     }
                     if (!settings.needsAuthorization) Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.drive_reconnect))
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    val isNarrow = maxWidth < 360.dp
+                    if (isNarrow) {
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { disconnect = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.drive_disconnect))
+                            }
+                            OutlinedButton(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                                Text(stringResource(R.string.drive_reconnect), textAlign = TextAlign.Center)
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedButton(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.weight(1f)) {
+                                Text(stringResource(R.string.drive_reconnect))
+                            }
+                            TextButton(onClick = { disconnect = true }, enabled = !state.busy) { Text(stringResource(R.string.drive_disconnect)) }
+                        }
                     }
-                    TextButton(onClick = { disconnect = true }, enabled = !state.busy) { Text(stringResource(R.string.drive_disconnect)) }
                 }
             }
             if (settings.lastBackupMs > 0) {
@@ -131,8 +148,11 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             DriveToggle(R.string.drive_category_textures, settings.includeTextures, !state.busy) { value -> viewModel.configure { it.copy(includeTextures = value) } }
             HorizontalDivider()
             DriveSection {
-                Text(stringResource(R.string.drive_schedule), style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.drive_schedule), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     listOf(0, 6, 12, 24).forEach { hours ->
                         FilterChip(selected = settings.intervalHours == hours, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(intervalHours = hours) } },
@@ -145,8 +165,11 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             DriveToggle(R.string.drive_charging, settings.chargingOnly, !state.busy) { value -> viewModel.configure { it.copy(chargingOnly = value) } }
             Text(stringResource(R.string.drive_schedule_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             DriveSection {
-                Text(stringResource(R.string.drive_retention, settings.keepCopies), style = MaterialTheme.typography.titleSmall)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.drive_retention, settings.keepCopies), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleSmall)
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     listOf(1, 3, 5, 10, 20).forEach { count ->
                         FilterChip(selected = settings.keepCopies == count, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(keepCopies = count) } }, label = { Text(count.toString()) })
@@ -165,7 +188,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                 }
             }
             if (state.copies.isEmpty()) DriveSection {
-                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), modifier = Modifier.size(64.dp)) {
                         Box(contentAlignment = Alignment.Center) {
@@ -253,7 +276,10 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
 private fun DriveTransferProgress(operation: DriveOperation, queued: Boolean, cancel: () -> Unit) {
     val context = LocalContext.current
     DriveSection {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Text(stringResource(when (operation.phase) {
                 "prepare" -> R.string.drive_preparing
                 "upload" -> R.string.drive_uploading
@@ -266,12 +292,16 @@ private fun DriveTransferProgress(operation: DriveOperation, queued: Boolean, ca
                 style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
         }
-        if (operation.percent >= 0) LinearProgressIndicator(progress = { operation.percent / 100f }, modifier = Modifier.fillMaxWidth())
-        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        if (operation.percent >= 0) LinearProgressIndicator(progress = { operation.percent / 100f }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         if (operation.totalBytes > 0) {
-            Text(stringResource(R.string.drive_transfer_amount, Formatter.formatFileSize(context, operation.transferredBytes),
-                Formatter.formatFileSize(context, operation.totalBytes)), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                stringResource(R.string.drive_transfer_amount, Formatter.formatFileSize(context, operation.transferredBytes),
+                Formatter.formatFileSize(context, operation.totalBytes)),
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum")
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(if (operation.bytesPerSecond > 0) stringResource(R.string.drive_transfer_speed,
                     Formatter.formatFileSize(context, operation.bytesPerSecond)) else "—",
                     modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
@@ -282,7 +312,7 @@ private fun DriveTransferProgress(operation: DriveOperation, queued: Boolean, ca
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        TextButton(onClick = cancel, modifier = Modifier.align(Alignment.End)) { Text(stringResource(R.string.drive_cancel)) }
+        TextButton(onClick = cancel, modifier = Modifier.align(Alignment.End).padding(end = 16.dp)) { Text(stringResource(R.string.drive_cancel)) }
     }
 }
 
@@ -302,7 +332,7 @@ private fun DriveSection(content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), contentColor = MaterialTheme.colorScheme.onSurface,
         border = profileCardBorder()) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
 }
 
