@@ -132,6 +132,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Date
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled", "ConfigurationScreenWidthHeight")
@@ -222,7 +224,7 @@ fun GameDetailScreen(
                         .fillMaxWidth(if (isLandscape) 0.4f else 1f)
                         .widthIn(max = heroMaxWidth)
                         .aspectRatio(2f / 3f)
-                        .clip(RoundedCornerShape(28.dp))
+                        .clip(neonShape(28.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                 ) {
                     GameCoverArt(
@@ -428,7 +430,7 @@ private fun CommentsSection(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
     ) {
@@ -463,7 +465,7 @@ private fun CommentsSection(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(104.dp)
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(neonShape(18.dp))
                         )
                     }
                 }
@@ -514,7 +516,7 @@ private fun CommentComposer(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
     ) {
         Column(
@@ -551,7 +553,7 @@ private fun CommentComposer(
                     .height(112.dp),
                 minLines = 2,
                 maxLines = 4,
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 placeholder = {
                     Text(
                         text = stringResource(R.string.detail_comment_placeholder),
@@ -568,6 +570,7 @@ private fun CommentComposer(
                 )
             }
             Button(
+                shape = neonButtonShape(),
                 enabled = !isSubmitting && rating > 0 && text.isNotBlank(),
                 onClick = {
                     onSubmit(rating, text)
@@ -595,7 +598,7 @@ private fun CommentCard(comment: GameComment) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
         tonalElevation = 0.dp
     ) {
@@ -653,7 +656,7 @@ private fun CommentCard(comment: GameComment) {
 
             comment.deviceTitle.takeIf { it.isNotBlank() }?.let { deviceTitle ->
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = neonShape(12.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.07f)
                 ) {
                     Column(
@@ -727,14 +730,14 @@ private fun DetailSkeleton(
                 .fillMaxWidth()
                 .padding(horizontal = horizontalInset)
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(28.dp))
+                .clip(neonShape(28.dp))
         )
         SkeletonBlock(
             modifier = Modifier
                 .padding(horizontal = horizontalInset)
                 .fillMaxWidth(0.72f)
                 .height(34.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(neonShape(14.dp))
         )
         Row(
             modifier = Modifier.padding(horizontal = horizontalInset),
@@ -754,7 +757,7 @@ private fun DetailSkeleton(
                 .fillMaxWidth()
                 .padding(horizontal = horizontalInset)
                 .height(58.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(neonShape(18.dp))
         )
 
         if (isInstalledGame) {
@@ -764,7 +767,7 @@ private fun DetailSkeleton(
                         .fillMaxWidth()
                         .padding(horizontal = horizontalInset)
                         .height(74.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(neonShape(16.dp))
                 )
             }
             SkeletonBlock(
@@ -772,7 +775,7 @@ private fun DetailSkeleton(
                     .padding(horizontal = horizontalInset)
                     .width(128.dp)
                     .height(24.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
             )
             Row(
                 modifier = Modifier
@@ -785,7 +788,7 @@ private fun DetailSkeleton(
                         modifier = Modifier
                             .weight(1f)
                             .height(72.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(neonShape(14.dp))
                     )
                 }
             }
@@ -796,14 +799,14 @@ private fun DetailSkeleton(
                 .fillMaxWidth()
                 .padding(horizontal = horizontalInset)
                 .height(144.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(neonShape(16.dp))
         )
         SkeletonBlock(
             modifier = Modifier
                 .padding(horizontal = horizontalInset)
                 .width(156.dp)
                 .height(24.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(neonShape(10.dp))
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = horizontalInset),
@@ -814,7 +817,7 @@ private fun DetailSkeleton(
                     modifier = Modifier
                         .width(220.dp)
                         .height(130.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(neonShape(18.dp))
                 )
             }
         }
@@ -837,7 +840,7 @@ private fun EmptyDetailState(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -943,7 +946,7 @@ private fun CompatibilitySection(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
     ) {
@@ -1040,7 +1043,7 @@ private fun ExpandableInfoSection(
         else -> trimmedValue.take(collapsedMaxChars).trimEnd() + "..."
     }
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
 
     Surface(
         modifier = Modifier
@@ -1107,7 +1110,7 @@ private fun DetailSourceCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
@@ -1151,7 +1154,7 @@ private fun ScreenshotCard(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .width(220.dp)
@@ -1169,7 +1172,7 @@ private fun ScreenshotCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(130.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(neonShape(18.dp))
         ) {
             GameCoverArt(
                 coverPath = imageUrl,
@@ -1188,7 +1191,7 @@ private fun VideoCard(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .width(232.dp)
@@ -1206,7 +1209,7 @@ private fun VideoCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(neonShape(18.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
             GameCoverArt(
@@ -1567,7 +1570,7 @@ private fun ViewerTopBar(
     } else {
         Modifier
             .padding(top = 4.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(neonShape(22.dp))
             .background(Color.Black.copy(alpha = 0.44f))
     }
 

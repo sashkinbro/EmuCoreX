@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 enum class TvStorageRequest {
     BIOS_FILE,
@@ -135,6 +137,7 @@ fun TvStoragePickerHost(
                 sources.forEachIndexed { index, source ->
                     val interactionSource = remember(index, source.label) { MutableInteractionSource() }
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { launch(source) },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -146,7 +149,7 @@ fun TvStoragePickerHost(
                                 }
                             )
                             .gamepadFocusableCard(
-                                shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                                shape = neonShape(18.dp),
                                 interactionSource = interactionSource,
                                 addFocusTarget = false,
                                 focusHighlightMode = GamepadFocusHighlightMode.Always

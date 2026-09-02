@@ -52,6 +52,9 @@ import coil3.compose.AsyncImage
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Date
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewModel()) {
@@ -72,7 +75,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+        Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(20.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), contentColor = MaterialTheme.colorScheme.onSurface,
             border = profileCardBorder()) {
             Row(Modifier.fillMaxWidth().padding(18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -84,7 +87,8 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             }
         }
         if (!settings.connected || settings.needsAuthorization) {
-            Button(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                shape = neonButtonShape(),onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(if (settings.needsAuthorization) R.string.drive_reconnect else R.string.drive_connect))
             }
         }
@@ -118,13 +122,15 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                             TextButton(onClick = { disconnect = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.drive_disconnect))
                             }
-                            OutlinedButton(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedButton(
+                                shape = neonButtonShape(),onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.drive_reconnect), textAlign = TextAlign.Center)
                             }
                         }
                     } else {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedButton(onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                shape = neonButtonShape(),onClick = { context.activity()?.let(viewModel::connect) }, enabled = !state.busy, modifier = Modifier.weight(1f)) {
                                 Text(stringResource(R.string.drive_reconnect))
                             }
                             TextButton(onClick = { disconnect = true }, enabled = !state.busy) { Text(stringResource(R.string.drive_disconnect)) }
@@ -133,7 +139,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                 }
             }
             if (settings.lastBackupMs > 0) {
-                Surface(shape = RoundedCornerShape(18.dp), border = profileCardBorder()) {
+                Surface(shape = neonShape(18.dp), border = profileCardBorder()) {
                 ListItem(headlineContent = { Text(stringResource(R.string.drive_last_backup)) },
                     supportingContent = { Text("${date(settings.lastBackupMs)} · ${Formatter.formatFileSize(context, settings.lastSize)}") },
                     leadingContent = { Icon(Icons.Default.CloudDone, null) })
@@ -142,7 +148,8 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             if (state.queued || state.operation.phase.isNotBlank()) {
                 DriveTransferProgress(state.operation, state.queued, viewModel::cancel)
             }
-            Button(onClick = viewModel::backup, enabled = !state.busy && !settings.needsAuthorization, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                shape = neonButtonShape(),onClick = viewModel::backup, enabled = !state.busy && !settings.needsAuthorization, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.CloudUpload, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.drive_backup_now))
             }
             DriveToggle(R.string.drive_category_textures, settings.includeTextures, !state.busy) { value -> viewModel.configure { it.copy(includeTextures = value) } }
@@ -154,7 +161,8 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(0, 6, 12, 24).forEach { hours ->
-                        FilterChip(selected = settings.intervalHours == hours, enabled = !state.busy,
+                        FilterChip(
+                            shape = neonChipShape(),selected = settings.intervalHours == hours, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(intervalHours = hours) } },
                             label = { Text(if (hours == 0) stringResource(R.string.drive_manual) else stringResource(R.string.drive_hours, hours)) })
                     }
@@ -171,7 +179,8 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     listOf(1, 3, 5, 10, 20).forEach { count ->
-                        FilterChip(selected = settings.keepCopies == count, enabled = !state.busy,
+                        FilterChip(
+                            shape = neonChipShape(),selected = settings.keepCopies == count, enabled = !state.busy,
                             onClick = { viewModel.configure { it.copy(keepCopies = count) } }, label = { Text(count.toString()) })
                     }
                 }
@@ -199,7 +208,8 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                         fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     Text(stringResource(R.string.drive_empty_description), style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                    OutlinedButton(onClick = viewModel::backup, enabled = !state.busy && !settings.needsAuthorization) {
+                    OutlinedButton(
+                        shape = neonButtonShape(),onClick = viewModel::backup, enabled = !state.busy && !settings.needsAuthorization) {
                         Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.drive_backup_now))
@@ -207,7 +217,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
                 }
             }
             state.copies.forEach { copy ->
-                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                     border = profileCardBorder()) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(copy.device, fontWeight = FontWeight.SemiBold)
@@ -231,7 +241,7 @@ internal fun DriveBackupPanel(viewModel: DriveBackupViewModel = sharedDriveViewM
             val success = message == "restored"
             val accent = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
             Surface(modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
-                shape = RoundedCornerShape(18.dp), color = accent.copy(alpha = 0.08f), border = profileCardBorder()) {
+                shape = neonShape(18.dp), color = accent.copy(alpha = 0.08f), border = profileCardBorder()) {
                 Row(Modifier.padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(if (success) Icons.Default.CheckCircle else Icons.Default.Info, null, tint = accent)
@@ -318,7 +328,7 @@ private fun DriveTransferProgress(operation: DriveOperation, queued: Boolean, ca
 
 @Composable
 private fun DriveToggle(label: Int, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp),
+    Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), border = profileCardBorder()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(label), Modifier.weight(1f).padding(end = 12.dp), style = MaterialTheme.typography.bodyMedium)
@@ -329,7 +339,7 @@ private fun DriveToggle(label: Int, checked: Boolean, enabled: Boolean, onChange
 
 @Composable
 private fun DriveSection(content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+    Surface(modifier = Modifier.fillMaxWidth(), shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), contentColor = MaterialTheme.colorScheme.onSurface,
         border = profileCardBorder()) {
         Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)

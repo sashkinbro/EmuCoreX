@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 
 fun Modifier.shimmer(
@@ -137,14 +138,14 @@ fun PremiumLoadingAnimation(
                 modifier = Modifier
                     .size(size * 0.82f)
                     .graphicsLayer { rotationZ = rotation }
-                    .border(3.5.dp, color.copy(alpha = 0.85f), RoundedCornerShape(14.dp))
+                    .border(3.5.dp, color.copy(alpha = 0.85f), neonShape(14.dp))
             )
 
             Box(
                 modifier = Modifier
                     .size(size * 0.62f)
                     .graphicsLayer { rotationZ = -rotation * 1.8f }
-                    .border(2.5.dp, color.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+                    .border(2.5.dp, color.copy(alpha = 0.55f), neonShape(10.dp))
             )
 
             Text(

@@ -39,6 +39,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 private val imageLoadingSemaphore = Semaphore(4)
 @Composable
@@ -108,7 +109,7 @@ fun GameCoverArt(
     } else {
         Box(
             modifier = modifier
-                .clip(RoundedCornerShape(20.dp))
+                .clip(neonShape(20.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .shimmer(showShimmer = isLoading),
             contentAlignment = Alignment.Center

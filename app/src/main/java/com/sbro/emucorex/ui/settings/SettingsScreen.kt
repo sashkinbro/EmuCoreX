@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -244,6 +245,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import com.sbro.emucorex.ui.common.AppAlertDialog as AlertDialog
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorex.ui.theme.neon.NeonBlack
+import com.sbro.emucorex.ui.theme.neon.NeonBlue
+import com.sbro.emucorex.ui.theme.neon.NeonRed
+import com.sbro.emucorex.ui.theme.neon.NeonYellow
+import com.sbro.emucorex.ui.theme.neon.neonAccentColor
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
+import com.sbro.emucorex.ui.theme.neon.neonCornerAccent
+import androidx.compose.foundation.border
+import androidx.compose.ui.unit.sp
 
 private enum class SettingsTab {
     General, Graphics, Controls, Emulation, Audio, Fixes, Library, Network, Customization, GameMenu, Updates, Pro, Arcade, About
@@ -612,7 +625,7 @@ fun SettingsScreen(
             Button(
                 onClick = { showNamcoArcadeGuide = false },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Text(
                     text = stringResource(R.string.close),
@@ -768,7 +781,7 @@ fun SettingsScreen(
                     .clickable {
                         includeSaveStatesInBackup = !includeSaveStatesInBackup
                     },
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.26f),
                 border = BorderStroke(
                     1.dp,
@@ -812,7 +825,7 @@ fun SettingsScreen(
                     settingsBackupExporter.launch("emucorex-settings-backup.zip")
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Text(
                     text = stringResource(R.string.settings_backup_export_action),
@@ -847,7 +860,7 @@ fun SettingsScreen(
                     )
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
                     ) {
                         Column(
@@ -920,13 +933,13 @@ fun SettingsScreen(
                             .focusRequester(coverUrlFocusRequester),
                         minLines = 2,
                         maxLines = 4,
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         label = { Text(stringResource(if (editingArcadeCoverUrl) R.string.settings_arcade_cover_download_url else R.string.settings_cover_download_url)) },
                         placeholder = { Text(if (editingArcadeCoverUrl) CoverArtRepository.DEFAULT_ARCADE_COVER_BASE_URL else stringResource(R.string.settings_cover_download_url_placeholder)) }
                     )
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
                     ) {
                         Column(
@@ -1029,7 +1042,7 @@ private fun SettingsCompactTopBar(
                 top = topInset,
                 bottom = 4.dp
             ),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
@@ -1064,7 +1077,7 @@ private fun SettingsCompactTopBar(
                             .fillMaxWidth()
                             .skipGamepadTextFieldFocus(),
                         singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         placeholder = { Text(stringResource(R.string.settings_search_placeholder)) }
                     )
                 } else {
@@ -1102,7 +1115,7 @@ private fun SettingsCompactTopBar(
                 DropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { onMenuExpandedChange(false) },
-                    shape = RoundedCornerShape(20.dp)
+                    shape = neonShape(20.dp)
                 ) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.settings_reset_all_action)) },
@@ -2269,10 +2282,11 @@ private fun SettingsContent(
                                 val interactionSource = remember { MutableInteractionSource() }
                                 FilterChip(
                                     modifier = Modifier.tvGamepadFocusableCard(
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = neonShape(16.dp),
                                         interactionSource = interactionSource,
                                         addFocusTarget = false
                                     ),
+                                    shape = neonChipShape(),
                                     selected = selectedGamepadPadIndex == padIndex,
                                     onClick = { selectedGamepadPadIndex = padIndex },
                                     interactionSource = interactionSource,
@@ -3409,7 +3423,7 @@ private fun CustomizationSettingsTab(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .height(210.dp),
-            shape = RoundedCornerShape(22.dp),
+            shape = neonShape(22.dp),
             color = MaterialTheme.colorScheme.background,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         ) {
@@ -3491,7 +3505,7 @@ private fun CustomizationSettingsTab(
                                 modifier = Modifier
                                     .width(52.dp * uiState.homeGridScale)
                                     .aspectRatio(0.72f),
-                                shape = RoundedCornerShape(10.dp),
+                                shape = neonShape(10.dp),
                                 color = when (index % 3) {
                                     0 -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
                                     1 -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f)
@@ -3561,7 +3575,7 @@ private fun CustomizationSettingsTab(
                         .width(156.dp)
                         .aspectRatio(16f / 9f)
                         .clickable { viewModel.setHomeBackgroundPreset(preset) },
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(
                         if (selected) 2.dp else 1.dp,
@@ -3636,7 +3650,7 @@ private fun CustomizationSettingsTab(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .height(sideArtworkPreviewLayout.heightDp.dp),
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             color = Color.Black,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
         ) {
@@ -3818,7 +3832,7 @@ private fun CustomizationSettingsTab(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .height(124.dp),
-            shape = RoundedCornerShape(22.dp),
+            shape = neonShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
         ) {
@@ -4111,7 +4125,7 @@ private fun VisualStylePreviewCard(
     preview: @Composable () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .width(176.dp)
@@ -4145,7 +4159,7 @@ private fun VisualStylePreviewCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.background.copy(alpha = 0.72f))
                     .padding(7.dp)
             ) {
@@ -4182,7 +4196,7 @@ private fun GameMenuLayoutMiniature(style: GameMenuLayoutStyle, tabCount: Int) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 3.dp, vertical = 5.dp)
-                .clip(RoundedCornerShape(7.dp))
+                .clip(neonShape(7.dp))
                 .background(panelColor)
         ) {
             MiniatureVerticalTabs(Modifier.fillMaxHeight().width(38.dp), tabCount, navColor, labelled = true)
@@ -4197,7 +4211,7 @@ private fun GameMenuLayoutMiniature(style: GameMenuLayoutStyle, tabCount: Int) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight(0.78f)
-                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
+                    .clip(neonShapeCorners(topStart = 10.dp, topEnd = 10.dp))
                     .background(panelColor)
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -4215,7 +4229,7 @@ private fun GameMenuLayoutMiniature(style: GameMenuLayoutStyle, tabCount: Int) {
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(0.64f)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(neonShape(7.dp))
                     .background(panelColor)
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -4230,10 +4244,10 @@ private fun GameMenuLayoutMiniature(style: GameMenuLayoutStyle, tabCount: Int) {
 @Composable
 private fun DrawerStyleMiniature(style: DrawerVisualStyle) {
     val shape = when (style) {
-        DrawerVisualStyle.CLASSIC -> RoundedCornerShape(9.dp)
-        DrawerVisualStyle.COMPACT -> RoundedCornerShape(3.dp)
-        DrawerVisualStyle.GLASS -> RoundedCornerShape(13.dp)
-        DrawerVisualStyle.CONSOLE -> RoundedCornerShape(2.dp)
+        DrawerVisualStyle.CLASSIC -> neonShape(9.dp)
+        DrawerVisualStyle.COMPACT -> neonShape(3.dp)
+        DrawerVisualStyle.GLASS -> neonShape(13.dp)
+        DrawerVisualStyle.CONSOLE -> neonShape(2.dp)
     }
     val panelWidth = when (style) {
         DrawerVisualStyle.COMPACT -> 0.66f
@@ -4283,14 +4297,14 @@ private fun DrawerStyleMiniature(style: DrawerVisualStyle) {
 private fun MiniatureContentPanel(modifier: Modifier, color: Color) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(7.dp))
+            .clip(neonShape(7.dp))
             .background(color)
             .padding(7.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp)
     ) {
-        Box(Modifier.fillMaxWidth(0.62f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)))
+        Box(Modifier.fillMaxWidth(0.62f).height(8.dp).clip(neonShape(4.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)))
         repeat(3) {
-            Box(Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)))
+            Box(Modifier.fillMaxWidth().height(7.dp).clip(neonShape(4.dp)).background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)))
         }
     }
 }
@@ -4304,7 +4318,7 @@ private fun MiniatureVerticalTabs(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(7.dp))
+            .clip(neonShape(7.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.78f))
             .padding(4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -4314,7 +4328,7 @@ private fun MiniatureVerticalTabs(
                 Modifier
                     .fillMaxWidth(if (labelled) 1f else 0.85f)
                     .height(if (labelled) 11.dp else 9.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(neonShape(4.dp))
                     .background(if (index == 0) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f))
             )
         }
@@ -4329,7 +4343,7 @@ private fun MiniatureHorizontalTabs(modifier: Modifier, tabCount: Int, color: Co
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(4.dp))
+                    .clip(neonShape(4.dp))
                     .background(if (index == 0) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f))
             )
         }
@@ -4368,7 +4382,7 @@ private fun DrawerItemEditorRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
     ) {
         Row(
@@ -4459,7 +4473,7 @@ private fun GameMenuEditorRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
     ) {
         Row(
@@ -4491,7 +4505,7 @@ private fun GameMenuSectionRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
     ) {
         Row(
@@ -4666,7 +4680,7 @@ private fun ProStatusCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = if (isUnlocked) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         } else {
@@ -4686,7 +4700,7 @@ private fun ProStatusCard(
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(neonShape(14.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -4743,7 +4757,7 @@ private fun ProStatusCard(
                     Button(
                         onClick = onApplyCrimson,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = neonShape(16.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.settings_pro_apply_theme),
@@ -4755,7 +4769,7 @@ private fun ProStatusCard(
                     OutlinedButton(
                         onClick = onRestore,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = neonShape(16.dp)
                     ) {
                         Text(
                             text = stringResource(R.string.settings_pro_restore),
@@ -4767,7 +4781,7 @@ private fun ProStatusCard(
                         onClick = onPurchase,
                         enabled = !purchaseInProgress,
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = neonShape(16.dp)
                     ) {
                         Text(
                             text = stringResource(
@@ -4811,7 +4825,7 @@ private fun ProMetaPill(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
@@ -4845,7 +4859,7 @@ private fun ProFeatureRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
     ) {
@@ -4857,7 +4871,7 @@ private fun ProFeatureRow(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(
                         if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                         else MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
@@ -4899,7 +4913,7 @@ private fun AboutNote(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding, vertical = 4.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
     ) {
@@ -4964,11 +4978,13 @@ private fun ThemeSelector(
 ) {
     val customThemes = customThemeLibrary.sanitized().themes
     val customThemeOptionStart = 100
+    val neonThemeOptionValue = 50
     val defaultThemeName = stringResource(R.string.theme_manager_default_name)
     val options = buildList {
         add(0 to stringResource(R.string.settings_theme_system))
         add(1 to stringResource(R.string.settings_theme_light))
         add(2 to stringResource(R.string.settings_theme_dark))
+        add(neonThemeOptionValue to stringResource(R.string.settings_theme_neon))
         add(
             3 to if (isProUnlocked) {
                 stringResource(R.string.settings_theme_pro)
@@ -4995,6 +5011,7 @@ private fun ThemeSelector(
             ThemeMode.LIGHT -> 1
             ThemeMode.DARK -> 2
             ThemeMode.PRO -> 3
+            ThemeMode.NEON -> neonThemeOptionValue
             ThemeMode.CUSTOM -> if (activeCustomThemeIndex >= 0) {
                 customThemeOptionStart + activeCustomThemeIndex
             } else {
@@ -5006,6 +5023,7 @@ private fun ThemeSelector(
             when (value) {
                 1 -> onSelected(ThemeMode.LIGHT)
                 2 -> onSelected(ThemeMode.DARK)
+                neonThemeOptionValue -> onSelected(ThemeMode.NEON)
                 3 -> if (isProUnlocked) onSelected(ThemeMode.PRO) else onProLockedSelected()
                 in customThemeOptionStart until customThemeOptionStart + customThemes.size -> {
                     if (isProUnlocked) {
@@ -5047,10 +5065,11 @@ private fun CustomControlsQuickSelector(
                 val interactionSource = remember { MutableInteractionSource() }
                 FilterChip(
                     modifier = Modifier.tvGamepadFocusableCard(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         interactionSource = interactionSource,
                         addFocusTarget = false
                     ),
+                    shape = neonChipShape(),
                     selected = control.enabled,
                     onClick = { onEnabledChange(control.id, !control.enabled) },
                     interactionSource = interactionSource,
@@ -5073,20 +5092,44 @@ internal fun SettingsSection(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val neon = LocalNeonTheme.current
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onBackground,
+            text = if (neon) title.uppercase() else title,
+            style = MaterialTheme.typography.titleLarge.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = if (neon) 1.2.sp else MaterialTheme.typography.titleLarge.letterSpacing
+            ),
+            color = if (neon) NeonYellow else MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(horizontal = ScreenHorizontalPadding)
         )
+        if (neon) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = ScreenHorizontalPadding)
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(NeonRed, NeonYellow, Color.Transparent)
+                        )
+                    )
+            ) {
+                Box(modifier = Modifier.fillMaxWidth())
+            }
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = ScreenHorizontalPadding),
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp
+            tonalElevation = 2.dp,
+            border = if (neon) {
+                BorderStroke(1.dp, NeonYellow.copy(alpha = 0.14f))
+            } else {
+                null
+            }
         ) {
             Column(
                 modifier = Modifier.padding(vertical = 16.dp),
@@ -5116,11 +5159,15 @@ internal fun SettingsItem(
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val itemFocusRequester = remember { FocusRequester() }
     val helpFocusRequester = remember { FocusRequester() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = horizontalPadding)
+            .neonCornerAccent(
+                accent = neonAccentColor(label.hashCode().mod(3)),
+                markSize = 9.dp
+            )
             .then(
                 if (tvUiEnabled && helpText != null) {
                     Modifier
@@ -5153,16 +5200,32 @@ internal fun SettingsItem(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)
+                        .clip(neonShape(12.dp))
+                        .then(
+                            if (LocalNeonTheme.current) {
+                                Modifier
+                                    .background(if (enabled) NeonBlack else NeonBlack.copy(alpha = 0.6f))
+                                    .border(
+                                        1.dp,
+                                        NeonBlue.copy(alpha = if (enabled) 0.35f else 0.18f),
+                                        neonShape(12.dp)
+                                    )
+                            } else {
+                                Modifier.background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)
+                                )
+                            }
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f),
+                        tint = if (LocalNeonTheme.current) {
+                            NeonBlue.copy(alpha = if (enabled) 1f else 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 1f else 0.5f)
+                        },
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -5225,7 +5288,7 @@ private fun CoverUrlExampleRow(
     onLongClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(14.dp)
+    val shape = neonShape(14.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -5456,7 +5519,7 @@ private fun GamepadBindingRow(
     onClearClick: (() -> Unit)?
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -5481,7 +5544,7 @@ private fun GamepadBindingRow(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -5542,7 +5605,7 @@ internal fun ToggleItem(
     val itemFocusRequester = remember { FocusRequester() }
     val helpFocusRequester = remember { FocusRequester() }
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -5587,7 +5650,7 @@ internal fun ToggleItem(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -5654,7 +5717,7 @@ private fun ActionItem(
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
     val itemFocusRequester = remember { FocusRequester() }
     val helpFocusRequester = remember { FocusRequester() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -5692,7 +5755,7 @@ private fun ActionItem(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -5801,7 +5864,7 @@ private fun SliderItem(
                     }
                 }
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -5812,7 +5875,7 @@ private fun SliderItem(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(neonShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -5953,7 +6016,7 @@ internal fun ShaderPresetSelector(
                         .fillMaxWidth(if (isLandscape) 0.82f else 0.94f)
                         .widthIn(max = if (isLandscape) 960.dp else 720.dp)
                         .fillMaxHeight(if (isLandscape) 0.94f else 0.86f),
-                    shape = RoundedCornerShape(30.dp),
+                    shape = neonShape(30.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(
                         1.dp,
@@ -5968,7 +6031,7 @@ internal fun ShaderPresetSelector(
                         ) {
                             Surface(
                                 modifier = Modifier.size(if (isLandscape) 50.dp else 56.dp),
-                                shape = RoundedCornerShape(18.dp),
+                                shape = neonShape(18.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -6059,7 +6122,7 @@ internal fun ShaderPresetSelector(
                                         )
                                     }
                                 },
-                                shape = RoundedCornerShape(18.dp)
+                                shape = neonShape(18.dp)
                             )
                         }
 
@@ -6274,7 +6337,7 @@ private fun ShaderPresetCategoryCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         onClick = onClick,
@@ -6345,7 +6408,7 @@ private fun ShaderPresetDialogOption(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         onClick = onClick,
@@ -6437,11 +6500,11 @@ private fun SideArtworkPicker(
                         .width(156.dp)
                         .aspectRatio(16f / 9f)
                         .tvGamepadFocusableCard(
-                            shape = RoundedCornerShape(14.dp),
+                            shape = neonShape(14.dp),
                             interactionSource = interactionSource,
                             addFocusTarget = false
                         ),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = Color.Black,
                     interactionSource = interactionSource,
                     border = BorderStroke(
@@ -6551,10 +6614,11 @@ internal fun ChoiceSection(
                 val optionInteractionSource = remember { MutableInteractionSource() }
                 FilterChip(
                     modifier = Modifier.tvGamepadFocusableCard(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         interactionSource = optionInteractionSource,
                         addFocusTarget = false
                     ),
+                    shape = neonChipShape(),
                     selected = selectedValue == value,
                     onClick = { onSelect(value) },
                     interactionSource = optionInteractionSource,
@@ -6634,10 +6698,11 @@ private fun BitmaskChoiceSection(
                 val optionInteractionSource = remember { MutableInteractionSource() }
                 FilterChip(
                     modifier = Modifier.tvGamepadFocusableCard(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         interactionSource = optionInteractionSource,
                         addFocusTarget = false
                     ),
+                    shape = neonChipShape(),
                     selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
                     onClick = { onToggle(metric) },
                     interactionSource = optionInteractionSource,
@@ -7045,7 +7110,7 @@ private fun LanguageOptionCard(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(20.dp)
+    val shape = neonShape(20.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -7070,7 +7135,7 @@ private fun LanguageOptionCard(
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(neonShape(14.dp))
                     .background(
                         if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)

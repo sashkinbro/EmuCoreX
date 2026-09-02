@@ -100,6 +100,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 fun HubDetailScreen(
@@ -242,7 +244,7 @@ private fun HubArticleContent(
                             .widthIn(max = 760.dp)
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
-                            .clip(RoundedCornerShape(26.dp))
+                            .clip(neonShape(26.dp))
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .clickable {
                                 viewerIndex = imageSpecs.indexOfFirst { it.url == heroSpec.url }.coerceAtLeast(0)
@@ -347,7 +349,7 @@ private fun HubArticleContent(
             items(article.item.sources, key = { it.url }) { source ->
                 Surface(
                     modifier = Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
                     onClick = { runCatching { uriHandler.openUri(source.url) } }
                 ) {
@@ -422,7 +424,7 @@ private fun HubRelatedMaterialCard(
             .widthIn(max = 760.dp)
             .fillMaxWidth()
             .padding(vertical = 5.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
         onClick = onClick
@@ -445,7 +447,7 @@ private fun HubRelatedMaterialCard(
                     modifier = Modifier
                         .width(128.dp)
                         .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(13.dp)),
+                        .clip(neonShape(13.dp)),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -495,7 +497,7 @@ private fun HubArticleBlock(
         )
         "quote" -> Surface(
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
@@ -521,7 +523,7 @@ private fun HubArticleBlock(
             val warning = block.string("style") == "warning"
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = if (warning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
                 contentColor = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
             ) {
@@ -541,7 +543,7 @@ private fun HubArticleBlock(
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
                             .clickable { onOpenImage(assetId) },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = neonShape(20.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh
                     ) {
                         HubImage(
@@ -570,7 +572,7 @@ private fun HubArticleBlock(
                                     .width(300.dp)
                                     .aspectRatio(16f / 9f)
                                     .clickable { onOpenImage(assetId) },
-                                shape = RoundedCornerShape(20.dp),
+                                shape = neonShape(20.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh
                             ) {
                                 HubImage(
@@ -595,7 +597,7 @@ private fun HubArticleBlock(
             val providerId = block.string("providerId")
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = neonShape(20.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 onClick = { onOpenVideo(providerId) }
             ) {
@@ -611,6 +613,7 @@ private fun HubArticleBlock(
             }
         }
         "link" -> FilledTonalButton(
+            shape = neonButtonShape(),
             onClick = { onOpenLink(block.string("url")) },
             modifier = Modifier.padding(vertical = 8.dp)
         ) {
@@ -746,7 +749,8 @@ private fun HubDetailError(onRetry: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(vertical = 14.dp)
         )
-        Button(onClick = onRetry) { Text(stringResource(R.string.hub_retry)) }
+        Button(
+            shape = neonButtonShape(),onClick = onRetry) { Text(stringResource(R.string.hub_retry)) }
     }
 }
 

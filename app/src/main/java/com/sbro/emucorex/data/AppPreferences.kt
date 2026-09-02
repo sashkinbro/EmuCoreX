@@ -794,6 +794,7 @@ class AppPreferences(private val context: Context) {
             2 -> ThemeMode.DARK
             3 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.PRO else ThemeMode.SYSTEM
             4 -> if (prefs[PRO_UNLOCKED] == true) ThemeMode.CUSTOM else ThemeMode.SYSTEM
+            5 -> ThemeMode.NEON
             else -> ThemeMode.SYSTEM
         }
     }
@@ -929,6 +930,7 @@ class AppPreferences(private val context: Context) {
                 ThemeMode.DARK -> 2
                 ThemeMode.PRO -> 3
                 ThemeMode.CUSTOM -> 4
+                ThemeMode.NEON -> 5
             }
         }
     }

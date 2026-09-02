@@ -74,12 +74,16 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.shimmer
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorex.ui.theme.neon.NeonSystemBanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -314,6 +318,7 @@ fun SaveManagerScreen(
         )
     }
 
+    val neonThemeActive = LocalNeonTheme.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -350,12 +355,19 @@ fun SaveManagerScreen(
                     )
                 }
 
+                if (neonThemeActive) {
+                    item {
+                        NeonSystemBanner()
+                    }
+                }
+
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         FilledTonalButton(
+                            shape = neonButtonShape(),
                             onClick = {
                                 val fileName = if (isFiltered) {
                                     "${(screenSubtitle ?: "game").replace(' ', '_')}_saves.zip"
@@ -381,6 +393,7 @@ fun SaveManagerScreen(
                             )
                         }
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = { showImportSourceDialog = true },
                             enabled = !isWorking,
                             modifier = Modifier.weight(1.14f),
@@ -480,7 +493,7 @@ private fun SaveImportSourceOption(
     description: String,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -496,7 +509,7 @@ private fun SaveImportSourceOption(
         ) {
             Surface(
                 modifier = Modifier.size(44.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = neonShape(14.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -549,7 +562,7 @@ private fun SaveImportPreviewDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
                 ) {
@@ -698,7 +711,7 @@ private fun SaveManagerHeaderSkeleton(topInset: androidx.compose.ui.unit.Dp) {
         }
 
         Surface(
-            shape = RoundedCornerShape(22.dp),
+            shape = neonShape(22.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.26f)
         ) {
             Row(
@@ -759,7 +772,7 @@ private fun SaveEntryCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -782,7 +795,7 @@ private fun SaveEntryCard(
                     modifier = Modifier
                         .width(116.dp)
                         .height(86.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
                     tonalElevation = 0.dp,
                     shadowElevation = 0.dp
@@ -792,7 +805,7 @@ private fun SaveEntryCard(
                         fallbackTitle = entry.gameTitle,
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(14.dp)),
+                            .clip(neonShape(14.dp)),
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -862,6 +875,7 @@ private fun SaveEntryCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilledTonalButton(
+                    shape = neonButtonShape(),
                     onClick = onLoadClick,
                     enabled = entry.canLoad,
                     modifier = Modifier.weight(1f),
@@ -884,6 +898,7 @@ private fun SaveEntryCard(
                     )
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onDeleteClick,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -912,7 +927,7 @@ private fun SaveEntryCard(
 private fun SaveEntrySkeletonCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -935,7 +950,7 @@ private fun SaveEntrySkeletonCard() {
                     modifier = Modifier
                         .width(132.dp)
                         .height(96.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(neonShape(18.dp))
                 )
 
                 Column(
@@ -998,7 +1013,7 @@ private fun SaveEntrySkeletonCard() {
 
 @Composable
 private fun SkeletonBlock(modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Box(
         modifier = modifier
             .clip(shape)
@@ -1014,7 +1029,7 @@ private fun SkeletonBlock(modifier: Modifier = Modifier) {
 private fun EmptyStateCard(isFiltered: Boolean) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,

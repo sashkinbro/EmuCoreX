@@ -85,6 +85,7 @@ import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("ConfigurationScreenWidthHeight", "FrequentlyChangingValue")
@@ -226,7 +227,7 @@ fun CatalogSearchScreen(
                                 }
                             },
                             singleLine = true,
-                            shape = RoundedCornerShape(20.dp),
+                            shape = neonShape(20.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
@@ -401,7 +402,7 @@ private fun ScrollToTopButton(
         exit = fadeOut(tween(140)) + scaleOut(tween(140)),
         modifier = modifier
     ) {
-        val shape = RoundedCornerShape(18.dp)
+        val shape = neonShape(18.dp)
         val interactionSource = remember { MutableInteractionSource() }
 
         Box(
@@ -488,7 +489,7 @@ private fun CatalogGameCard(
     compact: Boolean
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = modifier.gamepadFocusableCard(
             shape = shape,
@@ -520,7 +521,7 @@ private fun CatalogGameCard(
                         modifier = Modifier
                             .padding(8.dp)
                             .align(Alignment.TopStart),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = neonShape(8.dp),
                         color = catalogCompatibilityColor(compatibility.status),
                         shadowElevation = 0.dp,
                         tonalElevation = 0.dp
@@ -605,7 +606,7 @@ private fun CatalogMessageCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(

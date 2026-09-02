@@ -59,6 +59,7 @@ import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 private val OverlaySelectedStroke = Color(0xFF7CC8FF).copy(alpha = 0.88f)
 private val OverlayPreviewStroke = Color.White.copy(alpha = 0.18f)
@@ -130,7 +131,7 @@ fun VectorOverlayButton(
     width: Dp,
     height: Dp,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(10.dp),
+    shape: Shape = neonShape(10.dp),
     contentScale: ContentScale = ContentScale.Fit,
     alpha: Float = 1f,
     selected: Boolean = false,
@@ -536,11 +537,11 @@ fun VectorDpadCluster(
     }
 
     val shape = when (visualStyle) {
-        TouchControlVisualStyle.CLASSIC -> RoundedCornerShape(22.dp)
-        TouchControlVisualStyle.LEGACY -> RoundedCornerShape(28.dp)
-        TouchControlVisualStyle.MODERN -> RoundedCornerShape(16.dp)
+        TouchControlVisualStyle.CLASSIC -> neonShape(22.dp)
+        TouchControlVisualStyle.LEGACY -> neonShape(28.dp)
+        TouchControlVisualStyle.MODERN -> neonShape(16.dp)
         TouchControlVisualStyle.ARCADE -> CircleShape
-        TouchControlVisualStyle.MINIMAL -> RoundedCornerShape(24.dp)
+        TouchControlVisualStyle.MINIMAL -> neonShape(24.dp)
     }
     val buttonSize = size * 0.36f
     Box(
@@ -562,7 +563,7 @@ fun VectorDpadCluster(
             drawableRes = R.drawable.ic_controller_up_button,
             width = buttonSize,
             height = buttonSize,
-            shape = RoundedCornerShape(8.dp),
+            shape = neonShape(8.dp),
             pressed = activeDirections.contains(OverlayDpadDirection.Up),
             interactive = false,
             visualStyle = visualStyle,
@@ -573,7 +574,7 @@ fun VectorDpadCluster(
             drawableRes = R.drawable.ic_controller_down_button,
             width = buttonSize,
             height = buttonSize,
-            shape = RoundedCornerShape(8.dp),
+            shape = neonShape(8.dp),
             pressed = activeDirections.contains(OverlayDpadDirection.Down),
             interactive = false,
             visualStyle = visualStyle,
@@ -584,7 +585,7 @@ fun VectorDpadCluster(
             drawableRes = R.drawable.ic_controller_left_button,
             width = buttonSize,
             height = buttonSize,
-            shape = RoundedCornerShape(8.dp),
+            shape = neonShape(8.dp),
             pressed = activeDirections.contains(OverlayDpadDirection.Left),
             interactive = false,
             visualStyle = visualStyle,
@@ -595,7 +596,7 @@ fun VectorDpadCluster(
             drawableRes = R.drawable.ic_controller_right_button,
             width = buttonSize,
             height = buttonSize,
-            shape = RoundedCornerShape(8.dp),
+            shape = neonShape(8.dp),
             pressed = activeDirections.contains(OverlayDpadDirection.Right),
             interactive = false,
             visualStyle = visualStyle,
@@ -748,11 +749,11 @@ fun VectorAnalogStick(
         CircleShape
     } else {
         when (visualStyle) {
-            TouchControlVisualStyle.CLASSIC -> RoundedCornerShape(22.dp)
-            TouchControlVisualStyle.LEGACY -> RoundedCornerShape(30.dp)
-            TouchControlVisualStyle.MODERN -> RoundedCornerShape(14.dp)
-            TouchControlVisualStyle.ARCADE -> RoundedCornerShape(32.dp)
-            TouchControlVisualStyle.MINIMAL -> RoundedCornerShape(20.dp)
+            TouchControlVisualStyle.CLASSIC -> neonShape(22.dp)
+            TouchControlVisualStyle.LEGACY -> neonShape(30.dp)
+            TouchControlVisualStyle.MODERN -> neonShape(14.dp)
+            TouchControlVisualStyle.ARCADE -> neonShape(32.dp)
+            TouchControlVisualStyle.MINIMAL -> neonShape(20.dp)
         }
     }
     val isActivelyPressed = pressed || activePointerId != null
@@ -805,11 +806,11 @@ fun VectorAnalogStick(
     ) {
         if (surfaceOnly) {
             val panelShape = when (visualStyle) {
-                TouchControlVisualStyle.CLASSIC -> RoundedCornerShape(22.dp)
-                TouchControlVisualStyle.LEGACY -> RoundedCornerShape(30.dp)
-                TouchControlVisualStyle.MODERN -> RoundedCornerShape(14.dp)
-                TouchControlVisualStyle.ARCADE -> RoundedCornerShape(32.dp)
-                TouchControlVisualStyle.MINIMAL -> RoundedCornerShape(20.dp)
+                TouchControlVisualStyle.CLASSIC -> neonShape(22.dp)
+                TouchControlVisualStyle.LEGACY -> neonShape(30.dp)
+                TouchControlVisualStyle.MODERN -> neonShape(14.dp)
+                TouchControlVisualStyle.ARCADE -> neonShape(32.dp)
+                TouchControlVisualStyle.MINIMAL -> neonShape(20.dp)
             }
             val guideSize = minOf(analogWidth, analogHeight)
             val guideColor = when (visualStyle) {
@@ -878,7 +879,7 @@ fun VectorAnalogStick(
                     .size(guideSize * 0.14f)
                     .clip(
                         when (visualStyle) {
-                            TouchControlVisualStyle.MODERN -> RoundedCornerShape(5.dp)
+                            TouchControlVisualStyle.MODERN -> neonShape(5.dp)
                             else -> CircleShape
                         }
                     )

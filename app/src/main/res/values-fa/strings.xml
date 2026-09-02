@@ -195,6 +195,7 @@
     <string name="settings_theme_system">سیستم</string>
     <string name="settings_theme_light">روشن</string>
     <string name="settings_theme_dark">تاریک</string>
+    <string name="settings_theme_neon">نئون</string>
     <string name="settings_theme_pro">Crimson Pro</string>
     <string name="settings_theme_pro_locked">باز کردن با Pro</string>
     <string name="settings_pro_tab">Pro</string>

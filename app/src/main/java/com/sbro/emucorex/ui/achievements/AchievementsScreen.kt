@@ -121,6 +121,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 private data class HubContentState(
     val isLoading: Boolean = true,
@@ -630,7 +631,7 @@ private fun ScrollToTopButton(
         modifier = modifier
     ) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = neonShape(20.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
             tonalElevation = 6.dp,
             shadowElevation = 6.dp,
@@ -658,7 +659,7 @@ private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -682,7 +683,7 @@ private fun AchievementToggleCard(retroState: RetroAchievementsUiState) {
                 Surface(
                     onClick = { showDisplaySettings = true },
                     modifier = Modifier.size(48.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
                 ) {
                     Box(
@@ -765,7 +766,7 @@ private fun AchievementDisplaySettingsDialog(
                     .fillMaxWidth(0.94f)
                     .widthIn(max = 580.dp)
                     .heightIn(max = maxHeight),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
@@ -786,7 +787,7 @@ private fun AchievementDisplaySettingsDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(52.dp),
-                            shape = RoundedCornerShape(17.dp),
+                            shape = neonShape(17.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -884,7 +885,7 @@ private fun AchievementDisplaySettingsDialog(
                     Button(
                         onClick = onDismiss,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -912,7 +913,7 @@ private fun AchievementUnlockSoundRow(
     Surface(
         onClick = onSelect,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -926,7 +927,7 @@ private fun AchievementUnlockSoundRow(
         ) {
             Surface(
                 modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(15.dp),
+                shape = neonShape(15.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -1110,7 +1111,7 @@ private fun AchievementAccountCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -1170,7 +1171,7 @@ private fun AchievementAccountCard(
                     Box(
                         modifier = Modifier
                             .size(76.dp)
-                            .clip(RoundedCornerShape(22.dp))
+                            .clip(neonShape(22.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
                             .border(
                                 width = 2.dp,
@@ -1181,7 +1182,7 @@ private fun AchievementAccountCard(
                                         listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary)
                                     }
                                 ),
-                                shape = RoundedCornerShape(22.dp)
+                                shape = neonShape(22.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -1190,7 +1191,7 @@ private fun AchievementAccountCard(
                             contentDescription = user.displayName,
                             modifier = Modifier
                                 .size(72.dp)
-                                .clip(RoundedCornerShape(20.dp)),
+                                .clip(neonShape(20.dp)),
                             fallback = {
                                 Icon(
                                     imageVector = Icons.Rounded.Person,
@@ -1249,7 +1250,7 @@ private fun AchievementAccountCard(
                     value = username,
                     onValueChange = onUsernameChange,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     singleLine = true,
                     leadingIcon = {
                         Icon(
@@ -1268,7 +1269,7 @@ private fun AchievementAccountCard(
                     value = password,
                     onValueChange = onPasswordChange,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     singleLine = true,
                     leadingIcon = {
                         Icon(
@@ -1325,7 +1326,7 @@ private fun ActionBadgeButton(
 ) {
     Surface(
         modifier = modifier.height(54.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = if (isPrimary && enabled) {
             MaterialTheme.colorScheme.primary
         } else if (isPrimary) {
@@ -1390,7 +1391,7 @@ private fun AccountStatCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -1436,7 +1437,7 @@ private fun UnlockedGameGroupCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -1522,7 +1523,7 @@ private fun ToggleRow(
     onCheckedChange: (Boolean) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1542,7 +1543,7 @@ private fun ToggleRow(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(neonShape(16.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
@@ -1591,7 +1592,7 @@ private fun SummaryRow(
 private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier, compact: Boolean = false) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(26.dp),
+        shape = neonShape(26.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -1635,7 +1636,7 @@ private fun NoticeCard(text: String, isError: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = if (isError) {
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
         } else {
@@ -1677,7 +1678,7 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
     val imagePath = item.coverArtPath ?: item.gameData.gameImageUrl
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
@@ -1693,7 +1694,7 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(neonShape(18.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -1702,7 +1703,7 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
                     contentDescription = item.gameTitle,
                     modifier = Modifier
                         .size(72.dp)
-                        .clip(RoundedCornerShape(18.dp)),
+                        .clip(neonShape(18.dp)),
                     fallback = {
                         Icon(
                             imageVector = Icons.Rounded.EmojiEvents,
@@ -1762,7 +1763,7 @@ private fun AchievementCard(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(26.dp),
+        shape = neonShape(26.dp),
         color = MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, cardBorderColor)
     ) {
@@ -1832,12 +1833,12 @@ private fun AchievementBadge(imagePath: String?, earned: Boolean) {
     Box(
         modifier = Modifier
             .size(76.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(neonShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
             .border(
                 width = if (earned) 1.dp else 0.dp,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(20.dp)
+                shape = neonShape(20.dp)
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -1846,7 +1847,7 @@ private fun AchievementBadge(imagePath: String?, earned: Boolean) {
             contentDescription = null,
             modifier = Modifier
                 .size(76.dp)
-                .clip(RoundedCornerShape(20.dp)),
+                .clip(neonShape(20.dp)),
             fallback = {
                 Icon(
                     imageVector = if (earned) Icons.Rounded.Star else Icons.Rounded.LockOpen,
@@ -1877,7 +1878,7 @@ private fun MiniBadge(
     }
 
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = neonShape(8.dp),
         color = bgColor
     ) {
         Text(
@@ -1908,7 +1909,7 @@ private fun AchievementsHubSkeleton(onBackClick: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = ScreenHorizontalPadding, vertical = 6.dp),
-                shape = RoundedCornerShape(24.dp),
+                shape = neonShape(24.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Box(modifier = Modifier.height(if (it == 0) 132.dp else 104.dp).fillMaxWidth().shimmer())
@@ -1936,7 +1937,7 @@ private fun AchievementsGameSkeleton(onBackClick: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = ScreenHorizontalPadding, vertical = 6.dp),
-                shape = RoundedCornerShape(24.dp),
+                shape = neonShape(24.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
                 Box(modifier = Modifier.height(if (it == 0) 96.dp else 144.dp).fillMaxWidth().shimmer())

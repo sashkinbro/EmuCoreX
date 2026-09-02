@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlin.math.abs
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 /** Shared top-level tab presentation used by settings and feature hubs. */
 @Composable
@@ -83,7 +84,7 @@ fun <T> ScrollableFilterTabRow(
                 modifier = focusModifier
                     .then(if (compact) Modifier.heightIn(min = 34.dp) else Modifier)
                     .tvGamepadFocusableCard(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         interactionSource = interactionSource,
                         addFocusTarget = false
                     ),

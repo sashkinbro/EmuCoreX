@@ -37,6 +37,7 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 internal enum class MultiplayerGuideId { Online, LocalLink, InternetLink }
 
@@ -87,7 +88,7 @@ internal fun MultiplayerGuideDetailScreen(
         item(key = "guide-intro") {
             Card(
                 modifier = Modifier.fillMaxWidth().widthIn(max = 820.dp),
-                shape = RoundedCornerShape(26.dp),
+                shape = neonShape(26.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
             ) {
@@ -138,7 +139,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.guideSection(
     item(key = key) {
         Card(
             modifier = Modifier.fillMaxWidth().widthIn(max = 820.dp),
-            shape = RoundedCornerShape(22.dp),
+            shape = neonShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.68f))
         ) {

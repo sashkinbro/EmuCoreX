@@ -32,6 +32,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 private val astcBlocks = listOf(4 to 4, 5 to 4, 5 to 5, 6 to 5, 6 to 6, 8 to 5, 8 to 6,
     8 to 8, 10 to 5, 10 to 6, 10 to 8, 10 to 10, 12 to 10, 12 to 12)
@@ -88,7 +90,7 @@ internal fun TextureOptimizationPanel(
     }
     val resultPhase = download?.let { downloadPhase(it.status) } ?: state.phase
     if (showCard && (state.id.isNotEmpty() || download != null) && resultPhase != "cancelled") {
-        Surface(shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface,
+        Surface(shape = neonShape(22.dp), color = MaterialTheme.colorScheme.surface,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = { onShowProgress?.invoke() ?: run { showProgress = true } }, modifier = Modifier.weight(1f)) {
@@ -116,7 +118,7 @@ internal fun TextureOptimizationPanel(
             }
             items((if (qualityRequest.allowOriginal) listOf(-1) else emptyList()) + astcBlocks.indices.sortedBy { astcBlocks[it].first * astcBlocks[it].second }) { choice ->
                 Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     color = if (requestedBlock == choice) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.24f) else MaterialTheme.colorScheme.surfaceContainerLow,
                     border = BorderStroke(if (requestedBlock == choice) 2.dp else 1.dp,
                         if (requestedBlock == choice) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
@@ -141,6 +143,7 @@ internal fun TextureOptimizationPanel(
                 FlowRow(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                     TextButton(onClick = onQualityDismiss) { Text(stringResource(R.string.close)) }
                     Button(
+                        shape = neonButtonShape(),
                         enabled = (qualityRequest.allowOriginal && requestedBlock < 0) || supportsAstc == true,
                         onClick = {
                             manager.block = requestedBlock
@@ -160,7 +163,7 @@ internal fun TextureOptimizationPanel(
         } ?: state
         Column(Modifier.verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(stringResource(R.string.texture_manager_title), style = MaterialTheme.typography.titleLarge)
-            Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow,
+            Surface(shape = neonShape(16.dp), color = MaterialTheme.colorScheme.surfaceContainerLow,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(phaseLabel(current.phase), style = MaterialTheme.typography.titleMedium)
@@ -192,7 +195,7 @@ internal fun TextureOptimizationPanel(
                     verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val buttonModifier = Modifier.width(buttonWidth).heightIn(min = 48.dp)
                     if (current.active || current.phase in setOf("paused", "failed")) {
-                        FilledTonalButton(modifier = buttonModifier, shape = RoundedCornerShape(12.dp), onClick = {
+                        FilledTonalButton(modifier = buttonModifier, shape = neonShape(12.dp), onClick = {
                             if (current.active) download?.let { downloads.pause(it.key) } ?: manager.pause()
                             else download?.let { downloads.resume(it.key) } ?: manager.resume()
                         }) {
@@ -200,7 +203,7 @@ internal fun TextureOptimizationPanel(
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(if (current.active) R.string.emulation_pause else R.string.texture_opt_resume), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        OutlinedButton(modifier = buttonModifier, shape = RoundedCornerShape(12.dp),
+                        OutlinedButton(modifier = buttonModifier, shape = neonShape(12.dp),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.65f)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             onClick = { download?.let { downloads.cancel(it.key) } ?: manager.cancel(); showProgress = false }) {
@@ -208,7 +211,7 @@ internal fun TextureOptimizationPanel(
                             Text(stringResource(R.string.cancel), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    OutlinedButton(onClick = { showProgress = false }, modifier = buttonModifier, shape = RoundedCornerShape(12.dp)) {
+                    OutlinedButton(onClick = { showProgress = false }, modifier = buttonModifier, shape = neonShape(12.dp)) {
                         Icon(Icons.Default.Close, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.close), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
@@ -253,7 +256,7 @@ private fun TextureDialog(onDismiss: () -> Unit, content: @Composable ColumnScop
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
             Surface(modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(max = maxHeight),
-                shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+                shape = neonShape(24.dp), color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                 Column(content = content)
             }

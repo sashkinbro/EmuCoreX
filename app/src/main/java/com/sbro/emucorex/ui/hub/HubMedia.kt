@@ -83,6 +83,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 data class HubImageSpec(
     val url: String,
@@ -378,7 +379,7 @@ fun HubVideoPlayer(
                             end = cutoutEnd + 12.dp
                         )
                         .fillMaxWidth(),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = Color.Black.copy(alpha = 0.72f)
                 ) {
                     Row(

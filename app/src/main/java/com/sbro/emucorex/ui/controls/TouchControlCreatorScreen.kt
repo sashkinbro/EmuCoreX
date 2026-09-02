@@ -91,9 +91,13 @@ import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.util.UUID
 import kotlin.math.min
 import kotlin.math.roundToInt
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
-private val CreatorCardShape = RoundedCornerShape(28.dp)
-private val CreatorControlShape = RoundedCornerShape(18.dp)
+@Composable
+private fun creatorCardShape() = neonShape(28.dp)
+
+@Composable
+private fun creatorControlShape() = neonShape(18.dp)
 
 private enum class ControlEditorCategory(val titleRes: Int) {
     ACTIONS(R.string.touch_control_creator_studio_actions),
@@ -322,7 +326,7 @@ fun TouchControlCreatorScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("touch_control_creator_preview_banner"),
-                    shape = CreatorCardShape,
+                    shape = creatorCardShape(),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     border = BorderStroke(
@@ -357,7 +361,7 @@ fun TouchControlCreatorScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("touch_control_creator_unlock_button"),
-                            shape = CreatorControlShape
+                            shape = creatorControlShape()
                         ) {
                             Text(stringResource(R.string.touch_control_creator_unlock))
                         }
@@ -393,7 +397,7 @@ fun TouchControlCreatorScreen(
                 if (library.controls.isEmpty()) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                     ) {
                         Column(
@@ -435,7 +439,7 @@ fun TouchControlCreatorScreen(
                         enabled = isProUnlocked &&
                             draft.id != previewSeed.id &&
                             library.controls.size < CustomTouchControlLibrary.MAX_CONTROLS,
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Rounded.ContentCopy, contentDescription = null)
@@ -445,7 +449,7 @@ fun TouchControlCreatorScreen(
                     OutlinedButton(
                         onClick = { deleteCandidate = draft },
                         enabled = isProUnlocked && draft.id != previewSeed.id,
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("touch_control_creator_delete_selected")
@@ -462,7 +466,7 @@ fun TouchControlCreatorScreen(
                     OutlinedButton(
                         onClick = { moveSelectedControl(-1) },
                         enabled = isProUnlocked && selectedLayerIndex > 0,
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = null)
@@ -473,7 +477,7 @@ fun TouchControlCreatorScreen(
                         onClick = { moveSelectedControl(1) },
                         enabled = isProUnlocked &&
                             selectedLayerIndex in 0 until library.controls.lastIndex,
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(stringResource(R.string.touch_control_creator_bring_forward))
@@ -547,7 +551,7 @@ fun TouchControlCreatorScreen(
                             } else {
                                 null
                             },
-                            shape = CreatorControlShape,
+                            shape = creatorControlShape(),
                             modifier = Modifier.testTag(
                                 "touch_control_creator_category_${category.name.lowercase()}"
                             )
@@ -571,7 +575,7 @@ fun TouchControlCreatorScreen(
                     },
                     label = { Text(stringResource(R.string.touch_control_creator_name)) },
                     singleLine = true,
-                    shape = CreatorControlShape,
+                    shape = creatorControlShape(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("touch_control_creator_name")
@@ -634,7 +638,7 @@ fun TouchControlCreatorScreen(
                             updateDraft { it.copy(content = CustomTouchControlContent.SYMBOL) }
                         },
                         label = { Text(stringResource(R.string.touch_control_creator_content_symbol)) },
-                        shape = CreatorControlShape
+                        shape = creatorControlShape()
                     )
                     FilterChip(
                         selected = draft.content == CustomTouchControlContent.TEXT,
@@ -642,7 +646,7 @@ fun TouchControlCreatorScreen(
                             updateDraft { it.copy(content = CustomTouchControlContent.TEXT) }
                         },
                         label = { Text(stringResource(R.string.touch_control_creator_content_text)) },
-                        shape = CreatorControlShape
+                        shape = creatorControlShape()
                     )
                     FilterChip(
                         selected = draft.content == CustomTouchControlContent.NONE,
@@ -650,7 +654,7 @@ fun TouchControlCreatorScreen(
                             updateDraft { it.copy(content = CustomTouchControlContent.NONE) }
                         },
                         label = { Text(stringResource(R.string.touch_control_creator_content_none)) },
-                        shape = CreatorControlShape
+                        shape = creatorControlShape()
                     )
                 }
                 OutlinedTextField(
@@ -661,7 +665,7 @@ fun TouchControlCreatorScreen(
                     label = { Text(stringResource(R.string.touch_control_creator_label)) },
                     enabled = draft.content == CustomTouchControlContent.TEXT,
                     singleLine = true,
-                    shape = CreatorControlShape,
+                    shape = creatorControlShape(),
                     modifier = Modifier.fillMaxWidth()
                 )
                 IntCreatorSlider(
@@ -688,7 +692,7 @@ fun TouchControlCreatorScreen(
                             selected = draft.shape == shape,
                             onClick = { updateDraft { it.copy(shape = shape) } },
                             label = { Text(stringResource(shape.titleRes())) },
-                            shape = RoundedCornerShape(14.dp)
+                            shape = neonShape(14.dp)
                         )
                     }
                 }
@@ -825,7 +829,7 @@ fun TouchControlCreatorScreen(
                             updateDraft { it.copy(pressMode = CustomTouchControlPressMode.HOLD) }
                         },
                         label = { Text(stringResource(R.string.touch_control_creator_press_hold)) },
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
@@ -834,7 +838,7 @@ fun TouchControlCreatorScreen(
                             updateDraft { it.copy(pressMode = CustomTouchControlPressMode.TOGGLE) }
                         },
                         label = { Text(stringResource(R.string.touch_control_creator_press_toggle)) },
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -893,7 +897,7 @@ fun TouchControlCreatorScreen(
                             )
                         }
                     },
-                    shape = CreatorControlShape,
+                    shape = creatorControlShape(),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
@@ -903,7 +907,7 @@ fun TouchControlCreatorScreen(
                 Button(
                     onClick = { onSave(library.sanitized()) },
                     enabled = isProUnlocked && library.controls.isNotEmpty(),
-                    shape = CreatorControlShape,
+                    shape = creatorControlShape(),
                     modifier = Modifier
                         .weight(1f)
                         .testTag("touch_control_creator_save")
@@ -925,7 +929,7 @@ private fun CreatorSection(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CreatorCardShape,
+        shape = creatorCardShape(),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
@@ -978,7 +982,7 @@ private fun ControlLibraryCard(
     Surface(
         onClick = onClick,
         modifier = Modifier.width(176.dp),
-        shape = CreatorControlShape,
+        shape = creatorControlShape(),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
@@ -1016,7 +1020,7 @@ private fun ControlPresetCard(
     Surface(
         onClick = onClick,
         modifier = Modifier.width(132.dp),
-        shape = CreatorControlShape,
+        shape = creatorControlShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -1078,7 +1082,7 @@ private fun ActionSelector(
                 } else {
                     null
                 },
-                shape = RoundedCornerShape(14.dp)
+                shape = neonShape(14.dp)
             )
         }
         CustomTouchControl.ALLOWED_ACTION_IDS
@@ -1093,7 +1097,7 @@ private fun ActionSelector(
                     } else {
                         null
                     },
-                    shape = RoundedCornerShape(14.dp)
+                    shape = neonShape(14.dp)
                 )
             }
     }
@@ -1108,7 +1112,7 @@ private fun ControlSectionPreview(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("touch_control_creator_local_preview"),
-        shape = CreatorControlShape,
+        shape = creatorControlShape(),
         color = MaterialTheme.colorScheme.background,
         border = BorderStroke(
             1.dp,
@@ -1208,7 +1212,7 @@ private fun ControlCanvasPreview(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(neonShape(22.dp))
             .background(Color(0xFF080B12))
     ) {
         val density = androidx.compose.ui.platform.LocalDensity.current
@@ -1260,14 +1264,14 @@ private fun ControlCanvasPreview(
                 .border(
                     1.dp,
                     Color.White.copy(alpha = 0.16f),
-                    RoundedCornerShape(16.dp)
+                    neonShape(16.dp)
                 )
         )
         Surface(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = neonShape(12.dp),
             color = Color.Black.copy(alpha = 0.48f),
             contentColor = Color.White
         ) {
@@ -1282,7 +1286,7 @@ private fun ControlCanvasPreview(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(12.dp),
-                shape = RoundedCornerShape(12.dp),
+                shape = neonShape(12.dp),
                 color = Color.Black.copy(alpha = 0.48f),
                 contentColor = Color.White
             ) {
@@ -1387,14 +1391,14 @@ private fun CreatorColorEditor(
     var hex by remember(value) { mutableStateOf(value.toRgbHex()) }
     val color = Color(value)
     Surface(
-        shape = CreatorControlShape,
+        shape = creatorControlShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
     ) {
         Column {
             Surface(
                 onClick = onExpandedChange,
                 modifier = Modifier.fillMaxWidth(),
-                shape = CreatorControlShape,
+                shape = creatorControlShape(),
                 color = Color.Transparent
             ) {
                 Row(
@@ -1473,7 +1477,7 @@ private fun CreatorColorEditor(
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Characters
                         ),
-                        shape = CreatorControlShape,
+                        shape = creatorControlShape(),
                         modifier = Modifier.fillMaxWidth()
                     )
                     val red = (value ushr 16) and 0xFF
@@ -1568,7 +1572,7 @@ private fun CreatorSwitchRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CreatorControlShape,
+        shape = creatorControlShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
     ) {
         Row(

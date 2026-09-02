@@ -175,6 +175,7 @@
     <string name="settings_theme_system">सिस्टम</string>
     <string name="settings_theme_light">लाइट</string>
     <string name="settings_theme_dark">डार्क</string>
+    <string name="settings_theme_neon">नियॉन</string>
     <string name="settings_language">भाषा</string>
     <string name="settings_tv_interface">टीवी इंटरफ़ेस</string>
     <string name="settings_tv_interface_auto">स्वचालित</string>

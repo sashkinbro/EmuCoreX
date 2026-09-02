@@ -152,6 +152,10 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 private enum class ProfileTab {
     Overview,
@@ -546,7 +550,7 @@ private fun ProfileBottomNav(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
         border = profileCardBorder()
@@ -567,11 +571,11 @@ private fun ProfileBottomNav(
                         .weight(1f)
                         .height(56.dp)
                         .tvGamepadFocusableCard(
-                            shape = RoundedCornerShape(22.dp),
+                            shape = neonShape(22.dp),
                             interactionSource = interactionSource,
                             addFocusTarget = false
                         ),
-                    shape = RoundedCornerShape(22.dp),
+                    shape = neonShape(22.dp),
                     interactionSource = interactionSource,
                     color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
                 ) {
@@ -628,7 +632,7 @@ private fun AuthContent(
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
+                shape = neonShape(22.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 2.dp,
                 border = profileCardBorder()
@@ -663,7 +667,7 @@ private fun AuthContent(
                             onValueChange = { displayName = it },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
-                            shape = RoundedCornerShape(20.dp),
+                            shape = neonShape(20.dp),
                             label = { Text(stringResource(R.string.profile_display_name)) },
                             leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) }
                         )
@@ -673,7 +677,7 @@ private fun AuthContent(
                         onValueChange = { email = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = neonShape(20.dp),
                         label = { Text(stringResource(R.string.profile_email)) },
                         leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) }
                     )
@@ -682,12 +686,13 @@ private fun AuthContent(
                         onValueChange = { password = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(20.dp),
+                        shape = neonShape(20.dp),
                         label = { Text(stringResource(R.string.profile_password)) },
                         visualTransformation = PasswordVisualTransformation(),
                         leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Login, contentDescription = null) }
                     )
                     Button(
+                        shape = neonButtonShape(),
                         enabled = !isLoading,
                         onClick = {
                             if (createMode) {
@@ -705,6 +710,7 @@ private fun AuthContent(
                         Text(stringResource(if (createMode) R.string.profile_create_account else R.string.profile_sign_in))
                     }
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         enabled = !isLoading,
                         onClick = onGoogleSignIn,
                         modifier = Modifier.fillMaxWidth()
@@ -819,7 +825,7 @@ private fun ReadOnlyProfileCard(profile: PlayerProfile) {
     }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = if (profile.isProMember) BorderStroke(1.dp, accent.copy(alpha = 0.72f)) else profileCardBorder()
@@ -946,7 +952,7 @@ private fun PlayerSocialActions(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = profileCardBorder()
     ) {
@@ -956,6 +962,7 @@ private fun PlayerSocialActions(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
+                shape = neonButtonShape(),
                 enabled = !isLoading && friendship?.status != FriendshipStatus.PendingOutgoing,
                 onClick = {
                     when (friendship?.status) {
@@ -1004,7 +1011,7 @@ private fun ProfileFeatureHubCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         border = profileCardBorder()
@@ -1015,18 +1022,21 @@ private fun ProfileFeatureHubCard(
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
             )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = onDevices, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    shape = neonButtonShape(),onClick = onDevices, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.Devices, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(7.dp))
                     Text(stringResource(R.string.profile_devices_count, deviceCount), maxLines = 1)
                 }
-                OutlinedButton(onClick = onCloudProfiles, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    shape = neonButtonShape(),onClick = onCloudProfiles, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(7.dp))
                     Text(stringResource(R.string.profile_cloud_count, cloudProfileCount), maxLines = 1)
                 }
             }
-            OutlinedButton(onClick = onFriends, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                shape = neonButtonShape(),onClick = onFriends, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.Person, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -1036,7 +1046,8 @@ private fun ProfileFeatureHubCard(
                 )
                 Text(friendCount.toString())
             }
-            OutlinedButton(onClick = onBlocked, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                shape = neonButtonShape(),onClick = onBlocked, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Rounded.Block, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -1082,7 +1093,7 @@ private fun AchievementSummaryCard(achievements: List<EmuAchievementState>) {
     val unlocked = achievements.filter { it.unlocked }
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
         border = profileCardBorder()
     ) {
@@ -1113,6 +1124,7 @@ private fun AchievementFilterRow(selected: String, onSelect: (String) -> Unit) {
             "hidden" to R.string.achievement_filter_hidden
         ).forEach { (key, label) ->
             FilterChip(
+                shape = neonChipShape(),
                 selected = selected == key,
                 onClick = { onSelect(key) },
                 label = { Text(stringResource(label), maxLines = 1) },
@@ -1127,7 +1139,7 @@ private fun AchievementRow(state: EmuAchievementState) {
     val hideDetails = state.definition.hidden && !state.unlocked
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         border = profileCardBorder(alpha = if (state.unlocked) 0.8f else 0.45f)
     ) {
@@ -1219,7 +1231,8 @@ private fun ProfileNotificationsDialog(
                 profile = profiles[relation.otherUid],
                 onOpen = { onOpenProfile(relation.otherUid) },
                 action = {
-                    Button(enabled = !isLoading, onClick = { onAccept(relation.id) }) {
+                    Button(
+                        shape = neonButtonShape(),enabled = !isLoading, onClick = { onAccept(relation.id) }) {
                         Text(stringResource(R.string.profile_friend_accept))
                     }
                 }
@@ -1310,7 +1323,8 @@ private fun ProfileBlockedPlayersDialog(
                 uid = uid,
                 profile = profiles[uid],
                 action = {
-                    OutlinedButton(enabled = !isLoading, onClick = { onUnblock(uid) }) {
+                    OutlinedButton(
+                        shape = neonButtonShape(),enabled = !isLoading, onClick = { onUnblock(uid) }) {
                         Icon(Icons.Rounded.LockOpen, contentDescription = null, modifier = Modifier.size(17.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.profile_unblock_player))
@@ -1332,7 +1346,7 @@ private fun SocialIdentityRow(
     Surface(
         onClick = onOpen ?: {},
         enabled = onOpen != null,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
     ) {
@@ -1361,7 +1375,7 @@ private fun ProfileDevicesDialog(
             Text(stringResource(R.string.profile_devices_empty), style = MaterialTheme.typography.bodyMedium)
         }
         devices.forEach { device ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
+            Surface(shape = neonShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Devices, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -1372,6 +1386,7 @@ private fun ProfileDevicesDialog(
                     Text(listOf(device.soc, device.gpuFamily, device.androidVersion).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             enabled = !isLoading,
                             onClick = { onSetPublic(device.deviceId, !device.isPublic) },
                             modifier = Modifier.weight(1f)
@@ -1410,8 +1425,10 @@ internal fun CloudProfilesDialog(
     var cloudTab by rememberSaveable { mutableIntStateOf(if (initialDrive) 1 else 0) }
     ProfileFeatureDialog(title = stringResource(R.string.profile_cloud_title), onDismiss = onDismiss) {
         if (firebaseAvailable) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = cloudTab == 0, onClick = { cloudTab = 0 }, label = { Text(stringResource(R.string.drive_settings_tab)) })
-            FilterChip(selected = cloudTab == 1, onClick = { cloudTab = 1 }, label = { Text(stringResource(R.string.drive_title)) })
+            FilterChip(
+                shape = neonChipShape(),selected = cloudTab == 0, onClick = { cloudTab = 0 }, label = { Text(stringResource(R.string.drive_settings_tab)) })
+            FilterChip(
+                shape = neonChipShape(),selected = cloudTab == 1, onClick = { cloudTab = 1 }, label = { Text(stringResource(R.string.drive_title)) })
         }
         if (cloudTab == 1 || !firebaseAvailable) {
             DriveBackupPanel()
@@ -1424,16 +1441,17 @@ internal fun CloudProfilesDialog(
             onValueChange = { name = it.take(64) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             label = { Text(stringResource(R.string.profile_cloud_name)) }
         )
         Button(
+            shape = neonButtonShape(),
             enabled = !isLoading && name.trim().isNotEmpty() && profiles.size < 5,
             onClick = { onSave(name, null); name = "" },
             modifier = Modifier.fillMaxWidth()
         ) { Text(stringResource(R.string.profile_cloud_save_current)) }
         profiles.forEach { profile ->
-            Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
+            Surface(shape = neonShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(profile.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                     Text(stringResource(R.string.profile_cloud_version, profile.appVersion, profile.coreVersion), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1442,6 +1460,7 @@ internal fun CloudProfilesDialog(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             enabled = !isLoading,
                             onClick = {
                                 if (pendingRestore == profile.id) {
@@ -1492,7 +1511,7 @@ private fun ProfileFeatureDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             modifier = Modifier.widthIn(max = 620.dp).fillMaxWidth().padding(20.dp).heightIn(max = 720.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
             border = profileCardBorder()
@@ -1550,7 +1569,7 @@ private fun ProfileOverview(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = profileCardBorder()
@@ -1646,6 +1665,7 @@ private fun ProfileOverview(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         enabled = !isActionLoading,
                         onClick = {
                             editingName = profile?.displayName.orEmpty()
@@ -1662,6 +1682,7 @@ private fun ProfileOverview(
                         Text(stringResource(R.string.profile_edit_name), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         enabled = !isActionLoading,
                         onClick = onSignOut,
                         modifier = Modifier.weight(1f)
@@ -1715,12 +1736,14 @@ private fun ProfileOverview(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedButton(onClick = onCustomizePro, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),onClick = onCustomizePro, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Rounded.Palette, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(7.dp))
                             Text(stringResource(R.string.profile_customize_pro), maxLines = 1)
                         }
-                        OutlinedButton(onClick = onShareCard, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),onClick = onShareCard, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(7.dp))
                             Text(stringResource(R.string.profile_player_card_share), maxLines = 1)
@@ -1772,7 +1795,7 @@ private fun EditProfileNameDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 560.dp),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
                 border = profileCardBorder(alpha = 0.82f)
@@ -1787,7 +1810,7 @@ private fun EditProfileNameDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(48.dp),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -1824,7 +1847,7 @@ private fun EditProfileNameDialog(
                             .focusRequester(focusRequester),
                         enabled = !isLoading,
                         singleLine = true,
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         label = { Text(stringResource(R.string.profile_display_name)) },
                         leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
                         supportingText = {
@@ -1846,6 +1869,7 @@ private fun EditProfileNameDialog(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = onDismiss,
                             enabled = !isLoading,
                             modifier = Modifier.weight(1f)
@@ -1853,6 +1877,7 @@ private fun EditProfileNameDialog(
                             Text(stringResource(R.string.cancel))
                         }
                         Button(
+                            shape = neonButtonShape(),
                             onClick = {
                                 keyboardController?.hide()
                                 onSave()
@@ -1880,7 +1905,7 @@ private fun EditProfileNameDialog(
 private fun ProBadge(accent: Color, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.widthIn(min = 58.dp),
-        shape = RoundedCornerShape(10.dp),
+        shape = neonShape(10.dp),
         color = accent.copy(alpha = 0.2f),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.72f))
     ) {
@@ -1940,7 +1965,7 @@ private fun FavoriteGamesShowcase(
                         fallbackTitle = game.title,
                         modifier = Modifier
                             .size(width = 48.dp, height = 68.dp)
-                            .clip(RoundedCornerShape(9.dp)),
+                            .clip(neonShape(9.dp)),
                         contentScale = ContentScale.Crop
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -1980,7 +2005,7 @@ private fun PlayerSearchField(
                 onValueChange = onQueryChange,
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                shape = RoundedCornerShape(20.dp),
+                shape = neonShape(20.dp),
                 placeholder = { Text(stringResource(R.string.profile_leaderboard_search_hint)) },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 trailingIcon = if (isLoading) {
@@ -2060,7 +2085,7 @@ private fun ProProfileCustomizationDialog(
                 modifier = Modifier
                     .fillMaxWidth(if (isLandscape) 0.98f else 0.94f)
                     .widthIn(max = if (isLandscape) 1600.dp else 720.dp),
-                shape = RoundedCornerShape(30.dp),
+                shape = neonShape(30.dp),
                 color = MaterialTheme.colorScheme.surface,
                 border = profileCardBorder(alpha = 0.6f)
             ) {
@@ -2079,7 +2104,7 @@ private fun ProProfileCustomizationDialog(
                     ) {
                         Surface(
                             modifier = Modifier.size(58.dp),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             color = profileAccentColor(accent).copy(alpha = 0.18f),
                             border = BorderStroke(1.dp, profileAccentColor(accent).copy(alpha = 0.34f))
                         ) {
@@ -2164,10 +2189,12 @@ private fun ProProfileCustomizationDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),onClick = onDismiss, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.cancel))
                         }
                         Button(
+                            shape = neonButtonShape(),
                             onClick = { onSave(accent, favoriteKeys) },
                             modifier = Modifier.weight(1f)
                         ) {
@@ -2189,7 +2216,7 @@ private fun ProCustomizationSection(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
         border = profileCardBorder(alpha = 0.38f)
     ) {
@@ -2234,7 +2261,7 @@ private fun ProfileAccentChoice(
         modifier = Modifier
             .width(132.dp)
             .height(52.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = if (selected) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
         border = BorderStroke(1.dp, if (selected) color.copy(alpha = 0.72f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f))
     ) {
@@ -2268,7 +2295,7 @@ private fun ProShowcaseGameChoice(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(17.dp),
+        shape = neonShape(17.dp),
         color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.13f) else MaterialTheme.colorScheme.surface.copy(alpha = if (enabled) 0.72f else 0.32f),
         border = BorderStroke(
             1.dp,
@@ -2285,7 +2312,7 @@ private fun ProShowcaseGameChoice(
                 fallbackTitle = game.title,
                 modifier = Modifier
                     .size(width = 42.dp, height = 58.dp)
-                    .clip(RoundedCornerShape(10.dp)),
+                    .clip(neonShape(10.dp)),
                 contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.weight(1f)) {
@@ -2326,7 +2353,7 @@ private fun AdvancedStatsContent(
     if (!isProUnlocked) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
+            shape = neonShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
             border = profileCardBorder()
         ) {
@@ -2368,7 +2395,7 @@ private fun AdvancedStatsContent(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
+            shape = neonShape(26.dp),
             color = MaterialTheme.colorScheme.surface,
             border = profileCardBorder(alpha = 0.72f)
         ) {
@@ -2379,7 +2406,7 @@ private fun AdvancedStatsContent(
             ) {
                 Surface(
                     modifier = Modifier.size(52.dp),
-                    shape = RoundedCornerShape(17.dp),
+                    shape = neonShape(17.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -2497,7 +2524,7 @@ private fun AdvancedStatsSkeleton() {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(26.dp),
+            shape = neonShape(26.dp),
             color = MaterialTheme.colorScheme.surface,
             border = profileCardBorder(alpha = 0.72f)
         ) {
@@ -2506,7 +2533,7 @@ private fun AdvancedStatsSkeleton() {
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SkeletonBlock(Modifier.size(52.dp).clip(RoundedCornerShape(17.dp)))
+                SkeletonBlock(Modifier.size(52.dp).clip(neonShape(17.dp)))
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(7.dp)
@@ -2515,19 +2542,19 @@ private fun AdvancedStatsSkeleton() {
                         Modifier
                             .fillMaxWidth(0.58f)
                             .height(20.dp)
-                            .clip(RoundedCornerShape(9.dp))
+                            .clip(neonShape(9.dp))
                     )
                     SkeletonBlock(
                         Modifier
                             .fillMaxWidth(0.92f)
                             .height(14.dp)
-                            .clip(RoundedCornerShape(7.dp))
+                            .clip(neonShape(7.dp))
                     )
                     SkeletonBlock(
                         Modifier
                             .fillMaxWidth(0.72f)
                             .height(14.dp)
-                            .clip(RoundedCornerShape(7.dp))
+                            .clip(neonShape(7.dp))
                     )
                 }
                 SkeletonBlock(Modifier.size(44.dp).clip(CircleShape))
@@ -2546,7 +2573,7 @@ private fun AdvancedStatsSkeleton() {
                 .padding(start = 4.dp, top = 4.dp)
                 .width(90.dp)
                 .height(20.dp)
-                .clip(RoundedCornerShape(9.dp))
+                .clip(neonShape(9.dp))
         )
         StatsActivitySkeleton()
     }
@@ -2556,7 +2583,7 @@ private fun AdvancedStatsSkeleton() {
 private fun EmptyActivityCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         border = profileCardBorder()
     ) {
@@ -2599,7 +2626,7 @@ private fun ActivityChart(activity: List<PlayerActivityDay>) {
     val maxMs = activity.maxOfOrNull { it.playTimeMs }?.coerceAtLeast(1L) ?: 1L
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         border = profileCardBorder()
     ) {
@@ -2633,7 +2660,7 @@ private fun ActivityChart(activity: List<PlayerActivityDay>) {
                             Modifier
                                 .width(24.dp)
                                 .height(barHeight)
-                                .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
+                                .clip(neonShapeCorners(topStart = 7.dp, topEnd = 7.dp))
                                 .background(MaterialTheme.colorScheme.primary)
                         )
                         Spacer(Modifier.height(5.dp))
@@ -2660,7 +2687,7 @@ private fun ProfileOverviewSkeletonContent(
                 modifier = Modifier
                     .width(68.dp)
                     .height(24.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
             )
         }
     }
@@ -2682,13 +2709,13 @@ private fun ProfileOverviewSkeletonContent(
                 modifier = Modifier
                     .fillMaxWidth(0.72f)
                     .height(24.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
             )
             SkeletonBlock(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
                     .height(16.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(neonShape(8.dp))
             )
         }
     }
@@ -2724,13 +2751,13 @@ private fun SkeletonButtonRow() {
             modifier = Modifier
                 .weight(1f)
                 .height(44.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(neonShape(18.dp))
         )
         SkeletonBlock(
             modifier = Modifier
                 .weight(1f)
                 .height(44.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(neonShape(18.dp))
         )
     }
 }
@@ -2739,7 +2766,7 @@ private fun SkeletonButtonRow() {
 private fun ReadOnlyProfileSkeletonCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = profileCardBorder()
@@ -2773,7 +2800,7 @@ private fun GamePlayStatRow(
                 fallbackTitle = game.title,
                 modifier = Modifier
                     .size(width = 54.dp, height = 78.dp)
-                    .clip(RoundedCornerShape(10.dp)),
+                    .clip(neonShape(10.dp)),
                 contentScale = ContentScale.Crop
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -2808,7 +2835,7 @@ private fun GamePlayStatRow(
         Surface(
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
             border = profileCardBorder(alpha = 0.48f),
@@ -2817,7 +2844,7 @@ private fun GamePlayStatRow(
     } else {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp,
             border = profileCardBorder(alpha = 0.48f),
@@ -2830,7 +2857,7 @@ private fun GamePlayStatRow(
 private fun GamePlayStatSkeletonRow() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         border = profileCardBorder(alpha = 0.48f)
@@ -2843,7 +2870,7 @@ private fun GamePlayStatSkeletonRow() {
             SkeletonBlock(
                 modifier = Modifier
                     .size(width = 54.dp, height = 78.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -2853,26 +2880,26 @@ private fun GamePlayStatSkeletonRow() {
                     modifier = Modifier
                         .fillMaxWidth(0.82f)
                         .height(18.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(neonShape(8.dp))
                 )
                 SkeletonBlock(
                     modifier = Modifier
                         .fillMaxWidth(0.46f)
                         .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .clip(neonShape(7.dp))
                 )
                 SkeletonBlock(
                     modifier = Modifier
                         .fillMaxWidth(0.58f)
                         .height(12.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(neonShape(6.dp))
                 )
             }
             SkeletonBlock(
                 modifier = Modifier
                     .width(44.dp)
                     .height(18.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(neonShape(8.dp))
             )
         }
     }
@@ -2882,7 +2909,7 @@ private fun GamePlayStatSkeletonRow() {
 private fun LeaderboardRowSkeleton() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = profileCardBorder(alpha = 0.5f)
@@ -2895,7 +2922,7 @@ private fun LeaderboardRowSkeleton() {
             SkeletonBlock(
                 Modifier
                     .size(width = 62.dp, height = 38.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(neonShape(18.dp))
             )
             SkeletonBlock(Modifier.size(52.dp).clip(CircleShape))
             Column(
@@ -2906,26 +2933,26 @@ private fun LeaderboardRowSkeleton() {
                     Modifier
                         .fillMaxWidth(0.78f)
                         .height(20.dp)
-                        .clip(RoundedCornerShape(9.dp))
+                        .clip(neonShape(9.dp))
                 )
                 SkeletonBlock(
                     Modifier
                         .fillMaxWidth(0.58f)
                         .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .clip(neonShape(7.dp))
                 )
                 SkeletonBlock(
                     Modifier
                         .fillMaxWidth(0.4f)
                         .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp))
+                        .clip(neonShape(7.dp))
                 )
             }
             SkeletonBlock(
                 Modifier
                     .width(66.dp)
                     .height(21.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(neonShape(9.dp))
             )
         }
     }
@@ -2944,7 +2971,7 @@ private fun StatsActivitySkeleton() {
         }
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             border = profileCardBorder()
         ) {
@@ -2956,7 +2983,7 @@ private fun StatsActivitySkeleton() {
                     Modifier
                         .width(138.dp)
                         .height(18.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(neonShape(8.dp))
                 )
                 Row(
                     modifier = Modifier
@@ -2974,13 +3001,13 @@ private fun StatsActivitySkeleton() {
                                 Modifier
                                     .width(24.dp)
                                     .height(height.dp)
-                                    .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
+                                    .clip(neonShapeCorners(topStart = 7.dp, topEnd = 7.dp))
                             )
                             SkeletonBlock(
                                 Modifier
                                     .width(28.dp)
                                     .height(10.dp)
-                                    .clip(RoundedCornerShape(5.dp))
+                                    .clip(neonShape(5.dp))
                             )
                         }
                     }
@@ -2994,7 +3021,7 @@ private fun StatsActivitySkeleton() {
 private fun StatChipSkeleton(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
         border = profileCardBorder(alpha = 0.34f)
     ) {
@@ -3007,13 +3034,13 @@ private fun StatChipSkeleton(modifier: Modifier = Modifier) {
                 Modifier
                     .fillMaxWidth(0.54f)
                     .height(22.dp)
-                    .clip(RoundedCornerShape(9.dp))
+                    .clip(neonShape(9.dp))
             )
             SkeletonBlock(
                 Modifier
                     .fillMaxWidth(0.76f)
                     .height(15.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(neonShape(7.dp))
             )
         }
     }
@@ -3026,7 +3053,7 @@ private fun RecentGamesCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = profileCardBorder()
@@ -3052,7 +3079,7 @@ private fun RecentGamesCard(
                     ) {
                         Surface(
                             onClick = { onGameClick(game) },
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = Color.Transparent
                         ) {
                             GameCoverArt(
@@ -3061,7 +3088,7 @@ private fun RecentGamesCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(136.dp)
-                                    .clip(RoundedCornerShape(16.dp)),
+                                    .clip(neonShape(16.dp)),
                                 contentScale = ContentScale.Crop
                             )
                         }
@@ -3083,7 +3110,7 @@ private fun RecentGamesCard(
 private fun RecentGamesSkeletonCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = profileCardBorder()
@@ -3097,7 +3124,7 @@ private fun RecentGamesSkeletonCard() {
                     .padding(horizontal = 16.dp)
                     .width(148.dp)
                     .height(22.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
             )
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -3112,19 +3139,19 @@ private fun RecentGamesSkeletonCard() {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(136.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(neonShape(16.dp))
                         )
                         SkeletonBlock(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(14.dp)
-                                .clip(RoundedCornerShape(7.dp))
+                                .clip(neonShape(7.dp))
                         )
                         SkeletonBlock(
                             modifier = Modifier
                                 .fillMaxWidth(0.68f)
                                 .height(12.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(neonShape(6.dp))
                         )
                     }
                 }
@@ -3144,7 +3171,7 @@ private fun LeaderboardRow(
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = if (isCurrentUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = if (isCurrentUser) {
@@ -3235,7 +3262,7 @@ private fun LeaderboardRow(
 private fun RankBadge(rank: Int?) {
     val topRank = rank != null && rank <= 3
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = if (topRank) colorForRank(rank).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Row(
@@ -3285,7 +3312,7 @@ private fun RevealOnEnter(
 private fun EmptyProfileState(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         border = profileCardBorder(alpha = 0.48f)
@@ -3308,7 +3335,7 @@ private fun StatChip(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
         border = profileCardBorder(alpha = 0.34f)
     ) {

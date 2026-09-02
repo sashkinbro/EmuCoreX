@@ -183,6 +183,7 @@
     <string name="settings_theme_system">시스템</string>
     <string name="settings_theme_light">라이트</string>
     <string name="settings_theme_dark">다크</string>
+    <string name="settings_theme_neon">네온</string>
     <string name="settings_language">언어</string>
     <string name="settings_tv_interface">TV 인터페이스</string>
     <string name="settings_tv_interface_auto">자동</string>

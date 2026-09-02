@@ -183,6 +183,7 @@
     <string name="settings_theme_system">النظام</string>
     <string name="settings_theme_light">فاتح</string>
     <string name="settings_theme_dark">داكن</string>
+    <string name="settings_theme_neon">نيون</string>
     <string name="settings_language">اللغة</string>
     <string name="settings_tv_interface">واجهة التلفاز</string>
     <string name="settings_tv_interface_auto">تلقائي</string>

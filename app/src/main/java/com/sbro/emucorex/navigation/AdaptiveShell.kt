@@ -99,6 +99,8 @@ import com.sbro.emucorex.ui.common.appStatusBarTopPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
 
 enum class PrimaryDestination {
     Home, Search, Hub, Formats, Achievements, Profile, Discord, Settings, Feedback
@@ -405,7 +407,7 @@ private fun CompactAdaptiveShell(
                 Surface(
                     modifier = Modifier
                         .padding(top = statusPadding + 12.dp, start = 12.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                     tonalElevation = 4.dp,
                     shadowElevation = 6.dp,
@@ -445,10 +447,10 @@ private fun CompactAdaptiveShell(
                     .fillMaxWidth(drawerWidthFraction)
                     .widthIn(min = 292.dp, max = if (isTabletClass) 360.dp else 320.dp),
                 drawerShape = when (drawerVisualStyle) {
-                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
-                    DrawerVisualStyle.GLASS -> RoundedCornerShape(topEnd = 38.dp, bottomEnd = 38.dp)
-                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(0.dp)
-                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(topEnd = 30.dp, bottomEnd = 30.dp)
+                    DrawerVisualStyle.COMPACT -> neonShapeCorners(topEnd = 12.dp, bottomEnd = 12.dp)
+                    DrawerVisualStyle.GLASS -> neonShapeCorners(topEnd = 38.dp, bottomEnd = 38.dp)
+                    DrawerVisualStyle.CONSOLE -> neonShape(0.dp)
+                    DrawerVisualStyle.CLASSIC -> neonShapeCorners(topEnd = 30.dp, bottomEnd = 30.dp)
                 },
                 drawerContainerColor = when (drawerVisualStyle) {
                     DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
@@ -924,10 +926,10 @@ private fun SideNavigation(
             Surface(
                 modifier = Modifier.fillMaxHeight(),
                 shape = when (drawerVisualStyle) {
-                    DrawerVisualStyle.COMPACT -> RoundedCornerShape(14.dp)
-                    DrawerVisualStyle.GLASS -> RoundedCornerShape(36.dp)
-                    DrawerVisualStyle.CONSOLE -> RoundedCornerShape(8.dp)
-                    DrawerVisualStyle.CLASSIC -> RoundedCornerShape(30.dp)
+                    DrawerVisualStyle.COMPACT -> neonShape(14.dp)
+                    DrawerVisualStyle.GLASS -> neonShape(36.dp)
+                    DrawerVisualStyle.CONSOLE -> neonShape(8.dp)
+                    DrawerVisualStyle.CLASSIC -> neonShape(30.dp)
                 },
                 color = when (drawerVisualStyle) {
                     DrawerVisualStyle.GLASS -> MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
@@ -953,10 +955,10 @@ private fun ShellAction(
 ) {
     val style = LocalDrawerVisualStyle.current
     val shape = when (style) {
-        DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
-        DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
-        DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
-        DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+        DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+        DrawerVisualStyle.GLASS -> neonShape(22.dp)
+        DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+        DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
     }
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -1029,10 +1031,10 @@ private fun ShellItem(
 ) {
     val style = LocalDrawerVisualStyle.current
     val shape = when (style) {
-        DrawerVisualStyle.COMPACT -> RoundedCornerShape(9.dp)
-        DrawerVisualStyle.GLASS -> RoundedCornerShape(22.dp)
-        DrawerVisualStyle.CONSOLE -> RoundedCornerShape(6.dp)
-        DrawerVisualStyle.CLASSIC -> RoundedCornerShape(18.dp)
+        DrawerVisualStyle.COMPACT -> neonShape(9.dp)
+        DrawerVisualStyle.GLASS -> neonShape(22.dp)
+        DrawerVisualStyle.CONSOLE -> neonShape(6.dp)
+        DrawerVisualStyle.CLASSIC -> neonShape(18.dp)
     }
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()

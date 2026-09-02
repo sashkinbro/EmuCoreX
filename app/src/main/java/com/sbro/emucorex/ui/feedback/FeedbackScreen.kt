@@ -83,6 +83,8 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 private data class FeedbackCategory(val id: String, val label: String)
 
@@ -265,7 +267,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 760.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = neonShape(20.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.22f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 border = BorderStroke(
@@ -291,7 +293,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                             onValueChange = {},
                             readOnly = true,
                             singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
@@ -304,7 +306,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                             expanded = categoryMenuExpanded,
                             onDismissRequest = { categoryMenuExpanded = false },
                             modifier = Modifier.heightIn(max = 384.dp),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                             border = BorderStroke(
                                 1.dp,
@@ -357,7 +359,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                                 gameMenuExpanded = libraryGames.isNotEmpty()
                             },
                             singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
@@ -395,7 +397,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                             expanded = gameMenuExpanded,
                             onDismissRequest = { gameMenuExpanded = false },
                             modifier = Modifier.heightIn(max = 360.dp),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                             border = BorderStroke(
                                 1.dp,
@@ -469,7 +471,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(170.dp),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         label = { Text(stringResource(R.string.feedback_message_label)) },
                         placeholder = { Text(stringResource(R.string.feedback_message_placeholder)) },
                         minLines = 4,
@@ -487,6 +489,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                     )
 
                     Button(
+                        shape = neonButtonShape(),
                         onClick = { showAttachmentSourceDialog = true },
                         enabled = !isInspectingAttachments && attachments.size < FeedbackLimits.MAX_ATTACHMENTS,
                         modifier = Modifier
@@ -512,7 +515,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 760.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = neonShape(20.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.14f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 border = BorderStroke(
@@ -549,6 +552,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
         }
         item {
             Button(
+                shape = neonButtonShape(),
                 onClick = submitFeedback,
                 enabled = !isQueueing && !isInspectingAttachments && FeedbackUploadScheduler.isConfigured,
                 modifier = Modifier
@@ -578,6 +582,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
+                        shape = neonButtonShape(),
                         onClick = {
                             showAttachmentSourceDialog = false
                             mediaPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
@@ -589,6 +594,7 @@ fun FeedbackScreen(onBackClick: () -> Unit) {
                         Text(stringResource(R.string.feedback_add_media))
                     }
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = {
                             showAttachmentSourceDialog = false
                             filePicker.launch(arrayOf("*/*"))
@@ -638,7 +644,7 @@ private fun feedbackTextFieldColors() = OutlinedTextFieldDefaults.colors(
 private fun AttachmentRow(attachment: FeedbackAttachment, onRemove: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
@@ -671,7 +677,7 @@ private fun AttachmentRow(attachment: FeedbackAttachment, onRemove: () -> Unit) 
 private fun FeedbackConfigurationWarning(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.errorContainer
     ) {
         Text(

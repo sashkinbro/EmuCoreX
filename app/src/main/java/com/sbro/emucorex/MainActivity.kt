@@ -114,6 +114,7 @@ open class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
                 ThemeMode.PRO -> true
                 ThemeMode.CUSTOM -> customTheme.dark
+                ThemeMode.NEON -> true
             }
 
             SideEffect {

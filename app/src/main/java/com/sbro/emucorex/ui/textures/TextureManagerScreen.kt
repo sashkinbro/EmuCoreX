@@ -74,6 +74,8 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -172,6 +174,7 @@ fun TextureManagerScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
                         enabled = !isWorking,
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -233,7 +236,7 @@ fun TextureManagerScreen(
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(22.dp),
+                        shape = neonShape(22.dp),
                         color = MaterialTheme.colorScheme.surface
                     ) {
                         Row(
@@ -409,7 +412,7 @@ private fun TextureOptionsPanel(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -537,7 +540,7 @@ private fun StoragePathRow(rootPath: String) {
     if (rootPath.isBlank()) return
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = neonShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
     ) {
         Column(
@@ -571,7 +574,7 @@ private fun TexturePackCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -590,7 +593,7 @@ private fun TexturePackCard(
                         .size(54.dp)
                         .background(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = neonShape(16.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -656,10 +659,12 @@ private fun TexturePackCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (pack.canOptimize) OutlinedButton(onClick = onOptimize, enabled = !isWorking && pack.replacementCount > 0) {
+                if (pack.canOptimize) OutlinedButton(
+                    shape = neonButtonShape(),onClick = onOptimize, enabled = !isWorking && pack.replacementCount > 0) {
                     Text(stringResource(R.string.texture_opt_optimize))
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onClearDumps,
                     enabled = !isWorking && pack.dumpCount > 0,
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding
@@ -669,6 +674,7 @@ private fun TexturePackCard(
                     Text(stringResource(R.string.texture_manager_clear_dumps))
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onDelete,
                     enabled = !isWorking,
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -687,7 +693,7 @@ private fun TexturePackCard(
 private fun EmptyTexturePacksPanel(rootPath: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -706,7 +712,7 @@ private fun EmptyTexturePacksPanel(rootPath: String) {
                         .size(54.dp)
                         .background(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = neonShape(16.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {

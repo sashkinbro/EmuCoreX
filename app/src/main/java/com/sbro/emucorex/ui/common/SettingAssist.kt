@@ -51,6 +51,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun SettingHelpButton(
@@ -114,7 +115,7 @@ fun SettingHelpButton(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.26f),
                 border = BorderStroke(
                     1.dp,
@@ -151,7 +152,7 @@ fun SettingHelpButton(
             Button(
                 onClick = { showDialog.value = false },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
@@ -216,7 +217,7 @@ fun AppAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(30.dp),
+    shape: Shape = neonShape(30.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     properties: DialogProperties = DialogProperties(
         usePlatformDefaultWidth = false,
@@ -276,7 +277,7 @@ fun CompactAppAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(30.dp),
+    shape: Shape = neonShape(30.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     properties: DialogProperties = DialogProperties(
         usePlatformDefaultWidth = false,
@@ -307,7 +308,7 @@ private fun StyledDialogScaffold(
     modifier: Modifier = Modifier,
     showEyebrow: Boolean = true,
     showIconContainer: Boolean = true,
-    shape: Shape = RoundedCornerShape(30.dp),
+    shape: Shape = neonShape(30.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     properties: DialogProperties = DialogProperties(
         usePlatformDefaultWidth = false,
@@ -417,7 +418,7 @@ private fun StyledDialogScaffold(
                         if (showIconContainer) {
                             Surface(
                                 modifier = Modifier.size(iconTileSize),
-                                shape = RoundedCornerShape(18.dp),
+                                shape = neonShape(18.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.78f)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {

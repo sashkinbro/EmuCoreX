@@ -74,6 +74,7 @@ import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorex.ui.theme.neon.neonShape
 private enum class NetworkHubTab {
     Overview,
     Online,
@@ -287,7 +288,7 @@ private fun NetworkInternetLinkPanel(viewModel: SettingsViewModel) {
             Button(
                 onClick = { InternetLinkSession.createRoom(context) },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Icon(Icons.Rounded.Public, contentDescription = null)
                 Spacer(Modifier.width(10.dp))
@@ -303,14 +304,14 @@ private fun NetworkInternetLinkPanel(viewModel: SettingsViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).skipGamepadTextFieldFocus(),
                 label = { Text(stringResource(R.string.network_room_code)) },
                 supportingText = { Text(stringResource(R.string.network_room_code_hint)) },
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 singleLine = true
             )
             OutlinedButton(
                 onClick = { InternetLinkSession.joinRoom(context, roomDraft) },
                 enabled = roomDraft.length == 8,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Text(stringResource(R.string.network_join_room))
             }
@@ -321,7 +322,7 @@ private fun NetworkInternetLinkPanel(viewModel: SettingsViewModel) {
                     viewModel.setDev9LocalLinkMode(AppPreferences.DEV9_LOCAL_LINK_OFF)
                 },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Text(stringResource(R.string.network_end_session))
             }
@@ -518,7 +519,7 @@ private fun NetworkSettingsTab(
                     label = { Text(stringResource(R.string.settings_network_local_host_address)) },
                     supportingText = { Text(stringResource(R.string.settings_network_local_host_address_desc)) },
                     isError = !hostValid,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     singleLine = true
                 )
             }
@@ -535,7 +536,7 @@ private fun NetworkSettingsTab(
                 label = { Text(stringResource(R.string.settings_network_local_port)) },
                 supportingText = { Text(stringResource(R.string.settings_network_local_port_desc)) },
                 isError = !portValid,
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 singleLine = true
             )
             var roomDraft by remember(uiState.dev9LocalLinkRoomCode) { mutableStateOf(uiState.dev9LocalLinkRoomCode) }
@@ -550,7 +551,7 @@ private fun NetworkSettingsTab(
                 label = { Text(stringResource(R.string.settings_network_local_room_code)) },
                 supportingText = { Text(stringResource(R.string.settings_network_local_room_code_desc)) },
                 isError = !roomValid,
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 singleLine = true
             )
             SettingsInlineNote(stringResource(R.string.settings_network_local_peer_id, uiState.dev9LocalLinkPeerId))
@@ -640,7 +641,7 @@ private fun DnsModeSetting(
                 Text(stringResource(if (valid) R.string.settings_network_dns_address_desc else R.string.settings_network_dns_invalid))
             },
             isError = !valid,
-            shape = RoundedCornerShape(18.dp),
+            shape = neonShape(18.dp),
             singleLine = true
         )
     }

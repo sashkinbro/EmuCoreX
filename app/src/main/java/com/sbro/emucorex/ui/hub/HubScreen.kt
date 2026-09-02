@@ -121,6 +121,9 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 fun HubScreen(
@@ -240,7 +243,7 @@ fun HubScreen(
                                 onValueChange = viewModel::setSearchQuery,
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                                 singleLine = true,
-                                shape = RoundedCornerShape(18.dp),
+                                shape = neonShape(18.dp),
                                 label = { Text(stringResource(R.string.hub_search)) },
                                 placeholder = { Text(stringResource(R.string.hub_search_hint)) },
                                 leadingIcon = {
@@ -439,7 +442,7 @@ private fun HubFilterMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier.widthIn(min = 280.dp),
-            shape = RoundedCornerShape(20.dp)
+            shape = neonShape(20.dp)
         ) {
             Text(
                 text = stringResource(R.string.hub_sort_and_filter),
@@ -528,7 +531,7 @@ internal fun HubScrollToTopButton(
         exit = fadeOut(tween(140)) + scaleOut(tween(140)),
         modifier = modifier
     ) {
-        val shape = RoundedCornerShape(18.dp)
+        val shape = neonShape(18.dp)
         val interactionSource = remember { MutableInteractionSource() }
         Box(
             modifier = Modifier
@@ -599,7 +602,7 @@ private fun Modifier.expandIntoHorizontalPadding(horizontalPadding: androidx.com
 private fun HubCard(item: HubItem, compact: Boolean, onOpen: () -> Unit, onToggleFavorite: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val cardRadius = if (compact) 18.dp else 22.dp
-    val shape = RoundedCornerShape(cardRadius)
+            val shape = neonShape(cardRadius)
     val open = rememberDebouncedClick(onClick = onOpen)
     Surface(
         modifier = Modifier
@@ -619,7 +622,7 @@ private fun HubCard(item: HubItem, compact: Boolean, onOpen: () -> Unit, onToggl
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(if (compact) 2f else 16f / 9f)
-                    .clip(RoundedCornerShape(topStart = cardRadius, topEnd = cardRadius))
+                    .clip(neonShapeCorners(topStart = cardRadius, topEnd = cardRadius))
             ) {
                 HubImage(
                     spec = item.heroThumbnailUrl?.let {
@@ -722,14 +725,14 @@ private fun HubSkeletonCard(compact: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(if (compact) 18.dp else 22.dp))
+                .clip(neonShape(if (compact) 18.dp else 22.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(if (compact) 2f else 16f / 9f).shimmer())
         Column(Modifier.padding(if (compact) 11.dp else 14.dp), verticalArrangement = Arrangement.spacedBy(if (compact) 7.dp else 10.dp)) {
-            Box(Modifier.fillMaxWidth(0.82f).height(20.dp).clip(RoundedCornerShape(8.dp)).shimmer())
-            Box(Modifier.fillMaxWidth(0.42f).height(14.dp).clip(RoundedCornerShape(8.dp)).shimmer())
-            Box(Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(10.dp)).shimmer())
+            Box(Modifier.fillMaxWidth(0.82f).height(20.dp).clip(neonShape(8.dp)).shimmer())
+            Box(Modifier.fillMaxWidth(0.42f).height(14.dp).clip(neonShape(8.dp)).shimmer())
+            Box(Modifier.fillMaxWidth().height(52.dp).clip(neonShape(10.dp)).shimmer())
         }
     }
 }
@@ -748,7 +751,8 @@ private fun HubErrorState(onRetry: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(top = 14.dp, bottom = 12.dp)
         )
-        Button(onClick = onRetry) { Text(stringResource(R.string.hub_retry)) }
+        Button(
+            shape = neonButtonShape(),onClick = onRetry) { Text(stringResource(R.string.hub_retry)) }
     }
 }
 
@@ -785,7 +789,7 @@ private fun HubEmptyState(
             .fillMaxWidth()
             .height(340.dp)
             .padding(vertical = 8.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 1.dp
     ) {
@@ -843,7 +847,7 @@ private fun HubEmptyState(
 private fun HubStatusBanner(text: String, containerColor: Color, contentColor: Color) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = neonShape(14.dp),
         color = containerColor
     ) {
         Text(text, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = contentColor, style = MaterialTheme.typography.labelMedium)

@@ -61,6 +61,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 fun AppUpdateTab(
@@ -115,7 +117,7 @@ private fun ReleaseHistoryCard(
     val cardColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f)
     val cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
     val expandInteractionSource = remember { MutableInteractionSource() }
-    val expandShape = RoundedCornerShape(18.dp)
+    val expandShape = neonShape(18.dp)
     UpdateSectionCard(
         title = stringResource(R.string.settings_updates_history_title),
         contentPadding = PaddingValues(16.dp)
@@ -145,7 +147,7 @@ private fun ReleaseHistoryCard(
                             .size(40.dp)
                             .background(
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                                shape = RoundedCornerShape(14.dp)
+                                shape = neonShape(14.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
@@ -182,6 +184,7 @@ private fun ReleaseHistoryCard(
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(
+                            shape = neonButtonShape(),
                             onClick = onRetry,
                             enabled = !loading
                         ) {
@@ -242,7 +245,7 @@ private fun ReleaseHistoryRow(
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -267,7 +270,7 @@ private fun ReleaseHistoryRow(
                     .size(40.dp)
                     .background(
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(14.dp)
+                        shape = neonShape(14.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -327,7 +330,7 @@ private fun ReleaseHistoryDialog(
                     .fillMaxWidth()
                     .widthIn(max = 620.dp)
                     .heightIn(max = maxHeight),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
                 shadowElevation = 12.dp,
@@ -349,7 +352,7 @@ private fun ReleaseHistoryDialog(
                                 .size(48.dp)
                                 .background(
                                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(16.dp)
+                                    shape = neonShape(16.dp)
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
@@ -427,6 +430,7 @@ private fun ReleaseHistoryDialog(
                             )
 
                             Button(
+                                shape = neonButtonShape(),
                                 onClick = onDownloadParallelRelease,
                                 enabled = release.hasParallelApk,
                                 modifier = Modifier.fillMaxWidth()
@@ -445,6 +449,7 @@ private fun ReleaseHistoryDialog(
                     }
 
                     Button(
+                        shape = neonButtonShape(),
                         onClick = onOpenRelease,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -471,7 +476,7 @@ private fun ReleaseHistoryDialog(
 private fun UpdateMetric(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.62f))
     ) {
@@ -530,7 +535,7 @@ private fun UpdateSectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ScreenHorizontalPadding),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,

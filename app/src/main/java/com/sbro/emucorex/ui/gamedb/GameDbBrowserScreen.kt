@@ -83,6 +83,7 @@ import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.snapshotFlow
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -160,7 +161,7 @@ fun GameDbBrowserScreen(
                         }
                     },
                     placeholder = { Text(stringResource(R.string.gamedb_browser_search_hint)) },
-                    shape = RoundedCornerShape(18.dp)
+                    shape = neonShape(18.dp)
                 )
                 FlowRow(
                     modifier = Modifier.tvFocusGroup(),
@@ -171,7 +172,7 @@ fun GameDbBrowserScreen(
                         val interactionSource = remember { MutableInteractionSource() }
                         FilterChip(
                             modifier = Modifier.tvGamepadFocusableCard(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = neonShape(16.dp),
                                 interactionSource = interactionSource,
                                 addFocusTarget = false
                             ),
@@ -229,7 +230,7 @@ fun GameDbBrowserScreen(
 private fun GameDbEntryCard(entry: GameDbCatalogEntry, loadCover: Boolean) {
     var expanded by rememberSaveable(entry.serial) { mutableStateOf(false) }
     val cardInteractionSource = remember { MutableInteractionSource() }
-    val cardShape = RoundedCornerShape(24.dp)
+    val cardShape = neonShape(24.dp)
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spring(stiffness = 500f),
@@ -265,7 +266,7 @@ private fun GameDbEntryCard(entry: GameDbCatalogEntry, loadCover: Boolean) {
                     modifier = Modifier
                         .width(88.dp)
                         .height(126.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(neonShape(16.dp))
                 )
                 Column(
                     modifier = Modifier.weight(1f),
@@ -355,7 +356,7 @@ private fun GameDbSettingRow(setting: GameDbSettingItem, compact: Boolean = fals
     val presentation = GameDbSettingPresentationMapper.map(setting)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = neonShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
         border = BorderStroke(
             1.dp,
@@ -462,7 +463,7 @@ private fun GameDbCountBadge(text: String, accent: Boolean) {
 private fun GameDbMessageCard(title: String, body: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
@@ -478,7 +479,7 @@ private fun GameDbMessageCard(title: String, body: String) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(15.dp))
+                    .clip(neonShape(15.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {

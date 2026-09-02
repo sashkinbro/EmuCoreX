@@ -76,6 +76,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 internal fun TextureOnlineCatalogSection(
@@ -189,7 +191,7 @@ internal fun TextureOnlineCatalogSection(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
@@ -331,7 +333,7 @@ internal fun TextureOnlineCatalogSection(
 private fun TextureCatalogEmptyState() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
@@ -342,7 +344,7 @@ private fun TextureCatalogEmptyState() {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = neonShape(14.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
@@ -378,7 +380,7 @@ private fun TextureCatalogCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
@@ -486,6 +488,7 @@ private fun TextureCatalogCard(
                             }
                             DownloadControlState.INSTALL -> {
                                 Button(
+                                    shape = neonButtonShape(),
                                     onClick = onInstall,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
@@ -509,6 +512,7 @@ private fun TextureCatalogCard(
                     }
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onSource,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -542,7 +546,7 @@ private fun TextureDownloadQueue(
     tasks.forEach { task ->
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = neonShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
         ) {
@@ -694,7 +698,8 @@ private fun DownloadActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Button(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+    Button(
+        shape = neonButtonShape(),onClick = onClick, modifier = modifier.fillMaxWidth()) {
         icon()
         Spacer(Modifier.width(7.dp))
         Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -708,7 +713,8 @@ private fun DownloadSecondaryAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    OutlinedButton(onClick = onClick, modifier = modifier.fillMaxWidth()) {
+    OutlinedButton(
+        shape = neonButtonShape(),onClick = onClick, modifier = modifier.fillMaxWidth()) {
         icon()
         Spacer(Modifier.width(7.dp))
         Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -737,7 +743,7 @@ private fun TextureCompatibilityBadge(compatible: Boolean) {
         MaterialTheme.colorScheme.onErrorContainer
     }
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = neonShape(10.dp),
         color = background,
         contentColor = foreground
     ) {

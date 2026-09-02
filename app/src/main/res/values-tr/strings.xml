@@ -183,6 +183,7 @@
     <string name="settings_theme_system">Sistem</string>
     <string name="settings_theme_light">Açık</string>
     <string name="settings_theme_dark">Koyu</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_language">Dil</string>
     <string name="settings_tv_interface">TV arayüzü</string>
     <string name="settings_tv_interface_auto">Otomatik</string>

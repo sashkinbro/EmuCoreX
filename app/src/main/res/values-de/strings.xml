@@ -128,6 +128,7 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Hell</string>
     <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_tv_interface">TV-Oberfläche</string>
     <string name="settings_tv_interface_auto">Automatisch</string>

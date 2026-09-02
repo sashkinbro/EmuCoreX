@@ -27,6 +27,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.LocalTvUiEnvironment
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 enum class GamepadFocusHighlightMode {
     ConnectedGamepadOnly,
@@ -35,11 +36,12 @@ enum class GamepadFocusHighlightMode {
 
 fun Modifier.gamepadFocusableCard(
     enabled: Boolean = true,
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape? = null,
     interactionSource: MutableInteractionSource? = null,
     addFocusTarget: Boolean = true,
     focusHighlightMode: GamepadFocusHighlightMode = GamepadFocusHighlightMode.ConnectedGamepadOnly
 ): Modifier = composed {
+    val effectiveShape = shape ?: neonShape(18.dp)
     val focusInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
     val isFocused by focusInteractionSource.collectIsFocusedAsState()
     val connectedGamepadCount by GamepadManager.connectedGamepadCountState.collectAsState()
@@ -59,7 +61,7 @@ fun Modifier.gamepadFocusableCard(
     }
 
     var focusedModifier = if (tvUiEnabled) {
-        this.clip(shape)
+        this.clip(effectiveShape)
     } else {
         this
             .graphicsLayer {
@@ -68,15 +70,15 @@ fun Modifier.gamepadFocusableCard(
             }
             .shadow(
                 elevation = if (shouldShowFocusHighlight) 14.dp else 0.dp,
-                shape = shape,
+                shape = effectiveShape,
                 clip = false
             )
-            .clip(shape)
+            .clip(effectiveShape)
     }
 
     focusedModifier = focusedModifier.border(
         border = focusBorder,
-        shape = shape
+        shape = effectiveShape
     )
 
     if (addFocusTarget) {
@@ -90,13 +92,13 @@ fun Modifier.gamepadFocusableCard(
 }
 
 fun Modifier.tvGamepadFocusableCard(
-    shape: Shape = RoundedCornerShape(18.dp),
+    shape: Shape? = null,
     interactionSource: MutableInteractionSource? = null,
     addFocusTarget: Boolean = true
 ): Modifier = composed {
     if (LocalTvUiEnvironment.current.enabled) {
         gamepadFocusableCard(
-            shape = shape,
+            shape = shape ?: neonShape(18.dp),
             interactionSource = interactionSource,
             addFocusTarget = addFocusTarget,
             focusHighlightMode = GamepadFocusHighlightMode.Always

@@ -175,6 +175,7 @@
     <string name="settings_theme_system">Sistema</string>
     <string name="settings_theme_light">Chiaro</string>
     <string name="settings_theme_dark">Scuro</string>
+    <string name="settings_theme_neon">Neon</string>
     <string name="settings_language">Lingua</string>
     <string name="settings_tv_interface">Interfaccia TV</string>
     <string name="settings_tv_interface_auto">Automatico</string>

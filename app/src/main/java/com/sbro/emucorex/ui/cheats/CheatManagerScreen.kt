@@ -96,6 +96,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -343,7 +345,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
+                    shape = neonShape(22.dp),
                     color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
@@ -366,7 +368,8 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                                 onCheckedChange = { enabled -> scope.launch { preferences.setEnableCheats(enabled) } }
                             )
                         }
-                        OutlinedButton(onClick = { importLauncher.launch(arrayOf("*/*")) }) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),onClick = { importLauncher.launch(arrayOf("*/*")) }) {
                             Icon(Icons.Rounded.FolderOpen, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.cheat_manager_import_pnach))
@@ -401,7 +404,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = neonShape(18.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                         contentColor = MaterialTheme.colorScheme.onSurface
                     ) {
@@ -611,7 +614,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                                 }
                             } else null,
                             singleLine = true,
-                            shape = RoundedCornerShape(18.dp)
+                            shape = neonShape(18.dp)
                         )
                     }
                 }
@@ -716,6 +719,7 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                 }
                 item(key = "cheat-delete") {
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { pendingDelete = current },
                         modifier = Modifier.animateItem(
                             fadeInSpec = tween(220),
@@ -807,7 +811,7 @@ private fun CheatCategoryCard(
     Surface(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
@@ -818,7 +822,7 @@ private fun CheatCategoryCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(13.dp),
+                shape = neonShape(13.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
@@ -857,7 +861,7 @@ private fun CheatToggleCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
@@ -882,7 +886,7 @@ private fun CheatToggleCard(
 private fun CheatSearchEmptyState(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
     ) {
@@ -898,7 +902,7 @@ private fun CheatSearchEmptyState(modifier: Modifier = Modifier) {
 private fun CheatCatalogEmptyState() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
@@ -909,7 +913,7 @@ private fun CheatCatalogEmptyState() {
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = neonShape(14.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
@@ -936,7 +940,7 @@ private fun CheatCatalogLoadingSkeleton() {
             modifier = Modifier
                 .fillMaxWidth(0.58f)
                 .height(24.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(neonShape(8.dp))
                 .shimmer()
         )
         repeat(2) {
@@ -944,7 +948,7 @@ private fun CheatCatalogLoadingSkeleton() {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(248.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(neonShape(18.dp))
                     .shimmer()
             ) {
                 Column(
@@ -970,7 +974,7 @@ private fun CheatSkeletonLine(widthFraction: Float, height: androidx.compose.ui.
         modifier = Modifier
             .fillMaxWidth(widthFraction)
             .height(height)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(neonShape(8.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.44f))
     )
 }
@@ -985,7 +989,7 @@ private fun CheatCatalogCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f))
     ) {
@@ -1024,6 +1028,7 @@ private fun CheatCatalogCard(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (compatible) {
                     Button(
+                        shape = neonButtonShape(),
                         onClick = onDownload,
                         enabled = !working,
                         modifier = Modifier.fillMaxWidth()
@@ -1039,6 +1044,7 @@ private fun CheatCatalogCard(
                     }
                 }
                 OutlinedButton(
+                    shape = neonButtonShape(),
                     onClick = onSource,
                     enabled = !working,
                     modifier = Modifier.fillMaxWidth()
@@ -1064,7 +1070,7 @@ private fun CheatCatalogSectionTitle(text: String) {
 @Composable
 private fun ContentCompatibilityBadge(compatible: Boolean) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = neonShape(10.dp),
         color = if (compatible) Color(0xFF1B6B3A) else MaterialTheme.colorScheme.errorContainer,
         contentColor = if (compatible) Color.White else MaterialTheme.colorScheme.onErrorContainer
     ) {

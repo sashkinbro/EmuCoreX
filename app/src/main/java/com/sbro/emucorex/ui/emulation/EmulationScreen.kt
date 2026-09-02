@@ -120,6 +120,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -221,6 +222,9 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
 
 private val DISC_SWAP_MIME_TYPES = arrayOf(
     "application/octet-stream",
@@ -1155,7 +1159,7 @@ fun EmulationScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(neonShape(12.dp))
                             .background(Color(0xFF50D9A0).copy(alpha = 0.20f))
                             .padding(horizontal = 9.dp, vertical = 9.dp),
                         contentAlignment = Alignment.Center
@@ -1187,7 +1191,7 @@ fun EmulationScreen(
                     showOverlayShortcut = false
                     toggleMenuClick()
                 },
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 tonalElevation = 6.dp,
                 shadowElevation = 10.dp,
@@ -1232,7 +1236,7 @@ fun EmulationScreen(
             }
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(neonShape(14.dp))
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
@@ -1301,7 +1305,7 @@ fun EmulationScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
+                        .clip(neonShape(24.dp))
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
                         .padding(horizontal = 32.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1343,7 +1347,7 @@ fun EmulationScreen(
             val isRunningStatus = uiState.statusMessage == "status_running"
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(18.dp))
+                    .clip(neonShape(18.dp))
                     .background(
                         Brush.horizontalGradient(
                             colors = if (isRunningStatus) listOf(
@@ -1359,7 +1363,7 @@ fun EmulationScreen(
                         width = 1.dp,
                         color = if (isRunningStatus) Color(0xFF50D9A0).copy(alpha = 0.4f)
                                 else Color.White.copy(alpha = 0.12f),
-                        shape = RoundedCornerShape(18.dp)
+                        shape = neonShape(18.dp)
                     )
                     .padding(horizontal = 28.dp, vertical = 14.dp),
                 contentAlignment = Alignment.Center
@@ -1708,7 +1712,7 @@ fun EmulationScreen(
         AlertDialog(
             onDismissRequest = dismissQuickSaveClick,
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             title = {
                 Text(
                     stringResource(R.string.emulation_quick_save_confirm_title),
@@ -1739,7 +1743,7 @@ fun EmulationScreen(
         AlertDialog(
             onDismissRequest = dismissQuickLoadClick,
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             title = {
                 Text(
                     stringResource(R.string.emulation_quick_load_confirm_title),
@@ -1770,7 +1774,7 @@ fun EmulationScreen(
         AlertDialog(
             onDismissRequest = dismissAutoSaveLoadClick,
             containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             title = {
                 Text(
                     stringResource(R.string.emulation_quick_load_confirm_title),
@@ -1843,7 +1847,7 @@ fun EmulationScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 560.dp),
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp,
                 shadowElevation = 16.dp
@@ -1866,6 +1870,7 @@ fun EmulationScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf(0, 1).forEach { padIndex ->
                                 FilterChip(
+                                    shape = neonChipShape(),
                                     selected = selectedGamepadPadIndex == padIndex,
                                     onClick = { selectedGamepadPadIndex = padIndex },
                                     label = { Text(gamepadPlayerLabel(padIndex)) }
@@ -2027,7 +2032,7 @@ private fun GameMenuTabId.toEmulationMenuTab(): EmulationMenuTab = when (this) {
 private fun TransportStatusOverlay(mode: EmulationTransportMode) {
     if (mode == EmulationTransportMode.None) return
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = neonShape(8.dp),
         color = Color(0xDD10131A),
         tonalElevation = 8.dp,
         shadowElevation = 10.dp,
@@ -2567,7 +2572,7 @@ private fun RetroAchievementsNotificationToast(
 
     Surface(
         onClick = onDismiss,
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = Color(0xE614151A),
         tonalElevation = 6.dp,
         shadowElevation = 10.dp,
@@ -2585,7 +2590,7 @@ private fun RetroAchievementsNotificationToast(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(neonShape(10.dp))
                     .background(accent.copy(alpha = 0.16f)),
                 fallback = {
                     Icon(
@@ -3180,7 +3185,7 @@ private fun EmulationSidebarMenu(
 
     val menuContent: @Composable ColumnScope.() -> Unit = {
                 Surface(
-                    shape = RoundedCornerShape(22.dp),
+                    shape = neonShape(22.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                 ) {
@@ -3291,7 +3296,7 @@ private fun EmulationSidebarMenu(
                         ) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         ) {
                             Column(
@@ -3408,7 +3413,7 @@ private fun EmulationSidebarMenu(
                                             enabled = !uiState.isActionInProgress,
                                             singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            shape = RoundedCornerShape(16.dp),
+                                            shape = neonShape(16.dp),
                                             textStyle = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                                             modifier = Modifier
                                                 .width(108.dp)
@@ -3465,7 +3470,7 @@ private fun EmulationSidebarMenu(
                         if (section == GameMenuSectionId.SESSION_DEBUG_TOOLS && uiState.showDebugOptions) {
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = neonShape(16.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                             ) {
                                 Column(
@@ -3499,7 +3504,7 @@ private fun EmulationSidebarMenu(
 
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = neonShape(16.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                             ) {
                                 Column(
@@ -3561,7 +3566,7 @@ private fun EmulationSidebarMenu(
 
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
                         ) {
                             Column(
@@ -4484,7 +4489,7 @@ private fun EmulationSidebarMenu(
 
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
                         ) {
                             Text(
@@ -4941,7 +4946,7 @@ private fun GameMenuLayoutHost(
                     modifier = Modifier
                         .fillMaxHeight()
                         .widthIn(min = 300.dp, max = 420.dp),
-                    shape = RoundedCornerShape(28.dp),
+                    shape = neonShape(28.dp),
                     scrollState = selectedTabScrollState,
                     bottomPadding = contentBottomPadding,
                     sectionSpacing = sectionSpacing,
@@ -4973,7 +4978,7 @@ private fun GameMenuLayoutHost(
                     modifier = Modifier
                         .fillMaxWidth(0.94f)
                         .fillMaxHeight(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = neonShape(24.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
                     shadowElevation = 12.dp
@@ -5015,7 +5020,7 @@ private fun GameMenuLayoutHost(
                     modifier = Modifier
                         .fillMaxWidth(0.96f)
                         .fillMaxHeight(),
-                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp, bottomStart = 18.dp, bottomEnd = 18.dp),
+                    shape = neonShapeCorners(topStart = 30.dp, topEnd = 30.dp, bottomStart = 18.dp, bottomEnd = 18.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.50f)),
                     shadowElevation = 14.dp
@@ -5055,7 +5060,7 @@ private fun GameMenuLayoutHost(
                     modifier = Modifier
                         .fillMaxHeight()
                         .widthIn(min = 300.dp, max = 352.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)),
                     shadowElevation = 10.dp
@@ -5091,7 +5096,7 @@ private fun GameMenuLayoutHost(
 @Composable
 private fun GameMenuContentSurface(
     modifier: Modifier,
-    shape: RoundedCornerShape,
+    shape: Shape,
     scrollState: ScrollState,
     bottomPadding: Dp,
     sectionSpacing: Dp,
@@ -5145,7 +5150,7 @@ private fun GameMenuVerticalNavigation(
 ) {
     Surface(
         modifier = modifier,
-        shape = if (showLabels) RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp) else RoundedCornerShape(24.dp),
+            shape = if (showLabels) neonShapeCorners(topStart = 24.dp, bottomStart = 24.dp) else neonShape(24.dp),
         color = if (showLabels) {
             MaterialTheme.colorScheme.surfaceContainerLow
         } else {
@@ -5298,7 +5303,7 @@ private fun GameMenuNavigationTile(
 ) {
     val resolvedIcon = icon ?: tab?.let(::gameMenuTabIcon) ?: Icons.Rounded.Menu
     val resolvedLabel = label ?: tab?.let { gameMenuTabLabel(it) }.orEmpty()
-    val shape = RoundedCornerShape(if (iconOnly) 14.dp else 16.dp)
+            val shape = neonShape(if (iconOnly) 14.dp else 16.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     Surface(
@@ -5498,7 +5503,7 @@ private fun OverlayAchievementsPane(
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = neonShape(20.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f)
             ) {
                 Column(
@@ -5617,7 +5622,7 @@ private fun OverlayAchievementsMetricCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
     ) {
         Column(
@@ -5642,7 +5647,7 @@ private fun OverlayAchievementsMetricCard(
 private fun OverlayAchievementsNotice(text: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
     ) {
         Text(
@@ -5658,7 +5663,7 @@ private fun OverlayAchievementsNotice(text: String) {
 private fun OverlayAchievementRow(achievement: RetroAchievementEntry) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)
     ) {
         Row(
@@ -5677,7 +5682,7 @@ private fun OverlayAchievementRow(achievement: RetroAchievementEntry) {
                 contentDescription = achievement.title,
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(neonShape(12.dp)),
                 fallback = {
                     Icon(
                         imageVector = Icons.Rounded.Star,
@@ -5751,7 +5756,7 @@ private fun EmulationMenuRailButton(
     onClick: () -> Unit,
     isDestructive: Boolean = false
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
     val iconScale by animateFloatAsState(
@@ -5818,7 +5823,7 @@ private fun EmulationGamepadBindingRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         onClick = onBindClick
     ) {
@@ -5832,7 +5837,7 @@ private fun EmulationGamepadBindingRow(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -5927,7 +5932,7 @@ private fun SettingsToggle(
     val interactionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
     val resetToast = stringResource(R.string.settings_reset_to_default_toast)
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -6087,7 +6092,7 @@ private fun LiveSelectionRow(
                     Surface(
                         modifier = Modifier.weight(1f),
                         onClick = { onValueChange(option.value) },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = neonShape(12.dp),
                         color = if (selected) {
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                         } else {
@@ -6138,6 +6143,7 @@ private fun LiveSelectionChip(
     modifier: Modifier = Modifier
 ) {
     FilterChip(
+        shape = neonChipShape(),
         modifier = modifier,
         selected = selected,
         onClick = onClick,
@@ -6395,6 +6401,7 @@ private fun LiveChipsSelectionRow(
         ) {
             items(options) { (value, label) ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = currentValue == value,
                     onClick = { onValueChange(value) },
                     label = { Text(text = label) }
@@ -6453,6 +6460,7 @@ private fun LiveBitmaskChoiceRow(
         ) {
             items(options) { (metric, label) ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
                     onClick = { onToggle(metric) },
                     label = { Text(text = label) }
@@ -6597,7 +6605,7 @@ private fun MenuButton(
     showProgress: Boolean = false,
     containerColor: Color? = null
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         modifier = modifier
@@ -6629,8 +6637,8 @@ private fun MenuButton(
                     if (gradientColors != null) {
                         Modifier.background(
                             Brush.horizontalGradient(gradientColors.map { it.copy(alpha = 0.22f) }),
-                            RoundedCornerShape(16.dp)
-                        ).border(1.dp, gradientColors.first().copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            neonShape(16.dp)
+                        ).border(1.dp, gradientColors.first().copy(alpha = 0.3f), neonShape(16.dp))
                     } else Modifier
                 )
                 .padding(horizontal = 16.dp, vertical = 16.dp),
@@ -6674,7 +6682,7 @@ private fun QuickIconActionButton(
     showProgress: Boolean,
     containerColor: Color
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         modifier = Modifier
@@ -6727,7 +6735,7 @@ private fun CompactIconActionButton(
     enabled: Boolean,
     showProgress: Boolean
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = neonShape(16.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Surface(
         modifier = Modifier

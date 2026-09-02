@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.GameItem
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun LibraryGamePicker(
@@ -65,7 +66,7 @@ fun LibraryGamePicker(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = horizontalContentPadding),
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             ) {
                 Text(
@@ -85,7 +86,7 @@ fun LibraryGamePicker(
             items(games, key = GameItem::path) { game ->
                 val selected = game.path == selectedPath
                 val interactionSource = remember { MutableInteractionSource() }
-                val shape = RoundedCornerShape(18.dp)
+                val shape = neonShape(18.dp)
                 Surface(
                     modifier = Modifier
                         .width(236.dp)
@@ -118,7 +119,7 @@ fun LibraryGamePicker(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .size(width = 58.dp, height = 82.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .clip(neonShape(12.dp))
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {

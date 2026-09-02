@@ -1,18 +1,27 @@
 package com.sbro.emucorex.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.data.AppFontChoice
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.CustomThemeConfig
+import com.sbro.emucorex.ui.theme.neon.NeonColorScheme
+import com.sbro.emucorex.ui.theme.neon.NeonCrtOverlay
+import com.sbro.emucorex.ui.theme.neon.NeonShapes
+import com.sbro.emucorex.ui.theme.neon.neonMonospace
 import java.io.File
 
 private val DarkColorScheme = darkColorScheme(
@@ -94,7 +103,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 enum class ThemeMode {
-    SYSTEM, LIGHT, DARK, PRO, CUSTOM
+    SYSTEM, LIGHT, DARK, PRO, CUSTOM, NEON
 }
 
 @Composable
@@ -113,38 +122,60 @@ fun EmuCoreXTheme(
         ThemeMode.DARK -> true
         ThemeMode.PRO -> true
         ThemeMode.CUSTOM -> customTheme.dark
+        ThemeMode.NEON -> true
     }
 
     val safeCustomTheme = remember(customTheme) { customTheme.sanitized() }
     val colorScheme = when (themeMode) {
         ThemeMode.PRO -> ProColorScheme
         ThemeMode.CUSTOM -> safeCustomTheme.toColorScheme()
+        ThemeMode.NEON -> NeonColorScheme
         else -> if (darkTheme) DarkColorScheme else LightColorScheme
     }
     val shapes = if (themeMode == ThemeMode.CUSTOM) {
         safeCustomTheme.toShapes()
+    } else if (themeMode == ThemeMode.NEON) {
+        NeonShapes
     } else {
         MaterialTheme.shapes
     }
 
     val safeFontScale = fontScale.coerceIn(AppPreferences.MIN_APP_FONT_SCALE, AppPreferences.MAX_APP_FONT_SCALE)
+    val baseTypography = remember(
+        fontChoice,
+        safeFontScale,
+        customFontFile?.absolutePath,
+        customFontRevision
+    ) {
+        typographyFor(
+            choice = fontChoice,
+            customFontFile = customFontFile,
+            fontScale = safeFontScale
+        )
+    }
+    val typography = if (themeMode == ThemeMode.NEON) {
+        baseTypography.neonMonospace()
+    } else {
+        baseTypography
+    }
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = remember(
-            fontChoice,
-            safeFontScale,
-            customFontFile?.absolutePath,
-            customFontRevision
+        typography = typography,
+        shapes = shapes
+    ) {
+        CompositionLocalProvider(
+            LocalNeonTheme provides (themeMode == ThemeMode.NEON)
         ) {
-            typographyFor(
-                choice = fontChoice,
-                customFontFile = customFontFile,
-                fontScale = safeFontScale
-            )
-        },
-        shapes = shapes,
-        content = content
-    )
+            if (themeMode == ThemeMode.NEON) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    content()
+                    NeonCrtOverlay()
+                }
+            } else {
+                content()
+            }
+        }
+    }
 }
 
 fun CustomThemeConfig.toColorScheme() = if (dark) {

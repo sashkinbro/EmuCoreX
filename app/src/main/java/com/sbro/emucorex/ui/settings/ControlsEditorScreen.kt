@@ -74,6 +74,7 @@ import com.sbro.emucorex.ui.common.VectorDpadCluster
 import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.buildOverlayCanvasLayout
 import com.sbro.emucorex.ui.emulation.EmulationUiState
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 data class ControlsEditorState(
     val overlayScale: Int = 100,
@@ -316,7 +317,7 @@ fun ControlsEditorScreen(
         ) {
             Surface(
                 color = Color(0xFF2B3F93).copy(alpha = 0.88f),
-                shape = RoundedCornerShape(16.dp)
+                shape = neonShape(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -354,7 +355,7 @@ fun ControlsEditorScreen(
                         onToggleLeftInputMode()
                         selectedControlId = if (isShowingLeftStick) "dpad_up" else "left_stick"
                     },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.White.copy(alpha = 0.08f),
@@ -366,7 +367,7 @@ fun ControlsEditorScreen(
 
                 OutlinedButton(
                     onClick = { onResetLayout() },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.White.copy(alpha = 0.08f),
@@ -385,7 +386,7 @@ fun ControlsEditorScreen(
                         }
                     },
                     enabled = selectedControlId != null && !selectedIsGroup,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.White.copy(alpha = 0.08f),
@@ -409,7 +410,7 @@ fun ControlsEditorScreen(
                         }
                     },
                     enabled = selectedIsStick,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (selectedStickSurfaceMode) {
@@ -425,7 +426,7 @@ fun ControlsEditorScreen(
 
                 Button(
                     onClick = onBackClick,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF3565FF),
@@ -443,7 +444,7 @@ fun ControlsEditorScreen(
                 Surface(
                     modifier = Modifier.padding(top = 8.dp),
                     color = Color(0xFF111827).copy(alpha = 0.82f),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = neonShape(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -453,7 +454,7 @@ fun ControlsEditorScreen(
                         OutlinedButton(
                             onClick = { setControlScaleLocally(controlId, scale - 10) },
                             enabled = scale > AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = neonShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.08f),
@@ -471,7 +472,7 @@ fun ControlsEditorScreen(
                         OutlinedButton(
                             onClick = { setControlScaleLocally(controlId, scale + 10) },
                             enabled = scale < AppPreferences.OVERLAY_CONTROL_SCALE_MAX,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = neonShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.08f),
@@ -487,7 +488,7 @@ fun ControlsEditorScreen(
                 Surface(
                     modifier = Modifier.padding(top = 8.dp),
                     color = Color(0xFF111827).copy(alpha = 0.82f),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = neonShape(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -497,7 +498,7 @@ fun ControlsEditorScreen(
                         OutlinedButton(
                             onClick = { setControlOpacityLocally(controlId, opacity - 10) },
                             enabled = opacity > AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = neonShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.08f),
@@ -515,7 +516,7 @@ fun ControlsEditorScreen(
                         OutlinedButton(
                             onClick = { setControlOpacityLocally(controlId, opacity + 10) },
                             enabled = opacity < AppPreferences.OVERLAY_CONTROL_OPACITY_MAX,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = neonShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = Color.White.copy(alpha = 0.08f),
@@ -532,7 +533,7 @@ fun ControlsEditorScreen(
                     Surface(
                         modifier = Modifier.padding(top = 8.dp),
                         color = Color(0xFF111827).copy(alpha = 0.82f),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = neonShape(16.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -542,7 +543,7 @@ fun ControlsEditorScreen(
                             OutlinedButton(
                                 onClick = { setControlWidthScaleLocally(controlId, widthScale - 10) },
                                 enabled = widthScale > 100,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = neonShape(14.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.White.copy(alpha = 0.08f),
@@ -560,7 +561,7 @@ fun ControlsEditorScreen(
                             OutlinedButton(
                                 onClick = { setControlWidthScaleLocally(controlId, widthScale + 10) },
                                 enabled = widthScale < 240,
-                                shape = RoundedCornerShape(14.dp),
+                                shape = neonShape(14.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.White.copy(alpha = 0.08f),
@@ -1015,7 +1016,7 @@ private fun PreviewCanvasButtonGroup(
     onMoveGroupBy: (Pair<Float, Float>) -> Unit,
     onCommitGroupPosition: () -> Unit
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = neonShape(22.dp)
     DraggableControl(
         id = id,
         selected = selected,

@@ -53,6 +53,7 @@ import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
 import java.io.File
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 private enum class ConversionUiState {
     Idle,
@@ -205,7 +206,7 @@ fun SupportedFormatsScreen(
                 onDismissRequest = { dialogMessage = null },
                 confirmButton = {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = neonShape(14.dp),
                         color = MaterialTheme.colorScheme.primary,
                         onClick = { dialogMessage = null }
                     ) {
@@ -250,7 +251,7 @@ private fun FormatsTopBar(
                 top = topInset,
                 bottom = 14.dp
             ),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 4.dp,
         shadowElevation = 6.dp
@@ -290,7 +291,7 @@ private fun HeroFormatsCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
+        shape = neonShape(30.dp),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
         tonalElevation = 2.dp
     ) {
@@ -310,7 +311,7 @@ private fun HeroFormatsCard(
             )
             StatusPill(status = status, isConverterAvailable = isConverterAvailable)
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = if (isConverterAvailable) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -380,7 +381,7 @@ private fun StatusPill(
     }
 
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = neonShape(14.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
     ) {
         Text(
@@ -402,7 +403,7 @@ private fun FormatGroupCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = neonShape(28.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
         tonalElevation = 4.dp,
         shadowElevation = 8.dp
@@ -413,7 +414,7 @@ private fun FormatGroupCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = neonShape(14.dp),
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
                     tonalElevation = 2.dp
                 ) {
@@ -446,7 +447,7 @@ private fun FormatGroupCard(
             ) {
                 formats.forEach { format ->
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = neonShape(16.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
                         tonalElevation = 1.dp
                     ) {

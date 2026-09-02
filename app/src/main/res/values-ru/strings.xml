@@ -128,6 +128,7 @@
     <string name="settings_theme_system">Системная</string>
     <string name="settings_theme_light">Светлая</string>
     <string name="settings_theme_dark">Темная</string>
+    <string name="settings_theme_neon">Неон</string>
     <string name="settings_language">Язык</string>
     <string name="settings_tv_interface">Интерфейс для ТВ</string>
     <string name="settings_tv_interface_auto">Автоматически</string>

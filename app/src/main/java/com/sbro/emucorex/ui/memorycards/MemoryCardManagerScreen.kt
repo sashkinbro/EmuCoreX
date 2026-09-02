@@ -83,11 +83,16 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorex.ui.theme.neon.NeonSystemBanner
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -311,6 +316,7 @@ fun MemoryCardManagerScreen(
         )
     }
 
+    val neonThemeActive = LocalNeonTheme.current
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -335,6 +341,12 @@ fun MemoryCardManagerScreen(
                 )
             }
 
+            if (neonThemeActive) {
+                item {
+                    NeonSystemBanner()
+                }
+            }
+
             item {
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -342,6 +354,7 @@ fun MemoryCardManagerScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = { showCreateDialog.value = true },
                         enabled = !isWorking,
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -354,6 +367,7 @@ fun MemoryCardManagerScreen(
                         Text(stringResource(R.string.memory_card_create_action))
                     }
                     FilledTonalButton(
+                        shape = neonButtonShape(),
                         onClick = { backupLauncher.launch("EmuCoreX-memory-cards.zip") },
                         enabled = cards.isNotEmpty() && !isWorking,
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -366,6 +380,7 @@ fun MemoryCardManagerScreen(
                         Text(stringResource(R.string.memory_card_backup_action))
                     }
                     OutlinedButton(
+                        shape = neonButtonShape(),
                         onClick = { restoreLauncher.launch(arrayOf("application/zip", "*/*")) },
                         enabled = !isWorking
                     ) {
@@ -472,7 +487,7 @@ private fun MemoryCardItem(
     val assignedSlot2 = assignments.slot2.equals(card.name, ignoreCase = true)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         tonalElevation = 1.dp,
         shadowElevation = 3.dp,
         color = MaterialTheme.colorScheme.surface,
@@ -496,7 +511,7 @@ private fun MemoryCardItem(
                         .size(54.dp)
                         .background(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = neonShape(16.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -547,11 +562,13 @@ private fun MemoryCardItem(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = assignedSlot1,
                     onClick = { onToggleSlot(1) },
                     label = { Text(stringResource(R.string.memory_card_slot_1)) }
                 )
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = assignedSlot2,
                     onClick = { onToggleSlot(2) },
                     label = { Text(stringResource(R.string.memory_card_slot_2)) }
@@ -595,7 +612,8 @@ private fun SmallActionButton(
     label: String,
     onClick: () -> Unit
 ) {
-    OutlinedButton(onClick = onClick) {
+    OutlinedButton(
+        shape = neonButtonShape(),onClick = onClick) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(6.dp))
         Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -606,7 +624,7 @@ private fun SmallActionButton(
 private fun EmptyMemoryCardsCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -630,7 +648,7 @@ private fun EmptyMemoryCardsCard() {
 private fun LoadingCard() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
+        shape = neonShape(22.dp),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
@@ -703,7 +721,7 @@ private fun MemoryCardCreateDialog(
                 modifier = Modifier
                     .fillMaxWidth(dialogWidthFraction)
                     .widthIn(max = dialogMaxWidth),
-                shape = RoundedCornerShape(26.dp),
+                shape = neonShape(26.dp),
                 tonalElevation = 6.dp,
                 shadowElevation = 10.dp,
                 color = MaterialTheme.colorScheme.surface
@@ -734,7 +752,7 @@ private fun MemoryCardCreateDialog(
                         onValueChange = { value = it },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = neonShape(14.dp),
                         label = { Text(stringResource(R.string.memory_card_name_field)) }
                     )
 
@@ -773,6 +791,7 @@ private fun MemoryCardCreateDialog(
                             ) {
                                 sizes.forEach { size ->
                                     FilterChip(
+                                        shape = neonChipShape(),
                                         selected = selectedSize == size,
                                         onClick = { selectedSize = size },
                                         label = { Text(stringResource(R.string.memory_card_size_value, size)) }
@@ -792,6 +811,7 @@ private fun MemoryCardCreateDialog(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         FilledTonalButton(
+                            shape = neonButtonShape(),
                             enabled = value.isNotBlank(),
                             onClick = {
                                 val trimmed = value.trim()
@@ -831,9 +851,9 @@ private fun MemoryCardCreateTypeRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(neonShape(16.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = neonShape(16.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor.copy(alpha = 0.85f))
     ) {
@@ -897,7 +917,7 @@ private fun MemoryCardNameDialog(
                     value = value,
                     onValueChange = { value = it },
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     label = { Text(stringResource(R.string.memory_card_name_field)) }
                 )
                 if (showSizeOptions) {
@@ -912,6 +932,7 @@ private fun MemoryCardNameDialog(
                     ) {
                         sizes.forEach { size ->
                             FilterChip(
+                                shape = neonChipShape(),
                                 selected = selectedSize == size,
                                 onClick = { selectedSize = size },
                                 label = { Text(stringResource(R.string.memory_card_size_value, size)) }

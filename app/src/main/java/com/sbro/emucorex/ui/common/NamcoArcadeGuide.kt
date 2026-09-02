@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun NamcoArcadeGuideContent(
@@ -47,7 +48,7 @@ fun NamcoArcadeGuideContent(
         steps.forEachIndexed { index, textRes ->
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = neonShape(18.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.52f),
                 border = BorderStroke(
                     1.dp,

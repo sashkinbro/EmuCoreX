@@ -124,6 +124,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 private enum class DeviceChipsetFamily {
     Snapdragon, MediaTek, Exynos, Tensor, Unknown
@@ -771,7 +773,7 @@ fun OnboardingScreen(
             exit = fadeOut(tween(120)) + scaleOut(targetScale = 1.02f, animationSpec = tween(120))
         ) {
             Surface(
-                shape = RoundedCornerShape(28.dp),
+                shape = neonShape(28.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                 tonalElevation = 12.dp
             ) {
@@ -831,7 +833,7 @@ private fun OnboardingHero(
         Box(
             modifier = Modifier
                 .size(112.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(neonShape(32.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
@@ -939,7 +941,7 @@ private fun OnboardingHeroPro(
         Box(
             modifier = Modifier
                 .size(112.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(neonShape(32.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) {
@@ -982,7 +984,7 @@ private fun OnboardingHeroArcade(
         Box(
             modifier = Modifier
                 .size(112.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(neonShape(32.dp))
                 .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center
         ) {
@@ -1042,7 +1044,7 @@ private fun OnboardingProContent(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = 520.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
         tonalElevation = 4.dp
     ) {
@@ -1077,6 +1079,7 @@ private fun OnboardingProContent(
             )
             if (!isProUnlocked) {
                 Button(
+                    shape = neonButtonShape(),
                     onClick = onPurchase,
                     enabled = !isPurchaseInProgress && !isProductLoading,
                     modifier = Modifier
@@ -1084,7 +1087,7 @@ private fun OnboardingProContent(
                         .focusRequester(purchaseFocusRequester)
                         .gamepadFocusableCard(
                             enabled = tvUiEnabled && !isPurchaseInProgress && !isProductLoading,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = neonShape(16.dp),
                             interactionSource = purchaseInteractionSource,
                             addFocusTarget = false,
                             focusHighlightMode = GamepadFocusHighlightMode.Always
@@ -1167,7 +1170,7 @@ private fun OnboardingNavigation(
     modifier: Modifier = Modifier
 ) {
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
-    val actionShape = RoundedCornerShape(12.dp)
+    val actionShape = neonShape(12.dp)
     val backActionFocusRequester = remember { FocusRequester() }
     val primaryActionFocusRequester = remember { FocusRequester() }
     val backActionInteractionSource = remember { MutableInteractionSource() }
@@ -1427,7 +1430,7 @@ private fun OnboardingSetupContent(
             gamePaths.forEach { path ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                 ) {
                     Row(
@@ -1478,7 +1481,7 @@ private fun OnboardingSetupContent(
             Spacer(modifier = Modifier.height(10.dp))
 
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = neonShape(24.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
                 tonalElevation = 4.dp
             ) {
@@ -1561,7 +1564,7 @@ private fun OnboardingSetupScrollHint(
                     modifier = Modifier
                         .width(3.dp)
                         .height(58.dp)
-                        .clip(RoundedCornerShape(2.dp))
+                        .clip(neonShape(2.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 )
                 Icon(
@@ -1677,7 +1680,7 @@ private fun ChipsetInfoDialog(
                 Text(text = stringResource(R.string.onboarding_chipset_dialog_ok))
             }
         },
-        shape = RoundedCornerShape(24.dp)
+        shape = neonShape(24.dp)
     )
 }
 
@@ -1710,7 +1713,7 @@ private fun CompactProfileCard(
 ) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = neonShape(20.dp),
         color = if (selected) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)
         } else {
@@ -1759,12 +1762,12 @@ private fun ProfileCard(
         modifier = modifier
             .fillMaxWidth()
             .gamepadFocusableCard(
-                shape = RoundedCornerShape(32.dp),
+                shape = neonShape(32.dp),
                 interactionSource = interactionSource,
                 addFocusTarget = false,
                 focusHighlightMode = GamepadFocusHighlightMode.Always
             ),
-        shape = RoundedCornerShape(32.dp),
+        shape = neonShape(32.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
         tonalElevation = if (selected) 6.dp else 2.dp,
         border = androidx.compose.foundation.BorderStroke(
@@ -1819,12 +1822,12 @@ private fun SetupCard(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .gamepadFocusableCard(
-                shape = RoundedCornerShape(32.dp),
+                shape = neonShape(32.dp),
                 interactionSource = interactionSource,
                 addFocusTarget = false,
                 focusHighlightMode = GamepadFocusHighlightMode.Always
             ),
-        shape = RoundedCornerShape(32.dp),
+        shape = neonShape(32.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
         tonalElevation = 2.dp,
         onClick = onClick,
@@ -1842,7 +1845,7 @@ private fun SetupCard(
                 Box(
                     modifier = Modifier
                         .size(52.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(neonShape(18.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
                 ) {

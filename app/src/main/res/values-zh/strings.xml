@@ -128,6 +128,7 @@
     <string name="settings_theme_system">系統</string>
     <string name="settings_theme_light">淺色</string>
     <string name="settings_theme_dark">深色</string>
+    <string name="settings_theme_neon">霓虹</string>
     <string name="settings_language">語言</string>
     <string name="settings_tv_interface">電視介面</string>
     <string name="settings_tv_interface_auto">自動</string>

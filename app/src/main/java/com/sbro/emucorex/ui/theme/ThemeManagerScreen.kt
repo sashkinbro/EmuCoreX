@@ -74,12 +74,19 @@ import com.sbro.emucorex.data.CustomThemeLibrary
 import com.sbro.emucorex.data.SavedCustomTheme
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
+import com.sbro.emucorex.ui.theme.neon.neonShape
 import java.util.UUID
 import kotlin.math.roundToInt
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
-private val ManagerCardShape = RoundedCornerShape(28.dp)
-private val ManagerControlShape = RoundedCornerShape(18.dp)
-private val ManagerSmallShape = RoundedCornerShape(14.dp)
+@Composable
+private fun managerCardShape() = neonShape(28.dp)
+
+@Composable
+private fun managerControlShape() = neonShape(18.dp)
+
+@Composable
+private fun managerSmallShape() = neonShape(14.dp)
 
 @Composable
 fun ThemeManagerScreen(
@@ -210,7 +217,7 @@ fun ThemeManagerScreen(
         if (candidate != null) {
             AlertDialog(
                 onDismissRequest = { deleteCandidateId = null },
-                shape = ManagerCardShape,
+                shape = managerCardShape(),
                 title = { Text(stringResource(R.string.theme_manager_delete_title)) },
                 text = {
                     Text(
@@ -266,7 +273,7 @@ fun ThemeManagerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("theme_manager_preview_banner"),
-                    shape = ManagerControlShape,
+                    shape = managerControlShape(),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
@@ -297,7 +304,7 @@ fun ThemeManagerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("theme_manager_unlock_button"),
-                            shape = ManagerSmallShape
+                            shape = managerSmallShape()
                         ) {
                             Text(stringResource(R.string.theme_manager_unlock))
                         }
@@ -360,7 +367,7 @@ fun ThemeManagerScreen(
                         onClick = { createTheme(draft.copy(name = "${draft.name} Copy")) },
                         enabled = isProUnlocked &&
                             library.themes.size < CustomThemeLibrary.MAX_THEMES,
-                        shape = ManagerControlShape,
+                        shape = managerControlShape(),
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Rounded.ContentCopy, contentDescription = null)
@@ -370,7 +377,7 @@ fun ThemeManagerScreen(
                     OutlinedButton(
                         onClick = { deleteCandidateId = selectedThemeId },
                         enabled = isProUnlocked,
-                        shape = ManagerControlShape,
+                        shape = managerControlShape(),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("theme_manager_delete_selected")
@@ -392,7 +399,7 @@ fun ThemeManagerScreen(
                     enabled = isProUnlocked,
                     label = { Text(stringResource(R.string.theme_manager_name)) },
                     singleLine = true,
-                    shape = ManagerControlShape,
+                    shape = managerControlShape(),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Row(
@@ -405,7 +412,7 @@ fun ThemeManagerScreen(
                         enabled = isProUnlocked,
                         label = { Text(stringResource(R.string.theme_manager_light_canvas)) },
                         leadingIcon = { Icon(Icons.Rounded.LightMode, contentDescription = null) },
-                        shape = ManagerControlShape,
+                        shape = managerControlShape(),
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
@@ -414,7 +421,7 @@ fun ThemeManagerScreen(
                         enabled = isProUnlocked,
                         label = { Text(stringResource(R.string.theme_manager_dark_canvas)) },
                         leadingIcon = { Icon(Icons.Rounded.DarkMode, contentDescription = null) },
-                        shape = ManagerControlShape,
+                        shape = managerControlShape(),
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -437,7 +444,7 @@ fun ThemeManagerScreen(
                             },
                             enabled = isProUnlocked,
                             modifier = Modifier.width(154.dp),
-                            shape = ManagerControlShape,
+                            shape = managerControlShape(),
                             color = config.toColorScheme().surface,
                             contentColor = config.toColorScheme().onSurface,
                             border = BorderStroke(
@@ -505,7 +512,7 @@ fun ThemeManagerScreen(
                             } else {
                                 null
                             },
-                            shape = ManagerSmallShape
+                            shape = managerSmallShape()
                         )
                     }
                 }
@@ -570,7 +577,7 @@ fun ThemeManagerScreen(
                         expandedRole = null
                     },
                     enabled = isProUnlocked,
-                    shape = ManagerControlShape,
+                    shape = managerControlShape(),
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null)
@@ -583,7 +590,7 @@ fun ThemeManagerScreen(
                         onSave(library)
                     },
                     enabled = isProUnlocked,
-                    shape = ManagerControlShape,
+                    shape = managerControlShape(),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.theme_manager_save))
@@ -597,7 +604,7 @@ fun ThemeManagerScreen(
                     onApply(library)
                 },
                 enabled = isProUnlocked,
-                shape = ManagerControlShape,
+                shape = managerControlShape(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)
@@ -622,7 +629,7 @@ private fun ThemeSection(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = ManagerCardShape,
+        shape = managerCardShape(),
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp,
@@ -680,7 +687,7 @@ private fun SavedThemeCard(
     Surface(
         onClick = onClick,
         modifier = Modifier.width(186.dp),
-        shape = ManagerControlShape,
+        shape = managerControlShape(),
         color = if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
@@ -889,10 +896,12 @@ private fun ThemePreview() {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = {}, modifier = Modifier.weight(1f)) {
+                Button(
+                    shape = neonButtonShape(),onClick = {}, modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.theme_manager_preview_button))
                 }
-                OutlinedButton(onClick = {}, modifier = Modifier.weight(1f)) {
+                OutlinedButton(
+                    shape = neonButtonShape(),onClick = {}, modifier = Modifier.weight(1f)) {
                     Text(stringResource(R.string.theme_manager_preview_secondary_button))
                 }
             }
@@ -926,7 +935,7 @@ private fun ColorEditor(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("theme_manager_color_${role.name.lowercase()}"),
-        shape = ManagerControlShape,
+        shape = managerControlShape(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = if (expanded) 2.dp else 0.dp,
@@ -943,7 +952,7 @@ private fun ColorEditor(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(ManagerControlShape)
+                    .clip(managerControlShape())
                     .clickable(onClick = onExpandedChange)
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -994,7 +1003,7 @@ private fun ColorEditor(
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                         enabled = enabled,
                         singleLine = true,
-                        shape = ManagerControlShape,
+                        shape = managerControlShape(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("theme_manager_hex_${role.name.lowercase()}")
@@ -1147,7 +1156,8 @@ private fun ThemeGroupPreview(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(onClick = {}, modifier = Modifier.weight(1f)) {
+                        Button(
+                            shape = neonButtonShape(),onClick = {}, modifier = Modifier.weight(1f)) {
                             Text(stringResource(R.string.theme_manager_preview_button))
                         }
                         PreviewContainer(

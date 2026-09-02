@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.EmulatorDataLocation
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun EmulatorDataLocationDialog(
@@ -70,7 +71,7 @@ fun EmulatorDataLocationDialog(
             onClick = { onSelect(EmulatorDataLocation.SD_CARD) }
         )
         val cancelInteractionSource = remember { MutableInteractionSource() }
-        val cancelShape = RoundedCornerShape(18.dp)
+        val cancelShape = neonShape(18.dp)
         TextButton(
             onClick = onDismiss,
             modifier = Modifier
@@ -99,7 +100,7 @@ private fun EmulatorDataLocationOption(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(18.dp)
+    val shape = neonShape(18.dp)
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary
     } else {

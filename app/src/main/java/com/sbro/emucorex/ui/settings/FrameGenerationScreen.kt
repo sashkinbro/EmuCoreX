@@ -55,6 +55,9 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
+import com.sbro.emucorex.ui.theme.neon.neonShape
+import com.sbro.emucorex.ui.theme.neon.neonChipShape
+import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -165,7 +168,7 @@ private fun DisclaimerCard() {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f))
     ) {
         Row(
@@ -204,7 +207,7 @@ private fun SetupStepCard(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         tonalElevation = 2.dp
     ) {
         Column(
@@ -221,14 +224,16 @@ private fun SetupStepCard(
             if (action != null || secondaryAction != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     action?.let {
-                        Button(onClick = onAction, enabled = actionsEnabled && !busy) {
+                        Button(
+                            shape = neonButtonShape(),onClick = onAction, enabled = actionsEnabled && !busy) {
                             if (busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                             else Icon(icon, null, Modifier.size(18.dp))
                             Text(it, modifier = Modifier.padding(start = 8.dp))
                         }
                     }
                     secondaryAction?.let {
-                        OutlinedButton(onClick = onSecondaryAction, enabled = actionsEnabled && !busy) {
+                        OutlinedButton(
+                            shape = neonButtonShape(),onClick = onSecondaryAction, enabled = actionsEnabled && !busy) {
                             Icon(Icons.AutoMirrored.Rounded.Launch, null, Modifier.size(18.dp))
                             Text(it, modifier = Modifier.padding(start = 8.dp))
                         }
@@ -247,7 +252,7 @@ private fun FrameGenerationControls(
     val settings = setup.settings
     Surface(
         color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(24.dp),
+        shape = neonShape(24.dp),
         tonalElevation = 2.dp
     ) {
         Column(
@@ -329,6 +334,7 @@ private fun OptionChips(
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             values.forEach { value ->
                 FilterChip(
+                    shape = neonChipShape(),
                     selected = value == selected,
                     onClick = { onSelect(value) },
                     enabled = enabled,
@@ -346,7 +352,7 @@ private fun RequirementsCard(ready: Boolean) {
         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
         contentColor = if (ready) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(20.dp)
+        shape = neonShape(20.dp)
     ) {
         Text(
             text = stringResource(if (ready) R.string.frame_generation_requirements_ready else R.string.frame_generation_requirements),

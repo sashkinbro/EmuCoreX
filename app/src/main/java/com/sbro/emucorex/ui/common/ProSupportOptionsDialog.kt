@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.ProProductOffer
 import com.sbro.emucorex.core.ProPurchaseTier
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun ProSupportOptionsDialog(
@@ -66,7 +67,7 @@ fun ProSupportOptionsDialog(
                 }
             )
             val interactionSource = remember(offer.tier) { MutableInteractionSource() }
-            val shape = RoundedCornerShape(18.dp)
+            val shape = neonShape(18.dp)
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -94,7 +95,7 @@ fun ProSupportOptionsDialog(
                     Box(
                         modifier = Modifier
                             .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(neonShape(14.dp))
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {

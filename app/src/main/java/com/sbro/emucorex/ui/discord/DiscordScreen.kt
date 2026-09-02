@@ -62,6 +62,7 @@ import com.sbro.emucorex.ui.common.SettingsStyledDialog
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import coil3.compose.AsyncImage
+import com.sbro.emucorex.ui.theme.neon.neonShape
 
 @Composable
 fun DiscordScreen(onBackClick: () -> Unit) {
@@ -104,7 +105,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
+                shape = neonShape(24.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 2.dp,
                 border = BorderStroke(
@@ -123,7 +124,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                         Box(
                             modifier = Modifier
                                 .size(54.dp)
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(neonShape(18.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -168,7 +169,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                     if (state.accountName.isNotBlank()) {
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = neonShape(18.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
                             border = BorderStroke(
                                 1.dp,
@@ -239,7 +240,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                         OutlinedButton(
                             onClick = DiscordIntegration::signOut,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = neonShape(16.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -252,7 +253,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                                 state.status != DiscordConnectionStatus.Authorizing &&
                                 state.status != DiscordConnectionStatus.Connecting,
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = neonShape(16.dp)
                         ) {
                             Icon(Icons.AutoMirrored.Rounded.Login, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -302,7 +303,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = neonShape(18.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
                     border = BorderStroke(
                         1.dp,
@@ -317,7 +318,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
                         Box(
                             modifier = Modifier
                                 .size(54.dp)
-                                .clip(RoundedCornerShape(15.dp))
+                                .clip(neonShape(15.dp))
                                 .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -395,7 +396,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
             OutlinedButton(
                 onClick = { runCatching { uriHandler.openUri(DISCORD_INVITE_URL) } },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = neonShape(16.dp)
             ) {
                 Icon(Icons.Rounded.Forum, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
@@ -424,7 +425,7 @@ fun DiscordScreen(onBackClick: () -> Unit) {
             Button(
                 onClick = { showInfo = false },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp)
+                shape = neonShape(18.dp)
             ) {
                 Text(stringResource(R.string.close))
             }
@@ -438,7 +439,7 @@ private fun DiscordEmptyFriendsRow() {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -467,7 +468,7 @@ private fun DiscordFriendRow(friend: DiscordFriend) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -526,7 +527,7 @@ private fun DiscordFriendRow(friend: DiscordFriend) {
 @Composable
 private fun DiscordPreviewTag(text: String, active: Boolean) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = neonShape(8.dp),
         color = if (active) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
         } else {
@@ -558,7 +559,7 @@ private fun DiscordSectionCard(title: String, content: @Composable ColumnScope.(
         )
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
+            shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp
         ) {
@@ -586,7 +587,7 @@ private fun DiscordToggleRow(
             .padding(horizontal = 16.dp),
         onClick = { onCheckedChange(!checked) },
         enabled = enabled,
-        shape = RoundedCornerShape(18.dp),
+        shape = neonShape(18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
     ) {
@@ -600,7 +601,7 @@ private fun DiscordToggleRow(
             Box(
                 modifier = Modifier
                     .size(38.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(neonShape(12.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = if (enabled) 0.1f else 0.05f)),
                 contentAlignment = Alignment.Center
             ) {
