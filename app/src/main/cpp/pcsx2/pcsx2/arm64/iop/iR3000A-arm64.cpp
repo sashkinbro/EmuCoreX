@@ -239,8 +239,7 @@ static void iopOakEmitDispatcherRegBody()
 	oakAsm->LDR(X1, X29, X1, oak::IndexExt::LSL, 3);
 	// Unmapped pages have a null LUT entry. Route them to the JIT compiler
 	// entry instead of faulting on the indexed load below; iopRecRecompile
-	// canonicalizes aliases or fast-forwards over gaps. Needs proper testing
-	// on low-end ARM64 devices for the extra CBZ cost (predicted not-taken).
+	// canonicalizes aliases or fast-forwards over gaps.
 	oak::Label mapped;
 	oakAsm->CBNZ(X1, mapped);
 	oakMoveAddressToReg(X2, &iopJITCompile);
@@ -1003,8 +1002,16 @@ void recResetIOP()
 	iopClearRecLUT((BASEBLOCK*)m_recBlockAlloc,
 		(((Ps2MemSize::TotalIopRam + Ps2MemSize::Rom + Ps2MemSize::Rom1 + Ps2MemSize::Rom2) / 4)));
 
+	// Unmapped pages must stay null so iopRecPageIsMapped() and the dispatcher
+	// CBNZ guard route them to iopJITCompile. Do NOT use recLUT_SetPage() with a
+	// null base here: it computes &base[(0-page)<<14], which is non-zero garbage
+	// (e.g. 0xFFFFFFFFC0000000) that passes the !=0 check and faults on the
+	// indexed LDR/BR below (Vitals: recExecuteBlock jumping to 0x4000018).
 	for (int i = 0; i < 0x10000; i++)
-		recLUT_SetPage(psxRecLUT, 0, 0, 0, i, 0);
+	{
+		psxRecLUT[i] = 0;
+		psxhwLUT[i] = 0;
+	}
 
 	// IOP knows 64k pages, hence for the 0x10000's
 
@@ -1220,7 +1227,16 @@ void psxSetBranchImm(u32 imm)
 
 	u8* link_patch = oakGetCurrentCodePointer();
 	oakAsm->NOP();
-	recBlocks.Link(HWADDR(imm), reinterpret_cast<s32*>(link_patch));
+	// Unmapped targets have no physical block address (hwLUT is 0 there), so
+	// HWADDR() would produce a garbage key that can never hit a real block.
+	// Canonicalize KUSEG aliases so branches reuse the canonical block, and
+	// jump straight to the dispatcher for truly unmapped targets (it routes
+	// via iopJITCompile to the skip path instead of faulting).
+	const u32 linkPC = iopRecCanonicalPC(imm);
+	if (linkPC != 0)
+		recBlocks.Link(HWADDR(linkPC), reinterpret_cast<s32*>(link_patch));
+	else
+		oakEmitJmpPtr(link_patch, (void*)iopDispatcherReg);
 }
 
 static __fi u32 psxScaleBlockCycles()
@@ -1630,7 +1646,6 @@ static void iopRecRecompile(u32 startpc)
 
 	// Normalize KUSEG aliases (e.g. 0x20000000 -> 0x00000000) and survive jumps
 	// to unmapped HW/gap addresses instead of faulting on PSX_GETBLOCK.
-	// Needs proper testing with games that do odd IOP jumps (IRX, SIF).
 	if (!iopRecPageIsMapped(startpc))
 	{
 		const u32 canon = iopRecCanonicalPC(startpc);
@@ -1906,7 +1921,15 @@ StartRecomp:
 			oakStore32(OAK_WSCRATCH, IOP_CPU(psxRegs.pc));
 			u8* link_patch = oakGetCurrentCodePointer();
 			oakAsm->NOP();
-			recBlocks.Link(HWADDR(s_nEndBlock), reinterpret_cast<s32*>(link_patch));
+			// s_nEndBlock can be the first unmapped address past the block
+			// (block scan stops at unmapped pages/4K boundaries). Linking it
+			// with HWADDR() would insert a garbage key; go via the dispatcher
+			// so unmapped fall-through uses the skip path.
+			const u32 linkPC = iopRecCanonicalPC(s_nEndBlock);
+			if (linkPC != 0)
+				recBlocks.Link(HWADDR(linkPC), reinterpret_cast<s32*>(link_patch));
+			else
+				oakEmitJmpPtr(link_patch, (void*)iopDispatcherReg);
 			psxbranch = 3;
 		}
 	}
