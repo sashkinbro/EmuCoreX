@@ -15,6 +15,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#ifdef __ANDROID__
+#include <sys/stat.h>
+#endif
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -74,6 +77,25 @@ static bool LoadVulkanLibraryWithAdrenoTools(const std::string& custom_driver_pa
 
 	std::string custom_driver_dir = custom_driver_path.substr(0, last_separator + 1);
 	std::string custom_driver_name = custom_driver_path.substr(last_separator + 1);
+
+	// Pre-validate before adrenotools/dlopen: a corrupt or truncated .so gets
+	// past stat() inside adrenotools but then crashes natively on first use
+	// (observed as SIGSEGV in strncmp inside Turnip). Fall back to the system
+	// driver here while we still can.
+	{
+		struct stat st = {};
+		// Real Turnip/Adreno ICDs are several MB; anything smaller cannot be
+		// a working Vulkan driver.
+		static constexpr off_t MIN_DRIVER_SIZE = 256 * 1024;
+		if (stat(custom_driver_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode) || st.st_size < MIN_DRIVER_SIZE)
+		{
+			__android_log_print(ANDROID_LOG_ERROR, "EmuCoreX",
+				"Vulkan custom driver failed validation (missing/too small): %s", custom_driver_path.c_str());
+			Console.Warning("Vulkan: Custom driver failed validation, falling back to system driver: %s",
+				custom_driver_path.c_str());
+			return false;
+		}
+	}
 
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan custom driver: adrenotools open driver=%s hookDir=%s",

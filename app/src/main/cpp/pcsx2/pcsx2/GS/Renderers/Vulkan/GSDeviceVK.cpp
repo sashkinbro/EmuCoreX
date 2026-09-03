@@ -238,9 +238,23 @@ bool GSDeviceVK::SelectInstanceExtensions(ExtensionList* extension_list, const W
 		return false;
 	}
 
+	// A buggy custom driver (e.g. a corrupt Turnip build) can return garbage
+	// here; allocating blindly would OOM, and proceeding with uninitialized
+	// names crashes inside the driver on vkCreateInstance. Fail cleanly so we
+	// fall back instead. Real drivers expose dozens of instance extensions.
+	if (extension_count > 1024)
+	{
+		Console.Error("VK: Implausible instance extension count %u, rejecting driver.", extension_count);
+		return false;
+	}
+
 	std::vector<VkExtensionProperties> available_extension_list(extension_count);
 	res = vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extension_list.data());
-	pxAssert(res == VK_SUCCESS);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkEnumerateInstanceExtensionProperties (2) failed: ");
+		return false;
+	}
 
 	auto SupportsExtension = [&available_extension_list, extension_list](const char* name, bool required) {
 		if (std::find_if(available_extension_list.begin(), available_extension_list.end(),

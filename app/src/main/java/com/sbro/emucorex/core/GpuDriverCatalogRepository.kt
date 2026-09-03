@@ -73,6 +73,18 @@ class GpuDriverCatalogRepository(private val context: Context) {
         } finally {
             connection.disconnect()
         }
+        // A truncated or empty archive would install a corrupt .so that later
+        // crashes natively inside the third-party driver. Fail here instead.
+        if (!target.isFile || target.length() <= 0L) {
+            target.delete()
+            throw IOException("Driver archive download is empty")
+        }
+        if (driver.sizeBytes != null && target.length() != driver.sizeBytes) {
+            target.delete()
+            throw IOException(
+                "Driver archive size mismatch (got ${target.length()}, expected ${driver.sizeBytes}); please retry"
+            )
+        }
         onProgress(1f)
         return target
     }

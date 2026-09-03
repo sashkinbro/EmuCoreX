@@ -35,7 +35,7 @@ class GpuDriverManager(private val context: Context) {
                     name = driverDir.name,
                     mainLibrary = mainLibrary,
                     mainLibraryPath = mainLibraryFile.absolutePath,
-                    isUsable = mainLibraryFile.isFile
+                    isUsable = isValidDriverLibrary(mainLibraryFile)
                 )
             }
             .sortedBy { it.name.lowercase() }
@@ -74,7 +74,7 @@ class GpuDriverManager(private val context: Context) {
         preferredPath
             ?.takeIf { it.isNotBlank() }
             ?.let(::File)
-            ?.takeIf { it.isFile }
+            ?.takeIf(::isValidDriverLibrary)
             ?.let { file ->
                 ensureDriverLibraryPermissions(file)
                 return file.absolutePath
@@ -125,6 +125,14 @@ class GpuDriverManager(private val context: Context) {
             error("Archive does not contain a Vulkan driver file")
         }
 
+        // A corrupt or truncated .so would only explode later as a native
+        // crash inside the third-party driver (e.g. Turnip SIGSEGV in
+        // strncmp). Reject it here while we can still report a clean error.
+        if (!isValidDriverLibrary(File(targetDir, selectedDriver))) {
+            targetDir.deleteRecursively()
+            error("Archive contains a corrupt Vulkan driver file")
+        }
+
         File(targetDir, "driver_name.txt").writeText("$selectedDriver\n")
         return driverName
     }
@@ -168,6 +176,22 @@ class GpuDriverManager(private val context: Context) {
             val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
         }
+    }
+}
+
+internal fun isValidDriverLibrary(file: File): Boolean {
+    if (!file.isFile || file.length() <= 0L) return false
+    return try {
+        file.inputStream().use { input ->
+            val magic = ByteArray(4)
+            if (input.read(magic) != magic.size) return false
+            // ELF magic: 0x7F 'E' 'L' 'F'. Catches empty files, HTML error
+            // pages and misnamed zips before they reach dlopen.
+            magic[0] == 0x7F.toByte() && magic[1] == 'E'.code.toByte() &&
+                magic[2] == 'L'.code.toByte() && magic[3] == 'F'.code.toByte()
+        }
+    } catch (_: Exception) {
+        false
     }
 }
 

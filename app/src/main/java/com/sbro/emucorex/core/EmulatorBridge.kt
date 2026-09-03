@@ -116,12 +116,14 @@ object EmulatorBridge {
 
     private fun prepareCustomDriverLibrary(path: String): String {
         if (path.isBlank()) return ""
+        // Never hand a stale or empty path to native code: a missing driver
+        // library must fall back to the system driver instead of reaching
+        // adrenotools/dlopen and crashing inside a third-party Vulkan binary.
         val file = File(path)
-        if (file.isFile) {
-            file.setReadable(true, true)
-            file.setWritable(true, true)
-            file.setExecutable(true, true)
-        }
+        if (!file.isFile || file.length() <= 0L) return ""
+        file.setReadable(true, true)
+        file.setWritable(true, true)
+        file.setExecutable(true, true)
         return path
     }
 
