@@ -213,7 +213,13 @@ std::optional<VkSurfaceFormatKHR> VKSwapChain::SelectSurfaceFormat(VkSurfaceKHR 
 	std::vector<VkSurfaceFormatKHR> surface_formats(format_count);
 	res = vkGetPhysicalDeviceSurfaceFormatsKHR(
 		GSDeviceVK::GetInstance()->GetPhysicalDevice(), surface, &format_count, surface_formats.data());
-	pxAssert(res == VK_SUCCESS);
+	// pxAssert alone is compiled out in release; a failing driver must fail the
+	// surface query here instead of feeding garbage formats into swapchain creation.
+	if (res != VK_SUCCESS && res != VK_INCOMPLETE)
+	{
+		LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfaceFormatsKHR (2) failed: ");
+		return std::nullopt;
+	}
 
 	// If there is a single undefined surface format, the device doesn't care, so we'll just use RGBA
 	if (surface_formats[0].format == VK_FORMAT_UNDEFINED)
@@ -279,7 +285,12 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 	std::vector<VkPresentModeKHR> present_modes(mode_count);
 	res = vkGetPhysicalDeviceSurfacePresentModesKHR(
 		GSDeviceVK::GetInstance()->GetPhysicalDevice(), surface, &mode_count, present_modes.data());
-	pxAssert(res == VK_SUCCESS);
+	// Same as above: never trust the second enumeration result in release builds.
+	if (res != VK_SUCCESS && res != VK_INCOMPLETE)
+	{
+		LOG_VULKAN_ERROR(res, "vkGetPhysicalDeviceSurfacePresentModesKHR (2) failed: ");
+		return false;
+	}
 
 	// Checks if a particular mode is supported, if it is, returns that mode.
 	const auto CheckForMode = [&present_modes](VkPresentModeKHR check_mode) {
@@ -562,7 +573,13 @@ bool VKSwapChain::CreateSwapChain()
 
 	std::vector<VkImage> images(image_count);
 	res = vkGetSwapchainImagesKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, &image_count, images.data());
-	pxAssert(res == VK_SUCCESS);
+	// Release builds must not build textures from a failed query; fail the swapchain
+	// so callers run the normal recreate path instead of crashing inside the driver.
+	if (res != VK_SUCCESS && res != VK_INCOMPLETE)
+	{
+		LOG_VULKAN_ERROR(res, "vkGetSwapchainImagesKHR (2) failed: ");
+		return false;
+	}
 
 #if defined(__ANDROID__)
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
@@ -670,10 +687,20 @@ VkResult VKSwapChain::AcquireNextImage()
 	const VkResult res = vkAcquireNextImageKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, UINT64_MAX,
 		m_semaphores[m_current_semaphore].available_semaphore, VK_NULL_HANDLE, &m_current_image);
 	m_image_acquire_result = res;
-	if (res != VK_SUCCESS)
+	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 	{
 		DEBUG_GS_LOG(ANDROID_LOG_WARN, "AcquireNextImage: vkAcquireNextImageKHR FAILED VkResult=%d m_swap_chain=%p",
 			static_cast<int>(res), m_swap_chain);
+		return res;
+	}
+	// The image index is written by the driver. A bogus index must never reach
+	// present or texture lookup; fail cleanly so BeginPresent recreates the swap chain.
+	if (m_current_image >= static_cast<u32>(m_images.size()))
+	{
+		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "AcquireNextImage: driver returned out-of-range image index %u (count %zu)",
+			m_current_image, m_images.size());
+		m_image_acquire_result = VK_ERROR_SURFACE_LOST_KHR;
+		return VK_ERROR_SURFACE_LOST_KHR;
 	}
 	return res;
 }
