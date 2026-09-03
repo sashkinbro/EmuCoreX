@@ -64,7 +64,8 @@ object DocumentPathResolver {
                 return treeUri
             }
 
-            val root = DocumentFile.fromTreeUri(context, treeUri) ?: continue
+            if (!DocumentsContract.isTreeUri(treeUri)) continue
+            val root = runCatching { DocumentFile.fromTreeUri(context, treeUri) }.getOrNull() ?: continue
             val relativeSegments = normalizedRawPath
                 .removePrefix(treePath)
                 .trim('/')
@@ -306,8 +307,16 @@ object DocumentPathResolver {
     }
 
     private fun findFileInPersistedTree(context: Context, targetUri: Uri, fileName: String): String? {
+        // persistedUriPermissions also holds single-document grants (file picker). fromTreeUri
+        // throws IllegalArgumentException on those instead of returning null, which crashed game
+        // launch (Vitals: getTreeDocumentId). Only tree URIs may go through, and the provider
+        // itself may be gone, so stay defensive on both checks.
         val persistedTrees = context.contentResolver.persistedUriPermissions
-            .mapNotNull { permission -> DocumentFile.fromTreeUri(context, permission.uri) }
+            .mapNotNull { permission ->
+                val treeUri = permission.uri
+                if (!DocumentsContract.isTreeUri(treeUri)) return@mapNotNull null
+                runCatching { DocumentFile.fromTreeUri(context, treeUri) }.getOrNull()
+            }
 
         for (tree in persistedTrees) {
             val resolved = findFileRecursive(tree, targetUri, fileName)
