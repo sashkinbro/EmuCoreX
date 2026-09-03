@@ -838,7 +838,7 @@ private:
 	VkPipeline m_current_pipeline = VK_NULL_HANDLE;
 
 	std::unique_ptr<GSTextureVK> m_null_texture;
-	VkFramebuffer m_null_framebuffer;
+	VkFramebuffer m_null_framebuffer = VK_NULL_HANDLE;
 
 	// current pipeline selector - we save this in the struct to avoid re-zeroing it every draw
 	PipelineSelector m_pipeline_selector = {};

@@ -1844,36 +1844,46 @@ void GSDeviceVK::DeferBufferDestruction(VkBuffer object, VmaAllocation allocatio
 {
 	// A null/stale entry queued here runs later inside DestroyResources; the Adreno driver
 	// faults inside vkDestroyBuffer instead of ignoring it, so never let one through.
-	if (object == VK_NULL_HANDLE)
+	// Capture the allocator by value: the lambda runs at fence completion or shutdown,
+	// when m_allocator may already be gone, and dereferencing `this` then would feed
+	// the driver a dead allocator.
+	if (object == VK_NULL_HANDLE || m_allocator == VK_NULL_HANDLE)
 		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
+	VmaAllocator allocator = m_allocator;
 	resources.cleanup_resources.push_back(
-		[this, object, allocation]() { vmaDestroyBuffer(m_allocator, object, allocation); });
+		[allocator, object, allocation]() { vmaDestroyBuffer(allocator, object, allocation); });
 }
 
 void GSDeviceVK::DeferFramebufferDestruction(VkFramebuffer object)
 {
-	if (object == VK_NULL_HANDLE)
+	// Same hazard as buffers: Adreno faults on vkDestroyFramebuffer with a dead device,
+	// so drop the entry when the device is already gone (its objects die with it) and
+	// otherwise pin the live device handle in the lambda.
+	if (object == VK_NULL_HANDLE || m_device == VK_NULL_HANDLE)
 		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
-	resources.cleanup_resources.push_back([this, object]() { vkDestroyFramebuffer(m_device, object, nullptr); });
+	VkDevice device = m_device;
+	resources.cleanup_resources.push_back([device, object]() { vkDestroyFramebuffer(device, object, nullptr); });
 }
 
 void GSDeviceVK::DeferImageDestruction(VkImage object, VmaAllocation allocation)
 {
-	if (object == VK_NULL_HANDLE)
+	if (object == VK_NULL_HANDLE || m_allocator == VK_NULL_HANDLE)
 		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
+	VmaAllocator allocator = m_allocator;
 	resources.cleanup_resources.push_back(
-		[this, object, allocation]() { vmaDestroyImage(m_allocator, object, allocation); });
+		[allocator, object, allocation]() { vmaDestroyImage(allocator, object, allocation); });
 }
 
 void GSDeviceVK::DeferImageViewDestruction(VkImageView object)
 {
-	if (object == VK_NULL_HANDLE)
+	if (object == VK_NULL_HANDLE || m_device == VK_NULL_HANDLE)
 		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
-	resources.cleanup_resources.push_back([this, object]() { vkDestroyImageView(m_device, object, nullptr); });
+	VkDevice device = m_device;
+	resources.cleanup_resources.push_back([device, object]() { vkDestroyImageView(device, object, nullptr); });
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -2623,13 +2633,19 @@ void GSDeviceVK::Destroy()
 	VKShaderCache::Destroy();
 
 	if (m_device != VK_NULL_HANDLE)
+	{
 		vkDestroyDevice(m_device, nullptr);
+		m_device = VK_NULL_HANDLE;
+	}
 
 	if (m_debug_messenger_callback != VK_NULL_HANDLE)
 		DisableDebugUtils();
 
 	if (m_instance != VK_NULL_HANDLE)
+	{
 		vkDestroyInstance(m_instance, nullptr);
+		m_instance = VK_NULL_HANDLE;
+	}
 
 	Vulkan::UnloadVulkanLibrary();
 }
@@ -5693,6 +5709,7 @@ void GSDeviceVK::DestroyResources()
 	if (m_null_framebuffer != VK_NULL_HANDLE)
 	{
 		vkDestroyFramebuffer(m_device, m_null_framebuffer, nullptr);
+		m_null_framebuffer = VK_NULL_HANDLE;
 	}
 
 	if (m_null_texture)
