@@ -87,6 +87,80 @@ static void iopClearRecLUT(BASEBLOCK* base, int count);
 			psxRecClearMem(mem) : \
             4)
 
+// IOP JIT maps only a subset of the 32-bit address space (RAM/ROM via the
+// 0x0000/0x8000/0xA000 bases). Any other PC (KUSEG aliases like 0x20000000,
+// HW registers, gaps) has a null LUT entry. Dereferencing PSX_GETBLOCK for
+// such a PC faults with address pc*2 (e.g. 0x40000030) – the top native
+// crash in Android Vitals (iopRecRecompile). Guard every dereference.
+static __fi bool iopRecPageIsMapped(u32 pc)
+{
+	return psxRecLUT[pc >> 16] != 0;
+}
+
+// Redirect an unmapped alias to its canonical mapped counterpart when it
+// addresses the same physical RAM/ROM (matches iopMemRead32 masking with
+// 0x1fffffff). Returns 0 when there is no executable mapping.
+static u32 iopRecCanonicalPC(u32 pc)
+{
+	if (iopRecPageIsMapped(pc))
+		return pc;
+	const u32 phys = pc & 0x1fffffffu;
+	if (iopRecPageIsMapped(phys))
+		return phys;
+	return 0;
+}
+
+// Fast-forward over unmapped executable space. The interpreter reads 0 (NOP)
+// there, so straight-line code would single-step for megabytes. Skip whole
+// 64K pages at once while keeping cycle accounting identical to N NOPs.
+static void iopRecSkipUnmappedPC(u32 startpc)
+{
+	u32 next = startpc + 4;
+	for (int guard = 0; guard < 0x10000; ++guard)
+	{
+		if (iopRecPageIsMapped(next))
+			break;
+		const u32 phys = next & 0x1fffffffu;
+		if (iopRecPageIsMapped(phys))
+		{
+			next = phys;
+			break;
+		}
+		const u32 nextPage = (next >> 16) + 1;
+		if (nextPage >= 0x10000)
+		{
+			next = 0;
+			break;
+		}
+		next = nextPage << 16;
+		if (next == 0)
+			break;
+	}
+
+	u64 skipped;
+	if (next >= startpc)
+		skipped = (static_cast<u64>(next) - startpc) >> 2;
+	else
+		skipped = ((0x100000000ull - startpc) >> 2) + (next >> 2);
+	if (skipped == 0)
+		skipped = 1;
+
+	psxRegs.pc = next;
+	psxRegs.cycle += static_cast<u32>(skipped);
+	if (!(psxHu32(HW_ICFG) & (1 << 3)))
+	{
+		psxRegs.iopCycleEE -= static_cast<s32>(skipped * 8);
+	}
+	else
+	{
+		const u32 cnum = 1280;
+		const u32 cdenom = 147;
+		const u64 t = (static_cast<u64>(cnum) * skipped) + psxRegs.iopCycleEECarry;
+		psxRegs.iopCycleEE -= static_cast<s32>(t / cdenom);
+		psxRegs.iopCycleEECarry = static_cast<u32>(t % cdenom);
+	}
+}
+
 
 // =====================================================================================================
 //  Dynamically Compiled Dispatchers - R3000A style
@@ -163,6 +237,16 @@ static void iopOakEmitDispatcherRegBody()
 	iopOakLoadCurrentPc();
 	oakAsm->LSR(W1, W0, 16);
 	oakAsm->LDR(X1, X29, X1, oak::IndexExt::LSL, 3);
+	// Unmapped pages have a null LUT entry. Route them to the JIT compiler
+	// entry instead of faulting on the indexed load below; iopRecRecompile
+	// canonicalizes aliases or fast-forwards over gaps. Needs proper testing
+	// on low-end ARM64 devices for the extra CBZ cost (predicted not-taken).
+	oak::Label mapped;
+	oakAsm->CBNZ(X1, mapped);
+	oakMoveAddressToReg(X2, &iopJITCompile);
+	oakAsm->LDR(X2, X2);
+	oakAsm->BR(X2);
+	oakAsm->l(mapped);
 	oakAsm->LSR(W0, W0, 2);
 	oakAsm->LDR(X0, X1, X0, oak::IndexExt::LSL, 3);
 	oakAsm->BR(X0);
@@ -1021,6 +1105,9 @@ static __fi u32 psxRecClearMem(u32 pc)
 {
 	BASEBLOCK* pblock;
 
+	if (!iopRecPageIsMapped(pc))
+		return 4;
+
 	pblock = PSX_GETBLOCK(pc);
 	// if ((u8*)iopJITCompile == pblock->GetFnptr())
 	if (pblock->GetFnptr() == (uptr)iopJITCompile)
@@ -1536,10 +1623,28 @@ void psxRecompileNextInstruction(bool delayslot, bool swapped_delayslot)
 }
 
 
-static void iopRecRecompile(const u32 startpc)
+static void iopRecRecompile(u32 startpc)
 {
 	u32 i;
 	u32 willbranch3 = 0;
+
+	// Normalize KUSEG aliases (e.g. 0x20000000 -> 0x00000000) and survive jumps
+	// to unmapped HW/gap addresses instead of faulting on PSX_GETBLOCK.
+	// Needs proper testing with games that do odd IOP jumps (IRX, SIF).
+	if (!iopRecPageIsMapped(startpc))
+	{
+		const u32 canon = iopRecCanonicalPC(startpc);
+		if (canon != 0 && canon != startpc)
+		{
+			psxRegs.pc = canon;
+			startpc = canon;
+		}
+		else if (canon == 0)
+		{
+			iopRecSkipUnmappedPC(startpc);
+			return;
+		}
+	}
 
 	// When upgrading the IOP, there are two resets, the second of which is a 'fake' reset
 	// This second 'reset' involves UDNL calling SYSMEM and LOADCORE directly, resetting LOADCORE's modules
@@ -1565,6 +1670,21 @@ static void iopRecRecompile(const u32 startpc)
 	if (recPtr >= recPtrEnd)
 	{
 		recResetIOP();
+		// Reset may have remapped pages; re-validate after the reset.
+		if (!iopRecPageIsMapped(startpc))
+		{
+			const u32 canon = iopRecCanonicalPC(startpc);
+			if (canon != 0 && canon != startpc)
+			{
+				psxRegs.pc = canon;
+				startpc = canon;
+			}
+			else if (canon == 0)
+			{
+				iopRecSkipUnmappedPC(startpc);
+				return;
+			}
+		}
 	}
 
 	// recPtrEnd is the reset threshold, while the remaining 64 KiB is the
@@ -1615,13 +1735,34 @@ static void iopRecRecompile(const u32 startpc)
 
 	while (1)
 	{
-		BASEBLOCK* pblock = PSX_GETBLOCK(i);
-		if (i != startpc && pblock->GetFnptr() != (uptr)iopJITCompile)
+		if (i != startpc)
 		{
-			// branch = 3
-			willbranch3 = 1;
-			s_nEndBlock = i;
-			break;
+			// Stop at unmapped pages and 4K boundaries instead of faulting or
+			// building megabyte-long NOP blocks out of zeroed RAM.
+			if (!iopRecPageIsMapped(i) || (i & 0xfff) == 0)
+			{
+				// branch = 3
+				willbranch3 = 1;
+				s_nEndBlock = i;
+				break;
+			}
+			BASEBLOCK* pblock = PSX_GETBLOCK(i);
+			if (pblock->GetFnptr() != (uptr)iopJITCompile)
+			{
+				// branch = 3
+				willbranch3 = 1;
+				s_nEndBlock = i;
+				break;
+			}
+			// Hard cap: pathological straight-line code (e.g. null jumps into
+			// zeroed RAM) must not balloon InstCache or overflow the 64K block
+			// reserve.
+			if (((i - startpc) >> 2) >= 1024)
+			{
+				willbranch3 = 1;
+				s_nEndBlock = i;
+				break;
+			}
 		}
 
 		psxRegs.code = iopMemRead32(i);
