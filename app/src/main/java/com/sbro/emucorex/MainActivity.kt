@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
@@ -107,6 +108,7 @@ open class MainActivity : ComponentActivity() {
                     launchedFromTv = launchedFromTv
                 )
             }
+            var isEmulationActive by remember { mutableStateOf(false) }
             val systemDarkTheme = isSystemInDarkTheme()
             val darkTheme = when (themeMode) {
                 ThemeMode.SYSTEM -> systemDarkTheme
@@ -131,7 +133,8 @@ open class MainActivity : ComponentActivity() {
                     fontChoice = fontChoice,
                     fontScale = appFontScale,
                     customFontFile = customFontRepository.installedFile(),
-                    customFontRevision = customFontRevision
+                    customFontRevision = customFontRevision,
+                    enableCrtOverlay = !isEmulationActive
                 ) {
                     AppNavigation(
                         launchIntentVersion = launchIntentVersion,
@@ -139,6 +142,7 @@ open class MainActivity : ComponentActivity() {
                         onStartupReady = {
                             keepSplashVisible = false
                         },
+                        onEmulationActiveChanged = { isEmulationActive = it },
                         onEmulationSessionCompleted = { activePlayTimeMs ->
                             recordCompletedEmulationSession(preferences, activePlayTimeMs)
                         }

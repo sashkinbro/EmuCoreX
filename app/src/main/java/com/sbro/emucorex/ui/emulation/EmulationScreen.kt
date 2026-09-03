@@ -222,6 +222,8 @@ import java.text.DateFormat
 import java.util.Date
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
+import com.sbro.emucorex.ui.theme.neon.NeonCrtOverlay
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonShapeCorners
 import com.sbro.emucorex.ui.theme.neon.neonChipShape
@@ -1665,6 +1667,9 @@ fun EmulationScreen(
                         .fillMaxHeight()
                         .fillMaxWidth()
                 )
+                if (LocalNeonTheme.current) {
+                    NeonCrtOverlay()
+                }
             }
         }
     }

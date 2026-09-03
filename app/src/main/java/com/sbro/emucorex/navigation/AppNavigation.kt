@@ -242,7 +242,8 @@ fun AppNavigation(
     launchIntentVersion: Int = 0,
     restoredFromSavedState: Boolean = false,
     onStartupReady: () -> Unit = {},
-    onEmulationSessionCompleted: (activePlayTimeMs: Long) -> Unit = {}
+    onEmulationSessionCompleted: (activePlayTimeMs: Long) -> Unit = {},
+    onEmulationActiveChanged: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
@@ -304,6 +305,9 @@ fun AppNavigation(
 
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(currentBackStackEntry?.destination) {
+        onEmulationActiveChanged(currentBackStackEntry?.destination?.hasRoute<EmulationRoute>() == true)
+    }
     val settingsViewModel: SettingsViewModel = viewModel()
     val settingsUiState by settingsViewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()

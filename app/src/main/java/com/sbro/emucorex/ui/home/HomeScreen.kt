@@ -161,6 +161,7 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.compose.foundation.lazy.itemsIndexed as rowItemsIndexed
+import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorex.ui.theme.neon.neonShape
 import com.sbro.emucorex.ui.theme.neon.neonButtonShape
 
@@ -911,7 +912,12 @@ private fun HomeHeader(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(
+                    start = 10.dp + if (LocalNeonTheme.current) 8.dp else 0.dp,
+                    end = 10.dp,
+                    top = 8.dp,
+                    bottom = 8.dp
+                ),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

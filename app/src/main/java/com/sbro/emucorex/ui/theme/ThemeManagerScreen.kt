@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
@@ -101,6 +102,9 @@ fun ThemeManagerScreen(
     val localizedDefaultTheme = remember(localizedDefaultName) {
         CustomThemeConfig.Default.copy(name = localizedDefaultName)
     }
+    // Fresh installs have no saved canvas: default it to the app theme
+    // (light app -> light canvas, dark app -> dark canvas).
+    val appCanvasDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val seedLibrary = remember(initialLibrary, localizedDefaultName) {
         val safeInitial = initialLibrary.sanitized()
         safeInitial
@@ -117,7 +121,7 @@ fun ThemeManagerScreen(
                 val now = System.currentTimeMillis()
                 val first = SavedCustomTheme(
                     id = UUID.randomUUID().toString(),
-                    config = localizedDefaultTheme,
+                    config = localizedDefaultTheme.withCanvas(appCanvasDark),
                     createdAtMillis = now,
                     updatedAtMillis = now
                 )
@@ -439,7 +443,7 @@ fun ThemeManagerScreen(
                         val config = preset.config().sanitized()
                         Surface(
                             onClick = {
-                                    draft = config.copy(name = draft.name).sanitized()
+                                    draft = config.copy(name = draft.name).withCanvas(draft.dark).sanitized()
                                     expandedRole = null
                             },
                             enabled = isProUnlocked,

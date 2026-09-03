@@ -114,6 +114,7 @@ fun EmuCoreXTheme(
     fontScale: Float = 1f,
     customFontFile: File? = null,
     customFontRevision: Int = 0,
+    enableCrtOverlay: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -166,13 +167,11 @@ fun EmuCoreXTheme(
         CompositionLocalProvider(
             LocalNeonTheme provides (themeMode == ThemeMode.NEON)
         ) {
-            if (themeMode == ThemeMode.NEON) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    content()
+            Box(modifier = Modifier.fillMaxSize()) {
+                content()
+                if (themeMode == ThemeMode.NEON && enableCrtOverlay) {
                     NeonCrtOverlay()
                 }
-            } else {
-                content()
             }
         }
     }
