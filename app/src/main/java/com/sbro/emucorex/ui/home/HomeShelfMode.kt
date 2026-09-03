@@ -298,7 +298,10 @@ internal fun HomeShelfMode(
                             .padding(horizontal = horizontalInset)
                             .padding(bottom = bottomInset + 8.dp)
                     ) { activePath ->
-                        val selectedGame = games.first { it.path == activePath }
+                        // AnimatedContent keeps rendering the previous path through the exit fade
+                        // while games may already have changed (hide/restore, rescan). A throwing
+                        // first {} here crashed recomposition (Vitals NoSuchElementException).
+                        val selectedGame = games.firstOrNull { it.path == activePath } ?: return@AnimatedContent
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
