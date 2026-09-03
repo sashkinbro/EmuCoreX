@@ -834,6 +834,7 @@
     <string name="onboarding_next">次へ</string>
     <string name="onboarding_back">戻る</string>
     <string name="onboarding_get_started">始める</string>
+    <string name="picker_no_document_handler">フォルダーを選択するためのファイルマネージャーが見つかりません。ファイルマネージャーアプリをインストールして、もう一度お試しください。</string>
 
     <string name="ok">OK</string>
     <string name="cancel">キャンセル</string>

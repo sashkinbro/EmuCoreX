@@ -536,6 +536,7 @@
     <string name="onboarding_next">Weiter</string>
     <string name="onboarding_back">Zurück</string>
     <string name="onboarding_get_started">Loslegen</string>
+    <string name="picker_no_document_handler">Kein Dateimanager zum Auswählen von Ordnern gefunden. Bitte installiere eine Dateimanager-App und versuche es erneut.</string>
 
     <string name="ok">OK</string>
     <string name="cancel">Abbrechen</string>

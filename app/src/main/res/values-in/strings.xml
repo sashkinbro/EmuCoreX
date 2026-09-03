@@ -1166,6 +1166,7 @@
     <string name="onboarding_next">Berikutnya</string>
     <string name="onboarding_back">Kembali</string>
     <string name="onboarding_get_started">Mulai</string>
+    <string name="picker_no_document_handler">Tidak ditemukan pengelola file untuk memilih folder. Silakan instal aplikasi pengelola file lalu coba lagi.</string>
 
     <!-- Common -->
     <string name="ok">OK</string>

@@ -536,6 +536,7 @@
     <string name="onboarding_next">Próximo</string>
     <string name="onboarding_back">Voltar</string>
     <string name="onboarding_get_started">Começar</string>
+    <string name="picker_no_document_handler">Nenhum gerenciador de arquivos encontrado para escolher pastas. Instale um aplicativo gerenciador de arquivos e tente novamente.</string>
 
     <string name="ok">OK</string>
     <string name="cancel">Cancelar</string>

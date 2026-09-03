@@ -1235,6 +1235,7 @@
     <string name="onboarding_next">Další</string>
     <string name="onboarding_back">Zpět</string>
     <string name="onboarding_get_started">Začít</string>
+    <string name="picker_no_document_handler">Nenalezen žádný správce souborů pro výběr složek. Nainstalujte si aplikaci správce souborů a zkuste to znovu.</string>
 
     <!-- Common -->
     <string name="ok">OK</string>

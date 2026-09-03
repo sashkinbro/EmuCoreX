@@ -233,6 +233,8 @@ import com.sbro.emucorex.ui.common.calculateSideArtworkPreviewLayout
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.safeLaunch
+import com.sbro.emucorex.ui.common.showNoDocumentPickerMessage
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
@@ -391,14 +393,14 @@ fun SettingsScreen(
     val launchBiosPicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-            else biosPicker.launch(null)
+            else biosPicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
         }
     )
     val openBiosDialog = rememberDebouncedClick(onClick = { showBiosDialog.value = true })
     val launchGamePicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
-            else gamePicker.launch(null)
+            else gamePicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
         }
     )
     val openEmulatorDataLocationDialog = rememberDebouncedClick(

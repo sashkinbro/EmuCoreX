@@ -536,6 +536,7 @@
     <string name="onboarding_next">Suivant</string>
     <string name="onboarding_back">Retour</string>
     <string name="onboarding_get_started">Commencer</string>
+    <string name="picker_no_document_handler">Aucun gestionnaire de fichiers trouvé pour choisir des dossiers. Veuillez installer une application de gestion de fichiers et réessayer.</string>
 
     <string name="ok">OK</string>
     <string name="cancel">Annuler</string>

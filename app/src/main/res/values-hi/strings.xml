@@ -748,6 +748,7 @@
     <string name="onboarding_next">अगला</string>
     <string name="onboarding_back">पीछे</string>
     <string name="onboarding_get_started">शुरू करें</string>
+    <string name="picker_no_document_handler">फ़ोल्डर चुनने के लिए कोई फ़ाइल मैनेजर नहीं मिला। कृपया कोई फ़ाइल मैनेजर ऐप इंस्टॉल करें और फिर से प्रयास करें।</string>
 
     <string name="ok">ठीक है</string>
     <string name="cancel">रद्द करें</string>

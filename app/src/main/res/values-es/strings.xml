@@ -536,6 +536,7 @@
     <string name="onboarding_next">Siguiente</string>
     <string name="onboarding_back">Atrás</string>
     <string name="onboarding_get_started">Empezar</string>
+    <string name="picker_no_document_handler">No se encontró ningún explorador de archivos para elegir carpetas. Instala una aplicación de explorador de archivos e inténtalo de nuevo.</string>
 
     <string name="ok">Aceptar</string>
     <string name="cancel">Cancelar</string>

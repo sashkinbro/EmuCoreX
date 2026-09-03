@@ -543,6 +543,7 @@
     <string name="onboarding_next">Далее</string>
     <string name="onboarding_back">Назад</string>
     <string name="onboarding_get_started">Начать</string>
+    <string name="picker_no_document_handler">Не найден файловый менеджер для выбора папок. Установите приложение файлового менеджера и попробуйте снова.</string>
 
     <string name="ok">ОК</string>
     <string name="cancel">Отмена</string>

@@ -120,6 +120,8 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.safeLaunch
+import com.sbro.emucorex.ui.common.showNoDocumentPickerMessage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -267,13 +269,13 @@ fun OnboardingScreen(
     val launchBiosPicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-            else biosPicker.launch(null)
+            else biosPicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
         }
     )
     val launchGamePicker = rememberDebouncedClick(
         onClick = {
             if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
-            else gamePicker.launch(null)
+            else gamePicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
         }
     )
     val openEmulatorDataLocationDialog = rememberDebouncedClick(

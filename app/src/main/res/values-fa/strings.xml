@@ -1166,6 +1166,7 @@
     <string name="onboarding_next">بعدی</string>
     <string name="onboarding_back">بازگشت</string>
     <string name="onboarding_get_started">شروع کنید</string>
+    <string name="picker_no_document_handler">هیچ مدیر فایلی برای انتخاب پوشه‌ها پیدا نشد. لطفاً یک برنامه مدیر فایل نصب کنید و دوباره تلاش کنید.</string>
 
     <!-- Common -->
     <string name="ok">تأیید</string>

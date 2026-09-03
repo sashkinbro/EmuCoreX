@@ -1235,6 +1235,7 @@
     <string name="onboarding_next">Next</string>
     <string name="onboarding_back">Back</string>
     <string name="onboarding_get_started">Get Started</string>
+    <string name="picker_no_document_handler">No file manager found to pick folders. Please install a file manager app and try again.</string>
 
     <!-- Common -->
     <string name="ok">OK</string>

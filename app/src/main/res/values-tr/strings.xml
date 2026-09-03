@@ -834,6 +834,7 @@
     <string name="onboarding_next">Sonraki</string>
     <string name="onboarding_back">Geri</string>
     <string name="onboarding_get_started">Başla</string>
+    <string name="picker_no_document_handler">Klasör seçmek için dosya yöneticisi bulunamadı. Lütfen bir dosya yöneticisi uygulaması yükleyip tekrar deneyin.</string>
 
     <string name="ok">Tamam</string>
     <string name="cancel">İptal</string>

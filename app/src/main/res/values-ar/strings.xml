@@ -834,6 +834,7 @@
     <string name="onboarding_next">التالي</string>
     <string name="onboarding_back">السابق</string>
     <string name="onboarding_get_started">البدء</string>
+    <string name="picker_no_document_handler">تعذّر العثور على مدير ملفات لاختيار المجلدات. يُرجى تثبيت تطبيق مدير ملفات ثم إعادة المحاولة.</string>
 
     <string name="ok">موافق</string>
     <string name="cancel">إلغاء</string>

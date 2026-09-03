@@ -149,6 +149,8 @@ import com.sbro.emucorex.ui.common.TvStorageRequest
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
+import com.sbro.emucorex.ui.common.safeLaunch
+import com.sbro.emucorex.ui.common.showNoDocumentPickerMessage
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.customization.HomeBackgroundMedia
@@ -417,11 +419,11 @@ fun HomeScreen(
                 gamesReady = uiState.gameFolderSet,
                 onBiosClick = {
                     if (tvUiEnabled) tvStorageRequest = TvStorageRequest.BIOS_FILE
-                    else biosPicker.launch(null)
+                    else biosPicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
                 },
                 onFolderClick = {
                     if (tvUiEnabled) tvStorageRequest = TvStorageRequest.GAME_FOLDER
-                    else folderPicker.launch(null)
+                    else folderPicker.safeLaunch(null) { context.showNoDocumentPickerMessage() }
                 },
                 topInset = topInset
             )

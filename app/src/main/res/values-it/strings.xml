@@ -748,6 +748,7 @@
     <string name="onboarding_next">Avanti</string>
     <string name="onboarding_back">Indietro</string>
     <string name="onboarding_get_started">Inizia</string>
+    <string name="picker_no_document_handler">Nessun file manager trovato per selezionare le cartelle. Installa un\'app di gestione file e riprova.</string>
 
     <string name="ok">OK</string>
     <string name="cancel">Annulla</string>

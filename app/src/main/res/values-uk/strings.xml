@@ -560,6 +560,7 @@
     <string name="onboarding_next">Далі</string>
     <string name="onboarding_back">Назад</string>
     <string name="onboarding_get_started">Почати</string>
+    <string name="picker_no_document_handler">Не знайдено файлового менеджера для вибору папок. Встановіть застосунок файлового менеджера та спробуйте ще раз.</string>
 
     <string name="ok">ОК</string>
     <string name="cancel">Скасувати</string>

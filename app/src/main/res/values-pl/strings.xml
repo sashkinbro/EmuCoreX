@@ -1233,6 +1233,7 @@
     <string name="onboarding_next">Dalej</string>
     <string name="onboarding_back">Wstecz</string>
     <string name="onboarding_get_started">Rozpocznij</string>
+    <string name="picker_no_document_handler">Nie znaleziono menedżera plików do wyboru folderów. Zainstaluj aplikację menedżera plików i spróbuj ponownie.</string>
 
     <!-- Common -->
     <string name="ok">OK</string>
