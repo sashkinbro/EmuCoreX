@@ -607,7 +607,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun setThemeMode(mode: ThemeMode) { viewModelScope.launch { preferences.setThemeMode(mode) } }
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
+        preferences.setThemeMode(mode)
+        if (mode == ThemeMode.NEON) {
+            preferences.setTouchControlVisualStyle(TouchControlVisualStyle.MODERN)
+        }
+    }
     fun saveCustomTheme(config: CustomThemeConfig, activate: Boolean) = viewModelScope.launch {
         if (!_uiState.value.isProUnlocked) return@launch
         if (activate) preferences.applyCustomTheme(config) else preferences.setCustomTheme(config)
