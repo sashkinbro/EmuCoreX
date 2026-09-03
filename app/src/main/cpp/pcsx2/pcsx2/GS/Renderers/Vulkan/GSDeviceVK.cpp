@@ -1842,6 +1842,10 @@ void GSDeviceVK::ExecuteCommandBuffer(WaitType wait_for_completion)
 
 void GSDeviceVK::DeferBufferDestruction(VkBuffer object, VmaAllocation allocation)
 {
+	// A null/stale entry queued here runs later inside DestroyResources; the Adreno driver
+	// faults inside vkDestroyBuffer instead of ignoring it, so never let one through.
+	if (object == VK_NULL_HANDLE)
+		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
 	resources.cleanup_resources.push_back(
 		[this, object, allocation]() { vmaDestroyBuffer(m_allocator, object, allocation); });
@@ -1849,12 +1853,16 @@ void GSDeviceVK::DeferBufferDestruction(VkBuffer object, VmaAllocation allocatio
 
 void GSDeviceVK::DeferFramebufferDestruction(VkFramebuffer object)
 {
+	if (object == VK_NULL_HANDLE)
+		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
 	resources.cleanup_resources.push_back([this, object]() { vkDestroyFramebuffer(m_device, object, nullptr); });
 }
 
 void GSDeviceVK::DeferImageDestruction(VkImage object, VmaAllocation allocation)
 {
+	if (object == VK_NULL_HANDLE)
+		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
 	resources.cleanup_resources.push_back(
 		[this, object, allocation]() { vmaDestroyImage(m_allocator, object, allocation); });
@@ -1862,6 +1870,8 @@ void GSDeviceVK::DeferImageDestruction(VkImage object, VmaAllocation allocation)
 
 void GSDeviceVK::DeferImageViewDestruction(VkImageView object)
 {
+	if (object == VK_NULL_HANDLE)
+		return;
 	FrameResources& resources = m_frame_resources[m_current_frame];
 	resources.cleanup_resources.push_back([this, object]() { vkDestroyImageView(m_device, object, nullptr); });
 }
@@ -2593,10 +2603,14 @@ void GSDeviceVK::Destroy()
 
 	EndRenderPass();
 	if (GetCurrentCommandBuffer() != VK_NULL_HANDLE)
-	{
 		ExecuteCommandBuffer(false);
+
+	// Always idle the GPU while the device is alive, not just when a command buffer is
+	// recording. Deferred destroys below (vmaDestroyBuffer etc.) require all submitted work
+	// referencing those buffers to be complete; Adreno faults inside vkDestroyBuffer when
+	// that invariant is violated (Vitals shutdown crash via DestroyResources).
+	if (m_device != VK_NULL_HANDLE)
 		WaitForGPUIdle();
-	}
 
 	m_swap_chain.reset();
 
@@ -5659,7 +5673,11 @@ void GSDeviceVK::DestroyResources()
 	m_expand_index_stream_buffer.Destroy(false);
 	m_vertex_stream_buffer.Destroy(false);
 	if (m_expand_index_buffer != VK_NULL_HANDLE)
+	{
 		vmaDestroyBuffer(m_allocator, m_expand_index_buffer, m_expand_index_buffer_allocation);
+		m_expand_index_buffer = VK_NULL_HANDLE;
+		m_expand_index_buffer_allocation = VK_NULL_HANDLE;
+	}
 
 	if (m_tfx_pipeline_layout != VK_NULL_HANDLE)
 		vkDestroyPipelineLayout(m_device, m_tfx_pipeline_layout, nullptr);
@@ -5716,7 +5734,10 @@ void GSDeviceVK::DestroyResources()
 	m_render_pass_cache.clear();
 
 	if (m_allocator != VK_NULL_HANDLE)
+	{
 		vmaDestroyAllocator(m_allocator);
+		m_allocator = VK_NULL_HANDLE;
+	}
 }
 
 VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)

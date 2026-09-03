@@ -860,8 +860,19 @@ GSDownloadTextureVK::GSDownloadTextureVK(u32 width, u32 height, GSTexture::Forma
 GSDownloadTextureVK::~GSDownloadTextureVK()
 {
 	// Buffer was created mapped, no need to manually unmap.
-	if (m_buffer != VK_NULL_HANDLE)
-		GSDeviceVK::GetInstance()->DeferBufferDestruction(m_buffer, m_allocation);
+	// The device may already be gone during teardown (same hazard GSTextureVK::Destroy
+	// guards against): queuing a destroy against a dead device/allocator faults the
+	// driver on the next DestroyResources pass, so drop it like the texture path does.
+	if (m_buffer == VK_NULL_HANDLE)
+		return;
+	GSDeviceVK* dev = GSDeviceVK::GetInstance();
+	if (!dev)
+	{
+		m_buffer = VK_NULL_HANDLE;
+		m_allocation = VK_NULL_HANDLE;
+		return;
+	}
+	dev->DeferBufferDestruction(m_buffer, m_allocation);
 }
 
 std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 height, GSTexture::Format format)
