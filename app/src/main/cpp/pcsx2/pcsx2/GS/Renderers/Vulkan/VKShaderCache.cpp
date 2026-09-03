@@ -63,6 +63,10 @@ namespace
 		u32 blob_size;
 	};
 #pragma pack(pop)
+
+	// Real pipeline caches are kilobytes to low megabytes. Anything beyond this
+	// cannot be a valid blob, so reject it before the driver touches it.
+	static constexpr size_t MAX_PIPELINE_CACHE_SIZE = 256 * 1024 * 1024;
 } // namespace
 
 static bool ValidatePipelineCacheHeader(const VK_PIPELINE_CACHE_HEADER& header)
@@ -658,6 +662,20 @@ bool VKShaderCache::CreateNewPipelineCache()
 
 bool VKShaderCache::ReadExistingPipelineCache()
 {
+	// If a previous run died inside vkCreatePipelineCache below, the blob is
+	// suspect: some drivers (observed Adreno memcpy SIGSEGV) read past the end
+	// of torn data instead of failing. The sentinel survives the crash while a
+	// healthy run deletes it right after the driver call, so this breaks the
+	// otherwise endless crash loop by starting from a fresh cache.
+	const std::string loading_filename = m_pipeline_cache_filename + ".loading";
+	if (FileSystem::FileExists(loading_filename.c_str()))
+	{
+		Console.Error("Pipeline cache load crashed previously, discarding '%s'", m_pipeline_cache_filename.c_str());
+		FileSystem::DeleteFilePath(m_pipeline_cache_filename.c_str());
+		FileSystem::DeleteFilePath(loading_filename.c_str());
+		return false;
+	}
+
 	std::optional<std::vector<u8>> data = FileSystem::ReadBinaryFile(m_pipeline_cache_filename.c_str());
 	if (!data.has_value())
 		return false;
@@ -673,9 +691,23 @@ bool VKShaderCache::ReadExistingPipelineCache()
 	if (!ValidatePipelineCacheHeader(header))
 		return false;
 
+	// The driver trusts everything past the header, so reject implausible sizes
+	// here instead of crashing inside vkCreatePipelineCache.
+	if (header.header_length > data->size() || data->size() > MAX_PIPELINE_CACHE_SIZE)
+	{
+		Console.Error("Pipeline cache at '%s' failed size validation (header %u, file %zu)",
+			m_pipeline_cache_filename.c_str(), header.header_length, data->size());
+		return false;
+	}
+
+	// Arm the sentinel for the risky driver call below; removed on success.
+	if (!FileSystem::WriteBinaryFile(loading_filename.c_str(), nullptr, 0))
+		Console.Warning("Failed to write pipeline cache sentinel '%s'", loading_filename.c_str());
+
 	const VkPipelineCacheCreateInfo ci{
 		VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, data->size(), data->data()};
 	VkResult res = vkCreatePipelineCache(GSDeviceVK::GetInstance()->GetDevice(), &ci, nullptr, &m_pipeline_cache);
+	FileSystem::DeleteFilePath(loading_filename.c_str());
 	if (res != VK_SUCCESS)
 	{
 		LOG_VULKAN_ERROR(res, "vkCreatePipelineCache() failed: ");
@@ -714,9 +746,15 @@ bool VKShaderCache::FlushPipelineCache()
 	if (!FileSystem::StatFile(m_pipeline_cache_filename.c_str(), &sd) || sd.Size != static_cast<s64>(data_size))
 	{
 		Console.WriteLn("Writing %zu bytes to '%s'", data_size, m_pipeline_cache_filename.c_str());
-		if (!FileSystem::WriteBinaryFile(m_pipeline_cache_filename.c_str(), data.data(), data.size()))
+		// Write through a temp file and rename: a kill mid-flush must never
+		// leave a torn blob behind, or the next launch feeds it to the driver
+		// and crashes inside vkCreatePipelineCache (Adreno memcpy SIGSEGV).
+		const std::string tmp_filename = m_pipeline_cache_filename + ".tmp";
+		if (!FileSystem::WriteBinaryFile(tmp_filename.c_str(), data.data(), data.size()) ||
+			!FileSystem::RenamePath(tmp_filename.c_str(), m_pipeline_cache_filename.c_str()))
 		{
 			Console.Error("Failed to write pipeline cache to '%s'", m_pipeline_cache_filename.c_str());
+			FileSystem::DeleteFilePath(tmp_filename.c_str());
 			return false;
 		}
 	}
