@@ -139,6 +139,34 @@ namespace ReplaceGL
 	{
 	}
 
+	// Indexed draw-buffer state only exists on desktop GL or via EXT_draw_buffers_indexed
+	// on GLES. The renderer only ever addresses index 0, where the plain entry points are
+	// exactly equivalent.
+	static void GLAPIENTRY ColorMaski(GLuint, GLboolean r, GLboolean g, GLboolean b, GLboolean a)
+	{
+		glColorMask(r, g, b, a);
+	}
+
+	static void GLAPIENTRY Enablei(GLenum cap, GLuint)
+	{
+		glEnable(cap);
+	}
+
+	static void GLAPIENTRY Disablei(GLenum cap, GLuint)
+	{
+		glDisable(cap);
+	}
+
+	static void GLAPIENTRY BlendEquationSeparatei(GLuint, GLenum mode_rgb, GLenum mode_alpha)
+	{
+		glBlendEquationSeparate(mode_rgb, mode_alpha);
+	}
+
+	static void GLAPIENTRY BlendFuncSeparatei(GLuint, GLenum src_rgb, GLenum dst_rgb, GLenum src_alpha, GLenum dst_alpha)
+	{
+		glBlendFuncSeparate(src_rgb, dst_rgb, src_alpha, dst_alpha);
+	}
+
 } // namespace ReplaceGL
 
 namespace Emulate_DSA
@@ -1029,6 +1057,21 @@ bool GSDeviceOGL::CheckFeatures()
 	{
 		glTextureBarrier = ReplaceGL::TextureBarrier;
 	}
+
+	// Strict GLES drivers (and some ANGLE configurations) don't export the indexed
+	// draw-buffer entry points at all, leaving GLAD with null pointers. Calling one faults
+	// with an unresolvable immediate caller (Vitals: DoStretchRect -> Unknown on budget
+	// devices), so fall back to the plain equivalents, which are identical for index 0.
+	if (!glColorMaski)
+		glColorMaski = ReplaceGL::ColorMaski;
+	if (!glEnablei)
+		glEnablei = ReplaceGL::Enablei;
+	if (!glDisablei)
+		glDisablei = ReplaceGL::Disablei;
+	if (!glBlendEquationSeparatei)
+		glBlendEquationSeparatei = ReplaceGL::BlendEquationSeparatei;
+	if (!glBlendFuncSeparatei)
+		glBlendFuncSeparatei = ReplaceGL::BlendFuncSeparatei;
 
 	if (!GLAD_GL_ARB_direct_state_access)
 	{
