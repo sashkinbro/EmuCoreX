@@ -384,6 +384,11 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 	m_is_gles = m_gl_context->IsGLES();
 
+	// Pick up the real surface extent from EGL (it re-queries EGL_WIDTH/HEIGHT on creation).
+	// The host-provided size can be stale, and a zero-extent window must never see
+	// default-framebuffer work (see HasDrawableSurface).
+	m_window_info = m_gl_context->GetWindowInfo();
+
 	if (!CheckFeatures())
 		return false;
 
@@ -393,7 +398,7 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	SetSwapInterval();
 
 	// Render a frame as soon as possible to clear out whatever was previously being displayed.
-	if (m_window_info.type != WindowInfo::Type::Surfaceless)
+	if (HasDrawableSurface())
 		RenderBlankFrame();
 
 	if (GLAD_GL_KHR_parallel_shader_compile)
@@ -1345,7 +1350,7 @@ bool GSDeviceOGL::UpdateWindow()
 
 	m_window_info = m_gl_context->GetWindowInfo();
 
-	if (m_window_info.type != WindowInfo::Type::Surfaceless)
+	if (HasDrawableSurface())
 	{
 		// reset vsync rate, since it (usually) gets lost
 		SetSwapInterval();
@@ -1391,9 +1396,15 @@ std::string GSDeviceOGL::GetDriverInfo() const
 		"OpenGL Context:\n{}\n{} {}\nGLSL: {}", gl_version, gl_vendor, gl_renderer, gl_shading_language_version);
 }
 
+bool GSDeviceOGL::HasDrawableSurface() const
+{
+	return m_window_info.type != WindowInfo::Type::Surfaceless && m_window_info.surface_width > 0 &&
+	       m_window_info.surface_height > 0;
+}
+
 GSDevice::PresentResult GSDeviceOGL::BeginPresent(bool frame_skip)
 {
-	if (frame_skip || m_window_info.type == WindowInfo::Type::Surfaceless)
+	if (frame_skip || !HasDrawableSurface())
 		return PresentResult::FrameSkipped;
 
 	// Get the pipeline statistics for this frame before postprocessing.

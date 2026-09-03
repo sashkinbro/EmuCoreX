@@ -330,6 +330,12 @@ private:
 	void RenderImGui();
 	void RenderBlankFrame();
 
+	// True only when the EGL surface actually has a drawable extent. ANGLE reports the real
+	// size in the context's window info, which can be zero while the Android surface isn't
+	// laid out yet; issuing default-framebuffer work (glClear/SwapBuffers) then drops into
+	// the Vulkan driver's AcquireNextImage, which faults on some drivers (MTK).
+	bool HasDrawableSurface() const;
+
 	void OMAttachRt(GSTexture* rt = nullptr);
 	void OMAttachDsAsRt(GSTexture* ds_as_rt = nullptr);
 	void OMAttachDs(GSTexture* ds = nullptr);
