@@ -92,6 +92,7 @@ set(pcsx2Sources
 	MMI.cpp
 	MTGS.cpp
 	MTVU.cpp
+	OpcodeFamilies.cpp
 	VU1Fingerprint.cpp
 	Patch.cpp
 	Pcsx2Config.cpp

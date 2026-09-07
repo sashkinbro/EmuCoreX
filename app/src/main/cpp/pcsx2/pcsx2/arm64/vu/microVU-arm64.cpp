@@ -14,9 +14,41 @@
 #include "common/StringUtil.h"
 #include "arm64/OaknutHelpers-arm64.h"
 #include "GS/GSXXH.h"
+#include "VUmicro.h"
+#include "OpcodeFamilies.h"
 
 alignas(64) vuRegistersPack g_vuRegistersPack;
 VU_Thread& vu1Thread = g_vuRegistersPack.vu1Thread;
+
+//------------------------------------------------------------------
+// EmuCoreX: interpreter fallback for blocklisted VU opcode families.
+// Invoked from generated code (see mVUdispatcherAB); runs the interpreter
+// for the remaining cycle budget, then adjusts mVU.cycles so the shared
+// mVUcleanUp() applies the consumed cycles exactly once.
+//------------------------------------------------------------------
+void mVURunInterpreterFallback0()
+{
+	microVU& mVU = microVU0;
+	const u32 startCycle = VU0.cycle;
+	CpuIntVU0.Execute(static_cast<u32>(std::max(0, mVU.cycles)));
+	const u32 executed = VU0.cycle - startCycle;
+	VU0.cycle = startCycle; // mVUcleanUp() will apply the delta once
+	mVU.cycles = mVU.totalCycles - static_cast<s32>(executed);
+	if (mVU.cycles < 0)
+		mVU.cycles = 0;
+}
+
+void mVURunInterpreterFallback1()
+{
+	microVU& mVU = microVU1;
+	const u32 startCycle = VU1.cycle;
+	CpuIntVU1.Execute(static_cast<u32>(std::max(0, mVU.cycles)));
+	const u32 executed = VU1.cycle - startCycle;
+	VU1.cycle = startCycle; // mVUcleanUp() will apply the delta once
+	mVU.cycles = mVU.totalCycles - static_cast<s32>(executed);
+	if (mVU.cycles < 0)
+		mVU.cycles = 0;
+}
 
 //------------------------------------------------------------------
 // Micro VU - Main Functions
@@ -37,6 +69,7 @@ void mVUinit(microVU& mVU, uint vuIndex)
 	mVU.prog.x86end  = (vuIndex ? SysMemory::GetVU1RecEnd() : SysMemory::GetVU0RecEnd()) - (mVUcacheSafeZone * _1mb);
 
 	mVU.regAlloc.reset(new microRegAlloc(mVU.index));
+	mVU.interpreterEntry = nullptr;
 }
 
 // Resets Rec Data

@@ -4,6 +4,7 @@
 #pragma once
 #include "JitProfiler.h"
 #include "HangTrace.h"
+#include "OpcodeFamilies.h"
 
 //------------------------------------------------------------------
 // Messages Called at Execution Time...
@@ -1230,6 +1231,15 @@ __fi void* mVUblockFetch(microVU& mVU, u32 startPC, uptr pState)
 	pxAssert((startPC & 7) == 0);
 	pxAssert(startPC <= mVU.microMemSize - 8);
 	startPC &= mVU.microMemSize - 8;
+
+	// EmuCoreX: interpreter fallback for blocklisted opcode families reached
+	// via indirect jumps (JR/JALR) during execution.
+	if (OpcodeFamilies::VURegionShouldInterpret(mVU.index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0,
+			startPC, mVU.microMemSize, mVU.progMemMask,
+			reinterpret_cast<const u32*>(mVU.regs().Micro)))
+	{
+		return mVU.interpreterEntry;
+	}
 
     u32 startPC_8 = startPC >> 3; // startPC / 8
 	blockCreate(startPC_8);

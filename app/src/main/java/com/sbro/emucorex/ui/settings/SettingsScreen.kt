@@ -278,6 +278,10 @@ fun SettingsScreen(
     onOpenThemeManager: (() -> Unit)? = null,
     onOpenTouchControlCreator: (() -> Unit)? = null,
     onOpenNetworkModes: (() -> Unit)? = null,
+    onOpenEeOpcodeFamilies: (() -> Unit)? = null,
+    onOpenIopOpcodeFamilies: (() -> Unit)? = null,
+    onOpenVu0OpcodeFamilies: (() -> Unit)? = null,
+    onOpenVu1OpcodeFamilies: (() -> Unit)? = null,
     viewModel: SettingsViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -601,6 +605,10 @@ fun SettingsScreen(
                 onOpenThemeManager = onOpenThemeManager,
                 onOpenTouchControlCreator = onOpenTouchControlCreator,
                 onOpenNetworkModes = onOpenNetworkModes,
+                onOpenEeOpcodeFamilies = onOpenEeOpcodeFamilies,
+                onOpenIopOpcodeFamilies = onOpenIopOpcodeFamilies,
+                onOpenVu0OpcodeFamilies = onOpenVu0OpcodeFamilies,
+                onOpenVu1OpcodeFamilies = onOpenVu1OpcodeFamilies,
                 viewModel = viewModel,
                 topInset = 0.dp,
                 modifier = Modifier
@@ -1180,7 +1188,11 @@ private fun SettingsContent(
     onOpenControlsLayoutEditor: (() -> Unit)? = null,
     onOpenThemeManager: (() -> Unit)? = null,
     onOpenTouchControlCreator: (() -> Unit)? = null,
-    onOpenNetworkModes: (() -> Unit)? = null
+    onOpenNetworkModes: (() -> Unit)? = null,
+    onOpenEeOpcodeFamilies: (() -> Unit)? = null,
+    onOpenIopOpcodeFamilies: (() -> Unit)? = null,
+    onOpenVu0OpcodeFamilies: (() -> Unit)? = null,
+    onOpenVu1OpcodeFamilies: (() -> Unit)? = null
 ) {
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val defaults = remember { SettingsSnapshot() }
@@ -2545,6 +2557,16 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_enable_ee_recompiler),
                             onResetToDefault = { viewModel.setEnableEeRecompiler(defaults.enableEeRecompiler) }
                         )
+                        SettingsItem(
+                            icon = Icons.Rounded.Memory,
+                            label = stringResource(R.string.opcode_families_open_ee),
+                            value = opcodeFamilyRowSummary(
+                                uiState.disabledEeOpcodeFamilies.size,
+                                uiState.disabledEeOpcodes.size
+                            ),
+                            onClick = { onOpenEeOpcodeFamilies?.invoke() },
+                            enabled = uiState.enableEeRecompiler
+                        )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_enable_iop_recompiler),
@@ -2553,6 +2575,16 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setEnableIopRecompiler,
                             helpText = stringResource(R.string.settings_help_enable_iop_recompiler),
                             onResetToDefault = { viewModel.setEnableIopRecompiler(defaults.enableIopRecompiler) }
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.Memory,
+                            label = stringResource(R.string.opcode_families_open_iop),
+                            value = opcodeFamilyRowSummary(
+                                uiState.disabledIopOpcodeFamilies.size,
+                                uiState.disabledIopOpcodes.size
+                            ),
+                            onClick = { onOpenIopOpcodeFamilies?.invoke() },
+                            enabled = uiState.enableIopRecompiler
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
@@ -2563,6 +2595,13 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_enable_vu0_recompiler),
                             onResetToDefault = { viewModel.setEnableVu0Recompiler(defaults.enableVu0Recompiler) }
                         )
+                        SettingsItem(
+                            icon = Icons.Rounded.Memory,
+                            label = stringResource(R.string.opcode_families_open_vu0),
+                            value = opcodeFamilyRowSummary(uiState.disabledVu0OpcodeFamilies.size, 0),
+                            onClick = { onOpenVu0OpcodeFamilies?.invoke() },
+                            enabled = uiState.enableVu0Recompiler
+                        )
                         ToggleItem(
                             icon = Icons.Rounded.Speed,
                             title = stringResource(R.string.settings_enable_vu1_recompiler),
@@ -2571,6 +2610,13 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setEnableVu1Recompiler,
                             helpText = stringResource(R.string.settings_help_enable_vu1_recompiler),
                             onResetToDefault = { viewModel.setEnableVu1Recompiler(defaults.enableVu1Recompiler) }
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.Memory,
+                            label = stringResource(R.string.opcode_families_open_vu1),
+                            value = opcodeFamilyRowSummary(uiState.disabledVu1OpcodeFamilies.size, 0),
+                            onClick = { onOpenVu1OpcodeFamilies?.invoke() },
+                            enabled = uiState.enableVu1Recompiler
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Bolt,
@@ -5141,6 +5187,14 @@ internal fun SettingsSection(
         }
     }
 }
+
+@Composable
+private fun opcodeFamilyRowSummary(disabledFamilies: Int, disabledOpcodes: Int): String =
+    if (disabledFamilies == 0 && disabledOpcodes == 0) {
+        stringResource(R.string.opcode_families_row_none)
+    } else {
+        stringResource(R.string.opcode_families_row_summary, disabledFamilies, disabledOpcodes)
+    }
 
 @Composable
 internal fun SettingsItem(

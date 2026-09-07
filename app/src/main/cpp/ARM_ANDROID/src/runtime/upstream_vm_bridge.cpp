@@ -8,7 +8,10 @@
 #include "pcsx2/Config.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/ImGui/ImGuiManager.h"
+#include "pcsx2/OpcodeFamilies.h"
 #include "pcsx2/PerformanceMetrics.h"
+#include "pcsx2/R3000A.h"
+#include "pcsx2/R5900.h"
 #include "pcsx2/VMManager.h"
 
 #include "common/Error.h"
@@ -103,6 +106,111 @@ bool FileExists(const std::string& path)
 	return !path.empty() && FileSystem::FileExists(path.c_str());
 }
 
+// ---------------------------------------------------------------------------
+// EmuCoreX opcode-family blocklists: per-core u64 family masks plus individual
+// opcode id sets, mirrored from the Android settings UI (see OpcodeFamilies.h
+// for the shared numeric conventions). When EE/IOP blocklists change we flush
+// the respective recompiler caches so blocks recompile with the new policy.
+// ---------------------------------------------------------------------------
+void ApplyOpcodeFamilyBlocklists(const RuntimeSettings& settings)
+{
+	struct CoreKeys
+	{
+		const char* mask_key;
+		const char* ids_key;
+		OpcodeFamilies::Core core;
+		bool has_ids;
+	};
+	static constexpr CoreKeys core_keys[] = {
+		{"DisabledFamilyMaskEE", "DisabledOpcodeIdsEE", OpcodeFamilies::CORE_EE, true},
+		{"DisabledFamilyMaskIOP", "DisabledOpcodeIdsIOP", OpcodeFamilies::CORE_IOP, true},
+		{"DisabledFamilyMaskVU0", nullptr, OpcodeFamilies::CORE_VU0, false},
+		{"DisabledFamilyMaskVU1", nullptr, OpcodeFamilies::CORE_VU1, false},
+	};
+
+	static u64 s_last_mask[OpcodeFamilies::CORE_COUNT] = {0, 0, 0, 0};
+	static u64 s_last_ids_hash[OpcodeFamilies::CORE_COUNT] = {0, 0, 0, 0};
+
+	auto find_setting = [&settings](const char* key) -> const std::string* {
+		const auto it = settings.find(std::string("EmuCoreX/JIT\n") + key);
+		return (it != settings.end()) ? &it->second : nullptr;
+	};
+
+	for (const CoreKeys& ck : core_keys)
+	{
+		const std::string* mask_str = find_setting(ck.mask_key);
+		u64 mask = 0;
+		if (mask_str && !mask_str->empty())
+		{
+			try
+			{
+				mask = std::stoull(*mask_str, nullptr, 10);
+			}
+			catch (...)
+			{
+				mask = 0;
+			}
+		}
+
+		std::unordered_set<u32> ids;
+		u64 ids_hash = 0;
+		if (ck.has_ids)
+		{
+			if (const std::string* ids_str = find_setting(ck.ids_key); ids_str && !ids_str->empty())
+			{
+				std::string_view view(*ids_str);
+				size_t start = 0;
+				while (start <= view.size())
+				{
+					const size_t comma = view.find(',', start);
+					const std::string_view token = view.substr(start,
+						(comma == std::string_view::npos) ? std::string_view::npos : comma - start);
+					if (!token.empty())
+					{
+						try
+						{
+							const u32 id = static_cast<u32>(std::stoul(std::string(token)));
+							ids.insert(id);
+							ids_hash = ids_hash * 1000003ull + id;
+						}
+						catch (...)
+						{
+						}
+					}
+					if (comma == std::string_view::npos)
+						break;
+					start = comma + 1;
+				}
+			}
+		}
+
+		const bool mask_changed = (mask != s_last_mask[ck.core]);
+		const bool ids_changed = ck.has_ids && (ids_hash != s_last_ids_hash[ck.core]);
+		if (!mask_changed && !ids_changed)
+			continue;
+
+		s_last_mask[ck.core] = mask;
+		s_last_ids_hash[ck.core] = ids_hash;
+		OpcodeFamilies::SetFamilyMask(ck.core, mask);
+		OpcodeFamilies::SetDisabledOpcodes(ck.core, ids);
+
+		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+			"Opcode family blocklist core=%u mask=0x%llx ids=%zu", ck.core,
+			static_cast<unsigned long long>(mask), ids.size());
+
+		// Flush the matching recompiler so cached blocks pick up the policy.
+		// (VU uses a runtime check, no cache flush needed.)
+		if (ck.core == OpcodeFamilies::CORE_EE && Cpu)
+		{
+			Cpu->Reset();
+		}
+		else if (ck.core == OpcodeFamilies::CORE_IOP && psxCpu)
+		{
+			psxCpu->Reset();
+		}
+	}
+}
+
 void ApplyAngleOpenGLLibraryHints(const VmLaunchConfig& config)
 {
 	const bool requested = GetBoolSetting(config.settings, "EmuCore/GS", "AndroidUseAngleOpenGL", false);
@@ -144,6 +252,8 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 
 	for (const auto& [key, value] : config.settings)
 		SetStringSetting(si, key, value);
+
+	ApplyOpcodeFamilyBlocklists(config.settings);
 
 	si.SetBoolValue("EmuCore/CPU/Recompiler", "EnableEE",
 		GetBoolSetting(config.settings, "EmuCore/CPU/Recompiler", "EnableEE", true));

@@ -177,6 +177,12 @@ data class SettingsUiState(
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
     val enableVu1Recompiler: Boolean = true,
+    val disabledEeOpcodeFamilies: Set<String> = emptySet(),
+    val disabledEeOpcodes: Set<String> = emptySet(),
+    val disabledIopOpcodeFamilies: Set<String> = emptySet(),
+    val disabledIopOpcodes: Set<String> = emptySet(),
+    val disabledVu0OpcodeFamilies: Set<String> = emptySet(),
+    val disabledVu1OpcodeFamilies: Set<String> = emptySet(),
     val enableFastmem: Boolean = true,
     val eeFpuRoundMode: Int = AppPreferences.DEFAULT_EE_FPU_ROUND_MODE,
     val vu0RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
@@ -458,6 +464,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             enableIopRecompiler = snapshot.enableIopRecompiler,
             enableVu0Recompiler = snapshot.enableVu0Recompiler,
             enableVu1Recompiler = snapshot.enableVu1Recompiler,
+            disabledEeOpcodeFamilies = snapshot.disabledEeOpcodeFamilies,
+            disabledEeOpcodes = snapshot.disabledEeOpcodes,
+            disabledIopOpcodeFamilies = snapshot.disabledIopOpcodeFamilies,
+            disabledIopOpcodes = snapshot.disabledIopOpcodes,
+            disabledVu0OpcodeFamilies = snapshot.disabledVu0OpcodeFamilies,
+            disabledVu1OpcodeFamilies = snapshot.disabledVu1OpcodeFamilies,
             enableFastmem = snapshot.enableFastmem,
             eeFpuRoundMode = snapshot.eeFpuRoundMode,
             vu0RoundMode = snapshot.vu0RoundMode,
@@ -1369,6 +1381,66 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             markPerformancePresetCustom()
             preferences.setEnableFastmem(enabled)
             EmulatorBridge.setSetting("EmuCore/CPU/Recompiler", "EnableFastmem", "bool", enabled.toString())
+        }
+    }
+
+    fun setDisabledEeOpcodeFamilies(families: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledEeOpcodeFamilies(families)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledFamilyMaskEE", "string",
+                OpcodeFamiliesModel.maskOf(families, OpcodeFamiliesModel.EE).toString(),
+            )
+        }
+    }
+
+    fun setDisabledEeOpcodes(opcodes: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledEeOpcodes(opcodes)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledOpcodeIdsEE", "string",
+                OpcodeFamiliesModel.idsCsv(opcodes),
+            )
+        }
+    }
+
+    fun setDisabledIopOpcodeFamilies(families: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledIopOpcodeFamilies(families)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledFamilyMaskIOP", "string",
+                OpcodeFamiliesModel.maskOf(families, OpcodeFamiliesModel.IOP).toString(),
+            )
+        }
+    }
+
+    fun setDisabledIopOpcodes(opcodes: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledIopOpcodes(opcodes)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledOpcodeIdsIOP", "string",
+                OpcodeFamiliesModel.idsCsv(opcodes),
+            )
+        }
+    }
+
+    fun setDisabledVu0OpcodeFamilies(families: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledVu0OpcodeFamilies(families)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledFamilyMaskVU0", "string",
+                OpcodeFamiliesModel.maskOf(families, OpcodeFamiliesModel.VU).toString(),
+            )
+        }
+    }
+
+    fun setDisabledVu1OpcodeFamilies(families: Set<String>) {
+        viewModelScope.launch {
+            preferences.setDisabledVu1OpcodeFamilies(families)
+            EmulatorBridge.setSetting(
+                "EmuCoreX/JIT", "DisabledFamilyMaskVU1", "string",
+                OpcodeFamiliesModel.maskOf(families, OpcodeFamiliesModel.VU).toString(),
+            )
         }
     }
 

@@ -84,6 +84,10 @@ import com.sbro.emucorex.ui.settings.SettingsScreen
 import com.sbro.emucorex.ui.settings.SettingsViewModel
 import com.sbro.emucorex.ui.settings.FrameGenerationScreen
 import com.sbro.emucorex.ui.settings.NetworkModesScreen
+import com.sbro.emucorex.ui.settings.EeOpcodeScreen
+import com.sbro.emucorex.ui.settings.IopOpcodeScreen
+import com.sbro.emucorex.ui.settings.Vu0OpcodeScreen
+import com.sbro.emucorex.ui.settings.Vu1OpcodeScreen
 import com.sbro.emucorex.ui.textures.TextureManagerScreen
 import com.sbro.emucorex.ui.theme.ThemeManagerScreen
 import com.sbro.emucorex.ui.common.PremiumLoadingAnimation
@@ -136,6 +140,18 @@ data class SettingsRoute(val tab: String = "general")
 
 @Serializable
 object NetworkModesRoute
+
+@Serializable
+object EeOpcodeFamiliesRoute
+
+@Serializable
+object IopOpcodeFamiliesRoute
+
+@Serializable
+object Vu0OpcodeFamiliesRoute
+
+@Serializable
+object Vu1OpcodeFamiliesRoute
 
 @Serializable
 object LanguageSettingsRoute
@@ -917,9 +933,57 @@ fun AppNavigation(
                                 launchSingleTop = true
                             }
                         },
+                        onOpenEeOpcodeFamilies = {
+                            navController.navigate(EeOpcodeFamiliesRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenIopOpcodeFamilies = {
+                            navController.navigate(IopOpcodeFamiliesRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenVu0OpcodeFamilies = {
+                            navController.navigate(Vu0OpcodeFamiliesRoute) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onOpenVu1OpcodeFamilies = {
+                            navController.navigate(Vu1OpcodeFamiliesRoute) {
+                                launchSingleTop = true
+                            }
+                        },
                         viewModel = settingsViewModel
                     )
                 }
+            }
+
+            composable<EeOpcodeFamiliesRoute> {
+                EeOpcodeScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
+            }
+
+            composable<IopOpcodeFamiliesRoute> {
+                IopOpcodeScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
+            }
+
+            composable<Vu0OpcodeFamiliesRoute> {
+                Vu0OpcodeScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
+            }
+
+            composable<Vu1OpcodeFamiliesRoute> {
+                Vu1OpcodeScreen(
+                    onBackClick = { navController.popBackStack() },
+                    viewModel = settingsViewModel
+                )
             }
 
             composable<NetworkModesRoute> {

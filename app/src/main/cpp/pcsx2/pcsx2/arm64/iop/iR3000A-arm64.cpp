@@ -5,6 +5,7 @@
 #include "R3000A.h"
 #include "arm64/ee/BaseblockEx-arm64.h"
 #include "R5900OpcodeTables.h"
+#include "OpcodeFamilies.h"
 #include "IopBios.h"
 #include "IopHw.h"
 #include "Common.h"
@@ -1595,6 +1596,14 @@ static void psxEncodeMemcheck()
 	}
 }
 
+// EmuCoreX: runs the instruction currently in psxRegs.code through the IOP
+// interpreter dispatch table. Called from recompiled code (see the opcode
+// family blocklist hook in psxRecompileNextInstruction).
+static void iopInterpretCurrentInstruction()
+{
+	psxBSC[psxRegs.code >> 26]();
+}
+
 void psxRecompileNextInstruction(bool delayslot, bool swapped_delayslot)
 {
 	const u32 profiler_pc = psxpc;
@@ -1624,7 +1633,23 @@ void psxRecompileNextInstruction(bool delayslot, bool swapped_delayslot)
 	g_pCurInstInfo++;
 
 	g_iopCyclePenalty = 0;
-	rpsxBSC[psxRegs.code >> 26]();
+	if (OpcodeFamilies::IOPShouldInterpret(psxRegs.code))
+	{
+		// EmuCoreX: user forced this opcode (or its family) onto the IOP
+		// interpreter. psxRegs.pc was already advanced to the instruction
+		// after this one, which matches the interpreter's execI() convention,
+		// so flushing PC and calling the interpreter dispatch table is enough.
+		// Branches execute their own delay slot and update psxRegs.pc, so end
+		// the block and let the dispatcher continue from the interpreter's pc.
+		_psxFlushCall(FLUSH_EVERYTHING | FLUSH_PC);
+		oakEmitCall(reinterpret_cast<void*>(&iopInterpretCurrentInstruction));
+		if (!s_recompilingDelaySlot)
+			psxbranch = 2;
+	}
+	else
+	{
+		rpsxBSC[psxRegs.code >> 26]();
+	}
 	s_psxBlockCycles += g_iopCyclePenalty;
 
 	if (!swapped_delayslot)

@@ -139,6 +139,12 @@ data class SettingsSnapshot(
     val enableIopRecompiler: Boolean = true,
     val enableVu0Recompiler: Boolean = true,
     val enableVu1Recompiler: Boolean = true,
+    val disabledEeOpcodeFamilies: Set<String> = emptySet(),
+    val disabledEeOpcodes: Set<String> = emptySet(),
+    val disabledIopOpcodeFamilies: Set<String> = emptySet(),
+    val disabledIopOpcodes: Set<String> = emptySet(),
+    val disabledVu0OpcodeFamilies: Set<String> = emptySet(),
+    val disabledVu1OpcodeFamilies: Set<String> = emptySet(),
     val enableFastmem: Boolean = true,
     val eeFpuRoundMode: Int = AppPreferences.DEFAULT_EE_FPU_ROUND_MODE,
     val vu0RoundMode: Int = AppPreferences.DEFAULT_VU_ROUND_MODE,
@@ -622,6 +628,12 @@ class AppPreferences(private val context: Context) {
         private val ENABLE_IOP_RECOMPILER = booleanPreferencesKey("enable_iop_recompiler")
         private val ENABLE_VU0_RECOMPILER = booleanPreferencesKey("enable_vu0_recompiler")
         private val ENABLE_VU1_RECOMPILER = booleanPreferencesKey("enable_vu1_recompiler")
+        private val DISABLED_EE_OPCODE_FAMILIES = stringSetPreferencesKey("disabled_ee_opcode_families")
+        private val DISABLED_EE_OPCODES = stringSetPreferencesKey("disabled_ee_opcodes")
+        private val DISABLED_IOP_OPCODE_FAMILIES = stringSetPreferencesKey("disabled_iop_opcode_families")
+        private val DISABLED_IOP_OPCODES = stringSetPreferencesKey("disabled_iop_opcodes")
+        private val DISABLED_VU0_OPCODE_FAMILIES = stringSetPreferencesKey("disabled_vu0_opcode_families")
+        private val DISABLED_VU1_OPCODE_FAMILIES = stringSetPreferencesKey("disabled_vu1_opcode_families")
         private val ENABLE_FASTMEM = booleanPreferencesKey("enable_fastmem")
         private val EE_FPU_ROUND_MODE = intPreferencesKey("ee_fpu_round_mode")
         private val VU0_ROUND_MODE = intPreferencesKey("vu0_round_mode")
@@ -1777,6 +1789,12 @@ class AppPreferences(private val context: Context) {
                 enableIopRecompiler = prefs[ENABLE_IOP_RECOMPILER] ?: true,
                 enableVu0Recompiler = prefs[ENABLE_VU0_RECOMPILER] ?: true,
                 enableVu1Recompiler = prefs[ENABLE_VU1_RECOMPILER] ?: true,
+                disabledEeOpcodeFamilies = prefs[DISABLED_EE_OPCODE_FAMILIES].orEmpty(),
+                disabledEeOpcodes = prefs[DISABLED_EE_OPCODES].orEmpty(),
+                disabledIopOpcodeFamilies = prefs[DISABLED_IOP_OPCODE_FAMILIES].orEmpty(),
+                disabledIopOpcodes = prefs[DISABLED_IOP_OPCODES].orEmpty(),
+                disabledVu0OpcodeFamilies = prefs[DISABLED_VU0_OPCODE_FAMILIES].orEmpty(),
+                disabledVu1OpcodeFamilies = prefs[DISABLED_VU1_OPCODE_FAMILIES].orEmpty(),
                 enableFastmem = prefs[ENABLE_FASTMEM] ?: true,
                 eeFpuRoundMode = sanitizeFloatRoundMode(prefs[EE_FPU_ROUND_MODE], DEFAULT_EE_FPU_ROUND_MODE),
                 vu0RoundMode = sanitizeFloatRoundMode(prefs[VU0_ROUND_MODE], DEFAULT_VU_ROUND_MODE),
@@ -2676,6 +2694,54 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setEnableVu1Recompiler(enabled: Boolean) {
         context.dataStore.edit { it[ENABLE_VU1_RECOMPILER] = enabled }
+    }
+
+    val disabledEeOpcodeFamilies: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_EE_OPCODE_FAMILIES].orEmpty()
+    }
+
+    suspend fun setDisabledEeOpcodeFamilies(families: Set<String>) {
+        context.dataStore.edit { it[DISABLED_EE_OPCODE_FAMILIES] = families }
+    }
+
+    val disabledEeOpcodes: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_EE_OPCODES].orEmpty()
+    }
+
+    suspend fun setDisabledEeOpcodes(opcodes: Set<String>) {
+        context.dataStore.edit { it[DISABLED_EE_OPCODES] = opcodes }
+    }
+
+    val disabledIopOpcodeFamilies: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_IOP_OPCODE_FAMILIES].orEmpty()
+    }
+
+    suspend fun setDisabledIopOpcodeFamilies(families: Set<String>) {
+        context.dataStore.edit { it[DISABLED_IOP_OPCODE_FAMILIES] = families }
+    }
+
+    val disabledIopOpcodes: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_IOP_OPCODES].orEmpty()
+    }
+
+    suspend fun setDisabledIopOpcodes(opcodes: Set<String>) {
+        context.dataStore.edit { it[DISABLED_IOP_OPCODES] = opcodes }
+    }
+
+    val disabledVu0OpcodeFamilies: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_VU0_OPCODE_FAMILIES].orEmpty()
+    }
+
+    suspend fun setDisabledVu0OpcodeFamilies(families: Set<String>) {
+        context.dataStore.edit { it[DISABLED_VU0_OPCODE_FAMILIES] = families }
+    }
+
+    val disabledVu1OpcodeFamilies: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[DISABLED_VU1_OPCODE_FAMILIES].orEmpty()
+    }
+
+    suspend fun setDisabledVu1OpcodeFamilies(families: Set<String>) {
+        context.dataStore.edit { it[DISABLED_VU1_OPCODE_FAMILIES] = families }
     }
 
     val enableFastmem: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -3769,6 +3835,12 @@ class AppPreferences(private val context: Context) {
             put("enableIopRecompiler", prefs[ENABLE_IOP_RECOMPILER] ?: true)
             put("enableVu0Recompiler", prefs[ENABLE_VU0_RECOMPILER] ?: true)
             put("enableVu1Recompiler", prefs[ENABLE_VU1_RECOMPILER] ?: true)
+            put("disabledEeOpcodeFamilies", JSONArray(prefs[DISABLED_EE_OPCODE_FAMILIES].orEmpty().sorted()))
+            put("disabledEeOpcodes", JSONArray(prefs[DISABLED_EE_OPCODES].orEmpty().sorted()))
+            put("disabledIopOpcodeFamilies", JSONArray(prefs[DISABLED_IOP_OPCODE_FAMILIES].orEmpty().sorted()))
+            put("disabledIopOpcodes", JSONArray(prefs[DISABLED_IOP_OPCODES].orEmpty().sorted()))
+            put("disabledVu0OpcodeFamilies", JSONArray(prefs[DISABLED_VU0_OPCODE_FAMILIES].orEmpty().sorted()))
+            put("disabledVu1OpcodeFamilies", JSONArray(prefs[DISABLED_VU1_OPCODE_FAMILIES].orEmpty().sorted()))
             put("enableFastmem", prefs[ENABLE_FASTMEM] ?: true)
             put("eeFpuRoundMode", sanitizeFloatRoundMode(prefs[EE_FPU_ROUND_MODE], DEFAULT_EE_FPU_ROUND_MODE))
             put("vu0RoundMode", sanitizeFloatRoundMode(prefs[VU0_ROUND_MODE], DEFAULT_VU_ROUND_MODE))
@@ -4163,6 +4235,19 @@ class AppPreferences(private val context: Context) {
             prefs[ENABLE_IOP_RECOMPILER] = json.optBoolean("enableIopRecompiler", true)
             prefs[ENABLE_VU0_RECOMPILER] = json.optBoolean("enableVu0Recompiler", true)
             prefs[ENABLE_VU1_RECOMPILER] = json.optBoolean("enableVu1Recompiler", true)
+            fun readStringSet(key: String, prefsKey: androidx.datastore.preferences.core.Preferences.Key<Set<String>>) {
+                json.optJSONArray(key)?.let { arr ->
+                    prefs[prefsKey] = (0 until arr.length()).mapNotNull { index ->
+                        (arr.opt(index) as? String)?.takeIf { it.isNotBlank() }
+                    }.toSet()
+                }
+            }
+            readStringSet("disabledEeOpcodeFamilies", DISABLED_EE_OPCODE_FAMILIES)
+            readStringSet("disabledEeOpcodes", DISABLED_EE_OPCODES)
+            readStringSet("disabledIopOpcodeFamilies", DISABLED_IOP_OPCODE_FAMILIES)
+            readStringSet("disabledIopOpcodes", DISABLED_IOP_OPCODES)
+            readStringSet("disabledVu0OpcodeFamilies", DISABLED_VU0_OPCODE_FAMILIES)
+            readStringSet("disabledVu1OpcodeFamilies", DISABLED_VU1_OPCODE_FAMILIES)
             prefs[ENABLE_FASTMEM] = json.optBoolean("enableFastmem", true)
             prefs[EE_FPU_ROUND_MODE] = sanitizeFloatRoundMode(json.optInt("eeFpuRoundMode", DEFAULT_EE_FPU_ROUND_MODE), DEFAULT_EE_FPU_ROUND_MODE)
             prefs[VU0_ROUND_MODE] = sanitizeFloatRoundMode(json.optInt("vu0RoundMode", DEFAULT_VU_ROUND_MODE), DEFAULT_VU_ROUND_MODE)

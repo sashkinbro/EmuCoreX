@@ -10,6 +10,7 @@
 #include "Patch.h"
 #include "R3000A.h"
 #include "R5900OpcodeTables.h"
+#include "OpcodeFamilies.h"
 #include "VMManager.h"
 #include "arm64/OaknutHelpers-arm64.h"
 #include "vtlb.h"
@@ -230,6 +231,27 @@ void recBranchCall(void (*func)())
 void recCall(void (*func)())
 {
 	iFlushCall(FLUSH_INTERPRETER);
+	recBeginOaknutEmit();
+	recFlushReccycle();
+	oakEmitCall(reinterpret_cast<void*>(func));
+	recReloadReccycle();
+	recEndOaknutEmit();
+}
+
+// EmuCoreX: delegates the instruction currently being recompiled to the EE
+// interpreter. Same contract as recCall(), but fixes up cpuRegs.pc when
+// recompiling a delay slot (the interpreter expects pc to already point past
+// the instruction it executes).
+static void recInterpretCurrentInstruction(void (*func)())
+{
+	iFlushCall(FLUSH_INTERPRETER);
+	if (g_recompilingDelaySlot)
+	{
+		recBeginOaknutEmit();
+		oakAsm->MOV(OAK_WSCRATCH, pc + 4);
+		oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.pc))});
+		recEndOaknutEmit();
+	}
 	recBeginOaknutEmit();
 	recFlushReccycle();
 	oakEmitCall(reinterpret_cast<void*>(func));
@@ -2049,7 +2071,22 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 	{
 		//If the COP0 DIE bit is disabled, cycles should be doubled.
 		s_nBlockCycles += opcode.cycles * (2 - ((cpuRegs.CP0.n.Config >> 18) & 0x1));
-		opcode.recompile();
+		if (OpcodeFamilies::EEShouldInterpret(cpuRegs.code))
+		{
+			// EmuCoreX: user forced this opcode (or its family) onto the
+			// interpreter. Branches execute their own delay slot and set
+			// cpuRegs.pc to the target, so end the block right away and let
+			// the dispatcher continue from the interpreter's pc. The immediate
+			// branch test matches recBranchCall() semantics for exception
+			// raising / interrupt enabling opcodes (SYSCALL, EI, ...).
+			recBranchCallScheduleImmediateTest_emit_oaknut();
+			recInterpretCurrentInstruction(opcode.interpret);
+			g_branch = 2;
+		}
+		else
+		{
+			opcode.recompile();
+		}
 	}
 
 	if (!swapped_delay_slot)
