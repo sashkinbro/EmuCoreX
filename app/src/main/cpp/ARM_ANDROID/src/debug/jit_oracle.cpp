@@ -169,7 +169,7 @@ struct Snapshot
     bool gifOverflowed;
 };
 
-Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr)
+Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr, const u32* initialVF = nullptr)
 {
     // The generated dispatcher may elide an FPCR write when VU and EE
     // configurations match. Reproduce its EE caller, not the shell FPCR.
@@ -190,6 +190,8 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
         for (u32 r = 1; r < 16; ++r)
             vu.VI[r].UL = r;
     }
+    if (initialVF)
+        std::memcpy(vu.VF, initialVF, sizeof(vu.VF));
     const u32 size = index ? 0x4000 : 0x1000;
     for (u32 i = 0; i < size; i += 8)
     {
@@ -316,6 +318,28 @@ void VUTests()
             char name[80];
             std::snprintf(name, sizeof(name), "VU%u unclamped ADDi flags operand=%08x", vu, operand);
             Compare(RunVU(vu, false, program, 0x80), RunVU(vu, true, program, 0x80), name);
+        }
+    }
+    EmuConfig.Cpu.Recompiler = savedClampOptions;
+    for (u32 vu = 0; vu < 2; ++vu)
+    {
+        EmuConfig.Cpu.Recompiler.vu0Overflow = true;
+        EmuConfig.Cpu.Recompiler.vu1Overflow = true;
+        for (u32 mask = 1; mask < 16; ++mask)
+        {
+            std::array<u32, 128> registers{};
+            registers[3] = 0x3f800000;
+            for (u32 lane = 0; lane < 4; ++lane)
+            {
+                registers[4 + lane] = std::array<u32, 4>{0x7f800000, 0xff800000, 0x7fc00000, 0x7f7fffff}[lane];
+                registers[8 + lane] = 0x40000000;
+            }
+            const std::vector<u32> program = {NOP_L, (mask << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x28u,
+                NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U};
+            char name[80];
+            std::snprintf(name, sizeof(name), "VU%u normal ADD clamp mask=%x", vu, mask);
+            Compare(RunVU(vu, false, program, 0x80, 0, 128, false, nullptr, registers.data()),
+                RunVU(vu, true, program, 0x80, 0, 128, false, nullptr, registers.data()), name);
         }
     }
     EmuConfig.Cpu.Recompiler = savedClampOptions;
