@@ -413,6 +413,11 @@ void _mVUflagPass(mV, u32 startPC, u32 sCount, u32 found, std::vector<u32>& v)
 		mVUregs.needExactMatch &= 7;
 		if (curI & _Ebit_)
 		{
+			// The E-bit epilogue reads the final architectural flags even
+			// without an explicit FS/FM/FC instruction. Keep incoming flag
+			// instances alive when the next block can exit before replacing
+			// them; marking only the terminating block loses earlier writes.
+			mVUregs.needExactMatch |= 7;
 			branch = 1;
 		}
 		if (curI & _Tbit_)

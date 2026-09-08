@@ -328,6 +328,21 @@ void VUTests()
         RunVU(1, true, flaggedKick, 0x80, 0, 128, false, &packetMemory), "VU1 STATUS survives XGKICK host call");
     for (u32 vu = 0; vu < 2; ++vu)
     {
+        for (u32 padding = 0; padding <= 8; ++padding)
+        {
+            std::vector<u32> branchFlags = {NOP_L,
+                (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x2cu};
+            for (u32 i = 0; i < padding; ++i)
+                branchFlags.insert(branchFlags.end(), {NOP_L, NOP_U});
+            // B skips two pairs after its delay slot, landing on an E-bit
+            // NOP. The exit must publish flags produced in the prior block.
+            branchFlags.insert(branchFlags.end(), {(0x20u << 25) | 3u, NOP_U,
+                NOP_L, NOP_U, NOP_L, NOP_U, NOP_L, NOP_U,
+                NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U});
+            char name[80];
+            std::snprintf(name, sizeof(name), "VU%u flags across branch to E with %u NOPs", vu, padding);
+            Compare(RunVU(vu, false, branchFlags, 0x80), RunVU(vu, true, branchFlags, 0x80), name);
+        }
         for (u32 repetitions : {1u, 2u, 4u, 8u})
         {
             std::vector<u32> flagsProgram;
