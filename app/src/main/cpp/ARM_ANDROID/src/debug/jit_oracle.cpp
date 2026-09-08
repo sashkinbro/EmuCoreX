@@ -171,6 +171,9 @@ struct Snapshot
 
 Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr)
 {
+    // The generated dispatcher may elide an FPCR write when VU and EE
+    // configurations match. Reproduce its EE caller, not the shell FPCR.
+    const FPControlRegisterBackup callerFPCR(EmuConfig.Cpu.FPUFPCR);
     VURegs& vu = index ? VU1 : VU0;
     u8* const micro = vu.Micro;
     u8* const mem = vu.Mem;
@@ -285,6 +288,23 @@ void VUTests()
     CpuVU1 = &CpuMicroVU1;
     CpuMicroVU0.Reserve();
     CpuMicroVU1.Reserve();
+    // VU1 must use its own operand clamp policy, independent of VU0.
+    const std::vector<u32> clampProbe = {0x7f800000, NOP_U | 0x80000000,
+        NOP_L, (15u << 21) | (3u << 6) | 0x22,
+        NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U};
+    const auto savedClampOptions = EmuConfig.Cpu.Recompiler;
+    for (bool clampVU1 : {false, true})
+    {
+        EmuConfig.Cpu.Recompiler.vu1Overflow = clampVU1;
+        EmuConfig.Cpu.Recompiler.vu0Overflow = false;
+        const auto withVU0Off = RunVU(1, false, clampProbe, 0x80);
+        EmuConfig.Cpu.Recompiler.vu0Overflow = true;
+        const auto withVU0On = RunVU(1, false, clampProbe, 0x80);
+        Compare(withVU0Off, withVU0On, clampVU1 ? "VU1 clamp on is independent of VU0" : "VU1 clamp off is independent of VU0");
+        Check(withVU0Off.regs.VF[3].UL[3] == (clampVU1 ? 0x7f7fffFFu : 0x7f800000u),
+            "VU1 operand uses selected overflow policy");
+    }
+    EmuConfig.Cpu.Recompiler = savedClampOptions;
     // Real XGKICK opcodes with a two-tag packet, without creating an MTGS
     // thread. Only the final submission is intercepted; VU transfer timing
     // and reads of guest packet memory still execute in each engine.
@@ -303,6 +323,21 @@ void VUTests()
     Compare(kickInt, RunVU(1, true, kick, 0x80, 1ull << 9, 1, false, &packetMemory), "VU1 XGKICK fallback packet bytes");
     for (u32 vu = 0; vu < 2; ++vu)
     {
+        // 1 + 3*2^-25 rounds up under nearest, but stays exactly 1 under
+        // the configured chop mode. The old shell environment hid this bug
+        // because the previous normal-valued corpus used exact sums.
+        const std::vector<u32> roundingProbe = {0x33c00000, NOP_U | 0x80000000,
+            NOP_L, (15u << 21) | (3u << 6) | 0x22,
+            NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U};
+        const auto roundingInt = RunVU(vu, false, roundingProbe, 0x80);
+        const auto roundingJit = RunVU(vu, true, roundingProbe, 0x80);
+        Check(roundingInt.regs.VF[3].UL[3] == 0x3f800000, "ADDi chop rounding has known result");
+        Compare(roundingInt, roundingJit, vu ? "VU1 inherited EE FPCR" : "VU0 inherited EE FPCR");
+        const auto savedEEFPCR = EmuConfig.Cpu.FPUFPCR;
+        EmuConfig.Cpu.FPUFPCR.SetRoundMode(FPRoundMode::Nearest);
+        Compare(roundingInt, RunVU(vu, true, roundingProbe, 0x80),
+            vu ? "VU1 distinct EE and VU FPCR" : "VU0 distinct EE and VU FPCR");
+        EmuConfig.Cpu.FPUFPCR = savedEEFPCR;
         for (u32 op : {0x28u, 0x2cu, 0x2au, 0x2bu, 0x2fu})
         {
             const u32 upper = (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | op;
@@ -520,6 +555,7 @@ static int ReplayVU1(const char* path, bool fallback)
     CpuMicroVU0.Reserve();
     CpuMicroVU1.Reserve();
     auto run = [&](bool jit) {
+        const FPControlRegisterBackup callerFPCR(EmuConfig.Cpu.FPUFPCR);
         ApplyCapture(input);
         BaseVUmicroCPU* cpu = jit ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU1) : &CpuIntVU1;
         cpu->Reset();
