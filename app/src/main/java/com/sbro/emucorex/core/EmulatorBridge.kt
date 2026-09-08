@@ -5,6 +5,8 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.view.Surface
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.BuildConfig
+import com.sbro.emucorex.ui.settings.OpcodeFamiliesModel
 import com.sbro.emucorex.network.NetPlaySession
 import com.sbro.emucorex.network.RemotePlaySession
 import com.sbro.emucorex.data.DisplayCrop
@@ -432,7 +434,9 @@ object EmulatorBridge {
         dev9LocalLinkAddress: String = "192.168.43.1",
         dev9LocalLinkPort: Int = AppPreferences.DEFAULT_LOCAL_LINK_PORT,
         dev9LocalLinkPeerId: Int = 2,
-        dev9LocalLinkRoomCode: String = ""
+        dev9LocalLinkRoomCode: String = "",
+        vu0FamilyMaskOverride: Int? = null,
+        vu1FamilyMaskOverride: Int? = null
     ) = withContext(serialDispatcher) {
         if (!isNativeLoaded) return@withContext
 
@@ -508,6 +512,11 @@ object EmulatorBridge {
             "applyRuntimeConfig renderer=${rendererName(resolvedRenderer)}($resolvedRenderer) driverType=$effectiveGpuDriverType requestedDriverType=$gpuDriverType hwDownload=$hwDownloadMode directJit={ee:$enableEeRecompiler iop:$enableIopRecompiler vu0:$enableVu0Recompiler vu1:$enableVu1Recompiler mtvu:$directMtvu instantVu1:$instantVu1 fastmem:$enableFastmem} speedhacks={waitLoop:$waitLoopSpeedhack intcStat:$intcStatSpeedhack vuFlag:$vuFlagHack fastBoot:$enableFastBoot fastCdvd:$fastCdvd} round={ee:$directEeFpuRoundMode vu0:$directVu0RoundMode vu1:$directVu1RoundMode} clamp={ee:$directEeFpuClampingMode vu0:$directVu0ClampingMode vu1:$directVu1ClampingMode} gameFixes={auto:$enableGameFixes eeTiming:$eeTimingHack} jitRequested={ee:$enableEeRecompiler iop:$enableIopRecompiler vu0:$enableVu0Recompiler vu1:$enableVu1Recompiler fastmem:$enableFastmem}"
         )
         val prefs = AppPreferences(context)
+        val opcodeSettings = prefs.settingsSnapshot.first()
+        val vu0Mask = vu0FamilyMaskOverride?.takeIf { BuildConfig.DEBUG && it in 0..1023 }?.toLong()
+            ?: OpcodeFamiliesModel.maskOf(opcodeSettings.disabledVu0OpcodeFamilies, OpcodeFamiliesModel.VU)
+        val vu1Mask = vu1FamilyMaskOverride?.takeIf { BuildConfig.DEBUG && it in 0..1023 }?.toLong()
+            ?: OpcodeFamiliesModel.maskOf(opcodeSettings.disabledVu1OpcodeFamilies, OpcodeFamiliesModel.VU)
         val achievementsHardcore = prefs.getAchievementsHardcoreSync()
         val effectiveEnableCheats = enableCheats && !achievementsHardcore
         val effectiveFrameLimitEnabled = frameLimitEnabled || achievementsHardcore
@@ -522,6 +531,15 @@ object EmulatorBridge {
         performRuntimeOps(
             buildList {
                 add(settingOp("EmuCore/GS", "Renderer", "int", resolvedRenderer.toString()))
+                // Reload persisted exclusions on every launch, including cold
+                // starts which have never opened a settings screen. Debug intent
+                // overrides affect this launch only and never write preferences.
+                add(settingOp("EmuCoreX/JIT", "DisabledFamilyMaskEE", "string", OpcodeFamiliesModel.maskOf(opcodeSettings.disabledEeOpcodeFamilies, OpcodeFamiliesModel.EE).toString()))
+                add(settingOp("EmuCoreX/JIT", "DisabledOpcodeIdsEE", "string", OpcodeFamiliesModel.idsCsv(opcodeSettings.disabledEeOpcodes)))
+                add(settingOp("EmuCoreX/JIT", "DisabledFamilyMaskIOP", "string", OpcodeFamiliesModel.maskOf(opcodeSettings.disabledIopOpcodeFamilies, OpcodeFamiliesModel.IOP).toString()))
+                add(settingOp("EmuCoreX/JIT", "DisabledOpcodeIdsIOP", "string", OpcodeFamiliesModel.idsCsv(opcodeSettings.disabledIopOpcodes)))
+                add(settingOp("EmuCoreX/JIT", "DisabledFamilyMaskVU0", "string", vu0Mask.toString()))
+                add(settingOp("EmuCoreX/JIT", "DisabledFamilyMaskVU1", "string", vu1Mask.toString()))
                 add(settingOp("DEV9/Eth", "EthEnable", "bool", effectiveDev9EthernetEnabled.toString()))
                 add(settingOp("DEV9/Eth", "EthApi", "string", when (dev9LocalLinkMode) {
                     AppPreferences.DEV9_INTERNET_LINK_HOST,

@@ -125,7 +125,9 @@ data class EmulationRoute(
     val renderer: Int? = null,
     val gsDumpFrames: Int? = null,
     val gsDumpDelayMs: Int? = null,
-    val exitAppOnExit: Boolean = false
+    val exitAppOnExit: Boolean = false,
+    val vu0FamilyMask: Int? = null,
+    val vu1FamilyMask: Int? = null
 )
 
 internal fun EmulationRoute.isMeaningfulReviewSession(): Boolean =
@@ -736,6 +738,8 @@ fun AppNavigation(
                     rendererOverride = route.renderer,
                     gsDumpFrames = route.gsDumpFrames,
                     gsDumpDelayMs = route.gsDumpDelayMs,
+                    vu0FamilyMaskOverride = route.vu0FamilyMask,
+                    vu1FamilyMaskOverride = route.vu1FamilyMask,
                     restoredAfterProcessDeath = blockRestoredEmulationRoute,
                     onExit = { activePlayTimeMs ->
                         if (route.exitAppOnExit) {
@@ -1380,6 +1384,8 @@ fun AppNavigation(
                     renderer = launchRequest.renderer,
                     gsDumpFrames = launchRequest.gsDumpFrames,
                     gsDumpDelayMs = launchRequest.gsDumpDelayMs,
+                    vu0FamilyMask = launchRequest.vu0FamilyMask,
+                    vu1FamilyMask = launchRequest.vu1FamilyMask,
                     exitAppOnExit = true
                 )
             ) {

@@ -4,6 +4,7 @@
 #include "OpcodeFamilies.h"
 #include "VUmicro.h"
 #include "cpuinfo.h"
+#include "Gif_Unit.h"
 
 #include <array>
 #include <cstdio>
@@ -26,6 +27,27 @@ void Check(bool pass, const char* name)
 
 void ClassifierTests()
 {
+    // A two-tag packet exercises the actual GIF parser used by XGKICK.
+    // Interpreter fallback must retain EOP even with the JIT configured on.
+    alignas(16) std::array<u8, 0x4000> gifMemory{};
+    Gif_Tag::HW_Gif_Tag tag{};
+    tag.NLOOP = 1;
+    tag.NREG = 1;
+    std::memcpy(gifMemory.data(), &tag, sizeof(tag));
+    tag.EOP = 1;
+    std::memcpy(gifMemory.data() + 32, &tag, sizeof(tag));
+    const auto savedConfig = EmuConfig;
+    EmuConfig.Cpu.Recompiler.EnableVU1 = true;
+    EmuConfig.Gamefixes.XgKickHack = false;
+    Check(gifUnit.GetGSPacketSize(GIF_PATH_1, gifMemory.data(), 0, ~0u, false, true) == 32,
+        "fallback XGKICK stops at first tag with JIT enabled");
+    Check(gifUnit.GetGSPacketSize(GIF_PATH_1, gifMemory.data(), 32, ~0u, false, true) == (0x80000000u | 32),
+        "fallback XGKICK preserves EOP with JIT enabled");
+    Check(gifUnit.GetGSPacketSize(GIF_PATH_1, gifMemory.data(), 0, ~0u, true, true) == (0x80000000u | 64),
+        "fallback XGKICK flush preserves packet size and EOP");
+    Check(gifUnit.GetGSPacketSize(GIF_PATH_1, gifMemory.data(), 0, ~0u, true) == 64,
+        "fast JIT XGKICK retains plain packet size");
+    EmuConfig = savedConfig;
     using namespace OpcodeFamilies;
     for (u32 op : {0x20u, 0x21u, 0x24u, 0x25u, 0x28u, 0x29u, 0x2cu, 0x2du, 0x2eu, 0x2fu})
     {

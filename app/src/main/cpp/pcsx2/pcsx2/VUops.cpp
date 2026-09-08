@@ -1867,7 +1867,7 @@ void _vuXGKICKTransfer(s32 cycles, bool flush)
 		if (VU1.xgkicksizeremaining == 0)
 		{
 			VUM_LOG("XGKICK reading new tag from %x", VU1.xgkickaddr);
-			u32 size = gifUnit.GetGSPacketSize(GIF_PATH_1, g_cpuRegistersPack.vuRegs[1].Mem, VU1.xgkickaddr, ~0u, flush);
+			u32 size = gifUnit.GetGSPacketSize(GIF_PATH_1, g_cpuRegistersPack.vuRegs[1].Mem, VU1.xgkickaddr, ~0u, flush, true);
 			VU1.xgkicksizeremaining = size & 0xFFFF;
 			VU1.xgkickendpacket = size >> 31;
 			VU1.xgkickdiff = 0x4000 - VU1.xgkickaddr;

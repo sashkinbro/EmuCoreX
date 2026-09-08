@@ -551,6 +551,8 @@ fun EmulationScreen(
     rendererOverride: Int? = null,
     gsDumpFrames: Int? = null,
     gsDumpDelayMs: Int? = null,
+    vu0FamilyMaskOverride: Int? = null,
+    vu1FamilyMaskOverride: Int? = null,
     restoredAfterProcessDeath: Boolean = false,
     onExit: (activePlayTimeMs: Long) -> Unit,
     viewModel: EmulationViewModel = viewModel()
@@ -881,6 +883,8 @@ fun EmulationScreen(
         rendererOverride,
         gsDumpFrames,
         gsDumpDelayMs,
+        vu0FamilyMaskOverride,
+        vu1FamilyMaskOverride,
         restoredAfterProcessDeath
     ) {
         if (restoredAfterProcessDeath) return@LaunchedEffect
@@ -898,7 +902,9 @@ fun EmulationScreen(
             enableMtvuOverride = enableMtvuOverride,
             rendererOverride = rendererOverride,
             gsDumpFrames = gsDumpFrames,
-            gsDumpDelayMs = gsDumpDelayMs
+            gsDumpDelayMs = gsDumpDelayMs,
+            vu0FamilyMaskOverride = vu0FamilyMaskOverride,
+            vu1FamilyMaskOverride = vu1FamilyMaskOverride
         )
         RetroAchievementsLiveStateManager.refreshFromNative()
     }

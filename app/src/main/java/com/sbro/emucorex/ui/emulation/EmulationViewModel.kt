@@ -1484,7 +1484,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         enableMtvuOverride: Boolean? = null,
         rendererOverride: Int? = null,
         gsDumpFrames: Int? = null,
-        gsDumpDelayMs: Int? = null
+        gsDumpDelayMs: Int? = null,
+        vu0FamilyMaskOverride: Int? = null,
+        vu1FamilyMaskOverride: Int? = null
     ) {
         val analyticsLaunchType = when {
             bootSmokeProbe -> "smoke_test"
@@ -1707,7 +1709,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     dev9LocalLinkAddress = config.dev9LocalLinkAddress,
                     dev9LocalLinkPort = config.dev9LocalLinkPort,
                     dev9LocalLinkPeerId = config.dev9LocalLinkPeerId,
-                    dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode
+                    dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode,
+                    vu0FamilyMaskOverride = vu0FamilyMaskOverride,
+                    vu1FamilyMaskOverride = vu1FamilyMaskOverride
                 )
 
                 val frameGenerationManager = FrameGenerationManager(getApplication())

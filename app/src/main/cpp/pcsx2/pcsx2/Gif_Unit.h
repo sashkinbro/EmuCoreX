@@ -633,7 +633,7 @@ struct Gif_Unit
 	}
 
 	// Returns GS Packet Size in bytes
-	u32 GetGSPacketSize(GIF_PATH pathIdx, u8* pMem, u32 offset = 0, u32 size = ~0u, bool flush = false)
+	u32 GetGSPacketSize(GIF_PATH pathIdx, u8* pMem, u32 offset = 0, u32 size = ~0u, bool flush = false, bool interpreter = false)
 	{
 		u32 memMask = pathIdx ? ~0u : 0x3fffu;
 		u32 curSize = 0;
@@ -648,7 +648,10 @@ struct Gif_Unit
 			}
 			if (curSize >= size)
 				return size;
-			if(((flush && gifTag.tag.EOP) || !flush) && (CHECK_XGKICKHACK || !REC_VU1))
+			// Family fallback executes the interpreter while REC_VU1 remains
+			// enabled. Its transfer loop needs tag boundaries and the EOP bit,
+			// not the whole-packet byte count used by the fast JIT path.
+			if(((flush && gifTag.tag.EOP) || !flush) && (interpreter || CHECK_XGKICKHACK || !REC_VU1))
 			{
 				return curSize | ((u32)gifTag.tag.EOP << 31);
 			}

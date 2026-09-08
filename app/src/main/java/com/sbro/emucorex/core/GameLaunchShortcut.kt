@@ -7,6 +7,7 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.sbro.emucorex.MainActivity
+import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.GameItem
 
@@ -26,6 +27,8 @@ object GameLaunchShortcut {
     const val EXTRA_RENDERER = "com.sbro.emucorex.extra.RENDERER"
     const val EXTRA_GS_DUMP_FRAMES = "com.sbro.emucorex.extra.GS_DUMP_FRAMES"
     const val EXTRA_GS_DUMP_DELAY_MS = "com.sbro.emucorex.extra.GS_DUMP_DELAY_MS"
+    const val EXTRA_VU0_FAMILY_MASK = "com.sbro.emucorex.extra.VU0_FAMILY_MASK"
+    const val EXTRA_VU1_FAMILY_MASK = "com.sbro.emucorex.extra.VU1_FAMILY_MASK"
 
     private const val SCHEME = "emucorex"
     private const val HOST = "launch"
@@ -44,7 +47,9 @@ object GameLaunchShortcut {
         val enableMtvu: Boolean? = null,
         val renderer: Int? = null,
         val gsDumpFrames: Int? = null,
-        val gsDumpDelayMs: Int? = null
+        val gsDumpDelayMs: Int? = null,
+        val vu0FamilyMask: Int? = null,
+        val vu1FamilyMask: Int? = null
     )
 
     fun requestPinnedShortcut(
@@ -121,7 +126,9 @@ object GameLaunchShortcut {
             gsDumpFrames = optionalIntExtra(intent, EXTRA_GS_DUMP_FRAMES)
                 ?: optionalIntQuery(data, "gsDumpFrames"),
             gsDumpDelayMs = optionalIntExtra(intent, EXTRA_GS_DUMP_DELAY_MS)
-                ?: optionalIntQuery(data, "gsDumpDelayMs")
+                ?: optionalIntQuery(data, "gsDumpDelayMs"),
+            vu0FamilyMask = debugFamilyMask(intent, EXTRA_VU0_FAMILY_MASK),
+            vu1FamilyMask = debugFamilyMask(intent, EXTRA_VU1_FAMILY_MASK)
         )
     }
 
@@ -132,6 +139,8 @@ object GameLaunchShortcut {
         intent.removeExtra(EXTRA_BOOT_BIOS)
         intent.removeExtra(EXTRA_BOOT_SMOKE_PROBE)
         intent.removeExtra(EXTRA_AUTOTEST_MODE)
+        intent.removeExtra(EXTRA_VU0_FAMILY_MASK)
+        intent.removeExtra(EXTRA_VU1_FAMILY_MASK)
         intent.removeExtra(EXTRA_ENABLE_EE_RECOMPILER)
         intent.removeExtra(EXTRA_ENABLE_IOP_RECOMPILER)
         intent.removeExtra(EXTRA_ENABLE_VU0_RECOMPILER)
@@ -154,6 +163,9 @@ object GameLaunchShortcut {
         if (data?.scheme != SCHEME || data.host != HOST) return null
         return data.getQueryParameter(key)?.toIntOrNull()
     }
+
+    private fun debugFamilyMask(intent: Intent, key: String): Int? =
+        if (BuildConfig.DEBUG) optionalIntExtra(intent, key)?.takeIf { it in 0..1023 } else null
 
     private fun optionalBooleanExtra(intent: Intent, key: String): Boolean? {
         return if (intent.hasExtra(key)) intent.getBooleanExtra(key, false) else null
