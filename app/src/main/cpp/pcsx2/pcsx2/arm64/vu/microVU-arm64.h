@@ -111,11 +111,6 @@ struct microProgManager
 // cleanup can reset the cache. It is not part of the normal allocation budget.
 static const uint mVUcacheSafeZone = 3; // Megabytes
 
-// EmuCoreX: interpreter fallback runners for blocklisted VU opcode families
-// (see OpcodeFamilies.h). Called from the generated interpreterEntry stubs.
-void mVURunInterpreterFallback0();
-void mVURunInterpreterFallback1();
-
 struct microVU
 {
 
@@ -139,7 +134,6 @@ struct microVU
 	u8* exitFunct;    // Function Ptr to the recompiler dispatcher (exit)
 	u8* startFunctXG; // Function Ptr to the recompiler dispatcher (xgkick resume)
 	u8* exitFunctXG;  // Function Ptr to the recompiler dispatcher (xgkick exit)
-	u8* interpreterEntry; // EmuCoreX: entry that runs the VU interpreter instead of JIT
 	u8* compareStateF;// Function Ptr to search which compares all state.
 	u8* waitMTVU;     // Ptr to function to save registers/sync VU1 thread
 	u8* copyPLState;  // Ptr to function to copy pipeline state into microVU

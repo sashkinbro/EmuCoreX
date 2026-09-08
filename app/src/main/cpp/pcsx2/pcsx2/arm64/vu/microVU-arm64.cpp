@@ -21,36 +21,6 @@ alignas(64) vuRegistersPack g_vuRegistersPack;
 VU_Thread& vu1Thread = g_vuRegistersPack.vu1Thread;
 
 //------------------------------------------------------------------
-// EmuCoreX: interpreter fallback for blocklisted VU opcode families.
-// Invoked from generated code (see mVUdispatcherAB); runs the interpreter
-// for the remaining cycle budget, then adjusts mVU.cycles so the shared
-// mVUcleanUp() applies the consumed cycles exactly once.
-//------------------------------------------------------------------
-void mVURunInterpreterFallback0()
-{
-	microVU& mVU = microVU0;
-	const u32 startCycle = VU0.cycle;
-	CpuIntVU0.Execute(static_cast<u32>(std::max(0, mVU.cycles)));
-	const u32 executed = VU0.cycle - startCycle;
-	VU0.cycle = startCycle; // mVUcleanUp() will apply the delta once
-	mVU.cycles = mVU.totalCycles - static_cast<s32>(executed);
-	if (mVU.cycles < 0)
-		mVU.cycles = 0;
-}
-
-void mVURunInterpreterFallback1()
-{
-	microVU& mVU = microVU1;
-	const u32 startCycle = VU1.cycle;
-	CpuIntVU1.Execute(static_cast<u32>(std::max(0, mVU.cycles)));
-	const u32 executed = VU1.cycle - startCycle;
-	VU1.cycle = startCycle; // mVUcleanUp() will apply the delta once
-	mVU.cycles = mVU.totalCycles - static_cast<s32>(executed);
-	if (mVU.cycles < 0)
-		mVU.cycles = 0;
-}
-
-//------------------------------------------------------------------
 // Micro VU - Main Functions
 //------------------------------------------------------------------
 
@@ -69,7 +39,6 @@ void mVUinit(microVU& mVU, uint vuIndex)
 	mVU.prog.x86end  = (vuIndex ? SysMemory::GetVU1RecEnd() : SysMemory::GetVU0RecEnd()) - (mVUcacheSafeZone * _1mb);
 
 	mVU.regAlloc.reset(new microRegAlloc(mVU.index));
-	mVU.interpreterEntry = nullptr;
 }
 
 // Resets Rec Data
@@ -544,9 +513,64 @@ void recMicroVU1::Reset()
 	mVUreset(microVU1, true);
 }
 
+static void mVUSelectInterpreter(microVU& mVU, u32 startPC)
+{
+	VURegs& vu = mVU.regs();
+	// A resumed program keeps its interpreter pipeline even if the policy
+	// changed while it was suspended. Only a completed program can hand off.
+	if (vu.flags & VUFLAG_INTERPRETER)
+		return;
+	const u32 core = mVU.index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0;
+	if (!OpcodeFamilies::g_familyMask[core])
+		return; // Avoid the scanner's work buffers on the normal JIT path.
+	if (!OpcodeFamilies::VURegionShouldInterpret(core,
+		startPC, mVU.microMemSize, mVU.progMemMask, reinterpret_cast<const u32*>(vu.Micro)))
+		return;
+	vu.flags |= VUFLAG_INTERPRETER;
+	vu.macflag = vu.VI[REG_MAC_FLAG].UL;
+	vu.statusflag = vu.VI[REG_STATUS_FLAG].UL;
+	vu.clipflag = vu.VI[REG_CLIP_FLAG].UL;
+	vu.q.UL = vu.VI[REG_Q].UL;
+	vu.p.UL = vu.VI[REG_P].UL;
+	vu.branch = vu.ebit = 0;
+	vu.takedelaybranch = false;
+	vu.fdiv = {};
+	vu.efu = {};
+	if (mVU.index)
+		CpuIntVU1.Reset();
+	else
+		CpuIntVU0.Reset();
+}
+
+static void mVUExecuteInterpreter(microVU& mVU, u32 cycles)
+{
+	VURegs& vu = mVU.regs();
+	// Execute owns TPC conversion, FPCR and cycle accounting. Do not enter
+	// the generated dispatcher or call mVUcleanUp on this path.
+	if (mVU.index)
+		CpuIntVU1.Execute(cycles);
+	else
+		CpuIntVU0.Execute(cycles);
+	if (!(VU0.VI[REG_VPU_STAT].UL & (mVU.index ? 0x100 : 1)))
+	{
+		vu.flags &= ~VUFLAG_INTERPRETER;
+		// Both engines have drained their pipelines at E. Publish the final
+		// architectural flags to all JIT instances for the next program.
+		const u32 status = vu.VI[REG_STATUS_FLAG].UL;
+		const u32 microStatus = VUDenormalizeStatus(status);
+		std::fill_n(vu.micro_statusflags, 4, microStatus);
+		std::fill_n(vu.micro_macflags, 4, vu.VI[REG_MAC_FLAG].UL);
+		std::fill_n(vu.micro_clipflags, 4, vu.VI[REG_CLIP_FLAG].UL);
+		vu.pending_q = vu.VI[REG_Q].UL;
+		vu.pending_p = vu.VI[REG_P].UL;
+		std::memset(&mVU.prog.lpState, 0, sizeof(mVU.prog.lpState));
+	}
+}
+
 void recMicroVU0::SetStartPC(u32 startPC)
 {
 	VU0.start_pc = startPC;
+	mVUSelectInterpreter(microVU0, startPC);
 }
 
 void recMicroVU0::Execute(u32 cycles)
@@ -555,6 +579,11 @@ void recMicroVU0::Execute(u32 cycles)
 
 	if (!(VU0.VI[REG_VPU_STAT].UL & 1))
 		return;
+	if (VU0.flags & VUFLAG_INTERPRETER)
+	{
+		mVUExecuteInterpreter(microVU0, cycles);
+		return;
+	}
 
 	VU0.VI[REG_TPC].UL <<= 3;
 
@@ -570,6 +599,7 @@ void recMicroVU0::Execute(u32 cycles)
 void recMicroVU1::SetStartPC(u32 startPC)
 {
 	VU1.start_pc = startPC;
+	mVUSelectInterpreter(microVU1, startPC);
 }
 
 void recMicroVU1::Step()
@@ -583,6 +613,12 @@ void recMicroVU1::Execute(u32 cycles)
 	{
 		if (!(VU0.VI[REG_VPU_STAT].UL & 0x100))
 			return;
+	}
+	if (VU1.flags & VUFLAG_INTERPRETER)
+	{
+		pxAssert(!THREAD_VU1);
+		mVUExecuteInterpreter(microVU1, cycles);
+		return;
 	}
 	VU1.VI[REG_TPC].UL <<= 3;
 	((mVUrecCall)microVU1.startFunct)(VU1.VI[REG_TPC].UL, cycles);

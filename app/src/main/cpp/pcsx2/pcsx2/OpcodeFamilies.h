@@ -158,8 +158,9 @@ namespace OpcodeFamilies
 	}
 
 	// Does the VU microprogram region starting at startPC (byte address,
-	// 8-aligned) contain a disabled family? Scans forward until E-bit/branch,
-	// bounded to a sane window. Cheap no-op when the mask is empty.
+	// 8-aligned) contain a disabled family? Covers reachable direct branches
+	// and delay slots, all memory for indirect control flow. Call at program
+	// start and retain the decision until completion. Empty masks are a no-op.
 	bool VURegionShouldInterpret(u32 core, u32 startPC, u32 microMemSize, u32 progMemMask, const u32* micro);
 
 	// Parses "mask;id,id,id" style values produced by the Android settings UI.

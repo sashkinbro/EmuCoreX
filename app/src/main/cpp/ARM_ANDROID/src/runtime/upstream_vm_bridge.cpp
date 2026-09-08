@@ -5,10 +5,13 @@
 #include "emucorex/debug_logcat.h"
 
 #include "pcsx2/CDVD/CDVDcommon.h"
+#include "pcsx2/Common.h"
 #include "pcsx2/Config.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/ImGui/ImGuiManager.h"
 #include "pcsx2/OpcodeFamilies.h"
+#include "pcsx2/MTVU.h"
+#include "pcsx2/VUmicro.h"
 #include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/R3000A.h"
 #include "pcsx2/R5900.h"
@@ -189,6 +192,17 @@ void ApplyOpcodeFamilyBlocklists(const RuntimeSettings& settings)
 		if (!mask_changed && !ids_changed)
 			continue;
 
+		// Settings are applied on the CPU thread. Drain the worker before
+		// publishing policy or resetting code which it may still be executing.
+		if (VMManager::HasValidVM())
+		{
+			vu1Thread.WaitVU();
+			if (ck.core == OpcodeFamilies::CORE_VU0)
+				vu0Finish();
+			else if (ck.core == OpcodeFamilies::CORE_VU1)
+				vu1Finish(false);
+		}
+
 		s_last_mask[ck.core] = mask;
 		s_last_ids_hash[ck.core] = ids_hash;
 		OpcodeFamilies::SetFamilyMask(ck.core, mask);
@@ -301,7 +315,10 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	const bool intc_stat_speedhack = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "IntcStat", true);
 	const bool vu_flag_hack = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "vuFlagHack", true);
 	const bool instant_vu1 = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "vu1Instant", true);
-	const bool vu_thread = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "vuThread", true);
+	// The interpreter accesses EE-owned VPU_STAT/VIF state. It cannot execute
+	// on the MTVU worker, whose packets deliberately omit the shared busy bit.
+	const bool vu_thread = GetBoolSetting(config.settings, "EmuCore/Speedhacks", "vuThread", true) &&
+		OpcodeFamilies::g_familyMask[OpcodeFamilies::CORE_VU1] == 0;
 	si.SetBoolValue("EmuCore/Speedhacks", "WaitLoop", wait_loop_speedhack);
 	si.SetBoolValue("EmuCore/Speedhacks", "IntcStat", intc_stat_speedhack);
 	si.SetBoolValue("EmuCore/Speedhacks", "vuFlagHack", vu_flag_hack);

@@ -847,10 +847,10 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		if (curI & _Ebit_)
 		{
 			eBitPass1(mVU, branch);
-			// VU0 end of program MAC results can be read by COP2, so best to make sure the last instance is valid
-			// Needed for State of Emergency 2 and Driving Emotion Type-S
-			if (isVU0)
-				mVUregs.needExactMatch |= 7;
+			// VU0 exposes these to COP2. VU1 also needs architectural flags at
+			// completion: the next microprogram may use the interpreter.
+			// Keep the final instances valid without disabling intra-block opts.
+			mVUregs.needExactMatch |= 7;
 		}
 
 		if ((curI & _Mbit_) && isVU0)
@@ -1232,14 +1232,6 @@ __fi void* mVUblockFetch(microVU& mVU, u32 startPC, uptr pState)
 	pxAssert(startPC <= mVU.microMemSize - 8);
 	startPC &= mVU.microMemSize - 8;
 
-	// EmuCoreX: interpreter fallback for blocklisted opcode families reached
-	// via indirect jumps (JR/JALR) during execution.
-	if (OpcodeFamilies::VURegionShouldInterpret(mVU.index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0,
-			startPC, mVU.microMemSize, mVU.progMemMask,
-			reinterpret_cast<const u32*>(mVU.regs().Micro)))
-	{
-		return mVU.interpreterEntry;
-	}
 
     u32 startPC_8 = startPC >> 3; // startPC / 8
 	blockCreate(startPC_8);

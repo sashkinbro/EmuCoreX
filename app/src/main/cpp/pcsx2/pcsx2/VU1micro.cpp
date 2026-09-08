@@ -16,6 +16,7 @@ u32 vudump = 0;
 // This is called by the COP2 as per the CTC instruction
 void vu1ResetRegs()
 {
+	VU1.flags &= ~VUFLAG_INTERPRETER;
 	VU0.VI[REG_VPU_STAT].UL &= ~0xff00; // stop vu1
 	VU0.VI[REG_FBRST].UL &= ~0xff00; // stop vu1
 	vif1Regs.stat.VEW = false;
@@ -39,6 +40,7 @@ void vu1Finish(bool add_cycles) {
 	if (VU0.VI[REG_VPU_STAT].UL & 0x100) {
 		DevCon.Warning("Force Stopping VU1, ran for too long");
 		VU0.VI[REG_VPU_STAT].UL &= ~0x100;
+		VU1.flags &= ~VUFLAG_INTERPRETER;
 	}
 	if (add_cycles)
 	{

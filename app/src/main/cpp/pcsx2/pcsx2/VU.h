@@ -36,6 +36,16 @@ enum VUStatus
 //#define VUFLAG_BREAKONMFLAG		0x00000001
 #define VUFLAG_MFLAGSET 0x00000002
 #define VUFLAG_INTCINTERRUPT 0x00000004
+// Engine ownership for a complete microprogram, including budget/M-bit yields.
+// Stored in the existing serialized flags word so save/load retains ownership.
+#define VUFLAG_INTERPRETER 0x00000008
+
+// Pack architectural Z/S and sticky Z/S into representative lane bits;
+// U/O/I/D and their sticky counterparts occupy the high scalar group.
+__forceinline_odr u32 VUDenormalizeStatus(u32 status)
+{
+	return ((status >> 3) & 0x18u) | ((status << 11) & 0x1800u) | ((status << 14) & 0x3cf0000u);
+}
 
 enum VUPipeState
 {

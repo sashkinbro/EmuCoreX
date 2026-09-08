@@ -14,6 +14,7 @@ using namespace R5900;
 // This is called by the COP2 as per the CTC instruction
 void vu0ResetRegs()
 {
+	VU0.flags &= ~VUFLAG_INTERPRETER;
 	VU0.VI[REG_VPU_STAT].UL &= ~0xff; // stop vu0
 	VU0.VI[REG_FBRST].UL &= ~0xff; // stop vu0
 	vif0Regs.stat.VEW = false;
@@ -22,7 +23,7 @@ void vu0ResetRegs()
 static __fi u32 vu0DenormalizeMicroStatus(u32 nstatus)
 {
 	// Matches the macro-VU status flag denormalization bit layout.
-	return ((nstatus >> 3) & 0x18u) | ((nstatus >> 11) & 0x1800u) | ((nstatus >> 14) & 0x3cf0000u);
+	return VUDenormalizeStatus(nstatus);
 }
 
 static __fi void vu0SetMicroFlags(u32* flags, u32 value)

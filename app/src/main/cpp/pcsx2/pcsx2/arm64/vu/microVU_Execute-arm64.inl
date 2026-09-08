@@ -217,17 +217,6 @@ void mVUdispatcherAB(mV)
 
     oakAsm->RET();
 
-	// EmuCoreX: interpreter fallback entry. Returned by mVUexecute() when the
-	// upcoming microprogram region contains an opcode family the user forced
-	// onto the interpreter. Entered with BR X0 exactly like a compiled block;
-	// runs the interpreter for the remaining budget and continues into the
-	// normal exit path (FPCR restore + mVUcleanUp).
-	mVU.interpreterEntry = oakGetCurrentCodePointer();
-	if (!isVU1)
-		oakEmitCall(reinterpret_cast<void*>(&mVURunInterpreterFallback0));
-	else
-		oakEmitCall(reinterpret_cast<void*>(&mVURunInterpreterFallback1));
-	oakEmitJmp(mVU.exitFunct);
 
     recEndOaknutEmit();
 
@@ -434,14 +423,6 @@ _mVUt void* mVUexecute(u32 startPC, u32 cycles)
 	mVU.cycles = cycles;
 	mVU.totalCycles = cycles;
 
-	// EmuCoreX: if the upcoming microprogram region contains an opcode family
-	// the user forced onto the interpreter, run the whole budget there.
-	if (OpcodeFamilies::VURegionShouldInterpret(vuIndex ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0,
-			startPC & vuLimit, mVU.microMemSize, mVU.progMemMask,
-			reinterpret_cast<const u32*>(mVU.regs().Micro)))
-	{
-		return mVU.interpreterEntry;
-	}
 
 	return mVUsearchProg<vuIndex>(startPC & vuLimit, (uptr)&mVU.prog.lpState); // Find and set correct program
 }

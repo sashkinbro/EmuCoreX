@@ -6,6 +6,7 @@
 
 #include "PrecompiledHeader.h"
 #include "OpcodeFamilies.h"
+#include <array>
 
 namespace OpcodeFamilies
 {
@@ -243,6 +244,8 @@ namespace OpcodeFamilies
 		// A = UPPER_ACC, C = UPPER_CONVERT, M = UPPER_MISC, X = unknown/MISC
 		u32 VUUpperFdFamily(u32 table, u32 sub)
 		{
+			if (table == 3 && (sub == 10 || sub == 11))
+				return VU::FAM_UPPER_MISC; // reserved / NOP
 			switch (sub)
 			{
 				case 0:
@@ -265,9 +268,6 @@ namespace OpcodeFamilies
 				case 4:
 				case 5: // ITOF*/FTOI*
 					return VU::FAM_UPPER_CONVERT;
-
-				case 12: // FD_11 sub 12 = NOP
-					return (table == 3) ? VU::FAM_UPPER_MISC : VU::FAM_UPPER_MISC;
 
 				default:
 					return VU::FAM_UPPER_MISC;
@@ -314,12 +314,14 @@ namespace OpcodeFamilies
 			const u32 primary = code & 0x3F;
 			if (primary <= 0x2F)
 				return VU::FAM_UPPER_MATH; // ADDx..MINI incl. q/i/broadcast forms
+			if (primary < 0x3C)
+				return VU::FAM_UPPER_MISC; // reserved, not an FD subtable
 			return VUUpperFdFamily(primary & 3, (code >> 6) & 0x1F);
 		}
 
 		// Lower opcode: 7-bit primary in the high bits.
 		const u32 primary = code >> 25;
-		if (primary < 0x20)
+		if (primary < 0x40)
 		{
 			switch (primary)
 			{
@@ -346,14 +348,14 @@ namespace OpcodeFamilies
 					return VU::FAM_LOWER_ALU;
 				case 32: // B
 				case 33: // BAL
-				case 34: // JR
-				case 35: // JALR
-				case 36: // IBEQ
-				case 37: // IBNE
-				case 38: // IBLTZ
-				case 39: // IBGTZ
-				case 40: // IBLEZ
-				case 41: // IBGEZ
+				case 36: // JR
+				case 37: // JALR
+				case 40: // IBEQ
+				case 41: // IBNE
+				case 44: // IBLTZ
+				case 45: // IBGTZ
+				case 46: // IBLEZ
+				case 47: // IBGEZ
 					return VU::FAM_LOWER_BRANCH;
 				default:
 					return VU::FAM_LOWER_ALU;
@@ -377,29 +379,68 @@ namespace OpcodeFamilies
 	{
 		if (g_familyMask[core] == 0 || !micro || microMemSize == 0)
 			return false;
-
-		// startPC is a byte address into micro memory, 8-byte aligned.
-		u32 idx = (startPC >> 2) & progMemMask;
-
-		// Scan the upcoming block: stop at E-bit or a lower-op branch. Bounded
-		// so pathological looping code can't spin here forever.
-		constexpr u32 MAX_INSTRUCTIONS = 128;
-		for (u32 n = 0; n < MAX_INSTRUCTIONS; ++n)
+		// Select an engine before entering a microprogram. Follow both arms of
+		// direct branches and include E/branch delay slots. Unknown indirect
+		// targets (or branches in delay slots) conservatively cover all memory.
+		// Never change engines at a block boundary with a live pipeline.
+		const u32 pairs = microMemSize / 8;
+		if (pairs == 0 || pairs > 2048 || (pairs & (pairs - 1)) || progMemMask != microMemSize / 4 - 1)
+			return true;
+		const u32 mask = pairs - 1;
+		auto disabled = [&](u32 pc) {
+			const u32 upper = micro[pc * 2 + 1];
+			return FamilyDisabled(core, VUClassify(upper, false)) ||
+				(!(upper & 0x80000000u) && FamilyDisabled(core, VUClassify(micro[pc * 2], true)));
+		};
+		auto all_memory = [&]() {
+			for (u32 pc = 0; pc < pairs; ++pc)
+				if (disabled(pc))
+					return true;
+			return false;
+		};
+		std::array<bool, 2048> visited{};
+		std::array<u32, 2048> work{};
+		u32 count = 0;
+		auto enqueue = [&](u32 pc) {
+			pc &= mask;
+			if (!visited[pc])
+			{
+				visited[pc] = true;
+				work[count++] = pc;
+			}
+		};
+		enqueue(startPC / 8);
+		while (count)
 		{
-			const u32 lower = micro[idx];
-			const u32 upper = micro[(idx + 1) & progMemMask];
-
-			if (FamilyDisabled(core, VUClassify(upper, false)) || FamilyDisabled(core, VUClassify(lower, true)))
+			const u32 pc = work[--count];
+			const u32 lower = micro[pc * 2];
+			const u32 upper = micro[pc * 2 + 1];
+			if (disabled(pc))
 				return true;
-
-			if (lower & (1u << 30)) // E-bit ends the block
-				break;
-			if (VUClassify(lower, true) == VU::FAM_LOWER_BRANCH)
-				break; // branch ends the block after its delay slot
-
-			idx = (idx + 2) & progMemMask;
+			const u32 delay = (pc + 1) & mask;
+			if (upper & 0x40000000u)
+			{
+				if (disabled(delay))
+					return true;
+				continue;
+			}
+			if (!(upper & 0x80000000u) && VUClassify(lower, true) == VU::FAM_LOWER_BRANCH)
+			{
+				if (disabled(delay))
+					return true;
+				const u32 delayUpper = micro[delay * 2 + 1];
+				const u32 op = lower >> 25;
+				if (op == 0x24 || op == 0x25 || (delayUpper & 0x40000000u) ||
+					(!(delayUpper & 0x80000000u) && VUClassify(micro[delay * 2], true) == VU::FAM_LOWER_BRANCH))
+					return all_memory();
+				const s32 offset = static_cast<s32>(lower << 21) >> 21;
+				enqueue(pc + 1 + offset);
+				if (op != 0x20 && op != 0x21)
+					enqueue(pc + 2);
+			}
+			else
+				enqueue(pc + 1);
 		}
-
 		return false;
 	}
 

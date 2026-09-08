@@ -2688,7 +2688,7 @@
     <string name="opcode_screen_vu1_title">Сімейства опкодів VU1</string>
     <string name="opcode_screen_vu1_subtitle">Примусове виконання сімейств інструкцій VU1 на інтерпретаторі VU1</string>
     <string name="opcode_families_note">Типово все виконується через рекомпілятор. Вимкніть сімейство — або окремий опкод усередині нього — щоб завжди виконувати його на інтерпретаторі замість JIT. Зручно для пошуку проблемної інструкції в конкретній грі. Зміни зберігаються та застосовуються одразу.</string>
-    <string name="opcode_families_note_vu">Типово все виконується через рекомпілятор. Вимкніть сімейство, щоб завжди виконувати його на інтерпретаторі VU замість JIT. Інструкції VU виконуються парами (dual-issue), тому виключення застосовуються до цілих сімейств, а не до окремих опкодів. Зміни зберігаються та застосовуються одразу.</string>
+    <string name="opcode_families_note_vu">Типово все виконується через рекомпілятор. Вимкніть сімейство, щоб мікропрограми з його інструкціями виконувалися на інтерпретаторі VU. Движок залишається незмінним під час переходів і пауз. Непрямі переходи можуть перевести на інтерпретатор додаткові програми. Зміни застосовуються після завершення поточної програми.</string>
     <string name="opcode_families_disabled_count">Сімейств на інтерпретаторі: %1$d</string>
     <string name="opcode_families_disabled_opcodes">Опкодів на інтерпретаторі: %1$d</string>
     <string name="opcode_families_reset_all">Скинути все</string>
@@ -2696,7 +2696,7 @@
     <string name="opcode_families_show_opcodes">Опкоди</string>
     <string name="opcode_families_row_none">Усе на рекомпіляторі</string>
     <string name="opcode_families_row_summary">Сімейств: %1$d · опкодів: %2$d</string>
-    <string name="opcode_families_mtvu_warning">Увімкнено MTVU. Інтерпретатор VU1 не використовує допоміжний потік, тому вимкнення сімейств VU1 може помітно знизити продуктивність.</string>
+    <string name="opcode_families_mtvu_warning">Виключення сімейств VU1 автоматично призупиняє MTVU, оскільки інтерпретатор працює в головному потоці емуляції. MTVU відновиться, коли всі сімейства VU1 знову будуть увімкнені. Виключення можуть помітно знизити продуктивність.</string>
     <string name="opcode_families_open_ee">Сімейства опкодів EE</string>
     <string name="opcode_families_open_iop">Сімейства опкодів IOP</string>
     <string name="opcode_families_open_vu0">Сімейства опкодів VU0</string>

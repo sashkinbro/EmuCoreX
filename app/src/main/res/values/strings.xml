@@ -341,7 +341,7 @@
     <string name="opcode_screen_vu1_title">VU1 Opcode Families</string>
     <string name="opcode_screen_vu1_subtitle">Force VU1 instruction families onto the VU1 interpreter</string>
     <string name="opcode_families_note">Everything is recompiled by default. Switch a family off — or open it and switch off a single opcode — to always run it on the interpreter instead of the JIT. Great for pinpointing a buggy instruction in a specific game. Changes are saved and applied immediately.</string>
-    <string name="opcode_families_note_vu">Everything is recompiled by default. Switch a family off to always run it on the VU interpreter instead of the JIT. VU instructions are dual-issue, so exclusions apply to whole families rather than single opcodes. Changes are saved and applied immediately.</string>
+    <string name="opcode_families_note_vu">Everything is recompiled by default. Switch a family off to run microprograms containing it on the VU interpreter. Each program keeps the same engine through branches and pauses. Indirect jumps may cause additional programs to use the interpreter. Changes apply after the current program finishes.</string>
     <string name="opcode_families_disabled_count">Families on interpreter: %1$d</string>
     <string name="opcode_families_disabled_opcodes">Opcodes on interpreter: %1$d</string>
     <string name="opcode_families_reset_all">Reset all</string>
@@ -349,7 +349,7 @@
     <string name="opcode_families_show_opcodes">Opcodes</string>
     <string name="opcode_families_row_none">All recompiled</string>
     <string name="opcode_families_row_summary">%1$d families · %2$d opcodes</string>
-    <string name="opcode_families_mtvu_warning">MTVU is enabled. The VU1 interpreter does not use the helper thread, so disabling VU1 families may noticeably reduce performance.</string>
+    <string name="opcode_families_mtvu_warning">VU1 family exclusions automatically suspend MTVU because the interpreter runs on the main emulation thread. MTVU resumes when all VU1 families are enabled again. Exclusions may noticeably reduce performance.</string>
     <string name="opcode_families_open_ee">EE opcode families</string>
     <string name="opcode_families_open_iop">IOP opcode families</string>
     <string name="opcode_families_open_vu0">VU0 opcode families</string>
