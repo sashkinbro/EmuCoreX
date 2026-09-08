@@ -34,9 +34,6 @@ app/.cxx/
 .externalNativeBuild/
 .angle-build/
 scripts/
-!scripts/
-scripts/*
-!scripts/validate_gpu_driver_database.py
 captures/
 out/
 dist/
@@ -64,10 +61,6 @@ build_output.txt
 hs_err_pid*
 autotests/
 tests/
-!/tests/
-/tests/*
-!/tests/Run-JitOracle.ps1
-!/tests/JIT_ORACLE.md
 !app/src/main/cpp/pcsx2/tests/
 !app/src/main/cpp/pcsx2/tests/ctest/
 !app/src/main/cpp/pcsx2/tests/ctest/core/
@@ -102,11 +95,6 @@ Thumbs.db
 emulog.txt
 # Local investigation notes and profiling captures
 docs/
-!docs/
-docs/*
-!docs/GPU_DRIVER_PROFILES.md
-# Private local GPU research database; never publish it.
-docs/gpu-driver-database.json
 profiling-runs/
 profiler/
 /local-traces/
