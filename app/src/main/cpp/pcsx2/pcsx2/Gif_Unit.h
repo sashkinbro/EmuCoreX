@@ -17,6 +17,10 @@
 #include "emucorex/debug_logcat.h"
 
 struct GS_Packet;
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+// Active only inside the isolated oracle process; gameplay returns false.
+extern bool EmuCoreXOracleRecordGif(const u8* data, u32 size);
+#endif
 extern void Gif_MTGS_Wait(bool isMTVU);
 extern void Gif_FinishIRQ();
 extern bool Gif_HandlerAD(u8* pMem);
@@ -339,6 +343,10 @@ struct Gif_Path
 
 	void CopyGSPacketData(u8* pMem, u32 size, bool aligned = false)
 	{
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+		if (EmuCoreXOracleRecordGif(pMem, size))
+			return;
+#endif
 		if (curSize + size > buffSize)
 		{ // Move gsPack to front of buffer
 			GUNIT_LOG("CopyGSPacketData: Realigning packet!");
@@ -667,6 +675,10 @@ struct Gif_Unit
 	// If transfer cannot take place at this moment the return value is 0
 	u32 TransferGSPacketData(GIF_TRANSFER_TYPE tranType, u8* pMem, u32 size, bool aligned = false)
 	{
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+		if (EmuCoreXOracleRecordGif(pMem, size))
+			return size;
+#endif
 		if (THREAD_VU1)
 		{
 			Gif_Path& path1 = gifPath[GIF_PATH_1];

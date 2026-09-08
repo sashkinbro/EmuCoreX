@@ -363,6 +363,7 @@ target_compile_definitions(emucore
 )
 if(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	target_compile_definitions(emucore PRIVATE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE EMUCOREX_ENABLE_NATIVE_SELF_TESTS=1)
 	target_sources(emucore PRIVATE src/debug/jit_oracle.cpp)
 	add_executable(emucorex_jit_oracle src/debug/jit_oracle_main.cpp)
 	target_link_libraries(emucorex_jit_oracle PRIVATE dl)

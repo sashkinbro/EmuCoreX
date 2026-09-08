@@ -9,9 +9,11 @@
 
 int main(int argc, char** argv)
 {
-    if (argc != 3)
+    const bool fallback = argc == 4 && std::strcmp(argv[2], "replay-vu1-fallback") == 0;
+    const bool replay = argc == 4 && (fallback || std::strcmp(argv[2], "replay-vu1") == 0);
+    if (argc != 3 && !replay)
     {
-        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu\n", argv[0]);
+        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu|replay-vu1 [capture.vuo]\n", argv[0]);
         return 2;
     }
     setvbuf(stdout, nullptr, _IONBF, 0);
@@ -31,13 +33,14 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "dlopen: %s\n", dlerror());
         return 2;
     }
-    auto run = reinterpret_cast<int (*)(const char*)>(dlsym(library, "EmuCoreXRunJitOracle"));
+    const char* symbol = fallback ? "EmuCoreXReplayVU1Fallback" : (replay ? "EmuCoreXReplayVU1" : "EmuCoreXRunJitOracle");
+    auto run = reinterpret_cast<int (*)(const char*)>(dlsym(library, symbol));
     if (!run)
     {
         std::fprintf(stderr, "debug oracle unavailable: %s\n", dlerror());
         return 2;
     }
-    const int result = run(argv[2]);
+    const int result = run(replay ? argv[3] : argv[2]);
     std::fflush(nullptr);
     // Process owns all emulator globals; avoid unrelated application teardown.
     _exit(result);

@@ -8,6 +8,9 @@
 #include <cmath>
 #include "VUmicro.h"
 #include "MTVU.h"
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+extern void EmuCoreXOracleCaptureVU1(u32 startPC);
+#endif
 
 #ifdef PCSX2_DEBUG
 u32 vudump = 0;
@@ -73,6 +76,9 @@ void vu1ExecMicro(u32 addr)
 	VU0.VI[REG_VPU_STAT].UL |=  0x0100;
 	if ((s32)addr != -1) VU1.VI[REG_TPC].UL = addr & 0x7FF;
 
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	EmuCoreXOracleCaptureVU1(VU1.VI[REG_TPC].UL << 3);
+#endif
 	CpuVU1->SetStartPC(VU1.VI[REG_TPC].UL << 3);
 	_vuExecMicroDebug(VU1);
 	if(!INSTANT_VU1)
