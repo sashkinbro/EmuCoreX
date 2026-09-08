@@ -321,8 +321,33 @@ void VUTests()
     Check(kickInt.gif.size() == 64 && !kickInt.gifOverflowed, "interpreter XGKICK emits exactly two tags");
     Compare(kickInt, RunVU(1, true, kick, 0x80, 0, 128, false, &packetMemory), "VU1 XGKICK JIT packet bytes");
     Compare(kickInt, RunVU(1, true, kick, 0x80, 1ull << 9, 1, false, &packetMemory), "VU1 XGKICK fallback packet bytes");
+    std::vector<u32> flaggedKick = {NOP_L, (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x2cu,
+        NOP_L, NOP_U, NOP_L, NOP_U, NOP_L, NOP_U};
+    flaggedKick.insert(flaggedKick.end(), kick.begin(), kick.end());
+    Compare(RunVU(1, false, flaggedKick, 0x80, 0, 128, false, &packetMemory),
+        RunVU(1, true, flaggedKick, 0x80, 0, 128, false, &packetMemory), "VU1 STATUS survives XGKICK host call");
     for (u32 vu = 0; vu < 2; ++vu)
     {
+        for (u32 repetitions : {1u, 2u, 4u, 8u})
+        {
+            std::vector<u32> flagsProgram;
+            for (u32 i = 0; i < repetitions; ++i)
+            {
+                for (u32 upper : {
+                    (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x2cu,
+                    (15u << 21) | (1u << 16) | (1u << 11) | (3u << 6) | 0x2cu,
+                    (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x28u})
+                {
+                    flagsProgram.push_back(NOP_L);
+                    flagsProgram.push_back(upper);
+                }
+            }
+            flagsProgram.insert(flagsProgram.end(), {NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U});
+            const auto expectedFlags = RunVU(vu, false, flagsProgram, 0x80);
+            char flagName[80];
+            std::snprintf(flagName, sizeof(flagName), "VU%u sticky flags across %u FMAC writes", vu, repetitions * 3);
+            Compare(expectedFlags, RunVU(vu, true, flagsProgram, 0x80), flagName);
+        }
         // 1 + 3*2^-25 rounds up under nearest, but stays exactly 1 under
         // the configured chop mode. The old shell environment hid this bug
         // because the previous normal-valued corpus used exact sums.

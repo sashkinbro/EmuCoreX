@@ -37,7 +37,12 @@ static inline mVURegSaveLayout mVUGetRegSaveLayout(microVU& mVU, bool onlyNeeded
         if (!oakIsCallerSaved(i) || i == 4)
             continue;
 
-        if (!onlyNeeded || mVU.regAlloc->checkCachedGPR(i)) {
+        // STATUS instances are pinned outside the VI allocator. They remain
+        // live across helper calls even when no guest VI register is cached
+        // here, and all four use caller-saved AAPCS64 registers.
+        const bool statusInstance = i == VU_HOST_F0 || i == VU_HOST_F1 ||
+            i == VU_HOST_F2 || i == VU_HOST_F3;
+        if (!onlyNeeded || statusInstance || mVU.regAlloc->checkCachedGPR(i)) {
             gprs_to_save.push_back(i);
         }
     }
