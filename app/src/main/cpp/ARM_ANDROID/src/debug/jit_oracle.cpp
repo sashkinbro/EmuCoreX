@@ -305,6 +305,20 @@ void VUTests()
             "VU1 operand uses selected overflow policy");
     }
     EmuConfig.Cpu.Recompiler = savedClampOptions;
+    for (u32 vu = 0; vu < 2; ++vu)
+    {
+        EmuConfig.Cpu.Recompiler.vu0Overflow = false;
+        EmuConfig.Cpu.Recompiler.vu1Overflow = false;
+        for (u32 operand : {0x7f800000u, 0xff800000u, 0x7fc00000u})
+        {
+            auto program = clampProbe;
+            program[0] = operand;
+            char name[80];
+            std::snprintf(name, sizeof(name), "VU%u unclamped ADDi flags operand=%08x", vu, operand);
+            Compare(RunVU(vu, false, program, 0x80), RunVU(vu, true, program, 0x80), name);
+        }
+    }
+    EmuConfig.Cpu.Recompiler = savedClampOptions;
     // Real XGKICK opcodes with a two-tag packet, without creating an MTGS
     // thread. Only the final submission is intercepted; VU transfer timing
     // and reads of guest packet memory still execute in each engine.

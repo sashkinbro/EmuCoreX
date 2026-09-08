@@ -484,19 +484,31 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 	mVUUpperMaskActiveLanes_oaknut(temp_w, AND_XYZW);
 	oakAsm->ORR(mac_w, mac_w, temp_w);
 
-	if (sFLAG.doFlag && CHECK_VUOVERFLOWHACK)
+	if ((sFLAG.doFlag || mFLAG.doFlag) && (CHECK_VUOVERFLOWHACK || !CHECK_VU_OVERFLOW(mVU.index)))
 	{
 		oak::Label no_overflow;
-		oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, sse4_compvals[0][0])));
-		// FACGE performs the same unordered-safe absolute comparison as the
-		// previous copy + abs-mask + FCMGE sequence, without materializing the
-		// mask or modifying a copy first.
-		oakAsm->FACGE(t1_q.S4(), t2_q.S4(), OAK_QSCRATCH3.S4());
+		if (CHECK_VUOVERFLOWHACK)
+		{
+			oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, sse4_compvals[0][0])));
+			oakAsm->FACGE(t1_q.S4(), t2_q.S4(), OAK_QSCRATCH3.S4());
+		}
+		else
+		{
+			// Match VU_MAC_UPDATE for unclamped results, including NaNs.
+			// Integer exponent inspection does not depend on FP comparisons.
+			oakAsm->SHL(t1_q.S4(), t2_q.S4(), 1);
+			oakAsm->USHR(t1_q.S4(), t1_q.S4(), 24);
+			oakAsm->MOVI(OAK_QSCRATCH3.S4(), 255);
+			oakAsm->CMEQ(t1_q.S4(), t1_q.S4(), OAK_QSCRATCH3.S4());
+		}
 		mVUUpperMovmskps_oaknut(temp_w, t1_q);
 		mVUUpperMaskActiveLanes_oaknut(temp_w, AND_XYZW);
 		oakAsm->CBZ(temp_w, no_overflow);
-		oakAsm->MOV(OAK_WSCRATCH, 0x820000);
-		oakAsm->ORR(status_w, status_w, OAK_WSCRATCH);
+		if (sFLAG.doFlag)
+		{
+			oakAsm->MOV(OAK_WSCRATCH, sFLAG.doNonSticky ? 0x820000 : 0x800000);
+			oakAsm->ORR(status_w, status_w, OAK_WSCRATCH);
+		}
 		if (mFLAG.doFlag)
 		{
 			oakAsm->LSL(temp_w, temp_w, 12);
