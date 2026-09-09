@@ -41,6 +41,22 @@ Official website: https://emucorex.web.app/
 - Physical gamepad remapping and gamepad-aware UI flows
 - A shared desktop application for Windows, Linux, and macOS with a native Qt Quick interface
 
+## Screenshots
+
+In-game captures running on a Snapdragon 8 Elite Gen 5 device with the Vulkan renderer:
+
+| Tekken 5 | Need for Speed: Most Wanted |
+| --- | --- |
+| ![Tekken 5](Screenshot/tekken-5.jpg?v=2) | ![Need for Speed: Most Wanted](Screenshot/need-for-speed-most-wanted.jpg?v=2) |
+
+| Shadow of the Colossus | SoulCalibur II |
+| --- | --- |
+| ![Shadow of the Colossus](Screenshot/shadow-of-the-colossus.jpg?v=2) | ![SoulCalibur II](Screenshot/soulcalibur-ii.jpg?v=2) |
+
+| God of War II |
+| --- |
+| ![God of War II](Screenshot/god-of-war-ii.jpg?v=2) |
+
 ## Desktop Roadmap
 
 Desktop builds are under active development in `Windows-MacOS-Linux/`. EmuCoreX is designed as one application across all three desktop operating systems, with native packaging and platform-appropriate graphics backends.
