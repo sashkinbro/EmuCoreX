@@ -106,7 +106,6 @@ void mVUreset(microVU& mVU, bool resetReserve)
 			continue;
 		}
 		mVU.prog.prog[i]->clear();
-		mVU.prog.quick[i].block = nullptr;
 		mVU.prog.quick[i].prog = nullptr;
 	}
 }
@@ -178,10 +177,7 @@ __fi void mVUclear(mV, u32 addr, u32 size)
 		if (!quick.prog)
 			continue;
 		if (mVUProgRangesOverlap(quick.prog, addr, size))
-		{
-			quick.block = nullptr;
 			quick.prog = nullptr;
-		}
 	}
 
 	// lpState is a carried entry-search key and becomes invalid after every
@@ -407,10 +403,10 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 			mVU.prog.isSame = 1;
 			mVU.prog.cur = shared;
 			quick.prog = shared;
-			quick.block = shared->block[start_pc_8];
-			if (quick.block == nullptr)
+			microBlockManager* block = shared->block[start_pc_8];
+			if (block == nullptr)
 				return mVUblockFetch(mVU, startPC, pState);
-			return mVUentryGet(mVU, quick.block, startPC, pState);
+			return mVUentryGet(mVU, block, startPC, pState);
 		}
 
 		auto it(list->begin());
@@ -420,18 +416,18 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 
 			if (b)
 			{
-				quick.block = it[0]->block[start_pc_8];
-				quick.prog  = it[0];
+				microBlockManager* block = it[0]->block[start_pc_8];
+				quick.prog = it[0];
 				list->erase(it);
 				list->push_front(quick.prog);
 
 				// Sanity check, in case for some reason the program compilation aborted half way through (JALR for example)
-				if (quick.block == nullptr)
+				if (block == nullptr)
 				{
 					void* entryPoint = mVUblockFetch(mVU, startPC, pState);
 					return entryPoint;
 				}
-				return mVUentryGet(mVU, quick.block, startPC, pState);
+				return mVUentryGet(mVU, block, startPC, pState);
 			}
 		}
 
@@ -443,7 +439,6 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 		mVU.prog.isSame  = 1;
 		mVU.prog.cur     = mVUcreateProg(mVU, regs_start_pc_8, liveKey);
 		void* entryPoint = mVUblockFetch(mVU,  startPC, pState);
-		quick.block      = mVU.prog.cur->block[start_pc_8];
 		quick.prog       = mVU.prog.cur;
 		list->push_front(mVU.prog.cur);
 		//mVUprintUniqueRatio(mVU);
@@ -454,16 +449,16 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 	mVU.prog.isSame = -1;
 	mVU.prog.cur = quick.prog;
 	// Because the VU's can now run in sections and not whole programs at once
-	// we need to set the current block so it gets the right program back
-	quick.block = mVU.prog.cur->block[start_pc_8];
+	// we need to resolve the current block so it gets the right program back
+	microBlockManager* block = mVU.prog.cur->block[start_pc_8];
 
 	// Sanity check, in case for some reason the program compilation aborted half way through
-	if (quick.block == nullptr)
+	if (block == nullptr)
 	{
 		void* entryPoint = mVUblockFetch(mVU, startPC, pState);
 		return entryPoint;
 	}
-	return mVUentryGet(mVU, quick.block, startPC, pState);
+	return mVUentryGet(mVU, block, startPC, pState);
 }
 
 //------------------------------------------------------------------

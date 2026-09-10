@@ -87,8 +87,7 @@ typedef std::deque<microProgram*> microProgramList;
 
 struct microProgramQuick
 {
-	microBlockManager* block; // Quick reference to valid microBlockManager for current startPC
-	microProgram*      prog;  // The microProgram who is the owner of 'block'
+	microProgram* prog; // The microProgram ordered first for this startPC
 };
 
 struct microProgManager
