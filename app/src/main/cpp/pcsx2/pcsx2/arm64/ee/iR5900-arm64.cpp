@@ -284,6 +284,14 @@ extern "C" void EmuCoreXEEForceExitAfterFirstBlock()
 	eeRecExitRequested = true;
 	cpuRegs.nextEventCycle = 0;
 }
+
+// Same as above, but lets the recompiler run until the cycle budget is spent,
+// so multi-block programs (branches, calls) complete before exiting.
+extern "C" void EmuCoreXEEForceExitAfterCycles(u32 budget)
+{
+	eeRecExitRequested = true;
+	cpuRegs.nextEventCycle = cpuRegs.cycle + budget;
+}
 #endif
 
 static void recEventTest()

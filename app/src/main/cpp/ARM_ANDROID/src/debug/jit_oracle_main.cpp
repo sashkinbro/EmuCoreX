@@ -26,7 +26,8 @@ int main(int argc, char** argv)
     }
     mkdir("artifacts", 0700);
     // A broken guest branch must not leave a device process running forever.
-    alarm(60);
+    // The expanded CPU corpora need more than the original minute.
+    alarm(300);
     void* library = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL);
     if (!library)
     {

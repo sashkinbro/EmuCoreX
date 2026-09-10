@@ -19,12 +19,19 @@
 #include <android/log.h>
 #include <cerrno>
 
-// Self-test builds only. Always true in this file, which exists only when the
-// native self-tests are enabled: the CPU event tests are suppressed so the
-// differential oracle can run without initializing SPU2, DEV9 and friends.
+// Self-test builds only. The differential oracle enables this so it can run
+// without initializing SPU2, DEV9 and friends. It must default to off: a debug
+// build is a real emulator too, and the event tests are required there.
+static bool s_oracleSkipEvents = false;
+
 extern "C" int EmuCoreXOracleSkipEvents()
 {
-    return 1;
+    return s_oracleSkipEvents ? 1 : 0;
+}
+
+extern "C" void EmuCoreXOracleSetSkipEvents(int enabled)
+{
+    s_oracleSkipEvents = enabled != 0;
 }
 
 namespace
@@ -733,6 +740,8 @@ constexpr u32 EE_SCRATCH_SIZE = 256;
 constexpr u32 IOP_SCRATCH_SIZE = 128;
 
 extern "C" void EmuCoreXEEForceExitAfterFirstBlock();
+extern "C" void EmuCoreXEEForceExitAfterCycles(u32 budget);
+extern "C" void EmuCoreXOracleEESteps(u32 steps);
 
 constexpr u32 MipsR(u32 rs, u32 rt, u32 rd, u32 sa, u32 fn)
 {
@@ -760,6 +769,9 @@ struct EESnapshot
     u32 acc;
     u32 accflag;
     u32 cp0[32];
+    u32 vu0_vf[128];
+    u32 vu0_vi[32];
+    u32 vu0_acc[4];
     u8 scratch[EE_SCRATCH_SIZE];
 };
 
@@ -789,6 +801,13 @@ void CaptureEE(EESnapshot& out)
     out.fcr31 = fpuRegs.fprc[31];
     out.acc = fpuRegs.ACC.UL;
     out.accflag = fpuRegs.ACCflag;
+    for (u32 vf = 0; vf < 32; ++vf)
+        for (u32 lane = 0; lane < 4; ++lane)
+            out.vu0_vf[vf * 4 + lane] = VU0.VF[vf].UL[lane];
+    for (u32 vi = 0; vi < 32; ++vi)
+        out.vu0_vi[vi] = VU0.VI[vi].UL;
+    for (u32 lane = 0; lane < 4; ++lane)
+        out.vu0_acc[lane] = VU0.ACC.UL[lane];
     for (u32 i = 0; i < EE_SCRATCH_SIZE; ++i)
         out.scratch[i] = memRead8(EE_TEST_SCRATCH + i);
 }
@@ -842,6 +861,9 @@ void CompareEE(const EESnapshot& expected, const EESnapshot& actual, const char*
         std::snprintf(field, sizeof(field), "CP0[%u]", reg);
         same &= CpuDiff(name, field, &expected.cp0[reg], &actual.cp0[reg], sizeof(u32));
     }
+    same &= CpuDiff(name, "VU0.VF", expected.vu0_vf, actual.vu0_vf, sizeof(expected.vu0_vf));
+    same &= CpuDiff(name, "VU0.VI", expected.vu0_vi, actual.vu0_vi, sizeof(expected.vu0_vi));
+    same &= CpuDiff(name, "VU0.ACC", expected.vu0_acc, actual.vu0_acc, sizeof(expected.vu0_acc));
     same &= CpuDiff(name, "scratch", expected.scratch, actual.scratch, sizeof(expected.scratch));
     Check(same, name);
 }
@@ -864,10 +886,15 @@ void CompareIOP(const IOPSnapshot& expected, const IOPSnapshot& actual, const ch
     Check(same, name);
 }
 
-EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program)
+EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program, bool multiBlock = false)
 {
     std::memset(&cpuRegs, 0, sizeof(cpuRegs));
     std::memset(&fpuRegs, 0, sizeof(fpuRegs));
+    std::memset(&VU0.VF, 0, sizeof(VU0.VF));
+    std::memset(&VU0.VI, 0, sizeof(VU0.VI));
+    std::memset(&VU0.ACC, 0, sizeof(VU0.ACC));
+    VU0.q.UL = VU0.p.UL = 0;
+    VU0.macflag = VU0.statusflag = VU0.clipflag = 0;
     // A self-branch terminates the recompiled block so the forced exit fires
     // at a branch boundary; the interpreter stops after the same steps.
     std::vector<u32> code = program;
@@ -884,23 +911,35 @@ EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program)
     EEsCycle = 0;
     EEoCycle = 0;
 
+    constexpr u32 budget = 4096;
     if (jit)
     {
         Cpu = &recCpu;
         Cpu->Reset();
-        EmuCoreXEEForceExitAfterFirstBlock();
+        if (multiBlock)
+            EmuCoreXEEForceExitAfterCycles(budget);
+        else
+            EmuCoreXEEForceExitAfterFirstBlock();
         Cpu->Execute();
     }
     else
     {
         Cpu = &intCpu;
         Cpu->Reset();
-        for (u32 i = 0; i < code.size(); ++i)
-            Cpu->Step();
+        // Exceptions abort the current step through the interpreter's jmpbuf;
+        // the helper arms it exactly like intExecute() does.
+        EmuCoreXOracleEESteps(multiBlock ? 40000u : static_cast<u32>(code.size()));
     }
 
     EESnapshot out;
     CaptureEE(out);
+    if (multiBlock)
+    {
+        // Both engines stop inside the trailing self-branch loop.
+        const u32 sentinel = EE_TEST_PC + static_cast<u32>(code.size() - 2) * 4;
+        if (out.pc >= sentinel && out.pc < sentinel + 8)
+            out.pc = sentinel;
+    }
     return out;
 }
 
@@ -940,8 +979,523 @@ IOPSnapshot RunIOPProgram(bool jit, const std::vector<u32>& program)
     return out;
 }
 
+void RunEECase(const char* name, const std::vector<u32>& code, bool multiBlock = false)
+{
+    const EESnapshot interp = RunEEProgram(false, code, multiBlock);
+    const EESnapshot jit = RunEEProgram(true, code, multiBlock);
+    CompareEE(interp, jit, name);
+}
+
+std::vector<u32> EEValueSetup()
+{
+    return {
+        MipsI(9, 0, 8, 0x8001),                              // t0 = 0xffff8001
+        MipsI(15, 0, 9, 0xdead), MipsI(13, 9, 9, 0xbeef),    // t1 = 0xdeadbeef
+        MipsI(9, 0, 10, 0x7fff),                             // t2
+        MipsI(9, 0, 11, 0xfffe),                             // t3 = -2
+        MipsI(15, 0, 12, 0x1234), MipsI(13, 12, 12, 0x5678), // t4
+        MipsI(9, 0, 13, 3),                                  // t5
+        MipsI(9, 0, 14, 33),                                 // t6
+        MipsI(9, 0, 16, 0x00ff),                             // s0
+        MipsI(9, 0, 17, 0x0101),                             // s1
+    };
+}
+
+std::vector<u32> EEScratchSetup()
+{
+    return {
+        MipsI(15, 0, 22, 0x0010), MipsI(13, 22, 22, 0x1000), // s6 = scratch
+        MipsI(15, 0, 8, 0x0123), MipsI(13, 8, 8, 0x4567),    // t0
+        MipsI(15, 0, 9, 0x89ab), MipsI(13, 9, 9, 0xcdef),    // t1
+        MipsI(43, 22, 8, 32), MipsI(43, 22, 9, 36),          // sw patterns
+        MipsI(9, 0, 10, 0x55), MipsI(9, 0, 11, 0x66),        // t2, t3
+    };
+}
+
+std::vector<u32> EECop1Setup()
+{
+    return {
+        MipsI(15, 0, 8, 0x3f80), MipsCop1(4, 8, 1, 0, 0),                            // f1 = 1.0
+        MipsI(15, 0, 8, 0x4000), MipsCop1(4, 8, 2, 0, 0),                            // f2 = 2.0
+        MipsI(15, 0, 8, 0x3eaa), MipsI(13, 8, 8, 0xaaab), MipsCop1(4, 8, 3, 0, 0),   // f3 = 1/3
+        MipsI(15, 0, 8, 0xc000), MipsCop1(4, 8, 4, 0, 0),                            // f4 = -2.0
+        MipsI(15, 0, 8, 0x7f7f), MipsI(13, 8, 8, 0xffff), MipsCop1(4, 8, 5, 0, 0),   // f5 = flt max
+        MipsI(15, 0, 8, 0x8000), MipsCop1(4, 8, 6, 0, 0),                            // f6 = -0.0
+        MipsI(15, 0, 8, 0x4049), MipsI(13, 8, 8, 0x0fdb), MipsCop1(4, 8, 7, 0, 0),   // f7 = pi
+        MipsI(9, 0, 8, 1234), MipsCop1(4, 8, 8, 0, 0),                               // f8 = W(1234)
+    };
+}
+
+// MMI uses a two-level function field: bits 5..0 pick the group, bits 10..6
+// the operation inside MMI0..MMI3.
+constexpr u32 Mmi(u32 group, u32 sub, u32 rs, u32 rt, u32 rd)
+{
+    return (0x1Cu << 26) | (rs << 21) | (rt << 16) | (rd << 11) | (sub << 6) | group;
+}
+
+void EECoverageSpecial()
+{
+    char name[96];
+
+    for (u32 fn : {0x20u, 0x21u, 0x22u, 0x23u, 0x24u, 0x25u, 0x26u, 0x27u, 0x2au, 0x2bu})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(8, 9, 18, 0, fn));
+        std::snprintf(name, sizeof(name), "ee special %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x2cu, 0x2du, 0x2eu, 0x2fu})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(8, 9, 18, 0, fn));
+        std::snprintf(name, sizeof(name), "ee special64 %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x00u, 0x02u, 0x03u, 0x38u, 0x3au, 0x3bu, 0x3cu, 0x3eu, 0x3fu})
+    {
+        for (u32 sa : {0u, 1u, 7u, 31u})
+        {
+            auto code = EEValueSetup();
+            code.push_back(MipsR(0, 8, 18, sa, fn));
+            std::snprintf(name, sizeof(name), "ee shift %02x sa=%u", fn, sa);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x04u, 0x06u, 0x07u, 0x14u, 0x16u, 0x17u})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(13, 8, 18, 0, fn));
+        std::snprintf(name, sizeof(name), "ee shiftv %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x0au, 0x0bu})
+    {
+        for (u32 condReg : {8u, 0u})
+        {
+            auto code = EEValueSetup();
+            code.push_back(MipsI(9, 0, 18, 0x5555));
+            code.push_back(MipsR(8, condReg, 18, 0, fn));
+            std::snprintf(name, sizeof(name), "ee movz/movn %02x cond=%u", fn, condReg);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x18u, 0x19u, 0x1au, 0x1bu, 0x1cu, 0x1du, 0x1eu, 0x1fu})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(8, 9, 0, 0, fn));
+        code.push_back(MipsR(0, 0, 18, 0, 0x10)); // mfhi
+        code.push_back(MipsR(0, 0, 20, 0, 0x12)); // mflo
+        std::snprintf(name, sizeof(name), "ee multdiv %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x11u, 0x13u})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(8, 0, 0, 0, fn));
+        std::snprintf(name, sizeof(name), "ee mthilo %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x28u, 0x29u})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsR(8, 0, 0, 0, fn));
+        code.push_back(MipsR(0, 0, 19, 0, 0x28)); // mfsa
+        std::snprintf(name, sizeof(name), "ee sa %02x", fn);
+        RunEECase(name, code);
+    }
+}
+
+void EECoverageMemory()
+{
+    char name[96];
+
+    // Strict loads/stores only use architecturally aligned addresses: the
+    // interpreter's unaligned diagnostic cancels the instruction while the JIT
+    // performs the access, matching upstream PCSX2. The merge ops below cover
+    // intentional unaligned access.
+    struct MemCase { u32 op; const u32* offsets; u32 count; };
+    const u32 byteOffs[] = {32u, 33u, 38u};
+    const u32 halfOffs[] = {32u, 34u, 38u};
+    const u32 wordOffs[] = {32u, 36u};
+    const u32 dwordOffs[] = {32u, 48u};
+    const MemCase loads[] = {
+        {32u, byteOffs, 3}, {36u, byteOffs, 3},
+        {33u, halfOffs, 3}, {37u, halfOffs, 3},
+        {35u, wordOffs, 2}, {39u, wordOffs, 2},
+        {55u, dwordOffs, 2},
+        {26u, byteOffs, 3}, {27u, byteOffs, 3}, // LDL/LDR merge forms
+        {34u, byteOffs, 3}, {38u, byteOffs, 3}, // LWL/LWR merge forms
+    };
+    for (const MemCase& mc : loads)
+    {
+        for (u32 i = 0; i < mc.count; ++i)
+        {
+            auto code = EEScratchSetup();
+            code.push_back(MipsI(mc.op, 22, 18, mc.offsets[i]));
+            std::snprintf(name, sizeof(name), "ee load %u off=%u", mc.op, mc.offsets[i]);
+            RunEECase(name, code);
+        }
+    }
+
+    const MemCase stores[] = {
+        {40u, byteOffs, 3}, {42u, byteOffs, 3}, {46u, byteOffs, 3},
+        {41u, halfOffs, 3},
+        {43u, wordOffs, 2},
+        {63u, dwordOffs, 2},
+        {44u, byteOffs, 3}, {45u, byteOffs, 3}, // SDL/SDR merge forms
+    };
+    for (const MemCase& mc : stores)
+    {
+        for (u32 i = 0; i < mc.count; ++i)
+        {
+            auto code = EEScratchSetup();
+            code.push_back(MipsI(mc.op, 22, 10, mc.offsets[i]));
+            std::snprintf(name, sizeof(name), "ee store %u off=%u", mc.op, mc.offsets[i]);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 off : {0u, 16u})
+    {
+        auto code = EEScratchSetup();
+        code.push_back(MipsI(30, 22, 8, off));  // lq t0/t1
+        code.push_back(MipsI(31, 22, 10, off)); // sq t2/t3
+        std::snprintf(name, sizeof(name), "ee lq/sq off=%u", off);
+        RunEECase(name, code);
+    }
+
+    // Unaligned load pairs reconstruct the word, store pairs merge into memory.
+    {
+        auto code = EEScratchSetup();
+        code.push_back(MipsI(34, 22, 18, 33));  // lwl
+        code.push_back(MipsI(38, 22, 18, 36));  // lwr
+        RunEECase("ee lwl/lwr pair", code);
+    }
+    {
+        auto code = EEScratchSetup();
+        code.push_back(MipsI(42, 22, 10, 33));  // swl
+        code.push_back(MipsI(46, 22, 10, 36));  // swr
+        RunEECase("ee swl/swr pair", code);
+    }
+    {
+        auto code = EEScratchSetup();
+        code.push_back(MipsI(26, 22, 18, 33));  // ldl
+        code.push_back(MipsI(27, 22, 18, 40));  // ldr
+        RunEECase("ee ldl/ldr pair", code);
+    }
+    {
+        auto code = EEScratchSetup();
+        code.push_back(MipsI(44, 22, 10, 33));  // sdl
+        code.push_back(MipsI(45, 22, 10, 40));  // sdr
+        RunEECase("ee sdl/sdr pair", code);
+    }
+}
+
+void EECoverageBranches()
+{
+    char name[96];
+
+    for (u32 op : {4u, 5u, 6u, 7u, 20u, 21u, 22u, 23u})
+    {
+        for (u32 mode = 0; mode < 2; ++mode)
+        {
+            auto code = EEValueSetup();
+            const u32 rt = mode ? 0u : 9u;
+            code.push_back(MipsI(op, 8, rt, 2)); // skip next when taken
+            code.push_back(MipsI(9, 0, 23, 1));  // delay slot marker
+            code.push_back(MipsI(9, 0, 24, 1));  // skipped marker
+            std::snprintf(name, sizeof(name), "ee branch %u mode %u", op, mode);
+            RunEECase(name, code, true);
+        }
+    }
+
+    for (u32 rt : {0u, 1u, 2u, 3u, 16u, 17u, 18u, 19u})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsI(1, 8, rt, 2));
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        std::snprintf(name, sizeof(name), "ee regimm rt=%u", rt);
+        RunEECase(name, code, true);
+    }
+
+    for (u32 op : {2u, 3u})
+    {
+        auto code = EEValueSetup();
+        const u32 targetIdx = static_cast<u32>(code.size()) + 3;
+        const u32 target = EE_TEST_PC + targetIdx * 4;
+        code.push_back((op << 26) | ((target >> 2) & 0x03ffffffu));
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        code.push_back(MipsI(9, 0, 25, 1));
+        std::snprintf(name, sizeof(name), "ee jump %u", op);
+        RunEECase(name, code, true);
+    }
+
+    {
+        auto code = EEValueSetup();
+        const u32 targetIdx = static_cast<u32>(code.size()) + 4;
+        const u32 target = EE_TEST_PC + targetIdx * 4;
+        code.push_back(MipsI(15, 0, 22, static_cast<u32>(target) >> 16));
+        code.push_back(MipsI(13, 22, 22, static_cast<u32>(target) & 0xffffu));
+        code.push_back(MipsR(22, 0, 0, 0, 0x08)); // jr s6
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        code.push_back(MipsI(9, 0, 25, 1));
+        RunEECase("ee jr", code, true);
+    }
+    {
+        auto code = EEValueSetup();
+        const u32 targetIdx = static_cast<u32>(code.size()) + 5;
+        const u32 target = EE_TEST_PC + targetIdx * 4;
+        code.push_back(MipsI(15, 0, 22, static_cast<u32>(target) >> 16));
+        code.push_back(MipsI(13, 22, 22, static_cast<u32>(target) & 0xffffu));
+        code.push_back(MipsR(22, 0, 31, 0, 0x09)); // jalr ra, s6
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        code.push_back(MipsI(9, 0, 25, 1));
+        RunEECase("ee jalr", code, true);
+    }
+}
+
+void EECoverageCop0()
+{
+    char name[96];
+
+    for (u32 rd = 0; rd < 32; ++rd)
+    {
+        if (rd == 9 || rd == 11 || rd == 25)
+            continue;
+        auto code = EEValueSetup();
+        code.push_back(MipsI(16, 0, 18, rd << 11));
+        std::snprintf(name, sizeof(name), "ee mfc0 rd=%u", rd);
+        RunEECase(name, code);
+    }
+
+    for (u32 rd : {0u, 2u, 3u, 4u, 5u, 6u, 10u, 12u, 13u, 14u, 16u, 28u, 29u, 30u})
+    {
+        auto code = EEValueSetup();
+        code.push_back(MipsI(9, 0, 18, 0x1234));
+        code.push_back(MipsI(16, 4, 18, rd << 11));
+        code.push_back(MipsI(16, 0, 19, rd << 11));
+        std::snprintf(name, sizeof(name), "ee mtc0/mfc0 rd=%u", rd);
+        RunEECase(name, code);
+    }
+}
+
+void EECoverageCop1()
+{
+    char name[96];
+
+    for (u32 fn : {0x00u, 0x01u, 0x02u, 0x03u})
+    {
+        for (u32 operands = 0; operands < 3; ++operands)
+        {
+            const u32 fs = operands == 0 ? 1u : (operands == 1 ? 3u : 5u);
+            const u32 ft = operands == 0 ? 2u : (operands == 1 ? 4u : 6u);
+            auto code = EECop1Setup();
+            code.push_back(MipsCop1(0x10, ft, fs, 10, fn));
+            std::snprintf(name, sizeof(name), "ee cop1 %02x f%u f%u", fn, fs, ft);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 pair = 0; pair < 3; ++pair)
+    {
+        const u32 ft = pair == 0 ? 2u : (pair == 1 ? 3u : 5u);
+        for (u32 fn : {0x04u, 0x05u, 0x06u, 0x07u})
+        {
+            auto code = EECop1Setup();
+            code.push_back(MipsCop1(0x10, ft, 0, 10, fn));
+            std::snprintf(name, sizeof(name), "ee cop1 unary %02x f%u", fn, ft);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x28u, 0x29u})
+    {
+        for (u32 operands = 0; operands < 3; ++operands)
+        {
+            const u32 fs = operands == 0 ? 1u : (operands == 1 ? 3u : 5u);
+            const u32 ft = operands == 0 ? 2u : (operands == 1 ? 4u : 6u);
+            auto code = EECop1Setup();
+            code.push_back(MipsCop1(0x10, ft, fs, 10, fn));
+            std::snprintf(name, sizeof(name), "ee cop1 %02x f%u f%u", fn, fs, ft);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x1au, 0x1bu, 0x1du})
+    {
+        auto code = EECop1Setup();
+        code.push_back(MipsCop1(0x10, 2, 1, 0, 0x1a)); // mula.s f1,f2 -> ACC
+        code.push_back(MipsCop1(0x10, 4, 3, 10, fn));  // fn f10, f3, f4
+        std::snprintf(name, sizeof(name), "ee cop1 acc %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x18u, 0x19u, 0x1cu})
+    {
+        auto code = EECop1Setup();
+        code.push_back(MipsCop1(0x10, 4, 3, 0, fn)); // fn ACC, f3, f4
+        std::snprintf(name, sizeof(name), "ee cop1 acc2 %02x", fn);
+        RunEECase(name, code);
+    }
+
+    for (u32 fn : {0x30u, 0x32u, 0x34u, 0x36u})
+    {
+        for (u32 operands = 0; operands < 3; ++operands)
+        {
+            const u32 fs = operands == 0 ? 1u : (operands == 1 ? 3u : 2u);
+            const u32 ft = operands == 0 ? 2u : (operands == 1 ? 4u : 1u);
+            auto code = EECop1Setup();
+            code.push_back(MipsCop1(0x10, ft, fs, 10, fn));
+            std::snprintf(name, sizeof(name), "ee cop1 cmp %02x f%u f%u", fn, fs, ft);
+            RunEECase(name, code);
+        }
+    }
+
+    for (u32 rt : {0u, 1u, 2u, 3u})
+    {
+        auto code = EECop1Setup();
+        code.push_back(MipsCop1(0x10, 2, 1, 10, 0x32)); // c.eq.s f10,f1,f2
+        code.push_back(MipsCop1(8, rt, 0, 0, 0));       // bc1f/t
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        std::snprintf(name, sizeof(name), "ee cop1 bc1 rt=%u", rt);
+        RunEECase(name, code, true);
+    }
+
+    {
+        auto code = EECop1Setup();
+        code.push_back(MipsCop1(0x10, 0, 8, 10, 0x20)); // cvt.s.w f10, f8
+        code.push_back(MipsCop1(0x10, 0, 2, 11, 0x24)); // cvt.w.s f11, f2
+        code.push_back(MipsCop1(0x10, 0, 3, 12, 0x24)); // cvt.w.s f12, f3
+        code.push_back(MipsCop1(0, 18, 10, 0, 0));      // mfc1 s2, f10
+        code.push_back(MipsCop1(2, 19, 31, 0, 0));      // cfc1 s3, fcr31
+        RunEECase("ee cop1 cvt", code);
+    }
+    {
+        auto code = EECop1Setup();
+        code.push_back(MipsCop1(4, 18, 10, 0, 0));      // mtc1 s2, f10
+        code.push_back(MipsCop1(6, 18, 31, 0, 0));      // ctc1 s2, fcr31
+        code.push_back(MipsCop1(2, 19, 31, 0, 0));      // cfc1 s3, fcr31
+        RunEECase("ee cop1 moves", code);
+    }
+}
+
+void EECoverageCop2()
+{
+    // QMTC2 vf_d, rt (writes vf_d/+/+1 from a GPR pair), then macro arithmetic.
+    auto qtc = [](u32 rt, u32 vd) { return (0x12u << 26) | (5u << 21) | (rt << 16) | (vd << 11); };
+    auto macro = [](u32 fn, u32 ft, u32 fs, u32 fd) {
+        return (0x12u << 26) | (0x10u << 21) | (ft << 16) | (fs << 11) | (fd << 6) | fn;
+    };
+    auto cfc2 = [](u32 rt, u32 rd) { return (0x12u << 26) | (2u << 21) | (rt << 16) | (rd << 11); };
+    auto ctc2 = [](u32 rt, u32 rd) { return (0x12u << 26) | (6u << 21) | (rt << 16) | (rd << 11); };
+    auto qmfc2 = [](u32 rt, u32 vd) { return (0x12u << 26) | (1u << 21) | (rt << 16) | (vd << 11); };
+    auto lqc2 = [](u32 base, u32 vt, u32 off) { return (0x36u << 26) | (base << 21) | (vt << 16) | (off & 0xffffu); };
+    auto sqc2 = [](u32 base, u32 vt, u32 off) { return (0x3eu << 26) | (base << 21) | (vt << 16) | (off & 0xffffu); };
+    char name[96];
+
+    {
+        auto code = EEValueSetup();
+        code.push_back(ctc2(8, 1));
+        code.push_back(cfc2(18, 1));
+        RunEECase("ee ctc2/cfc2", code);
+    }
+    {
+        auto code = EEValueSetup();
+        code.push_back(qtc(8, 1));  // vf1 = {t0,t1}
+        code.push_back(qtc(10, 2)); // vf2 = {t2,t3}
+        code.push_back(qmfc2(18, 1));
+        RunEECase("ee qmtc2/qmfc2", code);
+    }
+    {
+        auto code = EEScratchSetup();
+        code.push_back(lqc2(22, 1, 32));
+        code.push_back(sqc2(22, 1, 48));
+        RunEECase("ee lqc2/sqc2", code);
+    }
+    for (u32 fn : {0x28u, 0x29u, 0x2au, 0x2bu, 0x2cu, 0x2du, 0x2fu})
+    {
+        auto code = EEValueSetup();
+        code.push_back(qtc(8, 1));
+        code.push_back(qtc(10, 2));
+        code.push_back(macro(fn, 2, 1, 3));
+        code.push_back(qmfc2(18, 3));
+        std::snprintf(name, sizeof(name), "ee cop2 macro %02x", fn);
+        RunEECase(name, code);
+    }
+    {
+        auto code = EEValueSetup();
+        code.push_back(qtc(8, 1));
+        code.push_back(qtc(10, 2));
+        code.push_back(macro(0x30, 2, 1, 3)); // viadd vi3, vi1, vi2
+        code.push_back(cfc2(18, 3));
+        RunEECase("ee cop2 viadd", code);
+    }
+}
+
+void EECoverageMmi()
+{
+    constexpr u32 MMI0 = 8, MMI2 = 9, MMI1 = 40, MMI3 = 41;
+    char name[96];
+
+    const u32 mmi0Subs[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 30, 31};
+    const u32 mmi1Subs[] = {1, 2, 3, 4, 5, 6, 7, 10, 16, 17, 18, 20, 21, 22, 24, 25, 26, 27};
+    const u32 mmi2Subs[] = {0, 2, 3, 4, 8, 9, 10, 12, 13, 14, 16, 17, 18, 19, 20, 21, 26, 27, 28, 29, 30, 31};
+    const u32 mmi3Subs[] = {0, 3, 8, 9, 10, 12, 13, 14, 18, 19, 26, 27, 30};
+
+    auto runGroup = [&](const char* groupName, u32 group, const u32* subs, u32 count) {
+        for (u32 i = 0; i < count; ++i)
+        {
+            auto code = EEValueSetup();
+            code.push_back(Mmi(group, subs[i], 8, 9, 18));
+            code.push_back(Mmi(group, subs[i], 8, 9, 20));
+            std::snprintf(name, sizeof(name), "ee mmi %s sub=%u", groupName, subs[i]);
+            RunEECase(name, code);
+        }
+    };
+    runGroup("mmi0", MMI0, mmi0Subs, static_cast<u32>((sizeof(mmi0Subs) / sizeof(mmi0Subs[0]))));
+    runGroup("mmi1", MMI1, mmi1Subs, static_cast<u32>((sizeof(mmi1Subs) / sizeof(mmi1Subs[0]))));
+    runGroup("mmi2", MMI2, mmi2Subs, static_cast<u32>((sizeof(mmi2Subs) / sizeof(mmi2Subs[0]))));
+    runGroup("mmi3", MMI3, mmi3Subs, static_cast<u32>((sizeof(mmi3Subs) / sizeof(mmi3Subs[0]))));
+
+    // Base MMI group functions.
+    for (u32 group : {0u, 1u, 4u, 48u, 49u, 60u, 62u, 63u})
+    {
+        auto code = EEValueSetup();
+        code.push_back((0x1Cu << 26) | (8u << 21) | (9u << 16) | (18u << 11) | group);
+        std::snprintf(name, sizeof(name), "ee mmi base %u", group);
+        RunEECase(name, code);
+    }
+    for (u32 group : {52u, 54u, 55u})
+    {
+        auto code = EEValueSetup();
+        code.push_back((0x1Cu << 26) | (8u << 16) | (18u << 11) | (3u << 6) | group);
+        std::snprintf(name, sizeof(name), "ee mmi shifth %u", group);
+        RunEECase(name, code);
+    }
+    for (u32 group : {16u, 17u, 18u, 19u, 32u, 33u, 36u, 37u, 38u, 39u})
+    {
+        auto code = EEValueSetup();
+        code.push_back((0x1Cu << 26) | (8u << 21) | (9u << 16) | (18u << 11) | group);
+        std::snprintf(name, sizeof(name), "ee mmi base2 %u", group);
+        RunEECase(name, code);
+    }
+}
+
 void EETests()
 {
+    EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
     EmuConfig = Pcsx2Config();
     EmuConfig.Speedhacks.vuThread = false;
@@ -954,6 +1508,13 @@ void EETests()
     SysMemory::Reset();
     Cpu = &recCpu;
     Cpu->Reserve();
+    // COP2 macro mode runs through microVU0's hot path; give it a reserved,
+    // reset cache even though no microprogram is executed here.
+    CpuVU0 = &CpuMicroVU0;
+    CpuVU1 = &CpuMicroVU1;
+    CpuMicroVU0.Reserve();
+    CpuMicroVU1.Reserve();
+    CpuMicroVU0.Reset();
 
     // The forced exit runs one event test, which can service the IOP. Park it
     // in an empty self-branch so the event path stays side effect free.
@@ -1056,10 +1617,228 @@ void EETests()
         std::printf("EECYCLES %s interp=%u jit=%u\n", test.name, interp.cycle, jit.cycle);
         CompareEE(interp, jit, test.name);
     }
+
+    EECoverageSpecial();
+    EECoverageMemory();
+    EECoverageBranches();
+    EECoverageCop0();
+    EECoverageCop1();
+    EECoverageCop2();
+    EECoverageMmi();
+}
+
+void RunIOPCase(const char* name, const std::vector<u32>& code)
+{
+    const IOPSnapshot interp = RunIOPProgram(false, code);
+    const IOPSnapshot jit = RunIOPProgram(true, code);
+    CompareIOP(interp, jit, name);
+}
+
+std::vector<u32> IOPValueSetup()
+{
+    return {
+        MipsI(9, 0, 8, 0x8001),
+        MipsI(15, 0, 9, 0xdead), MipsI(13, 9, 9, 0xbeef),
+        MipsI(9, 0, 10, 0x7fff),
+        MipsI(9, 0, 11, 0xfffe),
+        MipsI(15, 0, 12, 0x1234), MipsI(13, 12, 12, 0x5678),
+        MipsI(9, 0, 13, 3),
+        MipsI(9, 0, 14, 33),
+        MipsI(9, 0, 16, 0x00ff),
+        MipsI(9, 0, 17, 0x0101),
+    };
+}
+
+std::vector<u32> IOPScratchSetup()
+{
+    return {
+        MipsI(15, 0, 22, 0x0018),                            // s6 = 0x00180000
+        MipsI(15, 0, 8, 0x0123), MipsI(13, 8, 8, 0x4567),
+        MipsI(15, 0, 9, 0x89ab), MipsI(13, 9, 9, 0xcdef),
+        MipsI(43, 22, 8, 32), MipsI(43, 22, 9, 36),
+        MipsI(9, 0, 10, 0x55), MipsI(9, 0, 11, 0x66),
+    };
+}
+
+void IOPCoverage()
+{
+    char name[96];
+
+    for (u32 fn : {0x20u, 0x21u, 0x22u, 0x23u, 0x24u, 0x25u, 0x26u, 0x27u, 0x2au, 0x2bu})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsR(8, 9, 18, 0, fn));
+        std::snprintf(name, sizeof(name), "iop special %02x", fn);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 fn : {0x00u, 0x02u, 0x03u})
+    {
+        for (u32 sa : {0u, 1u, 7u, 31u})
+        {
+            auto code = IOPValueSetup();
+            code.push_back(MipsR(0, 8, 18, sa, fn));
+            std::snprintf(name, sizeof(name), "iop shift %02x sa=%u", fn, sa);
+            RunIOPCase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x04u, 0x06u, 0x07u})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsR(13, 8, 18, 0, fn));
+        std::snprintf(name, sizeof(name), "iop shiftv %02x", fn);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 fn : {0x0au, 0x0bu})
+    {
+        for (u32 condReg : {8u, 0u})
+        {
+            auto code = IOPValueSetup();
+            code.push_back(MipsI(9, 0, 18, 0x5555));
+            code.push_back(MipsR(8, condReg, 18, 0, fn));
+            std::snprintf(name, sizeof(name), "iop movz/movn %02x cond=%u", fn, condReg);
+            RunIOPCase(name, code);
+        }
+    }
+
+    for (u32 fn : {0x18u, 0x19u, 0x1au, 0x1bu})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsR(8, 9, 0, 0, fn));
+        code.push_back(MipsR(0, 0, 18, 0, 0x10));
+        code.push_back(MipsR(0, 0, 20, 0, 0x12));
+        std::snprintf(name, sizeof(name), "iop multdiv %02x", fn);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 fn : {0x11u, 0x13u})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsR(8, 0, 0, 0, fn));
+        std::snprintf(name, sizeof(name), "iop mthilo %02x", fn);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 op : {8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u})
+    {
+        for (u32 imm : {0x1234u, 0xfff9u})
+        {
+            auto code = IOPValueSetup();
+            code.push_back(MipsI(op, 8, 18, imm));
+            std::snprintf(name, sizeof(name), "iop imm %u imm=%04x", op, imm);
+            RunIOPCase(name, code);
+        }
+    }
+
+    for (u32 op : {32u, 33u, 34u, 35u, 36u, 37u, 38u, 39u})
+    {
+        for (u32 off : {32u, 33u, 38u})
+        {
+            auto code = IOPScratchSetup();
+            code.push_back(MipsI(op, 22, 18, off));
+            std::snprintf(name, sizeof(name), "iop load %u off=%u", op, off);
+            RunIOPCase(name, code);
+        }
+    }
+
+    for (u32 op : {40u, 41u, 42u, 43u, 44u, 45u, 46u})
+    {
+        for (u32 off : {33u, 38u})
+        {
+            auto code = IOPScratchSetup();
+            code.push_back(MipsI(op, 22, 10, off));
+            std::snprintf(name, sizeof(name), "iop store %u off=%u", op, off);
+            RunIOPCase(name, code);
+        }
+    }
+    {
+        auto code = IOPScratchSetup();
+        code.push_back(MipsI(34, 22, 18, 33));
+        code.push_back(MipsI(38, 22, 18, 36));
+        RunIOPCase("iop lwl/lwr pair", code);
+    }
+    {
+        auto code = IOPScratchSetup();
+        code.push_back(MipsI(42, 22, 10, 33));
+        code.push_back(MipsI(46, 22, 10, 36));
+        RunIOPCase("iop swl/swr pair", code);
+    }
+
+    for (u32 op : {4u, 5u, 6u, 7u})
+    {
+        for (u32 mode = 0; mode < 2; ++mode)
+        {
+            auto code = IOPValueSetup();
+            const u32 rt = mode ? 0u : 9u;
+            code.push_back(MipsI(op, 8, rt, 2));
+            code.push_back(MipsI(9, 0, 23, 1));
+            code.push_back(MipsI(9, 0, 24, 1));
+            std::snprintf(name, sizeof(name), "iop branch %u mode %u", op, mode);
+            RunIOPCase(name, code);
+        }
+    }
+
+    for (u32 rt : {0u, 1u, 16u, 17u})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsI(1, 8, rt, 2));
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        std::snprintf(name, sizeof(name), "iop regimm rt=%u", rt);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 op : {2u, 3u})
+    {
+        auto code = IOPValueSetup();
+        const u32 targetIdx = static_cast<u32>(code.size()) + 3;
+        const u32 target = IOP_TEST_PC + targetIdx * 4;
+        code.push_back((op << 26) | ((target >> 2) & 0x03ffffffu));
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        code.push_back(MipsI(9, 0, 25, 1));
+        std::snprintf(name, sizeof(name), "iop jump %u", op);
+        RunIOPCase(name, code);
+    }
+    {
+        auto code = IOPValueSetup();
+        const u32 targetIdx = static_cast<u32>(code.size()) + 4;
+        const u32 target = IOP_TEST_PC + targetIdx * 4;
+        code.push_back(MipsI(15, 0, 22, static_cast<u32>(target) >> 16));
+        code.push_back(MipsI(13, 22, 22, static_cast<u32>(target) & 0xffffu));
+        code.push_back(MipsR(22, 0, 0, 0, 0x08));
+        code.push_back(MipsI(9, 0, 23, 1));
+        code.push_back(MipsI(9, 0, 24, 1));
+        code.push_back(MipsI(9, 0, 25, 1));
+        RunIOPCase("iop jr", code);
+    }
+
+    for (u32 rd = 0; rd < 16; ++rd)
+    {
+        if (rd == 1 || rd == 9 || rd == 11)
+            continue;
+        auto code = IOPValueSetup();
+        code.push_back(MipsI(16, 0, 18, rd << 11));
+        std::snprintf(name, sizeof(name), "iop mfc0 rd=%u", rd);
+        RunIOPCase(name, code);
+    }
+
+    for (u32 rd : {0u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 10u, 12u, 13u, 14u, 15u})
+    {
+        auto code = IOPValueSetup();
+        code.push_back(MipsI(9, 0, 18, 0x1234));
+        code.push_back(MipsI(16, 4, 18, rd << 11));
+        code.push_back(MipsI(16, 0, 19, rd << 11));
+        std::snprintf(name, sizeof(name), "iop mtc0/mfc0 rd=%u", rd);
+        RunIOPCase(name, code);
+    }
 }
 
 void IOPTests()
 {
+    EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
     EmuConfig = Pcsx2Config();
     EmuConfig.Speedhacks.vuThread = false;
@@ -1124,6 +1903,8 @@ void IOPTests()
         std::printf("IOPCYCLES %s interp=%u jit=%u\n", test.name, interp.cycle, jit.cycle);
         CompareIOP(interp, jit, test.name);
     }
+
+    IOPCoverage();
 }
 }
 

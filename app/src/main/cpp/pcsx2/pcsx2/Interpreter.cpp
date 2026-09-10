@@ -673,6 +673,20 @@ static void intStep()
 	execI();
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+// Differential oracle stepping. Exceptions longjmp through intJmpBuf, which
+// intExecute() normally arms; arm it per step here so address errors and
+// similar instructions abort cleanly instead of jumping into a dead frame.
+extern "C" void EmuCoreXOracleEESteps(u32 steps)
+{
+	for (u32 i = 0; i < steps; ++i)
+	{
+		if (fastjmp_set(&intJmpBuf) == 0)
+			execI();
+	}
+}
+#endif
+
 void intStepWithCancelBoundary()
 {
 	if (fastjmp_set(&intJmpBuf) != 0)
