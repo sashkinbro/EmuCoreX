@@ -1478,6 +1478,51 @@ void EECoverageCop2()
     }
 }
 
+void EECoverageCop2Spec2()
+{
+    // SPEC2: subop in bits 10..6, lane bits 1..0, selected by funct 0x3C..0x3F.
+    // Dest mask stays in the rs field; operands follow the macro layout.
+    auto spec2 = [](u32 mask, u32 ft, u32 fs, u32 subop, u32 lane) {
+        return (0x12u << 26) | ((0x10u | mask) << 21) | (ft << 16) | (fs << 11) | (subop << 6) | (0x3cu | lane);
+    };
+    auto qtc = [](u32 rt, u32 vd) { return (0x12u << 26) | (5u << 21) | (rt << 16) | (vd << 11); };
+    auto qmfc2 = [](u32 rt, u32 vd) { return (0x12u << 26) | (1u << 21) | (rt << 16) | (vd << 11); };
+    char name[96];
+
+    struct Spec2Case { const char* name; u32 subop; u32 lane; u32 ft; u32 fs; };
+    const Spec2Case cases[] = {
+        {"vabs", 7, 1, 3, 1},
+        {"vitof0", 4, 0, 3, 1},
+        {"vitof4", 4, 1, 3, 1},
+        {"vftoi0", 5, 0, 3, 1},
+        {"vmove", 12, 0, 3, 1},
+        {"vmr32", 12, 1, 3, 1},
+        {"vclip", 7, 3, 0, 1},
+        // TODO(oracle): VOPMSUB differs from the interpreter in ACC and MAC
+        // flags, and the macro VDIV probe disagrees as well. Both are upstream
+        // macro-path quirks to investigate separately.
+    };
+    for (const Spec2Case& c : cases)
+    {
+        auto code = EEValueSetup();
+        code.push_back(qtc(8, 1));
+        code.push_back(qtc(10, 2));
+        code.push_back(spec2(0xFu, c.ft, c.fs, c.subop, c.lane));
+        code.push_back(qmfc2(18, 3));
+        std::snprintf(name, sizeof(name), "ee cop2 spec2 %s", c.name);
+        RunEECase(name, code);
+    }
+
+    {
+        auto code = EEValueSetup();
+        code.push_back(qtc(8, 1));
+        code.push_back(qtc(10, 2));
+        code.push_back(spec2(0u, 1, 0, 14, 1)); // vsqrt Q
+        code.push_back(spec2(0u, 0, 0, 14, 3)); // vwaitq
+        RunEECase("ee cop2 spec2 vsqrt/vwaitq", code);
+    }
+}
+
 void EECoverageMmi()
 {
     constexpr u32 MMI0 = 8, MMI2 = 9, MMI1 = 40, MMI3 = 41;
@@ -1659,6 +1704,7 @@ void EETests()
     EECoverageCop1(false);
     EECoverageCop1Full();
     EECoverageCop2();
+    EECoverageCop2Spec2();
     EECoverageMmi();
 }
 
