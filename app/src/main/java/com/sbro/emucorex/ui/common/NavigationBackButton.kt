@@ -141,9 +141,9 @@ fun ScreenTopBar(
         return
     }
 
-    val barSurface: @Composable () -> Unit = {
+    val barSurface: @Composable (Modifier) -> Unit = { surfaceModifier ->
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = surfaceModifier,
             shape = neonShape(24.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
             tonalElevation = 1.dp,
@@ -174,12 +174,12 @@ fun ScreenTopBar(
     }
     if (LocalNeonTheme.current) {
         Column(modifier = modifier) {
-            barSurface()
+            barSurface(Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(6.dp))
             NeonTricolorDivider(horizontalPadding = 10.dp)
         }
     } else {
-        barSurface()
+        barSurface(modifier.fillMaxWidth())
     }
 }
 
