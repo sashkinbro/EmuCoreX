@@ -17,7 +17,7 @@ struct JitBlockProfile
 
 namespace JitProfiler
 {
-#if defined(NDEBUG) && !defined(PCSX2_DEVBUILD)
+#if defined(NDEBUG) && !defined(PCSX2_DEVBUILD) && !defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	class BlockCompileScope
 	{
 	public:

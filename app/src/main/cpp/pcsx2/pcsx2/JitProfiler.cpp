@@ -39,7 +39,7 @@
 #include <unordered_map>
 #include <vector>
 
-#if !defined(NDEBUG) || defined(PCSX2_DEVBUILD)
+#if !defined(NDEBUG) || defined(PCSX2_DEVBUILD) || defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 
 #if defined(__ANDROID__) && defined(__aarch64__)
 #include <dlfcn.h>
