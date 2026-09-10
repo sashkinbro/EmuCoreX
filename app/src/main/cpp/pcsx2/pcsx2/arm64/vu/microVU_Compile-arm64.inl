@@ -505,6 +505,7 @@ void mVUsetCycles(mV)
 
 static __fi void mVUCompileCompareCycles_emit_oaknut(mV, u32 cycles);
 static __fi void mVUCompileSubCycles_emit_oaknut(mV, u32 cycles);
+static __fi void mVUCompileSubComparedCycles_emit_oaknut(mV, u32 cycles);
 static __fi void mVUCompileStoreComparedCycles_emit_oaknut(mV);
 static __fi void mVUCompileStoreNextBlockCycles_emit_oaknut(mV, u32 cycles);
 
@@ -566,10 +567,16 @@ void mVUtestCycles(microVU& mVU, microFlagCycles& mFC)
 		// store that exact result instead of loading and subtracting again.
 		mVUCompileStoreComparedCycles_emit_oaknut(mVU);
 	}
+	else if (mVUcycles != 0)
+	{
+		// Without VUSyncHack the compare only subtracts one cycle. The compare
+		// result is still live in OAK_WSCRATCH on the taken PL path, so deduct
+		// the remaining block cost without reloading the counter from memory.
+		mVUCompileSubComparedCycles_emit_oaknut(mVU, mVUcycles - 1);
+	}
 	else
 	{
-		// Without VUSyncHack the compare only subtracts one cycle, while the
-		// block must still deduct its full cost.
+		// Defensive fallback; a compiled block normally costs at least one cycle.
 		mVUCompileSubCycles_emit_oaknut(mVU, mVUcycles);
 	}
 }
@@ -644,6 +651,16 @@ static __fi void mVUCompileSubCycles_emit_oaknut(mV, u32 cycles)
 	oakLoad32(OAK_WSCRATCH,
 		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].cycles))));
 	oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, cycles);
+	oakStore32(OAK_WSCRATCH,
+		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].cycles))));
+	recEndOaknutEmit();
+}
+
+static __fi void mVUCompileSubComparedCycles_emit_oaknut(mV, u32 cycles)
+{
+	recBeginOaknutEmit();
+	if (cycles != 0)
+		oakAsm->SUB(OAK_WSCRATCH, OAK_WSCRATCH, cycles);
 	oakStore32(OAK_WSCRATCH,
 		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].cycles))));
 	recEndOaknutEmit();
