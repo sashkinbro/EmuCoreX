@@ -15,6 +15,10 @@
 #include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "pcsx2/VUmicro.h"
+#include "pcsx2/OpcodeFamilies.h"
+#endif
 
 #include "common/ProgressCallback.h"
 #include "common/HostSys.h"
@@ -597,6 +601,17 @@ void Host::OnSaveStateLoaded(const std::string_view filename, bool was_successfu
 {
 	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "save state loaded: %.*s success=%s",
 		static_cast<int>(filename.size()), filename.data(), was_successful ? "true" : "false");
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (was_successful)
+		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+			"VU state after load: jit=%u/%u masks=0x%llx/0x%llx vpu=0x%x pc=%x/%x flags=%x/%x cycles=%u/%u",
+			static_cast<unsigned>(EmuConfig.Cpu.Recompiler.EnableVU0),
+			static_cast<unsigned>(EmuConfig.Cpu.Recompiler.EnableVU1),
+			static_cast<unsigned long long>(OpcodeFamilies::g_familyMask[OpcodeFamilies::CORE_VU0]),
+			static_cast<unsigned long long>(OpcodeFamilies::g_familyMask[OpcodeFamilies::CORE_VU1]),
+			VU0.VI[REG_VPU_STAT].UL, VU0.VI[REG_TPC].UL, VU1.VI[REG_TPC].UL,
+			VU0.flags, VU1.flags, VU0.cycle, VU1.cycle);
+#endif
 }
 
 void Host::OnSaveStateSaved(const std::string_view filename)

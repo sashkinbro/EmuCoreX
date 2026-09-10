@@ -10,6 +10,7 @@
 #include "MTVU.h"
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
 extern void EmuCoreXOracleCaptureVU1(u32 startPC);
+extern void EmuCoreXOracleFinishVU1();
 #endif
 
 #ifdef PCSX2_DEBUG
@@ -85,6 +86,9 @@ void vu1ExecMicro(u32 addr)
 		CpuVU1->ExecuteBlock(1);
 	else
 		CpuVU1->Execute(vu1RunCycles);
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	EmuCoreXOracleFinishVU1();
+#endif
 }
 
 void MTVUInterrupt()

@@ -40,6 +40,9 @@ struct VU1Capture
     u8 memory[0x4000]{}, micro[0x4000]{};
 };
 
+thread_local std::string pendingLivePath;
+thread_local VU1Capture pendingLiveInput;
+
 void ApplyCapture(const VU1Capture& input)
 {
     u8* mem = VU1.Mem;
@@ -75,6 +78,16 @@ void Check(bool pass, const char* name)
     ++checks;
     failures += !pass;
     std::printf("%s %s\n", pass ? "PASS" : "FAIL", name);
+}
+
+void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
+{
+    ++checks;
+    failures += !pass;
+    if (pass)
+        std::printf("PASS %s\n", name);
+    else
+        std::printf("FAIL %s actual=%08x expected=%08x\n", name, actual, expected);
 }
 
 void ClassifierTests()
@@ -169,7 +182,7 @@ struct Snapshot
     bool gifOverflowed;
 };
 
-Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr, const u32* initialVF = nullptr)
+Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr, const u32* initialVF = nullptr, const u32* initialACC = nullptr)
 {
     // The generated dispatcher may elide an FPCR write when VU and EE
     // configurations match. Reproduce its EE caller, not the shell FPCR.
@@ -192,6 +205,8 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
     }
     if (initialVF)
         std::memcpy(vu.VF, initialVF, sizeof(vu.VF));
+    if (initialACC)
+        std::memcpy(&vu.ACC, initialACC, sizeof(vu.ACC));
     const u32 size = index ? 0x4000 : 0x1000;
     for (u32 i = 0; i < size; i += 8)
     {
@@ -343,6 +358,25 @@ void VUTests()
         }
     }
     EmuConfig.Cpu.Recompiler = savedClampOptions;
+    for (bool clamp0 : {false, true})
+    for (bool clamp1 : {false, true})
+    for (u32 mask : {1u, 2u, 8u, 15u})
+    for (u32 opcode : {0x1bfu, 0xbfu}) // MULAw / MADDAw
+    {
+        EmuConfig.Cpu.Recompiler.vu0Overflow = clamp0;
+        EmuConfig.Cpu.Recompiler.vu1Overflow = clamp1;
+        std::array<u32, 128> registers{};
+        registers[3] = 0x3f800000;
+        std::fill_n(registers.data() + 4, 4, 0xffd23d20);
+        const std::vector<u32> program = {NOP_L, (mask << 21) | (1u << 11) | opcode,
+            NOP_L, NOP_U | 0x40000000, NOP_L, NOP_U};
+        char name[96];
+        std::snprintf(name, sizeof(name), "VU1 ACC broadcast op=%x mask=%x independent clamps=%u/%u",
+            opcode, mask, clamp0, clamp1);
+        Compare(RunVU(1, false, program, 0x80, 0, 128, false, nullptr, registers.data()),
+            RunVU(1, true, program, 0x80, 0, 128, false, nullptr, registers.data()), name);
+    }
+    EmuConfig.Cpu.Recompiler = savedClampOptions;
     // Real XGKICK opcodes with a two-tag packet, without creating an MTGS
     // thread. Only the final submission is intercepted; VU transfer timing
     // and reads of guest packet memory still execute in each engine.
@@ -491,6 +525,184 @@ void VUTests()
         }
     }
 }
+
+// ---------------------------------------------------------------
+// Golden vectors imported from the independent EmuCoreX core.
+//
+// The expected bits do not come from this core's interpreter or JIT. They are
+// the raw sign/magnitude semantics of the VU floating-point unit as modeled
+// by the separate EmuCoreX reference core (unit tests and published hardware
+// rows). A "golden" failure means both engines of this core agree with each
+// other but disagree with the reference; a "JIT vs interpreter" failure means
+// the two engines of this core disagree with each other.
+// ---------------------------------------------------------------
+constexpr u32 UpperOp(u32 primary, u32 mask, u32 fd, u32 fs, u32 ft)
+{
+    return primary | (fd << 6) | (fs << 11) | (ft << 16) | (mask << 21);
+}
+
+struct GoldenVector
+{
+    const char* name;
+    u32 primary; // 0 selects a lower-slot divider op in `lower`
+    u32 lower;
+    u32 fs;
+    u32 ft;
+    u32 acc;
+    bool usesAcc;
+    bool expectQ;
+    u32 expected;
+};
+
+void VectorsTests()
+{
+    constexpr u32 MUL = 0x2a, ADD = 0x28, SUB = 0x2c, MADD = 0x29, MSUB = 0x2d;
+    constexpr u32 MAX = 0x2b, MINI = 0x2f;
+    constexpr u32 DIV = 0x800003bc, SQRT = 0x800003bd, RSQRT = 0x800003be;
+
+    const GoldenVector vectors[] = {
+        // Booth-tree ordering and significand asymmetry.
+        {"mul_exact_identity", MUL, NOP_L, 0x3f800000, 0x3f800002, 0, false, false, 0x3f800001},
+        {"mul_min_normal_by_max", MUL, NOP_L, 0x00800000, 0x7fffffff, 0, false, false, 0x40fffffe},
+        {"mul_max_by_min_normal", MUL, NOP_L, 0x7fffffff, 0x00800000, 0, false, false, 0x40ffffff},
+        {"mul_carried_one_bit", MUL, NOP_L, 0x3f800400, 0x3f800002, 0, false, false, 0x3f800401},
+        {"mul_asym_fs_times_one", MUL, NOP_L, 0x3fffffff, 0x3f800000, 0, false, false, 0x3fffffff},
+        {"mul_asym_one_times_ft", MUL, NOP_L, 0x3f800000, 0x3fffffff, 0, false, false, 0x3ffffffe},
+        {"mul_ext_finite_square", MUL, NOP_L, 0x7fffffff, 0x7fffffff, 0, false, false, 0x7fffffff},
+        {"mul_ext_finite_negate", MUL, NOP_L, 0x7fffffff, 0xffffffff, 0, false, false, 0xffffffff},
+        {"mul_subnormal_payload", MUL, NOP_L, 0x007fffff, 0x7fffffff, 0, false, false, 0x00000000},
+        {"mul_underflow_flush", MUL, NOP_L, 0x3f080000, 0x00c80000, 0, false, false, 0x00000000},
+        {"mul_signed_zero_flush", MUL, NOP_L, 0xbf800000, 0x00000001, 0, false, false, 0x80000000},
+        {"mul_half_min_normal", MUL, NOP_L, 0x00800000, 0x3f000000, 0, false, false, 0x00000000},
+        {"mul_neg_half_min_normal", MUL, NOP_L, 0x80800000, 0x3f000000, 0, false, false, 0x80000000},
+        // Add/subtract, signed-zero underflow flush and extended finite values.
+        {"add_basic", ADD, NOP_L, 0x3f800000, 0x40000000, 0, false, false, 0x40400000},
+        {"sub_last_significand_bit", SUB, NOP_L, 0x3fffffff, 0x3f800000, 0, false, false, 0x3f7ffffe},
+        {"add_subnormal_payload", ADD, NOP_L, 0x00000001, 0x3f800000, 0, false, false, 0x3f800000},
+        {"sub_zero_payloads", SUB, NOP_L, 0x80000001, 0x00000001, 0, false, false, 0x80000000},
+        {"add_ext_finite_overflow", ADD, NOP_L, 0x7fffffff, 0x7fffffff, 0, false, false, 0x7fffffff},
+        {"sub_underflow_flush", SUB, NOP_L, 0x00800001, 0x00800000, 0, false, false, 0x00000000},
+        {"sub_underflow_neg_flush", SUB, NOP_L, 0x80800001, 0x80800000, 0, false, false, 0x80000000},
+        {"add_ps2float_published", ADD, NOP_L, 0x0a7ffff8, 0x8a800001, 0, false, false, 0x80000000},
+        // Accumulator forms use the same ordered-product model.
+        {"madd_basic", MADD, NOP_L, 0x40000000, 0x40400000, 0x3f800000, true, false, 0x40e00000},
+        {"madd_cancel", MADD, NOP_L, 0xc0800000, 0x3f000000, 0x40000000, true, false, 0x00000000},
+        {"msub_basic", MSUB, NOP_L, 0x40000000, 0x40400000, 0x40e00000, true, false, 0x3f800000},
+        {"msub_carried_one_bit", MSUB, NOP_L, 0x3f800400, 0x3f800002, 0x40000000, true, false, 0x3f7ff7fe},
+        // Raw sign/magnitude selection keeps fraction-bearing zero payloads.
+        {"max_basic", MAX, NOP_L, 0x3f800000, 0x40000000, 0, false, false, 0x40000000},
+        {"min_basic", MINI, NOP_L, 0x3f800000, 0x40000000, 0, false, false, 0x3f800000},
+        {"max_zero_payload", MAX, NOP_L, 0x80000001, 0x007fffff, 0, false, false, 0x007fffff},
+        {"min_zero_payload", MINI, NOP_L, 0x007fffff, 0x80000001, 0, false, false, 0x80000001},
+        {"max_signed_zero", MAX, NOP_L, 0x80000000, 0x00000000, 0, false, false, 0x00000000},
+        {"min_signed_zero", MINI, NOP_L, 0x00000000, 0x80000000, 0, false, false, 0x80000000},
+        // Divider unit (Q register), including published 90K-console rows.
+        {"div_hw_1_over_3", 0, DIV, 0x3f800000, 0x40400000, 0, false, true, 0x3eaaaaab},
+        {"div_hw_1_over_1p5", 0, DIV, 0x3f800000, 0x3fc00000, 0, false, true, 0x3f2aaaab},
+        {"div_exact_3_over_2", 0, DIV, 0x40c00000, 0x40000000, 0, false, true, 0x40400000},
+        {"div_srt_boundary", 0, DIV, 0x40490fda, 0x3fb504f2, 0, false, true, 0x400e2c19},
+        {"div_zero_by_neg_zero", 0, DIV, 0x00000000, 0x80000000, 0, false, true, 0xffffffff},
+        {"div_neg_two_by_zero", 0, DIV, 0xc0000000, 0x00000000, 0, false, true, 0xffffffff},
+        {"sqrt_four", 0, SQRT, 0, 0x40800000, 0, false, true, 0x40000000},
+        {"sqrt_1p5", 0, SQRT, 0, 0x3fc00000, 0, false, true, 0x3f9cc471},
+        {"sqrt_near_two", 0, SQRT, 0, 0x3fffffff, 0, false, true, 0x3fb504f3},
+        {"sqrt_ext_finite", 0, SQRT, 0, 0x7f800000, 0, false, true, 0x5f800000},
+        {"sqrt_max_finite", 0, SQRT, 0, 0x7fffffff, 0, false, true, 0x5fb504f3},
+        {"sqrt_negative", 0, SQRT, 0, 0xc0800000, 0, false, true, 0x40000000},
+        {"sqrt_neg_ext_finite", 0, SQRT, 0, 0xff800000, 0, false, true, 0x5f800000},
+        {"sqrt_payload_1p5", 0, SQRT, 0, 0x7fc00000, 0, false, true, 0x5f9cc471},
+        {"rsqrt_exact", 0, RSQRT, 0x40c00000, 0x40800000, 0, false, true, 0x40400000},
+        {"rsqrt_hw_2pow64", 0, RSQRT, 0x3f800000, 0x7f800000, 0, false, true, 0x1f800000},
+        {"rsqrt_invalid", 0, RSQRT, 0x00000000, 0x80000000, 0, false, true, 0xffffffff},
+    };
+
+    cpuinfo_initialize();
+    EmuConfig = Pcsx2Config();
+    EmuConfig.Speedhacks.vuThread = false;
+    EmuConfig.Speedhacks.vuFlagHack = false;
+    EmuConfig.Speedhacks.EECycleRate = 0;
+    EmuConfig.Speedhacks.EECycleSkip = 0;
+    if (!SysMemory::Allocate())
+    {
+        Check(false, "allocate emulator memory");
+        return;
+    }
+    CpuVU0 = &CpuMicroVU0;
+    CpuVU1 = &CpuMicroVU1;
+    CpuMicroVU0.Reserve();
+    CpuMicroVU1.Reserve();
+    // Default mirrors Pcsx2Config: VU0 operand clamping on, VU1 off. The other
+    // profiles are diagnostics, not shipping configurations.
+    struct ClampProfile
+    {
+        const char* name;
+        bool vu0Overflow;
+        bool vu1Overflow;
+        bool vu0SignOverflow;
+        bool vu1SignOverflow;
+    };
+    const ClampProfile profiles[] = {
+        {"default", true, false, false, false},
+        {"clamp-off", false, false, false, false},
+        {"clamp-on", true, true, false, false},
+        {"sign-preserve", true, true, true, true},
+    };
+    const auto savedClamp = EmuConfig.Cpu.Recompiler;
+    for (u32 vu = 0; vu < 2; ++vu)
+    {
+        for (const ClampProfile& profile : profiles)
+        {
+            EmuConfig.Cpu.Recompiler.vu0Overflow = profile.vu0Overflow;
+            EmuConfig.Cpu.Recompiler.vu1Overflow = profile.vu1Overflow;
+            EmuConfig.Cpu.Recompiler.vu0SignOverflow = profile.vu0SignOverflow;
+            EmuConfig.Cpu.Recompiler.vu1SignOverflow = profile.vu1SignOverflow;
+            for (const GoldenVector& vector : vectors)
+            {
+                std::array<u32, 128> registers{};
+                for (u32 lane = 0; lane < 4; ++lane)
+                {
+                    registers[0 * 4 + lane] = 0x3f800000;
+                    registers[1 * 4 + lane] = vector.fs;
+                    registers[2 * 4 + lane] = vector.ft;
+                }
+                const std::array<u32, 4> acc{vector.acc, vector.acc, vector.acc, vector.acc};
+                // Divider ops read vf1/vf2; SQRT only consumes Ft. The operand
+                // fields live in the lower word for these instructions.
+                u32 lower = vector.lower;
+                if (!vector.primary)
+                {
+                    lower |= (2u << 16);
+                    if ((lower & 0xffu) != (SQRT & 0xffu))
+                        lower |= (1u << 11);
+                }
+                // Keep one NOP pair before the E delay slot so the 7..13 cycle
+                // divider pipe commits before the program ends in both engines.
+                const std::vector<u32> program = {
+                    lower,
+                    vector.primary ? UpperOp(vector.primary, 0xf, 3, 1, 2) : NOP_U,
+                    NOP_L, NOP_U,
+                    NOP_L, NOP_U | 0x40000000,
+                    NOP_L, NOP_U};
+                auto run = [&](bool jit) {
+                    return RunVU(vu, jit, program, 0x80, 0, 128, false, nullptr, registers.data(),
+                        vector.usesAcc ? acc.data() : nullptr);
+                };
+                const auto interp = run(false);
+                const auto jit = run(true);
+                const u32 interpBits = vector.expectQ ? interp.regs.VI[REG_Q].UL : interp.regs.VF[3].UL[3];
+                const u32 jitBits = vector.expectQ ? jit.regs.VI[REG_Q].UL : jit.regs.VF[3].UL[3];
+                char name[128];
+                std::snprintf(name, sizeof(name), "VU%u %s golden interp %s", vu, profile.name, vector.name);
+                CheckBits(interpBits == vector.expected, interpBits, vector.expected, name);
+                std::snprintf(name, sizeof(name), "VU%u %s JIT vs interpreter %s", vu, profile.name, vector.name);
+                Compare(interp, jit, name);
+                std::snprintf(name, sizeof(name), "VU%u %s golden JIT %s", vu, profile.name, vector.name);
+                CheckBits(jitBits == vector.expected, jitBits, vector.expected, name);
+            }
+        }
+    }
+    EmuConfig.Cpu.Recompiler = savedClamp;
+}
 }
 
 bool EmuCoreXOracleRecordGif(const u8* data, u32 size)
@@ -540,7 +752,11 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
         remaining = count;
         stride = interval;
         position = sequence = 0;
-        __android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "VU oracle: capturing %u inputs to %s", count, directory.c_str());
+        __android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+            "VU oracle: capturing %u inputs to %s (VU1 jit=%u familyMask=0x%llx flagHack=%u)",
+            count, directory.c_str(), static_cast<unsigned>(EmuConfig.Cpu.Recompiler.EnableVU1),
+            static_cast<unsigned long long>(OpcodeFamilies::g_familyMask[OpcodeFamilies::CORE_VU1]),
+            static_cast<unsigned>(EmuConfig.Speedhacks.vuFlagHack));
     }
     if (++position % stride)
         return;
@@ -585,8 +801,37 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
         remaining = 0;
         return;
     }
+    pendingLiveInput = input;
+    pendingLivePath = path + ".actual";
     if (!--remaining)
         __android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "VU oracle: capture finished (%u inputs)", sequence);
+}
+
+void EmuCoreXOracleFinishVU1()
+{
+    if (pendingLivePath.empty())
+        return;
+    const std::string path = std::move(pendingLivePath);
+    pendingLivePath.clear();
+    // This first paired format supports completion in the initial dispatch.
+    // Never mistake an intermediate yield for the final architecture state.
+    if (VU0.VI[REG_VPU_STAT].UL & 0x100)
+    {
+        __android_log_print(ANDROID_LOG_WARN, "EmuCoreX", "VU oracle: no final result for yielded dispatch %s", path.c_str());
+        return;
+    }
+    auto& result = pendingLiveInput;
+    result.vuCycle = VU1.cycle;
+    std::memcpy(result.vf, VU1.VF, sizeof(result.vf));
+    std::memcpy(result.vi, VU1.VI, sizeof(result.vi));
+    std::memcpy(result.acc, &VU1.ACC, sizeof(result.acc));
+    std::memcpy(result.memory, VU1.Mem, sizeof(result.memory));
+    FILE* file = std::fopen(path.c_str(), "wb");
+    bool ok = file && std::fwrite(&result, sizeof(result), 1, file) == 1;
+    if (file && std::fclose(file) != 0)
+        ok = false;
+    if (!ok)
+        __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "VU oracle: failed writing live result %s", path.c_str());
 }
 
 static int ReplayVU1(const char* path, bool fallback)
@@ -632,11 +877,12 @@ static int ReplayVU1(const char* path, bool fallback)
     CpuVU1 = &CpuMicroVU1;
     CpuMicroVU0.Reserve();
     CpuMicroVU1.Reserve();
-    auto run = [&](bool jit) {
+    auto run = [&](bool jit, bool resetCache = true) {
         const FPControlRegisterBackup callerFPCR(EmuConfig.Cpu.FPUFPCR);
         ApplyCapture(input);
         BaseVUmicroCPU* cpu = jit ? static_cast<BaseVUmicroCPU*>(&CpuMicroVU1) : &CpuIntVU1;
-        cpu->Reset();
+        if (resetCache)
+            cpu->Reset();
         OpcodeFamilies::SetFamilyMask(OpcodeFamilies::CORE_VU1, jit && fallback ? 1023 : 0);
         cpu->SetStartPC(input.pc);
         const bool routed = (VU1.flags & VUFLAG_INTERPRETER) != 0;
@@ -650,10 +896,34 @@ static int ReplayVU1(const char* path, bool fallback)
             VU0.VI[REG_VPU_STAT].UL, routed, std::vector<u8>(VU1.Micro, VU1.Micro + 0x4000), std::move(gif), gifOverflow};
     };
     const auto expected = run(false);
+    if (FILE* liveFile = std::fopen((std::string(path) + ".actual").c_str(), "rb"))
+    {
+        VU1Capture live;
+        const bool validLive = std::fread(&live, sizeof(live), 1, liveFile) == 1 &&
+            std::fgetc(liveFile) == EOF && live.magic == input.magic && live.version == input.version &&
+            live.byteSize == sizeof(live) && live.pc == input.pc &&
+            std::memcmp(live.micro, input.micro, sizeof(live.micro)) == 0;
+        std::fclose(liveFile);
+        Check(validLive, "live result matches input format and microprogram");
+        if (validLive)
+        {
+            Check(std::memcmp(expected.regs.VF, live.vf, sizeof(live.vf)) == 0, "live VU1 VF vs interpreter");
+            Check(std::memcmp(expected.regs.VI, live.vi, sizeof(live.vi)) == 0, "live VU1 VI vs interpreter");
+            Check(std::memcmp(&expected.regs.ACC, live.acc, sizeof(live.acc)) == 0, "live VU1 ACC vs interpreter");
+            Check(std::memcmp(expected.memory.data(), live.memory, sizeof(live.memory)) == 0, "live VU1 memory vs interpreter");
+        }
+    }
     const auto actual = run(true);
     std::printf("INPUT pc=%04x clamp=%u fixes=%u speed=%u GIF interpreter=%zu jit=%zu\n",
         input.pc, input.clamp, input.fixes, input.speed, expected.gif.size(), actual.gif.size());
     Compare(expected, actual, "captured VU1 program");
+    if (!fallback)
+    {
+        // Reuse the emitted blocks with the same canonical input. Resetting
+        // before every replay cannot expose stale JIT block state.
+        for (u32 iteration = 0; iteration < 3; ++iteration)
+            Compare(expected, run(true, false), "captured VU1 program cached replay");
+    }
     if (fallback)
         Check(actual.fallback, "captured input used interpreter fallback");
     std::printf("RESULT checks=%d failures=%d\n", checks, failures);
@@ -677,6 +947,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
         VUTests();
+    else if (std::strcmp(suite, "vectors") == 0)
+        VectorsTests();
     else
         return 2;
     std::printf("RESULT checks=%d failures=%d\n", checks, failures);

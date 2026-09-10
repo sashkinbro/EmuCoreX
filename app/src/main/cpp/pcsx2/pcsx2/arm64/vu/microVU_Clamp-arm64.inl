@@ -27,14 +27,15 @@ static __fi void mVUUpperClamp1Vector_oaknut(mV, int reg, bool bClampE)
 
 static __fi void mVUUpperClamp2VectorIf_oaknut(mV, int reg, bool bClampE, bool canClamp, bool limits_ready = false)
 {
-	if (((!clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index)) || (clampE && bClampE && CHECK_VU_SIGN_OVERFLOW(mVU.index))) &&
-		canClamp)
-	{
+	// Operand conversion must mirror vuDouble(): exponent-255 values become
+	// signed 0x7f7fffff, and only the bitwise clamp reproduces that sign.
+	// FMINNM/FMAXNM remains in use for result clamps, where the NaN sign is
+	// intentionally not preserved.
+	const bool shouldClamp = ((!clampE && (CHECK_VU_SIGN_OVERFLOW(mVU.index) || CHECK_VU_OVERFLOW(mVU.index))) ||
+		(clampE && bClampE)) &&
+		canClamp;
+	if (shouldClamp)
 		mVUClamp1VectorBits_oaknut(reg, limits_ready);
-		return;
-	}
-
-	mVUUpperClamp1VectorIf_oaknut(mVU, reg, bClampE, canClamp, limits_ready);
 }
 
 static __fi void mVUUpperClamp2Vector_oaknut(mV, int reg, bool bClampE)
@@ -71,7 +72,9 @@ static __fi void mVUUpperClamp1Scalar_oaknut(mV, int reg, bool bClampE)
 
 static __fi void mVUUpperClamp2ScalarIf_oaknut(mV, int reg, bool bClampE, bool canClamp)
 {
-	if (((!clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index)) || (clampE && bClampE && CHECK_VU_SIGN_OVERFLOW(mVU.index))) &&
+	// See mVUUpperClamp2VectorIf_oaknut: this is an operand clamp and must
+	// match vuDouble() exponent-255 sign conversion.
+	if (((!clampE && (CHECK_VU_SIGN_OVERFLOW(mVU.index) || CHECK_VU_OVERFLOW(mVU.index))) || (clampE && bClampE)) &&
 		canClamp)
 	{
 		// These masks intentionally preserve Y/Z/W. An adjacent LDP copy matched
@@ -81,10 +84,7 @@ static __fi void mVUUpperClamp2ScalarIf_oaknut(mV, int reg, bool bClampE, bool c
 		oakAsm->SMIN(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH3.S4());
 		oakLoad128(OAK_QSCRATCH3, mVUClampOakSs4Mem(offsetof(mVU_SSE4, sse4_minvals[0][0])));
 		oakAsm->UMIN(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH3.S4());
-		return;
 	}
-
-	mVUUpperClamp1ScalarIf_oaknut(mVU, reg, bClampE, canClamp);
 }
 
 static __fi void mVUUpperClamp2Scalar_oaknut(mV, int reg, bool bClampE)
@@ -137,14 +137,11 @@ static __fi void mVU_clamp1Vector_oaknut(mV, int reg, bool bClampE)
 
 static __fi void mVU_clamp2ScalarIf_oaknut(mV, int reg, bool bClampE, bool canClamp)
 {
-	if (((!clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index)) || (clampE && bClampE && CHECK_VU_SIGN_OVERFLOW(mVU.index))) &&
+	// Lower operand clamp: bitwise sign-preserving form for vuDouble parity.
+	if (((!clampE && (CHECK_VU_SIGN_OVERFLOW(mVU.index) || CHECK_VU_OVERFLOW(mVU.index))) || (clampE && bClampE)) &&
 		canClamp)
 	{
 		mVUClamp1ScalarBits_oaknut(reg);
-	}
-	else
-	{
-		mVU_clamp1ScalarIf_oaknut(mVU, reg, bClampE, canClamp);
 	}
 }
 
@@ -169,14 +166,11 @@ static __fi void mVU_clamp4Scalar_oaknut(mV, int reg)
 
 static __fi void mVU_clamp2Vector_oaknut(mV, int reg, bool bClampE)
 {
-	if (((!clampE && CHECK_VU_SIGN_OVERFLOW(mVU.index)) || (clampE && bClampE && CHECK_VU_SIGN_OVERFLOW(mVU.index))) &&
+	// Lower operand clamp: bitwise sign-preserving form for vuDouble parity.
+	if (((!clampE && (CHECK_VU_SIGN_OVERFLOW(mVU.index) || CHECK_VU_OVERFLOW(mVU.index))) || (clampE && bClampE)) &&
 		mVU.regAlloc->checkVFClamp(reg))
 	{
 		mVUClamp1VectorBits_oaknut(reg);
-	}
-	else
-	{
-		mVU_clamp1Vector_oaknut(mVU, reg, bClampE);
 	}
 }
 
@@ -195,9 +189,9 @@ static __fi void mVUUpperClampVu1MaddLaneResult_oaknut(int reg, bool scalar)
 static __fi void mVUUpperClampAccLaneFs_oaknut(mV, int reg, bool scalar)
 {
 	// The interpreter's MULA/MADDA broadcast paths apply vuDouble() to Fs. Its
-	// exponent-255 conversion follows the VU0 overflow bit even for VU1, so use
-	// the bitwise clamp here as well. This preserves the NaN sign unlike FMINNM.
-	if (isVU1 && CHECK_VU_OVERFLOW(0))
+	// exponent-255 conversion follows this VU's overflow policy. The bitwise
+	// clamp preserves the NaN sign unlike FMINNM.
+	if (isVU1 && CHECK_VU_OVERFLOW(mVU.index))
 	{
 		if (scalar)
 			mVUClamp1ScalarBits_oaknut(reg);

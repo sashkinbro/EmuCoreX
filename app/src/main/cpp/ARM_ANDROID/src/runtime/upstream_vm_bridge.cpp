@@ -483,7 +483,9 @@ VMBootParameters CreateBootParameters(const VmLaunchConfig& config)
 		// Arcade manifests must go through VMManager::AutoDetectSource(). Treating a
 		// SAF-backed .acgame URI as an ISO bypasses manifest parsing and hands the
 		// encoded document ID to CDVD instead.
-		if (StringUtil::EndsWithNoCase(config.path, ".acgame"))
+		// GS dumps also require auto-detection: forcing ISO bypasses the
+		// replayer and incorrectly sends their packet stream to CDVD.
+		if (StringUtil::EndsWithNoCase(config.path, ".acgame") || VMManager::IsGSDumpFileName(config.path))
 			params.source_type.reset();
 		else if (!config.path.empty())
 			params.source_type = CDVD_SourceType::Iso;
