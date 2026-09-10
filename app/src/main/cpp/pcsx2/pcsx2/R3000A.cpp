@@ -213,8 +213,16 @@ static __fi void _psxTestInterrupts()
 	}
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" int EmuCoreXOracleSkipEvents();
+#endif
+
 __ri void iopEventTest()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (EmuCoreXOracleSkipEvents())
+		return;
+#endif
 	psxRegs.iopNextEventCycle = psxRegs.cycle + iopWaitCycles;
 
 	if (psxTestCycle(psxNextStartCounter, psxNextDeltaCounter))

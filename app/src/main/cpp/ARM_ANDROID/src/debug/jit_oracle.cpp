@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
+#include "IopMem.h"
 #include "Memory.h"
 #include "OpcodeFamilies.h"
+#include "R3000A.h"
+#include "R5900.h"
 #include "VUmicro.h"
 #include "cpuinfo.h"
 #include "Gif_Unit.h"
@@ -15,6 +18,14 @@
 #include <unistd.h>
 #include <android/log.h>
 #include <cerrno>
+
+// Self-test builds only. Always true in this file, which exists only when the
+// native self-tests are enabled: the CPU event tests are suppressed so the
+// differential oracle can run without initializing SPU2, DEV9 and friends.
+extern "C" int EmuCoreXOracleSkipEvents()
+{
+    return 1;
+}
 
 namespace
 {
@@ -703,6 +714,417 @@ void VectorsTests()
     }
     EmuConfig.Cpu.Recompiler = savedClamp;
 }
+
+// ---------------------------------------------------------------
+// EE / IOP differential oracle
+//
+// Both suites execute the same small guest programs on the recompiler and on
+// the interpreter and compare every architectural register. Straight-line EE
+// programs run for exactly their instruction count on the interpreter and as
+// one forced-exit recompiled block on the JIT. IOP programs end in a
+// self-branch and run on a shared cycle budget, so both engines stop inside a
+// region that does not modify state.
+// ---------------------------------------------------------------
+constexpr u32 EE_TEST_PC = 0x00100000;
+constexpr u32 EE_TEST_SCRATCH = 0x00101000;
+constexpr u32 IOP_TEST_PC = 0x00100000;
+constexpr u32 IOP_TEST_SCRATCH = 0x00180000;
+constexpr u32 EE_SCRATCH_SIZE = 256;
+constexpr u32 IOP_SCRATCH_SIZE = 128;
+
+extern "C" void EmuCoreXEEForceExitAfterFirstBlock();
+
+constexpr u32 MipsR(u32 rs, u32 rt, u32 rd, u32 sa, u32 fn)
+{
+    return (rs << 21) | (rt << 16) | (rd << 11) | (sa << 6) | fn;
+}
+
+constexpr u32 MipsI(u32 op, u32 rs, u32 rt, u32 imm)
+{
+    return (op << 26) | (rs << 21) | (rt << 16) | (imm & 0xffffu);
+}
+
+constexpr u32 MipsCop1(u32 rs, u32 ft, u32 fs, u32 fd, u32 fn)
+{
+    return (0x11u << 26) | (rs << 21) | (ft << 16) | (fs << 11) | (fd << 6) | fn;
+}
+
+struct EESnapshot
+{
+    u64 gpr[32];
+    u64 hi, lo;
+    u32 pc;
+    u32 cycle;
+    u32 fpr[32];
+    u32 fcr31;
+    u32 acc;
+    u32 accflag;
+    u32 cp0[32];
+    u8 scratch[EE_SCRATCH_SIZE];
+};
+
+struct IOPSnapshot
+{
+    u32 gpr[32];
+    u32 hi, lo;
+    u32 pc;
+    u32 cycle;
+    u32 cp0[32];
+    u8 scratch[IOP_SCRATCH_SIZE];
+};
+
+void CaptureEE(EESnapshot& out)
+{
+    std::memset(&out, 0, sizeof(out));
+    for (u32 i = 0; i < 32; ++i)
+    {
+        out.gpr[i] = cpuRegs.GPR.r[i].UD[0];
+        out.fpr[i] = fpuRegs.fpr[i].UL;
+        out.cp0[i] = cpuRegs.CP0.r[i];
+    }
+    out.hi = cpuRegs.HI.UD[0];
+    out.lo = cpuRegs.LO.UD[0];
+    out.pc = cpuRegs.pc;
+    out.cycle = cpuRegs.cycle;
+    out.fcr31 = fpuRegs.fprc[31];
+    out.acc = fpuRegs.ACC.UL;
+    out.accflag = fpuRegs.ACCflag;
+    for (u32 i = 0; i < EE_SCRATCH_SIZE; ++i)
+        out.scratch[i] = memRead8(EE_TEST_SCRATCH + i);
+}
+
+void CaptureIOP(IOPSnapshot& out)
+{
+    std::memset(&out, 0, sizeof(out));
+    for (u32 i = 0; i < 32; ++i)
+    {
+        out.gpr[i] = psxRegs.GPR.r[i];
+        out.cp0[i] = psxRegs.CP0.r[i];
+    }
+    out.hi = psxRegs.GPR.r[32];
+    out.lo = psxRegs.GPR.r[33];
+    out.pc = psxRegs.pc;
+    out.cycle = psxRegs.cycle;
+    for (u32 i = 0; i < IOP_SCRATCH_SIZE; ++i)
+        out.scratch[i] = iopMemRead8(IOP_TEST_SCRATCH + i);
+}
+
+bool CpuDiff(const char* test, const char* field, const void* expected, const void* actual, size_t size)
+{
+    const u8* a = static_cast<const u8*>(expected);
+    const u8* b = static_cast<const u8*>(actual);
+    for (size_t i = 0; i < size; ++i)
+    {
+        if (a[i] != b[i])
+        {
+            std::printf("DIFF %s %s byte=%zu interp=%02x jit=%02x\n", test, field, i, a[i], b[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
+void CompareEE(const EESnapshot& expected, const EESnapshot& actual, const char* name)
+{
+    bool same = CpuDiff(name, "GPR", expected.gpr, actual.gpr, sizeof(expected.gpr));
+    same &= CpuDiff(name, "HI", &expected.hi, &actual.hi, sizeof(expected.hi));
+    same &= CpuDiff(name, "LO", &expected.lo, &actual.lo, sizeof(expected.lo));
+    same &= CpuDiff(name, "PC", &expected.pc, &actual.pc, sizeof(expected.pc));
+    same &= CpuDiff(name, "FPR", expected.fpr, actual.fpr, sizeof(expected.fpr));
+    same &= CpuDiff(name, "FCR31", &expected.fcr31, &actual.fcr31, sizeof(expected.fcr31));
+    same &= CpuDiff(name, "ACC", &expected.acc, &actual.acc, sizeof(expected.acc));
+    same &= CpuDiff(name, "ACCflag", &expected.accflag, &actual.accflag, sizeof(expected.accflag));
+    for (u32 reg = 0; reg < 32; ++reg)
+    {
+        if (reg == 1 || reg == 9 || reg == 11)
+            continue; // Random, Count and Compare are cycle-relative.
+        char field[32];
+        std::snprintf(field, sizeof(field), "CP0[%u]", reg);
+        same &= CpuDiff(name, field, &expected.cp0[reg], &actual.cp0[reg], sizeof(u32));
+    }
+    same &= CpuDiff(name, "scratch", expected.scratch, actual.scratch, sizeof(expected.scratch));
+    Check(same, name);
+}
+
+void CompareIOP(const IOPSnapshot& expected, const IOPSnapshot& actual, const char* name)
+{
+    bool same = CpuDiff(name, "GPR", expected.gpr, actual.gpr, sizeof(expected.gpr));
+    same &= CpuDiff(name, "HI", &expected.hi, &actual.hi, sizeof(expected.hi));
+    same &= CpuDiff(name, "LO", &expected.lo, &actual.lo, sizeof(expected.lo));
+    same &= CpuDiff(name, "PC", &expected.pc, &actual.pc, sizeof(expected.pc));
+    for (u32 reg = 0; reg < 32; ++reg)
+    {
+        if (reg == 1 || reg == 9 || reg == 11)
+            continue;
+        char field[32];
+        std::snprintf(field, sizeof(field), "CP0[%u]", reg);
+        same &= CpuDiff(name, field, &expected.cp0[reg], &actual.cp0[reg], sizeof(u32));
+    }
+    same &= CpuDiff(name, "scratch", expected.scratch, actual.scratch, sizeof(expected.scratch));
+    Check(same, name);
+}
+
+EESnapshot RunEEProgram(bool jit, const std::vector<u32>& program)
+{
+    std::memset(&cpuRegs, 0, sizeof(cpuRegs));
+    std::memset(&fpuRegs, 0, sizeof(fpuRegs));
+    // A self-branch terminates the recompiled block so the forced exit fires
+    // at a branch boundary; the interpreter stops after the same steps.
+    std::vector<u32> code = program;
+    code.push_back(0x1000ffffu);
+    code.push_back(0);
+    for (u32 i = 0; i < code.size(); ++i)
+        memWrite32(EE_TEST_PC + i * 4, code[i]);
+    for (u32 i = 0; i < EE_SCRATCH_SIZE; ++i)
+        memWrite8(EE_TEST_SCRATCH + i, static_cast<u8>(i * 13 + 7));
+    cpuRegs.pc = EE_TEST_PC;
+    cpuRegs.cycle = 0;
+    cpuRegs.branch = 0;
+    cpuRegs.nextEventCycle = 0x7fffffffu;
+    EEsCycle = 0;
+    EEoCycle = 0;
+
+    if (jit)
+    {
+        Cpu = &recCpu;
+        Cpu->Reset();
+        EmuCoreXEEForceExitAfterFirstBlock();
+        Cpu->Execute();
+    }
+    else
+    {
+        Cpu = &intCpu;
+        Cpu->Reset();
+        for (u32 i = 0; i < code.size(); ++i)
+            Cpu->Step();
+    }
+
+    EESnapshot out;
+    CaptureEE(out);
+    return out;
+}
+
+IOPSnapshot RunIOPProgram(bool jit, const std::vector<u32>& program)
+{
+    std::memset(&psxRegs, 0, sizeof(psxRegs));
+    const u32 sentinel = IOP_TEST_PC + static_cast<u32>(program.size()) * 4;
+    for (u32 i = 0; i < program.size(); ++i)
+        iopMemWrite32(IOP_TEST_PC + i * 4, program[i]);
+    iopMemWrite32(sentinel, 0x1000ffffu); // b .
+    iopMemWrite32(sentinel + 4, 0);
+    for (u32 i = 0; i < IOP_SCRATCH_SIZE; ++i)
+        iopMemWrite8(IOP_TEST_SCRATCH + i, static_cast<u8>(i * 13 + 7));
+    psxRegs.pc = IOP_TEST_PC;
+    psxRegs.cycle = 0;
+    // A zero event cycle feeds the WaitLoop fast path a zero delta and the
+    // block budget never drains.
+    psxRegs.iopNextEventCycle = 0x7fffffffu;
+
+    const s32 budget = static_cast<s32>(program.size() + 16) * 8;
+    if (jit)
+    {
+        psxCpu = &psxRec;
+        psxRec.Reset();
+    }
+    else
+    {
+        psxCpu = &psxInt;
+        psxInt.Reset();
+    }
+    psxCpu->ExecuteBlock(budget);
+
+    IOPSnapshot out;
+    CaptureIOP(out);
+    if (out.pc >= sentinel && out.pc < sentinel + 8)
+        out.pc = sentinel;
+    return out;
+}
+
+void EETests()
+{
+    cpuinfo_initialize();
+    EmuConfig = Pcsx2Config();
+    EmuConfig.Speedhacks.vuThread = false;
+    EmuConfig.Speedhacks.vuFlagHack = false;
+    if (!SysMemory::Allocate())
+    {
+        Check(false, "allocate emulator memory");
+        return;
+    }
+    SysMemory::Reset();
+    Cpu = &recCpu;
+    Cpu->Reserve();
+
+    // The forced exit runs one event test, which can service the IOP. Park it
+    // in an empty self-branch so the event path stays side effect free.
+    psxCpu = &psxInt;
+    psxInt.Reset();
+    iopMemWrite32(IOP_TEST_SCRATCH, 0x1000ffffu);
+    iopMemWrite32(IOP_TEST_SCRATCH + 4, 0);
+    psxRegs.pc = IOP_TEST_SCRATCH;
+    psxRegs.cycle = 0;
+
+    struct EECase
+    {
+        const char* name;
+        std::vector<u32> code;
+    };
+    std::vector<EECase> cases;
+
+    cases.push_back({"alu_logic", {
+        MipsI(15, 0, 8, 0x1234), MipsI(13, 8, 8, 0x5678),      // lui/ori t0
+        MipsI(15, 0, 9, 0x0fed), MipsI(13, 9, 9, 0xcba9),      // lui/ori t1
+        MipsR(8, 9, 10, 0, 0x21), MipsR(8, 9, 11, 0, 0x23),    // addu/subu
+        MipsR(8, 9, 12, 0, 0x24), MipsR(8, 9, 13, 0, 0x25),    // and/or
+        MipsR(8, 9, 14, 0, 0x26), MipsR(8, 9, 15, 0, 0x27),    // xor/nor
+        MipsR(8, 9, 16, 0, 0x2a), MipsR(8, 9, 17, 0, 0x2b),    // slt/sltu
+        MipsR(9, 8, 18, 0, 0x2a), MipsR(9, 8, 19, 0, 0x2b),    // slt/sltu reversed
+        MipsI(9, 8, 20, 0x1234), MipsI(10, 8, 21, 0x1234),     // addiu/slti
+    }});
+
+    cases.push_back({"imm_shift", {
+        MipsI(9, 0, 8, 0x7fff), MipsI(9, 0, 9, 33),            // t0, t1=33
+        MipsR(0, 8, 10, 7, 0x00), MipsR(0, 8, 11, 3, 0x02),    // sll/srl
+        MipsR(0, 8, 12, 3, 0x03), MipsR(9, 8, 13, 0, 0x04),    // sra/sllv
+        MipsR(9, 8, 14, 0, 0x06), MipsR(9, 8, 15, 0, 0x07),    // srlv/srav
+        MipsI(12, 8, 16, 0x0f0f), MipsI(14, 8, 17, 0x0f0f),    // andi/xori
+        MipsI(15, 0, 18, 0xdead), MipsI(9, 8, 19, 0x8000),     // lui/addiu negative
+    }});
+
+    cases.push_back({"mult_div", {
+        MipsI(9, 0, 8, 1234), MipsI(9, 0, 9, 0xfff9),          // t0=1234, t1=-7
+        MipsR(8, 9, 0, 0, 0x18), MipsR(0, 0, 10, 0, 0x10), MipsR(0, 0, 11, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x1a), MipsR(0, 0, 12, 0, 0x10), MipsR(0, 0, 13, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x1b), MipsR(0, 0, 14, 0, 0x10), MipsR(0, 0, 15, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x19), MipsR(0, 0, 16, 0, 0x10), MipsR(0, 0, 17, 0, 0x12),
+    }});
+
+    cases.push_back({"div_only", {
+        MipsI(9, 0, 8, 1234), MipsI(9, 0, 9, 0xfff9),
+        MipsR(8, 9, 0, 0, 0x1a), MipsR(0, 0, 12, 0, 0x10), MipsR(0, 0, 13, 0, 0x12),
+    }});
+
+    cases.push_back({"div_mem", {
+        MipsI(15, 0, 8, 0x0010), MipsI(13, 8, 8, 0x1000),
+        MipsI(9, 0, 9, 1234), MipsI(43, 8, 9, 0),
+        MipsI(9, 0, 9, 0xfff9), MipsI(43, 8, 9, 4),
+        MipsI(35, 8, 10, 0), MipsI(35, 8, 11, 4),
+        MipsR(10, 11, 0, 0, 0x1a), MipsR(0, 0, 12, 0, 0x10), MipsR(0, 0, 13, 0, 0x12),
+    }});
+
+    cases.push_back({"load_store", {
+        MipsI(15, 0, 8, 0x0010), MipsI(13, 8, 8, 0x1000),      // t0=0x00101000
+        MipsI(9, 0, 9, 0x1234),
+        MipsI(43, 8, 9, 4), MipsI(35, 8, 10, 4),               // sw/lw
+        MipsI(40, 8, 9, 8), MipsI(36, 8, 11, 8),               // sb/lbu
+        MipsI(9, 0, 12, 0xfffe),
+        MipsI(41, 8, 12, 12), MipsI(33, 8, 13, 12), MipsI(37, 8, 14, 12),
+        MipsI(15, 0, 15, 0xdead), MipsI(13, 15, 15, 0xbeef),
+        MipsI(63, 8, 15, 16), MipsI(55, 8, 16, 16),            // sd/ld
+    }});
+
+    cases.push_back({"cop0_moves", {
+        MipsI(9, 0, 8, 0x1234),
+        MipsI(16, 4, 8, 12 << 11), MipsI(16, 0, 9, 12 << 11),  // mtc0/mfc0 Status
+        MipsI(16, 4, 8, 14 << 11), MipsI(16, 0, 10, 14 << 11), // mtc0/mfc0 EPC
+        MipsI(16, 0, 11, 8 << 11),                             // mfc0 BadVAddr
+        MipsI(16, 0, 12, 15 << 11),                            // mfc0 PRId
+    }});
+
+    std::vector<u32> cop1 = {
+        MipsI(15, 0, 8, 0x3f80), MipsCop1(4, 8, 1, 0, 0),      // mtc1 t0, f1 = 1.0
+        MipsI(15, 0, 9, 0x4000), MipsCop1(4, 9, 2, 0, 0),      // mtc1 t1, f2 = 2.0
+        MipsCop1(0x10, 2, 1, 3, 0x00),                         // add.s f3
+        MipsCop1(0x10, 2, 1, 4, 0x01),                         // sub.s f4
+        MipsCop1(0x10, 2, 1, 5, 0x02),                         // mul.s f5
+        MipsCop1(0x10, 2, 1, 6, 0x03),                         // div.s f6
+        MipsCop1(0x10, 2, 0, 7, 0x04),                         // sqrt.s f7
+        MipsCop1(0x10, 4, 0, 8, 0x05),                         // abs.s f8
+        MipsCop1(0x10, 1, 0, 9, 0x07),                         // neg.s f9
+        MipsCop1(0x10, 5, 0, 10, 0x06),                        // mov.s f10
+        MipsCop1(0, 10, 3, 0, 0),                              // mfc1 t2, f3
+        MipsCop1(2, 11, 31, 0, 0),                             // cfc1 t3, fcr31
+    };
+    for (u32 i = 0; i < 40; ++i)
+        cop1.push_back(0);
+    cases.push_back({"cop1_basic", cop1});
+
+    for (const EECase& test : cases)
+    {
+        const EESnapshot interp = RunEEProgram(false, test.code);
+        const EESnapshot jit = RunEEProgram(true, test.code);
+        std::printf("EECYCLES %s interp=%u jit=%u\n", test.name, interp.cycle, jit.cycle);
+        CompareEE(interp, jit, test.name);
+    }
+}
+
+void IOPTests()
+{
+    cpuinfo_initialize();
+    EmuConfig = Pcsx2Config();
+    EmuConfig.Speedhacks.vuThread = false;
+    EmuConfig.Speedhacks.WaitLoop = false;
+    if (!SysMemory::Allocate())
+    {
+        Check(false, "allocate emulator memory");
+        return;
+    }
+    SysMemory::Reset();
+    psxCpu = &psxRec;
+    psxCpu->Reserve();
+
+    struct IOPCase
+    {
+        const char* name;
+        std::vector<u32> code;
+    };
+    std::vector<IOPCase> cases;
+
+    cases.push_back({"alu_logic", {
+        MipsI(15, 0, 8, 0x1234), MipsI(13, 8, 8, 0x5678),
+        MipsI(15, 0, 9, 0x0fed), MipsI(13, 9, 9, 0xcba9),
+        MipsR(8, 9, 10, 0, 0x21), MipsR(8, 9, 11, 0, 0x23),
+        MipsR(8, 9, 12, 0, 0x24), MipsR(8, 9, 13, 0, 0x25),
+        MipsR(8, 9, 14, 0, 0x26), MipsR(8, 9, 15, 0, 0x27),
+        MipsR(8, 9, 16, 0, 0x2a), MipsR(8, 9, 17, 0, 0x2b),
+    }});
+
+    cases.push_back({"imm_shift", {
+        MipsI(9, 0, 8, 0x7fff), MipsI(9, 0, 9, 3),
+        MipsR(0, 8, 10, 7, 0x00), MipsR(0, 8, 11, 3, 0x02),
+        MipsR(0, 8, 12, 3, 0x03), MipsR(9, 8, 13, 0, 0x04),
+        MipsR(9, 8, 14, 0, 0x06), MipsR(9, 8, 15, 0, 0x07),
+        MipsI(12, 8, 16, 0x0f0f), MipsI(14, 8, 17, 0x0f0f),
+        MipsI(15, 0, 18, 0xdead), MipsI(9, 8, 19, 0x8000),
+    }});
+
+    cases.push_back({"mult_div", {
+        MipsI(9, 0, 8, 1234), MipsI(9, 0, 9, 0xfff9),
+        MipsR(8, 9, 0, 0, 0x18), MipsR(0, 0, 10, 0, 0x10), MipsR(0, 0, 11, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x1a), MipsR(0, 0, 12, 0, 0x10), MipsR(0, 0, 13, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x1b), MipsR(0, 0, 14, 0, 0x10), MipsR(0, 0, 15, 0, 0x12),
+        MipsR(8, 9, 0, 0, 0x19), MipsR(0, 0, 16, 0, 0x10), MipsR(0, 0, 17, 0, 0x12),
+    }});
+
+    cases.push_back({"load_store", {
+        MipsI(15, 0, 8, 0x0018), MipsI(13, 8, 8, 0x0000),
+        MipsI(9, 0, 9, 0x1234),
+        MipsI(43, 8, 9, 4), MipsI(35, 8, 10, 4),
+        MipsI(40, 8, 9, 8), MipsI(36, 8, 11, 8),
+        MipsI(9, 0, 12, 0xfffe),
+        MipsI(41, 8, 12, 12), MipsI(33, 8, 13, 12), MipsI(37, 8, 14, 12),
+        MipsI(15, 0, 15, 0xdead), MipsI(13, 15, 15, 0xbeef),
+        MipsI(38, 8, 16, 16), MipsI(42, 8, 16, 20),            // lwl/swl pair
+    }});
+
+    for (const IOPCase& test : cases)
+    {
+        const IOPSnapshot interp = RunIOPProgram(false, test.code);
+        const IOPSnapshot jit = RunIOPProgram(true, test.code);
+        std::printf("IOPCYCLES %s interp=%u jit=%u\n", test.name, interp.cycle, jit.cycle);
+        CompareIOP(interp, jit, test.name);
+    }
+}
 }
 
 bool EmuCoreXOracleRecordGif(const u8* data, u32 size)
@@ -949,6 +1371,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests();
     else if (std::strcmp(suite, "vectors") == 0)
         VectorsTests();
+    else if (std::strcmp(suite, "ee") == 0)
+        EETests();
+    else if (std::strcmp(suite, "iop") == 0)
+        IOPTests();
     else
         return 2;
     std::printf("RESULT checks=%d failures=%d\n", checks, failures);

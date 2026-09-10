@@ -468,6 +468,19 @@ static void recMFC0LoadSigned32_emit_oaknut(int host_reg, s64 offset)
 	recEndOaknutEmit();
 }
 
+static void recMFC0LoadSigned32Masked_emit_oaknut(int host_reg, s64 offset, u32 mask)
+{
+	const oak::WReg dst_w = oakWRegister(host_reg);
+	const oak::XReg dst_x = oakXRegister(host_reg);
+
+	recBeginOaknutEmit();
+	oakLoad32(dst_w, {oak::util::X27, offset});
+	oakAsm->MOV(OAK_WSCRATCH, mask);
+	oakAsm->AND(dst_w, dst_w, OAK_WSCRATCH);
+	oakAsm->SXTW(dst_x, dst_w);
+	recEndOaknutEmit();
+}
+
 static void recMTC0StoreConst32_emit_oaknut(s64 offset, u32 value)
 {
 	recBeginOaknutEmit();
@@ -666,6 +679,14 @@ void recMFC0()
 	}
 	else if (_Rd_ == 24)
 	{
+		return;
+	}
+	else if (_Rd_ == 12)
+	{
+		// Matches COP0.cpp's interpreter: Status reads expose only the
+		// architecturally defined bits.
+		const int regt = _allocX86reg(X86TYPE_GPR, _Rt_, MODE_WRITE);
+		recMFC0LoadSigned32Masked_emit_oaknut(regt, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.CP0.r[_Rd_])), 0xf0c79c1f);
 		return;
 	}
 

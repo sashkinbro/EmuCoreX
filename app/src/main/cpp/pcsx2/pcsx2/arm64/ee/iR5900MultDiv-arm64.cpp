@@ -525,7 +525,10 @@ static void recDIVConstExact()
 		quot = (g_cpuConstRegs[_Rs_].SL[0] < 0) ? 1 : -1;
 		rem = g_cpuConstRegs[_Rs_].SL[0];
 	}
-	recWritebackConstHILOExact<false, Upper>((u64)quot | ((u64)rem << 32));
+	// Mask both halves to 32 bits: sign-extending a negative quotient into the
+	// high word would overwrite the remainder.
+	recWritebackConstHILOExact<false, Upper>(
+		static_cast<u64>(static_cast<u32>(quot)) | (static_cast<u64>(static_cast<u32>(rem)) << 32));
 }
 
 static void recDIV_const()

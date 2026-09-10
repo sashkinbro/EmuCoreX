@@ -175,8 +175,16 @@ static const void* iopJITCompile = nullptr;
 static const void* iopEnterRecompiledCode = nullptr;
 static const void* iopExitRecompiledCode = nullptr;
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" int EmuCoreXOracleSkipEvents();
+#endif
+
 static void recEventTest()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (EmuCoreXOracleSkipEvents())
+		return;
+#endif
 	_cpuEventTest_Shared();
 }
 

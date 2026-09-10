@@ -556,8 +556,16 @@ static void intReset()
 	branch2 = 0;
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" int EmuCoreXOracleSkipEvents();
+#endif
+
 void intEventTest()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (EmuCoreXOracleSkipEvents())
+		return;
+#endif
 	// Perform counters, ints, and IOP updates:
 	_cpuEventTest_Shared();
 

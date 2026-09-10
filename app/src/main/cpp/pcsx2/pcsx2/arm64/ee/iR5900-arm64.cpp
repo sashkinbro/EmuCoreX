@@ -274,8 +274,31 @@ static const void* EnterRecompiledCode = nullptr;
 static const void* DispatchBlockDiscard = nullptr;
 static const void* DispatchPageReset = nullptr;
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" int EmuCoreXOracleSkipEvents();
+
+// Self-test hook: request a recompiler exit at the end of the next block so
+// the oracle can execute a straight-line program as one clean block.
+extern "C" void EmuCoreXEEForceExitAfterFirstBlock()
+{
+	eeRecExitRequested = true;
+	cpuRegs.nextEventCycle = 0;
+}
+#endif
+
 static void recEventTest()
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	// Differential oracle: leave recompiled code without running the event
+	// scheduler, which would otherwise execute uninitialized devices.
+	if (EmuCoreXOracleSkipEvents() && eeRecExitRequested)
+	{
+		eeRecExitRequested = false;
+		recExitExecution();
+		return;
+	}
+#endif
+
 	// End JIT timing (measures time spent in recompiled code since last event test)
 	if (::emucorex::IsProfilerLogcatEnabled())
 	{
