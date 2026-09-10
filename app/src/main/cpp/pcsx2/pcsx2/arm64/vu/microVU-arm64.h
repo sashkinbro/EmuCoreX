@@ -299,35 +299,40 @@ public:
 	}
 };
 
-static __fi void mVUcanonicalizeViBackup(microRegInfo& state)
+static __fi u8 mVUcanonicalViBackup(const microRegInfo& state)
 {
-	if (state.viBackUp && !state.VI[state.viBackUp])
-		state.viBackUp = 0;
+	return (state.viBackUp && !state.VI[state.viBackUp]) ? 0 : state.viBackUp;
 }
 
-static __fi void mVUcanonicalizeFlagInfo(microRegInfo& state)
+static __fi u8 mVUcanonicalFlagInfo(const microRegInfo& state)
 {
+	u8 flagInfo = state.flagInfo;
 	if (!(state.needExactMatch & 2))
-		state.flagInfo &= ~0x30;
+		flagInfo &= ~0x30;
 	if (state.needExactMatch & 1)
-		state.flagInfo &= ~0x0c;
+		flagInfo &= ~0x0c;
 	if (state.needExactMatch & 2)
-		state.flagInfo &= ~0x30;
+		flagInfo &= ~0x30;
 	if (state.needExactMatch & 4)
-		state.flagInfo &= ~0xc0;
+		flagInfo &= ~0xc0;
+	return flagInfo;
 }
 
-static __fi void mVUcanonicalizePipeState(microRegInfo& state)
-{
-	mVUcanonicalizeViBackup(state);
-	mVUcanonicalizeFlagInfo(state);
-}
-
+// The canonical pipe state only ever changes viBackUp and flagInfo, so compare
+// those two fields instead of materializing a 96-byte copy and memcmp'ing it.
+// The search state is the hot VU0 program-entry path; the untouched case lets
+// the caller keep using the original pointer without the stack traffic.
 static __fi microRegInfo* mVUcanonicalizeSearchState(microRegInfo* state, microRegInfo& storage)
 {
+	const u8 viBackUp = mVUcanonicalViBackup(*state);
+	const u8 flagInfo = mVUcanonicalFlagInfo(*state);
+	if (viBackUp == state->viBackUp && flagInfo == state->flagInfo)
+		return state;
+
 	storage = *state;
-	mVUcanonicalizePipeState(storage);
-	return (std::memcmp(&storage, state, sizeof(microRegInfo)) != 0) ? &storage : state;
+	storage.viBackUp = viBackUp;
+	storage.flagInfo = flagInfo;
+	return &storage;
 }
 
 // microVU rec structs
