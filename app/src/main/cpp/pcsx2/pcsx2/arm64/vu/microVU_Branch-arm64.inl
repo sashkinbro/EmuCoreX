@@ -256,7 +256,8 @@ static __fi void mVUBranchTryJumpCacheFastPath_emit_oaknut(mV)
 	const oak::XReg start_pc = oak::util::X0;
 	const oak::XReg block = oak::util::X1;
 	const oak::XReg jump_cache = oak::util::X2;
-	const oak::XReg pc_index = oak::util::X3;
+	// X3 holds the live STATUS instance F0, including on cache hits.
+	const oak::XReg pc_index = oak::util::X6;
 	const oak::XReg cached_prog = oak::util::X4;
 	const oak::XReg quick_prog = oak::util::X5;
 
@@ -543,12 +544,27 @@ void normJumpCompile(mV, microFlagCycles& mFC, bool isEvilJump)
 	if (doJumpCaching && !doJumpAsSameProgram)
 		mVUBranchTryJumpCacheFastPath_emit_oaknut(mVU);
 
+	// The allocator flush above does not own the four pinned STATUS registers.
+	// They are caller-saved in AAPCS64 and must survive the C++ cache-miss
+	// compiler just as they survive the direct cached branch.
+	recBeginOaknutEmit();
+	oakAsm->SUB(oak::util::SP, oak::util::SP, 32);
+	oakAsm->STP(oakXRegister(VU_HOST_F0), oakXRegister(VU_HOST_F1), oak::util::SP, oak::SOffset<10, 3>(0));
+	oakAsm->STP(oakXRegister(VU_HOST_F2), oakXRegister(VU_HOST_F3), oak::util::SP, oak::SOffset<10, 3>(16));
+	recEndOaknutEmit();
+
 	if (!mVU.index) {
 		mVUBranchEmitCall_oaknut(reinterpret_cast<const void*>(mVUcompileJIT<0>));
     }
 	else {
 		mVUBranchEmitCall_oaknut(reinterpret_cast<const void*>(mVUcompileJIT<1>));
     }
+
+	recBeginOaknutEmit();
+	oakAsm->LDP(oakXRegister(VU_HOST_F0), oakXRegister(VU_HOST_F1), oak::util::SP, oak::SOffset<10, 3>(0));
+	oakAsm->LDP(oakXRegister(VU_HOST_F2), oakXRegister(VU_HOST_F3), oak::util::SP, oak::SOffset<10, 3>(16));
+	oakAsm->ADD(oak::util::SP, oak::util::SP, 32);
+	recEndOaknutEmit();
 
 	mVUrestoreRegs(mVU);
 	mVUBranchEmitBrT1_oaknut();

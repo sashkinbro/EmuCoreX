@@ -3001,6 +3001,10 @@ void GSState::Transfer(const u8* mem, u32 size)
 							mem += sizeof(GIFPackedReg);
 							size--;
 						} while (path.StepReg() && size > 0 && path.reg != 0);
+						// The partial loop can consume the input or finish the tag.
+						// Do not enter a bulk handler with zero remaining registers.
+						if (size == 0 || path.nloop == 0)
+							break;
 					}
 
 					// all data available? usually is

@@ -8,6 +8,7 @@
 #include "VUmicro.h"
 #include "cpuinfo.h"
 #include "Gif_Unit.h"
+#include "GS/GSState.h"
 
 #include <array>
 #include <cstdio>
@@ -60,6 +61,8 @@ struct VU1Capture
 
 thread_local std::string pendingLivePath;
 thread_local VU1Capture pendingLiveInput;
+thread_local std::vector<u8> pendingLiveGif;
+thread_local bool pendingLiveGifOverflow = false;
 
 void ApplyCapture(const VU1Capture& input)
 {
@@ -110,6 +113,41 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 
 void ClassifierTests()
 {
+    // Exercise the real GS parser at every QWC boundary, including completion
+    // of a PACKED loop that started in an earlier Transfer call.
+    struct PacketState final : GSState
+    {
+        void Draw() override {}
+        u32 Color() const { return m_v.RGBAQ.U32[0]; }
+        bool Complete() const { return m_path[3].nloop == 0; }
+    };
+    alignas(16) std::array<u64, 14> packet{};
+    packet[0] = 2ull | (1ull << 15) | (3ull << 60);
+    packet[1] = 0xf1full; // NOP, RGBA, NOP; two loops.
+    // RGBA occurs at QWC 2 and 5 (tag is QWC 0).
+    packet[4] = 0x2200000011ull;
+    packet[5] = 0x4400000033ull;
+    packet[10] = 0x6600000055ull;
+    packet[11] = 0x8800000077ull;
+    auto state = std::make_unique<PacketState>();
+    const auto* bytes = reinterpret_cast<const u8*>(packet.data());
+    state->Transfer<3>(bytes, 7);
+    Check(state->Complete() && state->Color() == 0x88776655,
+        "GS whole PACKED packet");
+    for (u32 split = 1; split < 7; ++split)
+    {
+        state->Reset(false);
+        state->Transfer<3>(bytes, split);
+        state->Transfer<3>(bytes + split * 16, 7 - split);
+        Check(state->Complete() && state->Color() == 0x88776655,
+            "GS split PACKED packet preserves register state");
+    }
+    state->Reset(false);
+    for (u32 qwc = 0; qwc < 7; ++qwc)
+        state->Transfer<3>(bytes + qwc * 16, 1);
+    Check(state->Complete() && state->Color() == 0x88776655,
+        "GS one-QWC fragments complete PACKED loop");
+
     // A two-tag packet exercises the actual GIF parser used by XGKICK.
     // Interpreter fallback must retain EOP even with the JIT configured on.
     alignas(16) std::array<u8, 0x4000> gifMemory{};
@@ -432,6 +470,16 @@ void VUTests()
             char name[80];
             std::snprintf(name, sizeof(name), "VU%u flags across branch to E with %u NOPs", vu, padding);
             Compare(RunVU(vu, false, branchFlags, 0x80), RunVU(vu, true, branchFlags, 0x80), name);
+            // The indirect target is compiled at runtime on a cache miss.
+            // Its C++ compiler call must preserve the incoming STATUS lanes.
+            branchFlags[0] = (8u << 25) | (1u << 16) | (16u + padding + 5u);
+            for (u32 op : {0x24u, 0x25u}) // JR / JALR
+            {
+                branchFlags[(1 + padding) * 2] = (op << 25) | (1u << 11) |
+                    (op == 0x25 ? (2u << 16) : 0u);
+                std::snprintf(name, sizeof(name), "VU%u STATUS across indirect op=%x padding=%u", vu, op, padding);
+                Compare(RunVU(vu, false, branchFlags, 0x80), RunVU(vu, true, branchFlags, 0x80), name);
+            }
         }
         for (u32 repetitions : {1u, 2u, 4u, 8u})
         {
@@ -2125,11 +2173,21 @@ void IOPTests()
 }
 }
 
-bool EmuCoreXOracleRecordGif(const u8* data, u32 size)
+bool EmuCoreXOracleRecordGif(const u8* data, u32 size, bool liveCopy)
 {
-    if (!gifOutput)
-        return false;
     constexpr size_t limit = 16 * 1024 * 1024;
+    if (!gifOutput)
+    {
+        if (liveCopy && !pendingLivePath.empty())
+        {
+            if (size > limit - pendingLiveGif.size())
+                pendingLiveGifOverflow = true;
+            else
+                pendingLiveGif.insert(pendingLiveGif.end(), data, data + size);
+        }
+        // Live recording must still deliver the packet to the real GS.
+        return false;
+    }
     if (size > limit - gifOutput->size())
         gifOverflow = true;
     else
@@ -2137,11 +2195,37 @@ bool EmuCoreXOracleRecordGif(const u8* data, u32 size)
     return true;
 }
 
+bool EmuCoreXOracleAllowVU1Fallback(u32 startPC)
+{
+    // Optional one-launch filter for the existing family policy. This narrows
+    // differential diagnosis without changing individual-instruction pipelines.
+    static const std::vector<u32> entries = [] {
+        std::vector<u32> result;
+        const std::string path = EmuFolders::Logs + "/vu-oracle-fallback-pc.request";
+        if (FILE* file = std::fopen(path.c_str(), "rb"))
+        {
+            u32 pc;
+            while (result.size() < 64 && std::fscanf(file, "%x", &pc) == 1)
+            {
+                if (pc < 0x4000 && !(pc & 7))
+                    result.push_back(pc);
+            }
+            std::fclose(file);
+            std::remove(path.c_str());
+            __android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+                "VU oracle: family fallback restricted to %zu entry PCs", result.size());
+        }
+        return result;
+    }();
+    return entries.empty() || std::find(entries.begin(), entries.end(), startPC) != entries.end();
+}
+
 void EmuCoreXOracleCaptureVU1(u32 startPC)
 {
     // Called on the EE thread after the previous program finished. MTVU
     // dispatch bypasses this hook; no cross-thread register snapshots.
-    static thread_local u32 poll = 0, remaining = 0, stride = 32, position = 0, sequence = 0;
+    static thread_local u32 poll = 1023, remaining = 0, stride = 32, position = 0, sequence = 0;
+    static thread_local u32 capturePC = ~0u;
     static thread_local std::string directory;
     if (!remaining)
     {
@@ -2152,10 +2236,12 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
         if (!file)
             return;
         u32 count = 0, interval = 32;
-        const int fields = std::fscanf(file, "%u %u", &count, &interval);
+        u32 requestedPC = ~0u;
+        const int fields = std::fscanf(file, "%u %u %x", &count, &interval, &requestedPC);
         std::fclose(file);
         std::remove(request.c_str());
-        if (fields < 1 || !count || count > 256 || !interval || interval > 65536)
+        if (fields < 1 || !count || count > 256 || !interval || interval > 65536 ||
+            (fields == 3 && (requestedPC >= 0x4000 || (requestedPC & 7))))
         {
             __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "VU oracle: invalid request fields=%d count=%u stride=%u", fields, count, interval);
             return;
@@ -2170,6 +2256,7 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
             return;
         }
         remaining = count;
+        capturePC = requestedPC;
         stride = interval;
         position = sequence = 0;
         __android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
@@ -2178,6 +2265,8 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
             static_cast<unsigned long long>(OpcodeFamilies::g_familyMask[OpcodeFamilies::CORE_VU1]),
             static_cast<unsigned>(EmuConfig.Speedhacks.vuFlagHack));
     }
+    if (capturePC != ~0u && startPC != capturePC)
+        return;
     if (++position % stride)
         return;
     // Canonical replay currently starts with drained pipelines. Never label a
@@ -2222,6 +2311,8 @@ void EmuCoreXOracleCaptureVU1(u32 startPC)
         return;
     }
     pendingLiveInput = input;
+    pendingLiveGif.clear();
+    pendingLiveGifOverflow = false;
     pendingLivePath = path + ".actual";
     if (!--remaining)
         __android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "VU oracle: capture finished (%u inputs)", sequence);
@@ -2252,6 +2343,21 @@ void EmuCoreXOracleFinishVU1()
         ok = false;
     if (!ok)
         __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "VU oracle: failed writing live result %s", path.c_str());
+    if (ok && !pendingLiveGifOverflow)
+    {
+        FILE* gifFile = std::fopen((path + ".gif.bin").c_str(), "wb");
+        bool gifOk = gifFile && (pendingLiveGif.empty() ||
+            std::fwrite(pendingLiveGif.data(), 1, pendingLiveGif.size(), gifFile) == pendingLiveGif.size());
+        if (gifFile && std::fclose(gifFile) != 0)
+            gifOk = false;
+        if (!gifOk)
+        {
+            std::remove((path + ".gif.bin").c_str());
+            __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "VU oracle: failed writing live GIF %s", path.c_str());
+        }
+    }
+    else if (pendingLiveGifOverflow)
+        __android_log_print(ANDROID_LOG_ERROR, "EmuCoreX", "VU oracle: live GIF overflow %s", path.c_str());
 }
 
 static int ReplayVU1(const char* path, bool fallback)
@@ -2327,13 +2433,26 @@ static int ReplayVU1(const char* path, bool fallback)
         Check(validLive, "live result matches input format and microprogram");
         if (validLive)
         {
-            Check(std::memcmp(expected.regs.VF, live.vf, sizeof(live.vf)) == 0, "live VU1 VF vs interpreter");
-            Check(std::memcmp(expected.regs.VI, live.vi, sizeof(live.vi)) == 0, "live VU1 VI vs interpreter");
-            Check(std::memcmp(&expected.regs.ACC, live.acc, sizeof(live.acc)) == 0, "live VU1 ACC vs interpreter");
-            Check(std::memcmp(expected.memory.data(), live.memory, sizeof(live.memory)) == 0, "live VU1 memory vs interpreter");
+            Check(CpuDiff("live VU1", "VF", expected.regs.VF, live.vf, sizeof(live.vf)), "live VU1 VF vs interpreter");
+            Check(CpuDiff("live VU1", "VI", expected.regs.VI, live.vi, sizeof(live.vi)), "live VU1 VI vs interpreter");
+            Check(CpuDiff("live VU1", "ACC", &expected.regs.ACC, live.acc, sizeof(live.acc)), "live VU1 ACC vs interpreter");
+            Check(CpuDiff("live VU1", "memory", expected.memory.data(), live.memory, sizeof(live.memory)), "live VU1 memory vs interpreter");
         }
     }
     const auto actual = run(true);
+    if (FILE* liveGifFile = std::fopen((std::string(path) + ".actual.gif.bin").c_str(), "rb"))
+    {
+        std::vector<u8> liveGif;
+        u8 chunk[4096];
+        size_t count;
+        while ((count = std::fread(chunk, 1, sizeof(chunk), liveGifFile)) != 0 && liveGif.size() <= 16 * 1024 * 1024)
+            liveGif.insert(liveGif.end(), chunk, chunk + count);
+        const bool validGif = !std::ferror(liveGifFile) && std::feof(liveGifFile) && liveGif.size() <= 16 * 1024 * 1024;
+        std::fclose(liveGifFile);
+        std::printf("LIVE GIF bytes=%zu interpreter=%zu jit=%zu\n", liveGif.size(), expected.gif.size(), actual.gif.size());
+        Check(validGif && liveGif == expected.gif, "live GIF vs interpreter");
+        Check(validGif && liveGif == actual.gif, "live GIF vs isolated JIT");
+    }
     std::printf("INPUT pc=%04x clamp=%u fixes=%u speed=%u GIF interpreter=%zu jit=%zu\n",
         input.pc, input.clamp, input.fixes, input.speed, expected.gif.size(), actual.gif.size());
     Compare(expected, actual, "captured VU1 program");

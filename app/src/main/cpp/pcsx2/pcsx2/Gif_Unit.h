@@ -18,8 +18,8 @@
 
 struct GS_Packet;
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
-// Active only inside the isolated oracle process; gameplay returns false.
-extern bool EmuCoreXOracleRecordGif(const u8* data, u32 size);
+// Suppresses GS submission only in isolated replay; live capture returns false.
+extern bool EmuCoreXOracleRecordGif(const u8* data, u32 size, bool liveCopy = true);
 #endif
 extern void Gif_MTGS_Wait(bool isMTVU);
 extern void Gif_FinishIRQ();
@@ -676,7 +676,8 @@ struct Gif_Unit
 	u32 TransferGSPacketData(GIF_TRANSFER_TYPE tranType, u8* pMem, u32 size, bool aligned = false)
 	{
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
-		if (EmuCoreXOracleRecordGif(pMem, size))
+		// Live transfers reach CopyGSPacketData below; record them there once.
+		if (EmuCoreXOracleRecordGif(pMem, size, false))
 			return size;
 #endif
 		if (THREAD_VU1)

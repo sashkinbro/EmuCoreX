@@ -518,6 +518,11 @@ static void mVUSelectInterpreter(microVU& mVU, u32 startPC)
 	const u32 core = mVU.index ? OpcodeFamilies::CORE_VU1 : OpcodeFamilies::CORE_VU0;
 	if (!OpcodeFamilies::g_familyMask[core])
 		return; // Avoid the scanner's work buffers on the normal JIT path.
+#ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
+	extern bool EmuCoreXOracleAllowVU1Fallback(u32 startPC);
+	if (mVU.index && !EmuCoreXOracleAllowVU1Fallback(startPC))
+		return;
+#endif
 	if (!OpcodeFamilies::VURegionShouldInterpret(core,
 		startPC, mVU.microMemSize, mVU.progMemMask, reinterpret_cast<const u32*>(vu.Micro)))
 		return;
