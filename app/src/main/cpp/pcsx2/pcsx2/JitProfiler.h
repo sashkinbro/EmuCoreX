@@ -84,6 +84,9 @@ namespace JitProfiler
 		uptr m_host_begin = 0;
 	};
 
+	#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	bool TestSampleRangeSelection();
+	#endif
 	bool IsActive();
 	void Start();
 	void Stop();

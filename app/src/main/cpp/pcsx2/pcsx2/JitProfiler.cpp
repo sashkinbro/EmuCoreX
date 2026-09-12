@@ -987,13 +987,26 @@ namespace
 			if (range->first_sample > sample_index || host_pc < range->host_begin || host_pc >= range->host_end)
 				continue;
 
-			if (!best || range->cache_generation > best->cache_generation ||
-				(range->cache_generation == best->cache_generation && range->first_sample > best->first_sample) ||
-				(range->cache_generation == best->cache_generation && range->first_sample == best->first_sample &&
-					(range->host_end - range->host_begin) < (best->host_end - best->host_begin)))
+			if (!best)
 			{
 				best = range;
+				continue;
 			}
+			if (range->cache_generation != best->cache_generation)
+			{
+				if (range->cache_generation > best->cache_generation)
+					best = range;
+				continue;
+			}
+
+			// A recursive VU branch scope closes after its child opcode scopes.
+			// Its later timestamp must not hide those narrower emitted ranges.
+			const bool candidate_inside_best = range->host_begin >= best->host_begin && range->host_end <= best->host_end &&
+				(range->host_begin != best->host_begin || range->host_end != best->host_end);
+			const bool best_inside_candidate = best->host_begin >= range->host_begin && best->host_end <= range->host_end &&
+				(range->host_begin != best->host_begin || range->host_end != best->host_end);
+			if (candidate_inside_best || (!best_inside_candidate && range->first_sample > best->first_sample))
+				best = range;
 		}
 		return best;
 	}
@@ -2100,6 +2113,37 @@ namespace
 		FileSystem::WriteStringToFile(latest_path.c_str(), text);
 	}
 } // namespace
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+bool TestSampleRangeSelection()
+{
+    OpcodeRangeEvent parent{}, child{}, reused{}, future{};
+    parent.host_begin = 0x1000; parent.host_end = 0x1100;
+    parent.first_sample = 20; parent.cache_generation = 1;
+    child.host_begin = 0x1040; child.host_end = 0x1060;
+    child.first_sample = 10; child.cache_generation = 1;
+    reused = parent; reused.cache_generation = 2; reused.first_sample = 30;
+    future = child; future.cache_generation = 3; future.first_sample = 50;
+    std::unordered_map<uptr, std::vector<const OpcodeRangeEvent*>> pages;
+    for (bool reverse : {false, true})
+    {
+        pages[1] = reverse ? std::vector<const OpcodeRangeEvent*>{&future, &reused, &child, &parent}
+                           : std::vector<const OpcodeRangeEvent*>{&parent, &child, &reused, &future};
+        if (FindSampleRange(pages, 0x1050, 25) != &child ||
+            FindSampleRange(pages, 0x1050, 15) != &child ||
+            FindSampleRange(pages, 0x1050, 35) != &reused ||
+            FindSampleRange(pages, 0x1050, 55) != &future ||
+            FindSampleRange(pages, 0x1060, 25) != &parent ||
+            FindSampleRange(pages, 0x1100, 25) != nullptr ||
+            FindSampleRange(pages, 0x2000, 25) != nullptr)
+            return false;
+    }
+    child = parent;
+    child.first_sample = 21;
+    pages[1] = {&child, &parent};
+    return FindSampleRange(pages, 0x1050, 25) == &child;
+}
+#endif
 
 bool IsActive()
 {
