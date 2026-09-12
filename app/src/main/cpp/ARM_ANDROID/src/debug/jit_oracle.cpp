@@ -1800,6 +1800,86 @@ void EECoverageMmi()
     }
 }
 
+
+void SqrtFlagTests()
+{
+    EmuCoreXOracleSetSkipEvents(1);
+    cpuinfo_initialize();
+    EmuConfig = Pcsx2Config();
+    EmuConfig.Speedhacks.vuThread = false;
+    EmuConfig.Speedhacks.vuFlagHack = false;
+    if (!SysMemory::Allocate())
+    {
+        Check(false, "allocate emulator memory");
+        return;
+    }
+    SysMemory::Reset();
+    Cpu = &recCpu;
+    Cpu->Reserve();
+    CpuVU0 = &CpuMicroVU0;
+    CpuVU1 = &CpuMicroVU1;
+    CpuMicroVU0.Reserve();
+    CpuMicroVU1.Reserve();
+    CpuMicroVU0.Reset();
+    psxCpu = &psxInt;
+    psxInt.Reset();
+    iopMemWrite32(IOP_TEST_SCRATCH, 0x1000ffffu);
+    iopMemWrite32(IOP_TEST_SCRATCH + 4, 0);
+    psxRegs.pc = IOP_TEST_SCRATCH;
+
+    // SCPH-90000 VU0 macro capture: ARMSX2 bfae0f5a1255e08fa655b667b826cfd41da2e4db,
+    // tests/ctest/core/recompilers/autocases_vurs.h, "sqrt" rows.
+    // Micro checks cover the same divide-unit flags, not full Q conformance.
+    constexpr u32 magnitudes[] = {
+        0, 1, 0x00400000, 0x007fffff, 0x00800000,
+        0x3f800000, 0x40800000, 0x7f7fffff, 0x7f800000, 0x7fffffff};
+    for (bool clamp : {false, true})
+    {
+        EmuConfig.Cpu.Recompiler.vu0Overflow = clamp;
+        EmuConfig.Cpu.Recompiler.vu1Overflow = clamp;
+        for (u32 magnitude : magnitudes)
+        for (u32 sign : {0u, 0x80000000u})
+        {
+            const u32 bits = magnitude | sign;
+            const u32 expected = sign ? 0x410u : 0;
+            char name[128];
+            for (bool jit : {false, true})
+            {
+                const std::vector<u32> code = {
+                    MipsI(15, 0, 8, bits >> 16), MipsI(13, 8, 8, bits),
+                    (0x12u << 26) | (5u << 21) | (8u << 16) | (2u << 11),
+                    (0x12u << 26) | (0x10u << 21) | (2u << 16) | (14u << 6) | 0x3du,
+                    (0x12u << 26) | (0x10u << 21) | (14u << 6) | 0x3fu,
+                    (0x12u << 26) | (2u << 21) | (18u << 16) | (REG_STATUS_FLAG << 11)};
+                const auto result = RunEEProgram(jit, code);
+                const u32 actual = static_cast<u32>(result.gpr[18]) & 0xc30u;
+                std::snprintf(name, sizeof(name), "SQRT macro clamp=%u jit=%u ft=%08x flags", clamp, jit, bits);
+                CheckBits(actual == expected, actual, expected, name);
+            }
+            std::array<u32, 128> registers{};
+            registers[3] = 0x3f800000;
+            registers[8] = bits;
+            std::vector<u32> program = {0x800003bdu | (2u << 16), NOP_U};
+            for (u32 i = 0; i < 16; ++i)
+                program.insert(program.end(), {NOP_L, NOP_U});
+            program.insert(program.end(), {NOP_L, NOP_U | 0x40000000u, NOP_L, NOP_U});
+            for (u32 vu : {0u, 1u})
+            {
+                const auto interp = RunVU(vu, false, program, 0x80, 0, 128, false, nullptr, registers.data());
+                const auto jit = RunVU(vu, true, program, 0x80, 0, 128, false, nullptr, registers.data());
+                for (const auto* result : {&interp, &jit})
+                {
+                    const u32 actual = result->regs.VI[REG_STATUS_FLAG].UL & 0xc30u;
+                    std::snprintf(name, sizeof(name), "SQRT VU%u clamp=%u jit=%u ft=%08x flags", vu, clamp, result == &jit, bits);
+                    CheckBits(actual == expected, actual, expected, name);
+                }
+                std::snprintf(name, sizeof(name), "SQRT VU%u clamp=%u ft=%08x differential", vu, clamp, bits);
+                Compare(interp, jit, name);
+            }
+        }
+    }
+}
+
 void EETests()
 {
     EmuCoreXOracleSetSkipEvents(1);
@@ -2595,6 +2675,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
         VUTests();
+    else if (std::strcmp(suite, "sqrt-flags") == 0)
+        SqrtFlagTests();
     else if (std::strcmp(suite, "vectors") == 0)
         VectorsTests();
     else if (std::strcmp(suite, "ee") == 0)

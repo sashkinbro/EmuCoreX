@@ -93,37 +93,13 @@ static __fi void mVU_prepareSqrtOperand_oaknut(mV, int xmmReg)
 static __fi void mVU_prepareMacroSqrtOperand_oaknut(mV, int xmmReg)
 {
 	oak::Label non_negative;
-	oak::Label write_zero;
-	oak::Label write_abs_without_flag;
-
 	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(xmmReg));
 	oakAsm->TST(OAK_WSCRATCH, 0x80000000u);
 	oakAsm->B(oak::util::EQ, non_negative);
 	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7fffffffu);
-	// vuDouble() turns signed zero and denormals into signed zero before
-	// SQRT, so they are not invalid even when the raw sign bit is set.
-	oakAsm->CMP(OAK_WSCRATCH2, 0x00800000u);
-	oakAsm->B(oak::util::LO, write_zero);
-	if (!CHECK_VU_OVERFLOW(mVU.index))
-	{
-		// Without overflow clamping, negative NaNs remain NaNs and do not
-		// satisfy the interpreter's ft < 0 comparison.
-		oakAsm->MOV(OAK_WSCRATCH, 0x7f800000u);
-		oakAsm->CMP(OAK_WSCRATCH2, OAK_WSCRATCH);
-		oakAsm->B(oak::util::HI, write_abs_without_flag);
-	}
 	oakAsm->FMOV(oakSRegister(xmmReg), OAK_WSCRATCH2);
-	// Store the absolute operand before mVU_storeDivFlag_oaknut() reuses
-	// OAK_WSCRATCH for the flag value.
+	// The divide unit raises I for every negative sign bit, including -0.
 	mVU_storeDivFlag_oaknut(mVU, divI);
-	oakAsm->B(non_negative);
-
-	oakAsm->l(write_abs_without_flag);
-	oakAsm->FMOV(oakSRegister(xmmReg), OAK_WSCRATCH2);
-	oakAsm->B(non_negative);
-
-	oakAsm->l(write_zero);
-	oakAsm->EOR(oakQRegister(xmmReg).B16(), oakQRegister(xmmReg).B16(), oakQRegister(xmmReg).B16());
 	oakAsm->l(non_negative);
 
 	if (CHECK_VU_OVERFLOW(mVU.index))

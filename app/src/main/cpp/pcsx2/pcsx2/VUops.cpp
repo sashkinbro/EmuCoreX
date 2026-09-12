@@ -979,7 +979,7 @@ static __fi void _vuSQRT(VURegs* VU)
 
 	VU->statusflag &= ~0x30;
 
-	if (ft < 0.0)
+	if (VU->VF[_Ft_].UL[_Ftf_] & 0x80000000u)
 		VU->statusflag |= 0x410;
 	VU->q.F = sqrt(fabs(ft));
 	VU->q.F = vuDouble(VU, VU->q.UL);
