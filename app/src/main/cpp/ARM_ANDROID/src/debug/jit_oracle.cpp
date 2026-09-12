@@ -707,7 +707,8 @@ void VectorsTests()
         {"sqrt_payload_1p5", 0, SQRT, 0, 0x7fc00000, 0, false, true, 0x5f9cc471},
         {"rsqrt_exact", 0, RSQRT, 0x40c00000, 0x40800000, 0, false, true, 0x40400000},
         {"rsqrt_hw_2pow64", 0, RSQRT, 0x3f800000, 0x7f800000, 0, false, true, 0x1f800000},
-        {"rsqrt_invalid", 0, RSQRT, 0x00000000, 0x80000000, 0, false, true, 0xffffffff},
+        // SCPH-90000 autocases_vurs.h: "rsqrt +0 / -0" saturates positive.
+        {"rsqrt_zero_by_neg_zero", 0, RSQRT, 0x00000000, 0x80000000, 0, false, true, 0x7fffffff},
     };
 
     cpuinfo_initialize();
@@ -1880,6 +1881,88 @@ void SqrtFlagTests()
     }
 }
 
+void DivEdgeTests()
+{
+    SqrtFlagTests();
+    if (failures)
+        return;
+    // STATUS and Q sign from the same SCPH-90000 capture as SqrtFlagTests.
+    // Saturation magnitude retains this core's FLT_MAX policy.
+    struct Edge { u32 fs, ft, flags, sign; u32 magnitude = 0x7f7fffff; };
+    constexpr Edge edges[] = {
+        {0x00000000, 0x00000000, 0x410, 0},
+        {0x80000000, 0x00000000, 0x410, 0x80000000},
+        {0x00000000, 0x80000000, 0x410, 0},
+        {0x80000000, 0x80000000, 0x410, 0x80000000},
+        {0x3f800000, 0x00000000, 0x820, 0},
+        {0xbf800000, 0x00000000, 0x820, 0x80000000},
+        {0x3f800000, 0x80000000, 0xc30, 0},
+        {0xbf800000, 0x80000000, 0xc30, 0x80000000},
+        {0x00000001, 0x00000001, 0x410, 0},
+        {0x80000001, 0x80000001, 0x410, 0x80000000},
+        {0x3f800000, 0x007fffff, 0x820, 0},
+        {0x3f800000, 0x807fffff, 0xc30, 0},
+        {0xbf800000, 0x807fffff, 0xc30, 0x80000000},
+        {0x3f800000, 0xc0800000, 0x410, 0, 0x3f000000},
+        {0xbf800000, 0xc0800000, 0x410, 0x80000000, 0x3f000000},
+        {0x00000000, 0xc0800000, 0x410, 0, 0},
+        {0x3f800000, 0x40800000, 0, 0, 0x3f000000},
+    };
+    for (bool clamp : {false, true})
+    {
+        EmuConfig.Cpu.Recompiler.vu0Overflow = clamp;
+        EmuConfig.Cpu.Recompiler.vu1Overflow = clamp;
+        for (const Edge& edge : edges)
+        {
+            char name[160];
+            const u32 expectedQ = edge.sign | edge.magnitude;
+            for (bool jit : {false, true})
+            {
+                const std::vector<u32> code = {
+                    MipsI(15, 0, 8, edge.fs >> 16), MipsI(13, 8, 8, edge.fs),
+                    MipsI(15, 0, 9, edge.ft >> 16), MipsI(13, 9, 9, edge.ft),
+                    (0x12u << 26) | (5u << 21) | (8u << 16) | (1u << 11),
+                    (0x12u << 26) | (5u << 21) | (9u << 16) | (2u << 11),
+                    (0x12u << 26) | (0x10u << 21) | (2u << 16) | (1u << 11) | (14u << 6) | 0x3eu,
+                    (0x12u << 26) | (0x10u << 21) | (14u << 6) | 0x3fu,
+                    (0x12u << 26) | (2u << 21) | (18u << 16) | (REG_STATUS_FLAG << 11),
+                    (0x12u << 26) | (2u << 21) | (19u << 16) | (REG_Q << 11)};
+                const auto result = RunEEProgram(jit, code);
+                const u32 flags = static_cast<u32>(result.gpr[18]) & 0xc30u;
+                const u32 q = static_cast<u32>(result.gpr[19]);
+                std::snprintf(name, sizeof(name), "RSQRT macro clamp=%u jit=%u fs=%08x ft=%08x flags", clamp, jit, edge.fs, edge.ft);
+                CheckBits(flags == edge.flags, flags, edge.flags, name);
+                std::snprintf(name, sizeof(name), "RSQRT macro clamp=%u jit=%u fs=%08x ft=%08x saturation", clamp, jit, edge.fs, edge.ft);
+                CheckBits(q == expectedQ, q, expectedQ, name);
+            }
+            std::array<u32, 128> registers{};
+            registers[3] = 0x3f800000;
+            registers[4] = edge.fs;
+            registers[8] = edge.ft;
+            std::vector<u32> program = {0x800003beu | (2u << 16) | (1u << 11), NOP_U};
+            for (u32 i = 0; i < 16; ++i)
+                program.insert(program.end(), {NOP_L, NOP_U});
+            program.insert(program.end(), {NOP_L, NOP_U | 0x40000000u, NOP_L, NOP_U});
+            for (u32 vu : {0u, 1u})
+            {
+                const auto interp = RunVU(vu, false, program, 0x80, 0, 128, false, nullptr, registers.data());
+                const auto jit = RunVU(vu, true, program, 0x80, 0, 128, false, nullptr, registers.data());
+                for (const auto* result : {&interp, &jit})
+                {
+                    const u32 flags = result->regs.VI[REG_STATUS_FLAG].UL & 0xc30u;
+                    const u32 q = result->regs.VI[REG_Q].UL;
+                    std::snprintf(name, sizeof(name), "RSQRT VU%u clamp=%u jit=%u fs=%08x ft=%08x flags", vu, clamp, result == &jit, edge.fs, edge.ft);
+                    CheckBits(flags == edge.flags, flags, edge.flags, name);
+                    std::snprintf(name, sizeof(name), "RSQRT VU%u clamp=%u jit=%u fs=%08x ft=%08x saturation", vu, clamp, result == &jit, edge.fs, edge.ft);
+                    CheckBits(q == expectedQ, q, expectedQ, name);
+                }
+                std::snprintf(name, sizeof(name), "RSQRT VU%u clamp=%u fs=%08x ft=%08x differential", vu, clamp, edge.fs, edge.ft);
+                Compare(interp, jit, name);
+            }
+        }
+    }
+}
+
 void EETests()
 {
     EmuCoreXOracleSetSkipEvents(1);
@@ -2677,6 +2760,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests();
     else if (std::strcmp(suite, "sqrt-flags") == 0)
         SqrtFlagTests();
+    else if (std::strcmp(suite, "div-edges") == 0)
+        DivEdgeTests();
     else if (std::strcmp(suite, "vectors") == 0)
         VectorsTests();
     else if (std::strcmp(suite, "ee") == 0)

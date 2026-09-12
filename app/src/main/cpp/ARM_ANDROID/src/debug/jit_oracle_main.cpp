@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     const bool replay = argc == 4 && (fallback || std::strcmp(argv[2], "replay-vu1") == 0);
     if (argc != 3 && !replay)
     {
-        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu|vectors|ee|iop|replay-vu1 [capture.vuo]\n", argv[0]);
+        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu|vectors|sqrt-flags|div-edges|ee|iop|replay-vu1 [capture.vuo]\n", argv[0]);
         return 2;
     }
     setvbuf(stdout, nullptr, _IONBF, 0);

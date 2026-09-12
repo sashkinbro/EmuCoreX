@@ -992,37 +992,16 @@ static __fi void _vuRSQRT(VURegs* VU)
 	float temp;
 
 	VU->statusflag &= ~0x30;
+	if (VU->VF[_Ft_].UL[_Ftf_] & 0x80000000u)
+		VU->statusflag |= 0x410;
 
 	if (ft == 0.0)
 	{
-		VU->statusflag |= 0x820;
-
-		if (fs != 0)
-		{
-			if ((VU->VF[_Ft_].UL[_Ftf_] & 0x80000000) ^
-				(VU->VF[_Fs_].UL[_Fsf_] & 0x80000000))
-				VU->q.UL = 0xFF7FFFFF;
-			else
-				VU->q.UL = 0x7F7FFFFF;
-		}
-		else
-		{
-			if ((VU->VF[_Ft_].UL[_Ftf_] & 0x80000000) ^
-				(VU->VF[_Fs_].UL[_Fsf_] & 0x80000000))
-				VU->q.UL = 0x80000000;
-			else
-				VU->q.UL = 0;
-
-			VU->statusflag |= 0x410;
-		}
+		VU->statusflag |= (fs == 0.0) ? 0x410 : 0x820;
+		VU->q.UL = (VU->VF[_Fs_].UL[_Fsf_] & 0x80000000u) | 0x7f7fffffu;
 	}
 	else
 	{
-		if (ft < 0.0)
-		{
-			VU->statusflag |= 0x410;
-		}
-
 		temp = sqrt(fabs(ft));
 		VU->q.F = fs / temp;
 		VU->q.F = vuDouble(VU, VU->q.UL);
@@ -4081,4 +4060,3 @@ void VFCOR()   { VU0.code = cpuRegs.code; _vuFCOR(&VU0); }
 void VFCSET()  { VU0.code = cpuRegs.code; _vuFCSET(&VU0); SYNCCLIPFLAG(); }
 void VFCGET()  { VU0.code = cpuRegs.code; _vuFCGET(&VU0); }
 void VXITOP()  { VU0.code = cpuRegs.code; _vuXITOP(&VU0); }
-

@@ -58,15 +58,9 @@ static __fi void mVU_prepareSqrtOperand_oaknut(mV, int xmmReg)
 	oakAsm->FMOV(OAK_WSCRATCH, oakSRegister(xmmReg));
 	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7fffffffu);
 
-	// Interpreter path does ft = vuDouble(raw), then sqrt(fabs(ft)).
-	// So -0 and negative denormals become +0 and must not raise I.
+	// The root's invalid flag depends on the sign before zero conversion.
 	oakAsm->TST(OAK_WSCRATCH, 0x80000000u);
 	oakAsm->B(oak::util::EQ, no_invalid);
-	oakAsm->CMP(OAK_WSCRATCH2, 0x00800000u);
-	oakAsm->B(oak::util::LO, no_invalid);
-	oakAsm->MOV(OAK_WSCRATCH, 0x7f800000u);
-	oakAsm->CMP(OAK_WSCRATCH2, OAK_WSCRATCH);
-	oakAsm->B(oak::util::HI, no_invalid);
 	mVU_storeDivFlag_oaknut(mVU, divI);
 
 	oakAsm->l(no_invalid);
@@ -117,12 +111,11 @@ static __fi void mVU_testVuZero_oaknut(int xmmReg)
 	oakAsm->CMP(OAK_WSCRATCH, 0);
 }
 
-static __fi void mVU_makeRsqrtZeroSign_oaknut(int dst, int fs, int ft)
+static __fi void mVU_makeRsqrtZeroSign_oaknut(int dst, int fs)
 {
 	const oak::QReg dst_q = oakQRegister(dst);
-	oakAsm->EOR(dst_q.B16(), oakQRegister(fs).B16(), oakQRegister(ft).B16());
 	mVUEmitSignbitVector_oaknut(OAK_QSCRATCH3);
-	oakAsm->AND(dst_q.B16(), dst_q.B16(), OAK_QSCRATCH3.B16());
+	oakAsm->AND(dst_q.B16(), oakQRegister(fs).B16(), OAK_QSCRATCH3.B16());
 }
 
 static __fi void mVU_makeRsqrtSignedMax_oaknut(int dst)
@@ -224,25 +217,31 @@ static void mVU_RSQRT_direct_emit_oaknut(mP)
 		mVUClamp1ScalarBits_oaknut(Ft);
 	}
 	mVU_storeDivFlag_oaknut(mVU, 0);
-	mVU_makeRsqrtZeroSign_oaknut(t1, Fs, Ft);
+	mVU_makeRsqrtZeroSign_oaknut(t1, Fs);
 	mVU_prepareSqrtOperand_oaknut(mVU, Ft);
 	oakAsm->FSQRT(oakSRegister(Ft), oakSRegister(Ft));
 	mVU_testVuZero_oaknut(Ft);
 	oak::Label normal_div;
 	oakAsm->B(oak::util::NE, normal_div);
 
-	mVU_storeDivFlag_oaknut(mVU, divD);
 	mVU_testVuZero_oaknut(Fs);
+	oak::Label divide_zero;
 	oak::Label signed_max;
-	oakAsm->B(oak::util::NE, signed_max);
-	mVU_storeDivFlag_oaknut(mVU, divD | divI);
-	oakAsm->MOV(oakQRegister(Fs).Selem()[0], oakQRegister(t1).Selem()[0]);
-	oak::Label done;
-	oakAsm->B(done);
+	oakAsm->B(oak::util::NE, divide_zero);
+	mVU_storeDivFlag_oaknut(mVU, divI);
+	oakAsm->B(signed_max);
+
+	oakAsm->l(divide_zero);
+	const oak::WReg flag = oakWRegister(VU_HOST_T1);
+	oakLoad32(flag, mVU_divFlag_oaknut(mVU));
+	oakAsm->ORR(flag, flag, 0x80000u);
+	oakAsm->ORR(flag, flag, 0x2000000u);
+	oakStore32(flag, mVU_divFlag_oaknut(mVU));
 
 	oakAsm->l(signed_max);
 	mVU_makeRsqrtSignedMax_oaknut(t1);
 	oakAsm->MOV(oakQRegister(Fs).Selem()[0], oakQRegister(t1).Selem()[0]);
+	oak::Label done;
 	oakAsm->B(done);
 
 	oakAsm->l(normal_div);
@@ -3816,4 +3815,3 @@ static void mVU_JALR_emit(mP)
 	}
 	pass3 { mVUlog("JALR vi%02d, [vi%02d]", _Ft_, _Fs_); }
 }
-
