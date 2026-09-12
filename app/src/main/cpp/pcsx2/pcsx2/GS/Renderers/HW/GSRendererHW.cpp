@@ -7479,6 +7479,11 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 
 	// Needs to be called everywhere we return early except tex is fb, or read only depth.
 	auto HandleBarrierHazard = [&](bool src_empty) -> bool {
+		// Same-pixel framebuffer fetch is not a texture barrier. Even disjoint source
+		// and destination rectangles need a copy when sampling an attached texture.
+		if (g_gs_device->Features().texture_feedback_requires_copy)
+			return false;
+
 		// Feedback loops conditions explained:
 		// RT: If texture barrier/multidraw fb copy is not supported we do an rt copy anyway in device
 		// which is why we allow the conditions to pass with one barrier.
@@ -7665,7 +7670,21 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 			const int horizontal_offset = ((page_offset % src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.x) + draw_offset.x;
 			const int vertical_offset = ((page_offset / src_target->m_TEX0.TBW) * GSLocalMemory::m_psm[src_target->m_TEX0.PSM].pgs.y) + draw_offset.y;
 
-			if (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy)
+			// Offset channel reads need a snapshot too. Preserve source coordinates:
+			// the shader adds ChannelShuffleOffset to gl_FragCoord.
+			// See ARMSX2/ARMSX2 commit 471cced6 (GPL-3.0).
+			const bool copy_shuffle_source = !m_downscale_source && rt && m_conf.tex == m_conf.rt &&
+				g_gs_device->Features().texture_feedback_requires_copy;
+			if (copy_shuffle_source)
+			{
+				m_conf.cb_ps.ChannelShuffleOffset = GSVector2((horizontal_offset - m_r.x) * tex->GetScale(), (vertical_offset - m_r.y) * tex->GetScale());
+				target_region = false;
+				source_region.bits = 0;
+				copy_size = src_unscaled_size;
+				copy_range = (copy_range + GSVector4i(horizontal_offset, vertical_offset).xyxy()).rintersect(src_bounds);
+				GSVector4i::storel(&copy_dst_offset, copy_range);
+			}
+			else if (g_gs_device->Features().texture_barrier || g_gs_device->Features().multidraw_fb_copy)
 			{
 				m_conf.cb_ps.ChannelShuffleOffset = GSVector2((horizontal_offset - m_r.x) * tex->GetScale(), (vertical_offset - m_r.y) * tex->GetScale());
 				target_region = false;
