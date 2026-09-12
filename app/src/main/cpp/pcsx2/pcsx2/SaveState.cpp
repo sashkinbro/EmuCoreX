@@ -84,6 +84,9 @@ static void PostLoadPrep()
 
 	UpdateVSyncRate(true);
 
+	// Restart MTVU state synchronization only after restoring shared VU memory.
+	MTVU_ResyncAfterStateLoad();
+
 	if (VMManager::Internal::HasBootedELF())
 		R5900SymbolImporter.OnElfLoadedInMemory();
 }

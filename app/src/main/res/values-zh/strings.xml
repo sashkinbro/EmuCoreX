@@ -73,6 +73,7 @@
     <string name="emulation_exit_confirm">要退出遊戲嗎？</string>
     <string name="emulation_exit_confirm_desc">未儲存的進度將會遺失。</string>
     <string name="emulation_saved">已儲存</string>
+    <string name="emulation_save_failed">保存即时存档失败。</string>
     <string name="emulation_loaded">已載入</string>
     <string name="emulation_load_failed">無法載入即時存檔。</string>
     <string name="emulation_fps">FPS: %s</string>

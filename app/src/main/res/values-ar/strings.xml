@@ -104,6 +104,7 @@
     <string name="emulation_exit_confirm">الخروج من اللعبة؟</string>
     <string name="emulation_exit_confirm_desc">سيتم فقدان التقدم غير المحفوظ.</string>
     <string name="emulation_saved">تم الحفظ</string>
+    <string name="emulation_save_failed">فشل حفظ الحالة.</string>
     <string name="emulation_loaded">تم التحميل</string>
     <string name="emulation_load_failed">فشل في تحميل حالة الحفظ.</string>
     <string name="emulation_fps">معدل الإطارات (FPS): %s</string>

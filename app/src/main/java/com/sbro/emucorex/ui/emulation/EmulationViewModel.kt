@@ -4884,7 +4884,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
             delay(250.milliseconds)
         }
-        return (resolveSaveStateFile(gamePath, slot) ?: fallbackFile).exists()
+        // A file that already existed before this save (unchanged timestamp) is not
+        // proof of success; only a new or updated state counts.
+        val finalFile = resolveSaveStateFile(gamePath, slot) ?: fallbackFile
+        val finalModified = finalFile.takeIf { it.exists() }?.lastModified() ?: 0L
+        return finalModified > 0L && (previousModified <= 0L || finalModified > previousModified)
     }
 
     private fun resolveSaveStateFile(gamePath: String, slot: Int): File? {
@@ -4944,14 +4948,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             _uiState.value = _uiState.value.copy(
                 isActionInProgress = false,
                 actionLabel = null,
-                toastMessage = if (success) "saved" else null
+                toastMessage = if (success) "saved" else "save_failed"
             )
             if (success) {
                 refreshSaveStateMetadata()
             }
             AppAnalytics.logSaveStateAction(action = "save", automatic = false, success = success)
             delay(2000.milliseconds)
-            _uiState.value = _uiState.value.copy(toastMessage = null)
+            if (_uiState.value.toastMessage == "saved" || _uiState.value.toastMessage == "save_failed") {
+                _uiState.value = _uiState.value.copy(toastMessage = null)
+            }
         }
     }
 

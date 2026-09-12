@@ -56,17 +56,16 @@ bool SaveStateBase::mtvuFreeze()
 	if (!IsSaving())
 	{
 		vu1Thread.Reset();
-		vu1Thread.WriteCol(vif1);
-		vu1Thread.WriteRow(vif1);
-		vu1Thread.WriteMicroMem(0, VU1.Micro, 0x4000);
-		vu1Thread.WriteDataMem(0, VU1.Mem, 0x4000);
-		vu1Thread.WriteVIRegs(&VU1.VI[0]);
-		vu1Thread.WriteVFRegs(&VU1.VF[0]);
+		// VU1 memory/registers are shared with the CPU thread. Keep the worker
+		// idle until all archive entries have been restored; queued writes here
+		// can overwrite the newly loaded memory with the pre-load contents.
 	}
 	for (size_t i = 0; i < 4; ++i)
 	{
 		unsigned int v = vu1Thread.vuCycles[i].load();
 		Freeze(v);
+		if (!IsSaving())
+			vu1Thread.vuCycles[i].store(v);
 	}
 
 	u32 gsInterrupts = vu1Thread.mtvuInterrupts.load();
@@ -81,6 +80,18 @@ bool SaveStateBase::mtvuFreeze()
 
 	Freeze(vu1Thread.vuCycleIdx);
 	return IsOkay();
+}
+
+void MTVU_ResyncAfterStateLoad()
+{
+	if (!THREAD_VU1)
+		return;
+
+	// Only the VIF unpack masks have private worker copies. VU1 memory and
+	// registers were restored in place, and PreLoadPrep cleared the JIT caches.
+	vu1Thread.WriteCol(vif1);
+	vu1Thread.WriteRow(vif1);
+	vu1Thread.WaitVU();
 }
 
 VU_Thread::VU_Thread()

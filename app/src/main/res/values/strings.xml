@@ -114,6 +114,7 @@
     <string name="emulation_exit_confirm">Exit the game?</string>
     <string name="emulation_exit_confirm_desc">Unsaved progress will be lost.</string>
     <string name="emulation_saved">Saved</string>
+    <string name="emulation_save_failed">Failed to save state.</string>
     <string name="emulation_loaded">Loaded</string>
     <string name="emulation_load_failed">Failed to load save state.</string>
     <string name="emulation_hardcore_action_blocked">This action is disabled while RetroAchievements Hardcore Mode is active.</string>

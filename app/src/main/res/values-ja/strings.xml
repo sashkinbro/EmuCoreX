@@ -104,6 +104,7 @@
     <string name="emulation_exit_confirm">ゲームを終了しますか？</string>
     <string name="emulation_exit_confirm_desc">セーブされていない進行状況は失われます。</string>
     <string name="emulation_saved">セーブしました</string>
+    <string name="emulation_save_failed">ステートを保存できませんでした。</string>
     <string name="emulation_loaded">ロードしました</string>
     <string name="emulation_load_failed">セーブ状態のロードに失敗しました。</string>
     <string name="emulation_fps">FPS: %s</string>

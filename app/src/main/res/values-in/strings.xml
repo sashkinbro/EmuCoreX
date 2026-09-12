@@ -114,6 +114,7 @@
     <string name="emulation_exit_confirm">Keluar dari game?</string>
     <string name="emulation_exit_confirm_desc">Progres yang belum disimpan akan hilang.</string>
     <string name="emulation_saved">Disimpan</string>
+    <string name="emulation_save_failed">Gagal menyimpan state.</string>
     <string name="emulation_loaded">Dimuat</string>
     <string name="emulation_load_failed">Gagal memuat status simpanan.</string>
     <string name="emulation_hardcore_action_blocked">Tindakan ini dinonaktifkan saat Mode Hardcore RetroAchievements aktif.</string>

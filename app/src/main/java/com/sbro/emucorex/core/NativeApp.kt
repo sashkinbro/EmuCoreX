@@ -380,6 +380,7 @@ object NativeApp {
     @JvmStatic external fun getGameSerial(): String?
     @JvmStatic external fun saveStateToSlot(slot: Int): Boolean
     @JvmStatic external fun loadStateFromSlot(slot: Int): Boolean
+    @JvmStatic external fun waitForSaveStateFlush()
     @JvmStatic external fun getSaveStatePathForFile(path: String, slot: Int): String?
     @JvmStatic external fun getSaveStateScreenshot(path: String): ByteArray?
     @JvmStatic external fun getRetroAchievementGameData(path: String): String?

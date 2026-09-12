@@ -59,6 +59,7 @@ public:
 	std::string GetSaveStatePathForFile(const std::string& path, int slot) const;
 	bool SaveStateToSlot(int slot);
 	bool LoadStateFromSlot(int slot);
+	void WaitForSaveStateFlush();
 	std::string ListMemoryCards() const;
 	bool CreateMemoryCard(const std::string& name, int type, int file_type);
 

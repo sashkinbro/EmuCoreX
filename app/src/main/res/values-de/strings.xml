@@ -73,6 +73,7 @@
     <string name="emulation_exit_confirm">Spiel beenden?</string>
     <string name="emulation_exit_confirm_desc">Nicht gespeicherter Fortschritt geht verloren.</string>
     <string name="emulation_saved">Gespeichert</string>
+    <string name="emulation_save_failed">Zustand konnte nicht gespeichert werden.</string>
     <string name="emulation_loaded">Geladen</string>
     <string name="emulation_load_failed">Speicherstand konnte nicht geladen werden.</string>
     <string name="emulation_fps">FPS: %s</string>

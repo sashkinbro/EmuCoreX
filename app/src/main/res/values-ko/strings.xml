@@ -104,6 +104,7 @@
     <string name="emulation_exit_confirm">게임을 종료하시겠습니까?</string>
     <string name="emulation_exit_confirm_desc">저장하지 않은 진행 상황은 손실됩니다.</string>
     <string name="emulation_saved">저장됨</string>
+    <string name="emulation_save_failed">상태를 저장하지 못했습니다.</string>
     <string name="emulation_loaded">불러옴</string>
     <string name="emulation_load_failed">저장 상태를 불러오지 못했습니다.</string>
     <string name="emulation_fps">FPS: %s</string>

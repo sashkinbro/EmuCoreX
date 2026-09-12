@@ -96,6 +96,7 @@
     <string name="emulation_exit_confirm">गेम से बाहर निकलें?</string>
     <string name="emulation_exit_confirm_desc">बिना सेव की गई प्रगति नष्ट हो जाएगी।</string>
     <string name="emulation_saved">सेव हो गया</string>
+    <string name="emulation_save_failed">स्टेट सेव नहीं हो सका।</string>
     <string name="emulation_loaded">लोड हो गया</string>
     <string name="emulation_load_failed">सेव स्थिति लोड करने में विफल।</string>
     <string name="emulation_fps">FPS: %s</string>

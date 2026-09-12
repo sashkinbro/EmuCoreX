@@ -114,6 +114,7 @@
     <string name="emulation_exit_confirm">Wyjść z gry?</string>
     <string name="emulation_exit_confirm_desc">Niezapisane postępy zostaną utracone.</string>
     <string name="emulation_saved">Zapisano</string>
+    <string name="emulation_save_failed">Nie udało się zapisać stanu.</string>
     <string name="emulation_loaded">Wczytano</string>
     <string name="emulation_load_failed">Nie udało się wczytać stanu zapisu.</string>
     <string name="emulation_hardcore_action_blocked">Ta akcja jest zablokowana, gdy tryb Hardcore RetroAchievements jest aktywny.</string>

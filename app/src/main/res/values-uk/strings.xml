@@ -73,6 +73,7 @@
     <string name="emulation_exit_confirm">Вийти з гри?</string>
     <string name="emulation_exit_confirm_desc">Незбережений прогрес буде втрачено.</string>
     <string name="emulation_saved">Збережено</string>
+    <string name="emulation_save_failed">Не вдалося зберегти стан.</string>
     <string name="emulation_loaded">Завантажено</string>
     <string name="emulation_load_failed">Не вдалося завантажити збереження.</string>
     <string name="emulation_fps">FPS: %s</string>

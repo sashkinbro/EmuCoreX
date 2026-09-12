@@ -137,3 +137,6 @@ private:
 };
 
 extern VU_Thread& vu1Thread;
+
+// Restores private MTVU unpack masks after all shared state has been loaded.
+void MTVU_ResyncAfterStateLoad();

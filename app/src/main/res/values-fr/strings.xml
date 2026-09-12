@@ -73,6 +73,7 @@
     <string name="emulation_exit_confirm">Quitter le jeu ?</string>
     <string name="emulation_exit_confirm_desc">La progression non sauvegardée sera perdue.</string>
     <string name="emulation_saved">Sauvegardé</string>
+    <string name="emulation_save_failed">Échec de l\'enregistrement de l\'état.</string>
     <string name="emulation_loaded">Chargé</string>
     <string name="emulation_load_failed">Impossible de charger la sauvegarde.</string>
     <string name="emulation_fps">FPS : %s</string>

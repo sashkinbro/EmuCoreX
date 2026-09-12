@@ -104,6 +104,7 @@
     <string name="emulation_exit_confirm">Oyundan çıkılsın mı?</string>
     <string name="emulation_exit_confirm_desc">Kaydedilmemiş ilerleme kaybolacak.</string>
     <string name="emulation_saved">Kaydedildi</string>
+    <string name="emulation_save_failed">Durum kaydedilemedi.</string>
     <string name="emulation_loaded">Yüklendi</string>
     <string name="emulation_load_failed">Kayıt durumu yüklenemedi.</string>
     <string name="emulation_fps">FPS: %s</string>

@@ -73,6 +73,7 @@
     <string name="emulation_exit_confirm">¿Salir del juego?</string>
     <string name="emulation_exit_confirm_desc">El progreso no guardado se perderá.</string>
     <string name="emulation_saved">Guardado</string>
+    <string name="emulation_save_failed">No se pudo guardar el estado.</string>
     <string name="emulation_loaded">Cargado</string>
     <string name="emulation_load_failed">No se pudo cargar el guardado.</string>
     <string name="emulation_fps">FPS: %s</string>

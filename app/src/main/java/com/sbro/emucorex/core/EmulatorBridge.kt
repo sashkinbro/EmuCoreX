@@ -1157,7 +1157,14 @@ object EmulatorBridge {
         if (!isNativeLoaded || !isVmActive) return false
         return runSerial {
             try {
-                NativeApp.saveStateToSlot(slot)
+                val started = NativeApp.saveStateToSlot(slot)
+                if (started) {
+                    // The archive is zipped on a background thread. Wait for the
+                    // flush so callers never report success (or load it) while the
+                    // file is still being written.
+                    runCatching { NativeApp.waitForSaveStateFlush() }
+                }
+                started
             } catch (_: Exception) {
                 false
             }
@@ -1170,8 +1177,10 @@ object EmulatorBridge {
             try {
                 val success = NativeApp.loadStateFromSlot(slot)
                 if (success) {
+                    // Rebind the surface for the restored GS state, but keep the
+                    // caller's pause state: loading from the in-game menu must not
+                    // silently unpause the game behind the menu.
                     runCatching { rebindSurface() }
-                    runCatching { NativeApp.resume() }
                 }
                 success
             } catch (_: Exception) {

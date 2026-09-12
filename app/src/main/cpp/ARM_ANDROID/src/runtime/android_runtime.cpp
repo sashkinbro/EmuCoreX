@@ -805,22 +805,39 @@ bool AndroidRuntime::SaveStateToSlot(int slot)
 		return false;
 
 	auto result = std::make_shared<bool>(false);
-	Host::RunOnCPUThread([slot, result]() {
+	auto failed = std::make_shared<std::atomic_bool>(false);
+	Host::RunOnCPUThread([slot, result, failed]() {
 		if (!VMManager::HasValidVM())
 			return;
 
-		VMManager::SaveStateToSlot(slot, true, [slot](const std::string& error) {
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "save state slot %d failed: %s", slot, error.c_str());
+		VMManager::SaveStateToSlot(slot, true, [slot, failed](const std::string& message) {
+			failed->store(true);
+			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "save state slot %d failed: %s", slot, message.c_str());
 		});
 		*result = true;
 	}, true);
-	return *result;
+	// The error callback may run on the ZIP worker. Wait before reporting
+	// success so an old slot file cannot hide a failed asynchronous save.
+	VMManager::WaitForSaveStateFlush();
+	return *result && !failed->load();
+}
+
+void AndroidRuntime::WaitForSaveStateFlush()
+{
+	if (!HasValidVm())
+		return;
+
+	VMManager::WaitForSaveStateFlush();
 }
 
 bool AndroidRuntime::LoadStateFromSlot(int slot)
 {
 	if (!HasValidVm())
 		return false;
+
+	// Never load a state whose background zip is still running: the archive would
+	// be read half-written.
+	VMManager::WaitForSaveStateFlush();
 
 	auto result = std::make_shared<bool>(false);
 	Host::RunOnCPUThread([slot, result]() {

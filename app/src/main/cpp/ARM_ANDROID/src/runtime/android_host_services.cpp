@@ -13,6 +13,7 @@
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
 #include "pcsx2/PerformanceMetrics.h"
+#include "pcsx2/R5900.h"
 #include "pcsx2/SPU2/spu2.h"
 #include "pcsx2/VMManager.h"
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -724,6 +725,23 @@ void Host::RequestVMShutdown(bool, bool, bool)
 void Host::PumpMessagesOnCPUThread()
 {
 	s_cpu_thread_id = std::this_thread::get_id();
+
+	// Input polling also reaches this function inside an EE event test. A load,
+	// reset or settings change must not replace VM state beneath that stack:
+	// counters and VU/IOP execution would continue using the old event's locals.
+	// Leave the tasks queued for the outer VM loop, after Execute() has returned.
+	if (eeEventTestIsActive)
+	{
+		bool pending;
+		{
+			std::lock_guard lock(s_cpu_tasks_mutex);
+			pending = !s_cpu_tasks.empty();
+		}
+		if (pending)
+			Cpu->ExitExecution();
+		emucorex::android::PollPendingPadUpdatesOnCPUThread();
+		return;
+	}
 
 	std::deque<std::function<void()>> tasks;
 	{
