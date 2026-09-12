@@ -1476,6 +1476,66 @@ private fun GameSettingsTabContent(
                         onResetToDefault = { onDraftChange(draft.copy(gamepadRightStickSensitivity = defaultProfile.gamepadRightStickSensitivity)) }
                     )
                     SliderRow(
+                        title = stringResource(R.string.settings_gamepad_left_stick_negative_deadzone),
+                        value = draft.gamepadLeftStickNegativeDeadzone.toFloat(),
+                        valueLabel = "${draft.gamepadLeftStickNegativeDeadzone}%",
+                        range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadLeftStickNegativeDeadzone = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadLeftStickNegativeDeadzone = defaultProfile.gamepadLeftStickNegativeDeadzone)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_right_stick_negative_deadzone),
+                        value = draft.gamepadRightStickNegativeDeadzone.toFloat(),
+                        valueLabel = "${draft.gamepadRightStickNegativeDeadzone}%",
+                        range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadRightStickNegativeDeadzone = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadRightStickNegativeDeadzone = defaultProfile.gamepadRightStickNegativeDeadzone)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_left_stick_anti_deadzone),
+                        value = draft.gamepadLeftStickAntiDeadzone.toFloat(),
+                        valueLabel = "${draft.gamepadLeftStickAntiDeadzone}%",
+                        range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadLeftStickAntiDeadzone = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadLeftStickAntiDeadzone = defaultProfile.gamepadLeftStickAntiDeadzone)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_right_stick_anti_deadzone),
+                        value = draft.gamepadRightStickAntiDeadzone.toFloat(),
+                        valueLabel = "${draft.gamepadRightStickAntiDeadzone}%",
+                        range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadRightStickAntiDeadzone = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadRightStickAntiDeadzone = defaultProfile.gamepadRightStickAntiDeadzone)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_left_stick_curve),
+                        value = draft.gamepadLeftStickCurve.toFloat(),
+                        valueLabel = "${draft.gamepadLeftStickCurve}%",
+                        range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadLeftStickCurve = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadLeftStickCurve = defaultProfile.gamepadLeftStickCurve)) }
+                    )
+                    SliderRow(
+                        title = stringResource(R.string.settings_gamepad_right_stick_curve),
+                        value = draft.gamepadRightStickCurve.toFloat(),
+                        valueLabel = "${draft.gamepadRightStickCurve}%",
+                        range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                        steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                        onValueChange = { onDraftChange(draft.copy(gamepadRightStickCurve = it.roundToInt())) },
+                        helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                        onResetToDefault = { onDraftChange(draft.copy(gamepadRightStickCurve = defaultProfile.gamepadRightStickCurve)) }
+                    )
+                    SliderRow(
                         title = stringResource(R.string.settings_pressure_modifier_amount),
                         value = draft.pressureModifierAmount.toFloat(),
                         valueLabel = "${draft.pressureModifierAmount}%",
@@ -3968,6 +4028,15 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
         gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
         gamepadButtonHaptics = gamepadButtonHaptics,
+        gamepadStickDeadzone = gamepadStickDeadzone,
+        gamepadLeftStickSensitivity = gamepadLeftStickSensitivity,
+        gamepadRightStickSensitivity = gamepadRightStickSensitivity,
+        gamepadLeftStickNegativeDeadzone = gamepadLeftStickNegativeDeadzone,
+        gamepadRightStickNegativeDeadzone = gamepadRightStickNegativeDeadzone,
+        gamepadLeftStickAntiDeadzone = gamepadLeftStickAntiDeadzone,
+        gamepadRightStickAntiDeadzone = gamepadRightStickAntiDeadzone,
+        gamepadLeftStickCurve = gamepadLeftStickCurve,
+        gamepadRightStickCurve = gamepadRightStickCurve,
         pressureModifierAmount = pressureModifierAmount,
         autoSaveOnExit = false,
         autoLoadOnStart = false,
@@ -4089,6 +4158,15 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2, defaultProfile.gamepadRightStickUpToR2),
         gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2, defaultProfile.gamepadRightStickDownToL2),
         gamepadButtonHaptics = pick("gamepadButtonHaptics", gamepadButtonHaptics, defaultProfile.gamepadButtonHaptics),
+        gamepadStickDeadzone = pick("gamepadStickDeadzone", gamepadStickDeadzone, defaultProfile.gamepadStickDeadzone),
+        gamepadLeftStickSensitivity = pick("gamepadLeftStickSensitivity", gamepadLeftStickSensitivity, defaultProfile.gamepadLeftStickSensitivity),
+        gamepadRightStickSensitivity = pick("gamepadRightStickSensitivity", gamepadRightStickSensitivity, defaultProfile.gamepadRightStickSensitivity),
+        gamepadLeftStickNegativeDeadzone = pick("gamepadLeftStickNegativeDeadzone", gamepadLeftStickNegativeDeadzone, defaultProfile.gamepadLeftStickNegativeDeadzone),
+        gamepadRightStickNegativeDeadzone = pick("gamepadRightStickNegativeDeadzone", gamepadRightStickNegativeDeadzone, defaultProfile.gamepadRightStickNegativeDeadzone),
+        gamepadLeftStickAntiDeadzone = pick("gamepadLeftStickAntiDeadzone", gamepadLeftStickAntiDeadzone, defaultProfile.gamepadLeftStickAntiDeadzone),
+        gamepadRightStickAntiDeadzone = pick("gamepadRightStickAntiDeadzone", gamepadRightStickAntiDeadzone, defaultProfile.gamepadRightStickAntiDeadzone),
+        gamepadLeftStickCurve = pick("gamepadLeftStickCurve", gamepadLeftStickCurve, defaultProfile.gamepadLeftStickCurve),
+        gamepadRightStickCurve = pick("gamepadRightStickCurve", gamepadRightStickCurve, defaultProfile.gamepadRightStickCurve),
         pressureModifierAmount = pick("pressureModifierAmount", pressureModifierAmount, defaultProfile.pressureModifierAmount),
         autoSaveOnExit = pick("autoSaveOnExit", autoSaveOnExit, defaultProfile.autoSaveOnExit),
         autoLoadOnStart = pick("autoLoadOnStart", autoLoadOnStart, defaultProfile.autoLoadOnStart),

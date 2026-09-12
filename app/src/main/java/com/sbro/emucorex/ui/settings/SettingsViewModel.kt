@@ -283,6 +283,12 @@ data class SettingsUiState(
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadLeftStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadRightStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadLeftStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadRightStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadLeftStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
+    val gamepadRightStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
@@ -568,6 +574,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             gamepadStickDeadzone = snapshot.gamepadStickDeadzone,
             gamepadLeftStickSensitivity = snapshot.gamepadLeftStickSensitivity,
             gamepadRightStickSensitivity = snapshot.gamepadRightStickSensitivity,
+            gamepadLeftStickNegativeDeadzone = snapshot.gamepadLeftStickNegativeDeadzone,
+            gamepadRightStickNegativeDeadzone = snapshot.gamepadRightStickNegativeDeadzone,
+            gamepadLeftStickAntiDeadzone = snapshot.gamepadLeftStickAntiDeadzone,
+            gamepadRightStickAntiDeadzone = snapshot.gamepadRightStickAntiDeadzone,
+            gamepadLeftStickCurve = snapshot.gamepadLeftStickCurve,
+            gamepadRightStickCurve = snapshot.gamepadRightStickCurve,
             gamepadRightStickUpToR2 = snapshot.gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = snapshot.gamepadRightStickDownToL2,
             gamepadButtonHaptics = snapshot.gamepadButtonHaptics,
@@ -2185,6 +2197,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGamepadStickDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadStickDeadzone(value) } }
     fun setGamepadLeftStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickSensitivity(value) } }
     fun setGamepadRightStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickSensitivity(value) } }
+    fun setGamepadLeftStickNegativeDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickNegativeDeadzone(value) } }
+    fun setGamepadRightStickNegativeDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickNegativeDeadzone(value) } }
+    fun setGamepadLeftStickAntiDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickAntiDeadzone(value) } }
+    fun setGamepadRightStickAntiDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickAntiDeadzone(value) } }
+    fun setGamepadLeftStickCurve(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickCurve(value) } }
+    fun setGamepadRightStickCurve(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickCurve(value) } }
     fun setGamepadRightStickUpToR2(enabled: Boolean) { viewModelScope.launch { preferences.setGamepadRightStickUpToR2(enabled) } }
     fun setGamepadRightStickDownToL2(enabled: Boolean) { viewModelScope.launch { preferences.setGamepadRightStickDownToL2(enabled) } }
     fun setGamepadButtonHaptics(enabled: Boolean) { viewModelScope.launch { preferences.setGamepadButtonHaptics(enabled) } }

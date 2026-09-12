@@ -1278,8 +1278,17 @@
     <string name="settings_game_fixes">GameDB-Fixes</string>
     <string name="settings_game_fixes_desc">Kompatibilitäts-Fixes aus der GameDB anwenden.</string>
     <string name="settings_help_game_fixes">Verwendet GameDB-Kompatibilitäts-Fixes für bekannte Spiele, einschließlich automatischer Überschreibungen für Clamping- und Rundungsmodi. Deaktiviere dies nur, wenn ein bestimmtes Spiel deine manuellen Clamping-Einstellungen anstelle der GameDB-Werte benötigt. Starte das Spiel neu, um Änderungen anzuwenden.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Erweitert kleine Stick-Bewegungen, bevor die Deadzone greift. Dadurch verlässt der Stick die Deadzone früher und Lenkung oder Zielen reagiert schneller. Erhöhe den Wert, wenn ein Spiel oder Controller eine große eigene Deadzone hat; 0% lässt die Standardreaktion.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Legt den kleinsten Wert fest, der gesendet wird, sobald der Stick die Deadzone verlässt. Erhöhe ihn für Spiele, deren eigene Deadzone sanfte Neigungen ignoriert, damit Bewegung sofort beginnt statt verspätet einzusetzen. 0% ist aus.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Bestimmt, wie schnell der Stick-Ausgang mit dem Weg ansteigt. 100% ist linear; über 100% ermöglicht feinere Kontrolle nahe der Mitte für präzises Lenken oder Zielen, unter 100% reagiert bei kleinen Neigungen schneller.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Weist den analogen R2-Trigger der Aufwärtsbewegung des rechten Sticks zu, sowohl für Gamepads als auch für Bildschirmsteuerungen. Dies kann bei Rennspielen helfen, bei denen Gas auf rechter Stick hoch liegt.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Weist den analogen L2-Trigger der Abwärtsbewegung des rechten Sticks zu, sowohl für Gamepads als auch für Bildschirmsteuerungen. Dies kann bei Rennspielen helfen, bei denen Bremse auf rechter Stick runter liegt.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Negative Deadzone des linken Sticks</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Negative Deadzone des rechten Sticks</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-Deadzone des linken Sticks</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-Deadzone des rechten Sticks</string>
+    <string name="settings_gamepad_left_stick_curve">Kurve des linken Sticks</string>
+    <string name="settings_gamepad_right_stick_curve">Kurve des rechten Sticks</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 zu rechter Stick hoch</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Verwende R2 als rechter Stick hoch.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 zu rechter Stick runter</string>

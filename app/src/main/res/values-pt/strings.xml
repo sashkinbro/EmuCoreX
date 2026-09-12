@@ -1278,8 +1278,17 @@
     <string name="settings_game_fixes">Correções da GameDB</string>
     <string name="settings_game_fixes_desc">Aplicar correções de compatibilidade da GameDB.</string>
     <string name="settings_help_game_fixes">Usa correções de compatibilidade da GameDB para jogos conhecidos, incluindo substituições automáticas do modo de arredondamento e clamping. Desative isto apenas quando um jogo específico precisar das suas configurações manuais de clamping em vez dos valores da GameDB; reinicie o jogo para aplicar.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Amplia pequenos movimentos do analógico antes da aplicação da zona morta, então o analógico sai da zona morta mais cedo e a direção ou a mira reage antes. Aumente se um jogo ou controle tiver uma zona morta grande própria; 0% mantém a resposta padrão.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Define o menor valor enviado assim que o analógico sai da zona morta. Aumente para jogos cuja própria zona morta ignora inclinações leves, para o movimento começar imediatamente em vez de chegar atrasado. 0% está desligado.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Define a rapidez com que a saída do analógico aumenta com o curso. 100% é linear; acima de 100% dá controle mais fino perto do centro para dirigir ou mirar com precisão, abaixo de 100% reage mais rápido a inclinações pequenas.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Mapeia o gatilho analógico R2 para o movimento para cima do analógico direito em gamepads e controles na tela. Isto pode ajudar em jogos de corrida onde o acelerador está no analógico direito para cima.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Mapeia o gatilho analógico L2 para o movimento para baixo do analógico direito em gamepads e controles na tela. Isto pode ajudar em jogos de corrida onde o travão está no analógico direito para baixo.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Zona morta negativa do analógico esquerdo</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Zona morta negativa do analógico direito</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-zona morta do analógico esquerdo</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-zona morta do analógico direito</string>
+    <string name="settings_gamepad_left_stick_curve">Curva do analógico esquerdo</string>
+    <string name="settings_gamepad_right_stick_curve">Curva do analógico direito</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 para analógico direito para cima</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Usar R2 como analógico direito para cima.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 para analógico direito para baixo</string>

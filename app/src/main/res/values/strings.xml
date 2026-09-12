@@ -775,6 +775,9 @@
     <string name="settings_help_gamepad_stick_deadzone">Ignores small physical stick movements near the center. Raise it if your controller drifts on its own; keep it lower if you want faster response around center.</string>
     <string name="settings_help_gamepad_left_stick_sensitivity">Adjusts how strongly the physical left stick responds after deadzone processing. Higher values reach full movement faster, while lower values make fine movement easier.</string>
     <string name="settings_help_gamepad_right_stick_sensitivity">Adjusts how strongly the physical right stick responds after deadzone processing. Higher values make camera or aim movement react faster, while lower values give you finer control.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Expands small stick movements before the deadzone is applied, so the stick leaves the deadzone sooner and steering or aiming reacts earlier. Raise it when a game or controller has a large built-in deadzone; 0% keeps the standard response.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Sets the smallest output sent once the stick leaves the deadzone. Raise it for games whose own deadzone ignores gentle tilts, so movement starts immediately instead of jumping in late. 0% is off.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Shapes how quickly stick output rises with travel. 100% is linear; above 100% gives finer control near center for precise steering or aiming, below 100% reacts faster at small tilts.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Maps the R2 analog trigger to upward movement on the right stick for both gamepads and on-screen controls. This can help racing games where throttle is bound to right stick up.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Maps the L2 analog trigger to downward movement on the right stick for both gamepads and on-screen controls. This can help racing games where brake is bound to right stick down.</string>
     <string name="settings_help_hide_overlay_on_gamepad">Hides the touch overlay whenever a physical controller is active. This makes the screen cleaner, but turn it off if you still want touch buttons available while a controller is connected.</string>
@@ -942,6 +945,12 @@
     <string name="settings_gamepad_stick_deadzone">Stick Deadzone</string>
     <string name="settings_gamepad_left_stick_sensitivity">Left Stick Sensitivity</string>
     <string name="settings_gamepad_right_stick_sensitivity">Right Stick Sensitivity</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Left Stick Negative Deadzone</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Right Stick Negative Deadzone</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Left Stick Anti-Deadzone</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Right Stick Anti-Deadzone</string>
+    <string name="settings_gamepad_left_stick_curve">Left Stick Curve</string>
+    <string name="settings_gamepad_right_stick_curve">Right Stick Curve</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 to Right Stick Up</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Use R2 as right stick up.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 to Right Stick Down</string>

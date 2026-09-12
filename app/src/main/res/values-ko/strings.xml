@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">GameDB 수정 사항</string>
     <string name="settings_game_fixes_desc">GameDB의 호환성 수정 사항을 적용합니다.</string>
     <string name="settings_help_game_fixes">알려진 게임에 대해 자동 클램프 및 반올림 모드 재정의를 포함하여 GameDB 호환성 수정 사항을 사용합니다. 특정 게임이 GameDB 값 대신 수동 클램핑 설정을 필요로 할 때만 이 옵션을 비활성화하세요. 적용하려면 게임을 다시 시작합니다.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">데드존을 적용하기 전에 작은 스틱 움직임을 확장하여 스틱이 데드존을 더 빨리 벗어나게 합니다. 게임이나 컨트롤러 자체의 데드존이 클 때 올리세요. 0%는 기본 반응을 유지합니다.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">스틱이 데드존을 벗어나는 순간 보내는 최소 출력을 설정합니다. 게임 자체 데드존이 약한 기울기를 무시할 때 올리면 움직임이 늦게 시작되지 않고 즉시 반응합니다. 0%는 꺼짐입니다.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">스틱 이동에 따라 출력이 얼마나 빠르게 상승하는지 조정합니다. 100%는 선형이며, 100%보다 높으면 중앙 부근에서 더 정밀하게 조향하거나 조준할 수 있고, 낮으면 작은 기울기에 더 빠르게 반응합니다.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">R2 아날로그 트리거를 게임패드와 화면 컨트롤 모두에서 오른쪽 스틱 위쪽 움직임에 매핑합니다. 가속이 오른쪽 스틱 위로 지정된 레이싱 게임에 도움이 될 수 있습니다.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">L2 아날로그 트리거를 게임패드와 화면 컨트롤 모두에서 오른쪽 스틱 아래쪽 움직임에 매핑합니다. 브레이크가 오른쪽 스틱 아래로 지정된 레이싱 게임에 도움이 될 수 있습니다.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">왼쪽 스틱 음수 데드존</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">오른쪽 스틱 음수 데드존</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">왼쪽 스틱 안티 데드존</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">오른쪽 스틱 안티 데드존</string>
+    <string name="settings_gamepad_left_stick_curve">왼쪽 스틱 곡선</string>
+    <string name="settings_gamepad_right_stick_curve">오른쪽 스틱 곡선</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2를 오른쪽 스틱 위로</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">R2를 오른쪽 스틱 위쪽으로 사용합니다.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2를 오른쪽 스틱 아래로</string>

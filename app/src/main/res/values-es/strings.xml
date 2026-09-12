@@ -1278,8 +1278,17 @@
     <string name="settings_game_fixes">Correcciones de GameDB</string>
     <string name="settings_game_fixes_desc">Aplicar correcciones de compatibilidad de la GameDB.</string>
     <string name="settings_help_game_fixes">Utiliza las correcciones de compatibilidad de GameDB para juegos conocidos, incluidas las anulaciones automáticas del modo de redondeo y clamping. Desactívalo solo cuando un juego específico necesite tus ajustes manuales de clamping en lugar de los valores de GameDB; reinicia el juego para aplicar.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Amplía los movimientos pequeños del stick antes de aplicar la zona muerta, así el stick sale antes de ella y la dirección o la puntería reaccionan más pronto. Súbela si un juego o mando tiene una zona muerta grande propia; 0 % mantiene la respuesta estándar.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Define el valor más pequeño que se envía en cuanto el stick sale de la zona muerta. Súbela en juegos cuya propia zona muerta ignora inclinaciones suaves, para que el movimiento empiece de inmediato en vez de llegar tarde. 0 % está desactivado.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Define con qué rapidez aumenta la salida del stick según el recorrido. 100 % es lineal; por encima de 100 % da un control más fino cerca del centro para dirigir o apuntar con precisión, y por debajo reacciona antes a inclinaciones pequeñas.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Asigna el gatillo analógico R2 al movimiento hacia arriba del stick derecho tanto en gamepads como en controles en pantalla. Esto puede ayudar en juegos de carreras donde el acelerador está asignado al stick derecho hacia arriba.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Asigna el gatillo analógico L2 al movimiento hacia abajo del stick derecho tanto en gamepads como en controles en pantalla. Esto puede ayudar en juegos de carreras donde el freno está asignado al stick derecho hacia abajo.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Zona muerta negativa del stick izquierdo</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Zona muerta negativa del stick derecho</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Antizona muerta del stick izquierdo</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Antizona muerta del stick derecho</string>
+    <string name="settings_gamepad_left_stick_curve">Curva del stick izquierdo</string>
+    <string name="settings_gamepad_right_stick_curve">Curva del stick derecho</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 a stick derecho arriba</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Usa R2 como stick derecho hacia arriba.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 a stick derecho abajo</string>

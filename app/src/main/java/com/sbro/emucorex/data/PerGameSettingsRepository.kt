@@ -46,6 +46,12 @@ data class PerGameSettings(
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadLeftStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadRightStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadLeftStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadRightStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadLeftStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
+    val gamepadRightStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
     val pressureModifierAmount: Int = AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT,
     val autoSaveOnExit: Boolean = false,
@@ -333,6 +339,30 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
             .coerceIn(50, 200),
         gamepadRightStickSensitivity = optInt("gamepadRightStickSensitivity", AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY)
             .coerceIn(50, 200),
+        gamepadLeftStickNegativeDeadzone = optInt(
+            "gamepadLeftStickNegativeDeadzone",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE
+        ).coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX),
+        gamepadRightStickNegativeDeadzone = optInt(
+            "gamepadRightStickNegativeDeadzone",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE
+        ).coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX),
+        gamepadLeftStickAntiDeadzone = optInt(
+            "gamepadLeftStickAntiDeadzone",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE
+        ).coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX),
+        gamepadRightStickAntiDeadzone = optInt(
+            "gamepadRightStickAntiDeadzone",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE
+        ).coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX),
+        gamepadLeftStickCurve = optInt(
+            "gamepadLeftStickCurve",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE
+        ).coerceIn(AppPreferences.GAMEPAD_STICK_CURVE_MIN, AppPreferences.GAMEPAD_STICK_CURVE_MAX),
+        gamepadRightStickCurve = optInt(
+            "gamepadRightStickCurve",
+            AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE
+        ).coerceIn(AppPreferences.GAMEPAD_STICK_CURVE_MIN, AppPreferences.GAMEPAD_STICK_CURVE_MAX),
         gamepadBindingsByPad = decodeGamepadBindingsByPerGameJson(optJSONObject("gamepadBindingsByPad")),
         pressureModifierAmount = optInt("pressureModifierAmount", AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT).coerceIn(1, 100),
         autoSaveOnExit = optBoolean("autoSaveOnExit", false),
@@ -511,6 +541,30 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("gamepadStickDeadzone")) put("gamepadStickDeadzone", gamepadStickDeadzone.coerceIn(0, 35))
         if (shouldWrite("gamepadLeftStickSensitivity")) put("gamepadLeftStickSensitivity", gamepadLeftStickSensitivity.coerceIn(50, 200))
         if (shouldWrite("gamepadRightStickSensitivity")) put("gamepadRightStickSensitivity", gamepadRightStickSensitivity.coerceIn(50, 200))
+        if (shouldWrite("gamepadLeftStickNegativeDeadzone")) put(
+            "gamepadLeftStickNegativeDeadzone",
+            gamepadLeftStickNegativeDeadzone.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+        )
+        if (shouldWrite("gamepadRightStickNegativeDeadzone")) put(
+            "gamepadRightStickNegativeDeadzone",
+            gamepadRightStickNegativeDeadzone.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+        )
+        if (shouldWrite("gamepadLeftStickAntiDeadzone")) put(
+            "gamepadLeftStickAntiDeadzone",
+            gamepadLeftStickAntiDeadzone.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+        )
+        if (shouldWrite("gamepadRightStickAntiDeadzone")) put(
+            "gamepadRightStickAntiDeadzone",
+            gamepadRightStickAntiDeadzone.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+        )
+        if (shouldWrite("gamepadLeftStickCurve")) put(
+            "gamepadLeftStickCurve",
+            gamepadLeftStickCurve.coerceIn(AppPreferences.GAMEPAD_STICK_CURVE_MIN, AppPreferences.GAMEPAD_STICK_CURVE_MAX)
+        )
+        if (shouldWrite("gamepadRightStickCurve")) put(
+            "gamepadRightStickCurve",
+            gamepadRightStickCurve.coerceIn(AppPreferences.GAMEPAD_STICK_CURVE_MIN, AppPreferences.GAMEPAD_STICK_CURVE_MAX)
+        )
         if (shouldWrite("gamepadBindingsByPad") && gamepadBindingsByPad.isNotEmpty()) {
             put("gamepadBindingsByPad", encodeGamepadBindingsPerGameJson(gamepadBindingsByPad))
         }

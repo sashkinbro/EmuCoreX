@@ -723,6 +723,9 @@
     <string name="settings_help_gamepad_stick_deadzone">Ignoruje drobne wychylenia fizycznych gałek w okolicach ich centrum. Podnieś tę wartość, jeśli pad dryfuje samoistnie (drift); zostaw mniejszą, jeśli chcesz szybszej reakcji blisko środka.</string>
     <string name="settings_help_gamepad_left_stick_sensitivity">Dostosowuje, jak mocno reaguje fizyczna lewa gałka po przetworzeniu martwej strefy. Wyższe wartości szybciej osiągają pełen ruch, podczas gdy niższe ułatwiają płynniejsze poruszanie się.</string>
     <string name="settings_help_gamepad_right_stick_sensitivity">Dostosowuje, jak mocno reaguje fizyczna prawa gałka po przetworzeniu martwej strefy. Wyższe wartości sprawiają, że kamera i celowanie reagują szybciej, podczas gdy niższe zapewniają lepszą kontrolę.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Rozszerza niewielkie ruchy gałki przed zastosowaniem martwej strefy, dzięki czemu gałka szybciej opuszcza martwą strefę, a kierowanie lub celowanie reaguje wcześniej. Zwiększ, gdy gra lub pad ma dużą własną martwą strefę; 0% to standardowa reakcja.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Ustawia najmniejszą wartość wysyłaną, gdy gałka opuści martwą strefę. Zwiększ w grach, których własna martwa strefa ignoruje delikatne wychylenia, aby ruch zaczynał się natychmiast, a nie z opóźnieniem. 0% wyłącza.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Określa, jak szybko wychylenie gałki przekłada się na wynik. 100% to liniowość; powyżej 100% daje precyzyjniejszą kontrolę blisko środka przy dokładnym kierowaniu lub celowaniu, poniżej 100% szybciej reaguje na małe wychylenia.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Mapuje analogowy spust R2 jako ruch prawej gałki w górę (zarówno dla pada, jak i dotyku). Pomaga to w grach wyścigowych, gdzie gaz jest przypisany do wychylenia gałki do przodu.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Mapuje analogowy spust L2 jako ruch prawej gałki w dół (zarówno dla pada, jak i dotyku). Pomaga to w grach wyścigowych, gdzie hamulec jest przypisany do wychylenia gałki do tyłu.</string>
     <string name="settings_help_hide_overlay_on_gamepad">Ukrywa nakładkę dotykową za każdym razem, gdy aktywny jest fizyczny kontroler. Dzięki temu ekran jest czystszy, ale wyłącz tę opcję, jeśli nadal chcesz mieć dostęp do przycisków ekranowych pomimo podpiętego pada.</string>
@@ -890,6 +893,12 @@
     <string name="settings_gamepad_stick_deadzone">Martwa strefa gałki</string>
     <string name="settings_gamepad_left_stick_sensitivity">Czułość lewej gałki</string>
     <string name="settings_gamepad_right_stick_sensitivity">Czułość prawej gałki</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Ujemna martwa strefa lewej gałki</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Ujemna martwa strefa prawej gałki</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Antymartwa strefa lewej gałki</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Antymartwa strefa prawej gałki</string>
+    <string name="settings_gamepad_left_stick_curve">Krzywa lewej gałki</string>
+    <string name="settings_gamepad_right_stick_curve">Krzywa prawej gałki</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 jako prawa gałka w górę</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Użyj przycisku R2 jako ruchu prawej gałki w górę.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 jako prawa gałka w dół</string>

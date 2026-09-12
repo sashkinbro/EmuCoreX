@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">إصلاحات GameDB</string>
     <string name="settings_game_fixes_desc">تطبيق إصلاحات التوافق من GameDB.</string>
     <string name="settings_help_game_fixes">يستخدم إصلاحات التوافق من GameDB للألعاب المعروفة، بما في ذلك التجاوزات التلقائية لوضع التقييد (clamp) والتقريب (round). قم بتعطيل هذا فقط عندما تحتاج لعبة معينة إلى إعدادات التقييد اليدوية بدلاً من قيم GameDB؛ أعد تشغيل اللعبة للتطبيق.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">يوسّع حركات العصا الصغيرة قبل تطبيق المنطقة الميتة، فتخرج العصا من المنطقة الميتة أبكر ويستجيب التوجيه أو التصويب أسرع. ارفعه إذا كانت اللعبة أو وحدة التحكم لديها منطقة ميتة كبيرة مدمجة؛ 0% يحافظ على الاستجابة القياسية.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">يحدد أصغر قيمة تُرسل بمجرد خروج العصا من المنطقة الميتة. ارفعه للألعاب التي تتجاهل منطقتها الميتة الإمالات الخفيفة، ليبدأ الحركة فورًا بدلًا من التأخر. 0% يعني إيقاف.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">يحدد مدى سرعة ارتفاع خرج العصا مع مقدار الحركة. 100% خطي؛ فوق 100% يمنح تحكمًا أدق قرب المركز للتوجيه أو التصويب الدقيق، وتحت 100% يستجيب أسرع للإمالات الصغيرة.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">يعيّن المحفز التناظري R2 إلى حركة العصا اليمنى لأعلى لكل من أذرع التحكم وعناصر التحكم على الشاشة. يمكن أن يساعد ذلك في ألعاب السباق التي يكون فيها التسارع معيّناً على العصا اليمنى لأعلى.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">يعيّن المحفز التناظري L2 إلى حركة العصا اليمنى لأسفل لكل من أذرع التحكم وعناصر التحكم على الشاشة. يمكن أن يساعد ذلك في ألعاب السباق التي تكون فيها الفرامل معيّنة على العصا اليمنى لأسفل.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">المنطقة الميتة السلبية للعصا اليسرى</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">المنطقة الميتة السلبية للعصا اليمنى</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">المنطقة الميتة المضادة للعصا اليسرى</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">المنطقة الميتة المضادة للعصا اليمنى</string>
+    <string name="settings_gamepad_left_stick_curve">منحنى العصا اليسرى</string>
+    <string name="settings_gamepad_right_stick_curve">منحنى العصا اليمنى</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 إلى العصا اليمنى لأعلى</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">استخدم R2 كحركة العصا اليمنى لأعلى.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 إلى العصا اليمنى لأسفل</string>

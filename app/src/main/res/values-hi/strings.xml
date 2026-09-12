@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">GameDB फ़िक्सेस</string>
     <string name="settings_game_fixes_desc">GameDB से संगतता फ़िक्सेस लागू करें।</string>
     <string name="settings_help_game_fixes">ज्ञात गेम्स के लिए GameDB संगतता फ़िक्सेस का उपयोग करता है, जिसमें स्वचालित क्लैंप और राउंड मोड ओवरराइड शामिल हैं। इसे केवल तभी अक्षम करें जब किसी विशिष्ट गेम को GameDB मानों के बजाय आपकी मैन्युअल क्लैम्पिंग सेटिंग्स की आवश्यकता हो; लागू करने के लिए गेम को पुनरारंभ करें。</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">डेडज़ोन लागू होने से पहले स्टिक की छोटी हरकतों को बढ़ाता है, जिससे स्टिक डेडज़ोन से जल्दी बाहर निकलता है और स्टीयरिंग या निशाना जल्दी प्रतिक्रिया देता है। अगर गेम या कंट्रोलर का अपना डेडज़ोन बड़ा हो तो इसे बढ़ाएँ; 0% मानक प्रतिक्रिया रखता है।</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">स्टिक के डेडज़ोन से बाहर निकलते ही भेजी जाने वाली सबसे छोटी वैल्यू तय करता है। जिन गेम का अपना डेडज़ोन हल्के झुकाव को नज़रअंदाज़ करता है, उनके लिए इसे बढ़ाएँ ताकि हरकत देर से शुरू होने के बजाय तुरंत शुरू हो। 0% बंद है।</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">यह तय करता है कि स्टिक के झुकाव के साथ आउटपुट कितनी तेज़ी से बढ़ता है। 100% लीनियर है; 100% से ऊपर केंद्र के पास बारीक नियंत्रण देता है ताकि सटीक स्टीयरिंग या निशाना लगाया जा सके, और 100% से नीचे छोटे झुकाव पर तेज़ प्रतिक्रिया देता है।</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">R2 एनालॉग ट्रिगर को गेमपैड और ऑन-स्क्रीन नियंत्रण दोनों में राइट स्टिक ऊपर की गति पर मैप करता है। यह उन रेसिंग गेम्स में मदद कर सकता है जहाँ थ्रॉटल राइट स्टिक ऊपर पर सेट है।</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">L2 एनालॉग ट्रिगर को गेमपैड और ऑन-स्क्रीन नियंत्रण दोनों में राइट स्टिक नीचे की गति पर मैप करता है। यह उन रेसिंग गेम्स में मदद कर सकता है जहाँ ब्रेक राइट स्टिक नीचे पर सेट है।</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">बाएँ स्टिक का नेगेटिव डेडज़ोन</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">दाएँ स्टिक का नेगेटिव डेडज़ोन</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">बाएँ स्टिक का एंटी डेडज़ोन</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">दाएँ स्टिक का एंटी डेडज़ोन</string>
+    <string name="settings_gamepad_left_stick_curve">बाएँ स्टिक कर्व</string>
+    <string name="settings_gamepad_right_stick_curve">दाएँ स्टिक कर्व</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 से राइट स्टिक ऊपर</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">R2 को राइट स्टिक ऊपर के रूप में उपयोग करें।</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 से राइट स्टिक नीचे</string>

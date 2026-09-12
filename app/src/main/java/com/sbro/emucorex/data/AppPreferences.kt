@@ -242,6 +242,12 @@ data class SettingsSnapshot(
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadLeftStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadRightStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadLeftStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadRightStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadLeftStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
+    val gamepadRightStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
@@ -348,7 +354,10 @@ class AppPreferences(private val context: Context) {
             "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset", "stickToggleTarget",
             "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
             "gyroInvertX", "gyroInvertY", "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
-            "gamepadRightStickSensitivity", "gamepadRightStickUpToR2",
+            "gamepadRightStickSensitivity", "gamepadLeftStickNegativeDeadzone",
+            "gamepadRightStickNegativeDeadzone", "gamepadLeftStickAntiDeadzone",
+            "gamepadRightStickAntiDeadzone", "gamepadLeftStickCurve", "gamepadRightStickCurve",
+            "gamepadRightStickUpToR2",
             "gamepadRightStickDownToL2", "gamepadButtonHaptics", "pressureModifierAmount",
             "enableFastBoot", "eeCycleRate", "eeCycleSkip", "enableEeRecompiler",
             "enableIopRecompiler", "enableVu0Recompiler", "enableVu1Recompiler", "enableFastmem",
@@ -449,6 +458,13 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_TOUCHSCREEN_RIGHT_STICK_SENSITIVITY = 100
         const val DEFAULT_GAMEPAD_STICK_DEADZONE = 15
         const val DEFAULT_GAMEPAD_STICK_SENSITIVITY = 100
+        const val GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX = 30
+        const val DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE = 0
+        const val GAMEPAD_STICK_ANTI_DEADZONE_MAX = 50
+        const val DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE = 0
+        const val GAMEPAD_STICK_CURVE_MIN = 50
+        const val GAMEPAD_STICK_CURVE_MAX = 200
+        const val DEFAULT_GAMEPAD_STICK_CURVE = 100
         const val DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE = true
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
         const val DEFAULT_PAD_VIBRATION_STRENGTH = 100
@@ -726,6 +742,12 @@ class AppPreferences(private val context: Context) {
         private val GAMEPAD_STICK_DEADZONE = intPreferencesKey("gamepad_stick_deadzone")
         private val GAMEPAD_LEFT_STICK_SENSITIVITY = intPreferencesKey("gamepad_left_stick_sensitivity")
         private val GAMEPAD_RIGHT_STICK_SENSITIVITY = intPreferencesKey("gamepad_right_stick_sensitivity")
+        private val GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE = intPreferencesKey("gamepad_left_stick_negative_deadzone")
+        private val GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE = intPreferencesKey("gamepad_right_stick_negative_deadzone")
+        private val GAMEPAD_LEFT_STICK_ANTI_DEADZONE = intPreferencesKey("gamepad_left_stick_anti_deadzone")
+        private val GAMEPAD_RIGHT_STICK_ANTI_DEADZONE = intPreferencesKey("gamepad_right_stick_anti_deadzone")
+        private val GAMEPAD_LEFT_STICK_CURVE = intPreferencesKey("gamepad_left_stick_curve")
+        private val GAMEPAD_RIGHT_STICK_CURVE = intPreferencesKey("gamepad_right_stick_curve")
         private val GAMEPAD_RIGHT_STICK_UP_TO_R2 = booleanPreferencesKey("gamepad_right_stick_up_to_r2")
         private val GAMEPAD_RIGHT_STICK_DOWN_TO_L2 = booleanPreferencesKey("gamepad_right_stick_down_to_l2")
         private val GAMEPAD_BINDINGS = stringPreferencesKey("gamepad_bindings")
@@ -1923,6 +1945,18 @@ class AppPreferences(private val context: Context) {
                 gamepadStickDeadzone = prefs[GAMEPAD_STICK_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_DEADZONE,
                 gamepadLeftStickSensitivity = prefs[GAMEPAD_LEFT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY,
                 gamepadRightStickSensitivity = prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+                gamepadLeftStickNegativeDeadzone = (prefs[GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE]
+                    ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE).coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX),
+                gamepadRightStickNegativeDeadzone = (prefs[GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE]
+                    ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE).coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX),
+                gamepadLeftStickAntiDeadzone = (prefs[GAMEPAD_LEFT_STICK_ANTI_DEADZONE]
+                    ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE).coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX),
+                gamepadRightStickAntiDeadzone = (prefs[GAMEPAD_RIGHT_STICK_ANTI_DEADZONE]
+                    ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE).coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX),
+                gamepadLeftStickCurve = (prefs[GAMEPAD_LEFT_STICK_CURVE]
+                    ?: DEFAULT_GAMEPAD_STICK_CURVE).coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX),
+                gamepadRightStickCurve = (prefs[GAMEPAD_RIGHT_STICK_CURVE]
+                    ?: DEFAULT_GAMEPAD_STICK_CURVE).coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX),
                 gamepadRightStickUpToR2 = prefs[GAMEPAD_RIGHT_STICK_UP_TO_R2] ?: false,
                 gamepadRightStickDownToL2 = prefs[GAMEPAD_RIGHT_STICK_DOWN_TO_L2] ?: false,
                 gamepadButtonHaptics = prefs[GAMEPAD_BUTTON_HAPTICS] ?: false,
@@ -2617,6 +2651,72 @@ class AppPreferences(private val context: Context) {
     suspend fun setGamepadRightStickSensitivity(value: Int) {
         context.dataStore.edit { prefs ->
             prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] = value.coerceIn(50, 200)
+        }
+    }
+
+    val gamepadLeftStickNegativeDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE)
+            .coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+    }
+
+    suspend fun setGamepadLeftStickNegativeDeadzone(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE] = value.coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+        }
+    }
+
+    val gamepadRightStickNegativeDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE)
+            .coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+    }
+
+    suspend fun setGamepadRightStickNegativeDeadzone(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE] = value.coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+        }
+    }
+
+    val gamepadLeftStickAntiDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_LEFT_STICK_ANTI_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE)
+            .coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+    }
+
+    suspend fun setGamepadLeftStickAntiDeadzone(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_LEFT_STICK_ANTI_DEADZONE] = value.coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+        }
+    }
+
+    val gamepadRightStickAntiDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_RIGHT_STICK_ANTI_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE)
+            .coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+    }
+
+    suspend fun setGamepadRightStickAntiDeadzone(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_RIGHT_STICK_ANTI_DEADZONE] = value.coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+        }
+    }
+
+    val gamepadLeftStickCurve: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_LEFT_STICK_CURVE] ?: DEFAULT_GAMEPAD_STICK_CURVE)
+            .coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+    }
+
+    suspend fun setGamepadLeftStickCurve(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_LEFT_STICK_CURVE] = value.coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+        }
+    }
+
+    val gamepadRightStickCurve: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[GAMEPAD_RIGHT_STICK_CURVE] ?: DEFAULT_GAMEPAD_STICK_CURVE)
+            .coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+    }
+
+    suspend fun setGamepadRightStickCurve(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[GAMEPAD_RIGHT_STICK_CURVE] = value.coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
         }
     }
 
@@ -3824,6 +3924,36 @@ class AppPreferences(private val context: Context) {
             put("gamepadStickDeadzone", prefs[GAMEPAD_STICK_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_DEADZONE)
             put("gamepadLeftStickSensitivity", prefs[GAMEPAD_LEFT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY)
             put("gamepadRightStickSensitivity", prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] ?: DEFAULT_GAMEPAD_STICK_SENSITIVITY)
+            put(
+                "gamepadLeftStickNegativeDeadzone",
+                (prefs[GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE)
+                    .coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            )
+            put(
+                "gamepadRightStickNegativeDeadzone",
+                (prefs[GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE)
+                    .coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            )
+            put(
+                "gamepadLeftStickAntiDeadzone",
+                (prefs[GAMEPAD_LEFT_STICK_ANTI_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE)
+                    .coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            )
+            put(
+                "gamepadRightStickAntiDeadzone",
+                (prefs[GAMEPAD_RIGHT_STICK_ANTI_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE)
+                    .coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            )
+            put(
+                "gamepadLeftStickCurve",
+                (prefs[GAMEPAD_LEFT_STICK_CURVE] ?: DEFAULT_GAMEPAD_STICK_CURVE)
+                    .coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+            )
+            put(
+                "gamepadRightStickCurve",
+                (prefs[GAMEPAD_RIGHT_STICK_CURVE] ?: DEFAULT_GAMEPAD_STICK_CURVE)
+                    .coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+            )
             put("gamepadRightStickUpToR2", prefs[GAMEPAD_RIGHT_STICK_UP_TO_R2] ?: false)
             put("gamepadRightStickDownToL2", prefs[GAMEPAD_RIGHT_STICK_DOWN_TO_L2] ?: false)
             put("gamepadButtonHaptics", prefs[GAMEPAD_BUTTON_HAPTICS] ?: false)
@@ -4224,6 +4354,30 @@ class AppPreferences(private val context: Context) {
             prefs[GAMEPAD_STICK_DEADZONE] = json.optInt("gamepadStickDeadzone", DEFAULT_GAMEPAD_STICK_DEADZONE).coerceIn(0, 35)
             prefs[GAMEPAD_LEFT_STICK_SENSITIVITY] = json.optInt("gamepadLeftStickSensitivity", DEFAULT_GAMEPAD_STICK_SENSITIVITY).coerceIn(50, 200)
             prefs[GAMEPAD_RIGHT_STICK_SENSITIVITY] = json.optInt("gamepadRightStickSensitivity", DEFAULT_GAMEPAD_STICK_SENSITIVITY).coerceIn(50, 200)
+            prefs[GAMEPAD_LEFT_STICK_NEGATIVE_DEADZONE] = json.optInt(
+                "gamepadLeftStickNegativeDeadzone",
+                DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE
+            ).coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            prefs[GAMEPAD_RIGHT_STICK_NEGATIVE_DEADZONE] = json.optInt(
+                "gamepadRightStickNegativeDeadzone",
+                DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE
+            ).coerceIn(0, GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            prefs[GAMEPAD_LEFT_STICK_ANTI_DEADZONE] = json.optInt(
+                "gamepadLeftStickAntiDeadzone",
+                DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE
+            ).coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            prefs[GAMEPAD_RIGHT_STICK_ANTI_DEADZONE] = json.optInt(
+                "gamepadRightStickAntiDeadzone",
+                DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE
+            ).coerceIn(0, GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            prefs[GAMEPAD_LEFT_STICK_CURVE] = json.optInt(
+                "gamepadLeftStickCurve",
+                DEFAULT_GAMEPAD_STICK_CURVE
+            ).coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
+            prefs[GAMEPAD_RIGHT_STICK_CURVE] = json.optInt(
+                "gamepadRightStickCurve",
+                DEFAULT_GAMEPAD_STICK_CURVE
+            ).coerceIn(GAMEPAD_STICK_CURVE_MIN, GAMEPAD_STICK_CURVE_MAX)
             prefs[GAMEPAD_RIGHT_STICK_UP_TO_R2] = json.optBoolean("gamepadRightStickUpToR2", false)
             prefs[GAMEPAD_RIGHT_STICK_DOWN_TO_L2] = json.optBoolean("gamepadRightStickDownToL2", false)
             prefs[GAMEPAD_BUTTON_HAPTICS] = json.optBoolean("gamepadButtonHaptics", false)

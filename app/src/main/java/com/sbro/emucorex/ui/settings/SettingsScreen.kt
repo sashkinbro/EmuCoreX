@@ -2262,6 +2262,72 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
                             onResetToDefault = { viewModel.setGamepadRightStickSensitivity(defaults.gamepadRightStickSensitivity) }
                         )
+                        SliderItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_gamepad_left_stick_negative_deadzone),
+                            subtitle = "${uiState.gamepadLeftStickNegativeDeadzone}%",
+                            value = uiState.gamepadLeftStickNegativeDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                            onValueChange = { viewModel.setGamepadLeftStickNegativeDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                            onResetToDefault = { viewModel.setGamepadLeftStickNegativeDeadzone(defaults.gamepadLeftStickNegativeDeadzone) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_gamepad_right_stick_negative_deadzone),
+                            subtitle = "${uiState.gamepadRightStickNegativeDeadzone}%",
+                            value = uiState.gamepadRightStickNegativeDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                            onValueChange = { viewModel.setGamepadRightStickNegativeDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                            onResetToDefault = { viewModel.setGamepadRightStickNegativeDeadzone(defaults.gamepadRightStickNegativeDeadzone) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_gamepad_left_stick_anti_deadzone),
+                            subtitle = "${uiState.gamepadLeftStickAntiDeadzone}%",
+                            value = uiState.gamepadLeftStickAntiDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                            onValueChange = { viewModel.setGamepadLeftStickAntiDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                            onResetToDefault = { viewModel.setGamepadLeftStickAntiDeadzone(defaults.gamepadLeftStickAntiDeadzone) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Tune,
+                            title = stringResource(R.string.settings_gamepad_right_stick_anti_deadzone),
+                            subtitle = "${uiState.gamepadRightStickAntiDeadzone}%",
+                            value = uiState.gamepadRightStickAntiDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                            onValueChange = { viewModel.setGamepadRightStickAntiDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                            onResetToDefault = { viewModel.setGamepadRightStickAntiDeadzone(defaults.gamepadRightStickAntiDeadzone) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_gamepad_left_stick_curve),
+                            subtitle = "${uiState.gamepadLeftStickCurve}%",
+                            value = uiState.gamepadLeftStickCurve.toFloat(),
+                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                            onValueChange = { viewModel.setGamepadLeftStickCurve(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                            onResetToDefault = { viewModel.setGamepadLeftStickCurve(defaults.gamepadLeftStickCurve) }
+                        )
+                        SliderItem(
+                            icon = Icons.Rounded.Gamepad,
+                            title = stringResource(R.string.settings_gamepad_right_stick_curve),
+                            subtitle = "${uiState.gamepadRightStickCurve}%",
+                            value = uiState.gamepadRightStickCurve.toFloat(),
+                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                            onValueChange = { viewModel.setGamepadRightStickCurve(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                            onResetToDefault = { viewModel.setGamepadRightStickCurve(defaults.gamepadRightStickCurve) }
+                        )
                         ToggleItem(
                             icon = Icons.Rounded.Gamepad,
                             title = stringResource(R.string.settings_gamepad_right_stick_up_to_r2),
@@ -5460,6 +5526,12 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Controls, R.string.settings_gamepad_stick_deadzone),
         entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_sensitivity),
         entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_sensitivity),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_negative_deadzone),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_negative_deadzone),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_anti_deadzone),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_anti_deadzone),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_left_stick_curve),
+        entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_curve),
         entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_up_to_r2),
         entry(SettingsTab.Controls, R.string.settings_gamepad_right_stick_down_to_l2),
         entry(SettingsTab.Controls, R.string.settings_pad_vibration),

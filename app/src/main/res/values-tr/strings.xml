@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">GameDB Düzeltmeleri</string>
     <string name="settings_game_fixes_desc">GameDB\'den uyumluluk düzeltmelerini uygula.</string>
     <string name="settings_help_game_fixes">Bilinen oyunlar için otomatik sınırlama (clamp) ve yuvarlama modu geçersiz kılmaları dahil olmak üzere GameDB uyumluluk düzeltmelerini kullanır. Bunu yalnızca belirli bir oyunun GameDB değerleri yerine manuel sınırlama ayarlarınıza ihtiyacı olduğunda devre dışı bırakın; uygulamak için oyunu yeniden başlatın.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Ölü bölge uygulanmadan önce küçük çubuk hareketlerini genişletir; böylece çubuk ölü bölgeden daha erken çıkar ve direksiyon veya nişan alma daha erken tepki verir. Oyunun veya kontrolcünün kendi ölü bölgesi büyükse artırın; %0 standart tepkiyi korur.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Çubuk ölü bölgeden çıktığında gönderilen en küçük değeri belirler. Kendi ölü bölgesi hafif eğimleri yok sayan oyunlarda artırın; böylece hareket geç başlamak yerine hemen başlar. %0 kapalıdır.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Çubuk çıkışının hareketle ne kadar hızlı arttığını belirler. %100 doğrusaldır; %100 üzeri hassas direksiyon veya nişan için merkeze yakın daha ince kontrol sağlar, %100 altı küçük eğimlerde daha hızlı tepki verir.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">R2 analog tetiğini hem gamepadlerde hem de ekran kontrollerinde sağ çubuğun yukarı hareketine eşler. Bu, gazın sağ çubuk yukarıya atandığı yarış oyunlarında yardımcı olabilir.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">L2 analog tetiğini hem gamepadlerde hem de ekran kontrollerinde sağ çubuğun aşağı hareketine eşler. Bu, frenin sağ çubuk aşağıya atandığı yarış oyunlarında yardımcı olabilir.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Sol Çubuk Negatif Ölü Bölge</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Sağ Çubuk Negatif Ölü Bölge</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Sol Çubuk Anti-Ölü Bölge</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Sağ Çubuk Anti-Ölü Bölge</string>
+    <string name="settings_gamepad_left_stick_curve">Sol Çubuk Eğrisi</string>
+    <string name="settings_gamepad_right_stick_curve">Sağ Çubuk Eğrisi</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 ile Sağ Çubuk Yukarı</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">R2 düğmesini sağ çubuk yukarı olarak kullan.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 ile Sağ Çubuk Aşağı</string>

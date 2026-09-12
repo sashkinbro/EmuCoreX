@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">GameDB修正</string>
     <string name="settings_game_fixes_desc">GameDBからの互換性修正を適用します。</string>
     <string name="settings_help_game_fixes">既知のゲームにGameDBの互換性修正（クランプおよび丸めモードの自動上書きを含む）を使用します。特定のゲームがGameDBの値ではなく手動のクランプ設定を必要とする場合にのみ、これを無効にしてください。変更を適用するにはゲームを再起動します。</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">デッドゾーンを適用する前に小さなスティックの動きを拡大し、スティックがデッドゾーンを早く抜けるようにします。ゲームやコントローラー側のデッドゾーンが大きい場合に上げてください。0% で標準の応答になります。</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">スティックがデッドゾーンを抜けた直後に送る最小値を設定します。ゲーム独自のデッドゾーンが軽い傾きを無視する場合に上げると、動きが遅れて始まるのではなく即座に反応します。0% でオフです。</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">スティックの傾きに対して出力がどれだけ速く立ち上がるかを調整します。100% でリニア、100% より上では中央付近がより精密になり正確なステアリングやエイムがしやすく、100% より下では小さな傾きに素早く反応します。</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">R2アナログトリガーを、ゲームパッドと画面上の操作の両方で右スティック上方向に割り当てます。アクセルが右スティック上に割り当てられているレースゲームに役立ちます。</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">L2アナログトリガーを、ゲームパッドと画面上の操作の両方で右スティック下方向に割り当てます。ブレーキが右スティック下に割り当てられているレースゲームに役立ちます。</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">左スティックの負のデッドゾーン</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">右スティックの負のデッドゾーン</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">左スティックのアンチデッドゾーン</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">右スティックのアンチデッドゾーン</string>
+    <string name="settings_gamepad_left_stick_curve">左スティックのカーブ</string>
+    <string name="settings_gamepad_right_stick_curve">右スティックのカーブ</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2を右スティック上に</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">R2を右スティック上方向として使用します。</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2を右スティック下に</string>

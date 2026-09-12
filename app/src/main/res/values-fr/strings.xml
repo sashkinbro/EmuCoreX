@@ -1278,8 +1278,17 @@
     <string name="settings_game_fixes">Correctifs GameDB</string>
     <string name="settings_game_fixes_desc">Appliquer les correctifs de compatibilité de la GameDB.</string>
     <string name="settings_help_game_fixes">Utilise les correctifs de compatibilité de la GameDB pour les jeux connus, y compris les remplacements automatiques des modes de clamping et d\'arrondi. Désactivez cette option uniquement lorsqu\'un jeu spécifique nécessite vos paramètres de clamping manuels au lieu des valeurs de la GameDB ; redémarrez le jeu pour appliquer.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Étend les petits mouvements du stick avant l\'application de la zone morte : le stick sort plus tôt de la zone morte et la direction ou la visée réagit plus tôt. Augmentez-la si un jeu ou une manette a une grande zone morte intégrée ; 0 % conserve la réponse standard.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Définit la plus petite valeur envoyée dès que le stick quitte la zone morte. Augmentez-la pour les jeux dont la zone morte ignore les légers inclinaisons, afin que le mouvement démarre immédiatement au lieu d\'arriver tard. 0 % désactive.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Définit la vitesse à laquelle la sortie du stick augmente avec la course. 100 % est linéaire ; au-dessus de 100 %, le contrôle près du centre est plus fin pour diriger ou viser précisément, en dessous de 100 %, la réaction aux petits mouvements est plus rapide.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Associe la gâchette analogique R2 au mouvement vers le haut du stick droit pour les manettes et les contrôles à l\'écran. Cela peut aider les jeux de course où l\'accélérateur est assigné au stick droit vers le haut.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Associe la gâchette analogique L2 au mouvement vers le bas du stick droit pour les manettes et les contrôles à l\'écran. Cela peut aider les jeux de course où le frein est assigné au stick droit vers le bas.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Zone morte négative du stick gauche</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Zone morte négative du stick droit</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-zone morte du stick gauche</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-zone morte du stick droit</string>
+    <string name="settings_gamepad_left_stick_curve">Courbe du stick gauche</string>
+    <string name="settings_gamepad_right_stick_curve">Courbe du stick droit</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 vers stick droit haut</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Utiliser R2 comme stick droit vers le haut.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 vers stick droit bas</string>

@@ -1600,6 +1600,12 @@ fun EmulationScreen(
                     onSetGamepadStickDeadzone = { viewModel.setGamepadStickDeadzone(it) },
                     onSetGamepadLeftStickSensitivity = { viewModel.setGamepadLeftStickSensitivity(it) },
                     onSetGamepadRightStickSensitivity = { viewModel.setGamepadRightStickSensitivity(it) },
+                    onSetGamepadLeftStickNegativeDeadzone = { viewModel.setGamepadLeftStickNegativeDeadzone(it) },
+                    onSetGamepadRightStickNegativeDeadzone = { viewModel.setGamepadRightStickNegativeDeadzone(it) },
+                    onSetGamepadLeftStickAntiDeadzone = { viewModel.setGamepadLeftStickAntiDeadzone(it) },
+                    onSetGamepadRightStickAntiDeadzone = { viewModel.setGamepadRightStickAntiDeadzone(it) },
+                    onSetGamepadLeftStickCurve = { viewModel.setGamepadLeftStickCurve(it) },
+                    onSetGamepadRightStickCurve = { viewModel.setGamepadRightStickCurve(it) },
                     onSetGamepadRightStickUpToR2 = { viewModel.setGamepadRightStickUpToR2(it) },
                     onSetGamepadRightStickDownToL2 = { viewModel.setGamepadRightStickDownToL2(it) },
                     onToggleControls = toggleControlsClick,
@@ -3056,6 +3062,12 @@ private fun EmulationSidebarMenu(
     onSetGamepadStickDeadzone: (Int) -> Unit,
     onSetGamepadLeftStickSensitivity: (Int) -> Unit,
     onSetGamepadRightStickSensitivity: (Int) -> Unit,
+    onSetGamepadLeftStickNegativeDeadzone: (Int) -> Unit,
+    onSetGamepadRightStickNegativeDeadzone: (Int) -> Unit,
+    onSetGamepadLeftStickAntiDeadzone: (Int) -> Unit,
+    onSetGamepadRightStickAntiDeadzone: (Int) -> Unit,
+    onSetGamepadLeftStickCurve: (Int) -> Unit,
+    onSetGamepadRightStickCurve: (Int) -> Unit,
     onSetGamepadRightStickUpToR2: (Boolean) -> Unit,
     onSetGamepadRightStickDownToL2: (Boolean) -> Unit,
     onToggleControls: () -> Unit,
@@ -3867,6 +3879,78 @@ private fun EmulationSidebarMenu(
                             onValueChange = { onSetGamepadRightStickSensitivity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
                             onResetToDefault = { onSetGamepadRightStickSensitivity(AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_left_stick_negative_deadzone),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadLeftStickNegativeDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadLeftStickNegativeDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                            onResetToDefault = { onSetGamepadLeftStickNegativeDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_right_stick_negative_deadzone),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadRightStickNegativeDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadRightStickNegativeDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
+                            onResetToDefault = { onSetGamepadRightStickNegativeDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_left_stick_anti_deadzone),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadLeftStickAntiDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadLeftStickAntiDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                            onResetToDefault = { onSetGamepadLeftStickAntiDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_right_stick_anti_deadzone),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadRightStickAntiDeadzone.toFloat(),
+                            range = 0f..AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadRightStickAntiDeadzone(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
+                            onResetToDefault = { onSetGamepadRightStickAntiDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_left_stick_curve),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadLeftStickCurve.toFloat(),
+                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadLeftStickCurve(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                            onResetToDefault = { onSetGamepadLeftStickCurve(AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE) }
+                        )
+
+                        LiveSliderRow(
+                            title = stringResource(R.string.settings_gamepad_right_stick_curve),
+                            valueLabelForValue = { "$it%" },
+                            value = uiState.gamepadRightStickCurve.toFloat(),
+                            range = AppPreferences.GAMEPAD_STICK_CURVE_MIN.toFloat()..AppPreferences.GAMEPAD_STICK_CURVE_MAX.toFloat(),
+                            steps = AppPreferences.GAMEPAD_STICK_CURVE_MAX - AppPreferences.GAMEPAD_STICK_CURVE_MIN - 1,
+                            enabled = gamepadConnected,
+                            onValueChange = { onSetGamepadRightStickCurve(it.toInt()) },
+                            helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
+                            onResetToDefault = { onSetGamepadRightStickCurve(AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE) }
                         )
 
                         SettingsToggle(

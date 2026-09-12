@@ -1276,8 +1276,17 @@
     <string name="settings_game_fixes">Correzioni GameDB</string>
     <string name="settings_game_fixes_desc">Applica le correzioni di compatibilità dal GameDB.</string>
     <string name="settings_help_game_fixes">Utilizza le correzioni di compatibilità del GameDB per i giochi noti, incluse le sovrascritture automatiche della modalità di arrotondamento e clamping. Disabilita questa opzione solo quando un gioco specifico necessita delle tue impostazioni manuali di clamping invece dei valori del GameDB; riavvia il gioco per applicare.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Amplia i piccoli movimenti della levetta prima dell\'applicazione della zona morta, così la levetta esce prima dalla zona morta e sterzo o mira reagiscono prima. Aumentala se un gioco o il controller ha una grande zona morta integrata; 0% mantiene la risposta standard.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Imposta il valore minimo inviato quando la levetta esce dalla zona morta. Aumentalo per i giochi la cui zona morta ignora le inclinazioni leggere, così il movimento parte subito invece di arrivare in ritardo. 0% è disattivato.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Definisce quanto rapidamente l\'uscita della levetta cresce con la corsa. 100% è lineare; oltre 100% offre un controllo più fine vicino al centro per sterzare o mirare con precisione, sotto 100% reagisce più in fretta ai piccoli movimenti.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Mappa il grilletto analogico R2 sul movimento verso l\'alto della levetta destra sia per i gamepad sia per i controlli su schermo. Questo può aiutare nei giochi di corse in cui l\'acceleratore è assegnato alla levetta destra verso l\'alto.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Mappa il grilletto analogico L2 sul movimento verso il basso della levetta destra sia per i gamepad sia per i controlli su schermo. Questo può aiutare nei giochi di corse in cui il freno è assegnato alla levetta destra verso il basso.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Zona morta negativa della levetta sinistra</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Zona morta negativa della levetta destra</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-zona morta della levetta sinistra</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-zona morta della levetta destra</string>
+    <string name="settings_gamepad_left_stick_curve">Curva della levetta sinistra</string>
+    <string name="settings_gamepad_right_stick_curve">Curva della levetta destra</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 a levetta destra su</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Usa R2 come levetta destra verso l\'alto.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 a levetta destra giù</string>

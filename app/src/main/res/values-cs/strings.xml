@@ -725,6 +725,9 @@
     <string name="settings_help_gamepad_stick_deadzone">Ignoruje drobné fyzické pohyby páčky poblíž středu. Zvyšte, pokud se ovladač hýbe sám o sobě; ponechte nižší, pokud chcete rychlejší odezvu blízko středu.</string>
     <string name="settings_help_gamepad_left_stick_sensitivity">Upravuje, jak silně fyzická levá páčka reaguje po zpracování mrtvé zóny. Vyšší hodnoty rychleji dosáhnou plného pohybu, zatímco nižší hodnoty usnadňují jemný pohyb.</string>
     <string name="settings_help_gamepad_right_stick_sensitivity">Upravuje, jak silně fyzická pravá páčka reaguje po zpracování mrtvé zóny. Vyšší hodnoty urychlují pohyb kamery nebo míření, zatímco nižší hodnoty poskytují jemnější kontrolu.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Rozšiřuje malé pohyby páčky před uplatněním mrtvé zóny, takže páčka opustí mrtvou zónu dříve a řízení či míření reaguje rychleji. Zvyšte, pokud má hra nebo ovladač velkou vlastní mrtvou zónu; 0 % zachová standardní odezvu.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Nastavuje nejmenší hodnotu odesílanou, jakmile páčka opustí mrtvou zónu. Zvyšte u her, jejichž vlastní mrtvá zóna ignoruje jemné náklony, aby pohyb začal okamžitě místo pozdního nástupu. 0 % je vypnuto.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Určuje, jak rychle výstup páčky roste s výchylkou. 100 % je lineární; nad 100 % dává jemnější kontrolu u středu pro přesné řízení či míření, pod 100 % reaguje rychleji na malé výchylky.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Namapuje analogovou spoušť R2 na pohyb nahoru na pravé páčce jak u gamepadů, tak u dotykového ovládání. Může to pomoci u závodních her, kde je plyn přiřazen pravé páčce nahoru.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Namapuje analogovou spoušť L2 na pohyb dolů na pravé páčce jak u gamepadů, tak u dotykového ovládání. Může to pomoci u závodních her, kde je brzda přiřazena pravé páčce dolů.</string>
     <string name="settings_help_hide_overlay_on_gamepad">Skryje dotykové překrytí na obrazovce, kdykoli je aktivní fyzický ovladač. Udrží to obrazovku čistší, ale vypněte to, pokud chcete mít i při připojeném ovladači dotyková tlačítka stále k dispozici.</string>
@@ -892,6 +895,12 @@
     <string name="settings_gamepad_stick_deadzone">Mrtvá zóna páčky (Deadzone)</string>
     <string name="settings_gamepad_left_stick_sensitivity">Citlivost levé páčky</string>
     <string name="settings_gamepad_right_stick_sensitivity">Citlivost pravé páčky</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Negativní mrtvá zóna levé páčky</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Negativní mrtvá zóna pravé páčky</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-mrtvá zóna levé páčky</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-mrtvá zóna pravé páčky</string>
+    <string name="settings_gamepad_left_stick_curve">Křivka levé páčky</string>
+    <string name="settings_gamepad_right_stick_curve">Křivka pravé páčky</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 na pravou páčku nahoru</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Použít R2 jako pravou páčku nahoru.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 na pravou páčku dolů</string>

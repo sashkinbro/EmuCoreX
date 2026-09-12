@@ -169,6 +169,12 @@ data class EmulationUiState(
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
+    val gamepadLeftStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadRightStickNegativeDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE,
+    val gamepadLeftStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadRightStickAntiDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE,
+    val gamepadLeftStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
+    val gamepadRightStickCurve: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE,
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
@@ -459,6 +465,12 @@ private data class LiveRuntimeSnapshot(
     val gamepadStickDeadzone: Int,
     val gamepadLeftStickSensitivity: Int,
     val gamepadRightStickSensitivity: Int,
+    val gamepadLeftStickNegativeDeadzone: Int,
+    val gamepadRightStickNegativeDeadzone: Int,
+    val gamepadLeftStickAntiDeadzone: Int,
+    val gamepadRightStickAntiDeadzone: Int,
+    val gamepadLeftStickCurve: Int,
+    val gamepadRightStickCurve: Int,
     val gamepadBindingsByPad: Map<Int, Map<String, Int>>,
     val pressureModifierAmount: Int,
     val autoSaveOnExit: Boolean,
@@ -828,6 +840,36 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             preferences.gamepadRightStickSensitivity.collect { value ->
                 _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadLeftStickNegativeDeadzone.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadLeftStickNegativeDeadzone = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadRightStickNegativeDeadzone.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadRightStickNegativeDeadzone = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadLeftStickAntiDeadzone.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadLeftStickAntiDeadzone = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadRightStickAntiDeadzone.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadRightStickAntiDeadzone = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadLeftStickCurve.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadLeftStickCurve = value)
+            }
+        }
+        viewModelScope.launch {
+            preferences.gamepadRightStickCurve.collect { value ->
+                _uiState.value = _uiState.value.copy(gamepadRightStickCurve = value)
             }
         }
         viewModelScope.launch {
@@ -1959,6 +2001,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gamepadStickDeadzone = liveRuntime.gamepadStickDeadzone,
                     gamepadLeftStickSensitivity = liveRuntime.gamepadLeftStickSensitivity,
                     gamepadRightStickSensitivity = liveRuntime.gamepadRightStickSensitivity,
+                    gamepadLeftStickNegativeDeadzone = liveRuntime.gamepadLeftStickNegativeDeadzone,
+                    gamepadRightStickNegativeDeadzone = liveRuntime.gamepadRightStickNegativeDeadzone,
+                    gamepadLeftStickAntiDeadzone = liveRuntime.gamepadLeftStickAntiDeadzone,
+                    gamepadRightStickAntiDeadzone = liveRuntime.gamepadRightStickAntiDeadzone,
+                    gamepadLeftStickCurve = liveRuntime.gamepadLeftStickCurve,
+                    gamepadRightStickCurve = liveRuntime.gamepadRightStickCurve,
                     gamepadBindingsByPad = liveRuntime.gamepadBindingsByPad,
                     pressureModifierAmount = liveRuntime.pressureModifierAmount,
                     autoSaveOnExit = liveRuntime.autoSaveOnExit,
@@ -1977,7 +2025,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         bindingsByPad = state.gamepadBindingsByPad,
                         deadzone = state.gamepadStickDeadzone,
                         leftSensitivity = state.gamepadLeftStickSensitivity,
-                        rightSensitivity = state.gamepadRightStickSensitivity
+                        rightSensitivity = state.gamepadRightStickSensitivity,
+                        leftNegativeDeadzone = state.gamepadLeftStickNegativeDeadzone,
+                        rightNegativeDeadzone = state.gamepadRightStickNegativeDeadzone,
+                        leftAntiDeadzone = state.gamepadLeftStickAntiDeadzone,
+                        rightAntiDeadzone = state.gamepadRightStickAntiDeadzone,
+                        leftStickCurve = state.gamepadLeftStickCurve,
+                        rightStickCurve = state.gamepadRightStickCurve
                     )
                 }
                 updateCrashContext(
@@ -2442,6 +2496,60 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             val normalized = value.coerceIn(50, 200)
             preferences.setGamepadRightStickSensitivity(normalized)
             _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = normalized)
+        }
+    }
+
+    fun setGamepadLeftStickNegativeDeadzone(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            preferences.setGamepadLeftStickNegativeDeadzone(normalized)
+            _uiState.value = _uiState.value.copy(gamepadLeftStickNegativeDeadzone = normalized)
+        }
+    }
+
+    fun setGamepadRightStickNegativeDeadzone(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
+            preferences.setGamepadRightStickNegativeDeadzone(normalized)
+            _uiState.value = _uiState.value.copy(gamepadRightStickNegativeDeadzone = normalized)
+        }
+    }
+
+    fun setGamepadLeftStickAntiDeadzone(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            preferences.setGamepadLeftStickAntiDeadzone(normalized)
+            _uiState.value = _uiState.value.copy(gamepadLeftStickAntiDeadzone = normalized)
+        }
+    }
+
+    fun setGamepadRightStickAntiDeadzone(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
+            preferences.setGamepadRightStickAntiDeadzone(normalized)
+            _uiState.value = _uiState.value.copy(gamepadRightStickAntiDeadzone = normalized)
+        }
+    }
+
+    fun setGamepadLeftStickCurve(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(
+                AppPreferences.GAMEPAD_STICK_CURVE_MIN,
+                AppPreferences.GAMEPAD_STICK_CURVE_MAX
+            )
+            preferences.setGamepadLeftStickCurve(normalized)
+            _uiState.value = _uiState.value.copy(gamepadLeftStickCurve = normalized)
+        }
+    }
+
+    fun setGamepadRightStickCurve(value: Int) {
+        viewModelScope.launch {
+            val normalized = value.coerceIn(
+                AppPreferences.GAMEPAD_STICK_CURVE_MIN,
+                AppPreferences.GAMEPAD_STICK_CURVE_MAX
+            )
+            preferences.setGamepadRightStickCurve(normalized)
+            _uiState.value = _uiState.value.copy(gamepadRightStickCurve = normalized)
         }
     }
 
@@ -3834,7 +3942,13 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gameSettingsProfileActive = false,
                     gamepadStickDeadzone = settings.gamepadStickDeadzone,
                     gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
-                    gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity
+                    gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity,
+                    gamepadLeftStickNegativeDeadzone = settings.gamepadLeftStickNegativeDeadzone,
+                    gamepadRightStickNegativeDeadzone = settings.gamepadRightStickNegativeDeadzone,
+                    gamepadLeftStickAntiDeadzone = settings.gamepadLeftStickAntiDeadzone,
+                    gamepadRightStickAntiDeadzone = settings.gamepadRightStickAntiDeadzone,
+                    gamepadLeftStickCurve = settings.gamepadLeftStickCurve,
+                    gamepadRightStickCurve = settings.gamepadRightStickCurve
                 )
         }
     }
@@ -4047,6 +4161,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadStickDeadzone = settings.gamepadStickDeadzone,
             gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
             gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity,
+            gamepadLeftStickNegativeDeadzone = settings.gamepadLeftStickNegativeDeadzone,
+            gamepadRightStickNegativeDeadzone = settings.gamepadRightStickNegativeDeadzone,
+            gamepadLeftStickAntiDeadzone = settings.gamepadLeftStickAntiDeadzone,
+            gamepadRightStickAntiDeadzone = settings.gamepadRightStickAntiDeadzone,
+            gamepadLeftStickCurve = settings.gamepadLeftStickCurve,
+            gamepadRightStickCurve = settings.gamepadRightStickCurve,
             gamepadBindingsByPad = settings.gamepadBindingsByPad,
             pressureModifierAmount = settings.pressureModifierAmount,
             autoSaveOnExit = false,
@@ -4234,6 +4354,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadStickDeadzone = pick("gamepadStickDeadzone", gamepadStickDeadzone) { gamepadStickDeadzone },
             gamepadLeftStickSensitivity = pick("gamepadLeftStickSensitivity", gamepadLeftStickSensitivity) { gamepadLeftStickSensitivity },
             gamepadRightStickSensitivity = pick("gamepadRightStickSensitivity", gamepadRightStickSensitivity) { gamepadRightStickSensitivity },
+            gamepadLeftStickNegativeDeadzone = pick("gamepadLeftStickNegativeDeadzone", gamepadLeftStickNegativeDeadzone) { gamepadLeftStickNegativeDeadzone },
+            gamepadRightStickNegativeDeadzone = pick("gamepadRightStickNegativeDeadzone", gamepadRightStickNegativeDeadzone) { gamepadRightStickNegativeDeadzone },
+            gamepadLeftStickAntiDeadzone = pick("gamepadLeftStickAntiDeadzone", gamepadLeftStickAntiDeadzone) { gamepadLeftStickAntiDeadzone },
+            gamepadRightStickAntiDeadzone = pick("gamepadRightStickAntiDeadzone", gamepadRightStickAntiDeadzone) { gamepadRightStickAntiDeadzone },
+            gamepadLeftStickCurve = pick("gamepadLeftStickCurve", gamepadLeftStickCurve) { gamepadLeftStickCurve },
+            gamepadRightStickCurve = pick("gamepadRightStickCurve", gamepadRightStickCurve) { gamepadRightStickCurve },
             gamepadBindingsByPad = if (profile.providedKeys == null || "gamepadBindingsByPad" in profile.providedKeys) profile.gamepadBindingsByPad else gamepadBindingsByPad,
             pressureModifierAmount = pick("pressureModifierAmount", pressureModifierAmount) { pressureModifierAmount },
             autoSaveOnExit = pick("autoSaveOnExit", autoSaveOnExit) { autoSaveOnExit },
@@ -4409,6 +4535,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gamepadStickDeadzone = gamepadStickDeadzone,
             gamepadLeftStickSensitivity = gamepadLeftStickSensitivity,
             gamepadRightStickSensitivity = gamepadRightStickSensitivity,
+            gamepadLeftStickNegativeDeadzone = gamepadLeftStickNegativeDeadzone,
+            gamepadRightStickNegativeDeadzone = gamepadRightStickNegativeDeadzone,
+            gamepadLeftStickAntiDeadzone = gamepadLeftStickAntiDeadzone,
+            gamepadRightStickAntiDeadzone = gamepadRightStickAntiDeadzone,
+            gamepadLeftStickCurve = gamepadLeftStickCurve,
+            gamepadRightStickCurve = gamepadRightStickCurve,
             gamepadBindingsByPad = gamepadBindingsByPad,
             pressureModifierAmount = pressureModifierAmount,
             autoSaveOnExit = autoSaveOnExit,
@@ -4513,6 +4645,12 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (gamepadStickDeadzone != preferences.gamepadStickDeadzone.first()) add("gamepadStickDeadzone")
             if (gamepadLeftStickSensitivity != preferences.gamepadLeftStickSensitivity.first()) add("gamepadLeftStickSensitivity")
             if (gamepadRightStickSensitivity != preferences.gamepadRightStickSensitivity.first()) add("gamepadRightStickSensitivity")
+            if (gamepadLeftStickNegativeDeadzone != preferences.gamepadLeftStickNegativeDeadzone.first()) add("gamepadLeftStickNegativeDeadzone")
+            if (gamepadRightStickNegativeDeadzone != preferences.gamepadRightStickNegativeDeadzone.first()) add("gamepadRightStickNegativeDeadzone")
+            if (gamepadLeftStickAntiDeadzone != preferences.gamepadLeftStickAntiDeadzone.first()) add("gamepadLeftStickAntiDeadzone")
+            if (gamepadRightStickAntiDeadzone != preferences.gamepadRightStickAntiDeadzone.first()) add("gamepadRightStickAntiDeadzone")
+            if (gamepadLeftStickCurve != preferences.gamepadLeftStickCurve.first()) add("gamepadLeftStickCurve")
+            if (gamepadRightStickCurve != preferences.gamepadRightStickCurve.first()) add("gamepadRightStickCurve")
             if (gamepadBindingsByPad.isNotEmpty()) add("gamepadBindingsByPad")
             if (pressureModifierAmount != globalPressureModifierAmount) add("pressureModifierAmount")
             if (autoSaveOnExit) add("autoSaveOnExit")

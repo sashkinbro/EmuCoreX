@@ -683,6 +683,9 @@
     <string name="settings_help_gamepad_stick_deadzone">Mengabaikan pergerakan stik fisik kecil di dekat bagian tengah. Naikkan jika pengontrol Anda menyimpang dengan sendirinya (drift); jaga tetap rendah jika Anda menginginkan respons yang lebih cepat di sekitar bagian tengah.</string>
     <string name="settings_help_gamepad_left_stick_sensitivity">Menyesuaikan seberapa kuat stik fisik kiri merespons setelah pemrosesan deadzone. Nilai yang lebih tinggi mencapai gerakan penuh lebih cepat, sedangkan nilai yang lebih rendah memudahkan pergerakan halus.</string>
     <string name="settings_help_gamepad_right_stick_sensitivity">Menyesuaikan seberapa kuat stik fisik kanan merespons setelah pemrosesan deadzone. Nilai yang lebih tinggi membuat kamera atau bidikan bereaksi lebih cepat, sedangkan nilai yang lebih rendah memberikan kendali yang lebih halus kepada Anda.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Memperluas gerakan stik kecil sebelum deadzone diterapkan, sehingga stik keluar dari deadzone lebih awal dan kemudi atau bidikan bereaksi lebih cepat. Naikkan jika game atau pengontrol memiliki deadzone bawaan yang besar; 0% mempertahankan respons standar.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Menetapkan nilai terkecil yang dikirim begitu stik keluar dari deadzone. Naikkan untuk game yang deadzone bawaannya mengabaikan kemiringan ringan, agar gerakan langsung mulai alih-alih terlambat. 0% berarti nonaktif.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Mengatur seberapa cepat keluaran stik naik seiring gerakan. 100% linier; di atas 100% memberi kendali lebih halus di dekat tengah untuk kemudi atau bidikan presisi, di bawah 100% bereaksi lebih cepat pada kemiringan kecil.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Memetakan pelatuk (trigger) analog R2 ke gerakan ke atas pada stik kanan untuk gamepad dan kontrol di layar. Ini dapat membantu game balap yang mana gas/akselerasi terikat ke stik kanan atas.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Memetakan pelatuk (trigger) analog L2 ke gerakan ke bawah pada stik kanan untuk gamepad dan kontrol di layar. Ini dapat membantu game balap yang mana rem terikat ke stik kanan bawah.</string>
     <string name="settings_help_hide_overlay_on_gamepad">Menyembunyikan hamparan kontrol sentuh (overlay) kapan pun pengontrol fisik aktif. Ini membuat layar menjadi lebih bersih, tetapi nonaktifkan jika Anda masih ingin tombol sentuh tersedia saat pengontrol tersambung.</string>
@@ -828,6 +831,12 @@
     <string name="settings_gamepad_stick_deadzone">Deadzone Stik</string>
     <string name="settings_gamepad_left_stick_sensitivity">Sensitivitas Stik Kiri</string>
     <string name="settings_gamepad_right_stick_sensitivity">Sensitivitas Stik Kanan</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Deadzone Negatif Stik Kiri</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Deadzone Negatif Stik Kanan</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Anti-Deadzone Stik Kiri</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Anti-Deadzone Stik Kanan</string>
+    <string name="settings_gamepad_left_stick_curve">Kurva Stik Kiri</string>
+    <string name="settings_gamepad_right_stick_curve">Kurva Stik Kanan</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 ke Stik Kanan Atas</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Gunakan R2 sebagai stik kanan atas.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 ke Stik Kanan Bawah</string>

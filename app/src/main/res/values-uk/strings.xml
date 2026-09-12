@@ -1306,8 +1306,17 @@
     <string name="settings_game_fixes">Виправлення GameDB</string>
     <string name="settings_game_fixes_desc">Застосувати виправлення сумісності з GameDB.</string>
     <string name="settings_help_game_fixes">Використовує виправлення сумісності GameDB для відомих ігор, зокрема автоматичне перевизначення режимів клемпінгу та округлення. Вимикайте це лише тоді, коли конкретній грі потрібні ваші ручні налаштування клемпінгу замість значень GameDB; перезапустіть гру для застосування.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">Розширює невеликі рухи стіка до застосування мертвої зони, тому стік виходить із неї раніше і кермування чи прицілювання реагує швидше. Збільште, якщо гра або контролер має велику власну мертву зону; 0% — стандартна реакція.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">Визначає найменше значення, яке надсилається, щойно стік вийде з мертвої зони. Збільште для ігор, чия власна мертва зона ігнорує легкі нахили, щоб рух починався одразу, а не із запізненням. 0% — вимкнено.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">Визначає, як швидко вихідне значення стіка зростає з його відхиленням. 100% — лінійно; понад 100% дає точніше керування поблизу центру для точного кермування чи прицілювання, нижче 100% — швидшу реакцію на малих нахилах.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">Призначає аналоговий тригер R2 на рух правого стіка вгору для геймпада і наекранного керування. Це може допомогти в гоночних іграх, де газ призначений на правий стік вгору.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">Призначає аналоговий тригер L2 на рух правого стіка вниз для геймпада і наекранного керування. Це може допомогти в гоночних іграх, де гальмо призначене на правий стік вниз.</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">Негативна мертва зона лівого стіка</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">Негативна мертва зона правого стіка</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">Анти-мертва зона лівого стіка</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">Анти-мертва зона правого стіка</string>
+    <string name="settings_gamepad_left_stick_curve">Крива лівого стіка</string>
+    <string name="settings_gamepad_right_stick_curve">Крива правого стіка</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 на правий стік вгору</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">Використовувати R2 як рух правого стіка вгору.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 на правий стік вниз</string>

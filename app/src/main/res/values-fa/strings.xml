@@ -683,6 +683,9 @@
     <string name="settings_help_gamepad_stick_deadzone">حرکات فیزیکی کوچک استیک در نزدیکی مرکز را نادیده می‌گیرد.</string>
     <string name="settings_help_gamepad_left_stick_sensitivity">تنظیم می‌کند که استیک چپ فیزیکی چقدر قوی پاسخ می‌دهد.</string>
     <string name="settings_help_gamepad_right_stick_sensitivity">تنظیم می‌کند که استیک راست فیزیکی چقدر قوی پاسخ می‌دهد.</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">حرکات کوچک استیک را پیش از اعمال نقطه کور گسترش می‌دهد تا استیک زودتر از نقطه کور خارج شود و فرمان یا نشانه‌گیری سریع‌تر واکنش دهد. اگر بازی یا دسته نقطه کور داخلی بزرگی دارد آن را افزایش دهید؛ ۰٪ پاسخ استاندارد را حفظ می‌کند.</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">کمترین مقداری را تعیین می‌کند که پس از خروج استیک از نقطه کور ارسال می‌شود. برای بازی‌هایی که نقطه کور خودشان شیب‌های ملایم را نادیده می‌گیرد آن را افزایش دهید تا حرکت بی‌درنگ شروع شود. ۰٪ خاموش است.</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">تعیین می‌کند خروجی استیک با حرکت چقدر سریع بالا برود. ۱۰۰٪ خطی است؛ بالای ۱۰۰٪ کنترل دقیق‌تر نزدیک مرکز برای فرمان یا نشانه‌گیری فراهم می‌کند و زیر ۱۰۰٪ به شیب‌های کوچک سریع‌تر واکنش می‌دهد.</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">تریگر آنالوگ R2 را به حرکت رو به بالا روی استیک راست نگاشت می‌کند.</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">تریگر آنالوگ L2 را به حرکت رو به پایین روی استیک راست نگاشت می‌کند.</string>
     <string name="settings_help_hide_overlay_on_gamepad">هر زمان که یک کنترلر فیزیکی فعال باشد، روکش لمسی را مخفی می‌کند.</string>
@@ -828,6 +831,12 @@
     <string name="settings_gamepad_stick_deadzone">نقطه کور استیک (Deadzone)</string>
     <string name="settings_gamepad_left_stick_sensitivity">حساسیت استیک چپ</string>
     <string name="settings_gamepad_right_stick_sensitivity">حساسیت استیک راست</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">نقطه کور منفی استیک چپ</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">نقطه کور منفی استیک راست</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">نقطه کور معکوس استیک چپ</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">نقطه کور معکوس استیک راست</string>
+    <string name="settings_gamepad_left_stick_curve">منحنی استیک چپ</string>
+    <string name="settings_gamepad_right_stick_curve">منحنی استیک راست</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 برای استیک راست رو به بالا</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">استفاده از R2 به عنوان حرکت رو به بالای استیک راست.</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 برای استیک راست رو به پایین</string>

@@ -1278,8 +1278,17 @@
     <string name="settings_game_fixes">GameDB 修复</string>
     <string name="settings_game_fixes_desc">应用 GameDB 中的兼容性修复。</string>
     <string name="settings_help_game_fixes">对已知游戏使用 GameDB 兼容性修复，包括自动覆盖钳位和舍入模式。仅当特定游戏需要您的手动钳位设置而不是 GameDB 值时，才禁用此选项；重新启动游戏以应用。</string>
+    <string name="settings_help_gamepad_stick_negative_deadzone" formatted="false">在应用死区前放大摇杆的微小移动，使摇杆更早离开死区，转向或瞄准响应更快。当游戏或手柄自身死区较大时调高；0% 保持标准响应。</string>
+    <string name="settings_help_gamepad_stick_anti_deadzone" formatted="false">设置摇杆离开死区后发送的最小输出值。对于自身死区会忽略轻微倾斜的游戏，调高此值可让移动立即开始而不是延迟触发。0% 为关闭。</string>
+    <string name="settings_help_gamepad_stick_curve" formatted="false">调整摇杆输出随行程上升的速度。100% 为线性；高于 100% 时中心附近控制更精细，便于精准转向或瞄准；低于 100% 时对小幅倾斜反应更快。</string>
     <string name="settings_help_gamepad_right_stick_up_to_r2">将 R2 模拟扳机映射到右摇杆向上，适用于手柄和屏幕控制。这可以帮助油门绑定到右摇杆向上的赛车游戏。</string>
     <string name="settings_help_gamepad_right_stick_down_to_l2">将 L2 模拟扳机映射到右摇杆向下，适用于手柄和屏幕控制。这可以帮助刹车绑定到右摇杆向下的赛车游戏。</string>
+    <string name="settings_gamepad_left_stick_negative_deadzone">左摇杆负死区</string>
+    <string name="settings_gamepad_right_stick_negative_deadzone">右摇杆负死区</string>
+    <string name="settings_gamepad_left_stick_anti_deadzone">左摇杆反死区</string>
+    <string name="settings_gamepad_right_stick_anti_deadzone">右摇杆反死区</string>
+    <string name="settings_gamepad_left_stick_curve">左摇杆曲线</string>
+    <string name="settings_gamepad_right_stick_curve">右摇杆曲线</string>
     <string name="settings_gamepad_right_stick_up_to_r2">R2 映射为右摇杆向上</string>
     <string name="settings_gamepad_right_stick_up_to_r2_desc">将 R2 作为右摇杆向上使用。</string>
     <string name="settings_gamepad_right_stick_down_to_l2">L2 映射为右摇杆向下</string>

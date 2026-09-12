@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sign
 
@@ -194,6 +195,18 @@ object GamepadManager {
     @Volatile
     private var rightStickSensitivity = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY / 100f
     @Volatile
+    private var leftNegativeDeadzone = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE / 100f
+    @Volatile
+    private var rightNegativeDeadzone = AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE / 100f
+    @Volatile
+    private var leftAntiDeadzone = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE / 100f
+    @Volatile
+    private var rightAntiDeadzone = AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE / 100f
+    @Volatile
+    private var leftStickCurve = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE / 100f
+    @Volatile
+    private var rightStickCurve = AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE / 100f
+    @Volatile
     private var invertLeftStick = false
     @Volatile
     private var invertRightStick = false
@@ -220,6 +233,18 @@ object GamepadManager {
     private var savedGlobalLeftStickSensitivity: Float = leftStickSensitivity
     @Volatile
     private var savedGlobalRightStickSensitivity: Float = rightStickSensitivity
+    @Volatile
+    private var savedGlobalLeftNegativeDeadzone: Float = leftNegativeDeadzone
+    @Volatile
+    private var savedGlobalRightNegativeDeadzone: Float = rightNegativeDeadzone
+    @Volatile
+    private var savedGlobalLeftAntiDeadzone: Float = leftAntiDeadzone
+    @Volatile
+    private var savedGlobalRightAntiDeadzone: Float = rightAntiDeadzone
+    @Volatile
+    private var savedGlobalLeftStickCurve: Float = leftStickCurve
+    @Volatile
+    private var savedGlobalRightStickCurve: Float = rightStickCurve
 
     private val connectionLock = Any()
     private var appContext: Context? = null
@@ -345,6 +370,36 @@ object GamepadManager {
         scope.launch {
             preferences.gamepadRightStickSensitivity.collectLatest { value ->
                 rightStickSensitivity = value.coerceIn(50, 200) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadLeftStickNegativeDeadzone.collectLatest { value ->
+                leftNegativeDeadzone = value.coerceIn(0, 30) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadRightStickNegativeDeadzone.collectLatest { value ->
+                rightNegativeDeadzone = value.coerceIn(0, 30) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadLeftStickAntiDeadzone.collectLatest { value ->
+                leftAntiDeadzone = value.coerceIn(0, 50) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadRightStickAntiDeadzone.collectLatest { value ->
+                rightAntiDeadzone = value.coerceIn(0, 50) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadLeftStickCurve.collectLatest { value ->
+                leftStickCurve = value.coerceIn(50, 200) / 100f
+            }
+        }
+        scope.launch {
+            preferences.gamepadRightStickCurve.collectLatest { value ->
+                rightStickCurve = value.coerceIn(50, 200) / 100f
             }
         }
         scope.launch {
@@ -511,13 +566,25 @@ object GamepadManager {
         bindingsByPad: Map<Int, Map<String, Int>>?,
         deadzone: Int?,
         leftSensitivity: Int?,
-        rightSensitivity: Int?
+        rightSensitivity: Int?,
+        leftNegativeDeadzone: Int? = null,
+        rightNegativeDeadzone: Int? = null,
+        leftAntiDeadzone: Int? = null,
+        rightAntiDeadzone: Int? = null,
+        leftStickCurve: Int? = null,
+        rightStickCurve: Int? = null
     ) {
         if (!perGameBindingsActive) {
             savedGlobalBindingsByPad = customBindingsByPad
             savedGlobalAnalogDeadzone = analogDeadzone
             savedGlobalLeftStickSensitivity = leftStickSensitivity
             savedGlobalRightStickSensitivity = rightStickSensitivity
+            savedGlobalLeftNegativeDeadzone = this.leftNegativeDeadzone
+            savedGlobalRightNegativeDeadzone = this.rightNegativeDeadzone
+            savedGlobalLeftAntiDeadzone = this.leftAntiDeadzone
+            savedGlobalRightAntiDeadzone = this.rightAntiDeadzone
+            savedGlobalLeftStickCurve = this.leftStickCurve
+            savedGlobalRightStickCurve = this.rightStickCurve
             perGameBindingsActive = true
         }
         if (bindingsByPad != null && bindingsByPad.isNotEmpty()) {
@@ -539,6 +606,24 @@ object GamepadManager {
         if (rightSensitivity != null) {
             rightStickSensitivity = rightSensitivity.coerceIn(50, 200) / 100f
         }
+        if (leftNegativeDeadzone != null) {
+            this.leftNegativeDeadzone = leftNegativeDeadzone.coerceIn(0, 30) / 100f
+        }
+        if (rightNegativeDeadzone != null) {
+            this.rightNegativeDeadzone = rightNegativeDeadzone.coerceIn(0, 30) / 100f
+        }
+        if (leftAntiDeadzone != null) {
+            this.leftAntiDeadzone = leftAntiDeadzone.coerceIn(0, 50) / 100f
+        }
+        if (rightAntiDeadzone != null) {
+            this.rightAntiDeadzone = rightAntiDeadzone.coerceIn(0, 50) / 100f
+        }
+        if (leftStickCurve != null) {
+            this.leftStickCurve = leftStickCurve.coerceIn(50, 200) / 100f
+        }
+        if (rightStickCurve != null) {
+            this.rightStickCurve = rightStickCurve.coerceIn(50, 200) / 100f
+        }
     }
 
     fun clearPerGameOverrides() {
@@ -554,6 +639,12 @@ object GamepadManager {
         analogDeadzone = savedGlobalAnalogDeadzone
         leftStickSensitivity = savedGlobalLeftStickSensitivity
         rightStickSensitivity = savedGlobalRightStickSensitivity
+        leftNegativeDeadzone = savedGlobalLeftNegativeDeadzone
+        rightNegativeDeadzone = savedGlobalRightNegativeDeadzone
+        leftAntiDeadzone = savedGlobalLeftAntiDeadzone
+        rightAntiDeadzone = savedGlobalRightAntiDeadzone
+        leftStickCurve = savedGlobalLeftStickCurve
+        rightStickCurve = savedGlobalRightStickCurve
         resetChangedBindingStates(previousBindingsByPad, savedGlobalBindingsByPad)
     }
 
@@ -596,10 +687,20 @@ object GamepadManager {
             analogStatesByDeviceId.getOrPut(event.deviceId) { AnalogState() }
         }
 
-        val leftX = processStickAxis(event.getAxisValue(MotionEvent.AXIS_X), leftStickSensitivity)
-            .let { if (invertLeftStickHorizontal) -it else it }
-        val leftY = processStickAxis(event.getAxisValue(MotionEvent.AXIS_Y), leftStickSensitivity)
-            .let { if (invertLeftStick) -it else it }
+        val leftX = processStickAxis(
+            value = event.getAxisValue(MotionEvent.AXIS_X),
+            sensitivity = leftStickSensitivity,
+            negativeDeadzone = leftNegativeDeadzone,
+            antiDeadzone = leftAntiDeadzone,
+            curve = leftStickCurve
+        ).let { if (invertLeftStickHorizontal) -it else it }
+        val leftY = processStickAxis(
+            value = event.getAxisValue(MotionEvent.AXIS_Y),
+            sensitivity = leftStickSensitivity,
+            negativeDeadzone = leftNegativeDeadzone,
+            antiDeadzone = leftAntiDeadzone,
+            curve = leftStickCurve
+        ).let { if (invertLeftStick) -it else it }
         if (leftX != state.prevLeftX || leftY != state.prevLeftY) {
             dispatchAnalogStick(
                 padIndex = padIndex,
@@ -615,12 +716,18 @@ object GamepadManager {
         }
 
         val rightX = processStickAxis(
-            getAxisValueWithFallback(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
-            rightStickSensitivity
+            value = getAxisValueWithFallback(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
+            sensitivity = rightStickSensitivity,
+            negativeDeadzone = rightNegativeDeadzone,
+            antiDeadzone = rightAntiDeadzone,
+            curve = rightStickCurve
         ).let { if (invertRightStickHorizontal) -it else it }
         val physicalRightY = processStickAxis(
-            getAxisValueWithFallback(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY),
-            rightStickSensitivity
+            value = getAxisValueWithFallback(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY),
+            sensitivity = rightStickSensitivity,
+            negativeDeadzone = rightNegativeDeadzone,
+            antiDeadzone = rightAntiDeadzone,
+            curve = rightStickCurve
         )
         val rightY = physicalRightY.let { if (invertRightStick) -it else it }
         val physicalLT = getAxisValueWithFallback(event, MotionEvent.AXIS_LTRIGGER, MotionEvent.AXIS_BRAKE)
@@ -935,10 +1042,64 @@ object GamepadManager {
         }
     }
 
-    private fun processStickAxis(value: Float, sensitivity: Float): Float {
-        val deadzoned = applyDeadzone(value)
-        return (deadzoned * sensitivity.coerceIn(0.5f, 2f)).coerceIn(-1f, 1f)
+    /**
+     * Full per-stick shaping pipeline, in order:
+     *  1. Negative deadzone: expands the raw input before the inner deadzone, so the
+     *     stick leaves the deadzone sooner and reports movement earlier. This is the
+     *     countermeasure for a game (or pad) whose built-in deadzone swallows small
+     *     deflections; true center still reads 0 because the inner deadzone below
+     *     re-zeroes it.
+     *  2. Inner deadzone (existing): ignores center noise.
+     *  3. Response curve: exponent applied to the post-deadzone magnitude. 1.0 is
+     *     linear, above 1.0 gives finer control near center, below 1.0 reacts faster.
+     *  4. Sensitivity: linear output scale (existing).
+     *  5. Anti-deadzone: lifts any non-zero output to a minimum floor, so a game with
+     *     its own large deadzone responds the instant the stick moves. True center
+     *     (output == 0) always stays 0.
+     */
+    internal fun shapeStickAxis(
+        value: Float,
+        deadzone: Float,
+        sensitivity: Float,
+        negativeDeadzone: Float = 0f,
+        antiDeadzone: Float = 0f,
+        curve: Float = 1f
+    ): Float {
+        val raw = value.coerceIn(-1f, 1f)
+        val negative = negativeDeadzone.coerceIn(0f, 0.3f)
+        val expanded = if (negative > 0f) {
+            (raw / (1f - negative)).coerceIn(-1f, 1f)
+        } else {
+            raw
+        }
+        val deadzoned = applyDeadzone(expanded, deadzone)
+        if (deadzoned == 0f) return 0f
+        val exponent = curve.coerceIn(0.5f, 2f)
+        val curved = if (exponent != 1f) {
+            sign(deadzoned) * abs(deadzoned).pow(exponent)
+        } else {
+            deadzoned
+        }
+        val scaled = (curved * sensitivity.coerceIn(0.5f, 2f)).coerceIn(-1f, 1f)
+        val anti = antiDeadzone.coerceIn(0f, 0.5f)
+        if (anti <= 0f || scaled == 0f) return scaled
+        return (sign(scaled) * (anti + abs(scaled) * (1f - anti))).coerceIn(-1f, 1f)
     }
+
+    private fun processStickAxis(
+        value: Float,
+        sensitivity: Float,
+        negativeDeadzone: Float = 0f,
+        antiDeadzone: Float = 0f,
+        curve: Float = 1f
+    ): Float = shapeStickAxis(
+        value = value,
+        deadzone = analogDeadzone,
+        sensitivity = sensitivity,
+        negativeDeadzone = negativeDeadzone,
+        antiDeadzone = antiDeadzone,
+        curve = curve
+    )
 
     private fun getAxisValueWithFallback(event: MotionEvent, primaryAxis: Int, fallbackAxis: Int): Float {
         return if (hasJoystickAxis(event.device, primaryAxis)) {
@@ -948,8 +1109,8 @@ object GamepadManager {
         }
     }
 
-    private fun applyDeadzone(value: Float): Float {
-        val deadzone = analogDeadzone.coerceIn(0f, 0.35f)
+    private fun applyDeadzone(value: Float, deadzoneFraction: Float): Float {
+        val deadzone = deadzoneFraction.coerceIn(0f, 0.35f)
         val magnitude = abs(value)
         if (magnitude <= deadzone) return 0f
         val normalized = ((magnitude - deadzone) / (1f - deadzone)).coerceIn(0f, 1f)
