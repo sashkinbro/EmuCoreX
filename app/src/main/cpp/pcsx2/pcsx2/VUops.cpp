@@ -3919,7 +3919,7 @@ static __fi void SYNCSTATUSFLAG()
 static __fi void SYNCFDIV()
 {
 	VU0.VI[REG_Q].UL = VU0.q.UL;
-	VU0.VI[REG_STATUS_FLAG].UL = (VU0.VI[REG_STATUS_FLAG].UL & 0x3CF) | (VU0.statusflag & 0x30) | ((VU0.statusflag & 0x30) << 6);
+	VU0.VI[REG_STATUS_FLAG].UL = (VU0.VI[REG_STATUS_FLAG].UL & 0xFCF) | (VU0.statusflag & 0x30) | ((VU0.statusflag & 0x30) << 6);
 }
 
 void VABS()  { VU0.code = cpuRegs.code; _vuABS(&VU0); }

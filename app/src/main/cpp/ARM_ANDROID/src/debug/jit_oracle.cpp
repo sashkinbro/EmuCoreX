@@ -1844,18 +1844,22 @@ void SqrtFlagTests()
             const u32 bits = magnitude | sign;
             const u32 expected = sign ? 0x410u : 0;
             char name[128];
+            for (u32 seed : {0u, 0xfc0u})
             for (bool jit : {false, true})
             {
                 const std::vector<u32> code = {
                     MipsI(15, 0, 8, bits >> 16), MipsI(13, 8, 8, bits),
                     (0x12u << 26) | (5u << 21) | (8u << 16) | (2u << 11),
+                    MipsI(13, 0, 10, seed),
+                    (0x12u << 26) | (6u << 21) | (10u << 16) | (REG_STATUS_FLAG << 11),
                     (0x12u << 26) | (0x10u << 21) | (2u << 16) | (14u << 6) | 0x3du,
                     (0x12u << 26) | (0x10u << 21) | (14u << 6) | 0x3fu,
                     (0x12u << 26) | (2u << 21) | (18u << 16) | (REG_STATUS_FLAG << 11)};
                 const auto result = RunEEProgram(jit, code);
                 const u32 actual = static_cast<u32>(result.gpr[18]) & 0xc30u;
-                std::snprintf(name, sizeof(name), "SQRT macro clamp=%u jit=%u ft=%08x flags", clamp, jit, bits);
-                CheckBits(actual == expected, actual, expected, name);
+                const u32 seededExpected = expected | (seed & 0xc00u);
+                std::snprintf(name, sizeof(name), "SQRT macro clamp=%u jit=%u ft=%08x seed=%03x flags", clamp, jit, bits, seed);
+                CheckBits(actual == seededExpected, actual, seededExpected, name);
             }
             std::array<u32, 128> registers{};
             registers[3] = 0x3f800000;
