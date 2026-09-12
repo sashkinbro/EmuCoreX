@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -197,6 +198,7 @@ import com.sbro.emucorex.ui.controls.CustomControlVisual
 import com.sbro.emucorex.ui.controls.composeShape
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.EmulationSideArtworkOverlay
+import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ProvideGamepadMenuAction
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.ProvideGamepadUiNavigation
@@ -3201,7 +3203,7 @@ private fun EmulationSidebarMenu(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
                 ) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
@@ -3212,40 +3214,63 @@ private fun EmulationSidebarMenu(
                                     )
                                 )
                             )
-                            .padding(horizontal = 18.dp, vertical = 18.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = uiState.currentGameTitle.ifBlank { stringResource(R.string.emulation_sidebar_title) },
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = uiState.currentGameSubtitle.ifBlank { stringResource(R.string.emulation_menu_subtitle) },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
+                        val gameTitle = uiState.currentGameTitle.ifBlank { stringResource(R.string.emulation_sidebar_title) }
+                        Box(
+                            modifier = Modifier
+                                .width(74.dp)
+                                .aspectRatio(2f / 3f)
+                                .clip(neonShape(14.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                            GameCoverArt(
+                                coverPath = uiState.currentGameCoverArtPath,
+                                fallbackTitle = gameTitle,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.FillHeight
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = gameTitle,
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = uiState.currentGameSubtitle.ifBlank { stringResource(R.string.emulation_menu_subtitle) },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
                             ) {
-                                Text(
-                                    text = stringResource(
-                                        R.string.emulation_play_time_badge,
-                                        formatPlayTime(uiState.activePlayTimeMs)
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                )
+                                Surface(
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.18f))
+                                ) {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.emulation_play_time_badge,
+                                            formatPlayTime(uiState.activePlayTimeMs)
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }

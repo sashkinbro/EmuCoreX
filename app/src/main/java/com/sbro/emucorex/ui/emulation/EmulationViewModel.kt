@@ -266,6 +266,7 @@ data class EmulationUiState(
     val palFramerate: Float = AppPreferences.DEFAULT_PAL_FRAMERATE,
     val currentGameTitle: String = "",
     val currentGameSubtitle: String = "",
+    val currentGameCoverArtPath: String? = null,
     val gameSettingsProfileActive: Boolean = false,
     val currentSlotLastModified: Long = 0L,
     val autoSaveEnabled: Boolean = false,
@@ -1525,7 +1526,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             activePlayTimeMs = 0L,
             currentSlotLastModified = 0L,
             autoSaveLastModified = 0L,
-            isAutoSaveInProgress = false
+            isAutoSaveInProgress = false,
+            currentGameCoverArtPath = null
         )
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -1775,6 +1777,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
+                        currentGameCoverArtPath = null,
                         gameSettingsProfileActive = false,
                         cheatsGameKey = null,
                         availableCheats = emptyList()
@@ -1791,6 +1794,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
+                        currentGameCoverArtPath = null,
                         gameSettingsProfileActive = false,
                         cheatsGameKey = null,
                         availableCheats = emptyList()
@@ -1821,6 +1825,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.value = _uiState.value.copy(
                         currentGameTitle = currentGameTitle,
                         currentGameSubtitle = currentGameSubtitle(),
+                        currentGameCoverArtPath = currentGameCoverArtPath,
                         gameSettingsProfileActive = existingProfile != null
                     )
                     syncCurrentGameProfileMetadata()
@@ -5041,6 +5046,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(
             currentGameTitle = "",
             currentGameSubtitle = "",
+            currentGameCoverArtPath = null,
             gameSettingsProfileActive = false
         )
         currentGameSource = ""
