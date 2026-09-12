@@ -279,7 +279,6 @@ static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg, in
 
 	// Convert exponent==0 to a magnitude mask and leave only the original sign.
 	oakAsm->CMEQ(mask_q.S4(), exponent_q.S4(), 0);
-	oakAsm->SHL(mask_q.S4(), mask_q.S4(), 1);
 	oakAsm->USHR(mask_q.S4(), mask_q.S4(), 1);
 	oakAsm->BIC(reg_q.B16(), reg_q.B16(), mask_q.B16());
 
