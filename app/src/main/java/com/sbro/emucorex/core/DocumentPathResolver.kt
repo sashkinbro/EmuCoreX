@@ -11,6 +11,7 @@ import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.RandomAccessFile
 import androidx.core.net.toUri
 
 object DocumentPathResolver {
@@ -26,6 +27,7 @@ object DocumentPathResolver {
     private val biosArtifactExtensions = setOf("mec", "nvm", "elf")
     private val biosNameHints = listOf("scph", "ps2", "bios", "rom", "r27v1602f")
     private const val MAX_IMPORTED_BIOS_BYTES = 8L * 1024L * 1024L
+    private const val MAX_IMPORTED_ELF_BYTES = 256L * 1024L * 1024L
 
     fun resolveFilePath(context: Context, rawPath: String): String? {
         if (!rawPath.startsWith("content://")) return rawPath
@@ -219,7 +221,7 @@ object DocumentPathResolver {
 
     fun prepareElfLaunchPath(context: Context, rawPath: String): String? {
         if (rawPath.isBlank()) return null
-        if (!rawPath.startsWith("content://")) return File(rawPath).takeIf { it.isFile && it.canRead() }?.absolutePath ?: rawPath
+        if (!rawPath.startsWith("content://")) return File(rawPath).takeIf(::isReadableLocalFile)?.absolutePath ?: rawPath
 
         val uri = rawPath.toUri()
         val single = DocumentFile.fromSingleUri(context, uri)
@@ -230,18 +232,20 @@ object DocumentPathResolver {
 
         val directPath = resolveFilePath(context, rawPath)
             ?.let(::File)
-            ?.takeIf { it.isFile && it.canRead() }
+            ?.takeIf(::isReadableLocalFile)
             ?.absolutePath
         if (!directPath.isNullOrBlank()) return directPath
 
-        return uri.toString()
+        // EELOAD boots an ELF through the virtual "host:" device, which cannot carry a SAF
+        // document URI. Stage a local copy (arcade ELFs are staged for the same reason).
+        return stageElfForLaunch(context, rawPath, uri, displayName) ?: uri.toString()
     }
 
     fun prepareGameLaunchPath(context: Context, rawPath: String): String? {
         if (rawPath.isBlank()) return null
         if (!rawPath.startsWith("content://")) {
             val direct = File(rawPath)
-            if (direct.isFile && direct.canRead()) return direct.absolutePath
+            if (isReadableLocalFile(direct)) return direct.absolutePath
 
             val uri = findAccessibleTreeUriForRawPath(context, rawPath)
                 ?: return if (isScopedStorageExternalPath(rawPath)) null else rawPath
@@ -251,7 +255,7 @@ object DocumentPathResolver {
         val uri = rawPath.toUri()
         val directPath = resolveFilePath(context, rawPath)
             ?.let(::File)
-            ?.takeIf { it.isFile && it.canRead() }
+            ?.takeIf(::isReadableLocalFile)
             ?.absolutePath
         if (!directPath.isNullOrBlank()) return directPath
 
@@ -264,7 +268,7 @@ object DocumentPathResolver {
     private fun prepareUriGameLaunchPath(context: Context, uri: Uri): String {
         val resolvedDirect = resolveFilePath(context, uri.toString())
             ?.let(::File)
-            ?.takeIf { it.isFile && it.canRead() }
+            ?.takeIf(::isReadableLocalFile)
             ?.absolutePath
         if (!resolvedDirect.isNullOrBlank()) {
             Log.i(TAG, "Resolved content URI to direct filesystem game path: $resolvedDirect")
@@ -272,6 +276,47 @@ object DocumentPathResolver {
         }
 
         return uri.toString()
+    }
+
+    /**
+     * A plain path is only usable when the process can actually open it. `canRead()` can
+     * report true for locations that the kernel later rejects (stale SAF grant, removable
+     * volume remounted read-only), which previously surfaced as a generic launch failure.
+     */
+    internal fun isReadableLocalFile(file: File): Boolean {
+        if (!file.isFile) return false
+        return runCatching { RandomAccessFile(file, "r").use { true } }.getOrDefault(false)
+    }
+
+    private fun stageElfForLaunch(context: Context, rawPath: String, uri: Uri, displayName: String): String? {
+        val target = File(
+            File(context.getExternalFilesDir(null) ?: context.filesDir, "imported-elf"),
+            "${Integer.toHexString(rawPath.hashCode())}-${sanitizeFileName(displayName).ifBlank { "boot.elf" }}"
+        )
+        return runCatching {
+            val directory = target.parentFile ?: return@runCatching null
+            if (!directory.exists() && !directory.mkdirs()) return@runCatching null
+            val descriptor = context.contentResolver.openFileDescriptor(uri, "r") ?: return@runCatching null
+            ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+                FileOutputStream(target).use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var copied = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        copied += read
+                        if (copied > MAX_IMPORTED_ELF_BYTES) {
+                            throw IOException("ELF import exceeds $MAX_IMPORTED_ELF_BYTES bytes")
+                        }
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+            target.absolutePath
+        }.onFailure { error ->
+            target.delete()
+            Log.w(TAG, "Unable to stage ELF $uri", error)
+        }.getOrNull()
     }
 
     private fun resolveExternalStoragePath(uri: Uri): String? {

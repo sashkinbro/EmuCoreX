@@ -41,4 +41,18 @@ class DocumentPathResolverTest {
             parent.deleteRecursively()
         }
     }
+
+    @Test
+    fun readableLocalFileCheckAcceptsFilesOnly() {
+        val parent = Files.createTempDirectory("readable-file").toFile()
+        try {
+            val file = File(parent, "game.elf").apply { writeText("elf") }
+
+            assertTrue(DocumentPathResolver.isReadableLocalFile(file))
+            assertFalse(DocumentPathResolver.isReadableLocalFile(parent))
+            assertFalse(DocumentPathResolver.isReadableLocalFile(File(parent, "missing.elf")))
+        } finally {
+            parent.deleteRecursively()
+        }
+    }
 }
