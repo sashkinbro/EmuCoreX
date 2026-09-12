@@ -1226,6 +1226,36 @@ void EECoverageSpecial()
     }
 }
 
+void EECoverageDynamicAddress(bool fastmem)
+{
+    const bool savedFastmem = EmuConfig.Cpu.Recompiler.EnableFastmem;
+    EmuConfig.Cpu.Recompiler.EnableFastmem = fastmem;
+    // Loading the base from RAM prevents constant folding of the effective address.
+    char name[96];
+    for (s32 offset : {0, 4, -4, 16, -16, 4095, -4095, 4096, -4096, 32767, -32768})
+    {
+        for (u32 op : {32u, 36u, 33u, 37u, 35u, 39u, 55u, 30u, 49u})
+        {
+            for (u32 dest : {16u, 18u})
+            {
+                auto code = EEScratchSetup();
+                const u32 base = EE_TEST_SCRATCH + 64 - offset;
+                code.push_back(MipsI(15, 0, 8, base >> 16));
+                code.push_back(MipsI(13, 8, 8, base & 0xffff));
+                code.push_back(MipsI(43, 22, 8, 0));
+                code.push_back(MipsI(35, 22, 16, 0));
+                code.push_back(MipsI(op, 16, dest, offset));
+                // Capture the upper half of quadword loads through observable RAM too.
+                if (op == 30)
+                    code.push_back(MipsI(31, 22, dest, 96));
+                std::snprintf(name, sizeof(name), "ee dynamic load %u offset=%d dest=%u fastmem=%u", op, offset, dest, static_cast<u32>(fastmem));
+                RunEECase(name, code);
+            }
+        }
+    }
+    EmuConfig.Cpu.Recompiler.EnableFastmem = savedFastmem;
+}
+
 void EECoverageMemory()
 {
     char name[96];
@@ -1870,6 +1900,8 @@ void EETests()
     EECompileDeadlineRegression();
     EECoverageSpecial();
     EECoverageMemory();
+    EECoverageDynamicAddress(false);
+    EECoverageDynamicAddress(true);
     EECoverageBranches();
     EECoverageCop0();
     EECoverageCop1(false);
