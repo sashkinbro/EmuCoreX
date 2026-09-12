@@ -1653,7 +1653,10 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 			}
 
 			const std::string elf_name = ini.GetStringValue("data", "elf", "");
-			s_elf_override = ResolveArcadeAsset(filename, Path::Combine(subdir, elf_name));
+			// Arcade sets place the boot ELF either next to the manifest or inside its
+			// declared subdir. Search the same candidate list as dongle/SRAM assets so
+			// flat dumps and clone manifests with a parent-set subdir both launch.
+			s_elf_override = FindArcadeAsset(filename, subdir, elf_name);
 			if (!ArcadeAssetExists(s_elf_override))
 			{
 				Error::SetStringFmt(error, "Cannot open arcade boot ELF '{}'.", elf_name);
@@ -1707,7 +1710,9 @@ bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 
 			const std::string media_name = ini.GetStringValue("data", "mediasrc", "");
 			const std::string media_type = ini.GetStringValue("data", "media", "");
-			const std::string media_path = ResolveArcadeAsset(filename, Path::Combine(subdir, media_name));
+			// Media follows the same layout rules as the ELF: next to the manifest,
+			// inside the declared subdir, or in a shared memcards folder.
+			const std::string media_path = FindArcadeAsset(filename, subdir, media_name);
 			if (!ArcadeAssetExists(media_path))
 			{
 				Error::SetStringFmt(error, "Cannot open arcade media '{}'.", media_name);
