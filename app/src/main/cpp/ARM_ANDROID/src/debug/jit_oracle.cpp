@@ -787,6 +787,7 @@ constexpr u32 IOP_TEST_SCRATCH = 0x00180000;
 constexpr u32 EE_SCRATCH_SIZE = 256;
 constexpr u32 IOP_SCRATCH_SIZE = 128;
 
+extern "C" void EmuCoreXEEOracleSetCompileCallback(void (*callback)(u32));
 extern "C" void EmuCoreXEEForceExitAfterFirstBlock();
 extern "C" void EmuCoreXEEForceExitAfterCycles(u32 budget);
 extern "C" void EmuCoreXOracleEESteps(u32 steps);
@@ -1097,6 +1098,53 @@ std::vector<u32> EECop1Setup()
 constexpr u32 Mmi(u32 group, u32 sub, u32 rs, u32 rt, u32 rd)
 {
     return (0x1Cu << 26) | (rs << 21) | (rt << 16) | (rd << 11) | (sub << 6) | group;
+}
+
+u32 eeCompileObservedCycle = 0;
+u32 eeCompileCallbackCount = 0;
+
+void EECompileDeadlineCallback(u32 pc)
+{
+    if (pc == EE_TEST_PC + 32)
+    {
+        eeCompileObservedCycle = cpuRegs.cycle;
+        ++eeCompileCallbackCount;
+        cpuRegs.nextEventCycle = 0;
+    }
+}
+
+void EECompileDeadlineRegression()
+{
+    for (const u32 initial_cycle : {0x106af500u, 0xfffffff0u})
+    {
+        Cpu = &recCpu;
+        Cpu->Reset();
+        std::memset(&cpuRegs, 0, sizeof(cpuRegs));
+        const std::array<u32, 11> code = {{
+            MipsI(9, 0, 8, 1), MipsI(9, 8, 8, 1),
+            MipsI(4, 0, 0, 5), 0, 0, 0, 0, 0,
+            MipsI(9, 0, 9, 7), 0x1000ffffu, 0
+        }};
+        for (u32 i = 0; i < code.size(); ++i)
+            memWrite32(EE_TEST_PC + i * 4, code[i]);
+        cpuRegs.pc = EE_TEST_PC;
+        cpuRegs.cycle = initial_cycle;
+        eeCompileObservedCycle = 0;
+        eeCompileCallbackCount = 0;
+        EmuCoreXEEForceExitAfterCycles(4096);
+        EmuCoreXEEOracleSetCompileCallback(EECompileDeadlineCallback);
+        Cpu->Execute();
+        EmuCoreXEEOracleSetCompileCallback(nullptr);
+        const u32 before_callback = eeCompileObservedCycle - initial_cycle;
+        const u32 elapsed = cpuRegs.cycle - initial_cycle;
+        std::printf("EECOMPILE initial=%08x callback=%08x final=%08x calls=%u\n",
+            initial_cycle, eeCompileObservedCycle, cpuRegs.cycle, eeCompileCallbackCount);
+        Check(eeCompileCallbackCount == 1 && before_callback > 0 && before_callback < 256,
+            "ee compile callback observes preceding block cycles");
+        Check(elapsed >= before_callback && elapsed < 256 &&
+            cpuRegs.GPR.r[8].UD[0] == 2 && cpuRegs.GPR.r[9].UD[0] == 7,
+            "ee compile deadline reset preserves time and execution");
+    }
 }
 
 void EECoverageSpecial()
@@ -1819,6 +1867,7 @@ void EETests()
         CompareEE(interp, jit, test.name);
     }
 
+    EECompileDeadlineRegression();
     EECoverageSpecial();
     EECoverageMemory();
     EECoverageBranches();

@@ -276,6 +276,11 @@ static const void* DispatchPageReset = nullptr;
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 extern "C" int EmuCoreXOracleSkipEvents();
+static void (*s_oracleCompileCallback)(u32) = nullptr;
+extern "C" void EmuCoreXEEOracleSetCompileCallback(void (*callback)(u32))
+{
+	s_oracleCompileCallback = callback;
+}
 
 // Self-test hook: request a recompiler exit at the end of the next block so
 // the oracle can execute a straight-line program as one clean block.
@@ -365,8 +370,11 @@ static const void* _DynGen_JITCompileOaknut()
 	oakAlignAsmPtr();
 	u8* retval = oakGetCurrentCodePointer();
 
+	// ELF entry callbacks can change nextEventCycle while resetting execution caches.
+	recFlushReccycle();
 	oakLoadCurrentPc();
 	oakEmitCall(reinterpret_cast<const void*>(recRecompile));
+	recReloadReccycle();
 	oakEmitDispatcherRegBody();
 
 	return retval;
@@ -2444,6 +2452,11 @@ static u8* recShortBlockLink_emit_oaknut(u32 next_pc, u32 scaled_cycles)
 
 static void recRecompile(const u32 startpc)
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_oracleCompileCallback)
+		s_oracleCompileCallback(startpc);
+#endif
+
 	u32 i = 0;
 	u32 willbranch3 = 0;
 
