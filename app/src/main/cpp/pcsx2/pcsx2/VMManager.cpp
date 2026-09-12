@@ -1445,6 +1445,7 @@ static std::string FindArcadeAsset(const std::string& manifest, const std::strin
 		Path::Combine(subdir, filename),
 		filename,
 		Path::Combine("memcards", filename),
+		Path::Combine("../memcards", filename),
 		Path::Combine("../../memcards", filename),
 	};
 	for (const std::string& candidate : candidates)

@@ -3,6 +3,7 @@ package com.sbro.emucorex.core
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.DocumentsContract
@@ -28,6 +29,8 @@ object NativeApp {
     private const val TAG = "NativeApp"
     private const val RESOURCE_ROOT = "resources"
     private const val MAX_ACTIVE_SOUND_PLAYERS = 4
+    private const val MAX_TREE_SEARCH_ENTRIES = 8192
+    private const val MAX_TREE_SEARCH_DEPTH = 16
 
     @JvmStatic
     val hasNativeTools: Boolean
@@ -74,130 +77,239 @@ object NativeApp {
     @JvmStatic
     fun resolveArcadeAssetUri(manifestUri: String, relativePath: String): String? {
         val context = getContext() ?: return null
-        return runCatching {
-            // File-scheme fallback - works on all Android versions, no SAF persist needed
-            if (manifestUri.startsWith("/") || manifestUri.startsWith("file:")) {
-                val manifestFile = if (manifestUri.startsWith("file:")) File(manifestUri.toUri().path ?: manifestUri) else File(manifestUri)
-                val baseDir = manifestFile.parentFile ?: File(manifestUri).parentFile
-                if (baseDir != null) {
-                    val targetFile = File(baseDir, relativePath.replace('\\', '/')).canonicalFile
-                    if (targetFile.exists()) return@runCatching targetFile.absolutePath
-                    // Subdir logic is handled natively, direct check only here
-                }
+        val relative = relativePath.replace('\\', '/').trim('/')
+        if (relative.isEmpty()) return null
+        val resolved = runCatching {
+            if (manifestUri.startsWith("content://")) {
+                resolveContentArcadeAsset(context, manifestUri.toUri(), relative)
+            } else {
+                resolveLocalArcadeAsset(context, manifestUri, relative)
             }
-            val manifest = manifestUri.toUri()
-            // content:// via SAF - try DocumentId
-            val manifestId = runCatching { DocumentsContract.getDocumentId(manifest) }.getOrNull()
-            if (manifestId != null) {
-                val persistedRoot = context.contentResolver.persistedUriPermissions
-                    .asSequence()
-                    .filter { it.isReadPermission && it.uri.authority == manifest.authority }
-                    .mapNotNull { permission ->
-                        runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrNull()
-                    }
-                    .filter { candidate ->
-                        manifestId == candidate || manifestId.startsWith(if (candidate.endsWith(':')) candidate else "$candidate/")
-                    }
-                    .maxByOrNull(String::length)
-
-                // Fallback when persisted permission is missing (common on Android <16) - use manifest parent as virtual root
-                val rootId = persistedRoot ?: manifestId.substringBeforeLast('/', manifestId).ifBlank { manifestId.substringBefore(':', "") + ":" }
-                var targetId = manifestId.substringBeforeLast('/', manifestId)
-                relativePath.replace('\\', '/').split('/').forEach { part ->
-                    when (part) {
-                        "", "." -> Unit
-                        ".." -> {
-                            if (targetId != rootId) {
-                                targetId = targetId.substringBeforeLast('/', targetId)
-                            }
-                        }
-                        else -> targetId += "/$part"
-                    }
-                }
-                // Strict check for persisted root, broader check (storage root only) for fallback
-                if (persistedRoot != null) {
-                    val rootPrefix = if (rootId.endsWith(':')) rootId else "$rootId/"
-                    if (targetId != rootId && !targetId.startsWith(rootPrefix)) return@runCatching null
-                } else {
-                    // Fallback: prevent escaping storage root (e.g. primary:)
-                    val storageRoot = manifestId.substringBefore(':', "") + ":"
-                    if (!targetId.startsWith(storageRoot)) return@runCatching null
-                }
-
-                val target = runCatching {
-                    DocumentsContract.buildDocumentUriUsingTree(manifest, targetId)
-                }.getOrElse {
-                    DocumentsContract.buildDocumentUri(manifest.authority, targetId)
-                }
-                // Primary path: try direct FD (fast on Android 15/16)
-                val fd = runCatching { context.contentResolver.openFileDescriptor(target, "r") }.getOrNull()
-                if (fd != null) {
-                    fd.close()
-                    return@runCatching target.toString()
-                }
-                // Code branch for Android 14- where persisted permission is missing:
-                // enumerate via DocumentsContract child listing which works with the temporary
-                // grant from the picker, without requiring persistedUriPermission.
-                val fallbackUri = resolveViaChildEnumeration(context, manifest, manifestId, relativePath)
-                if (fallbackUri != null) return@runCatching fallbackUri
-            }
-            // Final fallback - try direct File if somehow accessible
-            resolveViaChildEnumeration(context, manifestUri.toUri(), runCatching { DocumentsContract.getDocumentId(manifestUri.toUri()) }.getOrNull() ?: "", relativePath)
         }.onFailure { error ->
-            Log.w(TAG, "Unable to resolve arcade asset $relativePath", error)
+            Log.w(TAG, "Unable to resolve arcade asset '$relativePath' from '$manifestUri'", error)
         }.getOrNull()
+        if (resolved != null) {
+            Log.d(TAG, "Resolved arcade asset '$relative' -> $resolved")
+        } else {
+            Log.d(TAG, "Arcade asset '$relative' was not found for manifest '$manifestUri'")
+        }
+        return resolved
     }
 
-    private fun resolveViaChildEnumeration(context: Context, manifestUri: android.net.Uri, manifestId: String, relativePath: String): String? {
-        return runCatching {
-            if (manifestId.isBlank()) return@runCatching null
-            val manifestParentId = manifestId.substringBeforeLast('/', "")
-            if (manifestParentId.isEmpty()) return@runCatching null
-            val treeUri = when {
-                DocumentsContract.isTreeUri(manifestUri) -> manifestUri
-                else -> {
-                    val persistedTree = context.contentResolver.persistedUriPermissions.firstOrNull { perm ->
-                        perm.isReadPermission && perm.uri.authority == manifestUri.authority &&
-                            runCatching { DocumentsContract.getTreeDocumentId(perm.uri) }.getOrNull()?.let { treeId ->
-                                manifestParentId == treeId || manifestParentId.startsWith(if (treeId.endsWith(':')) treeId else "$treeId/")
-                            } == true
-                    }?.uri
-                    persistedTree ?: manifestUri
-                }
-            }
-            var currentId = manifestParentId
-            val parts = relativePath.replace('\\', '/').split('/').filter { it.isNotEmpty() && it != "." }
-            for (part in parts) {
-                if (part == "..") {
-                    val rootCheck = currentId.substringBefore(':', "")
-                    val parent = currentId.substringBeforeLast('/', "")
-                    currentId = if (parent.isEmpty() || parent == rootCheck) "$rootCheck:" else parent
-                    continue
-                }
-                val nextId = findChildDocumentId(context, treeUri, currentId, part) ?: return@runCatching null
-                currentId = nextId
-            }
-            val target = runCatching { DocumentsContract.buildDocumentUriUsingTree(treeUri, currentId) }
-                .getOrElse { DocumentsContract.buildDocumentUri(manifestUri.authority ?: "", currentId) }
-            val fd = runCatching { context.contentResolver.openFileDescriptor(target, "r") }.getOrNull()
-            if (fd != null) {
-                fd.close()
-                return@runCatching target.toString()
-            }
-            null
-        }.getOrNull()
+    private fun resolveLocalArcadeAsset(context: Context, manifestPath: String, relative: String): String? {
+        val manifestFile = if (manifestPath.startsWith("file:")) {
+            File(manifestPath.toUri().path ?: manifestPath)
+        } else {
+            File(manifestPath)
+        }
+        val baseDir = manifestFile.parentFile ?: File(manifestPath).parentFile
+        if (baseDir != null) {
+            val target = File(baseDir, relative).canonicalFile
+            if (target.isFile) return target.absolutePath
+        }
+
+        // The library can keep a plain path after the direct file grant disappears (for
+        // example when the game lives on a removable volume). Retry through a persisted SAF
+        // tree so SD-card and USB arcade sets stay launchable.
+        val fallbackUri = DocumentPathResolver.findAccessibleTreeUriForRawPath(context, manifestPath)
+            ?: return null
+        if (!DocumentsContract.isTreeUri(fallbackUri) && runCatching { DocumentsContract.getDocumentId(fallbackUri) }.isFailure) {
+            return null
+        }
+        return resolveContentArcadeAsset(context, fallbackUri, relative)
     }
 
-    private fun findChildDocumentId(context: Context, treeUri: android.net.Uri, parentId: String, displayName: String): String? {
-        val childrenUri = runCatching { DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId) }.getOrNull() ?: return null
+    private fun resolveContentArcadeAsset(context: Context, manifest: Uri, relative: String): String? {
+        val manifestId = runCatching { DocumentsContract.getDocumentId(manifest) }.getOrNull()
+            ?: runCatching { DocumentsContract.getTreeDocumentId(manifest) }.getOrNull()
+            ?: return null
+        val authority = manifest.authority ?: return null
+        val treeUri = findTreeUriForManifest(context, manifest, manifestId)
+
+        // Fast path: external storage and most file-manager providers expose hierarchical
+        // document IDs, so the asset ID can be derived without listing directories.
+        ArcadeDocumentIds.parentDocumentId(manifestId)?.let { parentId ->
+            resolveArcadeAssetFromParent(context, treeUri, authority, parentId, relative)
+                ?.let { return it }
+        }
+
+        // Robust path: providers with opaque document IDs (or a missing persisted grant)
+        // only expose the tree itself, so walk from the granted root to the manifest parent
+        // and then follow the relative asset path from there.
+        if (treeUri != null) {
+            locateManifestParentDocumentId(context, treeUri, manifest, manifestId)?.let { parentId ->
+                resolveArcadeAssetFromParent(context, treeUri, authority, parentId, relative)
+                    ?.let { return it }
+            }
+        }
+        for (permission in context.contentResolver.persistedUriPermissions) {
+            if (!permission.isReadPermission || permission.uri.authority != authority) continue
+            val permissionUri = permission.uri
+            if (!DocumentsContract.isTreeUri(permissionUri)) continue
+            locateManifestParentDocumentId(context, permissionUri, manifest, manifestId)?.let { parentId ->
+                resolveArcadeAssetFromParent(context, permissionUri, authority, parentId, relative)
+                    ?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun findTreeUriForManifest(context: Context, manifest: Uri, manifestId: String): Uri? {
+        // A document URI created by DocumentFile already embeds the picker tree, which keeps
+        // every generated child URI inside the granted prefix.
+        if (DocumentsContract.isTreeUri(manifest)) return manifest
+        val authority = manifest.authority ?: return null
+
+        val persistedTree = context.contentResolver.persistedUriPermissions
+            .asSequence()
+            .filter { it.isReadPermission && it.uri.authority == authority && DocumentsContract.isTreeUri(it.uri) }
+            .filter { permission ->
+                val rootId = runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrNull()
+                    ?: return@filter false
+                manifestId == rootId ||
+                    manifestId.startsWith(if (rootId.endsWith(':')) rootId else "$rootId/")
+            }
+            .maxByOrNull { permission ->
+                runCatching { DocumentsContract.getTreeDocumentId(permission.uri) }.getOrDefault("").length
+            }
+            ?.uri
+        if (persistedTree != null) return persistedTree
+
+        // Without a persisted grant, root the tree at the manifest parent. Its encoded
+        // document ID still carries the prefix of the original picker grant.
+        val parentId = ArcadeDocumentIds.parentDocumentId(manifestId) ?: return null
+        return runCatching { DocumentsContract.buildTreeDocumentUri(authority, parentId) }.getOrNull()
+    }
+
+    private fun resolveArcadeAssetFromParent(
+        context: Context,
+        treeUri: Uri?,
+        authority: String,
+        parentId: String,
+        relative: String
+    ): String? {
+        val parts = relative.split('/').filter { it.isNotEmpty() && it != "." }
+        if (parts.isEmpty()) return null
+        val floorId = treeUri?.let { uri ->
+            runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull()
+        }
+
+        var currentId: String? = parentId
+        for (part in parts) {
+            currentId = when (part) {
+                ".." -> currentId?.let { ArcadeDocumentIds.ascendDocumentId(it, floorId) }
+                else -> currentId?.let { ArcadeDocumentIds.appendDocumentId(it, part) }
+            } ?: break
+        }
+        currentId?.let { candidate ->
+            buildAssetDocumentUri(treeUri, authority, candidate)?.let { uri ->
+                if (isReadableDocument(context, uri)) return uri.toString()
+            }
+        }
+
+        currentId = parentId
+        for (part in parts) {
+            currentId = when (part) {
+                ".." -> currentId?.let { ArcadeDocumentIds.ascendDocumentId(it, floorId) }
+                else -> currentId?.let { findChildDocumentId(context, treeUri, authority, it, part) }
+            } ?: return null
+        }
+        val uri = buildAssetDocumentUri(treeUri, authority, currentId) ?: return null
+        return if (isReadableDocument(context, uri)) uri.toString() else null
+    }
+
+    private fun buildAssetDocumentUri(treeUri: Uri?, authority: String, documentId: String): Uri? {
+        if (treeUri != null && DocumentsContract.isTreeUri(treeUri)) {
+            runCatching { DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId) }
+                .getOrNull()
+                ?.let { return it }
+        }
+        return runCatching { DocumentsContract.buildDocumentUri(authority, documentId) }.getOrNull()
+    }
+
+    private fun isReadableDocument(context: Context, uri: Uri): Boolean =
+        runCatching {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false
+        }.getOrDefault(false)
+
+    private fun findChildDocumentId(
+        context: Context,
+        treeUri: Uri?,
+        authority: String,
+        parentId: String,
+        displayName: String
+    ): String? {
+        val childrenUri = when {
+            treeUri != null && DocumentsContract.isTreeUri(treeUri) ->
+                runCatching { DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId) }.getOrNull()
+            else ->
+                runCatching { DocumentsContract.buildChildDocumentsUri(authority, parentId) }.getOrNull()
+        } ?: return null
         val cursor = runCatching {
-            context.contentResolver.query(childrenUri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+            context.contentResolver.query(
+                childrenUri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                ),
+                null,
+                null,
+                null
+            )
         }.getOrNull() ?: return null
-        cursor.use {
-            while (it.moveToNext()) {
-                val name = it.getString(1) ?: continue
+        cursor.use { rows ->
+            while (rows.moveToNext()) {
+                val name = rows.getString(1) ?: continue
                 if (name.equals(displayName, ignoreCase = true)) {
-                    return it.getString(0)
+                    return rows.getString(0)
+                }
+            }
+        }
+        return null
+    }
+
+    private fun locateManifestParentDocumentId(
+        context: Context,
+        treeUri: Uri,
+        manifestUri: Uri,
+        manifestId: String
+    ): String? {
+        if (!DocumentsContract.isTreeUri(treeUri)) return null
+        val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return null
+        val visited = HashSet<String>()
+        val queue = ArrayDeque<Pair<String, Int>>()
+        queue.add(rootId to 0)
+        var visitedEntries = 0
+        while (queue.isNotEmpty()) {
+            val (directoryId, depth) = queue.removeFirst()
+            if (!visited.add(directoryId) || depth > MAX_TREE_SEARCH_DEPTH) continue
+            val childrenUri = runCatching {
+                DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, directoryId)
+            }.getOrNull() ?: continue
+            val cursor = runCatching {
+                context.contentResolver.query(
+                    childrenUri,
+                    arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE
+                    ),
+                    null,
+                    null,
+                    null
+                )
+            }.getOrNull() ?: continue
+            cursor.use { rows ->
+                while (rows.moveToNext()) {
+                    if (++visitedEntries > MAX_TREE_SEARCH_ENTRIES) return null
+                    val childId = rows.getString(0) ?: continue
+                    if (childId == manifestId) return directoryId
+                    val childUri = runCatching {
+                        DocumentsContract.buildDocumentUriUsingTree(treeUri, childId)
+                    }.getOrNull()
+                    if (childUri == manifestUri) return directoryId
+                    if (rows.getString(1) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        queue.add(childId to depth + 1)
+                    }
                 }
             }
         }
@@ -250,6 +362,8 @@ object NativeApp {
     @JvmStatic external fun onNativeSurfaceChanged(surface: Surface, width: Int, height: Int, refreshRate: Float)
     @JvmStatic external fun onNativeSurfaceDestroyed()
     @JvmStatic external fun runVMThread(path: String): Boolean
+    /** Reason for the most recent native VM start failure, or null when none was recorded. */
+    @JvmStatic external fun getLastBootError(): String?
     /** Hot-swaps the mounted image on the CPU thread and leaves the VM paused for the caller to resume. */
     @JvmStatic external fun changeDisc(path: String): Boolean
     @JvmStatic external fun runBootSmokeProbe(path: String, steps: Int): Int

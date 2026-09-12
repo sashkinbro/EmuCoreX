@@ -2090,6 +2090,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 false
             }
             Log.i(TAG, "EmulatorBridge.startEmulation returned $started path=$pathToLaunch")
+            val nativeBootError = if (started) {
+                null
+            } else {
+                runCatching { NativeApp.getLastBootError() }.getOrNull()?.takeIf { it.isNotBlank() }
+            }
+            if (nativeBootError != null) {
+                Log.e(TAG, "Native VM start failed: $nativeBootError")
+                NativeApp.setCrashContextString("emu_launch_error", nativeBootError)
+            }
             val analyticsState = _uiState.value
             if (started) {
                 AppAnalytics.logEmulationStarted(
@@ -2126,7 +2135,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 _uiState.value = _uiState.value.copy(
                     isRunning = false,
                     statusMessage = null,
-                    toastMessage = "launch_failed"
+                    toastMessage = nativeBootError?.let { "launch_error:$it" } ?: "launch_failed"
                 )
                 delay(2500.milliseconds)
                 _uiState.value = _uiState.value.copy(toastMessage = null)

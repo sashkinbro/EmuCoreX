@@ -47,6 +47,9 @@ std::vector<u8> s_imgui_standard_font_data;
 std::vector<u8> s_imgui_emoji_font_data;
 bool s_cpu_runtime_initialized = false;
 
+std::mutex s_last_boot_error_mutex;
+std::string s_last_boot_error;
+
 void SetStringSetting(SettingsInterface& si, const std::string& compound_key, const std::string& value)
 {
 	const std::size_t split = compound_key.find('\n');
@@ -516,10 +519,12 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	ClearPendingHostCpuTasks();
 	InstallHostSettings(config);
 	RecordVmLaunchForCrashDiagnostics(config.path, config.boot_elf, config.probe_steps);
+	SetLastBootError({});
 
 	if (!s_cpu_runtime_initialized && !VMManager::Internal::CPUThreadInitialize())
 	{
 		ClearPendingHostCpuTasks();
+		SetLastBootError("VM CPU thread initialization failed.");
 		__android_log_write(ANDROID_LOG_ERROR, LOG_TAG, "VM CPU thread initialization failed");
 		if (startup_callback)
 			startup_callback(startup_userdata, false);
@@ -537,6 +542,7 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	{
 		PerformanceMetrics::SetCPUThread(Threading::ThreadHandle());
 		PerformanceMetrics::SetGSSWThreadCount(0);
+		SetLastBootError(error.GetDescription());
 		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "VMManager::Initialize failed: %s", error.GetDescription().c_str());
 		ClearPendingHostCpuTasks();
 		if (startup_callback)
@@ -579,5 +585,17 @@ void ApplyRuntimeSettingsToUpstream(const VmLaunchConfig& config)
 {
 	InstallHostSettings(config);
 	VMManager::ApplySettings();
+}
+
+void SetLastBootError(const std::string& message)
+{
+	std::lock_guard lock(s_last_boot_error_mutex);
+	s_last_boot_error = message;
+}
+
+std::string GetLastBootError()
+{
+	std::lock_guard lock(s_last_boot_error_mutex);
+	return s_last_boot_error;
 }
 }
