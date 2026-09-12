@@ -517,9 +517,8 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_memory_budget = SupportsExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_calibrated_timestamps =
 		SupportsExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, false);
-	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
-		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false) ||
-		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
+	// Keep Vulkan feedback on the explicit-barrier path.
+	m_optional_extensions.vk_ext_rasterization_order_attachment_access = false;
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
 #if !defined(__ANDROID__)
@@ -3209,9 +3208,9 @@ bool GSDeviceVK::CheckFeatures()
 		!unreliable_mobile_fbfetch && !GSConfig.DisableFramebufferFetch;
 	if (unreliable_mobile_fbfetch && has_framebuffer_fetch_extension)
 	{
-		Console.Warning("VK: Disabled unreliable mobile framebuffer fetch; using texture-barrier feedback.");
+		Console.Warning("VK: Disabled unreliable mobile framebuffer fetch.");
 	}
-	bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
+	const bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
@@ -3219,6 +3218,8 @@ bool GSDeviceVK::CheckFeatures()
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
 	m_features.texture_barrier = texture_barrier;
+	// Offset sampler reads also need a bounded source snapshot on the copy path.
+	m_features.texture_feedback_requires_copy = !texture_barrier;
 	m_features.dual_source_blend = m_device_features.dualSrcBlend;
 	// The r13p0-class Mali-G57 driver can expose alternating top/bottom FastMAD banks
 	// instead of the reconstructed frame. Keep the workaround model-specific and leave
@@ -3240,7 +3241,7 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
 
 	if (!m_features.texture_barrier)
-		Console.Warning("VK: Texture buffers are disabled. This may break some graphical effects.");
+		Console.WriteLn("VK: Using render-target snapshots for framebuffer feedback.");
 
 	// Keep the high-precision D32S8 path on every GPU which supports it. D24S8 is a
 	// capability fallback only; forcing it by GPU family can introduce visible
@@ -7346,9 +7347,8 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	}
 	else
 	{
-		// Drop the old feedback binding when the next draw no longer reads the render target.
-		// Keeping it around leaves a stale descriptor layout across feedback transitions.
-		PSSetShaderResource(TFX_TEXTURE_RT, nullptr, false);
+		// Preserve this draw's snapshot; only unused feedback bindings should be cleared.
+		PSSetShaderResource(TFX_TEXTURE_RT, config.require_one_barrier ? draw_rt_clone : nullptr, false);
 	}
 	if (pipe.IsDepthFeedbackLoop())
 	{
