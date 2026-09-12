@@ -7692,6 +7692,7 @@ __ri void GSRendererHW::HandleTextureHazards(const GSTextureCache::Target* rt, c
 
 				unscaled_size = src_target->GetUnscaledSize();
 				scale = src_target->GetScale();
+				HandleBarrierHazard(false);
 				return;
 			}
 			else

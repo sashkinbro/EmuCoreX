@@ -3000,7 +3000,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 		if (dst->m_scale != scale && (!preserve_scale || (type == RenderTarget && (is_shuffle || !dst->m_downscaled || TEX0.TBW != dst->m_TEX0.TBW))))
 		{
 			calcRescale(dst);
-			GSTexture* tex = type == RenderTarget ? g_gs_device->CreateRenderTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
+			GSTexture* tex = type == RenderTarget ? g_gs_device->CreateFeedbackTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
 			                                        g_gs_device->CreateDepthStencil(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::DepthStencil, clear);
 			if (!tex)
 				return nullptr;
@@ -3116,7 +3116,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 						dst->ResizeTexture(new_size.x, new_size.y, true, true, GSVector4i(dRect), true);
 					else
 					{
-						GSTexture* tex = type == RenderTarget ? g_gs_device->CreateRenderTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
+						GSTexture* tex = type == RenderTarget ? g_gs_device->CreateFeedbackTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
 						                                        g_gs_device->CreateDepthStencil(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::DepthStencil, clear);
 						if (!tex)
 							return nullptr;
@@ -3136,7 +3136,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 						dst->ResizeTexture(new_size.x, new_size.y, true, true, GSVector4i(dRect));
 					else
 					{
-						GSTexture* tex = type == RenderTarget ? g_gs_device->CreateRenderTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
+						GSTexture* tex = type == RenderTarget ? g_gs_device->CreateFeedbackTarget(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::Color, clear) :
 						                                        g_gs_device->CreateDepthStencil(new_scaled_size.x, new_scaled_size.y, GSTexture::Format::DepthStencil, clear);
 						if (!tex)
 							return nullptr;
@@ -3246,7 +3246,7 @@ GSTextureCache::Target* GSTextureCache::LookupTarget(GIFRegTEX0 TEX0, const GSVe
 				// Unfortunately, we still have an alpha channel to preserve, and we can't clear RGB...
 				// So, create a new target, clear/preload it, and copy RGB in.
 				GSTexture* tex = (type == RenderTarget) ?
-				                     g_gs_device->CreateRenderTarget(dst->m_texture->GetWidth(), dst->m_texture->GetHeight(), GSTexture::Format::Color, true) :
+				                     g_gs_device->CreateFeedbackTarget(dst->m_texture->GetWidth(), dst->m_texture->GetHeight(), GSTexture::Format::Color, true) :
 				                     g_gs_device->CreateDepthStencil(dst->m_texture->GetWidth(), dst->m_texture->GetHeight(), GSTexture::Format::DepthStencil, true);
 				if (!tex)
 					return nullptr;

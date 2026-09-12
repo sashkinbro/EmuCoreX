@@ -22,6 +22,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 class VKSwapChain;
@@ -245,6 +246,46 @@ private:
 		Ready,
 	};
 
+	enum TFX_TEXTURES : u32
+	{
+		TFX_TEXTURE_TEXTURE = 0,
+		TFX_TEXTURE_PALETTE,
+		TFX_TEXTURE_RT,
+		TFX_TEXTURE_PRIMID,
+		TFX_TEXTURE_DEPTH,
+		TFX_TEXTURE_RT_ROV,
+		TFX_TEXTURE_DEPTH_ROV,
+
+		NUM_TFX_TEXTURES
+	};
+
+	struct TextureDescriptorKey
+	{
+		VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+		VkSampler sampler = VK_NULL_HANDLE;
+		std::array<VkImageView, NUM_TFX_TEXTURES> views{};
+		std::array<VkImageLayout, NUM_TFX_TEXTURES> layouts{};
+
+		bool operator==(const TextureDescriptorKey& other) const
+		{
+			return layout == other.layout && sampler == other.sampler &&
+				views == other.views && layouts == other.layouts;
+		}
+	};
+	struct TextureDescriptorKeyHash
+	{
+		std::size_t operator()(const TextureDescriptorKey& key) const noexcept
+		{
+			std::size_t hash = 0;
+			HashCombine(hash, key.layout, key.sampler);
+			for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+				HashCombine(hash, key.views[i], static_cast<u32>(key.layouts[i]));
+			return hash;
+		}
+	};
+
+	VkDescriptorPool CreateFrameDescriptorPool();
+
 	struct FrameResources
 	{
 		// [0] - Init (upload) command buffer, [1] - draw command buffer
@@ -259,6 +300,9 @@ private:
 		bool timestamp_written = false;
 		QueryState pipeline_statistics_query = QueryState::None;
 		VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
+		std::vector<VkDescriptorPool> extra_descriptor_pools;
+		u32 active_descriptor_pool = 0;
+		std::unordered_map<TextureDescriptorKey, VkDescriptorSet, TextureDescriptorKeyHash> texture_descriptor_cache;
 
 		std::vector<std::function<void()>> cleanup_resources;
 	};
@@ -428,18 +472,7 @@ public:
 
 		NUM_TFX_DESCRIPTOR_SETS,
 	};
-	enum TFX_TEXTURES : u32
-	{
-		TFX_TEXTURE_TEXTURE = 0,
-		TFX_TEXTURE_PALETTE,
-		TFX_TEXTURE_RT,
-		TFX_TEXTURE_PRIMID,
-		TFX_TEXTURE_DEPTH,
-		TFX_TEXTURE_RT_ROV,
-		TFX_TEXTURE_DEPTH_ROV,
 
-		NUM_TFX_TEXTURES
-	};
 
 private:
 	std::unique_ptr<VKSwapChain> m_swap_chain;

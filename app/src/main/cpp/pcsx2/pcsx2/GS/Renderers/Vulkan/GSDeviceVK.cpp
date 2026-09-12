@@ -1010,6 +1010,9 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	vkGetPhysicalDeviceProperties2(m_physical_device, &properties2);
 
 	m_use_push_descriptors = m_optional_extensions.vk_khr_push_descriptor;
+#if defined(__ANDROID__)
+	m_use_push_descriptors = false;
+#endif
 	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
 	{
 		Console.Warning("VK: maxPushDescriptors (%u) below required (%u) - using descriptor-set fallback.",
@@ -1206,22 +1209,9 @@ bool GSDeviceVK::CreateCommandBuffers()
 
 		if (!m_use_push_descriptors)
 		{
-			static constexpr u32 MAX_FRAME_TEXTURE_SETS = 8192;
-			static constexpr u32 MAX_FRAME_DESCRIPTOR_SETS = MAX_FRAME_TEXTURE_SETS * 2;
-			const VkDescriptorPoolSize frame_pool_sizes[] = {
-				{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAME_TEXTURE_SETS * 2},
-				{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_FRAME_TEXTURE_SETS * 4},
-				{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_FRAME_TEXTURE_SETS * 2},
-				{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_FRAME_TEXTURE_SETS * 2},
-			};
-			const VkDescriptorPoolCreateInfo frame_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-				nullptr, 0, MAX_FRAME_DESCRIPTOR_SETS, static_cast<u32>(std::size(frame_pool_sizes)), frame_pool_sizes};
-			res = vkCreateDescriptorPool(m_device, &frame_pool_info, nullptr, &resources.descriptor_pool);
-			if (res != VK_SUCCESS)
-			{
-				LOG_VULKAN_ERROR(res, "vkCreateDescriptorPool (frame) failed: ");
+			resources.descriptor_pool = CreateFrameDescriptorPool();
+			if (resources.descriptor_pool == VK_NULL_HANDLE)
 				return false;
-			}
 			Vulkan::SetObjectName(m_device, resources.descriptor_pool, "Frame Texture Descriptor Pool %u", frame_index);
 		}
 
@@ -1384,21 +1374,52 @@ void GSDeviceVK::FreePersistentDescriptorSet(VkDescriptorSet set)
 	vkFreeDescriptorSets(m_device, m_global_descriptor_pool, 1, &set);
 }
 
+VkDescriptorPool GSDeviceVK::CreateFrameDescriptorPool()
+{
+	static constexpr u32 MAX_FRAME_TEXTURE_SETS = 8192;
+	static constexpr u32 MAX_FRAME_DESCRIPTOR_SETS = MAX_FRAME_TEXTURE_SETS * 2;
+	const VkDescriptorPoolSize frame_pool_sizes[] = {
+		{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAME_TEXTURE_SETS * 2},
+		{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, MAX_FRAME_TEXTURE_SETS * 4},
+		{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, MAX_FRAME_TEXTURE_SETS * 2},
+		{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_FRAME_TEXTURE_SETS * 2},
+	};
+	const VkDescriptorPoolCreateInfo frame_pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+		nullptr, 0, MAX_FRAME_DESCRIPTOR_SETS, static_cast<u32>(std::size(frame_pool_sizes)), frame_pool_sizes};
+	VkDescriptorPool pool = VK_NULL_HANDLE;
+	const VkResult res = vkCreateDescriptorPool(m_device, &frame_pool_info, nullptr, &pool);
+	if (res != VK_SUCCESS)
+		LOG_VULKAN_ERROR(res, "vkCreateDescriptorPool (frame) failed: ");
+	return pool;
+}
+
 VkDescriptorSet GSDeviceVK::AllocateFrameDescriptorSet(VkDescriptorSetLayout set_layout)
 {
-	const VkDescriptorPool pool = m_frame_resources[m_current_frame].descriptor_pool;
-	const VkDescriptorSetAllocateInfo allocate_info = {
-		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, nullptr, pool, 1, &set_layout};
-
-	VkDescriptorSet descriptor_set;
-	VkResult res = vkAllocateDescriptorSets(m_device, &allocate_info, &descriptor_set);
-	if (res != VK_SUCCESS)
+	auto& resources = m_frame_resources[m_current_frame];
+	for (;;)
 	{
-		LOG_VULKAN_ERROR(res, "vkAllocateDescriptorSets (frame) failed: ");
-		return VK_NULL_HANDLE;
+		const VkDescriptorPool pool = resources.active_descriptor_pool == 0 ? resources.descriptor_pool :
+			resources.extra_descriptor_pools[resources.active_descriptor_pool - 1];
+		const VkDescriptorSetAllocateInfo allocate_info = {
+			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, nullptr, pool, 1, &set_layout};
+		VkDescriptorSet descriptor_set;
+		const VkResult res = vkAllocateDescriptorSets(m_device, &allocate_info, &descriptor_set);
+		if (res == VK_SUCCESS)
+			return descriptor_set;
+		if (res != VK_ERROR_OUT_OF_POOL_MEMORY && res != VK_ERROR_FRAGMENTED_POOL)
+		{
+			LOG_VULKAN_ERROR(res, "vkAllocateDescriptorSets (frame) failed: ");
+			return VK_NULL_HANDLE;
+		}
+		if (resources.active_descriptor_pool == resources.extra_descriptor_pools.size())
+		{
+			const VkDescriptorPool extra_pool = CreateFrameDescriptorPool();
+			if (extra_pool == VK_NULL_HANDLE)
+				return VK_NULL_HANDLE;
+			resources.extra_descriptor_pools.push_back(extra_pool);
+		}
+		++resources.active_descriptor_pool;
 	}
-
-	return descriptor_set;
 }
 
 void GSDeviceVK::WaitForFenceCounter(u64 fence_counter)
@@ -1758,6 +1779,14 @@ void GSDeviceVK::ActivateCommandBuffer(u32 index)
 
 	if (resources.descriptor_pool != VK_NULL_HANDLE)
 	{
+		resources.texture_descriptor_cache.clear();
+		resources.active_descriptor_pool = 0;
+		for (VkDescriptorPool pool : resources.extra_descriptor_pools)
+		{
+			res = vkResetDescriptorPool(m_device, pool, 0);
+			if (res != VK_SUCCESS)
+				LOG_VULKAN_ERROR(res, "vkResetDescriptorPool failed: ");
+		}
 		res = vkResetDescriptorPool(m_device, resources.descriptor_pool, 0);
 		if (res != VK_SUCCESS)
 			LOG_VULKAN_ERROR(res, "vkResetDescriptorPool failed: ");
@@ -5736,6 +5765,8 @@ void GSDeviceVK::DestroyResources()
 			vkDestroyCommandPool(m_device, resources.command_pool, nullptr);
 		if (resources.descriptor_pool != VK_NULL_HANDLE)
 			vkDestroyDescriptorPool(m_device, resources.descriptor_pool, nullptr);
+		for (VkDescriptorPool pool : resources.extra_descriptor_pools)
+			vkDestroyDescriptorPool(m_device, pool, nullptr);
 	}
 
 	if (m_timestamp_query_pool != VK_NULL_HANDLE)
@@ -6860,11 +6891,29 @@ bool GSDeviceVK::ApplyTFXState(bool already_execed)
 		}
 		else
 		{
-			const VkDescriptorSet ds = AllocateFrameDescriptorSet(m_tfx_texture_ds_layout);
-			if (ds == VK_NULL_HANDLE)
-				return false;
-
-			dsub.UpdateToDescriptorSet(m_device, ds, true);
+			TextureDescriptorKey key;
+			key.layout = m_tfx_texture_ds_layout;
+			key.sampler = m_tfx_sampler;
+			for (u32 i = 0; i < NUM_TFX_TEXTURES; i++)
+			{
+				key.views[i] = m_tfx_textures[i]->GetView();
+				key.layouts[i] = (UsesInputAttachmentFeedbackPath() &&
+					(i == TFX_TEXTURE_RT || i == TFX_TEXTURE_DEPTH)) ?
+					VK_IMAGE_LAYOUT_GENERAL : m_tfx_textures[i]->GetVkLayout();
+			}
+			auto& cache = m_frame_resources[m_current_frame].texture_descriptor_cache;
+			const auto it = cache.find(key);
+			VkDescriptorSet ds;
+			if (it != cache.end())
+				ds = it->second;
+			else
+			{
+				ds = AllocateFrameDescriptorSet(m_tfx_texture_ds_layout);
+				if (ds == VK_NULL_HANDLE)
+					return false;
+				dsub.UpdateToDescriptorSet(m_device, ds, true);
+				cache.emplace(key, ds);
+			}
 			vkCmdBindDescriptorSets(cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_tfx_pipeline_layout,
 				TFX_DESCRIPTOR_SET_TEXTURES, 1, &ds, 0, nullptr);
 		}
@@ -6896,11 +6945,24 @@ bool GSDeviceVK::ApplyUtilityState(bool already_execed)
 		}
 		else
 		{
-			const VkDescriptorSet ds = AllocateFrameDescriptorSet(m_utility_ds_layout);
-			if (ds == VK_NULL_HANDLE)
-				return false;
-
-			dsub.UpdateToDescriptorSet(m_device, ds, true);
+			TextureDescriptorKey key;
+			key.layout = m_utility_ds_layout;
+			key.sampler = m_utility_sampler;
+			key.views[0] = m_utility_texture->GetView();
+			key.layouts[0] = m_utility_texture->GetVkLayout();
+			auto& cache = m_frame_resources[m_current_frame].texture_descriptor_cache;
+			const auto it = cache.find(key);
+			VkDescriptorSet ds;
+			if (it != cache.end())
+				ds = it->second;
+			else
+			{
+				ds = AllocateFrameDescriptorSet(m_utility_ds_layout);
+				if (ds == VK_NULL_HANDLE)
+					return false;
+				dsub.UpdateToDescriptorSet(m_device, ds, true);
+				cache.emplace(key, ds);
+			}
 			vkCmdBindDescriptorSets(
 				cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_utility_pipeline_layout, 0, 1, &ds, 0, nullptr);
 		}
