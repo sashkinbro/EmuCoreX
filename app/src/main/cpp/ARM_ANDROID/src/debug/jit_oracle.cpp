@@ -240,7 +240,7 @@ struct Snapshot
     bool gifOverflowed;
 };
 
-Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr, const u32* initialVF = nullptr, const u32* initialACC = nullptr)
+Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64 familyMask = 0, u32 budget = 128, bool resumeState = false, const std::vector<u8>* initialMemory = nullptr, const u32* initialVF = nullptr, const u32* initialACC = nullptr, const u32* initialVI = nullptr)
 {
     // The generated dispatcher may elide an FPCR write when VU and EE
     // configurations match. Reproduce its EE caller, not the shell FPCR.
@@ -261,6 +261,9 @@ Snapshot RunVU(u32 index, bool jit, const std::vector<u32>& program, u32 pc, u64
         for (u32 r = 1; r < 16; ++r)
             vu.VI[r].UL = r;
     }
+    if (initialVI)
+        for (u32 r = 1; r < 16; ++r)
+            vu.VI[r].UL = initialVI[r];
     if (initialVF)
         std::memcpy(vu.VF, initialVF, sizeof(vu.VF));
     if (initialACC)
@@ -458,6 +461,29 @@ void VUTests()
         RunVU(1, true, flaggedKick, 0x80, 0, 128, false, &packetMemory), "VU1 STATUS survives XGKICK host call");
     for (u32 vu = 0; vu < 2; ++vu)
     {
+        for (u32 value : {0u, 1u, 0x7fffu, 0x8000u, 0x8001u, 0xfffeu, 0xffffu})
+        {
+            for (u32 other : {0u, value})
+            {
+                for (u32 op : {0x28u, 0x29u, 0x2cu, 0x2du, 0x2eu, 0x2fu})
+                {
+                    std::array<u32, 16> vi{};
+                    vi[1] = value;
+                    vi[2] = other;
+                    const std::vector<u32> program = {
+                        (op << 25) | (1u << 11) | (2u << 16) | 3u, NOP_U,
+                        NOP_L, (15u << 21) | (2u << 16) | (1u << 11) | (3u << 6) | 0x2cu,
+                        (8u << 25) | (3u << 16) | 17u, NOP_U | 0x40000000u,
+                        NOP_L, NOP_U,
+                        (8u << 25) | (3u << 16) | 23u, NOP_U | 0x40000000u,
+                        NOP_L, NOP_U};
+                    char name[100];
+                    std::snprintf(name, sizeof(name), "VU%u signed branch op=%x value=%04x other=%04x", vu, op, value, other);
+                    Compare(RunVU(vu, false, program, 0x80, 0, 128, false, nullptr, nullptr, nullptr, vi.data()),
+                        RunVU(vu, true, program, 0x80, 0, 128, false, nullptr, nullptr, nullptr, vi.data()), name);
+                }
+            }
+        }
         for (u32 padding = 0; padding <= 8; ++padding)
         {
             std::vector<u32> branchFlags = {NOP_L,

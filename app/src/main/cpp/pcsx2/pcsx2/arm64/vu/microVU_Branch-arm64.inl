@@ -169,9 +169,21 @@ static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV)
 	recBeginOaknutEmit();
 	const OakMemOperand branch_mem =
 		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].branch)));
-	oakAsm->MOV(OAK_XSCRATCH2, static_cast<u64>(branch_mem.offset));
-	oakAsm->ADD(OAK_XSCRATCH2, branch_mem.base, OAK_XSCRATCH2);
-	oakAsm->LDRSH(OAK_XSCRATCH, OAK_XSCRATCH2);
+	if (branch_mem.offset >= 0 && branch_mem.offset < 8192 && (branch_mem.offset & 1) == 0)
+	{
+		oakAsm->LDRSH(OAK_XSCRATCH, branch_mem.base, oak::POffset<13, 1>(branch_mem.offset));
+	}
+	else if (branch_mem.offset >= 0 && branch_mem.offset < 0x1000000 && (branch_mem.offset & 1) == 0)
+	{
+		oakAsm->ADD(OAK_XSCRATCH2, branch_mem.base, static_cast<u64>(branch_mem.offset & ~0xfffLL));
+		oakAsm->LDRSH(OAK_XSCRATCH, OAK_XSCRATCH2, oak::POffset<13, 1>(branch_mem.offset & 0xfff));
+	}
+	else
+	{
+		oakAsm->MOV(OAK_XSCRATCH2, static_cast<u64>(branch_mem.offset));
+		oakAsm->ADD(OAK_XSCRATCH2, branch_mem.base, OAK_XSCRATCH2);
+		oakAsm->LDRSH(OAK_XSCRATCH, OAK_XSCRATCH2);
+	}
 	oakAsm->CMP(OAK_XSCRATCH, 0);
 	recEndOaknutEmit();
 }
