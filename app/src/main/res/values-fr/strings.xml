@@ -434,6 +434,9 @@
     <string name="emulation_cheats_title">Codes de triche</string>
     <string name="emulation_cheats_open_button">Codes de triche</string>
     <string name="emulation_cheats_empty">Aucun code de triche n\'a été trouvé pour ce jeu.</string>
+    <string name="emulation_cheats_enable_all">Tout activer</string>
+    <string name="emulation_cheats_disable_all">Tout désactiver</string>
+    <string name="emulation_cheats_empty_hint">Téléchargez les cheats de ce jeu dans le gestionnaire de cheats, puis activez-les ici.</string>
     <string name="settings_bilinear_filtering_nearest">Le plus proche</string>
     <string name="settings_bilinear_filtering_forced">Bilinéaire forcé</string>
     <string name="settings_bilinear_filtering_ps2">Bilinéaire PS2</string>

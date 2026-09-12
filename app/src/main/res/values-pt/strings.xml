@@ -434,6 +434,9 @@
     <string name="emulation_cheats_title">Cheats</string>
     <string name="emulation_cheats_open_button">Cheats</string>
     <string name="emulation_cheats_empty">Nenhum cheat foi encontrado para este jogo.</string>
+    <string name="emulation_cheats_enable_all">Ativar tudo</string>
+    <string name="emulation_cheats_disable_all">Desativar tudo</string>
+    <string name="emulation_cheats_empty_hint">Baixe os cheats deste jogo no gerenciador de cheats e ative-os aqui.</string>
     <string name="settings_bilinear_filtering_nearest">Mais próximo (Nearest)</string>
     <string name="settings_bilinear_filtering_forced">Bilinear Forçado</string>
     <string name="settings_bilinear_filtering_ps2">Bilinear PS2</string>

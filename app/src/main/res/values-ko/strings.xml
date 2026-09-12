@@ -719,6 +719,9 @@
     <string name="emulation_cheats_title">치트</string>
     <string name="emulation_cheats_open_button">치트</string>
     <string name="emulation_cheats_empty">이 게임에 대한 치트를 찾을 수 없습니다.</string>
+    <string name="emulation_cheats_enable_all">모두 활성화</string>
+    <string name="emulation_cheats_disable_all">모두 비활성화</string>
+    <string name="emulation_cheats_empty_hint">이 게임의 치트를 치트 관리자에서 다운로드한 뒤 여기에서 활성화하세요.</string>
     <string name="settings_bilinear_filtering_nearest">가장 가까운 (Nearest)</string>
     <string name="settings_bilinear_filtering_forced">이중 강제 (Bilinear Forced)</string>
     <string name="settings_bilinear_filtering_ps2">이중 PS2 (Bilinear PS2)</string>

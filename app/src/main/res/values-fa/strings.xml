@@ -1026,6 +1026,9 @@
     <string name="emulation_cheats_title">کدهای تقلب</string>
     <string name="emulation_cheats_open_button">کدهای تقلب</string>
     <string name="emulation_cheats_empty">هیچ کد تقلبی برای این بازی پیدا نشد.</string>
+    <string name="emulation_cheats_enable_all">فعال‌سازی همه</string>
+    <string name="emulation_cheats_disable_all">غیرفعال‌سازی همه</string>
+    <string name="emulation_cheats_empty_hint">برای این بازی از مدیر تقلب، تقلب‌ها را دانلود کنید و سپس اینجا فعالشان کنید.</string>
     <string name="settings_bilinear_filtering_nearest">نزدیک‌ترین</string>
     <string name="settings_bilinear_filtering_forced">دوخطی اجباری</string>
     <string name="settings_bilinear_filtering_ps2">دوخطی PS2</string>

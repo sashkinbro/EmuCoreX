@@ -719,6 +719,9 @@
     <string name="emulation_cheats_title">الشفرات</string>
     <string name="emulation_cheats_open_button">الشفرات</string>
     <string name="emulation_cheats_empty">لم يتم العثور على شفرات لهذه اللعبة.</string>
+    <string name="emulation_cheats_enable_all">تفعيل الكل</string>
+    <string name="emulation_cheats_disable_all">تعطيل الكل</string>
+    <string name="emulation_cheats_empty_hint">نزّل الغش لهذه اللعبة من مدير الغش ثم فعّله هنا.</string>
     <string name="settings_bilinear_filtering_nearest">الأقرب (Nearest)</string>
     <string name="settings_bilinear_filtering_forced">ثنائي مفروض (Forced)</string>
     <string name="settings_bilinear_filtering_ps2">ثنائي PS2</string>

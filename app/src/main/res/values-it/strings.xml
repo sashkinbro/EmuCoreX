@@ -633,6 +633,9 @@
     <string name="emulation_cheats_title">Trucchi</string>
     <string name="emulation_cheats_open_button">Trucchi</string>
     <string name="emulation_cheats_empty">Nessun trucco trovato per questo gioco.</string>
+    <string name="emulation_cheats_enable_all">Attiva tutti</string>
+    <string name="emulation_cheats_disable_all">Disattiva tutti</string>
+    <string name="emulation_cheats_empty_hint">Scarica i trucchi per questo gioco nel gestore trucchi, poi attivali qui.</string>
     <string name="settings_bilinear_filtering_nearest">Nearest</string>
     <string name="settings_bilinear_filtering_forced">Bilineare Forzato</string>
     <string name="settings_bilinear_filtering_ps2">Bilineare PS2</string>

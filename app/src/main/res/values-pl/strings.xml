@@ -1088,6 +1088,9 @@
     <string name="emulation_cheats_title">Kody</string>
     <string name="emulation_cheats_open_button">Kody</string>
     <string name="emulation_cheats_empty">Nie znaleziono żadnych kodów dla tej gry.</string>
+    <string name="emulation_cheats_enable_all">Włącz wszystkie</string>
+    <string name="emulation_cheats_disable_all">Wyłącz wszystkie</string>
+    <string name="emulation_cheats_empty_hint">Pobierz kody dla tej gry w menedżerze kodów, a następnie włącz je tutaj.</string>
     <string name="settings_bilinear_filtering_nearest">Nearest (Najbliższe - ostre, kanciaste)</string>
     <string name="settings_bilinear_filtering_forced">Bilinearne wymuszone</string>
     <string name="settings_bilinear_filtering_ps2">Bilinearne z PS2 (standardowe)</string>

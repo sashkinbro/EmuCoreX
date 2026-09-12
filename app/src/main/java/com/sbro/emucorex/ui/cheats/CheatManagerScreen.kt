@@ -706,6 +706,9 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                                         cheatWriteMutex.withLock {
                                             cheatRepository.setEnabledBlocks(latest.gameKey, enabledIds)
                                         }
+                                        if (enabled) {
+                                            preferences.setEnableCheats(true)
+                                        }
                                     }
                                 },
                                 modifier = Modifier.animateItem(

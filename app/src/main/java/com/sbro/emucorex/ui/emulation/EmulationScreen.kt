@@ -1621,7 +1621,10 @@ fun EmulationScreen(
                     onSetThreadPinning = { viewModel.setThreadPinning(it) },
                     onSetFastCdvd = { viewModel.setFastCdvd(it) },
                     onSetEnableCheats = { viewModel.setEnableCheats(it) },
-                    onOpenCheats = { showCheatsDialog = true },
+                    onOpenCheats = {
+                        viewModel.refreshAvailableCheats()
+                        showCheatsDialog = true
+                    },
                     onSetHwDownloadMode = { viewModel.setHwDownloadMode(it) },
                     onSetEeCycleRate = { viewModel.setEeCycleRate(it) },
                     onSetEeCycleSkip = { viewModel.setEeCycleSkip(it) },
@@ -1827,27 +1830,59 @@ fun EmulationScreen(
             title = { Text(stringResource(R.string.emulation_cheats_title)) },
             text = {
                 if (uiState.availableCheats.isEmpty()) {
-                    Text(stringResource(R.string.emulation_cheats_empty))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.emulation_cheats_empty))
+                        Text(
+                            text = stringResource(R.string.emulation_cheats_empty_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 } else {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        uiState.availableCheats.forEach { cheat ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(
+                                onClick = { viewModel.setAllCheatsEnabled(true) },
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Text(
-                                    text = cheat.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Switch(
-                                    checked = cheat.enabled,
-                                    onCheckedChange = { viewModel.setCheatEnabled(cheat.id, it) }
-                                )
+                                Text(stringResource(R.string.emulation_cheats_enable_all))
+                            }
+                            TextButton(
+                                onClick = { viewModel.setAllCheatsEnabled(false) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.emulation_cheats_disable_all))
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 420.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            uiState.availableCheats.forEach { cheat ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = cheat.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Switch(
+                                        checked = cheat.enabled,
+                                        onCheckedChange = { viewModel.setCheatEnabled(cheat.id, it) }
+                                    )
+                                }
                             }
                         }
                     }
@@ -4183,15 +4218,13 @@ private fun EmulationSidebarMenu(
                             onResetToDefault = { onSetEnableCheats(globalDefaults.enableCheats) }
                         )
 
-                        if (uiState.availableCheats.isNotEmpty()) {
-                            MenuButton(
-                                icon = Icons.Rounded.Star,
-                                text = stringResource(R.string.emulation_cheats_open_button),
-                                onClick = onOpenCheats,
-                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                                enabled = true
-                            )
-                        }
+                        MenuButton(
+                            icon = Icons.Rounded.Star,
+                            text = stringResource(R.string.emulation_cheats_open_button),
+                            onClick = onOpenCheats,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            enabled = true
+                        )
                                     }
 
                                     else -> Unit

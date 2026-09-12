@@ -633,6 +633,9 @@
     <string name="emulation_cheats_title">चीट्स</string>
     <string name="emulation_cheats_open_button">चीट्स</string>
     <string name="emulation_cheats_empty">इस गेम के लिए कोई चीट नहीं मिली।</string>
+    <string name="emulation_cheats_enable_all">सभी चालू करें</string>
+    <string name="emulation_cheats_disable_all">सभी बंद करें</string>
+    <string name="emulation_cheats_empty_hint">इस गेम के चीट्स चीट मैनेजर में डाउनलोड करें, फिर यहाँ चालू करें।</string>
     <string name="settings_bilinear_filtering_nearest">Nearest</string>
     <string name="settings_bilinear_filtering_forced">Bilinear Forced</string>
     <string name="settings_bilinear_filtering_ps2">Bilinear PS2</string>

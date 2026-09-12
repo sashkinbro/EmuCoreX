@@ -1026,6 +1026,9 @@
     <string name="emulation_cheats_title">Cheat</string>
     <string name="emulation_cheats_open_button">Cheat</string>
     <string name="emulation_cheats_empty">Tidak ada cheat yang ditemukan untuk game ini.</string>
+    <string name="emulation_cheats_enable_all">Aktifkan Semua</string>
+    <string name="emulation_cheats_disable_all">Nonaktifkan Semua</string>
+    <string name="emulation_cheats_empty_hint">Unduh cheat untuk game ini di Manajer Cheat, lalu aktifkan di sini.</string>
     <string name="settings_bilinear_filtering_nearest">Terdekat (Nearest)</string>
     <string name="settings_bilinear_filtering_forced">Bilinear Dipaksakan (Forced)</string>
     <string name="settings_bilinear_filtering_ps2">Bilinear PS2</string>

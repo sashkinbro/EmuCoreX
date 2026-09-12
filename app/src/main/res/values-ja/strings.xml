@@ -719,6 +719,9 @@
     <string name="emulation_cheats_title">チート</string>
     <string name="emulation_cheats_open_button">チート</string>
     <string name="emulation_cheats_empty">このゲームのチートは見つかりませんでした。</string>
+    <string name="emulation_cheats_enable_all">すべて有効化</string>
+    <string name="emulation_cheats_disable_all">すべて無効化</string>
+    <string name="emulation_cheats_empty_hint">このゲームのチートはチートマネージャーでダウンロードし、ここで有効にしてください。</string>
     <string name="settings_bilinear_filtering_nearest">Nearest</string>
     <string name="settings_bilinear_filtering_forced">Bilinear Forced</string>
     <string name="settings_bilinear_filtering_ps2">Bilinear PS2</string>

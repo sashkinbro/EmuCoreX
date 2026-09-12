@@ -434,6 +434,9 @@
     <string name="emulation_cheats_title">金手指</string>
     <string name="emulation_cheats_open_button">金手指</string>
     <string name="emulation_cheats_empty">找不到此遊戲的金手指。</string>
+    <string name="emulation_cheats_enable_all">全部启用</string>
+    <string name="emulation_cheats_disable_all">全部禁用</string>
+    <string name="emulation_cheats_empty_hint">请在金手指管理器中下载该游戏的金手指，然后在此处启用。</string>
     <string name="settings_bilinear_filtering_nearest">最近相鄰</string>
     <string name="settings_bilinear_filtering_forced">強制雙線性</string>
     <string name="settings_bilinear_filtering_ps2">PS2 雙線性</string>

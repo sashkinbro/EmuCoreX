@@ -2884,8 +2884,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             }
             EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", enabled.toString())
             if (enabled) {
-                syncCheatsForCurrentGame()
-                EmulatorBridge.reloadPatches()
+                refreshAvailableCheats()
             }
             updateCrashContext()
         }
@@ -2917,6 +2916,36 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setEnableCheats(true)
             }
             EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "true")
+            EmulatorBridge.reloadPatches()
+        }
+    }
+
+    fun setAllCheatsEnabled(enabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (enabled && isRetroAchievementsHardcoreRestricted()) {
+                runCatching { EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "false") }
+                runCatching { EmulatorBridge.reloadPatches() }
+                showHardcoreBlockedToast()
+                return@launch
+            }
+
+            val currentState = _uiState.value
+            val gameKey = currentState.cheatsGameKey ?: return@launch
+            if (currentState.availableCheats.isEmpty()) return@launch
+            val updatedBlocks = currentState.availableCheats.map { block -> block.copy(enabled = enabled) }
+            cheatRepository.setEnabledBlocks(
+                gameKey = gameKey,
+                enabledIds = if (enabled) updatedBlocks.mapTo(mutableSetOf()) { it.id } else emptySet()
+            )
+            syncCheatsForCurrentGame(gameKey)
+            if (enabled) {
+                persistRuntimeState(currentState.copy(availableCheats = updatedBlocks, enableCheats = true)) {
+                    preferences.setEnableCheats(true)
+                }
+                EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "true")
+            } else {
+                _uiState.value = currentState.copy(availableCheats = updatedBlocks)
+            }
             EmulatorBridge.reloadPatches()
         }
     }
@@ -4709,6 +4738,40 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         return profile.copy(providedKeys = providedKeys)
+    }
+
+    fun refreshAvailableCheats() {
+        val serial = currentGameSerial.trim()
+        val crc = currentGameCrc.trim()
+        val title = currentGameTitle.trim().takeIf { it.isNotBlank() && it != "PlayStation 2 BIOS" }
+        val previousKey = _uiState.value.cheatsGameKey
+        val cheatsEnabled = _uiState.value.enableCheats
+        val keys = buildList {
+            previousKey?.takeIf { it.isNotBlank() }?.let(::add)
+            if (serial.isNotBlank() && crc.isNotBlank()) add("${serial}_$crc")
+            if (crc.isNotBlank()) add(crc)
+            if (serial.isNotBlank()) add(serial)
+            title?.let(::add)
+        }
+        if (keys.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val config = cheatRepository.getGameConfig(
+                gameKeys = keys,
+                serial = serial,
+                crc = crc.takeIf { it.isNotBlank() }
+            )
+            _uiState.value = _uiState.value.copy(
+                cheatsGameKey = config?.gameKey,
+                availableCheats = config?.blocks.orEmpty()
+            )
+            if (!cheatsEnabled) return@launch
+            if (config != null) {
+                syncCheatsForCurrentGame(config.gameKey)
+            } else if (previousKey != null) {
+                syncCheatsForCurrentGame(previousKey)
+            }
+            runCatching { EmulatorBridge.reloadPatches() }
+        }
     }
 
     private fun refreshCurrentGameCheats(
