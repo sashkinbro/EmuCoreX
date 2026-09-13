@@ -2266,7 +2266,6 @@ SCAJ-20154:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SCAJ-20155:
   name: "義経英雄伝 修羅"
   name-sort: "よしつねえいゆうでん しゅら"
@@ -14043,7 +14042,6 @@ SLED-52929:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLED-52979:
   name: "Mercenaries - Playground of Destruction [Demo]"
   region: "PAL-E"
@@ -21746,7 +21744,6 @@ SLES-52822:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLES-52824:
   name: "Furry Tales"
   region: "PAL-E-F"
@@ -32936,7 +32933,6 @@ SLKA-25247:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLKA-25249:
   name: "이스 - 나피쉬팀의 상자 [Bundled with Guide Book]" # Undumped on ReDump as of 2025-08-28
   name-en: "Ys - The Ark of Napishtim [Bundled with Guide Book]"
@@ -34163,7 +34159,6 @@ SLKA-25462:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLKA-25463:
   name: "WWE 스맥다운 대 로우 2010"
   name-en: "WWE SmackDown! vs. Raw 2010"
@@ -47657,7 +47652,6 @@ SLPM-66002:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLPM-66003:
   name: "遙かなる時空の中で ～八葉抄～ [History Box]"
   name-sort: "はるかなるときのなかで ～はちようしょう～ [History Box]"
@@ -51965,7 +51959,6 @@ SLPM-66673:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLPM-66674:
   name: "タイガー・ウッズ PGA TOUR(R)07"
   name-sort: "たいがー・うっず PGA TOUR(R)07"
@@ -70409,7 +70402,6 @@ SLUS-21022:
   gsHWFixes:
     autoFlush: 2 # Reduces post-processing misalignment.
     halfPixelOffset: 5 # Fixes post positioning.
-    nativeScaling: 2 # Fixes post effects.
 SLUS-21025:
   name: "Madden NFL 2005 [Special Collectors Edition]"
   region: "NTSC-U"
