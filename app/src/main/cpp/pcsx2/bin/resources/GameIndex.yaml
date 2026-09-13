@@ -2408,14 +2408,8 @@ SCAJ-20172:
 SCAJ-20173:
   name: "Ace Combat Zero - The Belkan War"
   region: "NTSC-Unk"
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
   memcardFilters:
     - "SCAJ-20173"
     - "SLPS-25629"
@@ -7783,22 +7777,8 @@ SCKA-20070:
   name: "에이스 컴뱃 제로 ー더 벨칸 워ー"
   name-en: "Ace Combat Zero - The Belkan War"
   region: "NTSC-K"
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
-  patches:
-    2799A4E5:
-      content: |-
-        // Fixes collision/missle hit issues.
-        patch=0,EE,00131ebc,word,48498800
-        patch=0,EE,00131ec0,word,4B00682C
-        patch=0,EE,00131ecc,word,484A8800
-        patch=0,EE,00131ed0,word,4B0C682C
 SCKA-20071:
   name: "MLB 06 - The Show" # No listed Korean name on ReDump
   region: "NTSC-K"
@@ -8179,14 +8159,8 @@ SCKA-20133:
   name: "에이스 컴뱃 제로 - 더 벨칸 워 [PlayStation 2 BigHit Series]" # Undumped on ReDump as of 2025-08-28
   name-en: "Ace Combat Zero - The Belkan War [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
 SCKA-20134:
   name: "드래그 온 드라군 2 [Ultimate Hits]"
   name-en: "Drag-on Dragoon 2 [Ultimate Hits]"
@@ -61765,14 +61739,8 @@ SLPS-25629:
   name-sort: "えーすこんばっと・ぜろ ざ・べるかん・うぉー"
   name-en: "Ace Combat Zero - The Belkan War"
   region: "NTSC-J"
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
   memcardFilters:
     - "SCAJ-20173"
     - "SLPS-25629"
@@ -61784,14 +61752,6 @@ SLPS-25629:
     - "SCAJ-20136"
     - "SLPS-25418"
     - "SLPS-73218"
-  patches:
-    A04B52DB:
-      content: |-
-        // Fixes collision/missile hit issues.
-        patch=0,EE,00131e84,word,48498800
-        patch=0,EE,00131e88,word,4B00682C
-        patch=0,EE,00131e94,word,484A8800
-        patch=0,EE,00131e98,word,4B0C682C
 SLPS-25630:
   name: "プロ野球 熱スタ2006"
   name-sort: "ぷろやきゅう ねつすた2006"
@@ -64688,14 +64648,8 @@ SLPS-73250:
   name-sort: "えーすこんばっと・ぜろ・ざ・べるかん・うぉー [PlayStation2 the Best]"
   name-en: "Ace Combat Zero - The Belkan War [PlayStation2 the Best]"
   region: "NTSC-J"
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
   memcardFilters:
     - "SCAJ-20173"
     - "SLPS-25629"
@@ -72526,26 +72480,12 @@ SLUS-21346:
   name: "Ace Combat Zero - The Belkan War"
   region: "NTSC-U"
   compat: 5
-  gameFixes:
-    - SoftwareRendererFMVHack # Fixes FMVs disabling hash cache.
   gsHWFixes:
-    recommendedBlendingLevel: 2 # Helps banding when dithering is enabled.
-    halfPixelOffset: 3 # Fixes ghosting in foggy maps.
-    roundSprite: 1 # Fixes HUD artifacts.
     alignSprite: 1 # Fixes vertical lines.
-    mergeSprite: 1 # Better aligns main menu strips, improving font readability.
   memcardFilters:
     - "SLUS-21346"
     - "SLUS-20152"
     - "SLUS-20851"
-  patches:
-    65729657:
-      content: |-
-        // Fixes collision/missile hit issues.
-        patch=0,EE,00131EBC,word,48498800
-        patch=0,EE,00131EC0,word,4B00682C
-        patch=0,EE,00131ECC,word,484A8800
-        patch=0,EE,00131ED0,word,4B0C682C
 SLUS-21347:
   name: "AMF Xtreme Bowling"
   region: "NTSC-U"
