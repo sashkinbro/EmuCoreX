@@ -24252,10 +24252,6 @@ SLES-53614:
 SLES-53616:
   name: "True Crime - New York City"
   region: "PAL-E"
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -24268,10 +24264,6 @@ SLES-53616:
 SLES-53617:
   name: "True Crime - New York City"
   region: "PAL-G"
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -24284,10 +24276,6 @@ SLES-53617:
 SLES-53618:
   name: "True Crime - New York City"
   region: "PAL-S"
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -50703,10 +50691,6 @@ SLPM-66473:
   name-sort: "とぅるー くらいむ にゅーよーくしてぃ"
   name-en: "True Crime - New York City"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -54867,10 +54851,6 @@ SLPM-74243:
   name-sort: "とぅるー くらいむ にゅーよーくしてぃ [PlayStation2 the Best]"
   name-en: "True Crime - New York City [PlayStation2 the Best]"
   region: "NTSC-J"
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
@@ -70922,10 +70902,6 @@ SLUS-21106:
   name: "True Crime - New York City"
   region: "NTSC-U"
   compat: 5
-  clampModes:
-    eeClampMode: 2 # Fixes SPS on highway.
-  roundModes:
-    eeRoundMode: 0 # Fixes scene switching in intro.
   gsHWFixes:
     cpuSpriteRenderBW: 1 # Fixes textures.
     cpuSpriteRenderLevel: 1 # Needed for above.
