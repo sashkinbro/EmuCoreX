@@ -7070,6 +7070,8 @@ SCES-55570:
 SCES-55571:
   name: "Ghostbusters - The Video Game"
   region: "PAL-M6"
+  clampModes:
+    vu1ClampMode: 1 # Normal VU1 clamping.
 SCES-55573:
   name: "MotorStorm - Arctic Edge"
   region: "PAL-M14"
@@ -75502,6 +75504,8 @@ SLUS-21882:
   name: "Ghostbusters - The Video Game"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    vu1ClampMode: 1 # Normal VU1 clamping.
 SLUS-21883:
   name: "Disney/Pixar Cars - Race-O-Rama"
   region: "NTSC-U"
