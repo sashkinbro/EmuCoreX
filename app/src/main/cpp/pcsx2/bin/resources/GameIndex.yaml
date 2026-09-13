@@ -28560,7 +28560,6 @@ SLES-54963:
   clampModes:
     vu1ClampMode: 1
   gsHWFixes:
-    minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
     nativeScaling: 1 # Fixes post-processing smoothness and position.
     autoFlush: 1 # Fixes bloom positioning.
@@ -28572,7 +28571,6 @@ SLES-54964:
   clampModes:
     vu1ClampMode: 1
   gsHWFixes:
-    minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
     nativeScaling: 1 # Fixes post-processing smoothness and position.
     autoFlush: 1 # Fixes bloom positioning.
@@ -74057,7 +74055,6 @@ SLUS-21616:
   clampModes:
     vu1ClampMode: 1
   gsHWFixes:
-    minimumBlendingLevel: 3 # Fixes broken lighting on ground and buildings.
     halfPixelOffset: 4 # Mostly aligns post-processing.
     nativeScaling: 1 # Fixes post-processing smoothness and position.
     autoFlush: 1 # Fixes bloom positioning.
