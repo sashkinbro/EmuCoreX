@@ -175,7 +175,10 @@ bool GLProgram::GetBinary(std::vector<u8>* out_data, u32* out_data_format)
 
 void GLProgram::SetBinaryRetrievableHint()
 {
-	glProgramParameteri(m_program_id, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+	// Core in ES 3.0 and desktop GL 4.1+/ARB_get_program_binary; guard against a loader that
+	// could not resolve the entry point.
+	if (glProgramParameteri)
+		glProgramParameteri(m_program_id, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 }
 
 void GLProgram::BindAttribute(GLuint index, const char* name)

@@ -1449,6 +1449,7 @@ public:
 		bool rov                 : 1; ///< Supports rasterizer ordered views for both depth and color.
 		bool dual_source_blend   : 1; ///< Supports a second fragment output as a hardware blend factor.
 		bool broken_mad_deinterlace : 1; ///< Driver cannot reliably preserve/read the two-bank FastMAD history target.
+		bool rgba16_unorm        : 1; ///< Supports RGBA16 normalized color attachments (ColorClip); otherwise RGBA32F is used.
 		DepthFeedbackSupport depth_feedback : 2; ///< Support for depth feedback loops.
 		FeatureSupport()
 		{

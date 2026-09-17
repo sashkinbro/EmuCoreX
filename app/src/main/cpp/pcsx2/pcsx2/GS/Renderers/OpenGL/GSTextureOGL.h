@@ -82,6 +82,8 @@ public:
 private:
 	GSDownloadTextureOGL(u32 width, u32 height, GSTexture::Format format);
 
+	void EnsureMapped();
+
 	GLuint m_buffer_id = 0;
 	u32 m_buffer_size = 0;
 
@@ -89,4 +91,8 @@ private:
 
 	// used when buffer storage is not available
 	u8* m_cpu_buffer = nullptr;
+
+	// Core ES 3.0 PBO path without persistent mapping: the staging buffer is mapped on demand
+	// once the readback fence has signalled.
+	bool m_deferred_pbo = false;
 };

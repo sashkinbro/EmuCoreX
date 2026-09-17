@@ -3341,7 +3341,7 @@ bool GSDeviceVK::CheckFeatures()
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s model=%s arch=%s "
 		"roaa=%d fbfetch=%d fbfetchDenylisted=%d textureBarrier=%d inputAttachmentFeedback=%d "
-		"dualSrcBlend=%d depthFormat=%u fastMAD=%d madFallback=%s",
+		"dualSrcBlend=%d depthFormat=%u rgba16unorm=%d fastMAD=%d madFallback=%s",
 		m_device_properties.deviceName, m_device_properties.vendorID, m_device_properties.driverVersion,
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
 		IsMediaTekSoC() ? "MediaTek" : "other/unknown", GetMobileGPUIdentity().name.c_str(),
@@ -3351,6 +3351,7 @@ bool GSDeviceVK::CheckFeatures()
 		UsesInputAttachmentFeedbackPath() ? 1 : 0,
 		m_device_features.dualSrcBlend ? 1 : 0,
 		static_cast<unsigned>(m_depth_format),
+		m_features.rgba16_unorm ? 1 : 0,
 		m_features.broken_mad_deinterlace ? 0 : 1,
 		m_features.broken_mad_deinterlace ? "blend" : "none");
 #endif
@@ -3374,6 +3375,20 @@ bool GSDeviceVK::CheckFeatures()
 		m_features.line_expand ? "hardware" : "vertex expanding");
 
 	bool has_rov_storage_flags = true;
+
+	// ColorClip prefers RGBA16_UNORM for 9bpc blending emulation. Some mobile drivers do not
+	// expose it as a render target; in that case use RGBA32F instead of failing renderer
+	// creation.
+	{
+		constexpr VkFormatFeatureFlags clip_required =
+			VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
+		VkFormatProperties props = {};
+		vkGetPhysicalDeviceFormatProperties(m_physical_device, VK_FORMAT_R16G16B16A16_UNORM, &props);
+		m_features.rgba16_unorm = ((props.optimalTilingFeatures & clip_required) == clip_required);
+
+		if (!m_features.rgba16_unorm)
+			Console.Warning("VK: Using RGBA32F instead of RGBA16UNORM for clip textures.");
+	}
 
 	// Check texture format support before we try to create them.
 	for (u32 fmt = static_cast<u32>(GSTexture::Format::Color); fmt < static_cast<u32>(GSTexture::Format::PrimID); fmt++)
@@ -3541,6 +3556,8 @@ VkFormat GSDeviceVK::LookupNativeFormat(GSTexture::Format format) const
 
 	return (format == GSTexture::Format::DepthStencil) ?
 		m_depth_format :
+		(format == GSTexture::Format::ColorClip && !m_features.rgba16_unorm) ?
+			VK_FORMAT_R32G32B32A32_SFLOAT :
 		s_format_mapping[static_cast<int>(format)];
 }
 

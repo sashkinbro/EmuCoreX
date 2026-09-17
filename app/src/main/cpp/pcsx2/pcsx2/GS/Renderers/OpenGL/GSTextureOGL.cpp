@@ -518,6 +518,25 @@ std::unique_ptr<GSDownloadTextureOGL> GSDownloadTextureOGL::Create(u32 width, u3
 		return ret;
 	}
 
+	// Core ES 3.0 PBO path: the readback lands in a staging buffer and is mapped only after
+	// the fence signals, avoiding the synchronous glReadPixels stall. Kept to GLES so the
+	// established desktop buffer_storage/CPU paths are unchanged.
+	if (GSDeviceOGL::GetInstance()->IsGLESDevice() && !GSDeviceOGL::GetInstance()->IsDownloadPBODisabled() &&
+		glMapBufferRange && glFenceSync)
+	{
+		GLuint buffer_id;
+		glGenBuffers(1, &buffer_id);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer_id);
+		glBufferData(GL_PIXEL_PACK_BUFFER, buffer_size, nullptr, GL_STREAM_READ);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+		std::unique_ptr<GSDownloadTextureOGL> ret(new GSDownloadTextureOGL(width, height, format));
+		ret->m_buffer_id = buffer_id;
+		ret->m_buffer_size = buffer_size;
+		ret->m_deferred_pbo = true;
+		return ret;
+	}
+
 	// Fallback to glReadPixels() + CPU buffer.
 	u8* cpu_buffer = static_cast<u8*>(_aligned_malloc(buffer_size, VECTOR_ALIGNMENT));
 	if (!cpu_buffer)
@@ -555,6 +574,18 @@ void GSDownloadTextureOGL::CopyFromTexture(
 
 	if (!m_cpu_buffer)
 	{
+		if (m_deferred_pbo)
+		{
+			// Drop any previous mapping and orphan the store before queueing a new copy.
+			Unmap();
+			if (!m_needs_flush)
+			{
+				glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
+				glBufferData(GL_PIXEL_PACK_BUFFER, m_buffer_size, nullptr, GL_STREAM_READ);
+				glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+			}
+		}
+
 		// Read to PBO.
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
 	}
@@ -586,15 +617,32 @@ void GSDownloadTextureOGL::CopyFromTexture(
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 }
 
+void GSDownloadTextureOGL::EnsureMapped()
+{
+	if (!m_deferred_pbo || m_map_pointer || m_buffer_id == 0)
+		return;
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
+	m_map_pointer =
+		static_cast<const u8*>(glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, m_buffer_size, GL_MAP_READ_BIT));
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+}
+
 bool GSDownloadTextureOGL::Map(const GSVector4i& read_rc)
 {
-	// Either always mapped, or CPU buffer.
-	return true;
+	EnsureMapped();
+	return (m_map_pointer != nullptr);
 }
 
 void GSDownloadTextureOGL::Unmap()
 {
-	// Either always mapped, or CPU buffer.
+	if (!m_deferred_pbo || !m_map_pointer)
+		return;
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, m_buffer_id);
+	glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	m_map_pointer = nullptr;
 }
 
 void GSDownloadTextureOGL::Flush()
@@ -608,6 +656,8 @@ void GSDownloadTextureOGL::Flush()
 	glClientWaitSync(m_sync, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED);
 	glDeleteSync(m_sync);
 	m_sync = {};
+
+	EnsureMapped();
 }
 
 bool GSDownloadTextureOGL::Poll()
@@ -622,6 +672,7 @@ bool GSDownloadTextureOGL::Poll()
 	m_needs_flush = false;
 	glDeleteSync(m_sync);
 	m_sync = {};
+	EnsureMapped();
 	return true;
 }
 

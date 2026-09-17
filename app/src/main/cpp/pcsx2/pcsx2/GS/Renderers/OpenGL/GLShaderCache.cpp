@@ -61,7 +61,10 @@ bool GLShaderCache::CacheIndexKey::operator!=(const CacheIndexKey& key) const
 
 bool GLShaderCache::Open()
 {
-	m_program_binary_supported = GLAD_GL_ARB_get_program_binary;
+	// GL_ARB_get_program_binary covers desktop GL. On GLES, program binaries are core API
+	// since ES 3.0 (glGetProgramBinary/glProgramBinary), so the extension flag is always
+	// false there and the disk cache would otherwise never be used on Android.
+	m_program_binary_supported = GLAD_GL_ES_VERSION_3_0 || GLAD_GL_ARB_get_program_binary;
 	if (m_program_binary_supported)
 	{
 		// check that there's at least one format and the extension isn't being "faked"
