@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import com.sbro.emucorex.data.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +49,14 @@ object GamepadManager {
         val name: String
     )
 
+    data class AvailableGamepad(
+        val key: String,
+        val deviceId: Int,
+        val name: String,
+        val isExternal: Boolean,
+        val padIndex: Int? = null
+    )
+
     private data class BindingCaptureState(
         val padIndex: Int,
         val onCaptured: (Int) -> Unit
@@ -79,6 +88,11 @@ object GamepadManager {
         var lastUpdateElapsedMs: Long = 0L
     )
 
+    private class StartTransportHoldState {
+        var turboActive: Boolean = false
+        var job: Job? = null
+    }
+
     private data class FallbackRumbleState(
         val amplitude: Int,
         val durationMs: Long,
@@ -97,6 +111,8 @@ object GamepadManager {
 
     private const val TAG = "GamepadManager"
     private const val MAX_PAD_SLOTS = 2
+    private const val START_TRANSPORT_HOLD_DELAY_MS = 360L
+    private const val START_TAP_DURATION_MS = 70L
     private const val RUMBLE_UPDATE_INTERVAL_MS = 40L
     private const val RUMBLE_PULSE_DURATION_MS = 80L
     private const val PHONE_SMALL_MOTOR_WEIGHT = 0.35f
@@ -222,6 +238,10 @@ object GamepadManager {
     private var singleGamepadReplacesTouch = true
     @Volatile
     private var preferExternalGamepadAsPlayerOne = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
+    @Volatile
+    private var deviceAssignmentKeysByPad: Map<Int, String> = emptyMap()
+    @Volatile
+    private var ignoredDeviceKeys: Set<String> = emptySet()
 
     @Volatile
     private var perGameBindingsActive = false
@@ -249,6 +269,7 @@ object GamepadManager {
     private val connectionLock = Any()
     private var appContext: Context? = null
     private val deviceToPadIndex = linkedMapOf<Int, Int>()
+    private val startTransportHolds = mutableMapOf<Int, StartTransportHoldState>()
     private val analogStatesByDeviceId = mutableMapOf<Int, AnalogState>()
     private val rumbleStatesByPad = mutableMapOf<Int, RumbleState>()
     private val fallbackRumbleStatesByPad = mutableMapOf<Int, FallbackRumbleState>()
@@ -308,8 +329,16 @@ object GamepadManager {
     private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD)
     private val _gamepadShortcutActions = MutableSharedFlow<GamepadShortcutAction>(extraBufferCapacity = 8)
     val gamepadShortcutActions: SharedFlow<GamepadShortcutAction> = _gamepadShortcutActions
+    private val _gamepadFastForwardHolds = MutableSharedFlow<Boolean>(extraBufferCapacity = 8)
+    val gamepadFastForwardHolds: SharedFlow<Boolean> = _gamepadFastForwardHolds
     private val _connectedGamepadCountState = MutableStateFlow(0)
     val connectedGamepadCountState: StateFlow<Int> = _connectedGamepadCountState
+    private val _availableGamepadsState = MutableStateFlow<List<AvailableGamepad>>(emptyList())
+    val availableGamepadsState: StateFlow<List<AvailableGamepad>> = _availableGamepadsState
+    private val _gamepadDeviceAssignmentsState = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val gamepadDeviceAssignmentsState: StateFlow<Map<Int, String>> = _gamepadDeviceAssignmentsState
+    private val _ignoredGamepadDevicesState = MutableStateFlow<Set<String>>(emptySet())
+    val ignoredGamepadDevicesState: StateFlow<Set<String>> = _ignoredGamepadDevicesState
     private var connectedGamepadSnapshot: List<ConnectedGamepad> = emptyList()
 
     fun ensureInitialized(context: Context) {
@@ -435,6 +464,20 @@ object GamepadManager {
             }
         }
         scope.launch {
+            preferences.gamepadDeviceAssignments.collectLatest { assignments ->
+                deviceAssignmentKeysByPad = assignments
+                _gamepadDeviceAssignmentsState.value = assignments
+                refreshConnectedGamepads()
+            }
+        }
+        scope.launch {
+            preferences.ignoredGamepadDevices.collectLatest { ignored ->
+                ignoredDeviceKeys = ignored
+                _ignoredGamepadDevicesState.value = ignored
+                refreshConnectedGamepads()
+            }
+        }
+        scope.launch {
             while (true) {
                 refreshConnectedGamepads()
                 delay(750.milliseconds)
@@ -534,6 +577,7 @@ object GamepadManager {
     fun setEmulationInputEnabled(enabled: Boolean) {
         emulationInputEnabled = enabled
         if (!enabled) {
+            cancelStartTransportHolds()
             resetAnalogState()
             stopAllGamepadVibrations()
             EmulatorBridge.resetKeyStatus()
@@ -667,6 +711,9 @@ object GamepadManager {
             return true
         }
         val padKey = remapTriggerPadKeyForRightStick(rawPadKey)
+        if (padKey == PadKey.Start) {
+            return handleStartTransportEvent(padIndex, event)
+        }
         val pressed = event.action == KeyEvent.ACTION_DOWN
         val range = if (pressed && padKey in ANALOG_STICK_DIRECTION_KEYS) 255 else 0
 
@@ -675,6 +722,77 @@ object GamepadManager {
         }
         EmulatorBridge.setPadButton(padIndex, padKey, range, pressed)
         return true
+    }
+
+    private fun handleStartTransportEvent(padIndex: Int, event: KeyEvent): Boolean {
+        return when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                if (event.repeatCount == 0) {
+                    playGamepadButtonHaptic()
+                    beginStartTransportHold(padIndex)
+                }
+                true
+            }
+            KeyEvent.ACTION_UP -> {
+                val turboActive = endStartTransportHold(padIndex)
+                if (!turboActive) {
+                    scope.launch {
+                        EmulatorBridge.setPadButton(padIndex, PadKey.Start, 0, true)
+                        delay(START_TAP_DURATION_MS)
+                        EmulatorBridge.setPadButton(padIndex, PadKey.Start, 0, false)
+                    }
+                }
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun beginStartTransportHold(padIndex: Int) {
+        val state = StartTransportHoldState()
+        state.job = scope.launch {
+            delay(START_TRANSPORT_HOLD_DELAY_MS)
+            val activated = synchronized(connectionLock) {
+                if (startTransportHolds[padIndex] !== state) {
+                    false
+                } else {
+                    state.turboActive = true
+                    true
+                }
+            }
+            if (activated) {
+                _gamepadFastForwardHolds.tryEmit(true)
+            }
+        }
+        synchronized(connectionLock) {
+            startTransportHolds.remove(padIndex)?.job?.cancel()
+            startTransportHolds[padIndex] = state
+        }
+    }
+
+    private fun endStartTransportHold(padIndex: Int): Boolean {
+        val state = synchronized(connectionLock) { startTransportHolds.remove(padIndex) } ?: return false
+        state.job?.cancel()
+        if (!state.turboActive) return false
+        val stillHeld = synchronized(connectionLock) {
+            startTransportHolds.values.any { it.turboActive }
+        }
+        if (!stillHeld) {
+            _gamepadFastForwardHolds.tryEmit(false)
+        }
+        return true
+    }
+
+    private fun cancelStartTransportHolds() {
+        val wasHolding = synchronized(connectionLock) {
+            val active = startTransportHolds.values.any { it.turboActive }
+            startTransportHolds.values.forEach { it.job?.cancel() }
+            startTransportHolds.clear()
+            active
+        }
+        if (wasHolding) {
+            _gamepadFastForwardHolds.tryEmit(false)
+        }
     }
 
     fun handleMotionEvent(event: MotionEvent): Boolean {
@@ -1126,6 +1244,12 @@ object GamepadManager {
         }
     }
 
+    private fun gamepadDeviceKey(device: InputDevice): String {
+        val descriptor = runCatching { device.descriptor }.getOrNull()
+        if (!descriptor.isNullOrBlank()) return descriptor
+        return "${device.vendorId}:${device.productId}:${device.name}"
+    }
+
     private fun hasRecognizedGamepadButton(device: InputDevice): Boolean {
         return try {
             device.hasKeys(*GAMEPAD_BUTTON_KEY_CODES).any { it }
@@ -1173,6 +1297,7 @@ object GamepadManager {
                 }
             }
             val previousAssignments = deviceToPadIndex.toMap()
+            val deviceKeysByDeviceId = connectedDevices.associate { it.id to gamepadDeviceKey(it) }
             val externalDeviceIds = connectedDevices
                 .filter { it.isExternal }
                 .mapTo(mutableSetOf()) { it.id }
@@ -1181,7 +1306,10 @@ object GamepadManager {
                 connectedDeviceIds = connectedDevices.map { it.id },
                 singleGamepadReplacesTouch = singleGamepadReplacesTouch,
                 preferExternalGamepadAsPlayerOne = preferExternalGamepadAsPlayerOne,
-                externalDeviceIds = externalDeviceIds
+                externalDeviceIds = externalDeviceIds,
+                deviceKeysByDeviceId = deviceKeysByDeviceId,
+                padDeviceKeys = deviceAssignmentKeysByPad,
+                ignoredDeviceKeys = ignoredDeviceKeys
             )
 
             previousAssignments.forEach { (deviceId, padIndex) ->
@@ -1204,6 +1332,15 @@ object GamepadManager {
                 )
             }.sortedBy { it.padIndex }
             connectedGamepadSnapshot = snapshot
+            _availableGamepadsState.value = connectedDevices.map { device ->
+                AvailableGamepad(
+                    key = deviceKeysByDeviceId.getValue(device.id),
+                    deviceId = device.id,
+                    name = device.name.ifBlank { "Controller" },
+                    isExternal = device.isExternal,
+                    padIndex = deviceToPadIndex[device.id]
+                )
+            }
             snapshot
         }
 
@@ -1398,9 +1535,14 @@ object GamepadManager {
         connectedDeviceIds: List<Int>,
         singleGamepadReplacesTouch: Boolean,
         preferExternalGamepadAsPlayerOne: Boolean = AppPreferences.DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE,
-        externalDeviceIds: Set<Int> = emptySet()
+        externalDeviceIds: Set<Int> = emptySet(),
+        deviceKeysByDeviceId: Map<Int, String> = emptyMap(),
+        padDeviceKeys: Map<Int, String> = emptyMap(),
+        ignoredDeviceKeys: Set<String> = emptySet()
     ): LinkedHashMap<Int, Int> {
-        val connectedIds = connectedDeviceIds.distinct()
+        val connectedIds = connectedDeviceIds.distinct().filterNot { deviceId ->
+            deviceKeysByDeviceId[deviceId]?.let { it in ignoredDeviceKeys } == true
+        }
         val connectedIdSet = connectedIds.toSet()
         val stableDeviceIds = buildList {
             addAll(
@@ -1421,15 +1563,26 @@ object GamepadManager {
         } else {
             stableDeviceIds
         }
-        val targetPadIndices = desiredPadIndices(
+        val assignments = linkedMapOf<Int, Int>()
+        val assignedDeviceIds = mutableSetOf<Int>()
+        padDeviceKeys.toSortedMap().forEach { (padIndex, deviceKey) ->
+            if (padIndex !in 0 until MAX_PAD_SLOTS || deviceKey.isBlank()) return@forEach
+            val deviceId = orderedDeviceIds.firstOrNull { candidate ->
+                candidate !in assignedDeviceIds && deviceKeysByDeviceId[candidate] == deviceKey
+            } ?: return@forEach
+            assignments[deviceId] = padIndex
+            assignedDeviceIds += deviceId
+        }
+        val claimedPadIndices = assignments.values.toSet()
+        val remainingPadIndices = desiredPadIndices(
             connectedGamepadCount = orderedDeviceIds.size,
             singleGamepadReplacesTouch = singleGamepadReplacesTouch
-        )
-        return linkedMapOf<Int, Int>().apply {
-            orderedDeviceIds.take(targetPadIndices.size).forEachIndexed { index, deviceId ->
-                put(deviceId, targetPadIndices[index])
-            }
-        }
+        ).filterNot { it in claimedPadIndices }
+        orderedDeviceIds.asSequence()
+            .filterNot { it in assignedDeviceIds }
+            .zip(remainingPadIndices.asSequence())
+            .forEach { (deviceId, padIndex) -> assignments[deviceId] = padIndex }
+        return assignments
     }
 
     private fun desiredPadIndices(

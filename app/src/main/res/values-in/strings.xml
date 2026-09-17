@@ -848,6 +848,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Sentuh + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Prioritaskan Kontroler Eksternal untuk Pemain 1</string>
     <string name="settings_gamepad_external_player_one_desc">Tetapkan kontroler Bluetooth atau USB sebagai Pemain 1 sebelum kontrol bawaan perangkat genggam</string>
+    <string name="settings_gamepad_assignment_title">Penetapan Kontroler</string>
+    <string name="settings_gamepad_assignment_desc">Pilih kontroler mana yang mengendalikan tiap pemain.</string>
+    <string name="settings_help_gamepad_assignment">Biarkan penetapan otomatis kecuali kontroler yang salah mengambil Pemain 1. Mode otomatis mengikuti urutan koneksi dan mengutamakan kontroler eksternal saat opsi itu aktif. Pilih pemain untuk setiap kontroler yang terdeteksi, atau matikan kontroler untuk mengabaikan inputnya. Penetapan diingat untuk perangkat ini.</string>
+    <string name="settings_gamepad_assignment_auto">Otomatis</string>
+    <string name="settings_gamepad_assignment_custom">Kustom</string>
+    <string name="settings_gamepad_assignment_off">Nonaktif</string>
+    <string name="settings_gamepad_assignment_external">Eksternal</string>
+    <string name="settings_gamepad_assignment_built_in">Bawaan</string>
+    <string name="settings_gamepad_assignment_empty">Tidak ada kontroler terdeteksi. Hubungkan kontroler untuk menetapkannya.</string>
+    <string name="settings_gamepad_assignment_note">Tips: sebagian perangkat genggam menampilkan kontrol bawaan sebagai beberapa perangkat input. Jika game tidak merespons Pemain 1, tetapkan di sini kontroler yang benar-benar mengirim input ke Pemain 1.</string>
+    <string name="settings_gamepad_assignment_reset">Atur ulang ke otomatis</string>
     <string name="settings_help_gamepad_external_player_one">Biarkan aktif saat menghubungkan perangkat genggam ke TV: kontroler Bluetooth atau USB eksternal otomatis menjadi Pemain 1, sedangkan kontrol bawaan berpindah ke Pemain 2. Nonaktifkan jika kontrol bawaan harus tetap menjadi Pemain 1 untuk multipemain lokal.</string>
     <string name="settings_gamepad_auto">Deteksi Otomatis Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Sembunyikan Hamparan pada Gamepad</string>

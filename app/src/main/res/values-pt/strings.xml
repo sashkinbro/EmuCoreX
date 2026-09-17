@@ -961,6 +961,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Toque + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Preferir controle externo para o Jogador 1</string>
     <string name="settings_gamepad_external_player_one_desc">Atribuir um controle Bluetooth ou USB ao Jogador 1 antes dos controles integrados do portátil</string>
+    <string name="settings_gamepad_assignment_title">Atribuição de controles</string>
+    <string name="settings_gamepad_assignment_desc">Escolha qual controle controla cada jogador.</string>
+    <string name="settings_help_gamepad_assignment">Mantenha a atribuição automática, a menos que o controle errado assuma o Jogador 1. O modo automático segue a ordem de conexão e prefere controles externos quando essa opção está ativada. Escolha um jogador para cada controle detectado ou desligue um controle para ignorar sua entrada. As atribuições são lembradas neste dispositivo.</string>
+    <string name="settings_gamepad_assignment_auto">Automático</string>
+    <string name="settings_gamepad_assignment_custom">Personalizado</string>
+    <string name="settings_gamepad_assignment_off">Desligado</string>
+    <string name="settings_gamepad_assignment_external">Externo</string>
+    <string name="settings_gamepad_assignment_built_in">Integrado</string>
+    <string name="settings_gamepad_assignment_empty">Nenhum controle detectado. Conecte um controle para atribuí-lo.</string>
+    <string name="settings_gamepad_assignment_note">Dica: alguns portáteis expõem os controles integrados como vários dispositivos de entrada. Se um jogo não responder ao Jogador 1, atribua aqui ao Jogador 1 o controle que realmente envia entrada.</string>
+    <string name="settings_gamepad_assignment_reset">Redefinir para automático</string>
     <string name="settings_help_gamepad_external_player_one">Mantenha ativado ao conectar um portátil à TV: o controle Bluetooth ou USB externo se torna automaticamente o Jogador 1, enquanto os controles integrados passam para o Jogador 2. Desative se quiser manter os controles integrados como Jogador 1 no multijogador local.</string>
     <string name="settings_emulation_tab">Emulação</string>
     <string name="settings_fixes_tab">Correções</string>

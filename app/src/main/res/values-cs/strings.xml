@@ -912,6 +912,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dotyk + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Upřednostnit externí ovladač pro hráče 1</string>
     <string name="settings_gamepad_external_player_one_desc">Přiřadit ovladač Bluetooth nebo USB hráči 1 před vestavěným ovládáním handheldu</string>
+    <string name="settings_gamepad_assignment_title">Přiřazení ovladačů</string>
+    <string name="settings_gamepad_assignment_desc">Zvolte, který ovladač ovládá kterého hráče.</string>
+    <string name="settings_help_gamepad_assignment">Automatické přiřazení ponechte zapnuté, pokud se hráčem 1 nestává nesprávný ovladač. Automatický režim se řídí pořadím připojení a při zapnuté volbě upřednostňuje externí ovladače. U každého rozpoznaného ovladače zvolte hráče, nebo ovladač vypněte, aby se jeho vstup ignoroval. Přiřazení se u tohoto zařízení pamatují.</string>
+    <string name="settings_gamepad_assignment_auto">Automaticky</string>
+    <string name="settings_gamepad_assignment_custom">Vlastní</string>
+    <string name="settings_gamepad_assignment_off">Vypnuto</string>
+    <string name="settings_gamepad_assignment_external">Externí</string>
+    <string name="settings_gamepad_assignment_built_in">Vestavěný</string>
+    <string name="settings_gamepad_assignment_empty">Nebyly nalezeny žádné ovladače. Připojte ovladač, abyste jej mohli přiřadit.</string>
+    <string name="settings_gamepad_assignment_note">Tip: některá přenosná zařízení hlásí vestavěné ovládání jako několik vstupních zařízení. Pokud hra nereaguje na hráče 1, přiřaďte zde hráči 1 ovladač, který skutečně odesílá vstup.</string>
+    <string name="settings_gamepad_assignment_reset">Obnovit automatické přiřazení</string>
     <string name="settings_help_gamepad_external_player_one">Při připojení handheldu k televizi ponechte zapnuto: externí ovladač Bluetooth nebo USB se automaticky stane hráčem 1 a vestavěné ovládání se přesune na hráče 2. Vypněte, pokud má při místní hře pro více hráčů zůstat hráčem 1 vestavěné ovládání.</string>
     <string name="settings_gamepad_auto">Automaticky detekovat gamepad</string>
     <string name="settings_gamepad_hide_overlay">Skrýt překrytí při gamepadu</string>

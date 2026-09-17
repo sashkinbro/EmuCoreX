@@ -961,6 +961,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Táctil + Mando</string>
     <string name="settings_gamepad_external_player_one">Preferir mando externo para el jugador 1</string>
     <string name="settings_gamepad_external_player_one_desc">Asignar un mando Bluetooth o USB al jugador 1 antes que los controles integrados de la consola portátil</string>
+    <string name="settings_gamepad_assignment_title">Asignación de mandos</string>
+    <string name="settings_gamepad_assignment_desc">Elige qué mando controla a cada jugador.</string>
+    <string name="settings_help_gamepad_assignment">Mantén la asignación automática salvo que un mando incorrecto ocupe el Jugador 1. El modo automático sigue el orden de conexión y prefiere los mandos externos cuando esa opción está activada. Elige un jugador para cada mando detectado o desactiva un mando para ignorar su entrada. Las asignaciones se recuerdan para este dispositivo.</string>
+    <string name="settings_gamepad_assignment_auto">Automático</string>
+    <string name="settings_gamepad_assignment_custom">Personalizado</string>
+    <string name="settings_gamepad_assignment_off">Desactivado</string>
+    <string name="settings_gamepad_assignment_external">Externo</string>
+    <string name="settings_gamepad_assignment_built_in">Integrado</string>
+    <string name="settings_gamepad_assignment_empty">No se detectaron mandos. Conecta un mando para asignarlo.</string>
+    <string name="settings_gamepad_assignment_note">Consejo: algunas consolas portátiles exponen los controles integrados como varios dispositivos de entrada. Si un juego no responde al Jugador 1, asigna aquí al Jugador 1 el mando que realmente envía entrada.</string>
+    <string name="settings_gamepad_assignment_reset">Restablecer a automático</string>
     <string name="settings_help_gamepad_external_player_one">Déjalo activado al conectar una consola portátil al televisor: el mando Bluetooth o USB externo se convierte automáticamente en el jugador 1 y los controles integrados pasan al jugador 2. Desactívalo si quieres que los controles integrados sigan siendo el jugador 1 en el multijugador local.</string>
     <string name="settings_emulation_tab">Emulación</string>
     <string name="settings_fixes_tab">Correcciones</string>

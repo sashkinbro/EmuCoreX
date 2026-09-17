@@ -965,6 +965,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Сенсор + Геймпад</string>
     <string name="settings_gamepad_external_player_one">Внешний контроллер как Игрок 1</string>
     <string name="settings_gamepad_external_player_one_desc">Назначать Bluetooth- или USB-контроллер Игроком 1 вместо встроенного управления консоли</string>
+    <string name="settings_gamepad_assignment_title">Назначение контроллеров</string>
+    <string name="settings_gamepad_assignment_desc">Выберите, какой контроллер управляет каждым игроком.</string>
+    <string name="settings_help_gamepad_assignment">Оставьте автоматическое назначение, если только неверный контроллер не занимает Игрока 1. Автоматический режим учитывает порядок подключения и предпочитает внешние контроллеры, когда эта опция включена. Выберите игрока для каждого обнаруженного контроллера или отключите контроллер, чтобы игнорировать его ввод. Назначения запоминаются для этого устройства.</string>
+    <string name="settings_gamepad_assignment_auto">Автоматически</string>
+    <string name="settings_gamepad_assignment_custom">Вручную</string>
+    <string name="settings_gamepad_assignment_off">Выкл.</string>
+    <string name="settings_gamepad_assignment_external">Внешний</string>
+    <string name="settings_gamepad_assignment_built_in">Встроенный</string>
+    <string name="settings_gamepad_assignment_empty">Контроллеры не обнаружены. Подключите контроллер, чтобы назначить его.</string>
+    <string name="settings_gamepad_assignment_note">Совет: некоторые портативные консоли представляют встроенное управление как несколько устройств ввода. Если игра не реагирует на Игрока 1, назначьте здесь Игроку 1 контроллер, который действительно передаёт ввод.</string>
+    <string name="settings_gamepad_assignment_reset">Сбросить на автоматически</string>
     <string name="settings_help_gamepad_external_player_one">Оставьте включённым при подключении портативной консоли к телевизору: внешний Bluetooth- или USB-контроллер автоматически станет Игроком 1, а встроенное управление — Игроком 2. Отключите, если для локальной игры встроенное управление должно оставаться Игроком 1.</string>
     <string name="settings_emulation_tab">Эмуляция</string>
     <string name="settings_fixes_tab">Исправления</string>

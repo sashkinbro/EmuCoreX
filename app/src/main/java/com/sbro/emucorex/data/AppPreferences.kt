@@ -254,6 +254,8 @@ data class SettingsSnapshot(
     val pressureModifierAmount: Int = AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT,
     val gamepadBindings: Map<String, Int> = emptyMap(),
     val gamepadBindingsByPad: Map<Int, Map<String, Int>> = emptyMap(),
+    val gamepadDeviceAssignments: Map<Int, String> = emptyMap(),
+    val ignoredGamepadDevices: Set<String> = emptySet(),
     val gpuDriverType: Int = 0,
     val mediatekAngleOpenGl: Boolean = false,
     val customDriverPath: String? = null,
@@ -750,6 +752,8 @@ class AppPreferences(private val context: Context) {
         private val GAMEPAD_RIGHT_STICK_UP_TO_R2 = booleanPreferencesKey("gamepad_right_stick_up_to_r2")
         private val GAMEPAD_RIGHT_STICK_DOWN_TO_L2 = booleanPreferencesKey("gamepad_right_stick_down_to_l2")
         private val GAMEPAD_BINDINGS = stringPreferencesKey("gamepad_bindings")
+        private val GAMEPAD_DEVICE_ASSIGNMENTS = stringPreferencesKey("gamepad_device_assignments")
+        private val GAMEPAD_IGNORED_DEVICES = stringPreferencesKey("gamepad_ignored_devices")
         private val GPU_DRIVER_TYPE = intPreferencesKey("gpu_driver_type")
         private val MEDIATEK_ANGLE_OPENGL = booleanPreferencesKey("mediatek_angle_opengl")
         private val CUSTOM_DRIVER_PATH = stringPreferencesKey("custom_driver_path")
@@ -1957,6 +1961,8 @@ class AppPreferences(private val context: Context) {
                 pressureModifierAmount = (prefs[PRESSURE_MODIFIER_AMOUNT] ?: DEFAULT_PRESSURE_MODIFIER_AMOUNT).coerceIn(1, 100),
                 gamepadBindings = decodeGamepadBindings(prefs[GAMEPAD_BINDINGS]),
                 gamepadBindingsByPad = decodeGamepadBindingsByPad(prefs[GAMEPAD_BINDINGS]),
+                gamepadDeviceAssignments = decodeGamepadDeviceAssignments(prefs[GAMEPAD_DEVICE_ASSIGNMENTS]),
+                ignoredGamepadDevices = decodeIgnoredGamepadDevices(prefs[GAMEPAD_IGNORED_DEVICES]),
                 gpuDriverType = prefs[GPU_DRIVER_TYPE] ?: 0,
                 mediatekAngleOpenGl = prefs[MEDIATEK_ANGLE_OPENGL] ?: false,
                 customDriverPath = prefs[CUSTOM_DRIVER_PATH],
@@ -2529,6 +2535,46 @@ class AppPreferences(private val context: Context) {
                     }
                 )
             }
+        }.toString()
+    }
+
+    private fun decodeGamepadDeviceAssignments(raw: String?): Map<Int, String> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            val json = JSONObject(raw)
+            buildMap {
+                json.keys().forEach { key ->
+                    val padIndex = key.toIntOrNull() ?: return@forEach
+                    val deviceKey = json.optString(key).takeIf { it.isNotBlank() } ?: return@forEach
+                    put(padIndex.coerceIn(0, 1), deviceKey)
+                }
+            }
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun encodeGamepadDeviceAssignments(assignments: Map<Int, String>): String {
+        return JSONObject().apply {
+            assignments.toSortedMap().forEach { (padIndex, deviceKey) ->
+                if (deviceKey.isNotBlank()) put(padIndex.toString(), deviceKey)
+            }
+        }.toString()
+    }
+
+    private fun decodeIgnoredGamepadDevices(raw: String?): Set<String> {
+        if (raw.isNullOrBlank()) return emptySet()
+        return runCatching {
+            val json = JSONArray(raw)
+            buildSet {
+                for (index in 0 until json.length()) {
+                    json.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }.getOrDefault(emptySet())
+    }
+
+    private fun encodeIgnoredGamepadDevices(deviceKeys: Set<String>): String {
+        return JSONArray().apply {
+            deviceKeys.filter { it.isNotBlank() }.sorted().forEach(::put)
         }.toString()
     }
 
@@ -3507,6 +3553,52 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    val gamepadDeviceAssignments: Flow<Map<Int, String>> = context.dataStore.data.map { prefs ->
+        decodeGamepadDeviceAssignments(prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
+    }
+
+    suspend fun setGamepadDeviceAssignment(padIndex: Int, deviceKey: String?) {
+        context.dataStore.edit { prefs ->
+            val normalizedPadIndex = normalizeGamepadPadIndex(padIndex)
+            val updated = decodeGamepadDeviceAssignments(prefs[GAMEPAD_DEVICE_ASSIGNMENTS]).toMutableMap()
+            if (deviceKey.isNullOrBlank()) {
+                updated.remove(normalizedPadIndex)
+            } else {
+                updated.entries.removeAll { it.value == deviceKey }
+                updated[normalizedPadIndex] = deviceKey
+            }
+            if (updated.isEmpty()) {
+                prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
+            } else {
+                prefs[GAMEPAD_DEVICE_ASSIGNMENTS] = encodeGamepadDeviceAssignments(updated)
+            }
+        }
+    }
+
+    val ignoredGamepadDevices: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        decodeIgnoredGamepadDevices(prefs[GAMEPAD_IGNORED_DEVICES])
+    }
+
+    suspend fun setGamepadDeviceIgnored(deviceKey: String, ignored: Boolean) {
+        if (deviceKey.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val updated = decodeIgnoredGamepadDevices(prefs[GAMEPAD_IGNORED_DEVICES]).toMutableSet()
+            if (ignored) updated.add(deviceKey) else updated.remove(deviceKey)
+            if (updated.isEmpty()) {
+                prefs.remove(GAMEPAD_IGNORED_DEVICES)
+            } else {
+                prefs[GAMEPAD_IGNORED_DEVICES] = encodeIgnoredGamepadDevices(updated)
+            }
+        }
+    }
+
+    suspend fun resetGamepadDeviceAssignments() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
+            prefs.remove(GAMEPAD_IGNORED_DEVICES)
+        }
+    }
+
     // Custom Layout Offsets
     private fun parseOffsetStr(raw: String?, default: Pair<Float, Float> = 0f to 0f): Pair<Float, Float> {
         if (raw.isNullOrBlank()) return default
@@ -4062,6 +4154,8 @@ class AppPreferences(private val context: Context) {
             )
             put("hideOverlayOnGamepad", prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
+            put("gamepadDeviceAssignments", prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
+            put("gamepadIgnoredDevices", prefs[GAMEPAD_IGNORED_DEVICES])
             put("gpuDriverType", prefs[GPU_DRIVER_TYPE] ?: 0)
             put("customDriverPath", prefs[CUSTOM_DRIVER_PATH])
             put("dev9EthernetEnabled", prefs[DEV9_ETHERNET_ENABLED] ?: false)
@@ -4495,6 +4589,8 @@ class AppPreferences(private val context: Context) {
             )
             prefs[HIDE_OVERLAY_ON_GAMEPAD] = json.optBoolean("hideOverlayOnGamepad", true)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
+            json.optString("gamepadDeviceAssignments").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_DEVICE_ASSIGNMENTS] = it } ?: prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
+            json.optString("gamepadIgnoredDevices").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_IGNORED_DEVICES] = it } ?: prefs.remove(GAMEPAD_IGNORED_DEVICES)
             prefs[GPU_DRIVER_TYPE] = json.optInt("gpuDriverType", 0)
             json.optString("customDriverPath").takeIf { it.isNotBlank() }?.let { prefs[CUSTOM_DRIVER_PATH] = it } ?: prefs.remove(CUSTOM_DRIVER_PATH)
             prefs[DEV9_ETHERNET_ENABLED] = json.optBoolean("dev9EthernetEnabled", false)

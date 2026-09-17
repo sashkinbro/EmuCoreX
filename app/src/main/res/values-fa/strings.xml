@@ -848,6 +848,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">لمس + گیم‌پد</string>
     <string name="settings_gamepad_external_player_one">اولویت کنترلر خارجی برای بازیکن ۱</string>
     <string name="settings_gamepad_external_player_one_desc">اختصاص کنترلر Bluetooth یا USB به بازیکن ۱ پیش از کنترل‌های داخلی دستگاه دستی</string>
+    <string name="settings_gamepad_assignment_title">تخصیص دسته بازی</string>
+    <string name="settings_gamepad_assignment_desc">انتخاب کنید کدام دسته هر بازیکن را کنترل کند.</string>
+    <string name="settings_help_gamepad_assignment">تخصیص خودکار را روشن نگه دارید، مگر اینکه دسته اشتباهی بازیکن ۱ را بگیرد. حالت خودکار از ترتیب اتصال پیروی می‌کند و در صورت فعال بودن گزینه، دسته‌های خارجی را ترجیح می‌دهد. برای هر دسته شناسایی‌شده یک بازیکن انتخاب کنید، یا دسته را خاموش کنید تا ورودی آن نادیده گرفته شود. تخصیص‌ها برای این دستگاه به خاطر سپرده می‌شوند.</string>
+    <string name="settings_gamepad_assignment_auto">خودکار</string>
+    <string name="settings_gamepad_assignment_custom">سفارشی</string>
+    <string name="settings_gamepad_assignment_off">خاموش</string>
+    <string name="settings_gamepad_assignment_external">خارجی</string>
+    <string name="settings_gamepad_assignment_built_in">داخلی</string>
+    <string name="settings_gamepad_assignment_empty">هیچ دسته‌ای شناسایی نشد. برای تخصیص، یک دسته وصل کنید.</string>
+    <string name="settings_gamepad_assignment_note">نکته: برخی کنسول‌های دستی کنترل‌های داخلی را به‌صورت چند دستگاه ورودی ارائه می‌دهند. اگر بازی به بازیکن ۱ پاسخ نمی‌دهد، در اینجا دسته‌ای که واقعاً ورودی می‌فرستد را به بازیکن ۱ اختصاص دهید.</string>
+    <string name="settings_gamepad_assignment_reset">بازنشانی به خودکار</string>
     <string name="settings_help_gamepad_external_player_one">هنگام اتصال دستگاه دستی به تلویزیون این گزینه را روشن نگه دارید: کنترلر خارجی Bluetooth یا USB به‌طور خودکار بازیکن ۱ می‌شود و کنترل‌های داخلی به بازیکن ۲ منتقل می‌شوند. اگر می‌خواهید در بازی چندنفره محلی کنترل‌های داخلی بازیکن ۱ باقی بمانند، آن را خاموش کنید.</string>
     <string name="settings_gamepad_auto">تشخیص خودکار گیم‌پد</string>
     <string name="settings_gamepad_hide_overlay">مخفی کردن روکش در هنگام استفاده از گیم‌پد</string>

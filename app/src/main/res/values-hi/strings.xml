@@ -483,6 +483,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">टच + गेमपैड</string>
     <string name="settings_gamepad_external_player_one">खिलाड़ी 1 के लिए बाहरी कंट्रोलर को प्राथमिकता दें</string>
     <string name="settings_gamepad_external_player_one_desc">हैंडहेल्ड के बिल्ट-इन कंट्रोल से पहले Bluetooth या USB कंट्रोलर को खिलाड़ी 1 असाइन करें</string>
+    <string name="settings_gamepad_assignment_title">कंट्रोलर असाइनमेंट</string>
+    <string name="settings_gamepad_assignment_desc">चुनें कि कौन सा कंट्रोलर किस खिलाड़ी को नियंत्रित करता है।</string>
+    <string name="settings_help_gamepad_assignment">स्वचालित असाइनमेंट तब तक चालू रखें जब तक कोई गलत कंट्रोलर खिलाड़ी 1 न बन जाए। स्वचालित मोड कनेक्शन क्रम का पालन करता है और विकल्प चालू होने पर बाहरी कंट्रोलर को प्राथमिकता देता है। हर पहचाने गए कंट्रोलर के लिए खिलाड़ी चुनें, या उसका इनपुट अनदेखा करने के लिए कंट्रोलर बंद करें। असाइनमेंट इस डिवाइस के लिए याद रखे जाते हैं।</string>
+    <string name="settings_gamepad_assignment_auto">स्वचालित</string>
+    <string name="settings_gamepad_assignment_custom">कस्टम</string>
+    <string name="settings_gamepad_assignment_off">बंद</string>
+    <string name="settings_gamepad_assignment_external">बाहरी</string>
+    <string name="settings_gamepad_assignment_built_in">अंतर्निहित</string>
+    <string name="settings_gamepad_assignment_empty">कोई कंट्रोलर नहीं मिला। असाइन करने के लिए कंट्रोलर कनेक्ट करें।</string>
+    <string name="settings_gamepad_assignment_note">सुझाव: कुछ हैंडहेल्ड अंतर्निहित नियंत्रणों को कई इनपुट डिवाइस के रूप में दिखाते हैं। अगर कोई गेम खिलाड़ी 1 पर प्रतिक्रिया नहीं देता, तो यहाँ उस कंट्रोलर को खिलाड़ी 1 पर असाइन करें जो वास्तव में इनपुट भेजता है।</string>
+    <string name="settings_gamepad_assignment_reset">स्वचालित पर रीसेट करें</string>
     <string name="settings_help_gamepad_external_player_one">हैंडहेल्ड को टीवी से जोड़ते समय इसे चालू रखें: बाहरी Bluetooth या USB कंट्रोलर अपने आप खिलाड़ी 1 बन जाएगा और बिल्ट-इन कंट्रोल खिलाड़ी 2 पर चले जाएँगे। लोकल मल्टीप्लेयर में बिल्ट-इन कंट्रोल को खिलाड़ी 1 रखना हो तो इसे बंद करें।</string>
     <string name="settings_gamepad_auto">स्वतः पता लगाएँ गेमपैड</string>
     <string name="settings_gamepad_hide_overlay">गेमपैड पर ओवरले छिपाएं</string>

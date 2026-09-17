@@ -561,6 +561,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">اللمس + وحدة التحكم</string>
     <string name="settings_gamepad_external_player_one">تفضيل وحدة التحكم الخارجية للاعب 1</string>
     <string name="settings_gamepad_external_player_one_desc">تعيين وحدة تحكم Bluetooth أو USB للاعب 1 قبل عناصر التحكم المدمجة في الجهاز المحمول</string>
+    <string name="settings_gamepad_assignment_title">تعيين وحدة التحكم</string>
+    <string name="settings_gamepad_assignment_desc">اختر وحدة التحكم التي ستتحكم بكل لاعب.</string>
+    <string name="settings_help_gamepad_assignment">اترك التعيين التلقائي مفعّلاً إلا إذا حصلت وحدة تحكم خاطئة على اللاعب 1. يتبع الوضع التلقائي ترتيب الاتصال ويفضّل وحدات التحكم الخارجية عند تفعيل هذا الخيار. اختر لاعباً لكل وحدة تحكم مكتشفة، أو أوقف وحدة التحكم لتجاهل مدخلاتها. يتم حفظ التعيينات لهذا الجهاز.</string>
+    <string name="settings_gamepad_assignment_auto">تلقائي</string>
+    <string name="settings_gamepad_assignment_custom">مخصص</string>
+    <string name="settings_gamepad_assignment_off">إيقاف</string>
+    <string name="settings_gamepad_assignment_external">خارجية</string>
+    <string name="settings_gamepad_assignment_built_in">مدمجة</string>
+    <string name="settings_gamepad_assignment_empty">لم يتم اكتشاف أي وحدة تحكم. وصّل وحدة تحكم لتعيينها.</string>
+    <string name="settings_gamepad_assignment_note">ملاحظة: بعض الأجهزة المحمولة تعرض عناصر التحكم المدمجة كعدة أجهزة إدخال. إذا لم تستجب اللعبة للاعب 1، عيّن هنا وحدة التحكم التي ترسل الإدخال فعلياً إلى اللاعب 1.</string>
+    <string name="settings_gamepad_assignment_reset">إعادة الضبط إلى التلقائي</string>
     <string name="settings_help_gamepad_external_player_one">اترك هذا الخيار مفعلاً عند توصيل الجهاز المحمول بالتلفاز: تصبح وحدة تحكم Bluetooth أو USB الخارجية هي اللاعب 1 تلقائياً، بينما تنتقل عناصر التحكم المدمجة إلى اللاعب 2. عطّله إذا أردت أن تبقى عناصر التحكم المدمجة هي اللاعب 1 في اللعب الجماعي المحلي.</string>
     <string name="settings_gamepad_auto">الكشف التلقائي عن وحدة التحكم</string>
     <string name="settings_gamepad_hide_overlay">إخفاء الطبقة عند استخدام وحدة تحكم</string>

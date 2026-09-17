@@ -561,6 +561,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dokunmatik + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Oyuncu 1 için Harici Kumandaya Öncelik Ver</string>
     <string name="settings_gamepad_external_player_one_desc">Bluetooth veya USB kumandayı dahili el konsolu kontrollerinden önce Oyuncu 1 olarak ata</string>
+    <string name="settings_gamepad_assignment_title">Denetleyici Ataması</string>
+    <string name="settings_gamepad_assignment_desc">Hangi denetleyicinin hangi oyuncuyu kontrol edeceğini seçin.</string>
+    <string name="settings_help_gamepad_assignment">Yanlış denetleyici Oyuncu 1\'i almadığı sürece otomatik atamayı açık bırakın. Otomatik mod bağlantı sırasını izler ve seçenek açıkken harici denetleyicileri tercih eder. Algılanan her denetleyici için bir oyuncu seçin veya denetleyiciyi kapatarak girişini yok sayın. Atamalar bu cihaz için hatırlanır.</string>
+    <string name="settings_gamepad_assignment_auto">Otomatik</string>
+    <string name="settings_gamepad_assignment_custom">Özel</string>
+    <string name="settings_gamepad_assignment_off">Kapalı</string>
+    <string name="settings_gamepad_assignment_external">Harici</string>
+    <string name="settings_gamepad_assignment_built_in">Dahili</string>
+    <string name="settings_gamepad_assignment_empty">Denetleyici algılanmadı. Atamak için bir denetleyici bağlayın.</string>
+    <string name="settings_gamepad_assignment_note">İpucu: Bazı taşınabilir cihazlar dahili kontrolleri birden fazla giriş aygıtı olarak gösterir. Bir oyun Oyuncu 1\'e yanıt vermiyorsa, girişi gerçekten gönderen denetleyiciyi burada Oyuncu 1\'e atayın.</string>
+    <string name="settings_gamepad_assignment_reset">Otomatiğe sıfırla</string>
     <string name="settings_help_gamepad_external_player_one">El konsolunu TV\'ye bağlarken bunu açık tutun: harici Bluetooth veya USB kumanda otomatik olarak Oyuncu 1 olur, dahili kontroller ise Oyuncu 2\'ye geçer. Yerel çok oyunculu modda dahili kontrollerin Oyuncu 1 olarak kalmasını istiyorsanız kapatın.</string>
     <string name="settings_gamepad_auto">Gamepad\'i Otomatik Algıla</string>
     <string name="settings_gamepad_hide_overlay">Gamepad Üzerinde Arayüzü Gizle</string>

@@ -961,6 +961,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Tactile + Manette</string>
     <string name="settings_gamepad_external_player_one">Priorité à la manette externe pour le joueur 1</string>
     <string name="settings_gamepad_external_player_one_desc">Attribuer une manette Bluetooth ou USB au joueur 1 avant les commandes intégrées de la console portable</string>
+    <string name="settings_gamepad_assignment_title">Attribution des manettes</string>
+    <string name="settings_gamepad_assignment_desc">Choisissez quelle manette contrôle chaque joueur.</string>
+    <string name="settings_help_gamepad_assignment">Gardez l\'attribution automatique sauf si une mauvaise manette prend le Joueur 1. Le mode automatique suit l\'ordre de connexion et privilégie les manettes externes lorsque cette option est activée. Choisissez un joueur pour chaque manette détectée, ou désactivez une manette pour ignorer ses entrées. Les attributions sont mémorisées pour cet appareil.</string>
+    <string name="settings_gamepad_assignment_auto">Automatique</string>
+    <string name="settings_gamepad_assignment_custom">Personnalisé</string>
+    <string name="settings_gamepad_assignment_off">Désactivé</string>
+    <string name="settings_gamepad_assignment_external">Externe</string>
+    <string name="settings_gamepad_assignment_built_in">Intégrée</string>
+    <string name="settings_gamepad_assignment_empty">Aucune manette détectée. Connectez une manette pour l\'attribuer.</string>
+    <string name="settings_gamepad_assignment_note">Astuce : certaines consoles portables exposent les commandes intégrées comme plusieurs périphériques d\'entrée. Si un jeu ne répond pas au Joueur 1, attribuez ici au Joueur 1 la manette qui envoie réellement les entrées.</string>
+    <string name="settings_gamepad_assignment_reset">Réinitialiser en automatique</string>
     <string name="settings_help_gamepad_external_player_one">Laissez cette option activée lorsque vous connectez une console portable au téléviseur : la manette Bluetooth ou USB externe devient automatiquement le joueur 1 et les commandes intégrées passent au joueur 2. Désactivez-la si vous souhaitez conserver les commandes intégrées pour le joueur 1 en multijoueur local.</string>
     <string name="settings_emulation_tab">Émulation</string>
     <string name="settings_fixes_tab">Correctifs</string>

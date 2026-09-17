@@ -910,6 +910,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Dotyk + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Preferuj zewnętrzny kontroler dla gracza 1</string>
     <string name="settings_gamepad_external_player_one_desc">Przypisz kontroler Bluetooth lub USB do gracza 1 przed wbudowanym sterowaniem konsoli przenośnej</string>
+    <string name="settings_gamepad_assignment_title">Przypisanie kontrolerów</string>
+    <string name="settings_gamepad_assignment_desc">Wybierz, który kontroler steruje którym graczem.</string>
+    <string name="settings_help_gamepad_assignment">Pozostaw automatyczne przypisanie, chyba że niewłaściwy kontroler przejmuje Gracza 1. Tryb automatyczny działa zgodnie z kolejnością połączenia i preferuje kontrolery zewnętrzne, gdy opcja jest włączona. Wybierz gracza dla każdego wykrytego kontrolera lub wyłącz kontroler, aby ignorować jego dane wejściowe. Przypisania są zapamiętywane na tym urządzeniu.</string>
+    <string name="settings_gamepad_assignment_auto">Automatycznie</string>
+    <string name="settings_gamepad_assignment_custom">Niestandardowe</string>
+    <string name="settings_gamepad_assignment_off">Wyłączony</string>
+    <string name="settings_gamepad_assignment_external">Zewnętrzny</string>
+    <string name="settings_gamepad_assignment_built_in">Wbudowany</string>
+    <string name="settings_gamepad_assignment_empty">Nie wykryto kontrolerów. Podłącz kontroler, aby go przypisać.</string>
+    <string name="settings_gamepad_assignment_note">Wskazówka: niektóre konsole przenośne zgłaszają wbudowane sterowanie jako kilka urządzeń wejściowych. Jeśli gra nie reaguje na Gracza 1, przypisz tutaj Graczowi 1 kontroler, który faktycznie wysyła dane wejściowe.</string>
+    <string name="settings_gamepad_assignment_reset">Przywróć automatyczne</string>
     <string name="settings_help_gamepad_external_player_one">Pozostaw włączone podczas podłączania konsoli przenośnej do telewizora: zewnętrzny kontroler Bluetooth lub USB automatycznie zostanie graczem 1, a wbudowane sterowanie przejdzie na gracza 2. Wyłącz, jeśli w lokalnym trybie wieloosobowym wbudowane sterowanie ma pozostać graczem 1.</string>
     <string name="settings_gamepad_auto">Wykrywaj gamepad automatycznie</string>
     <string name="settings_gamepad_hide_overlay">Ukryj nakładkę przy gamepadzie</string>

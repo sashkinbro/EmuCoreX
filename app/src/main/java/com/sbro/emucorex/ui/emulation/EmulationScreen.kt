@@ -1003,6 +1003,12 @@ fun EmulationScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        GamepadManager.gamepadFastForwardHolds.collect { held ->
+            viewModel.setFastForwardHeld(held)
+        }
+    }
+
     LaunchedEffect(gamepadUiActive) {
         GamepadManager.setEmulationInputEnabled(!gamepadUiActive)
     }

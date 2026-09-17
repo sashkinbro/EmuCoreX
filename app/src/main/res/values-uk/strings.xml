@@ -1005,6 +1005,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Сенсор + Геймпад</string>
     <string name="settings_gamepad_external_player_one">Зовнішній контролер як Гравець 1</string>
     <string name="settings_gamepad_external_player_one_desc">Призначати Bluetooth- або USB-контролер Гравцем 1 замість вбудованого керування консолі</string>
+    <string name="settings_gamepad_assignment_title">Призначення контролерів</string>
+    <string name="settings_gamepad_assignment_desc">Виберіть, який контролер керує кожним гравцем.</string>
+    <string name="settings_help_gamepad_assignment">Залиште автоматичне призначення, якщо тільки неправильний контролер не займає Гравця 1. Автоматичний режим враховує порядок підключення та надає перевагу зовнішнім контролерам, коли цю опцію ввімкнено. Виберіть гравця для кожного виявленого контролера або вимкніть контролер, щоб ігнорувати його ввід. Призначення пам\'ятовуються для цього пристрою.</string>
+    <string name="settings_gamepad_assignment_auto">Автоматично</string>
+    <string name="settings_gamepad_assignment_custom">Вручну</string>
+    <string name="settings_gamepad_assignment_off">Вимк.</string>
+    <string name="settings_gamepad_assignment_external">Зовнішній</string>
+    <string name="settings_gamepad_assignment_built_in">Вбудований</string>
+    <string name="settings_gamepad_assignment_empty">Контролери не виявлено. Підключіть контролер, щоб призначити його.</string>
+    <string name="settings_gamepad_assignment_note">Порада: деякі портативні консолі показують вбудоване керування як кілька пристроїв введення. Якщо гра не реагує на Гравця 1, призначте тут Гравцю 1 контролер, який справді надсилає ввід.</string>
+    <string name="settings_gamepad_assignment_reset">Скинути до автоматичного</string>
     <string name="settings_help_gamepad_external_player_one">Залиште ввімкненим при підключенні портативної консолі до телевізора: зовнішній Bluetooth- або USB-контролер автоматично стане Гравцем 1, а вбудоване керування — Гравцем 2. Вимкніть, якщо для локальної гри вбудоване керування має залишатися Гравцем 1.</string>
     <string name="settings_emulation_tab">Емуляція</string>
     <string name="settings_fixes_tab">Виправлення</string>

@@ -2207,6 +2207,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGamepadRightStickDownToL2(enabled: Boolean) { viewModelScope.launch { preferences.setGamepadRightStickDownToL2(enabled) } }
     fun setGamepadButtonHaptics(enabled: Boolean) { viewModelScope.launch { preferences.setGamepadButtonHaptics(enabled) } }
     fun setPressureModifierAmount(value: Int) { viewModelScope.launch { preferences.setPressureModifierAmount(value) } }
+    fun setGamepadDeviceAssignment(padIndex: Int, deviceKey: String?) {
+        viewModelScope.launch { preferences.setGamepadDeviceAssignment(padIndex, deviceKey) }
+    }
+    fun setGamepadDeviceIgnored(deviceKey: String, ignored: Boolean) {
+        viewModelScope.launch { preferences.setGamepadDeviceIgnored(deviceKey, ignored) }
+    }
+    fun resetGamepadDeviceAssignments() {
+        viewModelScope.launch { preferences.resetGamepadDeviceAssignments() }
+    }
 
     fun setBiosPath(uri: Uri) {
         val application = getApplication<Application>()

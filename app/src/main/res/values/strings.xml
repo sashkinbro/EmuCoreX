@@ -962,6 +962,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">Touch + Gamepad</string>
     <string name="settings_gamepad_external_player_one">Prefer External Controller for Player 1</string>
     <string name="settings_gamepad_external_player_one_desc">Assign a Bluetooth or USB controller to Player 1 ahead of built-in handheld controls</string>
+    <string name="settings_gamepad_assignment_title">Controller Assignment</string>
+    <string name="settings_gamepad_assignment_desc">Choose which controller controls each player.</string>
+    <string name="settings_help_gamepad_assignment">Keep automatic assignment unless the wrong controller takes Player 1. Automatic mode follows the connection order and prefers external controllers when that option is enabled. Select a player for each detected controller, or turn a controller off to ignore its input. Assignments are remembered for this device.</string>
+    <string name="settings_gamepad_assignment_auto">Auto</string>
+    <string name="settings_gamepad_assignment_custom">Custom</string>
+    <string name="settings_gamepad_assignment_off">Off</string>
+    <string name="settings_gamepad_assignment_external">External</string>
+    <string name="settings_gamepad_assignment_built_in">Built-in</string>
+    <string name="settings_gamepad_assignment_empty">No controllers detected. Connect a controller to assign it.</string>
+    <string name="settings_gamepad_assignment_note">Tip: some handhelds expose the built-in controls as several controller inputs. If a game does not respond to Player 1, assign the controller that actually sends input to Player 1 here.</string>
+    <string name="settings_gamepad_assignment_reset">Reset to Automatic</string>
     <string name="settings_help_gamepad_external_player_one">Keep this enabled when connecting a handheld to a TV: an external Bluetooth or USB controller becomes Player 1 automatically, while the built-in controls move to Player 2. Disable it when you want the handheld controls to remain Player 1 for local multiplayer.</string>
     <string name="settings_gamepad_auto">Auto-detect Gamepad</string>
     <string name="settings_gamepad_hide_overlay">Hide Overlay on Gamepad</string>

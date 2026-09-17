@@ -561,6 +561,17 @@
     <string name="settings_gamepad_mode_touch_plus_gamepad">タッチ + ゲームパッド</string>
     <string name="settings_gamepad_external_player_one">プレイヤー1に外部コントローラーを優先</string>
     <string name="settings_gamepad_external_player_one_desc">携帯機の内蔵操作より先にBluetoothまたはUSBコントローラーをプレイヤー1へ割り当てます</string>
+    <string name="settings_gamepad_assignment_title">コントローラーの割り当て</string>
+    <string name="settings_gamepad_assignment_desc">どのコントローラーが各プレイヤーを操作するかを選択します。</string>
+    <string name="settings_help_gamepad_assignment">誤ったコントローラーがプレイヤー1になる場合を除き、自動割り当てのままにしてください。自動モードは接続順に従い、オプションが有効な場合は外部コントローラーを優先します。検出された各コントローラーにプレイヤーを選ぶか、コントローラーをオフにして入力を無視できます。割り当てはこのデバイスに保存されます。</string>
+    <string name="settings_gamepad_assignment_auto">自動</string>
+    <string name="settings_gamepad_assignment_custom">カスタム</string>
+    <string name="settings_gamepad_assignment_off">オフ</string>
+    <string name="settings_gamepad_assignment_external">外部</string>
+    <string name="settings_gamepad_assignment_built_in">内蔵</string>
+    <string name="settings_gamepad_assignment_empty">コントローラーが検出されません。割り当てるにはコントローラーを接続してください。</string>
+    <string name="settings_gamepad_assignment_note">ヒント: 一部の携帯機では内蔵コントローラーが複数の入力デバイスとして認識されます。ゲームがプレイヤー1に反応しない場合は、実際に入力を送信しているコントローラーをここでプレイヤー1に割り当ててください。</string>
+    <string name="settings_gamepad_assignment_reset">自動に戻す</string>
     <string name="settings_help_gamepad_external_player_one">携帯機をテレビに接続するときは有効にしてください。外部のBluetoothまたはUSBコントローラーが自動的にプレイヤー1となり、内蔵操作はプレイヤー2へ移動します。ローカルマルチプレイで内蔵操作をプレイヤー1のままにする場合は無効にしてください。</string>
     <string name="settings_gamepad_auto">ゲームパッドを自動検出</string>
     <string name="settings_gamepad_hide_overlay">ゲームパッドでオーバーレイを隠す</string>
