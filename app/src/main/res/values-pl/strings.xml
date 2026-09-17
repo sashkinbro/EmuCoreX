@@ -659,6 +659,9 @@
     <string name="settings_help_back_button_exits_game">Domyślnie wyłączone. Gdy włączone, przycisk Wstecz w Androidzie wykonuje tę samą akcję co opcja Wyjście w menu gry, łącznie z obecnym oknem potwierdzenia.</string>
     <string name="settings_confirm_save_load_actions">Potwierdzaj akcje zapisu/wczytywania</string>
     <string name="settings_confirm_save_load_actions_desc">Pytaj przed wykonaniem szybkiego zapisu lub szybkiego wczytania.</string>
+    <string name="settings_floating_quick_actions">Pływające przyciski szybkiego zapisu i odczytu</string>
+    <string name="settings_floating_quick_actions_desc">Pokazuj przeciągane przyciski szybkiego zapisu i odczytu podczas gry</string>
+    <string name="settings_help_floating_quick_actions">Dodaje dwa małe przeciągane przyciski na ekranie emulacji: jeden do szybkiego zapisu, drugi do szybkiego odczytu. Przeciągnij je w dowolne miejsce — ich pozycje są zapamiętywane. Działają w każdym trybie sterowania, także gdy sterowanie dotykowe jest ukryte lub podłączony jest fizyczny kontroler.</string>
     <string name="settings_auto_progressive_scan">Auto skanowanie progresywne</string>
     <string name="settings_auto_progressive_scan_desc">Przytrzymuje Trójkąt + Krzyżyk podczas uruchamiania dla gier z ukrytym wyborem 480p.</string>
     <string name="settings_show_fps">Pokaż licznik FPS</string>

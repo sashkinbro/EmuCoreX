@@ -1401,6 +1401,9 @@
     <string name="settings_help_back_button_exits_game">Desactivado de forma predeterminada. Al activarlo, el botón Atrás de Android usa la misma acción que Salir en el menú del juego, incluida la configuración de confirmación actual.</string>
     <string name="settings_confirm_save_load_actions">Confirmar acciones de guardar/cargar</string>
     <string name="settings_confirm_save_load_actions_desc">Preguntar antes de guardar o cargar rápidamente.</string>
+    <string name="settings_floating_quick_actions">Botones flotantes de guardado y carga rápidos</string>
+    <string name="settings_floating_quick_actions_desc">Mostrar botones flotantes de guardado y carga rápidos durante el juego</string>
+    <string name="settings_help_floating_quick_actions">Añade dos botones pequeños arrastrables en la pantalla de emulación: uno para guardado rápido y otro para carga rápida. Arrástralos a cualquier lugar para moverlos y sus posiciones se recuerdan. Funcionan en todos los modos de control, incluso con los controles táctiles ocultos o un mando físico conectado.</string>
     <string name="settings_help_touch_haptics">Añade una ligera respuesta háptica de Android cuando se presiona por primera vez un botón en pantalla, una dirección del D-pad o un stick analógico. Esto solo afecta la sensación de control y no cambia la vibración del juego.</string>
     <string name="settings_help_gamepad_button_haptics">Añade un pulso corto de baja intensidad al presionar los botones físicos del mando. Esto es independiente de la vibración del juego, por lo que los juegos compatibles aún pueden controlar la vibración normal del mando.</string>
     <string name="settings_help_confirm_save_load_actions">Muestra un diálogo de confirmación antes de sobrescribir un estado guardado o cargar uno. Desactívalo para guardar y cargar rápidamente con un solo toque.</string>

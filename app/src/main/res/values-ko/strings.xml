@@ -1399,6 +1399,9 @@
     <string name="settings_help_back_button_exits_game">기본적으로 꺼져 있습니다. 활성화하면 Android 뒤로 버튼이 게임 메뉴의 종료와 동일한 동작을 사용하며 현재 확인 설정도 그대로 적용됩니다.</string>
     <string name="settings_confirm_save_load_actions">저장/불러오기 작업 확인</string>
     <string name="settings_confirm_save_load_actions_desc">빠른 저장 또는 빠른 불러오기 전에 묻습니다.</string>
+    <string name="settings_floating_quick_actions">플로팅 빠른 저장/불러오기 버튼</string>
+    <string name="settings_floating_quick_actions_desc">게임 중 이동 가능한 빠른 저장 및 빠른 불러오기 버튼 표시</string>
+    <string name="settings_help_floating_quick_actions">에뮬레이션 화면에 드래그할 수 있는 작은 버튼 두 개를 추가합니다. 하나는 빠른 저장, 다른 하나는 빠른 불러오기입니다. 원하는 위치로 끌어 이동할 수 있으며 위치가 기억됩니다. 터치 컨트롤이 숨겨져 있거나 물리 컨트롤러가 연결된 경우를 포함해 모든 제어 모드에서 작동합니다.</string>
     <string name="settings_help_touch_haptics">화면 버튼, 방향패드 방향 또는 아날로그 스틱을 처음 누를 때 가벼운 Android 햅틱 피드백을 추가합니다. 이는 조작감에만 영향을 미치며 게임 내 진동은 변경하지 않습니다.</string>
     <string name="settings_help_gamepad_button_haptics">물리적 게임패드 버튼을 누를 때 짧고 약한 펄스를 추가합니다. 이는 게임 진동과는 별개이므로 지원되는 게임은 계속해서 일반 컨트롤러 진동을 제어할 수 있습니다.</string>
     <string name="settings_help_confirm_save_load_actions">저장 상태를 덮어쓰거나 불러오기 전에 확인 대화 상자를 표시합니다. 원탭 빠른 저장 및 빠른 불러오기를 사용하려면 끕니다.</string>

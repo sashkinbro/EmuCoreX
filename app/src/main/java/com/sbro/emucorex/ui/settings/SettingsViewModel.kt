@@ -63,9 +63,11 @@ import com.sbro.emucorex.ui.theme.ThemeMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import com.sbro.emucorex.core.GpuDriverCatalogRepository
@@ -345,6 +347,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    val floatingQuickActionsEnabled: StateFlow<Boolean> = preferences.floatingQuickActionsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     private var mediatekCompatibilityNoticeChecked = false
 
     init {
@@ -2194,6 +2198,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { preferences.setPreferExternalGamepadPlayerOne(enabled) }
     }
     fun setHideOverlayOnGamepad(enabled: Boolean) { viewModelScope.launch { preferences.setHideOverlayOnGamepad(enabled) } }
+    fun setFloatingQuickActionsEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferences.setFloatingQuickActionsEnabled(enabled) }
+    }
     fun setGamepadStickDeadzone(value: Int) { viewModelScope.launch { preferences.setGamepadStickDeadzone(value) } }
     fun setGamepadLeftStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadLeftStickSensitivity(value) } }
     fun setGamepadRightStickSensitivity(value: Int) { viewModelScope.launch { preferences.setGamepadRightStickSensitivity(value) } }

@@ -661,6 +661,9 @@
     <string name="settings_help_back_button_exits_game">Ve výchozím nastavení vypnuto. Je-li povoleno, tlačítko Zpět na Androidu spustí stejnou akci ukončení jako možnost Ukončit v herním menu, včetně aktuálního chování potvrzování.</string>
     <string name="settings_confirm_save_load_actions">Potvrdit akce uložení/načtení</string>
     <string name="settings_confirm_save_load_actions_desc">Zobrazit dotaz před rychlým uložením nebo rychlým načtením.</string>
+    <string name="settings_floating_quick_actions">Plovoucí tlačítka rychlého uložení a načtení</string>
+    <string name="settings_floating_quick_actions_desc">Zobrazit přesouvatelná tlačítka rychlého uložení a načtení během hraní</string>
+    <string name="settings_help_floating_quick_actions">Přidá na obrazovku emulace dvě malá přetahovatelná tlačítka: jedno pro rychlé uložení a jedno pro rychlé načtení. Přetažením je přesunete kamkoli a jejich pozice se pamatují. Fungují ve všech režimech ovládání, i když jsou ovládací prvky skryté nebo je připojen fyzický ovladač.</string>
     <string name="settings_auto_progressive_scan">Automatické progresivní skenování</string>
     <string name="settings_auto_progressive_scan_desc">Podržet Trojúhelník + Křížek během bootování pro hry se skrytou nabídkou 480p.</string>
     <string name="settings_show_fps">Zobrazit počítadlo FPS</string>

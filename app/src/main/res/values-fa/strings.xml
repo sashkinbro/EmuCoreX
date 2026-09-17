@@ -625,6 +625,9 @@
     <string name="settings_help_back_button_exits_game">به‌طور پیش‌فرض خاموش است. با فعال‌سازی، دکمه بازگشت Android همان عملکرد خروج در منوی بازی را با تنظیم تأیید فعلی اجرا می‌کند.</string>
     <string name="settings_confirm_save_load_actions">تأیید اقدامات ذخیره/بارگذاری</string>
     <string name="settings_confirm_save_load_actions_desc">قبل از ذخیره سریع یا بارگذاری سریع سؤال بپرسید.</string>
+    <string name="settings_floating_quick_actions">دکمه‌های شناور ذخیره و بارگذاری سریع</string>
+    <string name="settings_floating_quick_actions_desc">نمایش دکمه‌های شناور ذخیره و بارگذاری سریع در حین بازی</string>
+    <string name="settings_help_floating_quick_actions">دو دکمه کوچک قابل جابه‌جایی روی صفحه شبیه‌سازی اضافه می‌کند: یکی برای ذخیره سریع و دیگری برای بارگذاری سریع. آن‌ها را هر جا بکشید تا جابه‌جا شوند و مکانشان به خاطر سپرده می‌شود. در همه حالت‌های کنترل کار می‌کنند، حتی وقتی کنترل‌های لمسی پنهان هستند یا دسته فیزیکی وصل است.</string>
     <string name="settings_auto_progressive_scan">اسکن پیش‌رونده خودکار</string>
     <string name="settings_auto_progressive_scan_desc">برای بازی‌هایی با درخواست مخفی 480p، در حین راه‌اندازی مثلث + ضربدر را نگه دارید.</string>
     <string name="settings_show_fps">نمایش شمارنده FPS</string>

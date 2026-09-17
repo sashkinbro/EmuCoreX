@@ -1213,6 +1213,7 @@ private fun SettingsContent(
     val gamepadActions = remember { GamepadManager.mappableButtonActions() }
     val gamepadDeviceAssignments by GamepadManager.gamepadDeviceAssignmentsState.collectAsState()
     val ignoredGamepadDevices by GamepadManager.ignoredGamepadDevicesState.collectAsState()
+    val floatingQuickActionsEnabled by viewModel.floatingQuickActionsEnabled.collectAsState()
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
     val searchEntries = rememberSettingsSearchEntries()
@@ -1330,6 +1331,15 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setConfirmSaveLoadActions,
                             helpText = stringResource(R.string.settings_help_confirm_save_load_actions),
                             onResetToDefault = { viewModel.setConfirmSaveLoadActions(defaults.confirmSaveLoadActions) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.Save,
+                            title = stringResource(R.string.settings_floating_quick_actions),
+                            subtitle = stringResource(R.string.settings_floating_quick_actions_desc),
+                            checked = floatingQuickActionsEnabled,
+                            onCheckedChange = viewModel::setFloatingQuickActionsEnabled,
+                            helpText = stringResource(R.string.settings_help_floating_quick_actions),
+                            onResetToDefault = { viewModel.setFloatingQuickActionsEnabled(false) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Visibility,
@@ -5499,6 +5509,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Pro, R.string.settings_pro_title),
         entry(SettingsTab.General, R.string.settings_keep_screen_on),
         entry(SettingsTab.General, R.string.settings_back_button_exits_game),
+        entry(SettingsTab.General, R.string.settings_floating_quick_actions),
         entry(SettingsTab.General, R.string.settings_confirm_save_load_actions),
         entry(SettingsTab.General, R.string.settings_show_recent_games),
         entry(SettingsTab.General, R.string.settings_show_home_search),

@@ -1401,6 +1401,9 @@
     <string name="settings_help_back_button_exits_game">Desativado por padrão. Quando ativado, o botão Voltar do Android usa a mesma ação que Sair no menu do jogo, incluindo a configuração de confirmação atual.</string>
     <string name="settings_confirm_save_load_actions">Confirmar ações de salvar/carregar</string>
     <string name="settings_confirm_save_load_actions_desc">Perguntar antes de salvar ou carregar rapidamente.</string>
+    <string name="settings_floating_quick_actions">Botões flutuantes de salvar/carregar rápido</string>
+    <string name="settings_floating_quick_actions_desc">Mostrar botões flutuantes de salvar e carregar rápido durante o jogo</string>
+    <string name="settings_help_floating_quick_actions">Adiciona dois pequenos botões arrastáveis na tela de emulação: um para salvar rápido e outro para carregar rápido. Arraste-os para qualquer lugar; as posições são lembradas. Funcionam em todos os modos de controle, mesmo com os controles de toque ocultos ou um controle físico conectado.</string>
     <string name="settings_help_touch_haptics">Adiciona um leve feedback tátil do Android quando um botão na tela, direção do D-pad ou direcional analógico é pressionado pela primeira vez. Isso afeta apenas a sensação de controle e não altera a vibração do jogo.</string>
     <string name="settings_help_gamepad_button_haptics">Adiciona um pulso curto de baixa intensidade ao pressionar os botões físicos do controle. Isso é separado da vibração do jogo, para que os jogos suportados ainda possam controlar a vibração normal do controle.</string>
     <string name="settings_help_confirm_save_load_actions">Mostra uma caixa de diálogo de confirmação antes de sobrescrever ou carregar um estado de salvamento. Desative-o para salvar e carregar rapidamente com um toque.</string>

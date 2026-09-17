@@ -468,6 +468,12 @@ class AppPreferences(private val context: Context) {
         const val GAMEPAD_STICK_CURVE_MAX = 200
         const val DEFAULT_GAMEPAD_STICK_CURVE = 100
         const val DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE = true
+        const val DEFAULT_FLOATING_QUICK_SAVE_POSITION_X = 0.88f
+        const val DEFAULT_FLOATING_QUICK_SAVE_POSITION_Y = 0.42f
+        const val DEFAULT_FLOATING_QUICK_LOAD_POSITION_X = 0.88f
+        const val DEFAULT_FLOATING_QUICK_LOAD_POSITION_Y = 0.6f
+        const val FLOATING_QUICK_ACTION_MIN = 0.03f
+        const val FLOATING_QUICK_ACTION_MAX = 0.97f
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
         const val DEFAULT_PAD_VIBRATION_STRENGTH = 100
         const val DEFAULT_TOUCH_HAPTICS_STRENGTH = 60
@@ -729,6 +735,9 @@ class AppPreferences(private val context: Context) {
         private val PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE =
             booleanPreferencesKey("prefer_external_gamepad_player_one")
         private val HIDE_OVERLAY_ON_GAMEPAD = booleanPreferencesKey("hide_overlay_on_gamepad")
+        private val FLOATING_QUICK_ACTIONS_ENABLED = booleanPreferencesKey("floating_quick_actions_enabled")
+        private val FLOATING_QUICK_SAVE_POSITION = stringPreferencesKey("floating_quick_save_position")
+        private val FLOATING_QUICK_LOAD_POSITION = stringPreferencesKey("floating_quick_load_position")
         private val TOUCH_HAPTICS = booleanPreferencesKey("touch_haptics")
         private val STICK_TOGGLE_TARGET = intPreferencesKey("stick_toggle_target")
         private val TOUCH_HAPTICS_PRESET = intPreferencesKey("touch_haptics_preset")
@@ -3599,6 +3608,56 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    // Floating quick save/load buttons
+    val floatingQuickActionsEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[FLOATING_QUICK_ACTIONS_ENABLED] ?: false
+    }
+
+    suspend fun setFloatingQuickActionsEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[FLOATING_QUICK_ACTIONS_ENABLED] = enabled }
+    }
+
+    val floatingQuickSavePosition: Flow<Pair<Float, Float>> = context.dataStore.data.map { prefs ->
+        sanitizeFloatingQuickActionPosition(
+            parseOffsetStr(
+                prefs[FLOATING_QUICK_SAVE_POSITION],
+                DEFAULT_FLOATING_QUICK_SAVE_POSITION_X to DEFAULT_FLOATING_QUICK_SAVE_POSITION_Y
+            )
+        )
+    }
+
+    suspend fun setFloatingQuickSavePosition(x: Float, y: Float) {
+        context.dataStore.edit { prefs ->
+            prefs[FLOATING_QUICK_SAVE_POSITION] = formatOffsetStr(
+                x.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX),
+                y.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX)
+            )
+        }
+    }
+
+    val floatingQuickLoadPosition: Flow<Pair<Float, Float>> = context.dataStore.data.map { prefs ->
+        sanitizeFloatingQuickActionPosition(
+            parseOffsetStr(
+                prefs[FLOATING_QUICK_LOAD_POSITION],
+                DEFAULT_FLOATING_QUICK_LOAD_POSITION_X to DEFAULT_FLOATING_QUICK_LOAD_POSITION_Y
+            )
+        )
+    }
+
+    suspend fun setFloatingQuickLoadPosition(x: Float, y: Float) {
+        context.dataStore.edit { prefs ->
+            prefs[FLOATING_QUICK_LOAD_POSITION] = formatOffsetStr(
+                x.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX),
+                y.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX)
+            )
+        }
+    }
+
+    private fun sanitizeFloatingQuickActionPosition(position: Pair<Float, Float>): Pair<Float, Float> {
+        return position.first.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX) to
+            position.second.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX)
+    }
+
     // Custom Layout Offsets
     private fun parseOffsetStr(raw: String?, default: Pair<Float, Float> = 0f to 0f): Pair<Float, Float> {
         if (raw.isNullOrBlank()) return default
@@ -4153,6 +4212,9 @@ class AppPreferences(private val context: Context) {
                 prefs[PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE] ?: DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
             )
             put("hideOverlayOnGamepad", prefs[HIDE_OVERLAY_ON_GAMEPAD] ?: true)
+            put("floatingQuickActionsEnabled", prefs[FLOATING_QUICK_ACTIONS_ENABLED] ?: false)
+            put("floatingQuickSavePosition", prefs[FLOATING_QUICK_SAVE_POSITION])
+            put("floatingQuickLoadPosition", prefs[FLOATING_QUICK_LOAD_POSITION])
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
             put("gamepadDeviceAssignments", prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
             put("gamepadIgnoredDevices", prefs[GAMEPAD_IGNORED_DEVICES])
@@ -4588,6 +4650,9 @@ class AppPreferences(private val context: Context) {
                 DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE
             )
             prefs[HIDE_OVERLAY_ON_GAMEPAD] = json.optBoolean("hideOverlayOnGamepad", true)
+            prefs[FLOATING_QUICK_ACTIONS_ENABLED] = json.optBoolean("floatingQuickActionsEnabled", false)
+            json.optString("floatingQuickSavePosition").takeIf { it.isNotBlank() }?.let { prefs[FLOATING_QUICK_SAVE_POSITION] = it } ?: prefs.remove(FLOATING_QUICK_SAVE_POSITION)
+            json.optString("floatingQuickLoadPosition").takeIf { it.isNotBlank() }?.let { prefs[FLOATING_QUICK_LOAD_POSITION] = it } ?: prefs.remove(FLOATING_QUICK_LOAD_POSITION)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
             json.optString("gamepadDeviceAssignments").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_DEVICE_ASSIGNMENTS] = it } ?: prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
             json.optString("gamepadIgnoredDevices").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_IGNORED_DEVICES] = it } ?: prefs.remove(GAMEPAD_IGNORED_DEVICES)

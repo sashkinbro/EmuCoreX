@@ -1399,6 +1399,9 @@
     <string name="settings_help_back_button_exits_game">معطّل افتراضيًا. عند تفعيله، يستخدم زر الرجوع في Android إجراء الخروج نفسه الموجود في قائمة اللعبة، مع تطبيق إعداد التأكيد الحالي.</string>
     <string name="settings_confirm_save_load_actions">تأكيد إجراءات الحفظ/التحميل</string>
     <string name="settings_confirm_save_load_actions_desc">السؤال قبل الحفظ السريع أو التحميل السريع.</string>
+    <string name="settings_floating_quick_actions">أزرار عائمة للحفظ والتحميل السريع</string>
+    <string name="settings_floating_quick_actions_desc">إظهار زرّين قابلين للتحريك للحفظ والتحميل السريع أثناء اللعب</string>
+    <string name="settings_help_floating_quick_actions">يضيف زرين صغيرين قابلين للسحب على شاشة المحاكاة: أحدهما للحفظ السريع والآخر للتحميل السريع. اسحبهما إلى أي مكان لتغيير موضعهما، وسيتم تذكر الموضعين. يعملان في كل أوضاع التحكم، حتى عند إخفاء عناصر التحكم اللمسية أو توصيل وحدة تحكم فيزيائية.</string>
     <string name="settings_help_touch_haptics">يضيف استجابة لمس Android خفيفة عند الضغط لأول مرة على زر على الشاشة أو اتجاه D-pad أو عصا تناظرية. هذا يؤثر على الشعور بالتحكم فقط ولا يغير اهتزاز اللعبة.</string>
     <string name="settings_help_gamepad_button_haptics">يضيف نبضة قصيرة منخفضة القوة عند الضغط على أزرار لوحة الألعاب الفعلية. هذا منفصل عن اهتزاز اللعبة، لذلك يمكن للألعاب المدعومة الاستمرار في التحكم في اهتزاز وحدة التحكم العادي.</string>
     <string name="settings_help_confirm_save_load_actions">يعرض مربع حوار تأكيد قبل الكتابة فوق حالة حفظ أو تحميل واحدة. قم بإيقاف تشغيله للحفظ السريع والتحميل السريع بنقرة واحدة.</string>

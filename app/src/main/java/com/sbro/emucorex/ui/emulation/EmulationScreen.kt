@@ -34,6 +34,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -584,6 +585,15 @@ fun EmulationScreen(
     val globalDefaults by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
     val overlayDefaults by preferences.overlayLayoutSnapshot.collectAsState(initial = OverlayLayoutSnapshot())
     val gamepadBindingsByPad by preferences.gamepadBindingsByPad.collectAsState(initial = emptyMap())
+    val floatingQuickActionsEnabled by preferences.floatingQuickActionsEnabled.collectAsState(initial = false)
+    val persistedFloatingQuickSavePosition by preferences.floatingQuickSavePosition.collectAsState(
+        initial = AppPreferences.DEFAULT_FLOATING_QUICK_SAVE_POSITION_X to
+            AppPreferences.DEFAULT_FLOATING_QUICK_SAVE_POSITION_Y
+    )
+    val persistedFloatingQuickLoadPosition by preferences.floatingQuickLoadPosition.collectAsState(
+        initial = AppPreferences.DEFAULT_FLOATING_QUICK_LOAD_POSITION_X to
+            AppPreferences.DEFAULT_FLOATING_QUICK_LOAD_POSITION_Y
+    )
     val effectiveGamepadBindingsByPad = if (uiState.gameSettingsProfileActive && uiState.gamepadBindingsByPad.isNotEmpty()) {
         uiState.gamepadBindingsByPad
     } else {
@@ -625,6 +635,8 @@ fun EmulationScreen(
     var exitDispatched by remember { mutableStateOf(false) }
     var showQuickSaveDialog by remember { mutableStateOf(false) }
     var showQuickLoadDialog by remember { mutableStateOf(false) }
+    var floatingQuickSavePosition by remember { mutableStateOf<Offset?>(null) }
+    var floatingQuickLoadPosition by remember { mutableStateOf<Offset?>(null) }
     var showAutoSaveLoadDialog by remember { mutableStateOf(false) }
     var showCheatsDialog by remember { mutableStateOf(false) }
     var showControlsEditor by remember { mutableStateOf(false) }
@@ -1520,6 +1532,46 @@ fun EmulationScreen(
                 }
             }
         }
+        }
+
+        if (floatingQuickActionsEnabled && !uiState.showMenu && !showControlsEditor) {
+            FloatingQuickActionsLayer(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(26f),
+                savePosition = floatingQuickSavePosition
+                    ?: Offset(
+                        persistedFloatingQuickSavePosition.first,
+                        persistedFloatingQuickSavePosition.second
+                    ),
+                loadPosition = floatingQuickLoadPosition
+                    ?: Offset(
+                        persistedFloatingQuickLoadPosition.first,
+                        persistedFloatingQuickLoadPosition.second
+                    ),
+                saveEnabled = !uiState.isActionInProgress,
+                loadEnabled = !uiState.isActionInProgress,
+                saveInProgress = uiState.actionLabel == "saving",
+                loadInProgress = uiState.actionLabel == "loading",
+                onSavePositionChange = { floatingQuickSavePosition = it },
+                onLoadPositionChange = { floatingQuickLoadPosition = it },
+                onSavePositionCommit = {
+                    floatingQuickSavePosition?.let { position ->
+                        scope.launch {
+                            preferences.setFloatingQuickSavePosition(position.x, position.y)
+                        }
+                    }
+                },
+                onLoadPositionCommit = {
+                    floatingQuickLoadPosition?.let { position ->
+                        scope.launch {
+                            preferences.setFloatingQuickLoadPosition(position.x, position.y)
+                        }
+                    }
+                },
+                onSave = requestQuickSaveClick,
+                onLoad = requestQuickLoadClick
+            )
         }
 
         if (showControlsEditor) {
@@ -6885,6 +6937,154 @@ private fun QuickIconActionButton(
             }
         }
     }
+}
+
+private const val FLOATING_QUICK_ACTION_SIZE_DP = 54
+
+@Composable
+private fun FloatingQuickActionsLayer(
+    savePosition: Offset,
+    loadPosition: Offset,
+    saveEnabled: Boolean,
+    loadEnabled: Boolean,
+    saveInProgress: Boolean,
+    loadInProgress: Boolean,
+    onSavePositionChange: (Offset) -> Unit,
+    onLoadPositionChange: (Offset) -> Unit,
+    onSavePositionCommit: () -> Unit,
+    onLoadPositionCommit: () -> Unit,
+    onSave: () -> Unit,
+    onLoad: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val density = LocalDensity.current
+        val widthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+        val heightPx = with(density) { maxHeight.toPx() }.coerceAtLeast(1f)
+        val sizePx = with(density) { FLOATING_QUICK_ACTION_SIZE_DP.dp.toPx() }
+
+        FloatingQuickActionButton(
+            icon = Icons.Rounded.Save,
+            contentDescription = stringResource(R.string.emulation_quick_save_desc),
+            position = savePosition,
+            widthPx = widthPx,
+            heightPx = heightPx,
+            sizePx = sizePx,
+            enabled = saveEnabled,
+            showProgress = saveInProgress,
+            onDrag = { dragAmount ->
+                onSavePositionChange(
+                    clampFloatingQuickActionPosition(
+                        savePosition + Offset(dragAmount.x / widthPx, dragAmount.y / heightPx)
+                    )
+                )
+            },
+            onDragEnd = onSavePositionCommit,
+            onClick = onSave
+        )
+        FloatingQuickActionButton(
+            icon = Icons.Rounded.Restore,
+            contentDescription = stringResource(R.string.emulation_quick_load_desc),
+            position = loadPosition,
+            widthPx = widthPx,
+            heightPx = heightPx,
+            sizePx = sizePx,
+            enabled = loadEnabled,
+            showProgress = loadInProgress,
+            onDrag = { dragAmount ->
+                onLoadPositionChange(
+                    clampFloatingQuickActionPosition(
+                        loadPosition + Offset(dragAmount.x / widthPx, dragAmount.y / heightPx)
+                    )
+                )
+            },
+            onDragEnd = onLoadPositionCommit,
+            onClick = onLoad
+        )
+    }
+}
+
+@Composable
+private fun FloatingQuickActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    position: Offset,
+    widthPx: Float,
+    heightPx: Float,
+    sizePx: Float,
+    enabled: Boolean,
+    showProgress: Boolean,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onClick: () -> Unit
+) {
+    val currentPosition by rememberUpdatedState(position)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentOnClick by rememberUpdatedState(onClick)
+    val shape = neonShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    Surface(
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    x = (currentPosition.x * widthPx - sizePx / 2f).roundToInt(),
+                    y = (currentPosition.y * heightPx - sizePx / 2f).roundToInt()
+                )
+            }
+            .size(FLOATING_QUICK_ACTION_SIZE_DP.dp)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                currentOnClick()
+            }
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = { currentOnDragEnd() },
+                    onDragCancel = { currentOnDragEnd() },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        currentOnDrag(dragAmount)
+                    }
+                )
+            },
+        shape = shape,
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+        shadowElevation = 6.dp
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (showProgress) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun clampFloatingQuickActionPosition(position: Offset): Offset {
+    return Offset(
+        position.x.coerceIn(
+            AppPreferences.FLOATING_QUICK_ACTION_MIN,
+            AppPreferences.FLOATING_QUICK_ACTION_MAX
+        ),
+        position.y.coerceIn(
+            AppPreferences.FLOATING_QUICK_ACTION_MIN,
+            AppPreferences.FLOATING_QUICK_ACTION_MAX
+        )
+    )
 }
 
 @Composable

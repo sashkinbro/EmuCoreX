@@ -1401,6 +1401,9 @@
     <string name="settings_help_back_button_exits_game">默认关闭。启用后，Android 返回键将使用与游戏菜单中“退出”相同的操作，并沿用当前的确认设置。</string>
     <string name="settings_confirm_save_load_actions">确认保存/加载操作</string>
     <string name="settings_confirm_save_load_actions_desc">在快速保存或快速加载前询问。</string>
+    <string name="settings_floating_quick_actions">浮動快速儲存/讀取按鈕</string>
+    <string name="settings_floating_quick_actions_desc">遊戲期間顯示可移動的快速儲存與快速讀取按鈕</string>
+    <string name="settings_help_floating_quick_actions">在模擬畫面上新增兩個可拖曳的小按鈕：一個用於快速儲存，另一個用於快速讀取。將它們拖到任何位置，位置會被記住。它們在每種控制模式下都能運作，包括觸控控制隱藏或連接實體手把時。</string>
     <string name="settings_help_touch_haptics">首次按下屏幕按钮、十字键方向或模拟摇杆时添加轻微的 Android 触觉反馈。这仅影响控制手感，不会改变游戏内的震动。</string>
     <string name="settings_help_gamepad_button_haptics">在按下实体游戏手柄按钮时添加短促且低强度的脉冲。这独立于游戏震动，因此支持的游戏仍然可以控制常规的控制器震动。</string>
     <string name="settings_help_confirm_save_load_actions">在覆盖保存状态或加载保存状态前显示确认对话框。关闭此功能即可实现一键快速保存和快速加载。</string>

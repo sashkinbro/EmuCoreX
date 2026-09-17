@@ -1399,6 +1399,9 @@
     <string name="settings_help_back_button_exits_game">Varsayılan olarak kapalıdır. Etkinleştirildiğinde Android Geri düğmesi, geçerli onay ayarıyla birlikte oyun menüsündeki Çıkış ile aynı işlemi kullanır.</string>
     <string name="settings_confirm_save_load_actions">Kaydetme/yükleme eylemlerini onayla</string>
     <string name="settings_confirm_save_load_actions_desc">Hızlı kaydetme veya hızlı yüklemeden önce sor.</string>
+    <string name="settings_floating_quick_actions">Yüzen Hızlı Kaydet / Yükle Düğmeleri</string>
+    <string name="settings_floating_quick_actions_desc">Oyun sırasında taşınabilir hızlı kaydet ve hızlı yükle düğmelerini göster</string>
+    <string name="settings_help_floating_quick_actions">Emülasyon ekranına iki küçük sürüklenebilir düğme ekler: biri hızlı kaydetme, diğeri hızlı yükleme için. İstediğiniz yere sürükleyin; konumları hatırlanır. Dokunmatik kontroller gizliyken veya fiziksel bir oyun kolu bağlıyken dahil her kontrol modunda çalışırlar.</string>
     <string name="settings_help_touch_haptics">Ekranda bir düğmeye, D-pad yönüne veya analog çubuğa ilk basıldığında hafif bir Android titreşim geri bildirimi ekler. Bu sadece kontrol hissini etkiler ve oyun içi titreşimi değiştirmez.</string>
     <string name="settings_help_gamepad_button_haptics">Fiziksel gamepad düğmesi basımlarına kısa ve düşük güçlü bir darbe ekler. Bu oyun titreşiminden bağımsızdır, bu sayede desteklenen oyunlar normal kontrolcü titreşimini kontrol etmeye devam edebilir.</string>
     <string name="settings_help_confirm_save_load_actions">Bir kayıt durumunun üzerine yazmadan veya yüklemeden önce bir onay iletişim kutusu gösterir. Tek dokunuşla hızlı kaydetme ve hızlı yükleme için kapatın.</string>

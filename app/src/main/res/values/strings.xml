@@ -711,6 +711,9 @@
     <string name="settings_help_back_button_exits_game">Off by default. When enabled, the Android Back button uses the same exit action as Exit in the game menu, including the current confirmation behavior.</string>
     <string name="settings_confirm_save_load_actions">Confirm save/load actions</string>
     <string name="settings_confirm_save_load_actions_desc">Ask before quick save or quick load.</string>
+    <string name="settings_floating_quick_actions">Floating Quick Save / Load Buttons</string>
+    <string name="settings_floating_quick_actions_desc">Show draggable quick save and quick load buttons during gameplay</string>
+    <string name="settings_help_floating_quick_actions">Adds two small draggable buttons on the emulation screen: one for quick save and one for quick load. Drag them anywhere to move them, and their positions are remembered. They work in every control mode, including when the touch controls are hidden or a physical gamepad is connected.</string>
     <string name="settings_auto_progressive_scan">Auto Progressive Scan</string>
     <string name="settings_auto_progressive_scan_desc">Hold Triangle + Cross during boot for games with a hidden 480p prompt.</string>
     <string name="settings_show_fps">Show FPS counter</string>

@@ -1399,6 +1399,9 @@
     <string name="settings_help_back_button_exits_game">Disattivato per impostazione predefinita. Se attivato, il pulsante Indietro di Android usa la stessa azione di Esci nel menu di gioco, inclusa l’impostazione di conferma corrente.</string>
     <string name="settings_confirm_save_load_actions">Conferma azioni di salvataggio/caricamento</string>
     <string name="settings_confirm_save_load_actions_desc">Chiedi prima del salvataggio o caricamento rapido.</string>
+    <string name="settings_floating_quick_actions">Pulsanti flottanti di salvataggio/caricamento rapido</string>
+    <string name="settings_floating_quick_actions_desc">Mostra pulsanti mobili di salvataggio e caricamento rapido durante il gioco</string>
+    <string name="settings_help_floating_quick_actions">Aggiunge due piccoli pulsanti trascinabili sulla schermata di emulazione: uno per il salvataggio rapido e uno per il caricamento rapido. Trascinali dove vuoi; le loro posizioni vengono ricordate. Funzionano in ogni modalità di controllo, anche quando i comandi touch sono nascosti o è collegato un controller fisico.</string>
     <string name="settings_help_touch_haptics">Aggiunge un leggero feedback aptico di Android quando viene premuto per la prima volta un pulsante sullo schermo, una direzione del D-pad o uno stick analogico. Questo influenza solo la sensazione dei controlli e non modifica la vibrazione del gioco.</string>
     <string name="settings_help_gamepad_button_haptics">Aggiunge un breve impulso a bassa intensità alla pressione dei pulsanti fisici del gamepad. È separato dalla vibrazione del gioco, in modo che i giochi supportati possano continuare a controllare la normale vibrazione del controller.</string>
     <string name="settings_help_confirm_save_load_actions">Mostra una finestra di conferma prima di sovrascrivere o caricare un salvataggio di stato. Disattivalo per il salvataggio e il caricamento rapido con un solo tocco.</string>

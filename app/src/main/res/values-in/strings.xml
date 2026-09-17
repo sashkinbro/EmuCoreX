@@ -625,6 +625,9 @@
     <string name="settings_help_back_button_exits_game">Nonaktif secara default. Jika diaktifkan, tombol Kembali Android menggunakan tindakan yang sama dengan Keluar di menu game, termasuk pengaturan konfirmasi saat ini.</string>
     <string name="settings_confirm_save_load_actions">Konfirmasi tindakan simpan/muat</string>
     <string name="settings_confirm_save_load_actions_desc">Tanyakan sebelum simpan cepat atau muat cepat.</string>
+    <string name="settings_floating_quick_actions">Tombol Simpan/Muat Cepat Mengambang</string>
+    <string name="settings_floating_quick_actions_desc">Tampilkan tombol simpan cepat dan muat cepat yang dapat dipindahkan saat bermain</string>
+    <string name="settings_help_floating_quick_actions">Menambahkan dua tombol kecil yang dapat diseret di layar emulasi: satu untuk simpan cepat dan satu untuk muat cepat. Seret ke mana saja untuk memindahkannya, dan posisinya diingat. Keduanya berfungsi di semua mode kontrol, bahkan saat kontrol sentuh disembunyikan atau gamepad fisik terhubung.</string>
     <string name="settings_auto_progressive_scan">Pindai Progresif Otomatis</string>
     <string name="settings_auto_progressive_scan_desc">Tahan Segitiga + Silang saat boot untuk game dengan prompt 480p yang tersembunyi.</string>
     <string name="settings_show_fps">Tampilkan penghitung FPS</string>
