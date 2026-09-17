@@ -1404,6 +1404,14 @@
     <string name="settings_floating_quick_actions">浮動快速儲存/讀取按鈕</string>
     <string name="settings_floating_quick_actions_desc">遊戲期間顯示可移動的快速儲存與快速讀取按鈕</string>
     <string name="settings_help_floating_quick_actions">在模擬畫面上新增兩個可拖曳的小按鈕：一個用於快速儲存，另一個用於快速讀取。將它們拖到任何位置，位置會被記住。它們在每種控制模式下都能運作，包括觸控控制隱藏或連接實體手把時。</string>
+    <string name="settings_emulation_both_orientations">允許模擬時使用兩種方向</string>
+    <string name="settings_emulation_both_orientations_desc">讓模擬畫面在直向與橫向之間旋轉，而不是強制橫向</string>
+    <string name="settings_help_emulation_both_orientations">關閉時，模擬畫面一律保持橫向。開啟後也能以直向遊玩；畫面會跟隨裝置旋轉。全域方向鎖定會優先於此選項。</string>
+    <string name="settings_orientation_lock">方向鎖定</string>
+    <string name="settings_orientation_lock_auto">自動</string>
+    <string name="settings_orientation_lock_portrait">直向</string>
+    <string name="settings_orientation_lock_landscape">橫向</string>
+    <string name="settings_help_orientation_lock">在整個應用程式中鎖定方向，包括選單與模擬畫面。「自動」會遵循系統旋轉設定。「直向」與「橫向」會讓整個應用程式維持在選擇的方向。</string>
     <string name="settings_help_touch_haptics">首次按下屏幕按钮、十字键方向或模拟摇杆时添加轻微的 Android 触觉反馈。这仅影响控制手感，不会改变游戏内的震动。</string>
     <string name="settings_help_gamepad_button_haptics">在按下实体游戏手柄按钮时添加短促且低强度的脉冲。这独立于游戏震动，因此支持的游戏仍然可以控制常规的控制器震动。</string>
     <string name="settings_help_confirm_save_load_actions">在覆盖保存状态或加载保存状态前显示确认对话框。关闭此功能即可实现一键快速保存和快速加载。</string>

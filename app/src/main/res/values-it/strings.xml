@@ -1402,6 +1402,14 @@
     <string name="settings_floating_quick_actions">Pulsanti flottanti di salvataggio/caricamento rapido</string>
     <string name="settings_floating_quick_actions_desc">Mostra pulsanti mobili di salvataggio e caricamento rapido durante il gioco</string>
     <string name="settings_help_floating_quick_actions">Aggiunge due piccoli pulsanti trascinabili sulla schermata di emulazione: uno per il salvataggio rapido e uno per il caricamento rapido. Trascinali dove vuoi; le loro posizioni vengono ricordate. Funzionano in ogni modalità di controllo, anche quando i comandi touch sono nascosti o è collegato un controller fisico.</string>
+    <string name="settings_emulation_both_orientations">Consenti entrambe le orientazioni nell\'emulazione</string>
+    <string name="settings_emulation_both_orientations_desc">Consenti alla schermata di emulazione di ruotare tra verticale e orizzontale invece di forzare l\'orizzontale</string>
+    <string name="settings_help_emulation_both_orientations">Se disattivato, la schermata di emulazione resta sempre in orizzontale. Attivalo per giocare anche in verticale; lo schermo seguirà la rotazione del dispositivo. Il blocco globale dell\'orientamento ha la precedenza su questa opzione.</string>
+    <string name="settings_orientation_lock">Blocco orientamento</string>
+    <string name="settings_orientation_lock_auto">Automatico</string>
+    <string name="settings_orientation_lock_portrait">Verticale</string>
+    <string name="settings_orientation_lock_landscape">Orizzontale</string>
+    <string name="settings_help_orientation_lock">Blocca l\'orientamento dell\'app ovunque, inclusi menu e schermata di emulazione. «Automatico» segue le impostazioni di rotazione di sistema. «Verticale» e «Orizzontale» mantengono tutta l\'app nell\'orientamento scelto.</string>
     <string name="settings_help_touch_haptics">Aggiunge un leggero feedback aptico di Android quando viene premuto per la prima volta un pulsante sullo schermo, una direzione del D-pad o uno stick analogico. Questo influenza solo la sensazione dei controlli e non modifica la vibrazione del gioco.</string>
     <string name="settings_help_gamepad_button_haptics">Aggiunge un breve impulso a bassa intensità alla pressione dei pulsanti fisici del gamepad. È separato dalla vibrazione del gioco, in modo che i giochi supportati possano continuare a controllare la normale vibrazione del controller.</string>
     <string name="settings_help_confirm_save_load_actions">Mostra una finestra di conferma prima di sovrascrivere o caricare un salvataggio di stato. Disattivalo per il salvataggio e il caricamento rapido con un solo tocco.</string>

@@ -1404,6 +1404,14 @@
     <string name="settings_floating_quick_actions">Botones flotantes de guardado y carga rápidos</string>
     <string name="settings_floating_quick_actions_desc">Mostrar botones flotantes de guardado y carga rápidos durante el juego</string>
     <string name="settings_help_floating_quick_actions">Añade dos botones pequeños arrastrables en la pantalla de emulación: uno para guardado rápido y otro para carga rápida. Arrástralos a cualquier lugar para moverlos y sus posiciones se recuerdan. Funcionan en todos los modos de control, incluso con los controles táctiles ocultos o un mando físico conectado.</string>
+    <string name="settings_emulation_both_orientations">Permitir ambas orientaciones en la emulación</string>
+    <string name="settings_emulation_both_orientations_desc">Permitir que la pantalla de emulación gire entre vertical y horizontal en lugar de forzar la horizontal</string>
+    <string name="settings_help_emulation_both_orientations">Cuando está desactivado, la pantalla de emulación permanece siempre en horizontal. Actívalo para jugar también en vertical; la pantalla seguirá entonces la rotación del dispositivo. El bloqueo global de orientación tiene prioridad sobre esta opción.</string>
+    <string name="settings_orientation_lock">Bloqueo de orientación</string>
+    <string name="settings_orientation_lock_auto">Automático</string>
+    <string name="settings_orientation_lock_portrait">Vertical</string>
+    <string name="settings_orientation_lock_landscape">Horizontal</string>
+    <string name="settings_help_orientation_lock">Bloquea la orientación de la aplicación en todas partes, incluidos los menús y la pantalla de emulación. «Automático» sigue los ajustes de rotación del sistema. «Vertical» y «Horizontal» mantienen toda la aplicación en la orientación elegida.</string>
     <string name="settings_help_touch_haptics">Añade una ligera respuesta háptica de Android cuando se presiona por primera vez un botón en pantalla, una dirección del D-pad o un stick analógico. Esto solo afecta la sensación de control y no cambia la vibración del juego.</string>
     <string name="settings_help_gamepad_button_haptics">Añade un pulso corto de baja intensidad al presionar los botones físicos del mando. Esto es independiente de la vibración del juego, por lo que los juegos compatibles aún pueden controlar la vibración normal del mando.</string>
     <string name="settings_help_confirm_save_load_actions">Muestra un diálogo de confirmación antes de sobrescribir un estado guardado o cargar uno. Desactívalo para guardar y cargar rápidamente con un solo toque.</string>

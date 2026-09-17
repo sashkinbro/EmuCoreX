@@ -1402,6 +1402,14 @@
     <string name="settings_floating_quick_actions">Yüzen Hızlı Kaydet / Yükle Düğmeleri</string>
     <string name="settings_floating_quick_actions_desc">Oyun sırasında taşınabilir hızlı kaydet ve hızlı yükle düğmelerini göster</string>
     <string name="settings_help_floating_quick_actions">Emülasyon ekranına iki küçük sürüklenebilir düğme ekler: biri hızlı kaydetme, diğeri hızlı yükleme için. İstediğiniz yere sürükleyin; konumları hatırlanır. Dokunmatik kontroller gizliyken veya fiziksel bir oyun kolu bağlıyken dahil her kontrol modunda çalışırlar.</string>
+    <string name="settings_emulation_both_orientations">Emülasyonda iki yöne de izin ver</string>
+    <string name="settings_emulation_both_orientations_desc">Emülasyon ekranının dikey ve yatay arasında dönmesine izin ver; yatay zorlanmasın</string>
+    <string name="settings_help_emulation_both_orientations">Kapalıyken emülasyon ekranı her zaman yatay kalır. Dikey olarak da oynamak için açın; ekran artık cihaz döndürmesini izler. Genel yön kilidi bu seçeneğe göre önceliklidir.</string>
+    <string name="settings_orientation_lock">Yön Kilidi</string>
+    <string name="settings_orientation_lock_auto">Otomatik</string>
+    <string name="settings_orientation_lock_portrait">Dikey</string>
+    <string name="settings_orientation_lock_landscape">Yatay</string>
+    <string name="settings_help_orientation_lock">Uygulamanın yönünü menüler ve emülasyon ekranı dahil her yerde kilitler. «Otomatik» sistem döndürme ayarlarını izler. «Dikey» ve «Yatay» tüm uygulamayı seçilen yönde tutar.</string>
     <string name="settings_help_touch_haptics">Ekranda bir düğmeye, D-pad yönüne veya analog çubuğa ilk basıldığında hafif bir Android titreşim geri bildirimi ekler. Bu sadece kontrol hissini etkiler ve oyun içi titreşimi değiştirmez.</string>
     <string name="settings_help_gamepad_button_haptics">Fiziksel gamepad düğmesi basımlarına kısa ve düşük güçlü bir darbe ekler. Bu oyun titreşiminden bağımsızdır, bu sayede desteklenen oyunlar normal kontrolcü titreşimini kontrol etmeye devam edebilir.</string>
     <string name="settings_help_confirm_save_load_actions">Bir kayıt durumunun üzerine yazmadan veya yüklemeden önce bir onay iletişim kutusu gösterir. Tek dokunuşla hızlı kaydetme ve hızlı yükleme için kapatın.</string>

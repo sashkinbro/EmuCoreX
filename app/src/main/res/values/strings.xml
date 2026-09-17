@@ -714,6 +714,14 @@
     <string name="settings_floating_quick_actions">Floating Quick Save / Load Buttons</string>
     <string name="settings_floating_quick_actions_desc">Show draggable quick save and quick load buttons during gameplay</string>
     <string name="settings_help_floating_quick_actions">Adds two small draggable buttons on the emulation screen: one for quick save and one for quick load. Drag them anywhere to move them, and their positions are remembered. They work in every control mode, including when the touch controls are hidden or a physical gamepad is connected.</string>
+    <string name="settings_emulation_both_orientations">Allow Both Orientations in Emulation</string>
+    <string name="settings_emulation_both_orientations_desc">Let the emulation screen rotate between portrait and landscape instead of forcing landscape</string>
+    <string name="settings_help_emulation_both_orientations">When disabled, the emulation screen always stays in landscape. Enable it to play in portrait as well; the screen then follows device rotation. A global orientation lock overrides this option.</string>
+    <string name="settings_orientation_lock">Orientation Lock</string>
+    <string name="settings_orientation_lock_auto">Auto</string>
+    <string name="settings_orientation_lock_portrait">Portrait</string>
+    <string name="settings_orientation_lock_landscape">Landscape</string>
+    <string name="settings_help_orientation_lock">Locks the app orientation everywhere, including menus and the emulation screen. Auto follows the system rotation settings. Portrait and Landscape keep the whole app in the selected orientation.</string>
     <string name="settings_auto_progressive_scan">Auto Progressive Scan</string>
     <string name="settings_auto_progressive_scan_desc">Hold Triangle + Cross during boot for games with a hidden 480p prompt.</string>
     <string name="settings_show_fps">Show FPS counter</string>

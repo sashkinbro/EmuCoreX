@@ -628,6 +628,14 @@
     <string name="settings_floating_quick_actions">Tombol Simpan/Muat Cepat Mengambang</string>
     <string name="settings_floating_quick_actions_desc">Tampilkan tombol simpan cepat dan muat cepat yang dapat dipindahkan saat bermain</string>
     <string name="settings_help_floating_quick_actions">Menambahkan dua tombol kecil yang dapat diseret di layar emulasi: satu untuk simpan cepat dan satu untuk muat cepat. Seret ke mana saja untuk memindahkannya, dan posisinya diingat. Keduanya berfungsi di semua mode kontrol, bahkan saat kontrol sentuh disembunyikan atau gamepad fisik terhubung.</string>
+    <string name="settings_emulation_both_orientations">Izinkan Kedua Orientasi di Emulasi</string>
+    <string name="settings_emulation_both_orientations_desc">Biarkan layar emulasi berputar antara potret dan lanskap alih-alih memaksa lanskap</string>
+    <string name="settings_help_emulation_both_orientations">Saat dinonaktifkan, layar emulasi selalu dalam posisi lanskap. Aktifkan untuk bermain dalam posisi potret juga; layar akan mengikuti rotasi perangkat. Kunci orientasi global lebih diutamakan daripada opsi ini.</string>
+    <string name="settings_orientation_lock">Kunci Orientasi</string>
+    <string name="settings_orientation_lock_auto">Otomatis</string>
+    <string name="settings_orientation_lock_portrait">Potret</string>
+    <string name="settings_orientation_lock_landscape">Lanskap</string>
+    <string name="settings_help_orientation_lock">Mengunci orientasi aplikasi di mana saja, termasuk menu dan layar emulasi. «Otomatis» mengikuti pengaturan rotasi sistem. «Potret» dan «Lanskap» menahan seluruh aplikasi pada orientasi yang dipilih.</string>
     <string name="settings_auto_progressive_scan">Pindai Progresif Otomatis</string>
     <string name="settings_auto_progressive_scan_desc">Tahan Segitiga + Silang saat boot untuk game dengan prompt 480p yang tersembunyi.</string>
     <string name="settings_show_fps">Tampilkan penghitung FPS</string>

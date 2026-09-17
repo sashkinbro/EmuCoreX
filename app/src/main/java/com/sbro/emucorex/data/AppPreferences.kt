@@ -474,6 +474,14 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_FLOATING_QUICK_LOAD_POSITION_Y = 0.6f
         const val FLOATING_QUICK_ACTION_MIN = 0.03f
         const val FLOATING_QUICK_ACTION_MAX = 0.97f
+        const val ORIENTATION_LOCK_AUTO = 0
+        const val ORIENTATION_LOCK_PORTRAIT = 1
+        const val ORIENTATION_LOCK_LANDSCAPE = 2
+
+        fun normalizeOrientationLock(value: Int?): Int = when (value) {
+            ORIENTATION_LOCK_PORTRAIT, ORIENTATION_LOCK_LANDSCAPE -> value
+            else -> ORIENTATION_LOCK_AUTO
+        }
         const val DEFAULT_PRESSURE_MODIFIER_AMOUNT = 50
         const val DEFAULT_PAD_VIBRATION_STRENGTH = 100
         const val DEFAULT_TOUCH_HAPTICS_STRENGTH = 60
@@ -738,6 +746,9 @@ class AppPreferences(private val context: Context) {
         private val FLOATING_QUICK_ACTIONS_ENABLED = booleanPreferencesKey("floating_quick_actions_enabled")
         private val FLOATING_QUICK_SAVE_POSITION = stringPreferencesKey("floating_quick_save_position")
         private val FLOATING_QUICK_LOAD_POSITION = stringPreferencesKey("floating_quick_load_position")
+        private val ORIENTATION_LOCK = intPreferencesKey("orientation_lock")
+        private val EMULATION_ALLOWS_BOTH_ORIENTATIONS =
+            booleanPreferencesKey("emulation_allows_both_orientations")
         private val TOUCH_HAPTICS = booleanPreferencesKey("touch_haptics")
         private val STICK_TOGGLE_TARGET = intPreferencesKey("stick_toggle_target")
         private val TOUCH_HAPTICS_PRESET = intPreferencesKey("touch_haptics_preset")
@@ -3658,6 +3669,25 @@ class AppPreferences(private val context: Context) {
             position.second.coerceIn(FLOATING_QUICK_ACTION_MIN, FLOATING_QUICK_ACTION_MAX)
     }
 
+    // Screen orientation
+    val orientationLock: Flow<Int> = context.dataStore.data.map { prefs ->
+        normalizeOrientationLock(prefs[ORIENTATION_LOCK])
+    }
+
+    suspend fun setOrientationLock(value: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[ORIENTATION_LOCK] = normalizeOrientationLock(value)
+        }
+    }
+
+    val emulationAllowsBothOrientations: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[EMULATION_ALLOWS_BOTH_ORIENTATIONS] ?: false
+    }
+
+    suspend fun setEmulationAllowsBothOrientations(enabled: Boolean) {
+        context.dataStore.edit { it[EMULATION_ALLOWS_BOTH_ORIENTATIONS] = enabled }
+    }
+
     // Custom Layout Offsets
     private fun parseOffsetStr(raw: String?, default: Pair<Float, Float> = 0f to 0f): Pair<Float, Float> {
         if (raw.isNullOrBlank()) return default
@@ -4215,6 +4245,8 @@ class AppPreferences(private val context: Context) {
             put("floatingQuickActionsEnabled", prefs[FLOATING_QUICK_ACTIONS_ENABLED] ?: false)
             put("floatingQuickSavePosition", prefs[FLOATING_QUICK_SAVE_POSITION])
             put("floatingQuickLoadPosition", prefs[FLOATING_QUICK_LOAD_POSITION])
+            put("orientationLock", normalizeOrientationLock(prefs[ORIENTATION_LOCK]))
+            put("emulationAllowsBothOrientations", prefs[EMULATION_ALLOWS_BOTH_ORIENTATIONS] ?: false)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
             put("gamepadDeviceAssignments", prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
             put("gamepadIgnoredDevices", prefs[GAMEPAD_IGNORED_DEVICES])
@@ -4653,6 +4685,8 @@ class AppPreferences(private val context: Context) {
             prefs[FLOATING_QUICK_ACTIONS_ENABLED] = json.optBoolean("floatingQuickActionsEnabled", false)
             json.optString("floatingQuickSavePosition").takeIf { it.isNotBlank() }?.let { prefs[FLOATING_QUICK_SAVE_POSITION] = it } ?: prefs.remove(FLOATING_QUICK_SAVE_POSITION)
             json.optString("floatingQuickLoadPosition").takeIf { it.isNotBlank() }?.let { prefs[FLOATING_QUICK_LOAD_POSITION] = it } ?: prefs.remove(FLOATING_QUICK_LOAD_POSITION)
+            prefs[ORIENTATION_LOCK] = normalizeOrientationLock(json.optInt("orientationLock", ORIENTATION_LOCK_AUTO))
+            prefs[EMULATION_ALLOWS_BOTH_ORIENTATIONS] = json.optBoolean("emulationAllowsBothOrientations", false)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
             json.optString("gamepadDeviceAssignments").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_DEVICE_ASSIGNMENTS] = it } ?: prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
             json.optString("gamepadIgnoredDevices").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_IGNORED_DEVICES] = it } ?: prefs.remove(GAMEPAD_IGNORED_DEVICES)

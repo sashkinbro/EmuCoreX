@@ -1402,6 +1402,14 @@
     <string name="settings_floating_quick_actions">फ़्लोटिंग त्वरित सहेजें/लोड करें बटन</string>
     <string name="settings_floating_quick_actions_desc">गेमप्ले के दौरान हिलाए जा सकने वाले त्वरित सहेजें और लोड करें बटन दिखाएँ</string>
     <string name="settings_help_floating_quick_actions">एमुलेशन स्क्रीन पर दो छोटे खींचने योग्य बटन जोड़ता है: एक त्वरित सहेजने के लिए और एक त्वरित लोड करने के लिए। उन्हें कहीं भी खींचकर ले जाएँ; उनकी स्थिति याद रखी जाती है। ये हर नियंत्रण मोड में काम करते हैं, चाहे टच नियंत्रण छिपे हों या भौतिक गेमपैड जुड़ा हो।</string>
+    <string name="settings_emulation_both_orientations">एमुलेशन में दोनों ओरिएंटेशन की अनुमति दें</string>
+    <string name="settings_emulation_both_orientations_desc">एमुलेशन स्क्रीन को लैंडस्केप पर मजबूर करने के बजाय पोर्ट्रेट और लैंडस्केप के बीच घूमने दें</string>
+    <string name="settings_help_emulation_both_orientations">बंद होने पर एमुलेशन स्क्रीन हमेशा लैंडस्केप में रहती है। पोर्ट्रेट में भी खेलने के लिए इसे चालू करें; स्क्रीन तब डिवाइस के घूमने का पालन करती है। ग्लोबल ओरिएंटेशन लॉक इस विकल्प पर प्राथमिकता रखता है।</string>
+    <string name="settings_orientation_lock">ओरिएंटेशन लॉक</string>
+    <string name="settings_orientation_lock_auto">स्वचालित</string>
+    <string name="settings_orientation_lock_portrait">पोर्ट्रेट</string>
+    <string name="settings_orientation_lock_landscape">लैंडस्केप</string>
+    <string name="settings_help_orientation_lock">मेनू और एमुलेशन स्क्रीन सहित पूरे ऐप की ओरिएंटेशन लॉक करता है। «स्वचालित» सिस्टम रोटेशन सेटिंग्स का पालन करता है। «पोर्ट्रेट» और «लैंडस्केप» पूरे ऐप को चुनी हुई ओरिएंटेशन में रखते हैं।</string>
     <string name="settings_help_touch_haptics">जब कोई ऑन-स्क्रीन बटन, डी-पैड दिशा, या एनालॉग स्टिक पहली बार दबाया जाता है, तो हल्का Android हैप्टिक फीडबैक जोड़ता है। यह केवल नियंत्रण महसूस को प्रभावित करता है और इन-गेम रंबल को नहीं बदलता है。</string>
     <string name="settings_help_gamepad_button_haptics">भौतिक गेमपैड बटन दबाने पर एक छोटा कम-शक्ति वाला पल्स जोड़ता है। यह गेम रंबल से अलग है, इसलिए समर्थित गेम अभी भी सामान्य नियंत्रक कंपन को नियंत्रित कर सकते हैं।</string>
     <string name="settings_help_confirm_save_load_actions">सेव स्टेट को अधिलेखित करने या लोड करने से पहले एक पुष्टिकरण संवाद दिखाता है। वन-टैप क्विक सेव और क्विक लोड के लिए इसे बंद करें।</string>

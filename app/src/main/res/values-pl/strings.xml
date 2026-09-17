@@ -662,6 +662,14 @@
     <string name="settings_floating_quick_actions">Pływające przyciski szybkiego zapisu i odczytu</string>
     <string name="settings_floating_quick_actions_desc">Pokazuj przeciągane przyciski szybkiego zapisu i odczytu podczas gry</string>
     <string name="settings_help_floating_quick_actions">Dodaje dwa małe przeciągane przyciski na ekranie emulacji: jeden do szybkiego zapisu, drugi do szybkiego odczytu. Przeciągnij je w dowolne miejsce — ich pozycje są zapamiętywane. Działają w każdym trybie sterowania, także gdy sterowanie dotykowe jest ukryte lub podłączony jest fizyczny kontroler.</string>
+    <string name="settings_emulation_both_orientations">Zezwalaj na obie orientacje w emulacji</string>
+    <string name="settings_emulation_both_orientations_desc">Pozwól ekranowi emulacji obracać się między pionem a poziomem zamiast wymuszać poziom</string>
+    <string name="settings_help_emulation_both_orientations">Gdy wyłączone, ekran emulacji zawsze pozostaje w poziomie. Włącz, aby grać także w pionie; ekran będzie wtedy podążać za obrotem urządzenia. Globalna blokada orientacji ma priorytet nad tą opcją.</string>
+    <string name="settings_orientation_lock">Blokada orientacji</string>
+    <string name="settings_orientation_lock_auto">Automatycznie</string>
+    <string name="settings_orientation_lock_portrait">Pion</string>
+    <string name="settings_orientation_lock_landscape">Poziom</string>
+    <string name="settings_help_orientation_lock">Blokuje orientację aplikacji wszędzie, łącznie z menu i ekranem emulacji. „Automatycznie” stosuje się do systemowych ustawień obrotu. „Pion” i „Poziom” utrzymują całą aplikację w wybranej orientacji.</string>
     <string name="settings_auto_progressive_scan">Auto skanowanie progresywne</string>
     <string name="settings_auto_progressive_scan_desc">Przytrzymuje Trójkąt + Krzyżyk podczas uruchamiania dla gier z ukrytym wyborem 480p.</string>
     <string name="settings_show_fps">Pokaż licznik FPS</string>

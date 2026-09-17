@@ -664,6 +664,14 @@
     <string name="settings_floating_quick_actions">Plovoucí tlačítka rychlého uložení a načtení</string>
     <string name="settings_floating_quick_actions_desc">Zobrazit přesouvatelná tlačítka rychlého uložení a načtení během hraní</string>
     <string name="settings_help_floating_quick_actions">Přidá na obrazovku emulace dvě malá přetahovatelná tlačítka: jedno pro rychlé uložení a jedno pro rychlé načtení. Přetažením je přesunete kamkoli a jejich pozice se pamatují. Fungují ve všech režimech ovládání, i když jsou ovládací prvky skryté nebo je připojen fyzický ovladač.</string>
+    <string name="settings_emulation_both_orientations">Povolit obě orientace v emulaci</string>
+    <string name="settings_emulation_both_orientations_desc">Nechat obrazovku emulace otáčet mezi režimem na výšku a na šířku místo vynucení režimu na šířku</string>
+    <string name="settings_help_emulation_both_orientations">Když je volba vypnutá, obrazovka emulace zůstává vždy na šířku. Zapněte ji, chcete-li hrát i na výšku; obrazovka pak následuje otáčení zařízení. Globální zámek orientace má před touto volbou přednost.</string>
+    <string name="settings_orientation_lock">Zámek orientace</string>
+    <string name="settings_orientation_lock_auto">Automaticky</string>
+    <string name="settings_orientation_lock_portrait">Na výšku</string>
+    <string name="settings_orientation_lock_landscape">Na šířku</string>
+    <string name="settings_help_orientation_lock">Zamkne orientaci aplikace všude, včetně nabídek a obrazovky emulace. „Automaticky“ se řídí systémovým nastavením otáčení. „Na výšku“ a „Na šířku“ udrží celou aplikaci ve zvolené orientaci.</string>
     <string name="settings_auto_progressive_scan">Automatické progresivní skenování</string>
     <string name="settings_auto_progressive_scan_desc">Podržet Trojúhelník + Křížek během bootování pro hry se skrytou nabídkou 480p.</string>
     <string name="settings_show_fps">Zobrazit počítadlo FPS</string>

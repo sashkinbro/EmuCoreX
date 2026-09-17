@@ -594,6 +594,10 @@ fun EmulationScreen(
         initial = AppPreferences.DEFAULT_FLOATING_QUICK_LOAD_POSITION_X to
             AppPreferences.DEFAULT_FLOATING_QUICK_LOAD_POSITION_Y
     )
+    val orientationLockPreference by preferences.orientationLock.collectAsState(initial = null)
+    val emulationAllowsBothOrientations by preferences.emulationAllowsBothOrientations.collectAsState(
+        initial = null
+    )
     val effectiveGamepadBindingsByPad = if (uiState.gameSettingsProfileActive && uiState.gamepadBindingsByPad.isNotEmpty()) {
         uiState.gamepadBindingsByPad
     } else {
@@ -843,15 +847,28 @@ fun EmulationScreen(
         }
     }
 
-    DisposableEffect(activity, originalRequestedOrientation) {
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        activity?.window?.let { window ->
-            val controller = WindowCompat.getInsetsController(window, window.decorView)
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-        }
-        onDispose {
-            restoreHostUi()
+    val emulationOrientation: Int? = when {
+        orientationLockPreference == null || emulationAllowsBothOrientations == null -> null
+        tvUiEnabled -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        orientationLockPreference == AppPreferences.ORIENTATION_LOCK_PORTRAIT ->
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        orientationLockPreference == AppPreferences.ORIENTATION_LOCK_LANDSCAPE ->
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        emulationAllowsBothOrientations == true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR
+        else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    }
+
+    if (emulationOrientation != null) {
+        DisposableEffect(activity, originalRequestedOrientation, emulationOrientation) {
+            activity?.requestedOrientation = emulationOrientation
+            activity?.window?.let { window ->
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            }
+            onDispose {
+                restoreHostUi()
+            }
         }
     }
 

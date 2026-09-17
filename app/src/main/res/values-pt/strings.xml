@@ -1404,6 +1404,14 @@
     <string name="settings_floating_quick_actions">Botões flutuantes de salvar/carregar rápido</string>
     <string name="settings_floating_quick_actions_desc">Mostrar botões flutuantes de salvar e carregar rápido durante o jogo</string>
     <string name="settings_help_floating_quick_actions">Adiciona dois pequenos botões arrastáveis na tela de emulação: um para salvar rápido e outro para carregar rápido. Arraste-os para qualquer lugar; as posições são lembradas. Funcionam em todos os modos de controle, mesmo com os controles de toque ocultos ou um controle físico conectado.</string>
+    <string name="settings_emulation_both_orientations">Permitir ambas as orientações na emulação</string>
+    <string name="settings_emulation_both_orientations_desc">Permitir que a tela de emulação gire entre retrato e paisagem em vez de forçar paisagem</string>
+    <string name="settings_help_emulation_both_orientations">Quando desativado, a tela de emulação permanece sempre em paisagem. Ative para jogar também em retrato; a tela passa a seguir a rotação do dispositivo. O bloqueio global de orientação tem prioridade sobre esta opção.</string>
+    <string name="settings_orientation_lock">Bloqueio de orientação</string>
+    <string name="settings_orientation_lock_auto">Automático</string>
+    <string name="settings_orientation_lock_portrait">Retrato</string>
+    <string name="settings_orientation_lock_landscape">Paisagem</string>
+    <string name="settings_help_orientation_lock">Bloqueia a orientação do aplicativo em todos os lugares, incluindo menus e a tela de emulação. «Automático» segue as configurações de rotação do sistema. «Retrato» e «Paisagem» mantêm todo o aplicativo na orientação escolhida.</string>
     <string name="settings_help_touch_haptics">Adiciona um leve feedback tátil do Android quando um botão na tela, direção do D-pad ou direcional analógico é pressionado pela primeira vez. Isso afeta apenas a sensação de controle e não altera a vibração do jogo.</string>
     <string name="settings_help_gamepad_button_haptics">Adiciona um pulso curto de baixa intensidade ao pressionar os botões físicos do controle. Isso é separado da vibração do jogo, para que os jogos suportados ainda possam controlar a vibração normal do controle.</string>
     <string name="settings_help_confirm_save_load_actions">Mostra uma caixa de diálogo de confirmação antes de sobrescrever ou carregar um estado de salvamento. Desative-o para salvar e carregar rapidamente com um toque.</string>

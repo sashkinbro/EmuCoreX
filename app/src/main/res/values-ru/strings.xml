@@ -1404,6 +1404,14 @@
     <string name="settings_floating_quick_actions">Плавающие кнопки быстрого сохранения и загрузки</string>
     <string name="settings_floating_quick_actions_desc">Показывать перетаскиваемые кнопки быстрого сохранения и загрузки во время игры</string>
     <string name="settings_help_floating_quick_actions">Добавляет на экран эмуляции две небольшие перетаскиваемые кнопки: одну для быстрого сохранения и одну для быстрой загрузки. Перетащите их в любое место — позиции запоминаются. Работают в любом режиме управления, в том числе когда сенсорные элементы скрыты или подключён физический геймпад.</string>
+    <string name="settings_emulation_both_orientations">Разрешить обе ориентации в эмуляции</string>
+    <string name="settings_emulation_both_orientations_desc">Разрешить экрану эмуляции поворачиваться между портретом и ландшафтом вместо принудительного ландшафта</string>
+    <string name="settings_help_emulation_both_orientations">Когда выключено, экран эмуляции всегда остаётся в ландшафте. Включите, чтобы играть и в портрете: экран тогда следует за поворотом устройства. Глобальная фиксация ориентации имеет приоритет над этой опцией.</string>
+    <string name="settings_orientation_lock">Фиксация ориентации</string>
+    <string name="settings_orientation_lock_auto">Авто</string>
+    <string name="settings_orientation_lock_portrait">Портрет</string>
+    <string name="settings_orientation_lock_landscape">Ландшафт</string>
+    <string name="settings_help_orientation_lock">Фиксирует ориентацию приложения везде, включая меню и экран эмуляции. «Авто» следует системным настройкам поворота. «Портрет» и «Ландшафт» удерживают всё приложение в выбранной ориентации.</string>
     <string name="settings_help_touch_haptics">Добавляет легкую тактильную отдачу Android при первом нажатии экранной кнопки, направления крестовины или аналогового стика. Это влияет только на ощущения от управления и не меняет вибрацию в игре.</string>
     <string name="settings_help_gamepad_button_haptics">Добавляет короткий слабый импульс при нажатии физических кнопок геймпада. Это работает отдельно от игровой вибрации, поэтому поддерживаемые игры могут по-прежнему управлять стандартной вибрацией контроллера.</string>
     <string name="settings_help_confirm_save_load_actions">Показывает диалоговое окно подтверждения перед перезаписью или загрузкой сохранения. Отключите для быстрого сохранения и загрузки в одно касание.</string>

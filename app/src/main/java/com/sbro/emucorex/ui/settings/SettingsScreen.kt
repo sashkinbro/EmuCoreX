@@ -1214,6 +1214,8 @@ private fun SettingsContent(
     val gamepadDeviceAssignments by GamepadManager.gamepadDeviceAssignmentsState.collectAsState()
     val ignoredGamepadDevices by GamepadManager.ignoredGamepadDevicesState.collectAsState()
     val floatingQuickActionsEnabled by viewModel.floatingQuickActionsEnabled.collectAsState()
+    val orientationLock by viewModel.orientationLock.collectAsState()
+    val emulationAllowsBothOrientations by viewModel.emulationAllowsBothOrientations.collectAsState()
     val defaults = remember { SettingsSnapshot() }
     val overlayDefaults = remember { OverlayLayoutSnapshot() }
     val searchEntries = rememberSettingsSearchEntries()
@@ -1271,6 +1273,23 @@ private fun SettingsContent(
                                 }
                             )
                         )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_orientation_lock),
+                            options = listOf(
+                                AppPreferences.ORIENTATION_LOCK_AUTO to
+                                    stringResource(R.string.settings_orientation_lock_auto),
+                                AppPreferences.ORIENTATION_LOCK_PORTRAIT to
+                                    stringResource(R.string.settings_orientation_lock_portrait),
+                                AppPreferences.ORIENTATION_LOCK_LANDSCAPE to
+                                    stringResource(R.string.settings_orientation_lock_landscape)
+                            ),
+                            selectedValue = orientationLock,
+                            onSelect = viewModel::setOrientationLock,
+                            helpText = stringResource(R.string.settings_help_orientation_lock),
+                            onResetToDefault = {
+                                viewModel.setOrientationLock(AppPreferences.ORIENTATION_LOCK_AUTO)
+                            }
+                        )
                         ThemeSelector(
                             selected = uiState.themeMode,
                             isProUnlocked = uiState.isProUnlocked,
@@ -1313,6 +1332,15 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setKeepScreenOn,
                             helpText = stringResource(R.string.settings_help_keep_screen_on),
                             onResetToDefault = { viewModel.setKeepScreenOn(defaults.keepScreenOn) }
+                        )
+                        ToggleItem(
+                            icon = Icons.Rounded.ScreenRotation,
+                            title = stringResource(R.string.settings_emulation_both_orientations),
+                            subtitle = stringResource(R.string.settings_emulation_both_orientations_desc),
+                            checked = emulationAllowsBothOrientations,
+                            onCheckedChange = viewModel::setEmulationAllowsBothOrientations,
+                            helpText = stringResource(R.string.settings_help_emulation_both_orientations),
+                            onResetToDefault = { viewModel.setEmulationAllowsBothOrientations(false) }
                         )
                         ToggleItem(
                             icon = Icons.AutoMirrored.Rounded.ExitToApp,
@@ -5508,6 +5536,8 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.GameMenu, R.string.settings_game_menu_session_sections),
         entry(SettingsTab.Pro, R.string.settings_pro_title),
         entry(SettingsTab.General, R.string.settings_keep_screen_on),
+        entry(SettingsTab.General, R.string.settings_emulation_both_orientations),
+        entry(SettingsTab.General, R.string.settings_orientation_lock),
         entry(SettingsTab.General, R.string.settings_back_button_exits_game),
         entry(SettingsTab.General, R.string.settings_floating_quick_actions),
         entry(SettingsTab.General, R.string.settings_confirm_save_load_actions),

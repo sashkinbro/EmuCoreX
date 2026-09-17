@@ -1402,6 +1402,14 @@
     <string name="settings_floating_quick_actions">フローティング クイックセーブ/ロードボタン</string>
     <string name="settings_floating_quick_actions_desc">プレイ中に移動可能なクイックセーブとクイックロードのボタンを表示します</string>
     <string name="settings_help_floating_quick_actions">エミュレーション画面に小さなドラッグ可能なボタンを 2 つ追加します。1 つはクイックセーブ用、もう 1 つはクイックロード用です。どこにでもドラッグして移動でき、位置は記憶されます。タッチ操作が非表示の場合や物理コントローラー接続時など、どの操作モードでも機能します。</string>
+    <string name="settings_emulation_both_orientations">エミュレーションで両方の画面の向きを許可</string>
+    <string name="settings_emulation_both_orientations_desc">横向きを強制せず、エミュレーション画面を縦向きと横向きの間で回転できるようにします</string>
+    <string name="settings_help_emulation_both_orientations">オフの場合、エミュレーション画面は常に横向きのままです。縦向きでもプレイするにはオンにしてください。画面はデバイスの回転に従います。全体の画面の向きの固定は、このオプションより優先されます。</string>
+    <string name="settings_orientation_lock">画面の向きの固定</string>
+    <string name="settings_orientation_lock_auto">自動</string>
+    <string name="settings_orientation_lock_portrait">縦向き</string>
+    <string name="settings_orientation_lock_landscape">横向き</string>
+    <string name="settings_help_orientation_lock">メニューやエミュレーション画面を含め、アプリ全体の画面の向きを固定します。「自動」はシステムの回転設定に従います。「縦向き」と「横向き」はアプリ全体を選択した向きに保ちます。</string>
     <string name="settings_help_touch_haptics">画面上のボタン、十字キーの方向、またはアナログスティックを最初に押したときに、軽いAndroidハプティクスフィードバックを追加します。これは操作感にのみ影響し、ゲーム内の振動は変更しません。</string>
     <string name="settings_help_gamepad_button_haptics">物理的なゲームパッドのボタンを押したときに、短く弱い振動を追加します。これはゲームの振動とは別であるため、対応しているゲームは通常のコントローラーの振動を制御できます。</string>
     <string name="settings_help_confirm_save_load_actions">セーブステートを上書きまたはロードする前に確認ダイアログを表示します。ワンタップのクイックセーブとクイックロードを使用するにはオフにします。</string>
