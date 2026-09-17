@@ -1989,17 +1989,11 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
 #if defined(__ANDROID__)
-	header += fmt::format("#define GPU_PROFILE_MALI {}\n", IsMaliGPUProfile() ? 1 : 0);
-	header += fmt::format("#define GPU_PROFILE_ADRENO {}\n", IsAdrenoGPUProfile() ? 1 : 0);
-	header += fmt::format("#define GPU_PROFILE_POWERVR {}\n", IsPowerVRGPUProfile() ? 1 : 0);
 	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n",
 		UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
 	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n",
 		UsesMobileDriverWorkaround(DriverWorkaround::StoreBitwiseNegationInTemporary) ? 1 : 0);
 #else
-	header += "#define GPU_PROFILE_MALI 0\n";
-	header += "#define GPU_PROFILE_ADRENO 0\n";
-	header += "#define GPU_PROFILE_POWERVR 0\n";
 	header += "#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND 0\n";
 	header += "#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY 0\n";
 #endif

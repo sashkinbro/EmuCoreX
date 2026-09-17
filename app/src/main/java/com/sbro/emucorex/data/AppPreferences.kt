@@ -589,7 +589,6 @@ class AppPreferences(private val context: Context) {
         private val COVER_ART_STYLE = intPreferencesKey("cover_art_style")
         private val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val PERFORMANCE_PROFILE = intPreferencesKey("performance_profile")
-        private val GPU_HARDWARE_PROFILE = intPreferencesKey("gpu_hardware_profile")
         private val LANGUAGE_TAG = stringPreferencesKey("language_tag")
         private val ASPECT_RATIO = intPreferencesKey("aspect_ratio")
         private val DISPLAY_CROP_LEFT = intPreferencesKey("display_crop_left")
@@ -1242,11 +1241,6 @@ class AppPreferences(private val context: Context) {
     val performanceProfile: Flow<Int> = context.dataStore.data.map { prefs ->
         PerformanceProfiles.normalize(prefs[PERFORMANCE_PROFILE] ?: PerformanceProfiles.SAFE)
     }
-
-    val gpuHardwareProfile: Flow<Int> = context.dataStore.data.map { prefs ->
-        GpuHardwareProfiles.normalize(prefs[GPU_HARDWARE_PROFILE] ?: GpuHardwareProfiles.ADRENO)
-    }
-
 
     val gpuDriverType: Flow<Int> = context.dataStore.data.map { prefs ->
         prefs[GPU_DRIVER_TYPE] ?: 0
@@ -4206,7 +4200,6 @@ class AppPreferences(private val context: Context) {
             val gpuHardwareProfile = GpuHardwareProfiles.normalize(
                 json.optInt("gpuHardwareProfile", GpuHardwareProfiles.ADRENO)
             )
-            prefs[GPU_HARDWARE_PROFILE] = gpuHardwareProfile
             val importedRenderer = normalizeRendererPreference(
                 if (json.has("renderer")) json.optInt("renderer") else null
             )

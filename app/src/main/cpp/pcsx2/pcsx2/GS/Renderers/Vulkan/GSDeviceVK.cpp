@@ -596,10 +596,7 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 #if defined(__ANDROID__)
 	MobileDriverContext driver_context;
 	driver_context.api = MobileGpuApi::Vulkan;
-	driver_context.vendor_id = m_device_properties.vendorID;
-	driver_context.device_id = m_device_properties.deviceID;
 	driver_context.driver_version = m_device_properties.driverVersion;
-	driver_context.api_version = m_device_properties.apiVersion;
 	driver_context.max_draw_indirect_count = m_device_properties.limits.maxDrawIndirectCount;
 	GpuProfileSelection gpu_profile_selection =
 		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
@@ -4932,8 +4929,6 @@ bool GSDeviceVK::CreateRenderPasses()
 	const VkFormat rt_format = LookupNativeFormat(GSTexture::Format::Color);
 	const VkFormat colclip_rt_format = LookupNativeFormat(GSTexture::Format::ColorClip);
 	const VkFormat depth_format = LookupNativeFormat(GSTexture::Format::DepthStencil);
-	m_rt_format = rt_format;
-	m_colclip_rt_format = colclip_rt_format;
 	m_depth_format = depth_format;
 
 	for (u32 rt = 0; rt < 2; rt++)

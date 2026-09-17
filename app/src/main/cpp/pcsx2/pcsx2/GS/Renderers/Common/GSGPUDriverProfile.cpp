@@ -445,14 +445,6 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 		ParseOpenGLDriverVersion(context.api_version_string, selection.runtime_profile);
 	profile.version.raw = context.driver_version;
 
-	if (selection.runtime_profile != RuntimeGpuProfile::Unknown)
-		profile.confidence = selection.gpu.recognized ?
-			DriverProfileConfidence::Model : DriverProfileConfidence::Vendor;
-	if (profile.driver != MobileGpuDriver::Unknown)
-		profile.confidence = DriverProfileConfidence::Driver;
-	if (profile.version.known)
-		profile.confidence = DriverProfileConfidence::DriverVersion;
-
 	for (const DriverRule& rule : s_driver_rules)
 	{
 		if (std::string_view(rule.id) == "vk-arm-midgard-uniform-indexing" &&
@@ -475,8 +467,6 @@ MobileDriverProfile ResolveDriverProfile(const GpuProfileSelection& selection,
 		profile.matched_rule_count++;
 	}
 
-	profile.conservative_fallback =
-		(selection.runtime_profile == RuntimeGpuProfile::Unknown || profile.driver == MobileGpuDriver::Unknown);
 	return profile;
 }
 } // namespace GpuProfileDetail

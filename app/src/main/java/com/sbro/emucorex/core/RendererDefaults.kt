@@ -7,10 +7,7 @@ object RendererDefaults {
     const val VULKAN = 14
     const val DEFAULT = OPENGL
 
-    fun defaultForHardware(
-        @Suppress("UNUSED_PARAMETER")
-        isMediaTekHardware: Boolean = GpuHardwareProfiles.isMediaTekHardware()
-    ): Int {
+    fun defaultForHardware(): Int {
         return if (GpuHardwareProfiles.detectHardwareProfile() == GpuHardwareProfiles.ADRENO) {
             VULKAN
         } else {
@@ -18,13 +15,10 @@ object RendererDefaults {
         }
     }
 
-    fun normalizeAndroidRenderer(
-        value: Int,
-        isMediaTekHardware: Boolean = GpuHardwareProfiles.isMediaTekHardware()
-    ): Int {
+    fun normalizeAndroidRenderer(value: Int): Int {
         return when (value) {
             OPENGL, SOFTWARE, VULKAN -> value
-            else -> defaultForHardware(isMediaTekHardware)
+            else -> defaultForHardware()
         }
     }
 }

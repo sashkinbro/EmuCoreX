@@ -480,7 +480,7 @@ object EmulatorBridge {
         )
 
         val normalizedGpuHardwareProfile = GpuHardwareProfiles.normalize(gpuHardwareProfile)
-        val gpuHardwareProfileOverride = GpuHardwareProfiles.coreOverrideFor(normalizedGpuHardwareProfile)
+        val gpuHardwareProfileOverride = GpuHardwareProfiles.coreOverrideFor()
         val customDriverSupported = GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() && !GpuHardwareProfiles.isMediatekProfile(normalizedGpuHardwareProfile)
         val effectiveGpuDriverType = if (gpuDriverType == 1 && customDriverSupported) 1 else 0
         val effectiveMediatekAngleOpenGl = shouldUseMediatekAngleOpenGl(
@@ -729,7 +729,6 @@ object EmulatorBridge {
                 add(settingOp("EmuCoreX", "BiosSource", "string", biosPath.orEmpty()))
                 add(settingOp("EmuCoreX", "Renderer", "int", resolvedRenderer.toString()))
                 add(settingOp("EmuCoreX", "UpscaleMultiplier", "float", upscaleMultiplier.toString()))
-                add(settingOp("EmuCoreX", "GpuHardwareProfile", "int", normalizedGpuHardwareProfile.toString()))
                 add(settingOp("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString()))
                 add(settingOp("EmuCoreX", "AutotestMode", "bool", autotestMode.toString()))
                 add(settingOp("EmuCoreX", "DebugLogcatGS", "bool", prefs.debugLogcatGsSync().toString()))

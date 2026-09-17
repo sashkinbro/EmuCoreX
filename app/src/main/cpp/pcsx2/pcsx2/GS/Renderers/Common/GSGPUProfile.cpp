@@ -39,20 +39,13 @@ bool ContainsAny(std::string_view haystack, std::initializer_list<const char*> n
 	return false;
 }
 
-MobileGsTuning MakeMobileGsTuning(u32, u32, u32, u32)
-{
-	// Keep the legacy model-table call sites source-compatible, but do not let their old
-	// tier values change GS resource lifetime. Every call resolves to the full policy.
-	return MobileGsTuning{};
-}
-
 MobileGsTuning MakeConservativeMobileGsTuning()
 {
 	// Keep the upstream GS retention policy on every mobile GPU. Capability and driver
 	// workarounds remain profile-specific, but shrinking these pools is not a safe way to
 	// classify a weaker GPU: it increases allocation churn and can discard intermediate
 	// render surfaces still needed by multi-pass effects.
-	return MakeMobileGsTuning(300, 20, 300, 10);
+	return MobileGsTuning{};
 }
 } // namespace GpuProfileDetail
 
@@ -179,22 +172,6 @@ const char* GpuProfileDetector::OverrideToConfigString(GpuProfileOverride value)
 	}
 }
 
-const char* GpuProfileDetector::OverrideToString(GpuProfileOverride value)
-{
-	switch (value)
-	{
-		case GpuProfileOverride::Mali:
-			return "Force Mali";
-		case GpuProfileOverride::Adreno:
-			return "Force Adreno";
-		case GpuProfileOverride::PowerVR:
-			return "Force PowerVR";
-		case GpuProfileOverride::Auto:
-		default:
-			return "Auto";
-	}
-}
-
 const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
 {
 	switch (value)
@@ -241,17 +218,6 @@ const char* GpuProfileDetector::ArchitectureToString(MobileGpuArchitecture value
 	}
 }
 
-const char* GpuProfileDetector::ApiToString(MobileGpuApi value)
-{
-	switch (value)
-	{
-		case MobileGpuApi::OpenGL: return "OpenGL";
-		case MobileGpuApi::Vulkan: return "Vulkan";
-		case MobileGpuApi::Unknown:
-		default: return "Unknown";
-	}
-}
-
 const char* GpuProfileDetector::DriverToString(MobileGpuDriver value)
 {
 	switch (value)
@@ -268,66 +234,11 @@ const char* GpuProfileDetector::DriverToString(MobileGpuDriver value)
 	}
 }
 
-const char* GpuProfileDetector::BugToString(DriverBug value)
-{
-	switch (value)
-	{
-		case DriverBug::BrokenBufferStreaming: return "BrokenBufferStreaming";
-		case DriverBug::BrokenUnsynchronizedMapping: return "BrokenUnsynchronizedMapping";
-		case DriverBug::BrokenVectorBitwiseAnd: return "BrokenVectorBitwiseAnd";
-		case DriverBug::BrokenBitwiseOpNegation: return "BrokenBitwiseOpNegation";
-		case DriverBug::BrokenPrimitiveRestart: return "BrokenPrimitiveRestart";
-		case DriverBug::BrokenPushDescriptors: return "BrokenPushDescriptors";
-		case DriverBug::BrokenAttachmentFeedbackLoopLayout: return "BrokenAttachmentFeedbackLoopLayout";
-		case DriverBug::BrokenRasterizationOrderAttachmentAccess: return "BrokenRasterizationOrderAttachmentAccess";
-		case DriverBug::SlowCachedReadbackMemory: return "SlowCachedReadbackMemory";
-		case DriverBug::BrokenClearLoadOpRenderPass: return "BrokenClearLoadOpRenderPass";
-		case DriverBug::Broken16BitTextureFormats: return "Broken16BitTextureFormats";
-		case DriverBug::BrokenGenerateMipmapTallTexture: return "BrokenGenerateMipmapTallTexture";
-		case DriverBug::BrokenEmptyRenderPass: return "BrokenEmptyRenderPass";
-		case DriverBug::BrokenConstantLoad: return "BrokenConstantLoad";
-		case DriverBug::BrokenUniformIndexing: return "BrokenUniformIndexing";
-		case DriverBug::BrokenVSync: return "BrokenVSync";
-		case DriverBug::BrokenMultithreadedShaderCompilation: return "BrokenMultithreadedShaderCompilation";
-		case DriverBug::BrokenDynamicRendering: return "BrokenDynamicRendering";
-		case DriverBug::BrokenImagelessFramebuffer: return "BrokenImagelessFramebuffer";
-		case DriverBug::BrokenExtendedDynamicState: return "BrokenExtendedDynamicState";
-		case DriverBug::BrokenPrimitiveTopologyDynamicState: return "BrokenPrimitiveTopologyDynamicState";
-		case DriverBug::BrokenGraphicsPipelineLibrary: return "BrokenGraphicsPipelineLibrary";
-		case DriverBug::Count:
-		default: return "Unknown";
-	}
-}
-
-const char* GpuProfileDetector::WorkaroundToString(DriverWorkaround value)
-{
-	switch (value)
-	{
-		case DriverWorkaround::ScalarizeVectorBitwiseAnd: return "ScalarizeVectorBitwiseAnd";
-		case DriverWorkaround::StoreBitwiseNegationInTemporary: return "StoreBitwiseNegationInTemporary";
-		case DriverWorkaround::UseDescriptorSets: return "UseDescriptorSets";
-		case DriverWorkaround::DisableAttachmentFeedbackLoopLayout: return "DisableAttachmentFeedbackLoopLayout";
-		case DriverWorkaround::DisableRasterizationOrderAttachmentAccess:
-			return "DisableRasterizationOrderAttachmentAccess";
-		case DriverWorkaround::PreferCoherentReadback: return "PreferCoherentReadback";
-		case DriverWorkaround::AvoidClearLoadOpRenderPass: return "AvoidClearLoadOpRenderPass";
-		case DriverWorkaround::GenerateMipmapManuallyForTallTextures: return "GenerateMipmapManuallyForTallTextures";
-		case DriverWorkaround::RewriteUniformIndexing: return "RewriteUniformIndexing";
-		case DriverWorkaround::ForceFifoPresent: return "ForceFifoPresent";
-		case DriverWorkaround::AlignSwapchainWidthTo32: return "AlignSwapchainWidthTo32";
-		case DriverWorkaround::Count:
-		default: return "Unknown";
-	}
-}
-
 static void ApplyResolvedProfile(GpuProfileSelection& selection, RuntimeGpuProfile runtime_profile,
 	GpuProfileDetail::ResolvedGpuProfile&& resolved)
 {
 	selection.runtime_profile = runtime_profile;
 	selection.gpu = std::move(resolved.gpu);
-	// Model tables identify the GPU and select narrowly-scoped driver workarounds. Do not
-	// turn device tiering into a different GS resource lifetime model.
-	selection.gs_tuning = GpuProfileDetail::MakeConservativeMobileGsTuning();
 }
 
 GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value, std::string_view gpu_vendor,

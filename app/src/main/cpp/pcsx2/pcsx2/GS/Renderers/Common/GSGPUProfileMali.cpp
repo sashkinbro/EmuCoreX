@@ -16,56 +16,50 @@ struct MaliSpec
 	char series;
 	u16 model;
 	MobileGpuArchitecture architecture;
-	MobileGsTuning tuning;
 };
-
-constexpr MobileGsTuning T(u32 pool, u32 target_age, u32 texture_age)
-{
-	return MobileGsTuning{pool < 128, true, pool, target_age, pool, texture_age};
-}
 
 // Arm's public product families. Performance still depends heavily on MC/MP core count, which is applied below.
 static constexpr std::array<MaliSpec, 40> s_mali_specs = {{
-	{'U', 200, MobileGpuArchitecture::MaliUtgard, T(40, 4, 4)},
-	{'U', 300, MobileGpuArchitecture::MaliUtgard, T(40, 4, 4)},
-	{'U', 400, MobileGpuArchitecture::MaliUtgard, T(44, 4, 4)},
-	{'U', 450, MobileGpuArchitecture::MaliUtgard, T(48, 4, 4)},
-	{'U', 470, MobileGpuArchitecture::MaliUtgard, T(48, 4, 4)},
-	{'T', 600, MobileGpuArchitecture::MaliMidgard, T(48, 4, 4)},
-	{'T', 604, MobileGpuArchitecture::MaliMidgard, T(52, 4, 4)},
-	{'T', 620, MobileGpuArchitecture::MaliMidgard, T(52, 4, 4)},
-	{'T', 624, MobileGpuArchitecture::MaliMidgard, T(56, 5, 4)},
-	{'T', 628, MobileGpuArchitecture::MaliMidgard, T(60, 5, 4)},
-	{'T', 658, MobileGpuArchitecture::MaliMidgard, T(64, 5, 5)},
-	{'T', 678, MobileGpuArchitecture::MaliMidgard, T(68, 5, 5)},
-	{'T', 720, MobileGpuArchitecture::MaliMidgard, T(52, 4, 4)},
-	{'T', 760, MobileGpuArchitecture::MaliMidgard, T(64, 5, 5)},
-	{'T', 820, MobileGpuArchitecture::MaliMidgard, T(52, 4, 4)},
-	{'T', 830, MobileGpuArchitecture::MaliMidgard, T(56, 5, 4)},
-	{'T', 860, MobileGpuArchitecture::MaliMidgard, T(64, 5, 5)},
-	{'T', 880, MobileGpuArchitecture::MaliMidgard, T(72, 6, 5)},
-	{'G', 31, MobileGpuArchitecture::MaliBifrost, T(56, 5, 4)},
-	{'G', 51, MobileGpuArchitecture::MaliBifrost, T(60, 5, 5)},
-	{'G', 52, MobileGpuArchitecture::MaliBifrost, T(68, 5, 5)},
-	{'G', 71, MobileGpuArchitecture::MaliBifrost, T(72, 6, 5)},
-	{'G', 72, MobileGpuArchitecture::MaliBifrost, T(76, 6, 5)},
-	{'G', 76, MobileGpuArchitecture::MaliBifrost, T(84, 7, 6)},
-	{'G', 57, MobileGpuArchitecture::MaliValhall1, T(72, 6, 5)},
-	{'G', 68, MobileGpuArchitecture::MaliValhall1, T(84, 7, 6)},
-	{'G', 77, MobileGpuArchitecture::MaliValhall1, T(92, 7, 6)},
-	{'G', 78, MobileGpuArchitecture::MaliValhall1, T(104, 8, 7)}, // G78AE shares the GS policy.
-	{'G', 310, MobileGpuArchitecture::MaliValhall2, T(64, 5, 5)},
-	{'G', 510, MobileGpuArchitecture::MaliValhall2, T(80, 6, 5)},
-	{'G', 610, MobileGpuArchitecture::MaliValhall2, T(104, 8, 7)},
-	{'G', 710, MobileGpuArchitecture::MaliValhall2, T(136, 10, 8)},
-	{'G', 615, MobileGpuArchitecture::MaliValhall3, T(112, 8, 7)},
-	{'G', 715, MobileGpuArchitecture::MaliValhall3, T(144, 10, 8)},
-	{'G', 620, MobileGpuArchitecture::MaliFifthGen, T(104, 8, 7)},
-	{'G', 720, MobileGpuArchitecture::MaliFifthGen, T(140, 10, 8)},
-	{'G', 625, MobileGpuArchitecture::MaliFifthGen, T(112, 8, 7)},
-	{'G', 725, MobileGpuArchitecture::MaliFifthGen, T(144, 10, 8)},
-	{'G', 925, MobileGpuArchitecture::MaliFifthGen, T(160, 12, 8)},
-	{'G', 1, MobileGpuArchitecture::MaliG1, T(144, 10, 8)},
+	{'U', 200, MobileGpuArchitecture::MaliUtgard},
+	{'U', 300, MobileGpuArchitecture::MaliUtgard},
+	{'U', 400, MobileGpuArchitecture::MaliUtgard},
+	{'U', 450, MobileGpuArchitecture::MaliUtgard},
+	{'U', 470, MobileGpuArchitecture::MaliUtgard},
+	{'T', 600, MobileGpuArchitecture::MaliMidgard},
+	{'T', 604, MobileGpuArchitecture::MaliMidgard},
+	{'T', 620, MobileGpuArchitecture::MaliMidgard},
+	{'T', 624, MobileGpuArchitecture::MaliMidgard},
+	{'T', 628, MobileGpuArchitecture::MaliMidgard},
+	{'T', 658, MobileGpuArchitecture::MaliMidgard},
+	{'T', 678, MobileGpuArchitecture::MaliMidgard},
+	{'T', 720, MobileGpuArchitecture::MaliMidgard},
+	{'T', 760, MobileGpuArchitecture::MaliMidgard},
+	{'T', 820, MobileGpuArchitecture::MaliMidgard},
+	{'T', 830, MobileGpuArchitecture::MaliMidgard},
+	{'T', 860, MobileGpuArchitecture::MaliMidgard},
+	{'T', 880, MobileGpuArchitecture::MaliMidgard},
+	{'G', 31, MobileGpuArchitecture::MaliBifrost},
+	{'G', 51, MobileGpuArchitecture::MaliBifrost},
+	{'G', 52, MobileGpuArchitecture::MaliBifrost},
+	{'G', 71, MobileGpuArchitecture::MaliBifrost},
+	{'G', 72, MobileGpuArchitecture::MaliBifrost},
+	{'G', 76, MobileGpuArchitecture::MaliBifrost},
+	{'G', 57, MobileGpuArchitecture::MaliValhall1},
+	{'G', 68, MobileGpuArchitecture::MaliValhall1},
+	{'G', 77, MobileGpuArchitecture::MaliValhall1},
+	{'G', 78, MobileGpuArchitecture::MaliValhall1}, // G78AE shares the GS policy.
+	{'G', 310, MobileGpuArchitecture::MaliValhall2},
+	{'G', 510, MobileGpuArchitecture::MaliValhall2},
+	{'G', 610, MobileGpuArchitecture::MaliValhall2},
+	{'G', 710, MobileGpuArchitecture::MaliValhall2},
+	{'G', 615, MobileGpuArchitecture::MaliValhall3},
+	{'G', 715, MobileGpuArchitecture::MaliValhall3},
+	{'G', 620, MobileGpuArchitecture::MaliFifthGen},
+	{'G', 720, MobileGpuArchitecture::MaliFifthGen},
+	{'G', 625, MobileGpuArchitecture::MaliFifthGen},
+	{'G', 725, MobileGpuArchitecture::MaliFifthGen},
+	{'G', 925, MobileGpuArchitecture::MaliFifthGen},
+	{'G', 1, MobileGpuArchitecture::MaliG1},
 }};
 
 static bool ParseUnsigned(std::string_view text, size_t pos, u16* value, size_t* end)
@@ -215,62 +209,6 @@ static MobileGpuArchitecture ArchitectureForUnknownMali(char series, u16 model)
 	return MobileGpuArchitecture::MaliFifthGen;
 }
 
-static MobileGsTuning FallbackTuningForMali(MobileGpuArchitecture architecture)
-{
-	switch (architecture)
-	{
-		case MobileGpuArchitecture::MaliUtgard: return T(44, 4, 4);
-		case MobileGpuArchitecture::MaliMidgard: return T(60, 5, 5);
-		case MobileGpuArchitecture::MaliBifrost: return T(72, 6, 5);
-		case MobileGpuArchitecture::MaliValhall1: return T(88, 7, 6);
-		case MobileGpuArchitecture::MaliValhall2: return T(104, 8, 7);
-		case MobileGpuArchitecture::MaliValhall3: return T(128, 9, 7);
-		case MobileGpuArchitecture::MaliFifthGen: return T(136, 10, 8);
-		case MobileGpuArchitecture::MaliG1: return T(144, 10, 8);
-		default: return MakeConservativeMobileGsTuning();
-	}
-}
-
-static void ApplyCoreCountLimits(MobileGsTuning* tuning, u8 core_count)
-{
-	if (core_count == 0)
-		return;
-
-	u32 pool_cap = 160;
-	u32 target_age_cap = 12;
-	u32 texture_age_cap = 8;
-	if (core_count <= 2)
-	{
-		pool_cap = 64;
-		target_age_cap = 5;
-		texture_age_cap = 5;
-	}
-	else if (core_count <= 4)
-	{
-		pool_cap = 88;
-		target_age_cap = 7;
-		texture_age_cap = 6;
-	}
-	else if (core_count <= 6)
-	{
-		pool_cap = 112;
-		target_age_cap = 8;
-		texture_age_cap = 7;
-	}
-	else if (core_count <= 8)
-	{
-		pool_cap = 136;
-		target_age_cap = 10;
-		texture_age_cap = 8;
-	}
-
-	tuning->pooled_targets = std::min(tuning->pooled_targets, pool_cap);
-	tuning->pooled_textures = std::min(tuning->pooled_textures, pool_cap);
-	tuning->target_age = std::min(tuning->target_age, target_age_cap);
-	tuning->texture_age = std::min(tuning->texture_age, texture_age_cap);
-	tuning->constrained = (tuning->pooled_targets < 128 || tuning->pooled_textures < 128);
-	tuning->prefer_new_textures = true;
-}
 } // namespace
 
 bool LooksLikeMali(std::string_view lowered_hints)
@@ -284,7 +222,6 @@ ResolvedGpuProfile ResolveMaliProfile(std::string_view lowered_hints)
 {
 	ResolvedGpuProfile resolved;
 	resolved.gpu.name = "Unknown Mali";
-	resolved.tuning = MakeConservativeMobileGsTuning();
 
 	char series = 0;
 	u16 model = 0;
@@ -307,8 +244,6 @@ ResolvedGpuProfile ResolveMaliProfile(std::string_view lowered_hints)
 	if (resolved.gpu.core_count != 0)
 		resolved.gpu.name += " MC" + std::to_string(resolved.gpu.core_count);
 
-	resolved.tuning = spec ? spec->tuning : FallbackTuningForMali(resolved.gpu.architecture);
-	ApplyCoreCountLimits(&resolved.tuning, resolved.gpu.core_count);
 	return resolved;
 }
 } // namespace GpuProfileDetail

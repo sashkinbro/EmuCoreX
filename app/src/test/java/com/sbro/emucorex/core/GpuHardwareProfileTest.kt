@@ -27,9 +27,7 @@ class GpuHardwareProfileTest {
 
     @Test
     fun nativeProfileAlwaysUsesRendererAutoDetection() {
-        assertEquals("auto", GpuHardwareProfiles.coreOverrideFor(GpuHardwareProfiles.ADRENO))
-        assertEquals("auto", GpuHardwareProfiles.coreOverrideFor(GpuHardwareProfiles.MALI))
-        assertEquals("auto", GpuHardwareProfiles.coreOverrideFor(GpuHardwareProfiles.POWERVR))
+        assertEquals("auto", GpuHardwareProfiles.coreOverrideFor())
     }
 
     @Test
@@ -37,17 +35,14 @@ class GpuHardwareProfileTest {
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
         assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999, false))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO, false))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999, true))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO, true))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
         // An explicit user selection must survive regardless of the hardware default.
-        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN, true))
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
     }
 
     @Test
     fun rendererDefaultsToOpenGlForSnapdragonAndMediaTek() {
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware(false))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware(true))
+        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware())
     }
 }

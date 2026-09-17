@@ -24,7 +24,7 @@ object GpuHardwareProfiles {
     // Pass only the SoC-vendor hint. "mediatek" intentionally parses as an automatic GPU override:
     // the native renderer still uses GL_RENDERER/VkPhysicalDeviceProperties for the actual GPU,
     // which matters because older MediaTek generations can use PowerVR instead of Mali.
-    fun coreOverrideFor(@Suppress("UNUSED_PARAMETER") profile: Int): String =
+    fun coreOverrideFor(): String =
         if (isMediaTekHardware()) "mediatek" else "auto"
 
     fun isMediaTekHardware(): Boolean {

@@ -72,19 +72,16 @@ static MobileDriverContext MakeVulkanContext(RuntimeGpuProfile vendor, bool mesa
 	switch (vendor)
 	{
 		case RuntimeGpuProfile::Adreno:
-			context.vendor_id = 0x5143;
 			context.driver_id = mesa ? 18 : 8;
 			context.driver_name = mesa ? "Mesa Turnip" : "Qualcomm proprietary";
 			context.driver_version = (512u << 22) | (900u << 12);
 			break;
 		case RuntimeGpuProfile::Mali:
-			context.vendor_id = 0x13B5;
 			context.driver_id = mesa ? 20 : 9;
 			context.driver_name = mesa ? "Mesa PanVK" : "ARM proprietary";
 			context.driver_version = (54u << 22) | (1u << 12);
 			break;
 		case RuntimeGpuProfile::PowerVR:
-			context.vendor_id = 0x1010;
 			context.driver_id = mesa ? 25 : 7;
 			context.driver_name = mesa ? "Mesa PowerVR" : "Imagination proprietary";
 			// First raw version at which the legacy swapchain-width workaround is disabled.
@@ -465,7 +462,6 @@ TEST(GpuDriverProfile, SeparatesProprietaryAdrenoFromTurnip)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
-	proprietary.vendor_id = 0x5143;
 	proprietary.driver_id = 8;
 	proprietary.driver_version = (512u << 22) | (800u << 12);
 	proprietary.android_sdk = 35;
@@ -606,7 +602,6 @@ TEST(GpuDriverProfile, AppliesVersionBoundedMaliRules)
 {
 	MobileDriverContext r38;
 	r38.api = MobileGpuApi::Vulkan;
-	r38.vendor_id = 0x13B5;
 	r38.driver_id = 9;
 	r38.driver_version = (38u << 22) | (1u << 12);
 	r38.android_sdk = 34;
@@ -693,7 +688,6 @@ TEST(GpuDriverProfile, RecognizesLegacyMaliAndPowerVRCutoffs)
 {
 	MobileDriverContext mali;
 	mali.api = MobileGpuApi::Vulkan;
-	mali.vendor_id = 0x13B5;
 	mali.driver_id = 9;
 	mali.driver_version = 0xaa9c4b29u;
 	const GpuProfileSelection legacy_mali =
@@ -705,7 +699,6 @@ TEST(GpuDriverProfile, RecognizesLegacyMaliAndPowerVRCutoffs)
 
 	MobileDriverContext powervr;
 	powervr.api = MobileGpuApi::Vulkan;
-	powervr.vendor_id = 0x1010;
 	powervr.driver_id = 7;
 	powervr.driver_version = 0x00582557u;
 	const GpuProfileSelection old_powervr =
@@ -728,7 +721,6 @@ TEST(GpuDriverProfile, KeepsAllAdrenoGenerationsFreeOfDriverWorkarounds)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
-	proprietary.vendor_id = 0x5143;
 	proprietary.driver_id = 8;
 
 	const GpuProfileSelection adreno530 =
@@ -795,7 +787,6 @@ TEST(GpuDriverProfile, KeepsEveryAdrenoGenerationOnCapabilityPaths)
 {
 	MobileDriverContext proprietary;
 	proprietary.api = MobileGpuApi::Vulkan;
-	proprietary.vendor_id = 0x5143;
 	proprietary.driver_id = 8;
 	proprietary.driver_version = (512u << 22) | (900u << 12);
 	proprietary.android_sdk = 35;
@@ -834,7 +825,6 @@ TEST(GpuDriverProfile, BoundsPowerVRClearLoadOpFallbackToAffectedDriverRange)
 {
 	MobileDriverContext powervr;
 	powervr.api = MobileGpuApi::Vulkan;
-	powervr.vendor_id = 0x1010;
 	powervr.driver_id = 7;
 	powervr.driver_version = (1u << 22) | (8u << 12) | 42u;
 

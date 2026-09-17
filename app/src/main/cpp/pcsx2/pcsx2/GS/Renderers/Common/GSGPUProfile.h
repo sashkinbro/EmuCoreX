@@ -71,15 +71,6 @@ enum class MobileGpuDriver : u8
 	Angle,
 };
 
-enum class DriverProfileConfidence : u8
-{
-	Unknown,
-	Vendor,
-	Model,
-	Driver,
-	DriverVersion,
-};
-
 enum class DriverBug : u8
 {
 	BrokenBufferStreaming,
@@ -137,11 +128,8 @@ struct MobileDriverVersion
 struct MobileDriverContext
 {
 	MobileGpuApi api = MobileGpuApi::Unknown;
-	u32 vendor_id = 0;
-	u32 device_id = 0;
 	u32 driver_version = 0;
 	u32 driver_id = 0;
-	u32 api_version = 0;
 	u32 android_sdk = 0;
 	u32 max_draw_indirect_count = 0;
 	std::string_view driver_name;
@@ -159,8 +147,6 @@ struct MobileDriverProfile
 	u64 bugs = 0;
 	u64 workarounds = 0;
 	u32 matched_rule_count = 0;
-	DriverProfileConfidence confidence = DriverProfileConfidence::Unknown;
-	bool conservative_fallback = true;
 	std::string driver_name;
 
 	constexpr bool HasBug(DriverBug bug) const
@@ -214,13 +200,9 @@ class GpuProfileDetector
 public:
 	static GpuProfileOverride ParseOverride(std::string_view value);
 	static const char* OverrideToConfigString(GpuProfileOverride value);
-	static const char* OverrideToString(GpuProfileOverride value);
 	static const char* RuntimeProfileToString(RuntimeGpuProfile value);
 	static const char* ArchitectureToString(MobileGpuArchitecture value);
-	static const char* ApiToString(MobileGpuApi value);
 	static const char* DriverToString(MobileGpuDriver value);
-	static const char* BugToString(DriverBug value);
-	static const char* WorkaroundToString(DriverWorkaround value);
 
 	static GpuProfileSelection Resolve(std::string_view override_value, std::string_view gpu_vendor,
 		std::string_view gpu_renderer_or_name);

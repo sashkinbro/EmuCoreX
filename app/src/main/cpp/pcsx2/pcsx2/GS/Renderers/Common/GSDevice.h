@@ -1629,7 +1629,6 @@ public:
 	__fi const MobileGpuIdentity& GetMobileGPUIdentity() const { return m_mobile_gpu_identity; }
 	__fi const MobileGsTuning& GetMobileGSTuning() const { return m_mobile_gs_tuning; }
 	__fi const MobileDriverProfile& GetMobileDriverProfile() const { return m_mobile_driver_profile; }
-	__fi bool HasMobileDriverBug(DriverBug bug) const { return m_mobile_driver_profile.HasBug(bug); }
 	__fi bool UsesMobileDriverWorkaround(DriverWorkaround workaround) const
 	{
 		return m_mobile_driver_profile.UsesWorkaround(workaround);
