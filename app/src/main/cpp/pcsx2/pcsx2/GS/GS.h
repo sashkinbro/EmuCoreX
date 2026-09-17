@@ -89,6 +89,10 @@ void GSSetVSyncMode(GSVSyncMode mode, bool allow_present_throttle);
 
 GSRendererType GSGetCurrentRenderer();
 bool GSIsHardwareRenderer();
+
+/// Returns true when the running game is Haunting Ground (any region or release), which is the
+/// only game that needs render-target snapshots for its attached-texture reads.
+bool GSIsHauntingGround();
 std::string GetDefaultAdapter();
 bool GSWantsExclusiveFullscreen();
 std::optional<float> GSGetHostRefreshRate();

@@ -1137,7 +1137,11 @@ bool GSDeviceOGL::CheckFeatures()
 		m_features.texture_barrier = framebuffer_fetch || has_texture_barrier_extension;
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
-	m_features.texture_feedback_requires_copy = !has_texture_barrier_extension || GSConfig.OverrideTextureBarriers == 0;
+	// Framebuffer fetch cannot stand in for a texture barrier when a draw samples its attached
+	// target. Only Haunting Ground performs the offset reads which need the bounded source copy;
+	// every other game keeps the cheap fetch path.
+	m_features.texture_feedback_requires_copy =
+		GSIsHauntingGround() && (!has_texture_barrier_extension || GSConfig.OverrideTextureBarriers == 0);
 	m_features.dual_source_blend =
 		!m_is_gles || GLAD_GL_EXT_blend_func_extended || GLAD_GL_ARB_blend_func_extended;
 	if (gpu_profile_mali && has_arm_framebuffer_fetch && !has_ext_framebuffer_fetch)
@@ -1697,15 +1701,23 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 	if (!T->IsRenderTargetOrDepthStencil() || T->GetState() == GSTexture::State::Dirty)
 		return;
 
+	// The widened attachment checks are only needed by the Haunting Ground snapshot path;
+	// other games keep the original FBO selection.
+	const bool haunting_ground_fix = GSIsHauntingGround();
+	const bool is_render_target =
+		haunting_ground_fix ? t->IsRenderTarget() : (t->GetType() == GSTexture::Type::RenderTarget);
+	const bool is_depth_stencil =
+		haunting_ground_fix ? t->IsDepthStencil() : (t->GetType() == GSTexture::Type::DepthStencil);
+
 	// Clearing an MRT attachment through color slot 0 would replace the active RT.
-	use_write_fbo |= (GLState::ds_as_rt != nullptr);
+	use_write_fbo |= (haunting_ground_fix && GLState::ds_as_rt != nullptr);
 	if (use_write_fbo)
 	{
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_write);
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-			t->IsRenderTarget() ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
+			is_render_target ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-			GL_TEXTURE_2D, t->IsDepthStencil() ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
+			GL_TEXTURE_2D, is_depth_stencil ? static_cast<GSTextureOGL*>(t)->GetID() : 0, 0);
 	}
 	else
 	{
@@ -1790,7 +1802,7 @@ void GSDeviceOGL::CommitClear(GSTexture* t, bool use_write_fbo)
 	if (use_write_fbo)
 	{
 		glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,
-			t->IsRenderTarget() ? GL_COLOR_ATTACHMENT0 : GL_DEPTH_STENCIL_ATTACHMENT,
+			is_render_target ? GL_COLOR_ATTACHMENT0 : GL_DEPTH_STENCIL_ATTACHMENT,
 			GL_TEXTURE_2D, 0, 0);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
 	}

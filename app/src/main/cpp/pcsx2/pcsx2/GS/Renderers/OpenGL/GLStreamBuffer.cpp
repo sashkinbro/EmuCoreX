@@ -3,6 +3,8 @@
 
 #include "GS/Renderers/OpenGL/GLStreamBuffer.h"
 
+#include "GS/GS.h"
+
 #include "common/BitUtils.h"
 #include "common/AlignedMalloc.h"
 #include "common/Assertions.h"
@@ -277,7 +279,10 @@ namespace
 
 			const u32 flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | (coherent ? GL_MAP_COHERENT_BIT : 0);
 			// Coherent storage also needs a coherent mapping, since Unmap skips explicit flushing.
-			const u32 map_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | (coherent ? GL_MAP_COHERENT_BIT : GL_MAP_FLUSH_EXPLICIT_BIT);
+			// Only the Haunting Ground snapshot path needs the coherent mapping; other games keep
+			// the original mapping flags.
+			const u32 map_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT |
+				(coherent ? (GSIsHauntingGround() ? GL_MAP_COHERENT_BIT : 0) : GL_MAP_FLUSH_EXPLICIT_BIT);
 			if (GLAD_GL_VERSION_4_4 || GLAD_GL_ARB_buffer_storage)
 				glBufferStorage(target, size, nullptr, flags);
 			else if (GLAD_GL_EXT_buffer_storage)

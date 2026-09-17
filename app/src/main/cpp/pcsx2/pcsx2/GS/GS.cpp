@@ -240,6 +240,31 @@ static void GSClampUpscaleMultiplier(Pcsx2Config::GSOptions& config)
 	config.UpscaleMultiplier = static_cast<float>(max_upscale_multiplier);
 }
 
+static bool IsHauntingGroundSerial(std::string_view serial)
+{
+	// Haunting Ground (PAL/NTSC-U) and its Japanese releases, titled Demento.
+	static constexpr std::array<std::string_view, 4> serials = {
+		"SLES-52877", "SLPM-65913", "SLPM-66638", "SLUS-21075",
+	};
+	return std::find(serials.begin(), serials.end(), serial) != serials.end();
+}
+
+bool GSIsHauntingGround()
+{
+	// Cache the lookup: the serial only changes on game boot, and some callers run per draw.
+	static std::string cached_serial;
+	static bool cached_result = false;
+
+	const std::string serial = VMManager::GetDiscSerial();
+	if (serial != cached_serial)
+	{
+		cached_serial = serial;
+		cached_result = IsHauntingGroundSerial(serial);
+	}
+
+	return cached_result;
+}
+
 #ifdef __ANDROID__
 static bool IsTekken5Serial(std::string_view serial)
 {
