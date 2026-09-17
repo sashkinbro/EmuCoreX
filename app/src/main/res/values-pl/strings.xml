@@ -277,6 +277,7 @@
     <string name="tv_storage_source_title">Wybierz pamięć</string>
     <string name="tv_storage_all_locations">Wszystkie lokalizacje</string>
     <string name="tv_storage_picker_unavailable">Na tym urządzeniu TV nie jest zainstalowany żaden kompatybilny menedżer plików systemowych.</string>
+    <string name="tv_storage_picker_invalid_selection">Nie można użyć tego folderu. Wybierz go ponownie lub wybierz inną lokalizację.</string>
     <string name="settings_language_system">Domyślny systemowy</string>
     <string name="settings_language_sheet_subtitle">Wybierz język aplikacji.</string>
     <string name="settings_language_screen_subtitle">Wybierz język interfejsu dla EmuCoreX.</string>

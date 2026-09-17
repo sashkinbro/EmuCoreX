@@ -196,6 +196,7 @@
     <string name="tv_storage_source_title">اختر وحدة التخزين</string>
     <string name="tv_storage_all_locations">كل المواقع</string>
     <string name="tv_storage_picker_unavailable">لا يوجد منتقي ملفات نظام متوافق مثبت على جهاز التلفاز هذا.</string>
+    <string name="tv_storage_picker_invalid_selection">لا يمكن استخدام هذا المجلد. اختره مرة أخرى أو اختر موقع تخزين آخر.</string>
     <string name="settings_language_system">الافتراضي للنظام</string>
     <string name="settings_language_sheet_subtitle">اختر لغة التطبيق.</string>
     <string name="settings_language_screen_subtitle">اختر لغة واجهة EmuCoreX.</string>

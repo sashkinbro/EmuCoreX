@@ -271,6 +271,7 @@
     <string name="tv_storage_source_title">انتخاب فضای ذخیره‌سازی</string>
     <string name="tv_storage_all_locations">همه مکان‌ها</string>
     <string name="tv_storage_picker_unavailable">هیچ انتخابگر فایل سیستمی سازگاری روی این دستگاه تلویزیون نصب نیست.</string>
+    <string name="tv_storage_picker_invalid_selection">این پوشه قابل استفاده نیست. دوباره آن را انتخاب کنید یا مکان ذخیره‌سازی دیگری انتخاب کنید.</string>
     <string name="settings_language_system">پیش‌فرض سیستم</string>
     <string name="settings_language_sheet_subtitle">زبان برنامه را انتخاب کنید.</string>
     <string name="settings_language_screen_subtitle">زبان رابط کاربری EmuCoreX را انتخاب کنید.</string>

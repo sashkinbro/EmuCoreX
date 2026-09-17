@@ -188,6 +188,7 @@
     <string name="tv_storage_source_title">स्टोरेज चुनें</string>
     <string name="tv_storage_all_locations">सभी स्थान</string>
     <string name="tv_storage_picker_unavailable">इस टीवी डिवाइस पर कोई संगत सिस्टम फ़ाइल पिकर इंस्टॉल नहीं है।</string>
+    <string name="tv_storage_picker_invalid_selection">इस फ़ोल्डर का उपयोग नहीं किया जा सकता। इसे दोबारा चुनें या कोई दूसरा संग्रहण स्थान चुनें।</string>
     <string name="settings_language_system">सिस्टम डिफ़ॉल्ट</string>
     <string name="settings_language_sheet_subtitle">ऐप की भाषा चुनें।</string>
     <string name="settings_language_screen_subtitle">EmuCoreX के लिए इंटरफ़ेस भाषा चुनें।</string>

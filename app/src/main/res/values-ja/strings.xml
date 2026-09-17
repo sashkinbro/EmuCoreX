@@ -196,6 +196,7 @@
     <string name="tv_storage_source_title">ストレージを選択</string>
     <string name="tv_storage_all_locations">すべての場所</string>
     <string name="tv_storage_picker_unavailable">このテレビ端末には互換性のあるシステムファイル選択機能がインストールされていません。</string>
+    <string name="tv_storage_picker_invalid_selection">このフォルダーは使用できません。もう一度選択するか、別の保存先を選んでください。</string>
     <string name="settings_language_system">システムデフォルト</string>
     <string name="settings_language_sheet_subtitle">アプリの言語を選択してください。</string>
     <string name="settings_language_screen_subtitle">EmuCoreXのインターフェース言語を選択してください。</string>

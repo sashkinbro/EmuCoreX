@@ -196,6 +196,7 @@
     <string name="tv_storage_source_title">Depolama alanı seç</string>
     <string name="tv_storage_all_locations">Tüm konumlar</string>
     <string name="tv_storage_picker_unavailable">Bu TV cihazında uyumlu bir sistem dosya seçicisi yüklü değil.</string>
+    <string name="tv_storage_picker_invalid_selection">Bu klasör kullanılamıyor. Yeniden seçin veya başka bir depolama konumu seçin.</string>
     <string name="settings_language_system">Sistem varsayılanı</string>
     <string name="settings_language_sheet_subtitle">Uygulama dilini seçin.</string>
     <string name="settings_language_screen_subtitle">EmuCoreX için arayüz dilini seçin.</string>

@@ -141,6 +141,7 @@
     <string name="tv_storage_source_title">選擇儲存空間</string>
     <string name="tv_storage_all_locations">所有位置</string>
     <string name="tv_storage_picker_unavailable">此電視裝置未安裝相容的系統檔案選擇器。</string>
+    <string name="tv_storage_picker_invalid_selection">無法使用此資料夾。請重新選擇或選擇其他儲存位置。</string>
     <string name="settings_language_system">系統預設</string>
     <string name="settings_language_sheet_subtitle">選擇應用程式語言。</string>
     <string name="settings_language_screen_subtitle">選擇 EmuCoreX 的介面語言。</string>

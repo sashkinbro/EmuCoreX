@@ -141,6 +141,7 @@
     <string name="tv_storage_source_title">Escolher armazenamento</string>
     <string name="tv_storage_all_locations">Todos os locais</string>
     <string name="tv_storage_picker_unavailable">Nenhum seletor de arquivos do sistema compatível está instalado neste dispositivo de TV.</string>
+    <string name="tv_storage_picker_invalid_selection">Não é possível usar essa pasta. Escolha-a novamente ou selecione outro local de armazenamento.</string>
     <string name="settings_language_system">Padrão do sistema</string>
     <string name="settings_language_sheet_subtitle">Escolha o idioma do aplicativo.</string>
     <string name="settings_language_screen_subtitle">Escolha o idioma da interface para o EmuCoreX.</string>

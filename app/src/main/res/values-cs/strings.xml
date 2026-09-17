@@ -277,6 +277,7 @@
     <string name="tv_storage_source_title">Vyberte úložiště</string>
     <string name="tv_storage_all_locations">Všechna umístění</string>
     <string name="tv_storage_picker_unavailable">Na tomto televizním zařízení není nainstalován žádný kompatibilní systémový nástroj pro výběr souborů.</string>
+    <string name="tv_storage_picker_invalid_selection">Tuto složku nelze použít. Vyberte ji znovu nebo zvolte jiné umístění.</string>
     <string name="settings_language_system">Výchozí nastavení systému</string>
     <string name="settings_language_sheet_subtitle">Vyberte jazyk aplikace.</string>
     <string name="settings_language_screen_subtitle">Vyberte jazyk rozhraní pro EmuCoreX.</string>

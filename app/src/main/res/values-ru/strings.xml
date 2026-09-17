@@ -141,6 +141,7 @@
     <string name="tv_storage_source_title">Выберите накопитель</string>
     <string name="tv_storage_all_locations">Все расположения</string>
     <string name="tv_storage_picker_unavailable">На этом ТВ-устройстве не установлен совместимый системный выбор файлов.</string>
+    <string name="tv_storage_picker_invalid_selection">Эту папку нельзя использовать. Выберите её снова или укажите другое расположение.</string>
     <string name="settings_language_system">По умолчанию</string>
     <string name="settings_language_sheet_subtitle">Выберите язык приложения.</string>
     <string name="settings_language_screen_subtitle">Выберите язык интерфейса для EmuCoreX.</string>

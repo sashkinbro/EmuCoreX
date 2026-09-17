@@ -141,6 +141,7 @@
     <string name="tv_storage_source_title">Виберіть накопичувач</string>
     <string name="tv_storage_all_locations">Усі розташування</string>
     <string name="tv_storage_picker_unavailable">На цьому ТВ-пристрої не встановлено сумісний системний засіб вибору файлів.</string>
+    <string name="tv_storage_picker_invalid_selection">Цю папку не можна використати. Виберіть її знову або вкажіть інше розташування.</string>
     <string name="settings_language_system">За замовчуванням</string>
     <string name="settings_language_sheet_subtitle">Виберіть мову додатка.</string>
     <string name="settings_language_screen_subtitle">Виберіть мову інтерфейсу для EmuCoreX.</string>

@@ -271,6 +271,7 @@
     <string name="tv_storage_source_title">Pilih penyimpanan</string>
     <string name="tv_storage_all_locations">Semua lokasi</string>
     <string name="tv_storage_picker_unavailable">Tidak ada pemilih file sistem yang kompatibel terpasang di perangkat TV ini.</string>
+    <string name="tv_storage_picker_invalid_selection">Folder itu tidak dapat digunakan. Pilih lagi atau pilih lokasi penyimpanan lain.</string>
     <string name="settings_language_system">Default sistem</string>
     <string name="settings_language_sheet_subtitle">Pilih bahasa aplikasi.</string>
     <string name="settings_language_screen_subtitle">Pilih bahasa antarmuka untuk EmuCoreX.</string>

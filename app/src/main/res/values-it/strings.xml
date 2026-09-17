@@ -188,6 +188,7 @@
     <string name="tv_storage_source_title">Scegli archivio</string>
     <string name="tv_storage_all_locations">Tutte le posizioni</string>
     <string name="tv_storage_picker_unavailable">Su questo dispositivo TV non è installato un selettore file di sistema compatibile.</string>
+    <string name="tv_storage_picker_invalid_selection">Impossibile usare questa cartella. Selezionala di nuovo o scegli un\'altra posizione di archiviazione.</string>
     <string name="settings_language_system">Predefinita di sistema</string>
     <string name="settings_language_sheet_subtitle">Scegli la lingua dell\'app.</string>
     <string name="settings_language_screen_subtitle">Scegli la lingua dell\'interfaccia per EmuCoreX.</string>
