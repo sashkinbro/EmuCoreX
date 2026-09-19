@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -18,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.CheatBlock
@@ -27,9 +25,10 @@ import com.sbro.emucorex.ui.cheats.groupCheatBlocks
 import com.sbro.emucorex.ui.theme.neon.neonShape
 
 /**
- * In-game cheat list, grouped the same way as the cheat manager. Every group
- * has a master switch below its cheats; toggles persist through the shared
- * [com.sbro.emucorex.data.CheatRepository], so the manager stays in sync.
+ * In-game cheat list, grouped the same way as the cheat manager. Every cheat is
+ * its own card (long titles wrap instead of being clipped) and every group ends
+ * with a master card that toggles the whole group. Toggles persist through the
+ * shared [com.sbro.emucorex.data.CheatRepository], so the manager stays in sync.
  */
 @Composable
 internal fun EmulationCheatsSection(
@@ -68,7 +67,7 @@ internal fun EmulationCheatsSection(
     val groups = remember(blocks) { groupCheatBlocks(blocks) }
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -88,7 +87,7 @@ internal fun EmulationCheatsSection(
             }
         }
         groups.forEach { (category, categoryBlocks) ->
-            CheatGroupCard(
+            CheatGroupSection(
                 category = category,
                 blocks = categoryBlocks,
                 onCheatToggle = onCheatToggle,
@@ -99,67 +98,65 @@ internal fun EmulationCheatsSection(
 }
 
 @Composable
-private fun CheatGroupCard(
+private fun CheatGroupSection(
     category: CheatCategory,
     blocks: List<CheatBlock>,
     onCheatToggle: (String, Boolean) -> Unit,
     onGroupToggle: (List<String>, Boolean) -> Unit
 ) {
     val allEnabled = blocks.all { it.enabled }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(category.titleRes),
+            modifier = Modifier.padding(start = 4.dp),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.primary
+        )
+        blocks.forEach { block ->
+            CheatOptionCard(
+                title = block.title,
+                checked = block.enabled,
+                onCheckedChange = { enabled -> onCheatToggle(block.id, enabled) }
+            )
+        }
+        CheatOptionCard(
+            title = stringResource(R.string.emulation_cheats_group_enable),
+            checked = allEnabled,
+            onCheckedChange = { enabled -> onGroupToggle(blocks.map { it.id }, enabled) }
+        )
+    }
+}
+
+@Composable
+private fun CheatOptionCard(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = neonShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = stringResource(category.titleRes),
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
-                color = MaterialTheme.colorScheme.primary
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            blocks.forEach { block ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = block.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Switch(
-                        checked = block.enabled,
-                        onCheckedChange = { enabled -> onCheatToggle(block.id, enabled) }
-                    )
-                }
-            }
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.emulation_cheats_group_enable),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Switch(
-                    checked = allEnabled,
-                    onCheckedChange = { enabled -> onGroupToggle(blocks.map { it.id }, enabled) }
-                )
-            }
         }
     }
 }
