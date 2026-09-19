@@ -662,6 +662,7 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/GSLsfg.cpp
 		GS/Renderers/Vulkan/GSTextureVK.cpp
 		GS/Renderers/Vulkan/vk_mem_alloc.cpp
+		GS/Renderers/Vulkan/VKBakedShaderPack.cpp
 		GS/Renderers/Vulkan/VKBuilders.cpp
 		GS/Renderers/Vulkan/VKLoader.cpp
 		GS/Renderers/Vulkan/VKShaderCache.cpp
@@ -672,6 +673,7 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/GSDeviceVK.h
 		GS/Renderers/Vulkan/GSLsfg.h
 		GS/Renderers/Vulkan/GSTextureVK.h
+		GS/Renderers/Vulkan/VKBakedShaderPack.h
 		GS/Renderers/Vulkan/VKBuilders.h
 		GS/Renderers/Vulkan/VKEntryPoints.h
 		GS/Renderers/Vulkan/VKEntryPoints.inl

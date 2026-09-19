@@ -7,13 +7,18 @@
 
 #include "common/HashCombine.h"
 
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+class VKBakedShaderPack;
 
 class VKShaderCache
 {
@@ -26,8 +31,20 @@ public:
 	/// Returns a handle to the pipeline cache. Set set_dirty to true if you are planning on writing to it externally.
 	VkPipelineCache GetPipelineCache(bool set_dirty = true);
 
-	/// Writes pipeline cache to file, saving all newly compiled pipelines.
-	bool FlushPipelineCache();
+	/// Writes pipeline cache to file, saving all newly compiled pipelines. The write re-serialises
+	/// the whole cache, so non-forced calls are rate-limited; force=true is for teardown.
+	bool FlushPipelineCache(bool force = false);
+
+	/// Creates a pipeline cache seeded with the contents of the shared cache, for use on a
+	/// compilation thread. Returns VK_NULL_HANDLE on failure. Merge it back with
+	/// MergeTransientPipelineCache() when the thread is done.
+	VkPipelineCache CreateTransientPipelineCache();
+
+	/// Merges a transient cache into the shared cache and destroys it.
+	void MergeTransientPipelineCache(VkPipelineCache cache);
+
+	/// Serializes creation against the shared pipeline cache and FlushPipelineCache().
+	std::mutex& GetPipelineCacheMutex();
 
 	VkShaderModule GetVertexShader(std::string_view shader_code);
 	VkShaderModule GetFragmentShader(std::string_view shader_code);
@@ -95,8 +112,14 @@ private:
 
 	CacheIndex m_index;
 
+	std::mutex m_shader_mutex;
+	std::mutex m_pipeline_cache_mutex;
+
 	VkPipelineCache m_pipeline_cache = VK_NULL_HANDLE;
-	bool m_pipeline_cache_dirty = false;
+	std::atomic<bool> m_pipeline_cache_dirty{false};
+	std::chrono::steady_clock::time_point m_last_pipeline_cache_flush{};
+
+	std::unique_ptr<VKBakedShaderPack> m_baked_pack;
 };
 
 extern std::unique_ptr<VKShaderCache> g_vulkan_shader_cache;

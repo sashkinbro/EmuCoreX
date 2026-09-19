@@ -456,7 +456,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 {
 	const float safe_refresh_rate =
 		(std::isfinite(refresh_rate) && refresh_rate > 0.0f) ? std::min(refresh_rate, 240.0f) : 0.0f;
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
+	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
 		window, width, height, safe_refresh_rate);
 	bool update_display_window = false;
 	ANativeWindow* old_window = nullptr;
@@ -475,7 +475,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 
 	if (update_display_window)
 	{
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
+		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		// Surface callbacks run on Android's UI/Binder threads, while the MTGS ring
 		// buffer has exactly one producer: the CPU thread. Keep the old window alive
 		// until the serialized GS update has detached from it.
@@ -500,7 +500,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 
 void AndroidRuntime::ClearSurface()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "ClearSurface: clearing native window");
+	__android_log_write(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: clearing native window");
 	ANativeWindow* old_window = nullptr;
 	bool update_display_window = false;
 	{
@@ -515,7 +515,7 @@ void AndroidRuntime::ClearSurface()
 
 	if (update_display_window)
 	{
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
+		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
 			if (value)
 				ANativeWindow_release(value);

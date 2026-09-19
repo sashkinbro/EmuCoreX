@@ -355,14 +355,14 @@ std::optional<WindowInfo> Host::GetTopLevelWindowInfo()
 
 void Host::OnInputDeviceConnected(const std::string_view identifier, const std::string_view device_name)
 {
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "input connected: %.*s (%.*s)",
+		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "input connected: %.*s (%.*s)",
 		static_cast<int>(identifier.size()), identifier.data(),
 		static_cast<int>(device_name.size()), device_name.data());
 }
 
 void Host::OnInputDeviceDisconnected(const InputBindingKey, const std::string_view identifier)
 {
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "input disconnected: %.*s",
+	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "input disconnected: %.*s",
 		static_cast<int>(identifier.size()), identifier.data());
 }
 
@@ -390,7 +390,7 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool)
 	info.surface_height = static_cast<u32>(std::max(height, 0));
 	info.surface_scale = (width > 0 && height > 0) ? (static_cast<float>(std::max(width, height)) / 800.0f) : 1.0f;
 	info.surface_refresh_rate = refresh_rate;
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "AcquireRenderWindow: type=%s window=%p size=%dx%d",
+	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "AcquireRenderWindow: type=%s window=%p size=%dx%d",
 		info.type == WindowInfo::Type::Android ? "Android" : "Surfaceless", window, width, height);
 	return info;
 }
@@ -405,7 +405,7 @@ void Host::BeginPresentFrame()
 
 void Host::RequestResizeHostDisplay(s32 width, s32 height)
 {
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "resize requested: %dx%d", width, height);
+	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "resize requested: %dx%d", width, height);
 }
 
 void Host::OnVMStarting()

@@ -30,6 +30,9 @@ public:
 	bool GetProgram(GLProgram* out_program, const std::string_view vertex_shader,
 		const std::string_view fragment_shader, const PreLinkCallback& callback = {});
 
+	/// Returns true if a compiled binary for this program pair exists in the disk cache.
+	bool HasProgram(const std::string_view vertex_shader, const std::string_view fragment_shader) const;
+
 	std::optional<GLProgram> GetComputeProgram(const std::string_view glsl, const PreLinkCallback& callback = {});
 	bool GetComputeProgram(GLProgram* out_program, const std::string_view glsl, const PreLinkCallback& callback = {});
 
@@ -93,4 +96,6 @@ private:
 
 	CacheIndex m_index;
 	bool m_program_binary_supported = false;
+	u32 m_binary_load_failures = 0;
+	u32 m_driver_signature = 0;
 };

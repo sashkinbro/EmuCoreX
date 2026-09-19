@@ -4,6 +4,7 @@
 #include "GS/GSShaderCompileIndicator.h"
 #include "GS/GS.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
+#include "GS/Renderers/Vulkan/VKBakedShaderPack.h"
 #include "GS/Renderers/Vulkan/VKBuilders.h"
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 
@@ -444,8 +445,12 @@ VKShaderCache::VKShaderCache() = default;
 VKShaderCache::~VKShaderCache()
 {
 	CloseShaderCache();
-	FlushPipelineCache();
+	FlushPipelineCache(true);
 	ClosePipelineCache();
+
+	const u32 baked_hits = GSShaderCompileIndicator::GetBakedHitCount();
+	if (baked_hits > 0)
+		Console.WriteLn("Baked shader pack served %u shader modules this session.", baked_hits);
 }
 
 bool VKShaderCache::CacheIndexKey::operator==(const CacheIndexKey& key) const
@@ -482,16 +487,26 @@ void VKShaderCache::Open()
 		const std::string index_filename = base_filename + ".idx";
 		const std::string blob_filename = base_filename + ".bin";
 
-		if (!ReadExistingShaderCache(index_filename, blob_filename))
+		const bool shader_cache_reset = !ReadExistingShaderCache(index_filename, blob_filename);
+		if (shader_cache_reset)
 			CreateNewShaderCache(index_filename, blob_filename);
 
-		if (!ReadExistingPipelineCache())
+		// Discard the pipeline blob whenever the SPIR-V cache was discarded. The blob is only
+		// validated against the device header (vendor/device/UUID), which does not change across
+		// an app update, so a SHADER_CACHE_VERSION bump used to keep every pipeline built from
+		// the previous build's shaders while their SPIR-V was wiped. Dead entries then accumulate
+		// and make FlushPipelineCache serialise an ever-growing cache.
+		if (shader_cache_reset || !ReadExistingPipelineCache())
 			CreateNewPipelineCache();
 	}
 	else
 	{
 		CreateNewPipelineCache();
 	}
+
+	m_baked_pack = std::make_unique<VKBakedShaderPack>();
+	if (!m_baked_pack->Open())
+		m_baked_pack.reset();
 }
 
 VkPipelineCache VKShaderCache::GetPipelineCache(bool set_dirty /*= true*/)
@@ -499,7 +514,9 @@ VkPipelineCache VKShaderCache::GetPipelineCache(bool set_dirty /*= true*/)
 	if (m_pipeline_cache == VK_NULL_HANDLE)
 		return VK_NULL_HANDLE;
 
-	m_pipeline_cache_dirty |= set_dirty;
+	if (set_dirty)
+		m_pipeline_cache_dirty.store(true, std::memory_order_relaxed);
+
 	return m_pipeline_cache;
 }
 
@@ -717,10 +734,27 @@ bool VKShaderCache::ReadExistingPipelineCache()
 	return true;
 }
 
-bool VKShaderCache::FlushPipelineCache()
+bool VKShaderCache::FlushPipelineCache(bool force)
 {
-	if (m_pipeline_cache == VK_NULL_HANDLE || !m_pipeline_cache_dirty || m_pipeline_cache_filename.empty())
+	if (m_pipeline_cache == VK_NULL_HANDLE || m_pipeline_cache_filename.empty())
 		return false;
+
+	std::lock_guard lock(m_pipeline_cache_mutex);
+
+	if (!m_pipeline_cache_dirty.load(std::memory_order_relaxed))
+		return false;
+
+	// Serialising the whole cache blocks the calling thread (the GS thread for threshold
+	// flushes), so non-forced writes are rate-limited. Losing one flush only costs a recompile
+	// on the next cold start; force=true is used at teardown and after the warmup batch.
+	static constexpr std::chrono::seconds MIN_FLUSH_INTERVAL{120};
+	const auto now = std::chrono::steady_clock::now();
+	if (!force && m_last_pipeline_cache_flush.time_since_epoch().count() != 0 &&
+		(now - m_last_pipeline_cache_flush) < MIN_FLUSH_INTERVAL)
+	{
+		return false;
+	}
+	m_last_pipeline_cache_flush = now;
 
 	size_t data_size;
 	VkResult res =
@@ -763,14 +797,64 @@ bool VKShaderCache::FlushPipelineCache()
 		Console.WriteLn("Skipping updating pipeline cache '%s' due to no changes.", m_pipeline_cache_filename.c_str());
 	}
 
-	m_pipeline_cache_dirty = false;
+	m_pipeline_cache_dirty.store(false, std::memory_order_relaxed);
 	return true;
+}
+
+VkPipelineCache VKShaderCache::CreateTransientPipelineCache()
+{
+	VkDevice device = GSDeviceVK::GetInstance()->GetDevice();
+	const VkPipelineCacheCreateInfo ci{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, nullptr, 0, 0, nullptr};
+
+	VkPipelineCache cache = VK_NULL_HANDLE;
+	VkResult res = vkCreatePipelineCache(device, &ci, nullptr, &cache);
+	if (res != VK_SUCCESS)
+	{
+		LOG_VULKAN_ERROR(res, "vkCreatePipelineCache() failed: ");
+		return VK_NULL_HANDLE;
+	}
+
+	if (m_pipeline_cache != VK_NULL_HANDLE)
+	{
+		std::lock_guard lock(m_pipeline_cache_mutex);
+		res = vkMergePipelineCaches(device, cache, 1, &m_pipeline_cache);
+		if (res != VK_SUCCESS)
+			LOG_VULKAN_ERROR(res, "vkMergePipelineCaches() (seed) failed: ");
+	}
+
+	return cache;
+}
+
+void VKShaderCache::MergeTransientPipelineCache(VkPipelineCache cache)
+{
+	if (cache == VK_NULL_HANDLE)
+		return;
+
+	VkDevice device = GSDeviceVK::GetInstance()->GetDevice();
+	if (m_pipeline_cache != VK_NULL_HANDLE)
+	{
+		std::lock_guard lock(m_pipeline_cache_mutex);
+		const VkResult res = vkMergePipelineCaches(device, m_pipeline_cache, 1, &cache);
+		if (res == VK_SUCCESS)
+			m_pipeline_cache_dirty.store(true, std::memory_order_relaxed);
+		else
+			LOG_VULKAN_ERROR(res, "vkMergePipelineCaches() (merge) failed: ");
+	}
+
+	vkDestroyPipelineCache(device, cache, nullptr);
+}
+
+std::mutex& VKShaderCache::GetPipelineCacheMutex()
+{
+	return m_pipeline_cache_mutex;
 }
 
 void VKShaderCache::ClosePipelineCache()
 {
 	if (m_pipeline_cache == VK_NULL_HANDLE)
 		return;
+
+	std::lock_guard lock(m_pipeline_cache_mutex);
 
 	vkDestroyPipelineCache(GSDeviceVK::GetInstance()->GetDevice(), m_pipeline_cache, nullptr);
 	m_pipeline_cache = VK_NULL_HANDLE;
@@ -821,6 +905,18 @@ VKShaderCache::CacheIndexKey VKShaderCache::GetCacheKey(u32 type, const std::str
 std::optional<VKShaderCache::SPIRVCodeVector> VKShaderCache::GetShaderSPV(u32 type, std::string_view shader_code)
 {
 	const auto key = GetCacheKey(type, shader_code);
+
+	if (m_baked_pack && !GSConfig.UseDebugDevice)
+	{
+		std::optional<SPIRVCodeVector> baked = m_baked_pack->Lookup(
+			key.source_hash_low, key.source_hash_high, key.source_length, key.shader_type);
+		if (baked.has_value())
+		{
+			GSShaderCompileIndicator::RecordBakedHit();
+			return baked;
+		}
+	}
+
 	auto iter = m_index.find(key);
 	if (iter == m_index.end())
 		return CompileAndAddShaderSPV(key, shader_code);
@@ -839,6 +935,8 @@ std::optional<VKShaderCache::SPIRVCodeVector> VKShaderCache::GetShaderSPV(u32 ty
 
 VkShaderModule VKShaderCache::GetShaderModule(u32 type, std::string_view shader_code)
 {
+	std::lock_guard lock(m_shader_mutex);
+
 	std::optional<SPIRVCodeVector> spv = GetShaderSPV(type, shader_code);
 	if (!spv.has_value())
 		return VK_NULL_HANDLE;

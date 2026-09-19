@@ -15,6 +15,17 @@ namespace GSShaderCompileIndicator
 	inline std::atomic<u32> s_count{0};
 	inline std::atomic<u64> s_time_ns{0};
 	inline std::atomic<u64> s_last_time{0};
+	inline std::atomic<u32> s_baked_hits{0};
+
+	inline void RecordBakedHit()
+	{
+		s_baked_hits.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	inline u32 GetBakedHitCount()
+	{
+		return s_baked_hits.load(std::memory_order_relaxed);
+	}
 
 	inline u64 GetRecentCompileHold()
 	{

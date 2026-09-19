@@ -15,10 +15,12 @@
 
 #include "core/runtime/BuildVersion.h"
 #include "platform/host/Host.h"
+#include "ShaderCacheVersion.h"
 
 #include "common/Console.h"
 #include "common/BitUtils.h"
 #include "common/Error.h"
+#include "common/FileSystem.h"
 
 #include "emucorex/debug_logcat.h"
 #include "common/HostSys.h"
@@ -37,14 +39,20 @@
 #include "librashader.h"
 #endif
 
+#include <algorithm>
 #include <bit>
+#include <cstring>
+#include <deque>
 #include <limits>
 #include <mutex>
 #include <sstream>
+#include <thread>
+#include <unordered_set>
 #include <utility>
 
 #if defined(__ANDROID__)
 #include <android/log.h>
+#include <sys/resource.h>
 #endif
 #include "emucorex/debug_logcat.h"
 
@@ -2618,7 +2626,10 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		return false;
 
 #ifdef __ANDROID__
-	WarmupCommonTFXPipelines();
+	if (GSConfig.DisableAsyncTFXCompile)
+		WarmupCommonTFXPipelines();
+	else
+		StartAsyncTFXCompilation();
 #endif
 
 	InitializeState();
@@ -2628,6 +2639,9 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 void GSDeviceVK::Destroy()
 {
 	std::unique_lock lock(s_instance_mutex);
+
+	// Workers touch m_device and the shader cache, so they must be gone before teardown.
+	StopAsyncTFXCompilation();
 
 	GSDevice::Destroy();
 
@@ -5803,9 +5817,12 @@ void GSDeviceVK::DestroyResources()
 
 VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)
 {
-	const auto it = m_tfx_vertex_shaders.find(sel.key);
-	if (it != m_tfx_vertex_shaders.end())
-		return it->second;
+	{
+		std::lock_guard lock(m_tfx_shaders_mutex);
+		const auto it = m_tfx_vertex_shaders.find(sel.key);
+		if (it != m_tfx_vertex_shaders.end())
+			return it->second;
+	}
 
 	std::stringstream ss;
 	AddShaderHeader(ss);
@@ -5822,15 +5839,27 @@ VkShaderModule GSDeviceVK::GetTFXVertexShader(GSHWDrawConfig::VSSelector sel)
 	if (mod)
 		Vulkan::SetObjectName(m_device, mod, "TFX Vertex %08X", sel.key);
 
-	m_tfx_vertex_shaders.emplace(sel.key, mod);
+	std::lock_guard lock(m_tfx_shaders_mutex);
+	const auto [it, inserted] = m_tfx_vertex_shaders.emplace(sel.key, mod);
+	if (!inserted)
+	{
+		if (mod != VK_NULL_HANDLE)
+			vkDestroyShaderModule(m_device, mod, nullptr);
+
+		return it->second;
+	}
+
 	return mod;
 }
 
 VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector& sel)
 {
-	const auto it = m_tfx_fragment_shaders.find(sel);
-	if (it != m_tfx_fragment_shaders.end())
-		return it->second;
+	{
+		std::lock_guard lock(m_tfx_shaders_mutex);
+		const auto it = m_tfx_fragment_shaders.find(sel);
+		if (it != m_tfx_fragment_shaders.end())
+			return it->second;
+	}
 
 	std::stringstream ss;
 	AddShaderHeader(ss);
@@ -5906,11 +5935,21 @@ VkShaderModule GSDeviceVK::GetTFXFragmentShader(const GSHWDrawConfig::PSSelector
 	if (mod)
 		Vulkan::SetObjectName(m_device, mod, "TFX Fragment %016" PRIX64 "_%016" PRIX64, sel.key_hi, sel.key_lo);
 
-	m_tfx_fragment_shaders.emplace(sel, mod);
+	std::lock_guard lock(m_tfx_shaders_mutex);
+	const auto [it, inserted] = m_tfx_fragment_shaders.emplace(sel, mod);
+	if (!inserted)
+	{
+		if (mod != VK_NULL_HANDLE)
+			vkDestroyShaderModule(m_device, mod, nullptr);
+
+		return it->second;
+	}
+
 	return mod;
 }
 
-VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
+VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
+	const PipelineSelector& p, VkPipelineCache pipeline_cache, bool lock_pipeline_cache)
 {
 	static constexpr std::array<VkPrimitiveTopology, 3> topology_lookup = {{
 		VK_PRIMITIVE_TOPOLOGY_POINT_LIST, // Point
@@ -6035,7 +6074,17 @@ VkPipeline GSDeviceVK::CreateTFXPipeline(const PipelineSelector& p)
 	if (m_features.framebuffer_fetch && p.IsRTFeedbackLoop())
 		gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
 
-	VkPipeline pipeline = gpb.Create(m_device, g_vulkan_shader_cache->GetPipelineCache(true));
+	VkPipeline pipeline;
+	if (lock_pipeline_cache)
+	{
+		std::lock_guard cache_lock(g_vulkan_shader_cache->GetPipelineCacheMutex());
+		pipeline = gpb.Create(m_device, pipeline_cache);
+	}
+	else
+	{
+		pipeline = gpb.Create(m_device, pipeline_cache);
+	}
+
 	if (pipeline)
 	{
 		Vulkan::SetObjectName(
@@ -6050,24 +6099,42 @@ VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 	if (m_last_tfx_pipeline_valid && m_last_tfx_pipeline_selector == p)
 		return m_last_tfx_pipeline;
 
-	const auto it = m_tfx_pipelines.find(p);
-	if (it != m_tfx_pipelines.end())
 	{
-		m_last_tfx_pipeline_selector = p;
-		m_last_tfx_pipeline = it->second;
-		m_last_tfx_pipeline_valid = true;
-		return m_last_tfx_pipeline;
+		std::lock_guard lock(m_tfx_pipelines_mutex);
+		const auto it = m_tfx_pipelines.find(p);
+		if (it != m_tfx_pipelines.end())
+		{
+			m_last_tfx_pipeline_selector = p;
+			m_last_tfx_pipeline = it->second;
+			m_last_tfx_pipeline_valid = true;
+			return m_last_tfx_pipeline;
+		}
 	}
 
 	m_last_tfx_pipeline_selector = p;
-	m_last_tfx_pipeline = CreateTFXPipeline(p);
+	m_last_tfx_pipeline =
+		PublishTFXPipeline(p, CreateTFXPipelineWithCache(p, g_vulkan_shader_cache->GetPipelineCache(true), true));
 	m_last_tfx_pipeline_valid = true;
-	m_tfx_pipelines.emplace(p, m_last_tfx_pipeline);
+
+	// Persist the pipeline cache every N new compiles so an OOM-kill or crash mid-session does
+	// not throw the batch away. The flush is rate-limited internally, and it never runs while
+	// m_tfx_pipelines_mutex is held.
+	static constexpr u32 PIPELINE_CACHE_FLUSH_THRESHOLD = 256;
+	if (m_last_tfx_pipeline != VK_NULL_HANDLE &&
+		++m_tfx_pipeline_compile_counter >= PIPELINE_CACHE_FLUSH_THRESHOLD)
+	{
+		m_tfx_pipeline_compile_counter = 0;
+		g_vulkan_shader_cache->FlushPipelineCache();
+	}
+
 	return m_last_tfx_pipeline;
 }
 
-void GSDeviceVK::WarmupCommonTFXPipelines()
+void GSDeviceVK::BuildWarmupTFXSelectors(std::vector<PipelineSelector>& out)
 {
+	out.clear();
+	out.reserve(164);
+
 	static constexpr std::array<u8, 5> tfx_modes = {{TFX_NONE, TFX_MODULATE, TFX_DECAL, TFX_HIGHLIGHT, TFX_HIGHLIGHT2}};
 	static constexpr std::array<u8, 2> topologies = {{
 		static_cast<u8>(GSHWDrawConfig::Topology::Triangle),
@@ -6078,7 +6145,6 @@ void GSDeviceVK::WarmupCommonTFXPipelines()
 	static constexpr std::array<bool, 2> tcc_values = {{true, false}};
 	static constexpr std::array<bool, 2> ds_values = {{false, true}};
 
-	u32 warmed = 0;
 	for (const u8 tfx : tfx_modes)
 	{
 		for (const u8 topo : topologies)
@@ -6130,8 +6196,7 @@ void GSDeviceVK::WarmupCommonTFXPipelines()
 							pipe.dss.date = false;
 							pipe.cms = GSHWDrawConfig::ColorMaskSelector();
 							pipe.bs = GSHWDrawConfig::BlendState();
-							GetTFXPipeline(pipe);
-							warmed++;
+							out.push_back(pipe);
 						}
 					}
 				}
@@ -6188,12 +6253,255 @@ void GSDeviceVK::WarmupCommonTFXPipelines()
 			pipe.bs.op = OP_ADD;
 			pipe.bs.src_factor_alpha = CONST_ONE;
 			pipe.bs.dst_factor_alpha = INV_SRC_ALPHA;
-			GetTFXPipeline(pipe);
-			warmed++;
+			out.push_back(pipe);
+		}
+	}
+}
+
+void GSDeviceVK::WarmupCommonTFXPipelines()
+{
+	std::vector<PipelineSelector> selectors;
+	BuildWarmupTFXSelectors(selectors);
+	for (const PipelineSelector& p : selectors)
+		GetTFXPipeline(p);
+
+	Console.WriteLn("VK: Warmed %zu common TFX pipelines.", selectors.size());
+}
+
+void GSDeviceVK::StartAsyncTFXCompilation()
+{
+	StopAsyncTFXCompilation();
+
+	LoadLearnedTFXSelectors();
+	BuildWarmupTFXSelectors(m_tfx_compile_queue);
+	AppendLearnedTFXSelectors(m_tfx_compile_queue);
+	m_tfx_compile_next.store(0, std::memory_order_relaxed);
+	m_tfx_compile_quit.store(false, std::memory_order_relaxed);
+
+	const u32 hw_threads = std::max(1u, std::thread::hardware_concurrency());
+	const u32 worker_count = std::min(MAX_TFX_COMPILE_THREADS, std::max(1u, hw_threads / 2));
+	for (u32 i = 0; i < worker_count; i++)
+	{
+		try
+		{
+			m_tfx_compile_threads.emplace_back(&GSDeviceVK::TFXCompileThreadEntryPoint, this);
+		}
+		catch (...)
+		{
+			break;
 		}
 	}
 
-	Console.WriteLn("VK: Warmed %u common TFX pipelines.", warmed);
+	if (m_tfx_compile_threads.empty())
+	{
+		Console.Warning("VK: Failed to start TFX compile threads, compiling synchronously.");
+		WarmupCommonTFXPipelines();
+		m_tfx_compile_queue.clear();
+		return;
+	}
+
+	Console.WriteLn("VK: Compiling %zu common TFX pipelines on %zu background thread(s).",
+		m_tfx_compile_queue.size(), m_tfx_compile_threads.size());
+}
+
+void GSDeviceVK::StopAsyncTFXCompilation()
+{
+	m_tfx_compile_quit.store(true, std::memory_order_relaxed);
+
+	for (std::thread& thread : m_tfx_compile_threads)
+	{
+		if (thread.joinable())
+			thread.join();
+	}
+
+	m_tfx_compile_threads.clear();
+	m_tfx_compile_queue.clear();
+	m_tfx_compile_quit.store(false, std::memory_order_relaxed);
+
+	SaveLearnedTFXSelectors();
+}
+
+void GSDeviceVK::TFXCompileThreadEntryPoint()
+{
+#if defined(__ANDROID__)
+	// Keep the emulation threads ahead of shader compilation.
+	setpriority(PRIO_PROCESS, 0, 19);
+#endif
+
+	m_tfx_compile_active_workers.fetch_add(1, std::memory_order_relaxed);
+	VkPipelineCache transient_cache = g_vulkan_shader_cache->CreateTransientPipelineCache();
+
+	for (;;)
+	{
+		if (m_tfx_compile_quit.load(std::memory_order_relaxed))
+			break;
+
+		const u32 index = m_tfx_compile_next.fetch_add(1, std::memory_order_relaxed);
+		if (index >= m_tfx_compile_queue.size())
+			break;
+
+		const PipelineSelector& p = m_tfx_compile_queue[index];
+		{
+			std::lock_guard lock(m_tfx_pipelines_mutex);
+			if (m_tfx_pipelines.find(p) != m_tfx_pipelines.end())
+				continue;
+		}
+
+		try
+		{
+			const VkPipeline pipeline = CreateTFXPipelineWithCache(p, transient_cache, false);
+			if (pipeline != VK_NULL_HANDLE)
+				PublishTFXPipeline(p, pipeline);
+		}
+		catch (...)
+		{
+			Console.Error("VK: Failed to compile TFX pipeline on background thread.");
+		}
+	}
+
+	// The last worker merges its cache and flushes to disk, so the batch survives a kill.
+	const u32 remaining = m_tfx_compile_active_workers.fetch_sub(1, std::memory_order_acq_rel) - 1;
+	g_vulkan_shader_cache->MergeTransientPipelineCache(transient_cache);
+	if (remaining == 0)
+		g_vulkan_shader_cache->FlushPipelineCache(true);
+}
+
+VkPipeline GSDeviceVK::PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline)
+{
+	std::lock_guard lock(m_tfx_pipelines_mutex);
+
+	const auto [it, inserted] = m_tfx_pipelines.emplace(p, pipeline);
+	if (!inserted && pipeline != VK_NULL_HANDLE && it->second != pipeline)
+		vkDestroyPipeline(m_device, pipeline, nullptr);
+	else if (inserted && pipeline != VK_NULL_HANDLE)
+		RecordLearnedTFXSelector(p);
+
+	return it->second;
+}
+
+namespace
+{
+#pragma pack(push, 4)
+	struct LearnedTFXSelectorsHeader
+	{
+		u32 magic;
+		u32 version;
+		u32 selector_size;
+		u32 count;
+		u32 shader_cache_version;
+		u32 vendor_id;
+		u32 device_id;
+		u32 reserved;
+		u8 uuid[VK_UUID_SIZE];
+	};
+#pragma pack(pop)
+
+	static constexpr u32 LEARNED_TFX_SELECTORS_MAGIC = 0x4C584654; // 'TFXL'
+	static constexpr u32 LEARNED_TFX_SELECTORS_VERSION = 1;
+
+	static std::string GetLearnedTFXSelectorsFileName()
+	{
+		return Path::Combine(EmuFolders::Cache, "tfx_pipeline_selectors.bin");
+	}
+} // namespace
+
+void GSDeviceVK::LoadLearnedTFXSelectors()
+{
+	m_tfx_learned_set.clear();
+	m_tfx_learned_order.clear();
+	m_tfx_learned_dirty = false;
+
+	std::optional<std::vector<u8>> data = FileSystem::ReadBinaryFile(GetLearnedTFXSelectorsFileName().c_str());
+	if (!data.has_value() || data->size() < sizeof(LearnedTFXSelectorsHeader))
+		return;
+
+	LearnedTFXSelectorsHeader header;
+	std::memcpy(&header, data->data(), sizeof(header));
+
+	const VkPhysicalDeviceProperties& props = m_device_properties;
+	if (header.magic != LEARNED_TFX_SELECTORS_MAGIC || header.version != LEARNED_TFX_SELECTORS_VERSION ||
+		header.selector_size != sizeof(PipelineSelector) || header.shader_cache_version != SHADER_CACHE_VERSION ||
+		header.vendor_id != props.vendorID || header.device_id != props.deviceID ||
+		std::memcmp(header.uuid, props.pipelineCacheUUID, VK_UUID_SIZE) != 0)
+	{
+		return;
+	}
+
+	const size_t available = (data->size() - sizeof(header)) / sizeof(PipelineSelector);
+	const size_t count = std::min<size_t>(header.count, available);
+	for (size_t i = 0; i < count; i++)
+	{
+		PipelineSelector p;
+		std::memcpy(&p, data->data() + sizeof(header) + i * sizeof(PipelineSelector), sizeof(p));
+		if (m_tfx_learned_set.insert(p).second)
+			m_tfx_learned_order.push_back(p);
+	}
+
+	if (!m_tfx_learned_order.empty())
+		Console.WriteLn("VK: Loaded %zu learned TFX pipelines from previous sessions.", m_tfx_learned_order.size());
+}
+
+void GSDeviceVK::AppendLearnedTFXSelectors(std::vector<PipelineSelector>& out)
+{
+	if (m_tfx_learned_order.empty())
+		return;
+
+	std::unordered_set<PipelineSelector, PipelineSelectorHash> present(out.begin(), out.end());
+	size_t appended = 0;
+	for (auto it = m_tfx_learned_order.rbegin(); it != m_tfx_learned_order.rend(); ++it)
+	{
+		if (present.insert(*it).second)
+		{
+			out.push_back(*it);
+			appended++;
+		}
+	}
+
+	Console.WriteLn("VK: Replaying %zu learned TFX pipelines in the background.", appended);
+}
+
+void GSDeviceVK::SaveLearnedTFXSelectors()
+{
+	if (!m_tfx_learned_dirty || m_tfx_learned_order.empty())
+		return;
+
+	LearnedTFXSelectorsHeader header = {};
+	header.magic = LEARNED_TFX_SELECTORS_MAGIC;
+	header.version = LEARNED_TFX_SELECTORS_VERSION;
+	header.selector_size = sizeof(PipelineSelector);
+	header.count = static_cast<u32>(m_tfx_learned_order.size());
+	header.shader_cache_version = SHADER_CACHE_VERSION;
+	header.vendor_id = m_device_properties.vendorID;
+	header.device_id = m_device_properties.deviceID;
+	std::memcpy(header.uuid, m_device_properties.pipelineCacheUUID, VK_UUID_SIZE);
+
+	std::vector<u8> buffer(sizeof(header) + m_tfx_learned_order.size() * sizeof(PipelineSelector));
+	std::memcpy(buffer.data(), &header, sizeof(header));
+
+	size_t offset = sizeof(header);
+	for (const PipelineSelector& p : m_tfx_learned_order)
+	{
+		std::memcpy(buffer.data() + offset, &p, sizeof(p));
+		offset += sizeof(p);
+	}
+
+	if (FileSystem::WriteBinaryFile(GetLearnedTFXSelectorsFileName().c_str(), buffer.data(), buffer.size()))
+		m_tfx_learned_dirty = false;
+}
+
+void GSDeviceVK::RecordLearnedTFXSelector(const PipelineSelector& p)
+{
+	if (!m_tfx_learned_set.insert(p).second)
+		return;
+
+	m_tfx_learned_order.push_back(p);
+	m_tfx_learned_dirty = true;
+
+	while (m_tfx_learned_order.size() > MAX_LEARNED_TFX_SELECTORS)
+	{
+		m_tfx_learned_set.erase(m_tfx_learned_order.front());
+		m_tfx_learned_order.pop_front();
+	}
 }
 
 bool GSDeviceVK::BindDrawPipeline(const PipelineSelector& p)

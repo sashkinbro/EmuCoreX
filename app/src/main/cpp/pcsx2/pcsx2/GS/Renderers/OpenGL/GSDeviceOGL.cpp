@@ -10,9 +10,12 @@
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
 #include "platform/host/Host.h"
+#include "ShaderCacheVersion.h"
 
 #include "common/Console.h"
 #include "common/Error.h"
+#include "common/FileSystem.h"
+#include "common/Path.h"
 #include "common/ScopedGuard.h"
 #include "common/StringUtil.h"
 
@@ -26,7 +29,9 @@
 #include "librashader.h"
 #endif
 
+#include <algorithm>
 #include <cinttypes>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <type_traits>
@@ -423,6 +428,23 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	// Store adapter name currently in use
 	m_name = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
 
+	// Fingerprint the driver so the learned program set is discarded when it changes.
+	{
+		auto hash_string = [](u64 hash, const char* str) {
+			for (; str && *str; str++)
+			{
+				hash ^= static_cast<u8>(*str);
+				hash *= 1099511628211ull;
+			}
+			return hash;
+		};
+
+		m_driver_hash = 1469598103934665603ull;
+		m_driver_hash = hash_string(m_driver_hash, reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
+		m_driver_hash = hash_string(m_driver_hash, reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
+		m_driver_hash = hash_string(m_driver_hash, reinterpret_cast<const char*>(glGetString(GL_VERSION)));
+	}
+
 	SetSwapInterval();
 
 	// Render a frame as soon as possible to clear out whatever was previously being displayed.
@@ -441,6 +463,10 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	{
 		Console.WriteLn("GL: Not using shader cache.");
 	}
+
+#ifdef __ANDROID__
+	LoadLearnedTFXPrograms();
+#endif
 
 	// because of fbo bindings below...
 	GLState::Clear();
@@ -872,6 +898,10 @@ void GSDeviceOGL::Destroy()
 
 	if (m_gl_context)
 	{
+#ifdef __ANDROID__
+		SaveLearnedTFXPrograms();
+#endif
+
 		DestroyTimestampQueries();
 		DestroyPipelineStatisticsQueries();
 		DestroyResources();
@@ -3591,7 +3621,132 @@ GLProgram& GSDeviceOGL::GetTFXProgram(const ProgramSelector& psel)
 	m_shader_cache.GetProgram(&prog, vs, ps);
 	m_last_tfx_program_selector = psel;
 	m_last_tfx_program = &m_programs.emplace(psel, std::move(prog)).first->second;
+#ifdef __ANDROID__
+	if (m_last_tfx_program->IsValid())
+		RecordLearnedTFXProgram(psel);
+#endif
 	return *m_last_tfx_program;
+}
+
+namespace
+{
+#pragma pack(push, 4)
+	struct LearnedTFXProgramsHeader
+	{
+		u32 magic;
+		u32 version;
+		u32 selector_size;
+		u32 count;
+		u32 shader_cache_version;
+		u32 reserved;
+		u64 driver_hash;
+	};
+#pragma pack(pop)
+
+	static constexpr u32 LEARNED_TFX_PROGRAMS_MAGIC = 0x4C505847; // 'GXPL'
+	static constexpr u32 LEARNED_TFX_PROGRAMS_VERSION = 1;
+
+	static std::string GetLearnedTFXProgramsFileName()
+	{
+		return Path::Combine(EmuFolders::Cache, "gl_tfx_programs.bin");
+	}
+} // namespace
+
+void GSDeviceOGL::LoadLearnedTFXPrograms()
+{
+	m_learned_programs_set.clear();
+	m_learned_programs_order.clear();
+	m_learned_programs_dirty = false;
+
+	std::optional<std::vector<u8>> data = FileSystem::ReadBinaryFile(GetLearnedTFXProgramsFileName().c_str());
+	if (!data.has_value() || data->size() < sizeof(LearnedTFXProgramsHeader))
+		return;
+
+	LearnedTFXProgramsHeader header;
+	std::memcpy(&header, data->data(), sizeof(header));
+
+	if (header.magic != LEARNED_TFX_PROGRAMS_MAGIC || header.version != LEARNED_TFX_PROGRAMS_VERSION ||
+		header.selector_size != sizeof(ProgramSelector) || header.shader_cache_version != SHADER_CACHE_VERSION ||
+		header.driver_hash != m_driver_hash)
+	{
+		return;
+	}
+
+	const size_t available = (data->size() - sizeof(header)) / sizeof(ProgramSelector);
+	const size_t count = std::min<size_t>(header.count, available);
+	for (size_t i = 0; i < count; i++)
+	{
+		ProgramSelector psel;
+		std::memcpy(&psel, data->data() + sizeof(header) + i * sizeof(ProgramSelector), sizeof(psel));
+		if (m_learned_programs_set.insert(psel).second)
+			m_learned_programs_order.push_back(psel);
+	}
+
+	if (!m_learned_programs_order.empty())
+		Console.WriteLn("GL: Loaded %zu learned TFX programs from previous sessions.", m_learned_programs_order.size());
+}
+
+void GSDeviceOGL::WarmupLearnedTFXPrograms()
+{
+	if (m_learned_programs_order.empty())
+		return;
+
+	size_t replayed = 0;
+	for (const ProgramSelector& psel : m_learned_programs_order)
+	{
+		const std::string vs(GetVSSource(psel.vs));
+		const std::string ps(GetPSSource(psel.ps));
+		if (!m_shader_cache.HasProgram(vs, ps))
+			continue;
+
+		GetTFXProgram(psel);
+		replayed++;
+	}
+
+	if (replayed > 0)
+		Console.WriteLn("GL: Replayed %zu learned TFX programs from the binary cache.", replayed);
+}
+
+void GSDeviceOGL::SaveLearnedTFXPrograms()
+{
+	if (!m_learned_programs_dirty || m_learned_programs_order.empty())
+		return;
+
+	LearnedTFXProgramsHeader header = {};
+	header.magic = LEARNED_TFX_PROGRAMS_MAGIC;
+	header.version = LEARNED_TFX_PROGRAMS_VERSION;
+	header.selector_size = sizeof(ProgramSelector);
+	header.count = static_cast<u32>(m_learned_programs_order.size());
+	header.shader_cache_version = SHADER_CACHE_VERSION;
+	header.driver_hash = m_driver_hash;
+
+	std::vector<u8> buffer(sizeof(header) + m_learned_programs_order.size() * sizeof(ProgramSelector));
+	std::memcpy(buffer.data(), &header, sizeof(header));
+
+	size_t offset = sizeof(header);
+	for (const ProgramSelector& psel : m_learned_programs_order)
+	{
+		std::memcpy(buffer.data() + offset, &psel, sizeof(psel));
+		offset += sizeof(psel);
+	}
+
+	if (FileSystem::WriteBinaryFile(GetLearnedTFXProgramsFileName().c_str(), buffer.data(), buffer.size()))
+		m_learned_programs_dirty = false;
+}
+
+void GSDeviceOGL::RecordLearnedTFXProgram(const ProgramSelector& p)
+{
+	if (!m_learned_programs_set.insert(p).second)
+		return;
+
+	m_learned_programs_order.push_back(p);
+	m_learned_programs_dirty = true;
+
+	while (m_learned_programs_order.size() > MAX_LEARNED_TFX_PROGRAMS)
+	{
+		m_learned_programs_set.erase(m_learned_programs_order.front());
+		m_learned_programs_order.pop_front();
+	}
 }
 
 void GSDeviceOGL::SetupPipeline(const ProgramSelector& psel)
@@ -3615,6 +3770,8 @@ void GSDeviceOGL::WarmupCommonTFXPrograms()
 		psel.ps.tcc = (tfx != TFX_NONE);
 		GetTFXProgram(psel);
 	}
+
+	WarmupLearnedTFXPrograms();
 
 	GLProgram::ResetLastProgram();
 	Console.WriteLn("GL: Warmed %zu common TFX shader programs.", tfx_modes.size());

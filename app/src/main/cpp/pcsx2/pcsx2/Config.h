@@ -780,6 +780,7 @@ struct Pcsx2Config
 					UseDebugBlend : 1,
 					UseBlitSwapChain : 1,
 					DisableShaderCache : 1,
+					DisableAsyncTFXCompile : 1,
 					DisableFramebufferFetch : 1,
 					DisableVertexShaderExpand : 1,
 					SkipDuplicateFrames : 1,

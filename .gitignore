@@ -83,6 +83,9 @@ y/
 *.pyc
 *.pyo
 
+# Local-only shader bake notes
+/app/src/main/cpp/ARM_ANDROID/shader_bake/README.md
+
 # Node / web tooling
 node_modules/
 

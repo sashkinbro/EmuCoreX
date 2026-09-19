@@ -13,6 +13,9 @@
 
 #include "common/HashCombine.h"
 
+#include <deque>
+#include <unordered_set>
+
 class GLContext;
 
 class GSDepthStencilOGL
@@ -130,8 +133,14 @@ public:
 		VSSelector vs;
 		u8 pad[15];
 
-		__fi bool operator==(const ProgramSelector& p) const { return BitEqual(*this, p); }
-		__fi bool operator!=(const ProgramSelector& p) const { return !BitEqual(*this, p); }
+		// Compare only the meaningful key fields, matching ProgramSelectorHash. BitEqual()
+		// memcmp'd all 32 bytes including padding, so logically identical selectors could hash
+		// to the same bucket yet fail equality, making m_programs.find() miss.
+		__fi bool operator==(const ProgramSelector& p) const
+		{
+			return (vs.key == p.vs.key && ps.key_hi == p.ps.key_hi && ps.key_lo == p.ps.key_lo);
+		}
+		__fi bool operator!=(const ProgramSelector& p) const { return !(*this == p); }
 	};
 	static_assert(sizeof(ProgramSelector) == 32, "Program selector is 32 bytes");
 	static_assert(offsetof(ProgramSelector, pad) + sizeof(ProgramSelector::pad) == sizeof(ProgramSelector));
@@ -249,6 +258,21 @@ private:
 	ProgramSelector m_last_tfx_program_selector = {};
 	GLProgram* m_last_tfx_program = nullptr;
 	GLShaderCache m_shader_cache;
+
+	// Learned TFX program set. Programs seen in a session are replayed from the
+	// binary cache at the start of the next session, so GL stops compiling them
+	// mid-gameplay (the context is thread-affine, workers are not possible).
+	static constexpr u32 MAX_LEARNED_TFX_PROGRAMS = 4096;
+
+	void LoadLearnedTFXPrograms();
+	void WarmupLearnedTFXPrograms();
+	void SaveLearnedTFXPrograms();
+	void RecordLearnedTFXProgram(const ProgramSelector& p);
+
+	std::unordered_set<ProgramSelector, ProgramSelectorHash> m_learned_programs_set;
+	std::deque<ProgramSelector> m_learned_programs_order;
+	bool m_learned_programs_dirty = false;
+	u64 m_driver_hash = 0;
 
 	GLuint m_palette_ss = 0;
 

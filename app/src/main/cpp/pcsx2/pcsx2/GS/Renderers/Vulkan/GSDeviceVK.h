@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -23,6 +24,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class VKSwapChain;
@@ -530,6 +532,38 @@ private:
 	PipelineSelector m_last_tfx_pipeline_selector = {};
 	VkPipeline m_last_tfx_pipeline = VK_NULL_HANDLE;
 	bool m_last_tfx_pipeline_valid = false;
+	u32 m_tfx_pipeline_compile_counter = 0;
+
+	std::mutex m_tfx_shaders_mutex;
+	std::mutex m_tfx_pipelines_mutex;
+
+	// Background TFX pipeline compilation. Workers drain a fixed list of selectors
+	// (the Android warmup set plus everything learned from previous sessions) so the
+	// GS thread never pays for it, then merge their transient pipeline caches back
+	// into the shared one.
+	static constexpr u32 MAX_TFX_COMPILE_THREADS = 3;
+	static constexpr u32 MAX_LEARNED_TFX_SELECTORS = 4096;
+
+	void StartAsyncTFXCompilation();
+	void StopAsyncTFXCompilation();
+	void TFXCompileThreadEntryPoint();
+	VkPipeline PublishTFXPipeline(const PipelineSelector& p, VkPipeline pipeline);
+	static void BuildWarmupTFXSelectors(std::vector<PipelineSelector>& out);
+
+	void LoadLearnedTFXSelectors();
+	void AppendLearnedTFXSelectors(std::vector<PipelineSelector>& out);
+	void SaveLearnedTFXSelectors();
+	void RecordLearnedTFXSelector(const PipelineSelector& p);
+
+	std::vector<std::thread> m_tfx_compile_threads;
+	std::vector<PipelineSelector> m_tfx_compile_queue;
+	std::atomic<u32> m_tfx_compile_next{0};
+	std::atomic<u32> m_tfx_compile_active_workers{0};
+	std::atomic<bool> m_tfx_compile_quit{false};
+
+	std::unordered_set<PipelineSelector, PipelineSelectorHash> m_tfx_learned_set;
+	std::deque<PipelineSelector> m_tfx_learned_order;
+	bool m_tfx_learned_dirty = false;
 
 	VkRenderPass m_utility_color_render_pass_load = VK_NULL_HANDLE;
 	VkRenderPass m_utility_color_render_pass_clear = VK_NULL_HANDLE;
@@ -579,7 +613,8 @@ private:
 
 	VkShaderModule GetTFXVertexShader(GSHWDrawConfig::VSSelector sel);
 	VkShaderModule GetTFXFragmentShader(const GSHWDrawConfig::PSSelector& sel);
-	VkPipeline CreateTFXPipeline(const PipelineSelector& p);
+	VkPipeline CreateTFXPipelineWithCache(const PipelineSelector& p, VkPipelineCache pipeline_cache,
+		bool lock_pipeline_cache);
 	VkPipeline GetTFXPipeline(const PipelineSelector& p);
 
 	VkShaderModule GetUtilityVertexShader(const std::string& source, const char* replace_main);
