@@ -1114,6 +1114,7 @@
     <string name="emulation_cheats_title">Cheaty</string>
     <string name="emulation_cheats_open_button">Cheaty</string>
     <string name="emulation_cheats_empty">Nebyly nalezeny žádné cheaty pro tuto hru.</string>
+    <string name="emulation_cheats_group_enable">Zapnout vše ve skupině</string>
     <string name="emulation_cheats_enable_all">Zapnout všechny</string>
     <string name="emulation_cheats_disable_all">Vypnout všechny</string>
     <string name="emulation_cheats_empty_hint">Stáhněte cheaty pro tuto hru ve správci cheatů a pak je zde zapněte.</string>

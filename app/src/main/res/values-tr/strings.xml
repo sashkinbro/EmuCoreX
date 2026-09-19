@@ -732,6 +732,7 @@
     <string name="emulation_cheats_title">Hileler</string>
     <string name="emulation_cheats_open_button">Hileler</string>
     <string name="emulation_cheats_empty">Bu oyun için hiçbir hile bulunamadı.</string>
+    <string name="emulation_cheats_group_enable">Gruptaki tümünü etkinleştir</string>
     <string name="emulation_cheats_enable_all">Tümünü Etkinleştir</string>
     <string name="emulation_cheats_disable_all">Tümünü Devre Dışı Bırak</string>
     <string name="emulation_cheats_empty_hint">Bu oyunun hilelerini Hile Yöneticisi\'nden indirin, sonra burada etkinleştirin.</string>

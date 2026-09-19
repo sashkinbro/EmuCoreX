@@ -2904,10 +2904,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedBlocks = currentState.availableCheats.map { block ->
                 if (block.id == blockId) block.copy(enabled = enabled) else block
             }
-            cheatRepository.setEnabledBlocks(
-                gameKey = gameKey,
-                enabledIds = updatedBlocks.filter { it.enabled }.map { it.id }.toSet()
-            )
+            // Only this ID is written, so toggles made in the cheat manager
+            // (which share the same state file) are preserved.
+            cheatRepository.setBlockEnabled(gameKey, blockId, enabled)
             syncCheatsForCurrentGame(gameKey)
             persistRuntimeState(_uiState.value.copy(
                 availableCheats = updatedBlocks,
@@ -2916,6 +2915,37 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 preferences.setEnableCheats(true)
             }
             EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "true")
+            EmulatorBridge.reloadPatches()
+        }
+    }
+
+    /** Enables or disables every cheat in a group (category) at once. */
+    fun setCheatGroupEnabled(blockIds: Collection<String>, enabled: Boolean) {
+        if (blockIds.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (enabled && isRetroAchievementsHardcoreRestricted()) {
+                runCatching { EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "false") }
+                runCatching { EmulatorBridge.reloadPatches() }
+                showHardcoreBlockedToast()
+                return@launch
+            }
+
+            val currentState = _uiState.value
+            val gameKey = currentState.cheatsGameKey ?: return@launch
+            val idSet = blockIds.toSet()
+            val updatedBlocks = currentState.availableCheats.map { block ->
+                if (block.id in idSet) block.copy(enabled = enabled) else block
+            }
+            cheatRepository.setBlocksEnabled(gameKey, idSet, enabled)
+            syncCheatsForCurrentGame(gameKey)
+            if (enabled) {
+                persistRuntimeState(currentState.copy(availableCheats = updatedBlocks, enableCheats = true)) {
+                    preferences.setEnableCheats(true)
+                }
+                EmulatorBridge.setSetting("EmuCore", "EnableCheats", "bool", "true")
+            } else {
+                _uiState.value = currentState.copy(availableCheats = updatedBlocks)
+            }
             EmulatorBridge.reloadPatches()
         }
     }
@@ -2933,9 +2963,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             val gameKey = currentState.cheatsGameKey ?: return@launch
             if (currentState.availableCheats.isEmpty()) return@launch
             val updatedBlocks = currentState.availableCheats.map { block -> block.copy(enabled = enabled) }
-            cheatRepository.setEnabledBlocks(
+            cheatRepository.setBlocksEnabled(
                 gameKey = gameKey,
-                enabledIds = if (enabled) updatedBlocks.mapTo(mutableSetOf()) { it.id } else emptySet()
+                blockIds = currentState.availableCheats.map { it.id },
+                enabled = enabled
             )
             syncCheatsForCurrentGame(gameKey)
             if (enabled) {

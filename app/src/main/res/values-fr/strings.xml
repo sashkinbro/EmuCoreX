@@ -436,6 +436,7 @@
     <string name="emulation_cheats_title">Codes de triche</string>
     <string name="emulation_cheats_open_button">Codes de triche</string>
     <string name="emulation_cheats_empty">Aucun code de triche n\'a été trouvé pour ce jeu.</string>
+    <string name="emulation_cheats_group_enable">Activer tout dans le groupe</string>
     <string name="emulation_cheats_enable_all">Tout activer</string>
     <string name="emulation_cheats_disable_all">Tout désactiver</string>
     <string name="emulation_cheats_empty_hint">Téléchargez les cheats de ce jeu dans le gestionnaire de cheats, puis activez-les ici.</string>

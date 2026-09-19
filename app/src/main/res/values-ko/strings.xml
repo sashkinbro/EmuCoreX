@@ -732,6 +732,7 @@
     <string name="emulation_cheats_title">치트</string>
     <string name="emulation_cheats_open_button">치트</string>
     <string name="emulation_cheats_empty">이 게임에 대한 치트를 찾을 수 없습니다.</string>
+    <string name="emulation_cheats_group_enable">그룹 내 모두 활성화</string>
     <string name="emulation_cheats_enable_all">모두 활성화</string>
     <string name="emulation_cheats_disable_all">모두 비활성화</string>
     <string name="emulation_cheats_empty_hint">이 게임의 치트를 치트 관리자에서 다운로드한 뒤 여기에서 활성화하세요.</string>

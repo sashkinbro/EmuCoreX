@@ -442,6 +442,7 @@
     <string name="emulation_cheats_title">Читы</string>
     <string name="emulation_cheats_open_button">Читы</string>
     <string name="emulation_cheats_empty">Для этой игры читы не найдены.</string>
+    <string name="emulation_cheats_group_enable">Включить все в группе</string>
     <string name="emulation_cheats_enable_all">Включить все</string>
     <string name="emulation_cheats_disable_all">Отключить все</string>
     <string name="emulation_cheats_empty_hint">Загрузите читы для этой игры в менеджере читов, а затем включите их здесь.</string>

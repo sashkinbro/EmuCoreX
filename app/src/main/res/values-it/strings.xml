@@ -646,6 +646,7 @@
     <string name="emulation_cheats_title">Trucchi</string>
     <string name="emulation_cheats_open_button">Trucchi</string>
     <string name="emulation_cheats_empty">Nessun trucco trovato per questo gioco.</string>
+    <string name="emulation_cheats_group_enable">Attiva tutti nel gruppo</string>
     <string name="emulation_cheats_enable_all">Attiva tutti</string>
     <string name="emulation_cheats_disable_all">Disattiva tutti</string>
     <string name="emulation_cheats_empty_hint">Scarica i trucchi per questo gioco nel gestore trucchi, poi attivali qui.</string>

@@ -732,6 +732,7 @@
     <string name="emulation_cheats_title">チート</string>
     <string name="emulation_cheats_open_button">チート</string>
     <string name="emulation_cheats_empty">このゲームのチートは見つかりませんでした。</string>
+    <string name="emulation_cheats_group_enable">グループ内をすべて有効化</string>
     <string name="emulation_cheats_enable_all">すべて有効化</string>
     <string name="emulation_cheats_disable_all">すべて無効化</string>
     <string name="emulation_cheats_empty_hint">このゲームのチートはチートマネージャーでダウンロードし、ここで有効にしてください。</string>

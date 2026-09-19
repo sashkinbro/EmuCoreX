@@ -157,6 +157,32 @@ class CheatRepository(private val context: Context) {
         writeEnabledIds(state)
     }
 
+    /**
+     * Adds or removes a single block from the stored enabled set. Reads the
+     * latest state from disk first so toggles made in another screen (the cheat
+     * manager vs. the in-game menu) are never overwritten with a stale copy.
+     */
+    fun setBlockEnabled(gameKey: String, blockId: String, enabled: Boolean) = synchronized(CHEAT_IO_LOCK) {
+        val normalizedGameKey = normalizeGameKey(gameKey)
+        val state = loadEnabledIds()
+        val enabledIds = storedValues(state, normalizedGameKey, gameKey).toMutableSet()
+        if (enabled) enabledIds.add(blockId) else enabledIds.remove(blockId)
+        state.put(normalizedGameKey, JSONArray(enabledIds.toList()))
+        if (normalizedGameKey != gameKey) state.remove(gameKey)
+        writeEnabledIds(state)
+    }
+
+    /** Enables or disables a whole group of blocks with the same read-modify-write. */
+    fun setBlocksEnabled(gameKey: String, blockIds: Collection<String>, enabled: Boolean) = synchronized(CHEAT_IO_LOCK) {
+        val normalizedGameKey = normalizeGameKey(gameKey)
+        val state = loadEnabledIds()
+        val enabledIds = storedValues(state, normalizedGameKey, gameKey).toMutableSet()
+        if (enabled) enabledIds.addAll(blockIds) else enabledIds.removeAll(blockIds.toSet())
+        state.put(normalizedGameKey, JSONArray(enabledIds.toList()))
+        if (normalizedGameKey != gameKey) state.remove(gameKey)
+        writeEnabledIds(state)
+    }
+
     fun syncActiveCheats(gameKey: String, serial: String?, crc: String?) = synchronized(CHEAT_IO_LOCK) {
         val source = resolveImportedFile(gameKey)
         val normalizedGameKey = source.nameWithoutExtension

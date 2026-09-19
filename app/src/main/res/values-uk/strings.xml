@@ -453,6 +453,7 @@
     <string name="emulation_cheats_title">Чіти</string>
     <string name="emulation_cheats_open_button">Чіти</string>
     <string name="emulation_cheats_empty">Для цієї гри чітів не знайдено.</string>
+    <string name="emulation_cheats_group_enable">Увімкнути всі в групі</string>
     <string name="emulation_cheats_enable_all">Увімкнути всі</string>
     <string name="emulation_cheats_disable_all">Вимкнути всі</string>
     <string name="emulation_cheats_empty_hint">Завантажте чіти для цієї гри в менеджері чітів, а потім увімкніть їх тут.</string>
