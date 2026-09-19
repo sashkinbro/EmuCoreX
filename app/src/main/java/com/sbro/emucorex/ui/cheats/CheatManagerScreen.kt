@@ -184,6 +184,10 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
     }
 
     LaunchedEffect(catalog) {
+        // Clear the previous index while the new catalog is indexed: a stale
+        // index matched against the fresh catalog briefly flashes the empty
+        // "no cheats for this game" state.
+        catalogIndex = null
         catalogIndex = withContext(Dispatchers.Default) {
             indexRemoteCheatCatalog(catalog)
         }
@@ -344,7 +348,10 @@ fun CheatManagerScreen(onBackClick: () -> Unit) {
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     stringResource(R.string.cheat_manager_enable),
@@ -863,7 +870,8 @@ private fun CheatToggleCard(
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = block.title,

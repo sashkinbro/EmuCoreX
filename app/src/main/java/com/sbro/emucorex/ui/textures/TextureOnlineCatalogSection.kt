@@ -71,6 +71,7 @@ import com.sbro.emucorex.data.formatDownloadBytes
 import com.sbro.emucorex.data.formatDownloadDuration
 import com.sbro.emucorex.ui.common.LibraryGamePicker
 import com.sbro.emucorex.ui.common.contentCatalogTitleKey
+import com.sbro.emucorex.ui.common.rememberRetainedState
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -90,17 +91,27 @@ internal fun TextureOnlineCatalogSection(
     val libraryRepository = remember(context) { ContentLibraryRepository(context) }
     val installState = remember(context) { RemoteContentInstallState(context) }
     val downloadManager = remember(context) { TextureDownloadManager(context) }
-    var games by remember { mutableStateOf<List<GameItem>>(emptyList()) }
-    var selectedPath by remember { mutableStateOf<String?>(null) }
-    var identity by remember { mutableStateOf<SelectedGameIdentity?>(null) }
-    var identityPath by remember { mutableStateOf<String?>(null) }
-    var resolvingIdentity by remember { mutableStateOf(false) }
-    var packs by remember { mutableStateOf<List<RemoteTexturePack>>(emptyList()) }
-    var installed by remember { mutableStateOf<Map<String, InstalledRemoteTexture>>(emptyMap()) }
-    var loading by remember { mutableStateOf(true) }
-    var cached by remember { mutableStateOf(false) }
-    var loadFailed by remember { mutableStateOf(false) }
-    var downloadTasks by remember { mutableStateOf<List<TextureDownloadTask>>(emptyList()) }
+    // Retained so scrolling the card out of view and back does not reset the
+    // loaded catalog, lose the selected game, re-run the loaders or replay the
+    // entrance animation.
+    var games by rememberRetainedState("texture_online_catalog.games", emptyList<GameItem>())
+    var selectedPath by rememberRetainedState<String?>("texture_online_catalog.selected_path", null)
+    var identity by rememberRetainedState<SelectedGameIdentity?>("texture_online_catalog.identity", null)
+    var identityPath by rememberRetainedState<String?>("texture_online_catalog.identity_path", null)
+    var resolvingIdentity by rememberRetainedState("texture_online_catalog.resolving_identity", false)
+    var packs by rememberRetainedState("texture_online_catalog.packs", emptyList<RemoteTexturePack>())
+    var installed by rememberRetainedState(
+        "texture_online_catalog.installed",
+        emptyMap<String, InstalledRemoteTexture>()
+    )
+    var installSnapshotLoaded by rememberRetainedState("texture_online_catalog.snapshot_loaded", false)
+    var loading by rememberRetainedState("texture_online_catalog.loading", true)
+    var cached by rememberRetainedState("texture_online_catalog.cached", false)
+    var loadFailed by rememberRetainedState("texture_online_catalog.load_failed", false)
+    var downloadTasks by rememberRetainedState(
+        "texture_online_catalog.download_tasks",
+        emptyList<TextureDownloadTask>()
+    )
     val notificationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -111,10 +122,16 @@ internal fun TextureOnlineCatalogSection(
             val catalog = catalogRepository.loadTextureCatalog()
             Triple(libraryGames, catalog, installState.installedTextures())
         }
-        games = loaded.first
-        packs = loaded.second.entries
-        cached = loaded.second.fromCache
-        loadFailed = loaded.second.entries.isEmpty()
+        if (loaded.first.isNotEmpty() || games.isEmpty()) {
+            games = loaded.first
+        }
+        // A failed refresh (offline, bad response) must not wipe a previously
+        // loaded catalog: only replace the packs when the new result is usable.
+        if (loaded.second.entries.isNotEmpty() || packs.isEmpty()) {
+            packs = loaded.second.entries
+            cached = loaded.second.fromCache
+            loadFailed = loaded.second.entries.isEmpty()
+        }
         installed = loaded.third
         selectedPath = selectedPath ?: games.firstOrNull()?.path
         loading = false
@@ -134,7 +151,13 @@ internal fun TextureOnlineCatalogSection(
         while (isActive) {
             downloadTasks = withContext(Dispatchers.IO) { downloadManager.tasks() }
             val refreshedInstalled = withContext(Dispatchers.IO) { installState.installedTextures() }
-            if (refreshedInstalled != installed) {
+            if (!installSnapshotLoaded) {
+                // The first poll only syncs the already-installed packs. Firing
+                // the install callback here force-enabled replacements every
+                // time the screen was opened, overriding the user's choice.
+                installed = refreshedInstalled
+                installSnapshotLoaded = true
+            } else if (refreshedInstalled != installed) {
                 installed = refreshedInstalled
                 onInstalled()
             }
@@ -151,6 +174,9 @@ internal fun TextureOnlineCatalogSection(
             resolvingIdentity = false
             return@LaunchedEffect
         }
+        // Already resolved for this game (the card was scrolled out and back):
+        // keep the cached identity so the content does not flash a spinner.
+        if (identityPath == game.path && identity != null) return@LaunchedEffect
         identity = null
         identityPath = null
         resolvingIdentity = true
