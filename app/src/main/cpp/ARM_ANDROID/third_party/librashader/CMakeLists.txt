@@ -48,6 +48,132 @@ else()
 	return()
 endif()
 
+# ---- Host Rust toolchain (Windows fallback) ---------------------------------------
+# cargo compiles every crate's build script for the HOST, even when the cdylib itself is
+# cross-built for Android. The rustup default on Windows is *-pc-windows-msvc, whose
+# linker is link.exe from Visual Studio's "Desktop development with C++" workload. When
+# that workload is missing (or simply not on PATH for the Gradle daemon) EVERY build
+# script dies on that one missing binary, and ninja reports it as a dozen unrelated
+# "could not compile <crate> (build script) due to 1 previous error" lines that hide the
+# real cause.
+#
+# rustup's GNU toolchain needs no Visual Studio at all: it links against the rust-mingw
+# import libraries and rust-lld that rustup itself installs. So when the default
+# toolchain cannot link a trivial host binary, fall back to an installed GNU toolchain
+# that also has the std for the Android target being built. Force a specific toolchain
+# with -DEMUCOREX_RUST_TOOLCHAIN=<rustup toolchain name>.
+set(EMUCOREX_RUST_TOOLCHAIN "" CACHE STRING
+	"rustup toolchain for librashader's host build scripts. Empty = auto-detect.")
+set(_lrs_rustup_env "")
+set(_lrs_cargo_path "")
+set(_lrs_probe_dir "${CMAKE_CURRENT_BINARY_DIR}/host-linker-probe")
+set(_lrs_probe_error "")
+
+if(EMUCOREX_RUST_TOOLCHAIN)
+	set(_lrs_rustup_env "RUSTUP_TOOLCHAIN=${EMUCOREX_RUST_TOOLCHAIN}")
+	message(STATUS "librashader: host Rust toolchain pinned to ${EMUCOREX_RUST_TOOLCHAIN}")
+elseif(CMAKE_HOST_WIN32)
+	get_filename_component(_lrs_cargo_bin_dir "${CARGO_EXECUTABLE}" DIRECTORY)
+	find_program(RUSTC_EXECUTABLE rustc HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
+	find_program(RUSTUP_EXECUTABLE rustup HINTS "${_lrs_cargo_bin_dir}" "$ENV{USERPROFILE}/.cargo/bin")
+
+	if(NOT RUSTC_EXECUTABLE)
+		message(FATAL_ERROR "librashader: cargo was found at ${CARGO_EXECUTABLE} but rustc was "
+			"not. Repair the Rust installation (https://rustup.rs) or take cargo off PATH.")
+	endif()
+
+	file(MAKE_DIRECTORY "${_lrs_probe_dir}")
+	file(WRITE "${_lrs_probe_dir}/probe.rs" "fn main() {}\n")
+	execute_process(
+		COMMAND "${RUSTC_EXECUTABLE}" --crate-name librashader_host_probe --emit=link
+			--out-dir "${_lrs_probe_dir}" "${_lrs_probe_dir}/probe.rs"
+		RESULT_VARIABLE _lrs_probe_status
+		OUTPUT_QUIET
+		ERROR_VARIABLE _lrs_probe_error
+	)
+
+	if(NOT "${_lrs_probe_status}" STREQUAL "0")
+		execute_process(
+			COMMAND "${RUSTC_EXECUTABLE}" -vV
+			OUTPUT_VARIABLE _lrs_rustc_version
+			ERROR_QUIET
+		)
+		string(REGEX MATCH "host: ([A-Za-z0-9_.-]+)" _lrs_host_match "${_lrs_rustc_version}")
+		set(_lrs_host_triple "${CMAKE_MATCH_1}")
+
+		# msvc is the only Windows host flavour whose linker lives outside rustup.
+		set(_lrs_fallback_triples "")
+		foreach(_lrs_suffix gnu gnullvm)
+			string(REPLACE "-msvc" "-${_lrs_suffix}" _lrs_candidate "${_lrs_host_triple}")
+			if(NOT _lrs_candidate STREQUAL _lrs_host_triple)
+				list(APPEND _lrs_fallback_triples "${_lrs_candidate}")
+			endif()
+		endforeach()
+
+		set(_lrs_gnu_toolchain "")
+		if(RUSTUP_EXECUTABLE)
+			execute_process(
+				COMMAND "${RUSTUP_EXECUTABLE}" toolchain list
+				OUTPUT_VARIABLE _lrs_rustup_toolchains
+				ERROR_QUIET
+			)
+			foreach(_lrs_candidate IN LISTS _lrs_fallback_triples)
+				string(REGEX MATCH "([A-Za-z0-9._-]+-${_lrs_candidate})([^A-Za-z0-9._-]|$)"
+					_lrs_toolchain_match "${_lrs_rustup_toolchains}")
+				if(_lrs_toolchain_match)
+					set(_lrs_toolchain "${CMAKE_MATCH_1}")
+					execute_process(
+						COMMAND "${RUSTUP_EXECUTABLE}" target list --toolchain "${_lrs_toolchain}" --installed
+						OUTPUT_VARIABLE _lrs_toolchain_targets
+						ERROR_QUIET
+					)
+					string(REGEX MATCH "(^|\n)${_lrs_rust_target}\r?(\n|$)" _lrs_toolchain_target_match
+						"${_lrs_toolchain_targets}")
+					if(_lrs_toolchain_target_match)
+						set(_lrs_gnu_toolchain "${_lrs_toolchain}")
+						break()
+					endif()
+				endif()
+			endforeach()
+		endif()
+
+		if(_lrs_gnu_toolchain)
+			# Only trust the fallback once it has proven it can link a host binary itself.
+			execute_process(
+				COMMAND "${CMAKE_COMMAND}" -E env "RUSTUP_TOOLCHAIN=${_lrs_gnu_toolchain}"
+					"${RUSTC_EXECUTABLE}" --crate-name librashader_host_probe --emit=link
+					--out-dir "${_lrs_probe_dir}" "${_lrs_probe_dir}/probe.rs"
+				RESULT_VARIABLE _lrs_fallback_status
+				OUTPUT_QUIET
+				ERROR_VARIABLE _lrs_fallback_error
+			)
+			if("${_lrs_fallback_status}" STREQUAL "0")
+				set(_lrs_rustup_env "RUSTUP_TOOLCHAIN=${_lrs_gnu_toolchain}")
+				message(STATUS "librashader: '${_lrs_host_triple}' cannot link host build scripts "
+					"(no Visual Studio C++ tools) -> using ${_lrs_gnu_toolchain}")
+			else()
+				set(_lrs_probe_error "${_lrs_probe_error}\n${_lrs_fallback_error}")
+			endif()
+		endif()
+
+		if(NOT _lrs_rustup_env)
+			set(_lrs_fix_hint "  * install the Visual Studio \"Desktop development with C++\" workload, or\n")
+			foreach(_lrs_candidate IN LISTS _lrs_fallback_triples)
+				string(APPEND _lrs_fix_hint
+					"  * run: rustup toolchain install ${_lrs_candidate}"
+					" && rustup target add ${_lrs_rust_target} --toolchain ${_lrs_candidate}\n")
+			endforeach()
+			string(APPEND _lrs_fix_hint
+				"  * or build without RetroArch shaders by taking cargo off PATH.\n")
+			message(FATAL_ERROR
+				"librashader: cargo is installed but the Rust host toolchain cannot link native "
+				"build scripts.\n${_lrs_probe_error}\ncargo needs that linker for build scripts. "
+				"Fix it by any of:\n${_lrs_fix_hint}"
+				"Also possible: -DEMUCOREX_RUST_TOOLCHAIN=<rustup toolchain> to force a toolchain.")
+		endif()
+	endif()
+endif()
+
 # ---- NDK toolchain paths for cargo's linker/cc ------------------------------------
 # cargo drives its own linker, so hand it the same NDK clang CMake is using.
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
@@ -98,6 +224,63 @@ string(TOUPPER "${_lrs_rust_target}" _lrs_target_upper)
 string(REPLACE "-" "_" _lrs_target_upper "${_lrs_target_upper}")
 string(REPLACE "-" "_" _lrs_target_under "${_lrs_rust_target}")
 
+# ---- dlltool for a GNU host --------------------------------------------------------
+# rustc shells out to `dlltool` (bare name, resolved on PATH) whenever a crate links a
+# system DLL through #[link(kind = "raw-dylib")], which getrandom and friends do. An
+# msvc host uses lib.exe, but a GNU host needs one, and the GNU toolchain's copy in
+# rustlib's self-contained bin dir cannot work here: it delegates to an `as` assembler
+# that rustup's mingw bundle does not ship.
+#
+# The NDK already carries a self-contained equivalent (llvm-dlltool), so stage it under
+# the name rustc looks for, next to the libwinpthread it is linked against, and prepend
+# that directory to cargo's PATH. Only GNU hosts need this.
+if(CMAKE_HOST_WIN32 AND _lrs_rustup_env MATCHES "gnu")
+	set(_lrs_host_tools_dir "${CMAKE_CURRENT_BINARY_DIR}/host-tools")
+	set(_lrs_dlltool_shim "${_lrs_host_tools_dir}/dlltool.exe")
+	file(MAKE_DIRECTORY "${_lrs_host_tools_dir}")
+	execute_process(
+		COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_lrs_tc}/bin/llvm-dlltool.exe"
+			"${_lrs_dlltool_shim}"
+	)
+	if(NOT EXISTS "${_lrs_dlltool_shim}")
+		message(FATAL_ERROR "librashader: expected llvm-dlltool at ${_lrs_tc}/bin, but it is "
+			"missing. The NDK install looks incomplete.")
+	endif()
+	if(EXISTS "${_lrs_tc}/bin/libwinpthread-1.dll")
+		execute_process(
+			COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_lrs_tc}/bin/libwinpthread-1.dll"
+				"${_lrs_host_tools_dir}/libwinpthread-1.dll"
+		)
+	endif()
+
+	# Smoke-test the shim with the exact argument shape rustc uses for raw-dylib: a shim
+	# that cannot start (missing libwinpthread) would otherwise fail deep inside cargo
+	# with an opaque CreateProcess error.
+	set(_lrs_dlltool_probe_dir "${CMAKE_CURRENT_BINARY_DIR}/dlltool-probe")
+	file(MAKE_DIRECTORY "${_lrs_dlltool_probe_dir}")
+	file(WRITE "${_lrs_dlltool_probe_dir}/probe.def"
+		"LIBRARY probe.dll\nEXPORTS\n    probe_symbol\n")
+	file(REMOVE "${_lrs_dlltool_probe_dir}/probe.lib")
+	execute_process(
+		COMMAND "${_lrs_dlltool_shim}" -d "${_lrs_dlltool_probe_dir}/probe.def" -D probe.dll
+			-l "${_lrs_dlltool_probe_dir}/probe.lib" -m i386:x86-64 -f --64
+			--no-leading-underscore --temp-prefix "probe.dll:"
+		RESULT_VARIABLE _lrs_dlltool_probe_status
+		OUTPUT_QUIET
+		ERROR_VARIABLE _lrs_dlltool_probe_error
+	)
+	if(NOT EXISTS "${_lrs_dlltool_probe_dir}/probe.lib")
+		message(FATAL_ERROR "librashader: the staged dlltool shim failed to create an import "
+			"library:\n${_lrs_dlltool_probe_error}")
+	endif()
+
+	# PATH keeps its semicolons: escaped here so the whole value stays ONE argument to
+	# `cmake -E env`, which is what puts the shim first for cargo/rustc.
+	set(_lrs_cargo_path "PATH=${_lrs_host_tools_dir};$ENV{PATH}")
+	string(REPLACE ";" "\\;" _lrs_cargo_path "${_lrs_cargo_path}")
+	message(STATUS "librashader: staged a dlltool shim at ${_lrs_dlltool_shim}")
+endif()
+
 # ---- Fetch the pinned source (configure time, nothing vendored) --------------------
 # librashader has no root CMakeLists, so point SOURCE_SUBDIR at a path that doesn't
 # exist: that populates the tree WITHOUT trying to add_subdirectory() it.
@@ -119,6 +302,8 @@ set(_lrs_lib "${_lrs_out_dir}/${_lrs_rust_target}/release/liblibrashader_capi.so
 add_custom_command(
 	OUTPUT "${_lrs_lib}"
 	COMMAND ${CMAKE_COMMAND} -E env
+		${_lrs_rustup_env}
+		${_lrs_cargo_path}
 		"CARGO_TARGET_${_lrs_target_upper}_LINKER=${_lrs_cc}"
 		"CC_${_lrs_target_under}=${_lrs_cc}"
 		"CXX_${_lrs_target_under}=${_lrs_cxx}"
@@ -130,7 +315,10 @@ add_custom_command(
 		# Android вЂ” which resolves NEEDED by bare name out of lib/<abi>/ вЂ” can't find
 		# it, so the core fails to load. Stamp the soname so DT_NEEDED is just the
 		# filename, exactly like a CMake-built .so.
-		"RUSTFLAGS=-C link-arg=-Wl,-soname,liblibrashader_capi.so"
+		# Scope the soname flag to the Android triple: plain RUSTFLAGS would also reach
+		# the host build scripts cargo compiles first, and a Windows msvc link.exe
+		# cannot parse -Wl,... arguments.
+		"CARGO_TARGET_${_lrs_target_upper}_RUSTFLAGS=-C link-arg=-Wl,-soname,liblibrashader_capi.so"
 		${CARGO_EXECUTABLE} build --release
 			--manifest-path "${librashader_src_SOURCE_DIR}/librashader-capi/Cargo.toml"
 			--target ${_lrs_rust_target}
