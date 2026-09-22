@@ -95,6 +95,7 @@
     <string name="emulation_auto_save_title">オートセーブ</string>
     <string name="emulation_auto_save_empty">オートセーブはまだありません。</string>
     <string name="emulation_auto_save_last_saved">最終オートセーブ: %1$s</string>
+    <string name="emulation_auto_save_restore_title">オートセーブを復元</string>
     <string name="emulation_auto_save_interval_label">間隔</string>
     <string name="emulation_auto_save_interval_suffix">分</string>
     <string name="emulation_play_time_badge">プレイ時間 %1$s</string>

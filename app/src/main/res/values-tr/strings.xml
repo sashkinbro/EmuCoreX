@@ -95,6 +95,7 @@
     <string name="emulation_auto_save_title">Otomatik Kayıt</string>
     <string name="emulation_auto_save_empty">Henüz otomatik kayıt yok.</string>
     <string name="emulation_auto_save_last_saved">Son otomatik kayıt: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Otomatik kaydı geri yükle</string>
     <string name="emulation_auto_save_interval_label">Her</string>
     <string name="emulation_auto_save_interval_suffix">dk</string>
     <string name="emulation_play_time_badge">Oynama süresi %1$s</string>

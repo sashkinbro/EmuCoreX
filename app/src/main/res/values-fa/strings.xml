@@ -101,6 +101,7 @@
     <string name="emulation_auto_save_title">ذخیره خودکار</string>
     <string name="emulation_auto_save_empty">هنوز ذخیره خودکاری وجود ندارد.</string>
     <string name="emulation_auto_save_last_saved">آخرین ذخیره خودکار: %1$s</string>
+    <string name="emulation_auto_save_restore_title">بازیابی ذخیره خودکار</string>
     <string name="emulation_auto_save_interval_label">هر</string>
     <string name="emulation_auto_save_interval_suffix">دقیقه</string>
     <string name="emulation_auto_save_on_exit">ذخیره خودکار هنگام خروج</string>

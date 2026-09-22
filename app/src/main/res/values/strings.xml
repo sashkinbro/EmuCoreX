@@ -101,6 +101,7 @@
     <string name="emulation_auto_save_title">Auto Save</string>
     <string name="emulation_auto_save_empty">No auto save yet.</string>
     <string name="emulation_auto_save_last_saved">Last auto save: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Restore auto save</string>
     <string name="emulation_auto_save_interval_label">Every</string>
     <string name="emulation_auto_save_interval_suffix">min</string>
     <string name="emulation_auto_save_on_exit">Auto save on exit</string>

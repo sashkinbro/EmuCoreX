@@ -1048,6 +1048,7 @@
     <string name="emulation_auto_save_title">Автозбереження</string>
     <string name="emulation_auto_save_empty">Поки немає автозбережень.</string>
     <string name="emulation_auto_save_last_saved">Останнє автозбереження: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Відновити автозбереження</string>
     <string name="emulation_auto_save_interval_label">Кожні</string>
     <string name="emulation_auto_save_interval_suffix">хв</string>
     <string name="emulation_play_time_badge">Час у грі %1$s</string>

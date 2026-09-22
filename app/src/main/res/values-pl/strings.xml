@@ -101,6 +101,7 @@
     <string name="emulation_auto_save_title">Autozapis</string>
     <string name="emulation_auto_save_empty">Brak autozapisów.</string>
     <string name="emulation_auto_save_last_saved">Ostatni autozapis: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Przywróć autozapis</string>
     <string name="emulation_auto_save_interval_label">Co</string>
     <string name="emulation_auto_save_interval_suffix">min</string>
     <string name="emulation_auto_save_on_exit">Autozapis przy wyjściu</string>

@@ -3514,17 +3514,55 @@ private fun EmulationSidebarMenu(
                                                 Text(stringResource(R.string.emulation_auto_save_interval_suffix))
                                             }
                                         )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        CompactIconActionButton(
-                                            icon = Icons.Rounded.Restore,
-                                            contentDescription = stringResource(R.string.emulation_quick_load_desc),
-                                            onClick = onLoadAutoSave,
-                                            enabled = !uiState.isActionInProgress && uiState.autoSaveLastModified > 0L,
-                                            showProgress = uiState.actionLabel == "loading"
-                                        )
                                     }
                                 }
                                 }
+                            }
+                        }
+
+                        }
+
+                        if ((section == GameMenuSectionId.AUTO_SAVE && !mergedIntoPreviousSaveStates) ||
+                            includeFollowingAutoSave
+                        ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = neonShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.emulation_auto_save_restore_title),
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (uiState.autoSaveLastModified > 0L) {
+                                            formatSaveTimestamp(uiState.autoSaveLastModified)
+                                        } else {
+                                            stringResource(R.string.emulation_auto_save_empty)
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                CompactIconActionButton(
+                                    icon = Icons.Rounded.Restore,
+                                    contentDescription = stringResource(R.string.emulation_quick_load_desc),
+                                    onClick = onLoadAutoSave,
+                                    enabled = !uiState.isActionInProgress && uiState.autoSaveLastModified > 0L,
+                                    showProgress = uiState.actionLabel == "loading"
+                                )
                             }
                         }
 

@@ -95,6 +95,7 @@
     <string name="emulation_auto_save_title">자동 저장</string>
     <string name="emulation_auto_save_empty">아직 자동 저장이 없습니다.</string>
     <string name="emulation_auto_save_last_saved">마지막 자동 저장: %1$s</string>
+    <string name="emulation_auto_save_restore_title">자동 저장 복원</string>
     <string name="emulation_auto_save_interval_label">주기</string>
     <string name="emulation_auto_save_interval_suffix">분</string>
     <string name="emulation_play_time_badge">플레이 시간 %1$s</string>

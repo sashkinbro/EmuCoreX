@@ -95,6 +95,7 @@
     <string name="emulation_auto_save_title">حفظ تلقائي</string>
     <string name="emulation_auto_save_empty">لا يوجد حفظ تلقائي حتى الآن.</string>
     <string name="emulation_auto_save_last_saved">آخر حفظ تلقائي: %1$s</string>
+    <string name="emulation_auto_save_restore_title">استعادة الحفظ التلقائي</string>
     <string name="emulation_auto_save_interval_label">كل</string>
     <string name="emulation_auto_save_interval_suffix">دقيقة</string>
     <string name="emulation_play_time_badge">وقت اللعب %1$s</string>

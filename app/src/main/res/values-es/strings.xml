@@ -1004,6 +1004,7 @@
     <string name="emulation_auto_save_title">Guardado automático</string>
     <string name="emulation_auto_save_empty">Aún no hay guardado automático.</string>
     <string name="emulation_auto_save_last_saved">Último guardado automático: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Restaurar guardado automático</string>
     <string name="emulation_auto_save_interval_label">Cada</string>
     <string name="emulation_auto_save_interval_suffix">min</string>
     <string name="emulation_play_time_badge">Tiempo de juego %1$s</string>

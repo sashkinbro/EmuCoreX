@@ -101,6 +101,7 @@
     <string name="emulation_auto_save_title">Simpan Otomatis</string>
     <string name="emulation_auto_save_empty">Belum ada simpanan otomatis.</string>
     <string name="emulation_auto_save_last_saved">Simpan otomatis terakhir: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Pulihkan simpanan otomatis</string>
     <string name="emulation_auto_save_interval_label">Setiap</string>
     <string name="emulation_auto_save_interval_suffix">mnt</string>
     <string name="emulation_auto_save_on_exit">Simpan otomatis saat keluar</string>

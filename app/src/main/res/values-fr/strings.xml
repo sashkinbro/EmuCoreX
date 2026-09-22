@@ -1004,6 +1004,7 @@
     <string name="emulation_auto_save_title">Sauvegarde automatique</string>
     <string name="emulation_auto_save_empty">Aucune sauvegarde automatique pour le moment.</string>
     <string name="emulation_auto_save_last_saved">Dernière sauvegarde automatique : %1$s</string>
+    <string name="emulation_auto_save_restore_title">Restaurer la sauvegarde automatique</string>
     <string name="emulation_auto_save_interval_label">Toutes les</string>
     <string name="emulation_auto_save_interval_suffix">min</string>
     <string name="emulation_play_time_badge">Temps de jeu %1$s</string>

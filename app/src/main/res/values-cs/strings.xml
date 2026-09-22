@@ -101,6 +101,7 @@
     <string name="emulation_auto_save_title">Automatické ukládání</string>
     <string name="emulation_auto_save_empty">Zatím žádné automatické uložení.</string>
     <string name="emulation_auto_save_last_saved">Poslední automatické uložení: %1$s</string>
+    <string name="emulation_auto_save_restore_title">Obnovit automatické ukládání</string>
     <string name="emulation_auto_save_interval_label">Každých</string>
     <string name="emulation_auto_save_interval_suffix">min</string>
     <string name="emulation_auto_save_on_exit">Automaticky uložit při ukončení</string>
