@@ -886,12 +886,14 @@ std::unique_ptr<GSDownloadTextureVK> GSDownloadTextureVK::Create(u32 width, u32 
 	VmaAllocationCreateInfo aci = {};
 	aci.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
 	aci.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	const bool prefer_coherent_readback =
-		GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(DriverWorkaround::PreferCoherentReadback);
-	// Keep this a preference, not a required heap restriction. The allocator can select the
-	// normal mapped readback memory when a device exposes no suitable coherent type.
-	aci.preferredFlags = prefer_coherent_readback ?
-		VK_MEMORY_PROPERTY_HOST_COHERENT_BIT : VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+	// Mobile drivers are more reliable with coherent readback memory. Keep this a preference,
+	// not a required heap restriction: the allocator can still pick normal mapped memory when
+	// a device exposes no suitable coherent type.
+#if defined(__ANDROID__)
+	aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+#else
+	aci.preferredFlags = VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+#endif
 
 	VmaAllocationInfo ai = {};
 	VmaAllocation allocation;

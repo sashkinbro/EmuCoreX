@@ -301,10 +301,10 @@ static void ApplyAndroidGameDBOverrides()
 	}
 
 	// Native half-pixel offset changes target invalidation, clamping and downsampling in addition to
-	// vertex alignment. MediaTek Mali drivers can render duplicated horizontal framebuffer regions in
+	// vertex alignment. MediaTek mobile GPUs can render duplicated horizontal framebuffer regions in
 	// Tekken 5 with this mode, while disabling it produces the correct frame. Keep the desktop GameDB
 	// fix for every other GPU/game, and preserve explicit manual hardware-hack selections.
-	if (!g_gs_device || !g_gs_device->IsMaliGPUProfile() || !g_gs_device->IsMediaTekSoC() ||
+	if (!g_gs_device || !g_gs_device->IsMobileGPUProfile() || !g_gs_device->IsMediaTekSoC() ||
 		GSConfig.UserHacks_HalfPixelOffset != GSHalfPixelOffset::Native)
 	{
 		return;

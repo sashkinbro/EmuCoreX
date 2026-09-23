@@ -21,11 +21,12 @@ object GpuHardwareProfiles {
         return normalize(profile) == MALI || normalize(profile) == POWERVR
     }
 
-    // Pass only the SoC-vendor hint. "mediatek" intentionally parses as an automatic GPU override:
-    // the native renderer still uses GL_RENDERER/VkPhysicalDeviceProperties for the actual GPU,
-    // which matters because older MediaTek generations can use PowerVR instead of Mali.
-    fun coreOverrideFor(): String =
-        if (isMediaTekHardware()) "mediatek" else "auto"
+    // Telemetry/crash-report label. The native renderer detects the GPU path itself.
+    fun familyName(profile: Int): String = when (normalize(profile)) {
+        ADRENO -> "adreno"
+        POWERVR -> "powervr"
+        else -> "mali"
+    }
 
     fun isMediaTekHardware(): Boolean {
         cachedMediaTekHardware?.let { return it }

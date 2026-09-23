@@ -22,7 +22,6 @@
 
 #include "glad/gl.h"
 
-#include <cctype>
 #include <cstdlib>
 #include <cstring>
 
@@ -37,64 +36,6 @@ static bool ShouldPreferESContext()
 	getenv_s(&buffer_size, buffer, "PREFER_GLES_CONTEXT");
 	return (std::strcmp(buffer, "1") == 0);
 #endif
-}
-
-// Parses the Mali driver token from GL_VERSION, e.g. "OpenGL ES 3.2 v1.r54p1-01rel0"
-// (r-driver) or "OpenGL ES 3.2 v1.g20p0-..." (g-driver).
-static bool ParseMaliDriverVersion(
-	const char* gl_version, int* gles_major, int* gles_minor, int* release, bool* is_g_driver)
-{
-	if (!gl_version || std::sscanf(gl_version, "OpenGL ES %d.%d", gles_major, gles_minor) != 2)
-		return false;
-
-	for (const char* pos = gl_version; (pos = std::strchr(pos, '.')) != nullptr; pos++)
-	{
-		const char kind = pos[1];
-		if ((kind != 'r' && kind != 'g') || !std::isdigit(static_cast<unsigned char>(pos[2])))
-			continue;
-
-		char* end = nullptr;
-		const long value = std::strtol(pos + 2, &end, 10);
-		if (end == pos + 2)
-			continue;
-
-		*release = static_cast<int>(value);
-		*is_g_driver = (kind == 'g');
-		return true;
-	}
-
-	return false;
-}
-
-static bool DisableBrokenExtensions(const char* gl_vendor, const char* gl_renderer, const char* gl_version)
-{
-	if (std::strstr(gl_vendor, "ARM") || std::strstr(gl_renderer, "Mali"))
-	{
-		// GL_{EXT,OES}_copy_image falls back to CPU paths on old Mali. The driver release in
-		// GL_VERSION is the authoritative signal: Bifrost parts (G71/G76) have model >= 57 but
-		// old r-drivers, while newer Immortalis parts must not be treated as "old" by name.
-		int gles_major = 0;
-		int gles_minor = 0;
-		int release = 0;
-		bool is_g_driver = false;
-		const bool parsed = ParseMaliDriverVersion(gl_version, &gles_major, &gles_minor, &release, &is_g_driver);
-
-		const bool usable = parsed &&
-			((gles_major >= 3 && is_g_driver && release > 0) ||
-				((gles_major > 3 || (gles_major == 3 && gles_minor >= 2)) && !is_g_driver && release > 31));
-
-		if (!usable)
-		{
-			Console.Warning("Old or unrecognized Mali driver, disabling GL_{EXT,OES}_copy_image (%s).",
-				gl_version ? gl_version : "unknown version");
-			GLAD_GL_EXT_copy_image = 0;
-			GLAD_GL_OES_copy_image = 0;
-			return true;
-		}
-
-		Console.WriteLn("Modern Mali driver (%s), keeping GL_{EXT,OES}_copy_image enabled.", gl_version);
-	}
-	return false;
 }
 
 GLContext::GLContext(const WindowInfo& wi)
@@ -174,12 +115,6 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	}
 
 	context_being_created = nullptr;
-
-	const char* gl_vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-	const char* gl_renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-	const char* gl_version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
-	if (gl_vendor && gl_renderer)
-		context->m_copy_image_disabled = DisableBrokenExtensions(gl_vendor, gl_renderer, gl_version);
 
 	return context;
 }

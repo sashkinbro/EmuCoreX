@@ -147,10 +147,9 @@ namespace GSLsfg
 			// VkDevice, and there is no equivalent path for the GLES backend.
 			if (!s_is_vulkan.load(std::memory_order_relaxed))
 				return Unavailable::NotVulkan;
-			// Adreno 7xx or newer, per upstream. Asked of the resolved architecture rather than
-			// a GL_RENDERER substring search, for the same reason the Mali workarounds moved
-			// into the driver database: a parsed generation can say "7xx and up", a substring
-			// cannot.
+			// Adreno 7xx or newer, per upstream. The generation is parsed from the device name
+			// once at device creation, so an unsupported part cannot slip through by matching a
+			// vendor substring.
 			if (s_adreno_generation.load(std::memory_order_relaxed) < 7)
 				return Unavailable::GpuUnsupported;
 		}

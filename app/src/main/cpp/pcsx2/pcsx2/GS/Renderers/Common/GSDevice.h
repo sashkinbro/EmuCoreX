@@ -1448,7 +1448,6 @@ public:
 		bool aa1                 : 1; ///< Supports AA1 (anti-aliasing for lines/triangles).
 		bool rov                 : 1; ///< Supports rasterizer ordered views for both depth and color.
 		bool dual_source_blend   : 1; ///< Supports a second fragment output as a hardware blend factor.
-		bool broken_mad_deinterlace : 1; ///< Driver cannot reliably preserve/read the two-bank FastMAD history target.
 		bool rgba16_unorm        : 1; ///< Supports RGBA16 normalized color attachments (ColorClip); otherwise RGBA32F is used.
 		DepthFeedbackSupport depth_feedback : 2; ///< Support for depth feedback loops.
 		FeatureSupport()
@@ -1496,9 +1495,6 @@ protected:
 	FeatureSupport m_features;
 	u32 m_max_texture_size = 0;
 	RuntimeGpuProfile m_runtime_gpu_profile = RuntimeGpuProfile::Unknown;
-	MobileGpuIdentity m_mobile_gpu_identity;
-	MobileGsTuning m_mobile_gs_tuning;
-	MobileDriverProfile m_mobile_driver_profile;
 	bool m_is_mediatek_soc = false;
 
 	struct
@@ -1621,23 +1617,18 @@ public:
 	__fi FeatureSupport Features() const { return m_features; }
 	__fi u32 GetMaxTextureSize() const { return m_max_texture_size; }
 	__fi void SetRuntimeGPUProfile(RuntimeGpuProfile profile) { m_runtime_gpu_profile = profile; }
-	__fi void SetMobileGPUIdentity(const MobileGpuIdentity& identity) { m_mobile_gpu_identity = identity; }
-	__fi void SetMobileGSTuning(const MobileGsTuning& tuning) { m_mobile_gs_tuning = tuning; }
-	__fi void SetMobileDriverProfile(const MobileDriverProfile& profile) { m_mobile_driver_profile = profile; }
 	__fi void SetMediaTekSoC(bool is_mediatek_soc) { m_is_mediatek_soc = is_mediatek_soc; }
 	__fi RuntimeGpuProfile GetRuntimeGPUProfile() const { return m_runtime_gpu_profile; }
-	__fi const MobileGpuIdentity& GetMobileGPUIdentity() const { return m_mobile_gpu_identity; }
-	__fi const MobileGsTuning& GetMobileGSTuning() const { return m_mobile_gs_tuning; }
-	__fi const MobileDriverProfile& GetMobileDriverProfile() const { return m_mobile_driver_profile; }
-	__fi bool UsesMobileDriverWorkaround(DriverWorkaround workaround) const
-	{
-		return m_mobile_driver_profile.UsesWorkaround(workaround);
-	}
 	__fi bool IsMediaTekSoC() const { return m_is_mediatek_soc; }
-	__fi bool IsConstrainedMobileGPUProfile() const { return m_mobile_gs_tuning.constrained; }
-	__fi bool IsMaliGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::Mali; }
+
+	/// True for the unified Mali/PowerVR tile-GPU path.
+	__fi bool IsMobileGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::Mobile; }
+
+	/// True when the GPU is an Adreno part (identity only, rendering shares the mobile path).
 	__fi bool IsAdrenoGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::Adreno; }
-	__fi bool IsPowerVRGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::PowerVR; }
+
+	/// True when any mobile GPU path was recognized (Mali/PowerVR or Adreno).
+	__fi bool HasMobileGPUProfile() const { return m_runtime_gpu_profile != RuntimeGpuProfile::Unknown; }
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }

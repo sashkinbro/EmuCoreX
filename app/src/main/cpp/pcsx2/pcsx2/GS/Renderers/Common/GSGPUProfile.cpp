@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "GS/Renderers/Common/GSGPUProfilePrivate.h"
+#include "GS/Renderers/Common/GSGPUProfile.h"
 
 #include <array>
 #include <cctype>
+#include <initializer_list>
+#include <string>
 
 #if defined(__ANDROID__)
 #include <sys/system_properties.h>
 #endif
 
-namespace GpuProfileDetail
+namespace
 {
 std::string ToLowerASCII(std::string_view value)
 {
@@ -23,70 +25,118 @@ std::string ToLowerASCII(std::string_view value)
 	return lowered;
 }
 
-static bool Contains(std::string_view haystack, std::string_view needle)
-{
-	return (haystack.find(needle) != std::string_view::npos);
-}
-
 bool ContainsAny(std::string_view haystack, std::initializer_list<const char*> needles)
 {
 	for (const char* needle : needles)
 	{
-		if (Contains(haystack, needle))
+		if (haystack.find(needle) != std::string_view::npos)
 			return true;
 	}
 
 	return false;
 }
 
-MobileGsTuning MakeConservativeMobileGsTuning()
+bool LooksLikeAdreno(std::string_view lowered)
 {
-	// Keep the upstream GS retention policy on every mobile GPU. Capability and driver
-	// workarounds remain profile-specific, but shrinking these pools is not a safe way to
-	// classify a weaker GPU: it increases allocation churn and can discard intermediate
-	// render surfaces still needed by multi-pass effects.
-	return MobileGsTuning{};
+	return ContainsAny(lowered, {"adreno", "qualcomm", "qcom", "snapdragon"});
 }
-} // namespace GpuProfileDetail
 
-namespace
+bool LooksLikeMobileTileGpu(std::string_view lowered)
 {
-static void AppendHint(std::string& hints, std::string_view key, std::string_view value)
+	return ContainsAny(lowered, {"mali", "immortalis", "powervr", "imgtec", "imagination technologies"});
+}
+} // namespace
+
+const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
 {
-	if (value.empty())
-		return;
-
-	if (!hints.empty())
-		hints.append(" | ");
-
-	if (!key.empty())
+	switch (value)
 	{
-		hints.append(key);
-		hints.push_back('=');
+		case RuntimeGpuProfile::Mobile:
+			return "Mobile";
+		case RuntimeGpuProfile::Adreno:
+			return "Adreno";
+		case RuntimeGpuProfile::Unknown:
+		default:
+			return "Unknown";
+	}
+}
+
+RuntimeGpuProfile GpuProfileDetector::Detect(std::string_view gpu_vendor, std::string_view gpu_renderer_or_name)
+{
+	// The renderer/device name is the strongest signal. Check it before the vendor string so a
+	// stale or conflicting vendor hint cannot select the wrong path.
+	const std::string renderer = ToLowerASCII(gpu_renderer_or_name);
+	if (LooksLikeAdreno(renderer))
+		return RuntimeGpuProfile::Adreno;
+	if (LooksLikeMobileTileGpu(renderer))
+		return RuntimeGpuProfile::Mobile;
+
+	const std::string vendor = ToLowerASCII(gpu_vendor);
+	if (LooksLikeAdreno(vendor))
+		return RuntimeGpuProfile::Adreno;
+	if (LooksLikeMobileTileGpu(vendor))
+		return RuntimeGpuProfile::Mobile;
+
+	return RuntimeGpuProfile::Unknown;
+}
+
+u32 GpuProfileDetector::ParseAdrenoGeneration(std::string_view gpu_renderer_or_name)
+{
+	const std::string lowered = ToLowerASCII(gpu_renderer_or_name);
+	const size_t position = lowered.find("adreno");
+	if (position == std::string::npos)
+		return 0;
+
+	// Device names look like "Adreno (TM) 740" or "Adreno X1-85". Walk to the first digit,
+	// resolving the X-series (9th generation) along the way.
+	size_t index = position + 6;
+	while (index < lowered.size())
+	{
+		const char ch = lowered[index];
+		if (ch == 'x')
+			return 9;
+		if (std::isdigit(static_cast<unsigned char>(ch)))
+			break;
+		index++;
 	}
 
-	hints.append(value);
+	u32 model = 0;
+	for (; index < lowered.size() && std::isdigit(static_cast<unsigned char>(lowered[index])); index++)
+		model = model * 10 + static_cast<u32>(lowered[index] - '0');
+
+	return (model >= 200) ? (model / 100) : 0;
 }
 
-#if defined(__ANDROID__)
-static std::string GetAndroidProperty(const char* name)
+bool GpuProfileDetector::LooksLikeMediaTekSoC(std::string_view hints)
 {
-	std::array<char, PROP_VALUE_MAX> value = {};
-	const int length = __system_property_get(name, value.data());
-	return (length > 0) ? std::string(value.data(), static_cast<size_t>(length)) : std::string();
+	const std::string lowered = ToLowerASCII(hints);
+	if (ContainsAny(lowered, {"mediatek", "dimensity", "helio", "mtk"}))
+		return true;
+
+	// MediaTek board/platform properties commonly use compact part numbers such as mt6877 or
+	// mt6989z without spelling out the vendor. Require a token boundary and four digits to avoid
+	// treating an unrelated occurrence of "mt" as a chipset identifier.
+	for (size_t i = 0; i + 6 <= lowered.size(); i++)
+	{
+		if (lowered[i] != 'm' || lowered[i + 1] != 't' ||
+			(i > 0 && std::isalnum(static_cast<unsigned char>(lowered[i - 1]))))
+		{
+			continue;
+		}
+
+		bool has_four_digits = true;
+		for (size_t digit = i + 2; digit < i + 6; digit++)
+			has_four_digits &= (std::isdigit(static_cast<unsigned char>(lowered[digit])) != 0);
+
+		if (has_four_digits)
+			return true;
+	}
+
+	return false;
 }
-#endif
 
-static std::string BuildHints(std::string_view gpu_vendor, std::string_view gpu_renderer_or_name,
-	const MobileDriverContext& driver_context)
+bool GpuProfileDetector::DetectMediaTekSoC()
 {
-	std::string hints;
-	AppendHint(hints, "gpu_vendor", gpu_vendor);
-	AppendHint(hints, "gpu", gpu_renderer_or_name);
-	AppendHint(hints, "driver_name", driver_context.driver_name);
-	AppendHint(hints, "driver_info", driver_context.driver_info);
-	AppendHint(hints, "api_version", driver_context.api_version_string);
-
 #if defined(__ANDROID__)
 	static constexpr const char* property_names[] = {
 		"ro.soc.manufacturer",
@@ -97,251 +147,21 @@ static std::string BuildHints(std::string_view gpu_vendor, std::string_view gpu_
 		"ro.hardware.chipname",
 		"ro.chipname",
 		"ro.product.board",
-		"ro.product.manufacturer",
-		"ro.product.model",
-		"ro.build.version.sdk",
-		"ro.vendor.product.manufacturer",
-		"ro.vendor.product.model",
 		"ro.mediatek.platform",
 		"ro.vendor.mediatek.platform",
-		"ro.product.cpu.abi",
-		"ro.vendor.product.cpu.abilist",
 	};
 
 	for (const char* property_name : property_names)
-		AppendHint(hints, property_name, GetAndroidProperty(property_name));
-#endif
-
-	return hints;
-}
-
-static bool LooksLikeMediaTekSoc(std::string_view lowered_hints)
-{
-	if (GpuProfileDetail::ContainsAny(lowered_hints, {"mediatek", "dimensity", "helio"}))
-		return true;
-
-	// MediaTek board/platform properties commonly use compact part numbers such as mt6877 or
-	// mt6989z without spelling out the vendor. Require a token boundary and four digits to avoid
-	// treating an unrelated occurrence of "mt" as a chipset identifier.
-	for (size_t i = 0; i + 6 <= lowered_hints.size(); i++)
 	{
-		if (lowered_hints[i] != 'm' || lowered_hints[i + 1] != 't' ||
-			(i > 0 && std::isalnum(static_cast<unsigned char>(lowered_hints[i - 1]))))
+		std::array<char, PROP_VALUE_MAX> value = {};
+		const int length = __system_property_get(property_name, value.data());
+		if (length > 0 &&
+			LooksLikeMediaTekSoC(std::string_view(value.data(), static_cast<size_t>(length))))
 		{
-			continue;
-		}
-
-		bool has_four_digits = true;
-		for (size_t digit = i + 2; digit < i + 6; digit++)
-			has_four_digits &= (std::isdigit(static_cast<unsigned char>(lowered_hints[digit])) != 0);
-
-		if (has_four_digits)
 			return true;
+		}
 	}
+#endif
 
 	return false;
-}
-} // namespace
-
-GpuProfileOverride GpuProfileDetector::ParseOverride(std::string_view value)
-{
-	const std::string lowered = GpuProfileDetail::ToLowerASCII(value);
-	if (lowered == "mali")
-		return GpuProfileOverride::Mali;
-	if (lowered == "adreno")
-		return GpuProfileOverride::Adreno;
-	if (lowered == "powervr")
-		return GpuProfileOverride::PowerVR;
-
-	return GpuProfileOverride::Auto;
-}
-
-const char* GpuProfileDetector::OverrideToConfigString(GpuProfileOverride value)
-{
-	switch (value)
-	{
-		case GpuProfileOverride::Mali:
-			return "mali";
-		case GpuProfileOverride::Adreno:
-			return "adreno";
-		case GpuProfileOverride::PowerVR:
-			return "powervr";
-		case GpuProfileOverride::Auto:
-		default:
-			return "auto";
-	}
-}
-
-const char* GpuProfileDetector::RuntimeProfileToString(RuntimeGpuProfile value)
-{
-	switch (value)
-	{
-		case RuntimeGpuProfile::Mali:
-			return "Mali";
-		case RuntimeGpuProfile::PowerVR:
-			return "PowerVR";
-		case RuntimeGpuProfile::Adreno:
-			return "Adreno";
-		case RuntimeGpuProfile::Unknown:
-		default:
-			return "Unknown";
-	}
-}
-
-const char* GpuProfileDetector::ArchitectureToString(MobileGpuArchitecture value)
-{
-	switch (value)
-	{
-		case MobileGpuArchitecture::Adreno2xx: return "Adreno 2xx";
-		case MobileGpuArchitecture::Adreno3xx: return "Adreno 3xx";
-		case MobileGpuArchitecture::Adreno4xx: return "Adreno 4xx";
-		case MobileGpuArchitecture::Adreno5xx: return "Adreno 5xx";
-		case MobileGpuArchitecture::Adreno6xx: return "Adreno 6xx";
-		case MobileGpuArchitecture::Adreno7xx: return "Adreno 7xx";
-		case MobileGpuArchitecture::Adreno8xx: return "Adreno 8xx";
-		case MobileGpuArchitecture::AdrenoX: return "Adreno X";
-		case MobileGpuArchitecture::MaliUtgard: return "Mali Utgard";
-		case MobileGpuArchitecture::MaliMidgard: return "Mali Midgard";
-		case MobileGpuArchitecture::MaliBifrost: return "Mali Bifrost";
-		case MobileGpuArchitecture::MaliValhall1: return "Mali Valhall (1st Gen)";
-		case MobileGpuArchitecture::MaliValhall2: return "Mali Valhall (2nd Gen)";
-		case MobileGpuArchitecture::MaliValhall3: return "Mali Valhall (3rd Gen)";
-		case MobileGpuArchitecture::MaliFifthGen: return "Arm 5th Gen";
-		case MobileGpuArchitecture::MaliG1: return "Arm Mali G1";
-		case MobileGpuArchitecture::PowerVRSeries5: return "PowerVR Series5/SGX";
-		case MobileGpuArchitecture::PowerVRRogue: return "PowerVR Rogue";
-		case MobileGpuArchitecture::PowerVRVolcanic: return "PowerVR Volcanic";
-		case MobileGpuArchitecture::PowerVR: return "PowerVR";
-		case MobileGpuArchitecture::Unknown:
-		default:
-			return "Unknown";
-	}
-}
-
-const char* GpuProfileDetector::DriverToString(MobileGpuDriver value)
-{
-	switch (value)
-	{
-		case MobileGpuDriver::ArmProprietary: return "ARM proprietary";
-		case MobileGpuDriver::MesaPanVK: return "Mesa PanVK";
-		case MobileGpuDriver::QualcommProprietary: return "Qualcomm proprietary";
-		case MobileGpuDriver::MesaTurnip: return "Mesa Turnip";
-		case MobileGpuDriver::ImaginationProprietary: return "Imagination proprietary";
-		case MobileGpuDriver::MesaPowerVR: return "Mesa PowerVR";
-		case MobileGpuDriver::Angle: return "ANGLE";
-		case MobileGpuDriver::Unknown:
-		default: return "Unknown";
-	}
-}
-
-static void ApplyResolvedProfile(GpuProfileSelection& selection, RuntimeGpuProfile runtime_profile,
-	GpuProfileDetail::ResolvedGpuProfile&& resolved)
-{
-	selection.runtime_profile = runtime_profile;
-	selection.gpu = std::move(resolved.gpu);
-}
-
-GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value, std::string_view gpu_vendor,
-	std::string_view gpu_renderer_or_name)
-{
-	return Resolve(override_value, gpu_vendor, gpu_renderer_or_name, {});
-}
-
-GpuProfileSelection GpuProfileDetector::Resolve(std::string_view override_value, std::string_view gpu_vendor,
-	std::string_view gpu_renderer_or_name, const MobileDriverContext& driver_context)
-{
-	GpuProfileSelection selection;
-	selection.override_mode = ParseOverride(override_value);
-	MobileDriverContext effective_context = driver_context;
-#if defined(__ANDROID__)
-	if (effective_context.android_sdk == 0)
-	{
-		const std::string sdk = GetAndroidProperty("ro.build.version.sdk");
-		u32 parsed_sdk = 0;
-		for (const char ch : sdk)
-		{
-			if (!std::isdigit(static_cast<unsigned char>(ch)))
-				break;
-			parsed_sdk = parsed_sdk * 10 + static_cast<u32>(ch - '0');
-		}
-		effective_context.android_sdk = parsed_sdk;
-	}
-#endif
-	selection.hints = BuildHints(gpu_vendor, gpu_renderer_or_name, effective_context);
-	const std::string lowered_hints = GpuProfileDetail::ToLowerASCII(selection.hints);
-	const std::string lowered_vendor = GpuProfileDetail::ToLowerASCII(gpu_vendor);
-	const std::string lowered_renderer = GpuProfileDetail::ToLowerASCII(gpu_renderer_or_name);
-	const std::string lowered_driver_identity = GpuProfileDetail::ToLowerASCII(
-		std::string(effective_context.driver_name) + " | " + std::string(effective_context.driver_info));
-	const std::string lowered_override = GpuProfileDetail::ToLowerASCII(override_value);
-	selection.is_mediatek_soc = (lowered_override == "mediatek") || LooksLikeMediaTekSoc(lowered_hints);
-	selection.gs_tuning = GpuProfileDetail::MakeConservativeMobileGsTuning();
-	const auto finalize = [&]() {
-		selection.driver = GpuProfileDetail::ResolveDriverProfile(selection, effective_context, lowered_hints);
-		return selection;
-	};
-
-	if (selection.override_mode == GpuProfileOverride::Mali)
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
-		return finalize();
-	}
-
-	if (selection.override_mode == GpuProfileOverride::Adreno)
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
-		return finalize();
-	}
-
-	if (selection.override_mode == GpuProfileOverride::PowerVR)
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
-		return finalize();
-	}
-
-	// The renderer/device name is the strongest identity signal. Check it before GL_VENDOR and
-	// the broader Android property bag so a stale or conflicting property cannot select another
-	// GPU family's workarounds.
-	if (GpuProfileDetail::LooksLikeAdreno(lowered_renderer))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikePowerVR(lowered_renderer))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikeMali(lowered_renderer))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikeAdreno(lowered_vendor))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikePowerVR(lowered_vendor))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikeMali(lowered_vendor))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
-	}
-	// Driver identity is still useful when a backend does not expose a renderer string.
-	// Do not use the complete Android property bag for family selection: SoC/platform
-	// properties identify the chip vendor, not necessarily the GPU (notably MediaTek),
-	// and can leak the host GPU into synthetic/unknown detection contexts.
-	else if (GpuProfileDetail::LooksLikeAdreno(lowered_driver_identity))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Adreno, GpuProfileDetail::ResolveAdrenoProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikePowerVR(lowered_driver_identity))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::PowerVR, GpuProfileDetail::ResolvePowerVRProfile(lowered_hints));
-	}
-	else if (GpuProfileDetail::LooksLikeMali(lowered_driver_identity))
-	{
-		ApplyResolvedProfile(selection, RuntimeGpuProfile::Mali, GpuProfileDetail::ResolveMaliProfile(lowered_hints));
-	}
-
-	return finalize();
 }

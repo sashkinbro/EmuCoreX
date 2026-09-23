@@ -26,8 +26,12 @@ class GpuHardwareProfileTest {
     }
 
     @Test
-    fun nativeProfileAlwaysUsesRendererAutoDetection() {
-        assertEquals("auto", GpuHardwareProfiles.coreOverrideFor())
+    fun familyNameMatchesHardwareProfile() {
+        assertEquals("adreno", GpuHardwareProfiles.familyName(GpuHardwareProfiles.ADRENO))
+        assertEquals("powervr", GpuHardwareProfiles.familyName(GpuHardwareProfiles.POWERVR))
+        assertEquals("mali", GpuHardwareProfiles.familyName(GpuHardwareProfiles.MALI))
+        // Unsupported persisted values normalize to the Mali family.
+        assertEquals("mali", GpuHardwareProfiles.familyName(999))
     }
 
     @Test

@@ -774,20 +774,14 @@ void GSDevice::AgePool()
 
 u32 GSDevice::GetPoolLimit(bool texture) const
 {
-#if defined(__ANDROID__)
-	return texture ? m_mobile_gs_tuning.pooled_textures : m_mobile_gs_tuning.pooled_targets;
-#else
+	// One resource policy for every GPU: shrinking the pools is not a safe way to classify a
+	// weaker device and increases allocation churn.
 	return texture ? MAX_POOLED_TEXTURES : MAX_POOLED_TARGETS;
-#endif
 }
 
 u32 GSDevice::GetPoolMaxAge(bool texture) const
 {
-#if defined(__ANDROID__)
-	return texture ? m_mobile_gs_tuning.texture_age : m_mobile_gs_tuning.target_age;
-#else
 	return texture ? MAX_TEXTURE_AGE : MAX_TARGET_AGE;
-#endif
 }
 
 void GSDevice::PurgePool()

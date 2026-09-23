@@ -120,17 +120,6 @@ static constexpr GSDevice::DepthFeedbackSupport GetVKDepthFeedbackSupport(bool t
 	}
 }
 
-#if defined(__ANDROID__)
-static bool ShouldUseConservativeAndroidVulkanFeedbackPath()
-{
-	// The Android Vulkan RT feedback path currently shows post-load corruption where the first
-	// draw looks correct and a later feedback-loop transition introduces reflection/highlight
-	// artifacts. Prefer the explicit barrier/input-attachment route until fb-fetch is revalidated
-	// against the newer GS core on Android as a whole.
-	return false;
-}
-#endif
-
 static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
 {
 	if (!tex)
@@ -140,15 +129,6 @@ static VkAttachmentLoadOp GetLoadOpForTexture(GSTextureVK* tex)
 	{
 		case GSTextureVK::State::Cleared:
 		{
-			if (GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(
-					DriverWorkaround::AvoidClearLoadOpRenderPass))
-			{
-				// PowerVR drivers can mishandle render passes whose attachment load op is CLEAR.
-				// Materialize the lazy clear first, then preserve it through a LOAD render pass.
-				tex->CommitClear();
-				return VK_ATTACHMENT_LOAD_OP_LOAD;
-			}
-
 			tex->SetState(GSTexture::State::Dirty);
 			return VK_ATTACHMENT_LOAD_OP_CLEAR;
 		}
@@ -529,12 +509,6 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access = false;
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
-#if !defined(__ANDROID__)
-	// Mobile driver profiles are resolved by Android. Preserve the established conservative
-	// fallback on other platforms which expose these mobile vendor IDs.
-	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
-		(m_device_properties.vendorID != 0x13B5u && m_device_properties.vendorID != 0x1010u);
-#endif
 	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_push_descriptor =
 		SupportsExtension(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, false);
@@ -601,22 +575,12 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	vkGetPhysicalDeviceProperties(m_physical_device, &m_device_properties);
 	m_name = m_device_properties.deviceName;
 
-#if defined(__ANDROID__)
-	MobileDriverContext driver_context;
-	driver_context.api = MobileGpuApi::Vulkan;
-	driver_context.driver_version = m_device_properties.driverVersion;
-	driver_context.max_draw_indirect_count = m_device_properties.limits.maxDrawIndirectCount;
-	GpuProfileSelection gpu_profile_selection =
-		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
-			GetVulkanVendorHint(m_device_properties.vendorID), m_name, driver_context);
-	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
-	SetMobileGPUIdentity(gpu_profile_selection.gpu);
-	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
-	SetMobileDriverProfile(gpu_profile_selection.driver);
-	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
-#else
-	SetRuntimeGPUProfile(RuntimeGpuProfile::Unknown);
-#endif
+	SetRuntimeGPUProfile(
+		GpuProfileDetector::Detect(GetVulkanVendorHint(m_device_properties.vendorID), m_name));
+	SetMediaTekSoC(GpuProfileDetector::DetectMediaTekSoC());
+	Console.WriteLn("VK: GPU profile '%s' (device: %s, vendor: 0x%04x%s).",
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), m_name.c_str(),
+		m_device_properties.vendorID, IsMediaTekSoC() ? ", MediaTek SoC" : "");
 
 	u32 queue_family_count;
 	vkGetPhysicalDeviceQueueFamilyProperties(m_physical_device, &queue_family_count, nullptr);
@@ -752,58 +716,16 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 	if (!SelectDeviceExtensions(&enabled_extensions, surface != VK_NULL_HANDLE))
 		return false;
 
-	// Query driver identity before creating the logical device. Several extension workarounds are
-	// specific to proprietary drivers and must not leak onto Mesa Turnip/PanVK.
-	if (m_optional_extensions.vk_khr_driver_properties)
-	{
-		VkPhysicalDeviceProperties2 driver_properties = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
-		m_device_driver_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
-		Vulkan::AddPointerToChain(&driver_properties, &m_device_driver_properties);
-		vkGetPhysicalDeviceProperties2(m_physical_device, &driver_properties);
-	}
-
 #if defined(__ANDROID__)
-	driver_context.driver_id = static_cast<u32>(m_device_driver_properties.driverID);
-	driver_context.driver_name = m_device_driver_properties.driverName;
-	driver_context.driver_info = m_device_driver_properties.driverInfo;
-	gpu_profile_selection = GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride,
-		GetVulkanVendorHint(m_device_properties.vendorID), m_name, driver_context);
-	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
-	SetMobileGPUIdentity(gpu_profile_selection.gpu);
-	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
-	SetMobileDriverProfile(gpu_profile_selection.driver);
-	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
-
-	u8 adreno_generation = 0;
-	switch (gpu_profile_selection.gpu.architecture)
-	{
-		case MobileGpuArchitecture::Adreno7xx: adreno_generation = 7; break;
-		case MobileGpuArchitecture::Adreno8xx: adreno_generation = 8; break;
-		case MobileGpuArchitecture::AdrenoX: adreno_generation = 9; break;
-		default: break;
-	}
-	GSLsfg::NoteRendererCapability(true, adreno_generation);
-
-	m_optional_extensions.vk_ext_attachment_feedback_loop_layout &=
-		!UsesMobileDriverWorkaround(DriverWorkaround::DisableAttachmentFeedbackLoopLayout);
-
-	Console.WriteLn("VK: Android GPU profile override='%s' resolved='%s' soc='%s' model='%s' "
-		"architecture='%s' driver='%s' version=%u.%u.%u raw=%08x rules=%u "
-		"bugs=%016llx workarounds=%016llx%s.",
-		GpuProfileDetector::OverrideToConfigString(gpu_profile_selection.override_mode),
-		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-		IsMediaTekSoC() ? "MediaTek" : "other/unknown",
-		gpu_profile_selection.gpu.name.c_str(),
-		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
-		GpuProfileDetector::DriverToString(gpu_profile_selection.driver.driver),
-		gpu_profile_selection.driver.version.major, gpu_profile_selection.driver.version.minor,
-		gpu_profile_selection.driver.version.patch, gpu_profile_selection.driver.version.raw,
-		gpu_profile_selection.driver.matched_rule_count,
-		static_cast<unsigned long long>(gpu_profile_selection.driver.bugs),
-		static_cast<unsigned long long>(gpu_profile_selection.driver.workarounds),
-		gpu_profile_selection.gs_tuning.constrained ? " constrained" : "");
-	DevCon.WriteLn("VK: Android GPU profile hints: %s", gpu_profile_selection.hints.c_str());
+	// Frame generation only supports Adreno 7xx and newer.
+	GSLsfg::NoteRendererCapability(true,
+		IsAdrenoGPUProfile() ? GpuProfileDetector::ParseAdrenoGeneration(m_name) : 0);
 #endif
+
+	// The unified mobile path uses input attachments for feedback. Keep the explicit
+	// feedback-loop layout only on drivers that are trusted with it.
+	if (IsMobileGPUProfile())
+		m_optional_extensions.vk_ext_attachment_feedback_loop_layout = false;
 
 	device_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
 	device_info.ppEnabledExtensionNames = enabled_extensions.data();
@@ -1016,7 +938,14 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 
 	m_use_push_descriptors = m_optional_extensions.vk_khr_push_descriptor;
 #if defined(__ANDROID__)
+	// Descriptor-set binding is the common, driver-agnostic path on mobile.
 	m_use_push_descriptors = false;
+#else
+	if (m_use_push_descriptors &&
+		(properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
+	{
+		m_use_push_descriptors = false;
+	}
 #endif
 	if (m_use_push_descriptors && push_descriptor_properties.maxPushDescriptors < NUM_TFX_TEXTURES)
 	{
@@ -1024,21 +953,8 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 			push_descriptor_properties.maxPushDescriptors, NUM_TFX_TEXTURES);
 		m_use_push_descriptors = false;
 	}
-	const bool profile_disables_push_descriptors =
-		UsesMobileDriverWorkaround(DriverWorkaround::UseDescriptorSets);
-#if defined(__ANDROID__)
-	if (m_use_push_descriptors && profile_disables_push_descriptors)
-#else
-	if (m_use_push_descriptors && (profile_disables_push_descriptors ||
-		properties2.properties.vendorID == 0x13B5u || properties2.properties.vendorID == 0x1010u))
-#endif
-		m_use_push_descriptors = false;
 	if (!m_use_push_descriptors)
 		Console.Warning("VK: Using non-push-descriptor texture binding fallback.");
-
-#if defined(__ANDROID__)
-	// MediaTek overrides removed to match Snapdragon
-#endif
 
 	if (m_optional_extensions.vk_ext_line_rasterization && !line_rasterization_feature.bresenhamLines)
 	{
@@ -3227,56 +3143,26 @@ bool GSDeviceVK::CreateDeviceAndSwapChain()
 bool GSDeviceVK::CheckFeatures()
 {
 	const VkPhysicalDeviceLimits& limits = m_device_properties.limits;
-	//const bool isAMD = (vendorID == 0x1002 || vendorID == 0x1022);
-	//const bool isNVIDIA = (vendorID == 0x10DE);
 
+	// ROAA is disabled during extension selection, so this stays false today. Keep the
+	// capability formula so an explicit opt-in would still have to pass through one place.
 	const bool has_framebuffer_fetch_extension = m_optional_extensions.vk_ext_rasterization_order_attachment_access;
-	// ROAA is a device capability, not a GPU-vendor policy. Prefer it whenever the driver
-	// exposes the extension, except for narrowly identified broken driver stacks below.
-	const bool is_mali_vk = (m_device_properties.vendorID == 0x13B5u);
-	const MobileGpuDriver mobile_driver = GetMobileDriverProfile().driver;
-	const bool is_arm_proprietary = (mobile_driver == MobileGpuDriver::ArmProprietary);
-	const bool is_mali_g57 = is_mali_vk &&
-		((GetMobileGPUIdentity().architecture == MobileGpuArchitecture::MaliValhall1 &&
-			 GetMobileGPUIdentity().model_number == 57) ||
-			 std::strstr(m_device_properties.deviceName, "Mali-G57") != nullptr);
-	// Affected mobile stacks can expose ROAA while returning zero or stale destination color.
-	// Keep the texture-barrier feedback path when the explicit driver profile denies ROAA.
-	const bool unreliable_mobile_fbfetch = UsesMobileDriverWorkaround(
-		DriverWorkaround::DisableRasterizationOrderAttachmentAccess);
-	bool framebuffer_fetch = has_framebuffer_fetch_extension &&
-		!unreliable_mobile_fbfetch && !GSConfig.DisableFramebufferFetch;
-	if (unreliable_mobile_fbfetch && has_framebuffer_fetch_extension)
-	{
-		Console.Warning("VK: Disabled unreliable mobile framebuffer fetch.");
-	}
+	const bool framebuffer_fetch = has_framebuffer_fetch_extension && !GSConfig.DisableFramebufferFetch;
 	const bool texture_barrier = (GSConfig.OverrideTextureBarriers != 0);
 
 	m_features.multidraw_fb_copy = false;
 	m_features.broken_point_sampler = false;
-
 
 	m_features.framebuffer_fetch = framebuffer_fetch;
 	m_features.texture_barrier = texture_barrier;
 	// Offset sampler reads also need a bounded source snapshot on the copy path.
 	m_features.texture_feedback_requires_copy = !texture_barrier;
 	m_features.dual_source_blend = m_device_features.dualSrcBlend;
-	// The r13p0-class Mali-G57 driver can expose alternating top/bottom FastMAD banks
-	// instead of the reconstructed frame. Keep the workaround model-specific and leave
-	// the normal motion-adaptive path enabled for newer Mali devices and other backends.
-	m_features.broken_mad_deinterlace =
-		is_arm_proprietary && IsMediaTekSoC() && is_mali_g57;
-#if defined(__ANDROID__)
-	const MobileGsTuning& mobile_gs_tuning = GetMobileGSTuning();
-#endif
 
 	// geometryShader is needed because gl_PrimitiveID is part of the Geometry SPIR-V Execution Model.
 	m_features.primitive_id = m_device_features.geometryShader;
 
 	m_features.prefer_new_textures = true;
-#if defined(__ANDROID__)
-	m_features.prefer_new_textures = mobile_gs_tuning.prefer_new_textures;
-#endif
 	m_features.provoking_vertex_last = m_optional_extensions.vk_ext_provoking_vertex;
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
 
@@ -3327,12 +3213,13 @@ bool GSDeviceVK::CheckFeatures()
 	m_features.line_expand =
 		(m_device_features.wideLines && limits.lineWidthRange[0] <= f_upscale && limits.lineWidthRange[1] >= f_upscale);
 
-	// Mobile Vulkan drivers tend to emulate wide points/lines expensively, so keep the vertex-expansion
-	// path on Android instead of routing this through legacy Mali/Adreno profile policy.
+	// Mobile Vulkan drivers tend to emulate wide points/lines expensively, so keep the
+	// vertex-expansion path on Android.
 #ifdef __ANDROID__
 	const bool prefer_vertex_expansion_for_mobile = true;
 #else
-	const bool prefer_vertex_expansion_for_mobile = (vendorID == 0x5143u || vendorID == 0x13B5u);
+	const bool prefer_vertex_expansion_for_mobile =
+		(m_device_properties.vendorID == 0x5143u || m_device_properties.vendorID == 0x13B5u);
 #endif
 	if (prefer_vertex_expansion_for_mobile)
 	{
@@ -3350,36 +3237,17 @@ bool GSDeviceVK::CheckFeatures()
 		m_features.provoking_vertex_last ? " provoking_vertex_last" : "", m_features.vs_expand ? " vs_expand" : "");
 #if defined(__ANDROID__)
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
-		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s model=%s arch=%s "
-		"roaa=%d fbfetch=%d fbfetchDenylisted=%d textureBarrier=%d inputAttachmentFeedback=%d "
-		"dualSrcBlend=%d depthFormat=%u rgba16unorm=%d fastMAD=%d madFallback=%s",
+		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s "
+		"roaa=%d fbfetch=%d textureBarrier=%d inputAttachmentFeedback=%d "
+		"dualSrcBlend=%d depthFormat=%u rgba16unorm=%d pointExpand=%d",
 		m_device_properties.deviceName, m_device_properties.vendorID, m_device_properties.driverVersion,
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-		IsMediaTekSoC() ? "MediaTek" : "other/unknown", GetMobileGPUIdentity().name.c_str(),
-		GpuProfileDetector::ArchitectureToString(GetMobileGPUIdentity().architecture),
+		IsMediaTekSoC() ? "MediaTek" : "other/unknown",
 		has_framebuffer_fetch_extension ? 1 : 0, m_features.framebuffer_fetch ? 1 : 0,
-		unreliable_mobile_fbfetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
-		UsesInputAttachmentFeedbackPath() ? 1 : 0,
-		m_device_features.dualSrcBlend ? 1 : 0,
-		static_cast<unsigned>(m_depth_format),
-		m_features.rgba16_unorm ? 1 : 0,
-		m_features.broken_mad_deinterlace ? 0 : 1,
-		m_features.broken_mad_deinterlace ? "blend" : "none");
+		m_features.texture_barrier ? 1 : 0, UsesInputAttachmentFeedbackPath() ? 1 : 0,
+		m_device_features.dualSrcBlend ? 1 : 0, static_cast<unsigned>(m_depth_format),
+		m_features.rgba16_unorm ? 1 : 0, m_features.point_expand ? 1 : 0);
 #endif
-	DevCon.WriteLn("VK: Mobile GPU profile: %s model=%s architecture=%s constrained=%s prefer_new=%s pool=%u/%u age=%u/%u.",
-		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-#if defined(__ANDROID__)
-		GetMobileGPUIdentity().name.c_str(),
-		GpuProfileDetector::ArchitectureToString(GetMobileGPUIdentity().architecture),
-#else
-		"Unknown", "Unknown",
-#endif
-		IsConstrainedMobileGPUProfile() ? "yes" : "no",
-		m_features.prefer_new_textures ? "yes" : "no",
-		GetMobileGSTuning().pooled_textures,
-		GetMobileGSTuning().pooled_targets,
-		GetMobileGSTuning().texture_age,
-		GetMobileGSTuning().target_age);
 
 	DevCon.WriteLn("Using %s for point expansion and %s for line expansion.",
 		m_features.point_expand ? "hardware" : "vertex expanding",
@@ -4677,10 +4545,9 @@ static void AddShaderHeader(std::stringstream& ss)
 	if (features.texture_barrier && dev->UseFeedbackLoopLayout())
 		ss << "#define HAS_FEEDBACK_LOOP_LAYOUT 1\n";
 
-	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND",
-		dev->UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
-	AddMacro(ss, "DRIVER_REWRITE_UNIFORM_INDEXING",
-		dev->UsesMobileDriverWorkaround(DriverWorkaround::RewriteUniformIndexing) ? 1 : 0);
+	// Some ARM proprietary drivers miscompile vector bitwise AND in shaders. Scalarize it on
+	// the whole mobile path rather than tracking individual driver versions.
+	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND", dev->HasMobileGPUProfile() ? 1 : 0);
 	ss << R"(
 #if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
@@ -4706,30 +4573,7 @@ ivec3 gpu_bitwise_and(ivec3 a, ivec3 b)
 #define gpu_bitwise_and(a, b) ((a) & (b))
 #endif
 
-#if DRIVER_REWRITE_UNIFORM_INDEXING
-float gpu_matrix_element(mat4 value, int column, int row)
-{
-	vec4 selected_column;
-	if (column == 0)
-		selected_column = value[0];
-	else if (column == 1)
-		selected_column = value[1];
-	else if (column == 2)
-		selected_column = value[2];
-	else
-		selected_column = value[3];
-
-	if (row == 0)
-		return selected_column[0];
-	if (row == 1)
-		return selected_column[1];
-	if (row == 2)
-		return selected_column[2];
-	return selected_column[3];
-}
-#else
 #define gpu_matrix_element(value, column, row) ((value)[column][row])
-#endif
 )";
 }
 
@@ -7432,13 +7276,12 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	// While a frame records, submit accumulated work to keep the GPU busy
 	// so it runs concurrently with GS-thread recording instead of only starting
 	// when the readback fence-waits on it. This fixes massive slowdowns on tilers.
-	// On TBDR GPUs (Mali, Adreno, PowerVR), mid-frame submits are very expensive
-	// because they break tile binning. Use a much higher threshold on mobile.
+	// On mobile tile GPUs, mid-frame submits are very expensive because they break tile
+	// binning. Use a much higher threshold on the mobile path.
 	{
-		const bool is_tbdr = IsDeviceMali() || IsDeviceAdreno() || IsDevicePowerVR();
 		constexpr u32 kick_threshold_desktop = 4000;
 		constexpr u32 kick_threshold_mobile = 40000;
-		const u32 kick_threshold = is_tbdr ? kick_threshold_mobile : kick_threshold_desktop;
+		const u32 kick_threshold = HasMobileGPUProfile() ? kick_threshold_mobile : kick_threshold_desktop;
 		if (m_draws_in_command_buffer >= kick_threshold)
 		{
 			ScanForCommandBufferCompletion();

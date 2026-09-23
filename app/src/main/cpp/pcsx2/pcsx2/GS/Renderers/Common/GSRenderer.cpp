@@ -231,16 +231,6 @@ bool GSRenderer::Merge(int field)
 	int mode = interlace_selection.shader_mode;
 	bool is_bob = GSConfig.InterlaceMode == GSInterlaceMode::BobTFF || GSConfig.InterlaceMode == GSInterlaceMode::BobBFF;
 
-	// FastMAD stores four fields in a two-bank history target. Older Mali-G57 Vulkan drivers can
-	// expose stale/alternating banks during reconstruction. Bob is not a safe fallback here: its
-	// intentionally alternating field phase makes the entire picture move vertically. Use the
-	// established weave+blend path instead, and suppress the FFMD merge offset so both the merge and
-	// deinterlace passes keep a fixed output coordinate system.
-	const bool stable_mad_fallback =
-		(mode == 3 && g_gs_device->Features().broken_mad_deinterlace);
-	if (stable_mad_fallback)
-		mode = 2;
-
 	for (int i = 0; i < 2; i++)
 	{
 		 const GSPCRTCRegs::PCRTCDisplay& curCircuit = PCRTCDisplays.PCRTCDisplays[i];
@@ -257,7 +247,7 @@ bool GSRenderer::Merge(int field)
 		src_gs_read[i] = ((GSVector4(curCircuit.framebufferRect) + GSVector4(0, y_offset[i], 0, y_offset[i])) * scale) / GSVector4(tex[i]->GetSize()).xyxy();
 		
 		float interlace_offset = 0.0f;
-		if (really_interlaced && m_regs->SMODE2.FFMD && !is_bob && !stable_mad_fallback &&
+		if (really_interlaced && m_regs->SMODE2.FFMD && !is_bob &&
 			!GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 		{
 			interlace_offset = (scale.y) * static_cast<float>(field ^ field2);

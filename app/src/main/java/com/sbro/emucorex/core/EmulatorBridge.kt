@@ -480,7 +480,6 @@ object EmulatorBridge {
         )
 
         val normalizedGpuHardwareProfile = GpuHardwareProfiles.normalize(gpuHardwareProfile)
-        val gpuHardwareProfileOverride = GpuHardwareProfiles.coreOverrideFor()
         val customDriverSupported = GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() && !GpuHardwareProfiles.isMediatekProfile(normalizedGpuHardwareProfile)
         val effectiveGpuDriverType = if (gpuDriverType == 1 && customDriverSupported) 1 else 0
         val effectiveMediatekAngleOpenGl = shouldUseMediatekAngleOpenGl(
@@ -490,7 +489,7 @@ object EmulatorBridge {
         )
         NativeApp.setCrashContextString("emu_renderer_name", rendererName(resolvedRenderer))
         NativeApp.setCrashContextString("emu_gpu_driver_mode", if (effectiveGpuDriverType == 1) "custom" else "system")
-        NativeApp.setCrashContextString("emu_gpu_profile", gpuHardwareProfileOverride)
+        NativeApp.setCrashContextString("emu_gpu_profile", GpuHardwareProfiles.familyName(normalizedGpuHardwareProfile))
         NativeApp.setCrashContextBool("emu_mediatek_angle_opengl", effectiveMediatekAngleOpenGl)
         val resolvedCustomDriverPath = if (effectiveGpuDriverType == 1) {
             prepareCustomDriverLibrary(customDriverPath.orEmpty())
@@ -636,7 +635,6 @@ object EmulatorBridge {
                 add(settingOp("EmuCore/GS", "HWDownloadMode", "int", hwDownloadMode.toString()))
                 add(settingOp("EmuCore/GS", "deinterlace_mode", "int", GsHackDefaults.coerceDeinterlaceMode(deinterlaceMode).toString()))
                 add(settingOp("EmuCore/GS", "dithering_ps2", "int", GsHackDefaults.coerceDithering(dithering).toString()))
-                add(settingOp("EmuCore/GS", "AndroidGpuProfileOverride", "string", gpuHardwareProfileOverride))
                 add(settingOp("EmuCore/GS", "AndroidUseAngleOpenGL", "bool", effectiveMediatekAngleOpenGl.toString()))
                 add(settingOp("EmuCore/GS", "OsdShowSpeed", "bool", "false"))
                 add(settingOp("EmuCore/GS", "OsdShowFPS", "bool", "false"))

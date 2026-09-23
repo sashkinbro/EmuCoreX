@@ -307,25 +307,6 @@ bool VKSwapChain::SelectPresentMode(VkSurfaceKHR surface, GSVSyncMode* vsync_mod
 		*vsync_mode = GSVSyncMode::FIFO;
 	}
 
-#if defined(__ANDROID__)
-	// r54p1 on Mali-G57 can run the producer ahead of Android's BufferQueue in
-	// MAILBOX/IMMEDIATE modes, eventually returning NO_BUFFER_AVAILABLE. FIFO is
-	// guaranteed on Android and provides the required producer-side backpressure.
-	// Keep this behind the proprietary-driver profile so PanVK and other stacks
-	// retain the present mode requested by the user.
-	const GSDeviceVK* const device = GSDeviceVK::GetInstance();
-	const bool force_fifo =
-		device->UsesMobileDriverWorkaround(DriverWorkaround::ForceFifoPresent);
-	if (force_fifo)
-	{
-		if (*vsync_mode != GSVSyncMode::FIFO)
-			WARNING_LOG("Mali-G57: forcing FIFO presentation to keep Android BufferQueue bounded.");
-		*present_mode = VK_PRESENT_MODE_FIFO_KHR;
-		*vsync_mode = GSVSyncMode::FIFO;
-		return true;
-	}
-#endif
-
 	switch (*vsync_mode)
 	{
 		case GSVSyncMode::Disabled:
@@ -446,19 +427,6 @@ bool VKSwapChain::CreateSwapChain()
 		std::clamp(size.width, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
 	size.height =
 		std::clamp(size.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
-	if (GSDeviceVK::GetInstance()->UsesMobileDriverWorkaround(
-			DriverWorkaround::AlignSwapchainWidthTo32) &&
-		size.width >= 32)
-	{
-		const u32 aligned_width = size.width & ~31u;
-		if (aligned_width >= surface_capabilities.minImageExtent.width &&
-			aligned_width <= surface_capabilities.maxImageExtent.width)
-		{
-			Console.WriteLn("VK: Applying legacy PowerVR swapchain width alignment: %u -> %u.",
-				size.width, aligned_width);
-			size.width = aligned_width;
-		}
-	}
 
 	// Prefer identity transform if possible
 	VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;

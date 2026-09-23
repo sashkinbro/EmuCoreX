@@ -945,11 +945,7 @@ bool GSDeviceOGL::CreateTextureFX()
 
 bool GSDeviceOGL::CheckFeatures()
 {
-	//bool vendor_id_amd = false;
 	bool vendor_id_nvidia = false;
-	//bool vendor_id_intel = false;
-	[[maybe_unused]] bool vendor_id_mali = false;
-	[[maybe_unused]] bool vendor_id_adreno = false;
 
 	memset(&m_bugs, 0, sizeof(m_bugs));
 
@@ -963,7 +959,6 @@ bool GSDeviceOGL::CheckFeatures()
 		std::strstr(vendor_str, "ATI"))
 	{
 		Console.WriteLn(Color_StrongRed, "GL: AMD GPU detected.");
-		//vendor_id_amd = true;
 	}
 	else if (std::strstr(vendor_str, "NVIDIA Corporation"))
 	{
@@ -974,54 +969,15 @@ bool GSDeviceOGL::CheckFeatures()
 	else if (std::strstr(vendor_str, "Intel"))
 	{
 		Console.WriteLn(Color_StrongBlue, "GL: Intel GPU detected.");
-		//vendor_id_intel = true;
-	}
-	else if (std::strstr(vendor_str, "ARM") || std::strstr(renderer_str, "Mali"))
-	{
-		Console.WriteLn(Color_Yellow, "GL: ARM Mali GPU detected.");
-		vendor_id_mali = true;
-	}
-	else if (std::strstr(vendor_str, "Qualcomm") || std::strstr(renderer_str, "Adreno"))
-	{
-		Console.WriteLn(Color_Cyan, "GL: Qualcomm Adreno GPU detected.");
-		vendor_id_adreno = true;
 	}
 
-#if defined(__ANDROID__)
-	MobileDriverContext driver_context;
-	driver_context.api = MobileGpuApi::OpenGL;
-	driver_context.driver_name = renderer_str;
-	driver_context.api_version_string = version_str;
-	const GpuProfileSelection gpu_profile_selection =
-		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str, driver_context);
-	SetRuntimeGPUProfile(gpu_profile_selection.runtime_profile);
-	SetMobileGPUIdentity(gpu_profile_selection.gpu);
-	SetMobileGSTuning(gpu_profile_selection.gs_tuning);
-	SetMobileDriverProfile(gpu_profile_selection.driver);
-	SetMediaTekSoC(gpu_profile_selection.is_mediatek_soc);
-	Console.WriteLn("GL: Android GPU profile override='%s' resolved='%s' model='%s' architecture='%s' "
-		"driver='%s' version=%u.%u.%u rules=%u bugs=%016llx workarounds=%016llx%s.",
-		GpuProfileDetector::OverrideToConfigString(gpu_profile_selection.override_mode),
-		GpuProfileDetector::RuntimeProfileToString(gpu_profile_selection.runtime_profile),
-		gpu_profile_selection.gpu.name.c_str(),
-		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
-		GpuProfileDetector::DriverToString(gpu_profile_selection.driver.driver),
-		gpu_profile_selection.driver.version.major, gpu_profile_selection.driver.version.minor,
-		gpu_profile_selection.driver.version.patch, gpu_profile_selection.driver.matched_rule_count,
-		static_cast<unsigned long long>(gpu_profile_selection.driver.bugs),
-		static_cast<unsigned long long>(gpu_profile_selection.driver.workarounds),
-		gpu_profile_selection.gs_tuning.constrained ? " constrained" : "");
-	DevCon.WriteLn("GL: Android GPU profile hints: %s", gpu_profile_selection.hints.c_str());
-	bool gpu_profile_mali = IsMaliGPUProfile();
-	bool gpu_profile_adreno = IsAdrenoGPUProfile();
-	bool gpu_profile_powervr = IsPowerVRGPUProfile();
-#else
-	bool gpu_profile_mali = vendor_id_mali;
-	bool gpu_profile_adreno = vendor_id_adreno;
-	bool gpu_profile_powervr = false;
-	SetRuntimeGPUProfile(gpu_profile_mali ? RuntimeGpuProfile::Mali :
-		(gpu_profile_adreno ? RuntimeGpuProfile::Adreno : RuntimeGpuProfile::Unknown));
-#endif
+	SetRuntimeGPUProfile(GpuProfileDetector::Detect(vendor_str, renderer_str));
+	SetMediaTekSoC(GpuProfileDetector::DetectMediaTekSoC());
+	Console.WriteLn("GL: GPU profile '%s' (renderer: %s%s).",
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), renderer_str,
+		IsMediaTekSoC() ? ", MediaTek SoC" : "");
+	const bool gpu_profile_mobile = IsMobileGPUProfile();
+	const bool gpu_profile_adreno = IsAdrenoGPUProfile();
 
 	GLint major_gl = 0;
 	GLint minor_gl = 0;
@@ -1152,11 +1108,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
 	m_features.bptc_textures =
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
-	m_features.prefer_new_textures = m_is_gles || gpu_profile_mali || gpu_profile_adreno || gpu_profile_powervr;
-#if defined(__ANDROID__)
-	const MobileGsTuning& mobile_gs_tuning = GetMobileGSTuning();
-	m_features.prefer_new_textures &= mobile_gs_tuning.prefer_new_textures;
-#endif
+	m_features.prefer_new_textures = m_is_gles || gpu_profile_mobile || gpu_profile_adreno;
 	m_features.stencil_buffer = true;
 
 	if (GSConfig.OverrideTextureBarriers == 0)
@@ -1174,30 +1126,15 @@ bool GSDeviceOGL::CheckFeatures()
 		GSIsHauntingGround() && (!has_texture_barrier_extension || GSConfig.OverrideTextureBarriers == 0);
 	m_features.dual_source_blend =
 		!m_is_gles || GLAD_GL_EXT_blend_func_extended || GLAD_GL_ARB_blend_func_extended;
-	if (gpu_profile_mali && has_arm_framebuffer_fetch && !has_ext_framebuffer_fetch)
-		DevCon.WriteLn("GL: Mali ARM-only framebuffer fetch cannot implement generic GS feedback; using copy fallback.");
-	if (gpu_profile_powervr)
-		DevCon.WriteLn("GL: PowerVR GPU profile active.");
-	else if (gpu_profile_adreno)
-		DevCon.WriteLn("GL: Adreno GPU profile active.");
-	DevCon.WriteLn("GL: Mobile GPU caps: profile=%s model=%s architecture=%s framebuffer_fetch=%s texture_barrier=%s arm_fetch=%s ext_fetch=%s constrained=%s prefer_new=%s pool=%u/%u age=%u/%u.",
+	if (gpu_profile_mobile && has_arm_framebuffer_fetch && !has_ext_framebuffer_fetch)
+		DevCon.WriteLn("GL: ARM-only framebuffer fetch cannot implement generic GS feedback; using copy fallback.");
+	DevCon.WriteLn("GL: Mobile GPU caps: profile=%s framebuffer_fetch=%s texture_barrier=%s arm_fetch=%s ext_fetch=%s prefer_new=%s.",
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
-#if defined(__ANDROID__)
-		gpu_profile_selection.gpu.name.c_str(),
-		GpuProfileDetector::ArchitectureToString(gpu_profile_selection.gpu.architecture),
-#else
-		"Unknown", "Unknown",
-#endif
 		m_features.framebuffer_fetch ? "yes" : "no",
 		m_features.texture_barrier ? "yes" : "no",
 		has_arm_framebuffer_fetch ? "yes" : "no",
 		has_ext_framebuffer_fetch ? "yes" : "no",
-		IsConstrainedMobileGPUProfile() ? "yes" : "no",
-		m_features.prefer_new_textures ? "yes" : "no",
-		GetMobileGSTuning().pooled_textures,
-		GetMobileGSTuning().pooled_targets,
-		GetMobileGSTuning().texture_age,
-		GetMobileGSTuning().target_age);
+		m_features.prefer_new_textures ? "yes" : "no");
 
 	if (!m_features.texture_barrier)
 	{
@@ -1220,11 +1157,10 @@ bool GSDeviceOGL::CheckFeatures()
 
 #if defined(__ANDROID__)
 	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
-		"OpenGL GS vendor=%s renderer=%s version=%s profile=%s model=%s arch=%s "
+		"OpenGL GS vendor=%s renderer=%s version=%s profile=%s "
 		"armFetch=%d extFetch=%d fbfetch=%d textureBarrier=%d copyFallback=%d dualSrcBlend=%d",
 		vendor_str, renderer_str, version_str ? version_str : "Unknown",
-		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), GetMobileGPUIdentity().name.c_str(),
-		GpuProfileDetector::ArchitectureToString(GetMobileGPUIdentity().architecture),
+		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()),
 		has_arm_framebuffer_fetch ? 1 : 0, has_ext_framebuffer_fetch ? 1 : 0,
 		m_features.framebuffer_fetch ? 1 : 0, m_features.texture_barrier ? 1 : 0,
 		m_features.multidraw_fb_copy ? 1 : 0, m_features.dual_source_blend ? 1 : 0);
@@ -1264,7 +1200,7 @@ bool GSDeviceOGL::CheckFeatures()
 #ifdef __ANDROID__
 	const bool prefer_vertex_expansion_for_mobile = true;
 #else
-	const bool prefer_vertex_expansion_for_mobile = vendor_id_mali;
+	const bool prefer_vertex_expansion_for_mobile = gpu_profile_mobile;
 #endif
 	if (prefer_vertex_expansion_for_mobile)
 	{
@@ -1308,32 +1244,14 @@ void GSDeviceOGL::SetSwapInterval()
 	// Fall back to manual throttling in this case.
 	m_vsync_mode = (m_vsync_mode == GSVSyncMode::Mailbox) ? GSVSyncMode::FIFO : m_vsync_mode;
 
-	// Mali-G57 r54p1 can exhaust Android's BufferQueue when swap interval zero is
-	// used. Keep this workaround model-specific so newer Mali and Adreno retain
-	// the user's low-latency setting.
-	const bool force_android_fifo =
-#if defined(__ANDROID__)
-		UsesMobileDriverWorkaround(DriverWorkaround::ForceFifoPresent);
-#else
-		false;
-#endif
-
 	// Window framebuffer has to be bound to call SetSwapInterval.
-	const s32 interval = static_cast<s32>(force_android_fifo || m_vsync_mode == GSVSyncMode::FIFO);
+	const s32 interval = static_cast<s32>(m_vsync_mode == GSVSyncMode::FIFO);
 	GLint current_fbo = 0;
 	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &current_fbo);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 
 	if (!m_gl_context->SetSwapInterval(interval))
 		WARNING_LOG("GL: Failed to set swap interval to {}", interval);
-
-#if defined(__ANDROID__)
-	if (force_android_fifo)
-	{
-		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
-			"OpenGL swapInterval=1 forcedForMaliG57=1");
-	}
-#endif
 
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, current_fbo);
 }
@@ -2018,15 +1936,12 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	header += fmt::format("#define HAS_EXT_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_EXT_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_ARM_SHADER_FRAMEBUFFER_FETCH {}\n", GLAD_GL_ARM_shader_framebuffer_fetch ? 1 : 0);
 	header += fmt::format("#define HAS_EXT_SHADER_PIXEL_LOCAL_STORAGE {}\n", GLAD_GL_EXT_shader_pixel_local_storage ? 1 : 0);
-#if defined(__ANDROID__)
-	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n",
-		UsesMobileDriverWorkaround(DriverWorkaround::ScalarizeVectorBitwiseAnd) ? 1 : 0);
-	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n",
-		UsesMobileDriverWorkaround(DriverWorkaround::StoreBitwiseNegationInTemporary) ? 1 : 0);
-#else
-	header += "#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND 0\n";
-	header += "#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY 0\n";
-#endif
+	// Uniform mobile shader defines: some ARM drivers miscompile vector bitwise AND, and some
+	// PowerVR GLSL compilers need the negated result stored in a temporary. Both are cheap
+	// and applied to the whole mobile path instead of individual driver rules.
+	const bool mobile_shader_defines = HasMobileGPUProfile();
+	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n", mobile_shader_defines ? 1 : 0);
+	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n", mobile_shader_defines ? 1 : 0);
 	header += R"(
 #define gpu_boolean_not(value) (!(value))
 
@@ -2290,7 +2205,7 @@ void GSDeviceOGL::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r
 	// Keep the established EXT path and depth/stencil behavior. Some GLES contexts
 	// expose only core 3.2 or OES copy-image; color copies need not use an FBO there.
 	else if (m_is_gles && !sTex->IsDepthStencil() && !dTex->IsDepthStencil() &&
-		!m_gl_context->IsCopyImageDisabled() && GLAD_GL_ES_VERSION_3_2 && glCopyImageSubData)
+		GLAD_GL_ES_VERSION_3_2 && glCopyImageSubData)
 	{
 		glCopyImageSubData(sid, GL_TEXTURE_2D, 0, r.x, r.y, 0, did, GL_TEXTURE_2D,
 			0, destX, destY, 0, r.width(), r.height(), 1);
