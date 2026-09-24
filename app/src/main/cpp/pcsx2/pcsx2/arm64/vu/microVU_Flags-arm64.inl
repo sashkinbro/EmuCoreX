@@ -39,8 +39,12 @@ static __fi void mVUFlagsShufpsInBlock_oaknut(oak::QReg dst, oak::QReg src, int 
 {
 	oakLoad128(OAK_QSCRATCH3,
 		mVUAllocOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[pIndex][1]))));
-	oakAsm->MOV(OAK_QSCRATCH.B16(), dst.B16());
-	oakAsm->MOV(OAK_QSCRATCH2.B16(), src.B16());
+	// The in-place caller passes dst == OAK_QSCRATCH, so the first table half is
+	// already the register; skip the self-move.
+	if (dst.index() != OAK_QSCRATCH.index())
+		oakAsm->MOV(OAK_QSCRATCH.B16(), dst.B16());
+	if (src.index() != OAK_QSCRATCH2.index())
+		oakAsm->MOV(OAK_QSCRATCH2.B16(), src.B16());
 	oakAsm->TBX(dst.B16(), oak::List(OAK_QSCRATCH.B16(), OAK_QSCRATCH2.B16()), OAK_QSCRATCH3.B16());
 }
 
@@ -353,18 +357,48 @@ __fi void mVUsetupFlags(mV, microFlagCycles& mFC)
             mVUFlagsMove32_emit_oaknut(VU_HOST_F2, getFlagReg4Id(bStatus[2]));
             mVUFlagsMove32_emit_oaknut(VU_HOST_F3, VU_HOST_T2);
         }
-        else
-        {
-            const int temp3 = mVU.regAlloc->allocGPRId();
-            mVUFlagsMove32_emit_oaknut(VU_HOST_T1, getFlagRegId(bStatus[0]));
-            mVUFlagsMove32_emit_oaknut(VU_HOST_T2, getFlagRegId(bStatus[1]));
-            mVUFlagsMove32_emit_oaknut(temp3, getFlagRegId(bStatus[2]));
-            mVUFlagsMove32_emit_oaknut(VU_HOST_F3, getFlagRegId(bStatus[3]));
-            mVUFlagsMove32_emit_oaknut(VU_HOST_F0, VU_HOST_T1);
-            mVUFlagsMove32_emit_oaknut(VU_HOST_F1, VU_HOST_T2);
-            mVUFlagsMove32_emit_oaknut(VU_HOST_F2, temp3);
-            mVU.regAlloc->clearNeeded(temp3);
-        }
+		else if (bStatus[0] != bStatus[1] && bStatus[0] != bStatus[2] && bStatus[0] != bStatus[3] &&
+			bStatus[1] != bStatus[2] && bStatus[1] != bStatus[3] && bStatus[2] != bStatus[3])
+		{
+			// A permutation: parking one element is enough for any cycle of the
+			// four status registers, so walk each source cycle instead of the old
+			// fixed sequence (which cost seven moves for a plain rotation).
+			bool done[4] = {};
+			for (int start = 0; start < 4; ++start)
+			{
+				if (done[start] || bStatus[start] == start)
+				{
+					done[start] = true;
+					continue;
+				}
+
+				mVUFlagsMove32_emit_oaknut(VU_HOST_T1, getFlagRegId(start));
+				int cur = start;
+				while (bStatus[cur] != start)
+				{
+					mVUFlagsMove32_emit_oaknut(getFlagRegId(cur), getFlagRegId(bStatus[cur]));
+					done[cur] = true;
+					cur = bStatus[cur];
+				}
+				mVUFlagsMove32_emit_oaknut(getFlagRegId(cur), VU_HOST_T1);
+				done[cur] = true;
+				done[start] = true;
+			}
+		}
+		else
+		{
+			// Repeated source instances (cannot happen for a monotonic ring today,
+			// but keep the old always-correct sequence as a fallback).
+			const int temp3 = mVU.regAlloc->allocGPRId();
+			mVUFlagsMove32_emit_oaknut(VU_HOST_T1, getFlagRegId(bStatus[0]));
+			mVUFlagsMove32_emit_oaknut(VU_HOST_T2, getFlagRegId(bStatus[1]));
+			mVUFlagsMove32_emit_oaknut(temp3, getFlagRegId(bStatus[2]));
+			mVUFlagsMove32_emit_oaknut(VU_HOST_F3, getFlagRegId(bStatus[3]));
+			mVUFlagsMove32_emit_oaknut(VU_HOST_F0, VU_HOST_T1);
+			mVUFlagsMove32_emit_oaknut(VU_HOST_F1, VU_HOST_T2);
+			mVUFlagsMove32_emit_oaknut(VU_HOST_F2, temp3);
+			mVU.regAlloc->clearNeeded(temp3);
+		}
 	}
 
 	if (doMFlagInsts && __Mac)
