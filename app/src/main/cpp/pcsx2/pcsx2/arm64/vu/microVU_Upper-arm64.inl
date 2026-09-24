@@ -65,13 +65,12 @@ static __fi bool mVUUpperWillClampFt_oaknut(mV, int clampType)
 
 static __fi void mVUUpperMovmskps_oaknut(const oak::WReg& dst, const oak::QReg& src, bool mask_ready = false)
 {
-	// Sign and zero extraction run back-to-back, so the second pass can retain
-	// mac_mask in Q31. Tests covered 524,288 special/FPCR combinations and
-	// 16 million random vectors; 14/21 long timing runs were faster (median 1-3%).
+	// The only caller passes a 0/all-ones lane mask (a CMEQ/CMHS result), so the
+	// per-lane AND with mac_mask already yields {0,1,2,4,8} lanes and the sign
+	// extension pass the old sequence needed is redundant.
 	if (!mask_ready)
 		oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, mac_mask)));
-	oakAsm->SSHR(OAK_QSCRATCH2.S4(), src.S4(), 31);
-	oakAsm->AND(OAK_QSCRATCH2.B16(), OAK_QSCRATCH2.B16(), OAK_QSCRATCH3.B16());
+	oakAsm->AND(OAK_QSCRATCH2.B16(), src.B16(), OAK_QSCRATCH3.B16());
 	oakAsm->ADDV(OAK_SSCRATCH, OAK_QSCRATCH2.S4());
 	oakAsm->FMOV(dst, OAK_SSCRATCH);
 }
@@ -509,11 +508,11 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 		else
 		{
 			// Match VU_MAC_UPDATE for unclamped results, including NaNs.
-			// Integer exponent inspection does not depend on FP comparisons.
+			// (v << 1) >= 0xFF000000 unsigned is exactly exp == 255, and unlike
+			// FP comparisons the integer test cannot raise FPCR exception flags.
 			oakAsm->SHL(vZero.S4(), src_q.S4(), 1);
-			oakAsm->USHR(vZero.S4(), vZero.S4(), 24);
-			oakAsm->MOVI(OAK_QSCRATCH3.S4(), 255);
-			oakAsm->CMEQ(vZero.S4(), vZero.S4(), OAK_QSCRATCH3.S4());
+			oakAsm->MOVI(OAK_QSCRATCH3.S4(), 0xff, oak::LslSymbol::LSL, 24);
+			oakAsm->CMHS(vZero.S4(), vZero.S4(), OAK_QSCRATCH3.S4());
 		}
 		mVUUpperMovmskps_oaknut(temp_w, vZero);
 		mVUUpperMaskActiveLanes_oaknut(temp_w, overflowMask);
