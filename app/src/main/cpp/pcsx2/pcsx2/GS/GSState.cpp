@@ -12,8 +12,6 @@
 #include "common/Path.h"
 #include "common/StringUtil.h"
 
-#include "emucorex/debug_logcat.h"
-
 #include <algorithm>
 #include <cfloat>
 #include <fstream>
@@ -1870,7 +1868,6 @@ void GSState::GIFRegHandlerHWREG(const GIFReg* RESTRICT r)
 
 void GSState::Flush(GSFlushReason reason)
 {
-	DEBUG_PROF_TIMING_START(gs_flush);
 	FlushWrite();
 
 	if (m_index.tail > 0)
@@ -1903,7 +1900,6 @@ void GSState::Flush(GSFlushReason reason)
 
 			if (!needs_flush[0] && !needs_flush[1])
 			{
-				DEBUG_PROF_TIMING_END(gs_flush, gs_flush);
 				return;
 			}
 		}
@@ -1936,7 +1932,6 @@ void GSState::Flush(GSFlushReason reason)
 	}
 
 	m_state_flush_reason = GSFlushReason::UNKNOWN;
-	DEBUG_PROF_TIMING_END(gs_flush, gs_flush);
 }
 
 void GSState::FlushWrite()
@@ -3096,8 +3091,6 @@ void GSState::Transfer(const u8* mem, u32 size)
 				// and according to Pseudonym we shouldn't even land in this code. So hmm indeed. (rama)
 			case GIF_FLG_IMAGE:
 			{
-				DEBUG_GS_TIMING_START(gs_image_transfer);
-				DEBUG_PROF_TIMING_START(gs_image);
 				const int len = (int)std::min(size, path.nloop);
 
 				switch (m_env.TRXDIR.XDIR)
@@ -3120,8 +3113,6 @@ void GSState::Transfer(const u8* mem, u32 size)
 				path.nloop -= len;
 				size -= len;
 
-				DEBUG_GS_TIMING_END_U64(gs_image_transfer, gs_image_transfer);
-				DEBUG_PROF_TIMING_END(gs_image, gs_image);
 				break;
 			}
 			default:

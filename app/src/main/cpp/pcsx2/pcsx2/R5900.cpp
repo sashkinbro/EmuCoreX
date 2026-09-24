@@ -14,8 +14,6 @@
 #include "MTVU.h"
 #include "VMManager.h"
 
-#include "emucorex/debug_logcat.h"
-
 #include "Hardware.h"
 #include "IPU/IPUdma.h"
 
@@ -380,7 +378,6 @@ static bool cpuIntsEnabled(int Interrupt)
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
 {
-	DEBUG_PROF_TIMING_START(ee_event_test);
 	eeEventTestIsActive = true;
 	cpuRegs.nextEventCycle = cpuRegs.cycle + eeWaitCycles;
 	cpuRegs.lastEventCycle = cpuRegs.cycle;
@@ -400,33 +397,24 @@ __fi void _cpuEventTest_Shared()
 	if (EEsCycle > 0)
 		iopEventAction = true;
 
-	DEBUG_PROF_TIMING_START(iop_exec);
 	if (iopEventAction)
 	{
 		EEsCycle = psxCpu->ExecuteBlock(EEsCycle);
 		iopEventAction = false;
 	}
-	DEBUG_PROF_TIMING_END(iop_exec, iop_exec);
 
-	DEBUG_PROF_TIMING_START(iop_event_test);
 	iopEventTest();
-	DEBUG_PROF_TIMING_END(iop_event_test, iop_event_test);
 
-	DEBUG_PROF_TIMING_START(rcnt_update);
 	if (cpuTestCycle(nextStartCounter, nextDeltaCounter))
 	{
-		DEBUG_PROF_TIMING_START(rcnt_core);
 		rcntUpdate();
-		DEBUG_PROF_TIMING_END(rcnt_core, rcnt_core);
 		_cpuTestPERF();
 	}
 	_cpuTestTIMR();
-	DEBUG_PROF_TIMING_END(rcnt_update, rcnt_update);
 
 	// ---- Interrupts -------------
 	if (cpuRegs.interrupt)
 	{
-		DEBUG_PROF_TIMING_START(dma_interrupt);
 		if (CHECK_INSTANTDMAHACK && dmacRegs.ctrl.DMAE && !(psHu8(DMAC_ENABLER + 2) & 1) && (cpuRegs.interrupt & 0x1FFFF))
 		{
 			while ((cpuRegs.interrupt & 0x1FFFF) && _cpuTestInterrupts())
@@ -434,16 +422,11 @@ __fi void _cpuEventTest_Shared()
 		}
 		else
 			_cpuTestInterrupts();
-		DEBUG_PROF_TIMING_END(dma_interrupt, dma_interrupt);
 	}
 
 	// ---- VU Sync -------------
-	DEBUG_PROF_TIMING_START(vu0_sync);
 	CpuVU0->ExecuteBlock();
-	DEBUG_PROF_TIMING_END(vu0_sync, vu0_sync);
-	DEBUG_PROF_TIMING_START(vu1_sync);
 	CpuVU1->ExecuteBlock();
-	DEBUG_PROF_TIMING_END(vu1_sync, vu1_sync);
 
     // ---- Schedule Next Event Test --------------
 #if defined(ANDROID)
@@ -472,7 +455,6 @@ __fi void _cpuEventTest_Shared()
 	cpuSetNextEvent(nextStartCounter, nextDeltaCounter);
 
 	eeEventTestIsActive = false;
-	DEBUG_PROF_TIMING_END(ee_event_test, ee_event_test);
 }
 
 __ri void cpuTestINTCInts()

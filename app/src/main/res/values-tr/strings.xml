@@ -1093,12 +1093,6 @@
     <string name="settings_ra_hardcore_pending">SIFIRLAMADAN SONRA HARDCORE</string>
     <string name="settings_ra_softcore_active">SOFTCORE</string>
     <string name="settings_ra_hardcore_pending_desc">Hardcore ayarlarda etkinleştirildi, ancak oyun sıfırlandıktan veya yeniden başlatıldıktan sonra aktif hale gelecektir.</string>
-    <string name="jit_profiler_title">JIT Profilleyici</string>
-    <string name="jit_profiler_start">JIT Profilleyiciyi Başlat</string>
-    <string name="jit_profiler_stop">Durdur ve Profili Kaydet</string>
-    <string name="jit_profiler_desc">EE, IOP, VU0 ve VU1 için JIT yeniden derleyici yürütmesinin profilini çıkarır.</string>
-    <string name="hang_trace_title">Takılma İzlemesi</string>
-    <string name="hang_trace_desc">Yükleme takılmalarını yeniden üretirken son EE, IOP, VU0 ve VU1 işlem kodlarını data/hang_trace.txt dosyasına kaydeder.</string>
     <string name="settings_fast_boot_desc">BIOS disk önyüklemesini atlar - başlamadan önce takılan oyunlar için devre dışı bırakın</string>
     <string name="settings_fast_boot">Hızlı Başlatma</string>
     <string name="settings_help_fast_boot">Normal BIOS disk önyükleme yolunu atlar ve oyuna daha hızlı giriş yapar. Çoğu oyun için etkin tutun; oynamadan önce takılan, yükleme ekranlarında döngüye giren veya oyun başlamadan önce sonsuza kadar bekliyor gibi görünen oyunlar için kapatın.</string>
@@ -1725,7 +1719,6 @@
     <string name="settings_customization_touch_style_minimal">Minimal</string>
     <string name="settings_game_menu_content_summary">Oyun içi menüde gösterilecek sekmeleri, içerik bloklarını ve sırasını seçin. Gelecekteki güncellemelerle eklenen yeni bloklar otomatik olarak dahil edilir.</string>
     <string name="settings_game_menu_tab_content_format">%1$s içeriği</string>
-    <string name="settings_game_menu_section_debug_tools">Geliştirici teşhisleri</string>
     <string name="settings_game_menu_section_controls_general">Arayüz (Overlay) ve ekran davranışı</string>
     <string name="settings_game_menu_section_graphics_display">Oluşturucu, çözünürlük ve en boy oranı</string>
     <string name="settings_game_menu_full_reset_desc">Tüm sekmeleri ve içerik bloklarını orijinal sırayla göster</string>
@@ -1986,9 +1979,6 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">EE JIT için doğrudan sanal bellek erişimi kullanır. Yalnızca çökmeleri veya yeniden derleyici sorunlarını tanılamak için kapatın.</string>
     <string name="settings_help_enable_fastmem">Yeniden derlenmiş bellek işlemlerinin daha yavaş işleyicileri atlaması için PS2 adreslerini ayrılmış bir sistem aralığına eşler. Normal oyun için açık bırakın. Kapatmak performansı ciddi ölçüde düşürür; ancak Fastmem hatalarını veya cihaza özgü bellek eşleme sorunlarını ayırmaya yardımcı olabilir. Uygulamak için oyunu yeniden başlatın.</string>
-    <string name="settings_debug_logcat_gs">logcat\'te GS hata ayıklama</string>
-    <string name="settings_debug_logcat_gs_desc">Ayrıntılı Vulkan/OpenGL GS etkinliklerini logcat\'e kaydeder (etiket: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">Android logcat\'e ayrıntılı Vulkan/OpenGL grafik sentezleyici kaydetmeyi etkinleştirir. \"DebugGS\" etiketiyle filtreleyin. Yalnızca oluşturma çökmelerini ve kayıp GPU cihazı hatalarını teşhis etmek için kullanışlıdır. Normal oyun için bunu kapalı tutun.</string>
     <string name="settings_theme_custom">Özel</string>
     <string name="settings_theme_custom_locked">Özel (PRO)</string>
     <string name="settings_theme_manager">Tema Yöneticisi</string>
@@ -2207,9 +2197,6 @@
     <string name="settings_clear_cover_cache_action">Temizle</string>
     <string name="settings_clear_cover_cache_success">Kapak önbelleği temizlendi. Kapaklar otomatik olarak yeniden indirilecek.</string>
     <string name="settings_clear_cover_cache_partial">Önbellekteki bazı kapaklar kaldırılamadı. Mevcut indirmeler tamamlandıktan sonra tekrar deneyin.</string>
-    <string name="settings_profiler_logcat">EE/IOP/VU Profilleyici</string>
-    <string name="settings_profiler_logcat_desc">EE, IOP, VU0, VU1 yürütmesini logcat\'te profille (etiket: Profiler).</string>
-    <string name="settings_help_profiler_logcat">Android logcat\'e EE, IOP, VU0, VU1 yürütme profillemesini etkinleştirir. \"Profiler\" etiketiyle filtreleyin. Olay testleri, IOP blokları, DMA kesintileri, VU senkronizasyonu için zamanlamayı gösterir. Normal oyun için bunu kapalı tutun.</string>
     <string name="settings_language_polish">Lehçe</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">Çekçe</string>

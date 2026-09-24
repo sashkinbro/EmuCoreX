@@ -120,8 +120,6 @@ data class SettingsSnapshot(
     val showRecentGames: Boolean = true,
     val showHomeSearch: Boolean = false,
     val showDebugOptions: Boolean = false,
-    val debugLogcatGs: Boolean = false,
-    val profilerLogcat: Boolean = false,
     val preferEnglishGameTitles: Boolean = false,
     val biosPath: String? = null,
     val biosValid: Boolean = false,
@@ -637,8 +635,6 @@ class AppPreferences(private val context: Context) {
         private val SHOW_RECENT_GAMES = booleanPreferencesKey("show_recent_games")
         private val SHOW_HOME_SEARCH = booleanPreferencesKey("show_home_search")
         private val SHOW_DEBUG_OPTIONS = booleanPreferencesKey("show_debug_options")
-        private val DEBUG_LOGCAT_GS = booleanPreferencesKey("debug_logcat_gs")
-        private val PROFILER_LOGCAT = booleanPreferencesKey("profiler_logcat")
         private val PREFER_ENGLISH_GAME_TITLES = booleanPreferencesKey("prefer_english_game_titles")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
         private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
@@ -1806,8 +1802,6 @@ class AppPreferences(private val context: Context) {
                 showRecentGames = prefs[SHOW_RECENT_GAMES] ?: true,
                 showHomeSearch = prefs[SHOW_HOME_SEARCH] ?: false,
                 showDebugOptions = prefs[SHOW_DEBUG_OPTIONS] ?: false,
-                debugLogcatGs = prefs[DEBUG_LOGCAT_GS] ?: false,
-                profilerLogcat = prefs[PROFILER_LOGCAT] ?: false,
                 preferEnglishGameTitles = prefs[PREFER_ENGLISH_GAME_TITLES] ?: false,
                 biosPath = biosPath,
                 gamePath = readGamePaths(prefs).firstOrNull(),
@@ -2378,34 +2372,6 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setShowDebugOptions(enabled: Boolean) {
         context.dataStore.edit { it[SHOW_DEBUG_OPTIONS] = enabled }
-    }
-
-    val debugLogcatGs: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[DEBUG_LOGCAT_GS] ?: false
-    }
-
-    suspend fun setDebugLogcatGs(enabled: Boolean) {
-        context.dataStore.edit { it[DEBUG_LOGCAT_GS] = enabled }
-    }
-
-    fun debugLogcatGsSync(): Boolean {
-        return kotlinx.coroutines.runBlocking {
-            context.dataStore.data.map { it[DEBUG_LOGCAT_GS] ?: false }.first()
-        }
-    }
-
-    val profilerLogcat: Flow<Boolean> = context.dataStore.data.map { prefs ->
-        prefs[PROFILER_LOGCAT] ?: false
-    }
-
-    suspend fun setProfilerLogcat(enabled: Boolean) {
-        context.dataStore.edit { it[PROFILER_LOGCAT] = enabled }
-    }
-
-    fun profilerLogcatSync(): Boolean {
-        return kotlinx.coroutines.runBlocking {
-            context.dataStore.data.map { it[PROFILER_LOGCAT] ?: false }.first()
-        }
     }
 
     val preferEnglishGameTitles: Flow<Boolean> = context.dataStore.data.map { prefs ->
@@ -4061,8 +4027,6 @@ class AppPreferences(private val context: Context) {
             put("showRecentGames", prefs[SHOW_RECENT_GAMES] ?: true)
             put("showHomeSearch", prefs[SHOW_HOME_SEARCH] ?: false)
             put("showDebugOptions", prefs[SHOW_DEBUG_OPTIONS] ?: false)
-            put("debugLogcatGs", prefs[DEBUG_LOGCAT_GS] ?: false)
-            put("profilerLogcat", prefs[PROFILER_LOGCAT] ?: false)
             put("preferEnglishGameTitles", prefs[PREFER_ENGLISH_GAME_TITLES] ?: false)
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
@@ -4496,8 +4460,6 @@ class AppPreferences(private val context: Context) {
             prefs[SHOW_RECENT_GAMES] = json.optBoolean("showRecentGames", true)
             prefs[SHOW_HOME_SEARCH] = json.optBoolean("showHomeSearch", false)
             prefs[SHOW_DEBUG_OPTIONS] = json.optBoolean("showDebugOptions", false)
-            prefs[DEBUG_LOGCAT_GS] = json.optBoolean("debugLogcatGs", false)
-            prefs[PROFILER_LOGCAT] = json.optBoolean("profilerLogcat", false)
             prefs[PREFER_ENGLISH_GAME_TITLES] = json.optBoolean("preferEnglishGameTitles", false)
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 2)

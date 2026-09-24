@@ -681,10 +681,6 @@
     <string name="settings_show_home_search_desc">Wyświetla pasek wyszukiwania na ekranie głównym.</string>
     <string name="settings_show_debug_options">Opcje debugowania</string>
     <string name="settings_show_debug_options_desc">Pokaż narzędzia profilowania dla deweloperów w menu gry.</string>
-    <string name="settings_debug_logcat_gs">Debuguj GS w logcat</string>
-    <string name="settings_debug_logcat_gs_desc">Rejestruj szczegółowe zdarzenia Vulkan/OpenGL GS do logcat (tag: DebugGS).</string>
-    <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">Profiluj wykonywanie EE, IOP, VU0, VU1 do logcat (tag: Profiler).</string>
     <string name="settings_prefer_english_game_titles">Preferuj angielskie tytuły gier</string>
     <string name="settings_prefer_english_game_titles_desc">Używaj angielskich nazw z bazy gier PCSX2, jeśli są dostępne.</string>
     <string name="settings_help_content_description">Pokaż szczegóły ustawienia</string>
@@ -705,8 +701,6 @@
     <string name="settings_help_recent_games">Pokazuje pasek szybkiego dostępu do ostatnio ogrywanych tytułów. Przydatne, jeśli często skaczesz między kilkoma grami; wyłącz, jeśli wolisz bardziej minimalistyczny ekran główny.</string>
     <string name="settings_help_home_search">Wyświetla pasek wyszukiwania w bibliotece bezpośrednio na ekranie głównym. Zostaw to włączone dla dużych kolekcji; wyłącz, jeśli wolisz czystszy układ i rzadko szukasz po nazwie.</string>
     <string name="settings_help_debug_options">Pokazuje dodatkowe funkcje diagnostyczne w menu w grze, w tym profiler JIT i rejestrator śladów awarii. Pozostaw wyłączone podczas normalnej gry.</string>
-    <string name="settings_help_debug_logcat_gs">Włącza szczegółowe logowanie syntetyzatora grafiki Vulkan/OpenGL w logcat Androida. Filtruj po tagu \"DebugGS\". Przydatne tylko do diagnozowania awarii renderowania i błędów zgubienia urządzenia GPU. Pozostaw to wyłączone podczas normalnej gry.</string>
-    <string name="settings_help_profiler_logcat">Włącza profilowanie wykonania EE, IOP, VU0, VU1 do logcat Androida. Filtruj po tagu \"Profiler\". Pokazuje czasy dla testów zdarzeń, bloków IOP, przerwań DMA, synchronizacji VU. Pozostaw to wyłączone podczas normalnej gry.</string>
     <string name="settings_help_prefer_english_game_titles">Używa angielskich tytułów z bazy GameIndex PCSX2 dla gier wydanych z japońskimi lub innymi regionalnymi nazwami. Pomaga to zachować czytelność biblioteki przy imporcie. Gry bez angielskiego tytułu w bazie zachowają swoją oryginalną nazwę.</string>
     <string name="settings_help_bios_path">Wskazuje EmuCoreX ścieżkę do pliku z obrazem BIOS-u PS2. Najlepszym wyborem jest czysty dump z Twojej własnej konsoli. Aplikacja oczekuje głównego obrazu BIOS, zazwyczaj pliku .bin lub .rom, a wygenerowane pliki NVRAM/MEC trzyma obok importowanej kopii.</string>
     <string name="settings_help_game_path">Dodaje foldery do biblioteki gier. EmuCoreX skanuje każdy wybrany folder rekursywnie i łączy wyniki, odrzucając powielone ścieżki plików. Dotknij folderu na liście, aby go usunąć. Obsługiwane obrazy to: .iso, .bin, .img, .mdf, .gz, .cso, .zso, .chd i .elf.</string>
@@ -1626,12 +1620,6 @@
     <string name="save">Zapisz</string>
     <string name="edit">Edytuj</string>
     <string name="delete">Usuń</string>
-    <string name="jit_profiler_title">Profiler JIT</string>
-    <string name="jit_profiler_start">Uruchom profiler JIT</string>
-    <string name="jit_profiler_stop">Zatrzymaj i zapisz profil</string>
-    <string name="jit_profiler_desc">Profiluje wykonywanie rekompilatora JIT dla EE, IOP, VU0 i VU1.</string>
-    <string name="hang_trace_title">Śledzenie zawieszeń (Hang Trace)</string>
-    <string name="hang_trace_desc">Zapisuje ostatnie kody operacji EE, IOP, VU0 i VU1 w pliku data/hang_trace.txt podczas reprodukowania zawieszania ekranu ładowania.</string>
     <string name="error_otg_read_only">Ten folder ma atrybut tylko do odczytu ze względu na ograniczenia systemu Android. Wybierz folder w pamięci wewnętrznej lub na obsługiwanej karcie SD.</string>
     <string name="error_storage_permission_not_persisted">System Android nie przyznał trwałego dostępu do tej lokalizacji. Wybierz ją ponownie w oknie systemowym.</string>
     <string name="settings_touch_haptics_strength">Siła haptyki dotykowej</string>
@@ -1810,7 +1798,6 @@
     <string name="settings_game_menu_section_quick_actions">Szybki zapis i wczytanie</string>
     <string name="settings_game_menu_section_automation">Automatyzacja zapisu i wczytywania</string>
     <string name="settings_game_menu_section_game_profile">Profil poszczególnej gry</string>
-    <string name="settings_game_menu_section_debug_tools">Diagnostyka deweloperska</string>
     <string name="settings_game_menu_section_controls_general">Nakładka i zachowanie ekranu</string>
     <string name="settings_game_menu_section_graphics_display">Renderowanie, rozdzielczość i proporcje obrazu</string>
     <string name="settings_game_menu_reset_section">Przywróć układ</string>

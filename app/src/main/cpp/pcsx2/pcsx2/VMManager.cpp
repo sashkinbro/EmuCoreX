@@ -51,7 +51,6 @@
 #include "common/ARCADE.h"
 #if defined(__ANDROID__)
 #include <sys/resource.h>
-#include "emucorex/debug_logcat.h"
 #endif
 
 #include "common/Console.h"
@@ -2754,9 +2753,6 @@ void VMManager::Internal::Throttle()
 	if (s_target_speed == 0.0f || s_use_vsync_for_timing)
 		return;
 
-	DEBUG_GS_TIMING_START(frame_throttle);
-	DEBUG_PROF_TIMING_START(frame_limiter);
-
 	const u64 uExpectedEnd =
 		s_limiter_frame_start +
 		s_limiter_ticks_per_frame; // Compute when we would expect this frame to end, assuming everything goes perfectly perfect.
@@ -2768,8 +2764,6 @@ void VMManager::Internal::Throttle()
 	{
 		// ... Fudge the next frame start over a bit. Prevents fast forward zoomies.
 		s_limiter_frame_start += (sDeltaTime / s_limiter_ticks_per_frame) * s_limiter_ticks_per_frame;
-		DEBUG_GS_TIMING_END_U64(frame_throttle, frame_throttle);
-		DEBUG_PROF_TIMING_END(frame_limiter, frame_limiter);
 		return;
 	}
 
@@ -2815,9 +2809,6 @@ void VMManager::Internal::Throttle()
 
 	// Finally, set our next frame start to when this one ends
 	s_limiter_frame_start = uExpectedEnd;
-
-	DEBUG_GS_TIMING_END_U64(frame_throttle, frame_throttle);
-	DEBUG_PROF_TIMING_END(frame_limiter, frame_limiter);
 }
 
 void VMManager::Internal::FrameRateChanged()

@@ -1501,12 +1501,6 @@
     <string name="save">ذخیره</string>
     <string name="edit">ویرایش</string>
     <string name="delete">حذف</string>
-    <string name="jit_profiler_title">پروفایلر JIT</string>
-    <string name="jit_profiler_start">شروع پروفایلر JIT</string>
-    <string name="jit_profiler_stop">توقف و ذخیره پروفایل</string>
-    <string name="jit_profiler_desc">اجرای کامپایلر مجدد JIT را برای EE، IOP، VU0 و VU1 پروفایل می‌کند.</string>
-    <string name="hang_trace_title">ردیابی هنگی (Hang Trace)</string>
-    <string name="hang_trace_desc">دستورالعمل‌های اخیر EE، IOP، VU0 و VU1 را در data/hang_trace.txt در هنگام بازتولید هنگی‌های بارگذاری ضبط می‌کند.</string>
     <string name="error_otg_read_only">به دلیل محدودیت‌های اندروید، این پوشه فقط خواندنی (Read-Only) است. لطفاً یک پوشه در حافظه داخلی یا یک کارت SD پشتیبانی شده انتخاب کنید.</string>
     <string name="error_storage_permission_not_persisted">اندروید دسترسی دائمی به این مکان را نداد. لطفاً آن را دوباره در انتخاب‌گر سیستم انتخاب کنید.</string>
     <string name="settings_touch_haptics_strength">قدرت بازخورد لمسی</string>
@@ -1740,7 +1734,6 @@
     <string name="settings_customization_touch_style_minimal">مینیمال</string>
     <string name="settings_game_menu_content_summary">زبانه‌ها، بلوک‌های محتوا و ترتیب نمایش در منوی داخل بازی را انتخاب کنید. بلوک‌های جدیدی که در به‌روزرسانی‌های آینده اضافه می‌شوند به‌طور خودکار لحاظ خواهند شد.</string>
     <string name="settings_game_menu_tab_content_format">محتوای %1$s</string>
-    <string name="settings_game_menu_section_debug_tools">عیب‌یابی توسعه‌دهنده</string>
     <string name="settings_game_menu_section_controls_general">رفتار همپوشانی و صفحه‌نمایش</string>
     <string name="settings_game_menu_section_graphics_display">رندر، وضوح و نسبت تصویر</string>
     <string name="settings_game_menu_full_reset_desc">نمایش همه زبانه‌ها و بلوک‌های محتوا در ترتیب اصلی</string>
@@ -2001,9 +1994,6 @@
     <string name="settings_enable_fastmem">حافظه سریع (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">برای JIT پردازنده EE از دسترسی مستقیم به حافظه مجازی استفاده می‌کند. فقط برای بررسی خرابی یا مشکل کامپایلر مجدد غیرفعال کنید.</string>
     <string name="settings_help_enable_fastmem">نشانی‌های PS2 را به یک محدوده رزروشده در حافظه دستگاه نگاشت می‌کند تا عملیات بازکامپایل‌شده از پردازشگرهای کندتر عبور نکنند. برای بازی عادی روشن بماند. خاموش کردن آن کارایی را بسیار کاهش می‌دهد، اما به تشخیص خطاهای Fastmem یا مشکلات نگاشت حافظه در دستگاه‌های خاص کمک می‌کند. برای اعمال، بازی را دوباره اجرا کنید.</string>
-    <string name="settings_debug_logcat_gs">اشکال‌زدایی GS در logcat</string>
-    <string name="settings_debug_logcat_gs_desc">ثبت رویدادهای دقیق Vulkan/OpenGL GS در logcat (برچسب: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">ثبت دقیق ترکیب‌کننده گرافیکی Vulkan/OpenGL را در logcat اندروید فعال می‌کند. با برچسب \"DebugGS\" فیلتر کنید. فقط برای تشخیص خرابی‌های رندر و خطاهای از دست رفتن دستگاه GPU مفید است. برای بازی عادی این گزینه را خاموش نگه دارید.</string>
     <string name="settings_theme_custom">سفارشی</string>
     <string name="settings_theme_custom_locked">سفارشی (PRO)</string>
     <string name="settings_theme_manager">مدیریت تم</string>
@@ -2222,9 +2212,6 @@
     <string name="settings_clear_cover_cache_action">پاک کردن</string>
     <string name="settings_clear_cover_cache_success">حافظه نهان کاورها پاک شد. کاورها به‌طور خودکار دوباره دانلود می‌شوند.</string>
     <string name="settings_clear_cover_cache_partial">برخی کاورهای ذخیره‌شده حذف نشدند. پس از پایان دانلودهای فعلی دوباره تلاش کنید.</string>
-    <string name="settings_profiler_logcat">نمایه ساز EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">نمایه‌سازی اجرای EE، IOP، VU0، VU1 در logcat (برچسب: Profiler).</string>
-    <string name="settings_help_profiler_logcat">نمایه‌سازی اجرای EE، IOP، VU0، VU1 را در Android logcat فعال می‌کند. با برچسب \"Profiler\" فیلتر کنید. زمان‌بندی تست‌های رویداد، بلوک‌های IOP، وقفه‌های DMA و همگام‌سازی VU را نشان می‌دهد. برای بازی عادی این را خاموش نگه دارید.</string>
     <string name="settings_language_polish">لهستانی</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">چکی</string>

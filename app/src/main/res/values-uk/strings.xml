@@ -1123,12 +1123,6 @@
     <string name="settings_language_native_korean">한국어</string>
     <string name="settings_language_native_turkish">Türkçe</string>
     <string name="settings_updates_rate_limit_error">Перевірка оновлень тимчасово недоступна. Повторіть спробу через %1$d хв.</string>
-    <string name="jit_profiler_title">Профайлер JIT</string>
-    <string name="jit_profiler_start">Запустити профайлер JIT</string>
-    <string name="jit_profiler_stop">Зупинити та зберегти профіль</string>
-    <string name="jit_profiler_desc">Профілює виконання рекомпілятора JIT для EE, IOP, VU0 та VU1.</string>
-    <string name="hang_trace_title">Трасування зависань</string>
-    <string name="hang_trace_desc">Записує останні опкоди EE, IOP, VU0 та VU1 у data/hang_trace.txt під час відтворення зависань завантаження.</string>
     <string name="settings_fast_boot_desc">Пропускає завантаження диска BIOS — вимкніть для ігор, які зависають перед запуском</string>
     <string name="settings_fast_boot">Швидке завантаження</string>
     <string name="settings_help_fast_boot">Пропускає звичайний шлях завантаження диска BIOS і швидше запускає гру. Залиште увімкненим для більшості ігор; вимикайте для тих, які зависають перед грою, зациклюються на екранах завантаження або, здається, чекають вічно до початку гри.</string>
@@ -1754,7 +1748,6 @@
     <string name="settings_customization_touch_style_minimal">Мінімалістичний</string>
     <string name="settings_game_menu_content_summary">Виберіть вкладки, блоки контенту та порядок їх відображення у внутрішньоігровому меню. Нові блоки з майбутніх оновлень додаватимуться автоматично.</string>
     <string name="settings_game_menu_tab_content_format">Контент %1$s</string>
-    <string name="settings_game_menu_section_debug_tools">Діагностика розробника</string>
     <string name="settings_game_menu_section_controls_general">Поведінка оверлею та екрану</string>
     <string name="settings_game_menu_section_graphics_display">Рендерер, роздільна здатність і співвідношення сторін</string>
     <string name="settings_game_menu_full_reset_desc">Показати кожну вкладку та блок контенту в початковому порядку</string>
@@ -2015,9 +2008,6 @@
     <string name="settings_enable_fastmem">Швидка памʼять (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">Використовує прямий доступ до віртуальної памʼяті для EE JIT. Вимикайте лише для діагностики збоїв або рекомпілятора.</string>
     <string name="settings_help_enable_fastmem">Відображає адреси PS2 у зарезервований діапазон памʼяті пристрою, щоб рекомпільовані операції не проходили через повільніші обробники. Для звичайної гри залишайте увімкненим. Вимкнення суттєво знижує продуктивність, але допомагає виявити помилки Fastmem або проблеми відображення памʼяті на окремих пристроях. Для застосування перезапустіть гру.</string>
-    <string name="settings_debug_logcat_gs">Налагодження GS у logcat</string>
-    <string name="settings_debug_logcat_gs_desc">Записувати детальні події Vulkan/OpenGL GS до logcat (тег: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">Вмикає детальний запис графічного синтезатора Vulkan/OpenGL до Android logcat. Фільтруйте за тегом \"DebugGS\". Корисно лише для діагностики збоїв рендерингу та помилок втрати пристрою GPU. Тримайте цю функцію вимкненою під час звичайної гри.</string>
     <string name="settings_theme_custom">Власний</string>
     <string name="settings_theme_custom_locked">Власний (PRO)</string>
     <string name="settings_theme_manager">Менеджер тем</string>
@@ -2236,9 +2226,6 @@
     <string name="settings_clear_cover_cache_action">Очистити</string>
     <string name="settings_clear_cover_cache_success">Кеш обкладинок очищено. Обкладинки автоматично завантажаться знову.</string>
     <string name="settings_clear_cover_cache_partial">Не всі кешовані обкладинки вдалося видалити. Спробуйте ще раз після завершення поточних завантажень.</string>
-    <string name="settings_profiler_logcat">Профайлер EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">Профілювати виконання EE, IOP, VU0, VU1 у logcat (тег: Profiler).</string>
-    <string name="settings_help_profiler_logcat">Вмикає профілювання виконання EE, IOP, VU0, VU1 у Android logcat. Фільтруйте за тегом \"Profiler\". Показує таймінги для тестів подій, блоків IOP, переривань DMA та синхронізації VU. Тримайте цю опцію вимкненою під час звичайної гри.</string>
     <string name="settings_language_polish">Польська</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">Чеська</string>

@@ -1501,12 +1501,6 @@
     <string name="save">Simpan</string>
     <string name="edit">Edit</string>
     <string name="delete">Hapus</string>
-    <string name="jit_profiler_title">Profiler JIT</string>
-    <string name="jit_profiler_start">Mulai Profiler JIT</string>
-    <string name="jit_profiler_stop">Berhenti &amp; Simpan Profil</string>
-    <string name="jit_profiler_desc">Membuat profil eksekusi rekompiler JIT untuk EE, IOP, VU0, dan VU1.</string>
-    <string name="hang_trace_title">Hang Trace (Jejak Hang)</string>
-    <string name="hang_trace_desc">Merekam opcode EE, IOP, VU0, dan VU1 baru-baru ini ke data/hang_trace.txt saat mereproduksi hang pemuatan.</string>
     <string name="error_otg_read_only">Folder ini bersifat read-only (hanya-baca) karena batasan Android. Silakan pilih folder di penyimpanan internal atau kartu SD yang didukung.</string>
     <string name="error_storage_permission_not_persisted">Android tidak memberikan akses permanen ke lokasi ini. Silakan pilih lagi melalui pemilih sistem.</string>
     <string name="settings_touch_haptics_strength">Kekuatan haptik sentuh</string>
@@ -1739,7 +1733,6 @@
     <string name="settings_customization_touch_style_minimal">Minimalis</string>
     <string name="settings_game_menu_content_summary">Pilih tab, blok konten, dan urutan yang ditampilkan di menu dalam game. Blok baru yang ditambahkan oleh pembaruan mendatang akan disertakan secara otomatis.</string>
     <string name="settings_game_menu_tab_content_format">Konten %1$s</string>
-    <string name="settings_game_menu_section_debug_tools">Diagnostik pengembang</string>
     <string name="settings_game_menu_section_controls_general">Perilaku overlay dan layar</string>
     <string name="settings_game_menu_section_graphics_display">Penyaji, resolusi, dan rasio aspek</string>
     <string name="settings_game_menu_full_reset_desc">Tampilkan setiap tab dan blok konten dalam urutan aslinya</string>
@@ -2000,9 +1993,6 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">Menggunakan akses memori virtual langsung untuk JIT EE. Nonaktifkan hanya untuk mendiagnosis crash atau masalah rekompiler.</string>
     <string name="settings_help_enable_fastmem">Memetakan alamat PS2 ke rentang sistem yang dicadangkan agar operasi memori hasil rekompilasi melewati penangan yang lebih lambat. Biarkan aktif untuk bermain normal. Menonaktifkannya sangat mengurangi performa, tetapi dapat membantu mengisolasi kesalahan Fastmem atau masalah pemetaan memori khusus perangkat. Mulai ulang game untuk menerapkan.</string>
-    <string name="settings_debug_logcat_gs">Debug GS logcat</string>
-    <string name="settings_debug_logcat_gs_desc">Catat detail peristiwa Vulkan/OpenGL GS ke logcat (tag: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">Mengaktifkan pencatatan verbose synthesizer grafis Vulkan/OpenGL ke logcat Android. Filter berdasarkan tag \"DebugGS\". Hanya berguna untuk mendiagnosis crash rendering dan kesalahan perangkat GPU yang hilang. Biarkan ini nonaktif untuk bermain normal.</string>
     <string name="settings_theme_custom">Kustom</string>
     <string name="settings_theme_custom_locked">Kustom (PRO)</string>
     <string name="settings_theme_manager">Manajer Tema</string>
@@ -2221,9 +2211,6 @@
     <string name="settings_clear_cover_cache_action">Hapus</string>
     <string name="settings_clear_cover_cache_success">Cache sampul telah dihapus. Sampul akan diunduh lagi secara otomatis.</string>
     <string name="settings_clear_cover_cache_partial">Beberapa sampul dalam cache tidak dapat dihapus. Coba lagi setelah unduhan saat ini selesai.</string>
-    <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">Profilkan eksekusi EE, IOP, VU0, VU1 ke logcat (tag: Profiler).</string>
-    <string name="settings_help_profiler_logcat">Mengaktifkan pembuatan profil eksekusi EE, IOP, VU0, VU1 ke Android logcat. Filter berdasarkan tag \"Profiler\". Menampilkan waktu untuk pengujian peristiwa, blok IOP, interupsi DMA, sinkronisasi VU. Biarkan ini nonaktif untuk permainan normal.</string>
     <string name="settings_language_polish">Polandia</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">Ceko</string>

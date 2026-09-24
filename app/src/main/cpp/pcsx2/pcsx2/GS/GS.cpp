@@ -27,7 +27,6 @@
 #ifdef __ANDROID__
 #include "emucorex/android_runtime.h"
 #endif
-#include "emucorex/debug_logcat.h"
 
 #if defined(__ANDROID__) && defined(ENABLE_OPENGL)
 #include "GS/Renderers/Common/GSGPUProfile.h"
@@ -360,8 +359,6 @@ static void CloseGSRenderer()
 bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_renderer,
 	std::optional<const Pcsx2Config::GSOptions*> old_config)
 {
-	DEBUG_GS_LOG(ANDROID_LOG_INFO, "GSreopen: recreate_device=%d recreate_renderer=%d renderer=%d",
-		recreate_device ? 1 : 0, recreate_renderer ? 1 : 0, static_cast<int>(new_renderer));
 	// Reopen correctness matters for rendering too: stale GS state after a backend/config flip can masquerade
 	// as a renderer bug, especially with cached HW targets and feedback-dependent effects.
 	Console.WriteLn("Reopening GS with %s device", recreate_device ? "new" : "existing");
@@ -426,7 +423,6 @@ bool GSreopen(bool recreate_device, bool recreate_renderer, GSRendererType new_r
 
 		if (!OpenGSDevice(new_renderer, false, recreate_window, vsync_mode, allow_present_throttle))
 		{
-			DEBUG_GS_LOG(ANDROID_LOG_ERROR, "GSreopen: OpenGSDevice FAILED for new renderer, trying old config");
 			Host::AddKeyedOSDMessage("GSReopenFailed",
 				TRANSLATE_STR("GS", "Failed to reopen, restoring old configuration."),
 				Host::OSD_CRITICAL_ERROR_DURATION);
@@ -555,9 +551,7 @@ void GSReadLocalMemoryUnsync(u8* mem, u32 qwc, u64 BITBLITBUF, u64 TRXPOS, u64 T
 
 void GSgifTransfer(const u8* mem, u32 size)
 {
-	DEBUG_GS_TIMING_START(gs_transfer);
 	g_gs_renderer->Transfer<3>(mem, size);
-	DEBUG_GS_TIMING_END_U64(gs_transfer, gs_transfer);
 }
 
 void GSgifTransfer1(u8* mem, u32 addr)
@@ -577,7 +571,6 @@ void GSgifTransfer3(u8* mem, u32 size)
 
 void GSvsync(u32 field, bool registers_written)
 {
-	DEBUG_GS_TIMING_START(gs_vsync);
 	// Update this here because we need to check if the pending draw affects the current frame, so our regs need to be updated.
 	g_gs_renderer->PCRTCDisplays.SetVideoMode(g_gs_renderer->GetVideoMode());
 	g_gs_renderer->PCRTCDisplays.EnableDisplays(g_gs_renderer->m_regs->PMODE, g_gs_renderer->m_regs->SMODE2, g_gs_renderer->isReallyInterlaced());
@@ -591,7 +584,6 @@ void GSvsync(u32 field, bool registers_written)
 	// get cleared in HW VSync, and may be needed for a buffered draw (FFX FMVs).
 	g_gs_renderer->Flush(GSState::VSYNC);
 	g_gs_renderer->VSync(field, registers_written, g_gs_renderer->IsIdleFrame());
-	DEBUG_GS_TIMING_END_U64(gs_vsync, gs_vsync);
 }
 
 int GSfreeze(FreezeAction mode, freezeData* data)
@@ -690,14 +682,11 @@ void GSResizeDisplayWindow(u32 width, u32 height, float scale)
 
 void GSUpdateDisplayWindow()
 {
-	DEBUG_GS_LOG(ANDROID_LOG_INFO, "GSUpdateDisplayWindow: calling g_gs_device->UpdateWindow()");
 	if (!g_gs_device->UpdateWindow())
 	{
-		DEBUG_GS_LOG(ANDROID_LOG_ERROR, "GSUpdateDisplayWindow: UpdateWindow FAILED");
 		Host::ReportErrorAsync("Error", TRANSLATE_SV("GS", "Failed to change window after update. The log may contain more information."));
 		return;
 	}
-	DEBUG_GS_LOG(ANDROID_LOG_INFO, "GSUpdateDisplayWindow: succeeded");
 
 #ifndef __ANDROID__
 	ImGuiManager::WindowResized();

@@ -23,8 +23,6 @@
 #include "microVU_IR-arm64.h"
 #include "common/Perf.h"
 
-#include "emucorex/debug_logcat.h"
-
 class microBlockManager;
 
 struct microBlockLink

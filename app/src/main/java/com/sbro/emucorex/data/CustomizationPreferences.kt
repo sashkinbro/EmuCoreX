@@ -151,7 +151,6 @@ enum class GameMenuSectionId(val tab: GameMenuTabId) {
     SAVE_STATES(GameMenuTabId.SESSION),
     AUTO_SAVE(GameMenuTabId.SESSION),
     QUICK_ACTIONS(GameMenuTabId.SESSION),
-    SESSION_DEBUG_TOOLS(GameMenuTabId.SESSION),
     AUTOMATION(GameMenuTabId.SESSION),
     GAME_PROFILE(GameMenuTabId.SESSION),
     CONTROLS_GENERAL(GameMenuTabId.CONTROLS),

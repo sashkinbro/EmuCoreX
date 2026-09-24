@@ -1095,12 +1095,6 @@
     <string name="settings_ra_hardcore_pending">HARDCORE TRAS REINICIO</string>
     <string name="settings_ra_softcore_active">SOFTCORE</string>
     <string name="settings_ra_hardcore_pending_desc">Hardcore está activado en los ajustes, pero se activará después de reiniciar o restablecer el juego.</string>
-    <string name="jit_profiler_title">Perfilador JIT</string>
-    <string name="jit_profiler_start">Iniciar perfilador JIT</string>
-    <string name="jit_profiler_stop">Detener y guardar perfil</string>
-    <string name="jit_profiler_desc">Perfila la ejecución del recompilador JIT para EE, IOP, VU0 y VU1.</string>
-    <string name="hang_trace_title">Rastreo de cuelgues</string>
-    <string name="hang_trace_desc">Registra los opcodes recientes de EE, IOP, VU0 y VU1 en data/hang_trace.txt mientras se reproducen los cuelgues de carga.</string>
     <string name="settings_fast_boot_desc">Omite el arranque del disco BIOS; desactívalo para juegos que se cuelgan antes de comenzar</string>
     <string name="settings_fast_boot">Arranque rápido</string>
     <string name="settings_help_fast_boot">Omite la ruta normal de arranque del disco BIOS y entra al juego más rápido. Mantenlo activado para la mayoría de los juegos; desactívalo para títulos que se cuelgan antes del juego, se repiten en las pantallas de carga o parecen esperar eternamente antes de que comience el juego.</string>
@@ -1727,7 +1721,6 @@
     <string name="settings_customization_touch_style_minimal">Minimalista</string>
     <string name="settings_game_menu_content_summary">Elige las pestañas, los bloques de contenido y el orden que se muestran en el menú del juego. Los bloques nuevos de futuras actualizaciones se añaden automáticamente.</string>
     <string name="settings_game_menu_tab_content_format">Contenido de %1$s</string>
-    <string name="settings_game_menu_section_debug_tools">Diagnósticos de desarrollador</string>
     <string name="settings_game_menu_section_controls_general">Comportamiento de superposición y pantalla</string>
     <string name="settings_game_menu_section_graphics_display">Renderizador, resolución y relación de aspecto</string>
     <string name="settings_game_menu_full_reset_desc">Mostrar todas las pestañas y bloques de contenido en el orden original</string>
@@ -1988,9 +1981,6 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">Usa memoria virtual directa para el JIT de EE. Desactívalo solo para diagnosticar cierres o problemas del recompilador.</string>
     <string name="settings_help_enable_fastmem">Asigna las direcciones de PS2 a un rango reservado del sistema para que las operaciones recompiladas eviten controladores más lentos. Déjalo activado para jugar normalmente. Desactivarlo reduce mucho el rendimiento, pero puede ayudar a aislar fallos de Fastmem o problemas de asignación de memoria específicos del dispositivo. Reinicia el juego para aplicarlo.</string>
-    <string name="settings_debug_logcat_gs">Depurar GS en logcat</string>
-    <string name="settings_debug_logcat_gs_desc">Registrar eventos detallados de Vulkan/OpenGL GS en logcat (etiqueta: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">Habilita el registro detallado del sintetizador de gráficos Vulkan/OpenGL en Android logcat. Filtra por la etiqueta \"DebugGS\". Útil solo para diagnosticar bloqueos de renderizado y errores de pérdida de dispositivo GPU. Mantenlo apagado para jugar normalmente.</string>
     <string name="settings_theme_custom">Personalizado</string>
     <string name="settings_theme_custom_locked">Personalizado (PRO)</string>
     <string name="settings_theme_manager">Gestor de Temas</string>
@@ -2209,9 +2199,6 @@
     <string name="settings_clear_cover_cache_action">Borrar</string>
     <string name="settings_clear_cover_cache_success">Caché de carátulas borrada. Las carátulas volverán a descargarse automáticamente.</string>
     <string name="settings_clear_cover_cache_partial">No se pudieron eliminar algunas carátulas almacenadas. Inténtalo de nuevo cuando terminen las descargas actuales.</string>
-    <string name="settings_profiler_logcat">Analizador de rendimiento de EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">Analiza el rendimiento de la ejecución de EE, IOP, VU0 y VU1 en logcat (etiqueta: Profiler).</string>
-    <string name="settings_help_profiler_logcat">Habilita el análisis de rendimiento de la ejecución de EE, IOP, VU0 y VU1 en Android logcat. Filtra por la etiqueta \"Profiler\". Muestra el tiempo para pruebas de eventos, bloques de IOP, interrupciones de DMA y sincronización de VU. Mantén esto desactivado para jugar de forma normal.</string>
     <string name="settings_language_polish">Polaco</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">Checo</string>

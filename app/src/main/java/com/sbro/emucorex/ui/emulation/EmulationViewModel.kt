@@ -282,9 +282,7 @@ data class EmulationUiState(
     val autoSaveLastModified: Long = 0L,
     val isAutoSaveInProgress: Boolean = false,
     val activePlayTimeMs: Long = 0L,
-    val showDebugOptions: Boolean = false,
-    val isJitProfilerActive: Boolean = false,
-    val isHangTraceActive: Boolean = false
+    val showDebugOptions: Boolean = false
 )
 
 private data class EmulationLaunchConfig(
@@ -689,22 +687,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         runCatching { EmulatorBridge.reloadPatches() }
     }
 
-    private fun stopHiddenDebugTools(state: EmulationUiState) {
-        if (!state.isJitProfilerActive && !state.isHangTraceActive) return
-        viewModelScope.launch {
-            if (state.isJitProfilerActive) {
-                EmulatorBridge.stopJitProfiler()
-            }
-            if (state.isHangTraceActive) {
-                EmulatorBridge.stopHangTrace()
-            }
-            _uiState.value = _uiState.value.copy(
-                isJitProfilerActive = false,
-                isHangTraceActive = false
-            )
-        }
-    }
-
     init {
         viewModelScope.launch {
             preferences.overlayShow.collect { enabled ->
@@ -795,11 +777,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.showDebugOptions.collect { enabled ->
-                val state = _uiState.value
-                _uiState.value = state.copy(showDebugOptions = enabled)
-                if (!enabled) {
-                    stopHiddenDebugTools(state)
-                }
+                _uiState.value = _uiState.value.copy(showDebugOptions = enabled)
             }
         }
         viewModelScope.launch {
@@ -2199,36 +2177,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 delay(2500.milliseconds)
                 _uiState.value = _uiState.value.copy(toastMessage = null)
             }
-        }
-    }
-
-    fun toggleJitProfiler() {
-        val state = _uiState.value
-        val nextState = !state.isJitProfilerActive
-        _uiState.value = state.copy(isJitProfilerActive = nextState)
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (nextState) {
-                    EmulatorBridge.startJitProfiler()
-                } else {
-                    EmulatorBridge.stopJitProfiler()
-                }
-            } catch (_: Exception) {}
-        }
-    }
-
-    fun toggleHangTrace() {
-        val state = _uiState.value
-        val nextState = !state.isHangTraceActive
-        _uiState.value = state.copy(isHangTraceActive = nextState)
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (nextState) {
-                    EmulatorBridge.startHangTrace()
-                } else {
-                    EmulatorBridge.stopHangTrace()
-                }
-            } catch (_: Exception) {}
         }
     }
 
@@ -5184,11 +5132,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     GamepadManager.clearPerGameOverrides()
                 } catch (_: Exception) { }
                 try {
-                    if (_uiState.value.isHangTraceActive) {
-                        EmulatorBridge.stopHangTrace()
-                    }
-                } catch (_: Exception) { }
-                try {
                     EmulatorBridge.shutdown()
                     var waitTime = 0
                     while (EmulatorBridge.isVmActive() && waitTime < 2000) {
@@ -5208,8 +5151,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     performanceOverlayText = "",
                     speedPercent = 100f,
                     transportMode = EmulationTransportMode.None,
-                    isJitProfilerActive = false,
-                    isHangTraceActive = false,
                     statusMessage = null
                 )
                 syncNativePerformanceOverlayState(_uiState.value)

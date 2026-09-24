@@ -59,7 +59,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
-import androidx.compose.material.icons.rounded.BugReport
+
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -1395,24 +1395,6 @@ private fun SettingsContent(
                             onCheckedChange = viewModel::setShowDebugOptions,
                             helpText = stringResource(R.string.settings_help_debug_options),
                             onResetToDefault = { viewModel.setShowDebugOptions(defaults.showDebugOptions) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.BugReport,
-                            title = stringResource(R.string.settings_debug_logcat_gs),
-                            subtitle = stringResource(R.string.settings_debug_logcat_gs_desc),
-                            checked = uiState.debugLogcatGs,
-                            onCheckedChange = viewModel::setDebugLogcatGs,
-                            helpText = stringResource(R.string.settings_help_debug_logcat_gs),
-                            onResetToDefault = { viewModel.setDebugLogcatGs(defaults.debugLogcatGs) }
-                        )
-                        ToggleItem(
-                            icon = Icons.Rounded.Speed,
-                            title = stringResource(R.string.settings_profiler_logcat),
-                            subtitle = stringResource(R.string.settings_profiler_logcat_desc),
-                            checked = uiState.profilerLogcat,
-                            onCheckedChange = viewModel::setProfilerLogcat,
-                            helpText = stringResource(R.string.settings_help_profiler_logcat),
-                            onResetToDefault = { viewModel.setProfilerLogcat(defaults.profilerLogcat) }
                         )
                         ToggleItem(
                             icon = Icons.Rounded.Language,
@@ -4740,7 +4722,6 @@ private fun gameMenuSectionLabel(section: GameMenuSectionId): String = when (sec
     GameMenuSectionId.QUICK_ACTIONS -> stringResource(R.string.settings_game_menu_section_quick_actions)
     GameMenuSectionId.AUTOMATION -> stringResource(R.string.settings_game_menu_section_automation)
     GameMenuSectionId.GAME_PROFILE -> stringResource(R.string.settings_game_menu_section_game_profile)
-    GameMenuSectionId.SESSION_DEBUG_TOOLS -> stringResource(R.string.settings_game_menu_section_debug_tools)
     GameMenuSectionId.CONTROLS_GENERAL -> stringResource(R.string.settings_game_menu_section_controls_general)
     GameMenuSectionId.CONTROLS_TOUCH -> stringResource(R.string.settings_touch_controls_section)
     GameMenuSectionId.CONTROLS_GAMEPAD -> stringResource(R.string.settings_gamepad_controls_section)
@@ -5550,8 +5531,6 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.General, R.string.settings_show_recent_games),
         entry(SettingsTab.General, R.string.settings_show_home_search),
         entry(SettingsTab.General, R.string.settings_prefer_english_game_titles),
-        entry(SettingsTab.General, R.string.settings_debug_logcat_gs),
-        entry(SettingsTab.General, R.string.settings_profiler_logcat),
         entry(SettingsTab.Graphics, R.string.settings_renderer),
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver) else null,
         if (GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers()) entry(SettingsTab.Graphics, R.string.settings_gpu_driver_manager_title) else null,

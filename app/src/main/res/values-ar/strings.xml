@@ -1093,12 +1093,6 @@
     <string name="settings_ra_hardcore_pending">هاردكور بعد إعادة الضبط</string>
     <string name="settings_ra_softcore_active">سوفتكور</string>
     <string name="settings_ra_hardcore_pending_desc">تم تفعيل وضع هاردكور في الإعدادات، ولكنه سيصبح نشطًا بعد إعادة ضبط اللعبة أو إعادة تشغيلها.</string>
-    <string name="jit_profiler_title">أداة تحليل JIT</string>
-    <string name="jit_profiler_start">بدء أداة تحليل JIT</string>
-    <string name="jit_profiler_stop">إيقاف وحفظ التحليل</string>
-    <string name="jit_profiler_desc">يحلل تنفيذ معيد تجميع JIT لـ EE و IOP و VU0 و VU1.</string>
-    <string name="hang_trace_title">تتبع التعليق</string>
-    <string name="hang_trace_desc">يسجل أكواد تشغيل EE و IOP و VU0 و VU1 الأخيرة في data/hang_trace.txt أثناء إعادة إنتاج تعليقات التحميل.</string>
     <string name="settings_fast_boot_desc">يتخطى تمهيد قرص BIOS - قم بتعطيله للألعاب التي تتوقف قبل البدء</string>
     <string name="settings_fast_boot">إقلاع سريع</string>
     <string name="settings_help_fast_boot">يتخطى مسار تمهيد قرص BIOS العادي وينتقل إلى اللعبة بشكل أسرع. أبقه ممكناً لمعظم الألعاب؛ قم بإيقاف تشغيله للعناوين التي تتوقف قبل اللعب، أو تستمر في التكرار على شاشات التحميل، أو تبدو وكأنها تنتظر إلى الأبد قبل بدء اللعبة.</string>
@@ -1729,7 +1723,6 @@
     <string name="settings_customization_touch_style_minimal">بسيط</string>
     <string name="settings_game_menu_content_summary">اختر علامات التبويب وكتل المحتوى والترتيب الموضح في القائمة داخل اللعبة. يتم تضمين الكتل الجديدة المضافة بواسطة التحديثات المستقبلية تلقائيًا.</string>
     <string name="settings_game_menu_tab_content_format">محتوى %1$s</string>
-    <string name="settings_game_menu_section_debug_tools">تشخيصات المطور</string>
     <string name="settings_game_menu_section_controls_general">سلوك التراكب والشاشة</string>
     <string name="settings_game_menu_section_graphics_display">العارض والدقة ونسبة العرض إلى الارتفاع</string>
     <string name="settings_game_menu_full_reset_desc">إظهار كل علامة تبويب وكتلة محتوى بالترتيب الأصلي</string>
@@ -1990,9 +1983,6 @@
     <string name="settings_enable_fastmem">الذاكرة السريعة (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">يستخدم وصولاً مباشراً إلى الذاكرة الافتراضية لمترجم EE الفوري. عطّله فقط لتشخيص الأعطال أو مشكلات إعادة الترجمة.</string>
     <string name="settings_help_enable_fastmem">يربط عناوين PS2 بنطاق محجوز في ذاكرة الجهاز كي تتجاوز عمليات الذاكرة المعاد ترجمتها المعالجات الأبطأ. اتركه مفعّلاً للعب العادي. يؤدي تعطيله إلى خفض الأداء كثيراً، لكنه قد يساعد في عزل أخطاء Fastmem أو مشكلات ربط الذاكرة الخاصة بالجهاز. أعد تشغيل اللعبة لتطبيق التغيير.</string>
-    <string name="settings_debug_logcat_gs">تصحيح أخطاء GS في logcat</string>
-    <string name="settings_debug_logcat_gs_desc">تسجيل أحداث Vulkan/OpenGL GS التفصيلية في logcat (العلامة: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">يمكّن التسجيل المطول لمُركِّب رسومات Vulkan/OpenGL في Android logcat. قم بالتصفية حسب العلامة \"DebugGS\". مفيد فقط لتشخيص أعطال العرض وأخطاء فقدان جهاز GPU. اترك هذا الإعداد قيد الإيقاف للعب العادي.</string>
     <string name="settings_theme_custom">مخصص</string>
     <string name="settings_theme_custom_locked">مخصص (PRO)</string>
     <string name="settings_theme_manager">مدير السمات</string>
@@ -2211,9 +2201,6 @@
     <string name="settings_clear_cover_cache_action">مسح</string>
     <string name="settings_clear_cover_cache_success">تم مسح ذاكرة الأغلفة المؤقتة. ستُنزّل الأغلفة تلقائيًا من جديد.</string>
     <string name="settings_clear_cover_cache_partial">تعذرت إزالة بعض الأغلفة المؤقتة. حاول مجددًا بعد انتهاء التنزيلات الحالية.</string>
-    <string name="settings_profiler_logcat">ملف تعريف EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">إنشاء ملف تعريف لتنفيذ EE و IOP و VU0 و VU1 في logcat (العلامة: Profiler).</string>
-    <string name="settings_help_profiler_logcat">يمكّن ملف تعريف تنفيذ EE و IOP و VU0 و VU1 في Android logcat. قم بالتصفية حسب العلامة \"Profiler\". يعرض التوقيت لاختبارات الأحداث وكتل IOP ومقاطعات DMA ومزامنة VU. اترك هذا مغلقًا للعب العادي.</string>
     <string name="settings_language_polish">البولندية</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">التشيكية</string>

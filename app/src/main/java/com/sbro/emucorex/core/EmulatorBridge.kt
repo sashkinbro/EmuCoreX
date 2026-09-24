@@ -729,8 +729,6 @@ object EmulatorBridge {
                 add(settingOp("EmuCoreX", "UpscaleMultiplier", "float", upscaleMultiplier.toString()))
                 add(settingOp("EmuCoreX", "HasContext", "bool", (context.applicationContext != null).toString()))
                 add(settingOp("EmuCoreX", "AutotestMode", "bool", autotestMode.toString()))
-                add(settingOp("EmuCoreX", "DebugLogcatGS", "bool", prefs.debugLogcatGsSync().toString()))
-                add(settingOp("EmuCoreX", "ProfilerLogcat", "bool", prefs.profilerLogcatSync().toString()))
                 add(settingOp("EmuCoreX", "AppVersion", "string", appVersionName(context)))
                 add(settingOp("EmuCore", "WarnAboutUnsafeSettings", "bool", "false"))
                 add(settingOp("InputSources", "PadVibration", "bool", padVibrationEnabled.toString()))

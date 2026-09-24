@@ -14,8 +14,6 @@
 #include "common/boost_spsc_queue.hpp"
 #include "common/Console.h"
 
-#include "emucorex/debug_logcat.h"
-
 struct GS_Packet;
 #ifdef EMUCOREX_ENABLE_NATIVE_SELF_TESTS
 // Suppresses GS submission only in isolated replay; live capture returns false.
@@ -365,23 +363,6 @@ struct Gif_Path
 		pxAssertMsg(curSize + size <= buffSize, "Gif Path Buffer Overflow!");
 		memcpy(&buffer[curSize], pMem, size);
 		curSize += size;
-
-		// Track max GIF path buffer usage
-		if (idx == GIF_PATH_1)
-		{
-			DEBUG_GS_SET_MAX(gif_path1_max_used, curSize);
-			DEBUG_GS_SET_MAX(gif_path1_total, buffSize);
-		}
-		else if (idx == GIF_PATH_2)
-		{
-			DEBUG_GS_SET_MAX(gif_path2_max_used, curSize);
-			DEBUG_GS_SET_MAX(gif_path2_total, buffSize);
-		}
-		else if (idx == GIF_PATH_3)
-		{
-			DEBUG_GS_SET_MAX(gif_path3_max_used, curSize);
-			DEBUG_GS_SET_MAX(gif_path3_total, buffSize);
-		}
 	}
 
 	// If completed a GS packet (with EOP) then set done to true

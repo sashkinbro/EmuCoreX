@@ -1093,12 +1093,6 @@
     <string name="settings_ra_hardcore_pending">リセット後にハードコア</string>
     <string name="settings_ra_softcore_active">ソフトコア</string>
     <string name="settings_ra_hardcore_pending_desc">設定でハードコアが有効になっていますが、ゲームをリセットまたは再起動した後にアクティブになります。</string>
-    <string name="jit_profiler_title">JITプロファイラ</string>
-    <string name="jit_profiler_start">JITプロファイラを開始</string>
-    <string name="jit_profiler_stop">停止してプロファイルを保存</string>
-    <string name="jit_profiler_desc">EE、IOP、VU0、VU1のJITリコンパイラの実行をプロファイルします。</string>
-    <string name="hang_trace_title">ハングトレース</string>
-    <string name="hang_trace_desc">ロード時のハングを再現しながら、最近のEE、IOP、VU0、VU1のオペコードをdata/hang_trace.txtに記録します。</string>
     <string name="settings_fast_boot_desc">BIOSディスクの起動をスキップします - 起動前にハングするゲームでは無効にしてください</string>
     <string name="settings_fast_boot">ファストブート</string>
     <string name="settings_help_fast_boot">通常のBIOSディスクの起動パスをスキップし、より早くゲームを開始します。ほとんどのゲームでは有効にしておきます。ゲームプレイ前にハングしたり、ロード画面でループしたり、ゲームが開始されるまで無限に待機しているように見えるタイトルの場合はオフにしてください。</string>
@@ -1724,7 +1718,6 @@
     <string name="settings_customization_touch_style_minimal">ミニマル</string>
     <string name="settings_game_menu_content_summary">ゲーム内メニューに表示されるタブ、コンテンツブロック、順序を選択します。今後のアップデートで追加される新しいブロックは自動的に含まれます。</string>
     <string name="settings_game_menu_tab_content_format">%1$sコンテンツ</string>
-    <string name="settings_game_menu_section_debug_tools">開発者用診断</string>
     <string name="settings_game_menu_section_controls_general">オーバーレイと画面の動作</string>
     <string name="settings_game_menu_section_graphics_display">レンダラー、解像度、アスペクト比</string>
     <string name="settings_game_menu_full_reset_desc">すべてのタブとコンテンツブロックを元の順序で表示する</string>
@@ -1985,9 +1978,6 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">EE JITのメモリアクセスに直接仮想メモリを使用します。クラッシュやリコンパイラの診断時のみ無効にしてください。</string>
     <string name="settings_help_enable_fastmem">PS2アドレスを予約済みのホスト領域に割り当て、再コンパイルされたメモリ操作が低速なハンドラを回避できるようにします。通常のプレイでは有効のままにしてください。無効にすると性能が大幅に低下しますが、Fastmemの障害や端末固有のメモリマッピング問題の切り分けに役立ちます。適用するにはゲームを再起動してください。</string>
-    <string name="settings_debug_logcat_gs">logcatでGSをデバッグ</string>
-    <string name="settings_debug_logcat_gs_desc">Vulkan/OpenGL GSの詳細なイベントをlogcatに記録します（タグ：DebugGS）。</string>
-    <string name="settings_help_debug_logcat_gs">AndroidのlogcatにVulkan/OpenGLグラフィックシンセサイザーの詳細なログ記録を有効にします。「DebugGS」タグでフィルタリングしてください。レンダリングのクラッシュやGPUデバイス消失エラーの診断にのみ役立ちます。通常のプレイではオフのままにしてください。</string>
     <string name="settings_theme_custom">カスタム</string>
     <string name="settings_theme_custom_locked">カスタム (PRO)</string>
     <string name="settings_theme_manager">テーママネージャー</string>
@@ -2206,9 +2196,6 @@
     <string name="settings_clear_cover_cache_action">消去</string>
     <string name="settings_clear_cover_cache_success">カバーのキャッシュを消去しました。カバーは自動的に再ダウンロードされます。</string>
     <string name="settings_clear_cover_cache_partial">一部のキャッシュ済みカバーを削除できませんでした。現在のダウンロードが完了してから再試行してください。</string>
-    <string name="settings_profiler_logcat">EE/IOP/VU プロファイラー</string>
-    <string name="settings_profiler_logcat_desc">EE、IOP、VU0、VU1の実行をlogcatにプロファイルします（タグ：Profiler）。</string>
-    <string name="settings_help_profiler_logcat">AndroidのlogcatへのEE、IOP、VU0、VU1の実行プロファイリングを有効にします。「Profiler」タグでフィルターしてください。イベントテスト、IOPブロック、DMA割り込み、VU同期のタイミングを表示します。通常のプレイではオフにしておいてください。</string>
     <string name="settings_language_polish">ポーランド語</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">チェコ語</string>

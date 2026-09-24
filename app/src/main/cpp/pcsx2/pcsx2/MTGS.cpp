@@ -18,8 +18,6 @@
 #include <thread>
 #include <vector>
 
-#include "emucorex/debug_logcat.h"
-
 #ifdef __linux__
 #include <unistd.h>
 #endif
@@ -274,17 +272,13 @@ void MTGS::PostVsyncStart(bool registers_written)
 
 	if ((s_QueuedFrameCount.fetch_add(1) < EmuConfig.GS.VsyncQueueSize) /*|| (!EmuConfig.GS.VsyncEnable && !EmuConfig.GS.FrameLimitEnable)*/)
 	{
-		// Track max queue depth
-		DEBUG_GS_SET_MAX(vsync_queue_depth_max, s_QueuedFrameCount.load(std::memory_order_relaxed));
 		return;
 	}
 
 	s_VsyncSignalListener.store(true, std::memory_order_release);
 	//Console.WriteLn( Color_Blue, "(EEcore Sleep) Vsync\t\tringpos=0x%06x, writepos=0x%06x", m_ReadPos.load(), m_WritePos.load() );
 
-	DEBUG_PROF_TIMING_START(mtgs_vsync_wait);
 	s_sem_Vsync.WaitWithSpin();
-	DEBUG_PROF_TIMING_END(mtgs_vsync_wait, mtgs_vsync_wait);
 }
 
 void MTGS::InitAndReadFIFO(u8* mem, u32 qwc)
@@ -458,9 +452,7 @@ void MTGS::MainLoop()
 					u32 size = tag.data[1];
 					if (offset != ~0u)
 					{
-						DEBUG_PROF_TIMING_START(mtgs_transfer);
 						GSgifTransfer((u8*)&path.buffer[offset], size / 16);
-						DEBUG_PROF_TIMING_END(mtgs_transfer, mtgs_transfer);
 					}
 					path.readAmount.fetch_sub(size, std::memory_order_acq_rel);
 					break;
@@ -468,9 +460,7 @@ void MTGS::MainLoop()
 
 		case Command::MTVUGSPacket:
 			{
-				DEBUG_PROF_TIMING_START(mtgs_mtvu_packet);
 				MTVU_LOG("MTGS - Waiting on semaXGkick!");
-				DEBUG_GS_TIMING_START(sema_xgkick_wait);
 				if (!vu1Thread.semaXGkick.TryWait())
 				{
 					mtvu_lock.unlock();
@@ -478,12 +468,9 @@ void MTGS::MainLoop()
 					// handoff is commonly not a short wait. Avoid burning the GS thread's full
 					// userspace spin budget while MTVU is still executing. The semaphore counter
 					// also makes a Post racing this call safe: Wait() consumes it without sleeping.
-					DEBUG_PROF_TIMING_START(mtgs_mtvu_wait);
 					vu1Thread.semaXGkick.Wait();
-					DEBUG_PROF_TIMING_END(mtgs_mtvu_wait, mtgs_mtvu_wait);
 					mtvu_lock.lock();
 				}
-				DEBUG_GS_TIMING_END_U64(sema_xgkick_wait, sema_xgkick_wait);
 					Gif_Path& path = gifUnit.gifPath[GIF_PATH_1];
 					GS_Packet gsPack = path.GetGSPacketMTVU(); // Get vu1 program's xgkick packet(s)
 					if (gsPack.size)
@@ -569,14 +556,11 @@ void MTGS::MainLoop()
 						}
 						else
 						{
-							DEBUG_PROF_TIMING_START(mtgs_transfer);
 							GSgifTransfer((u8*)&path.buffer[gsPack.offset], gsPack.size / 16);
-							DEBUG_PROF_TIMING_END(mtgs_transfer, mtgs_transfer);
 						}
 					}
 					path.readAmount.fetch_sub(gsPack.size + gsPack.readAmount, std::memory_order_release);
 					path.PopGSPacketMTVU(); // Should be done last, for proper Gif_MTGS_Wait()
-					DEBUG_PROF_TIMING_END(mtgs_mtvu_packet, mtgs_mtvu_packet);
 				break;
 				}
 
@@ -602,22 +586,11 @@ void MTGS::MainLoop()
 							((GSRegSIGBLID&)RingBuffer.Regs[0x1080]) = (GSRegSIGBLID&)remainder[2];
 
 							// CSR & 0x2000; is the pageflip id.
-							DEBUG_PROF_TIMING_START(mtgs_vsync_process);
 							GSvsync((((u32&)RingBuffer.Regs[0x1000]) & 0x2000) ? 0 : 1, remainder[4] != 0);
-							DEBUG_PROF_TIMING_END(mtgs_vsync_process, mtgs_vsync_process);
 
 							s_QueuedFrameCount.fetch_sub(1);
 							if (s_VsyncSignalListener.exchange(false))
 								s_sem_Vsync.Post();
-
-							// Dump performance metrics every 500 frames when debug logcat is enabled
-							static u32 s_vsync_frame_counter = 0;
-							if (++s_vsync_frame_counter >= 500)
-							{
-								s_vsync_frame_counter = 0;
-								DEBUG_GS_DUMP_METRICS();
-								DEBUG_PROF_DUMP();
-							}
 
 							// Do not StateCheckInThread() here
 							// Otherwise we could pause while there's still data in the queue
@@ -751,8 +724,6 @@ void MTGS::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 		u32 startP1Packs = path.GetPendingGSPackets();
 		if (startP1Packs)
 		{
-			DEBUG_GS_TIMING_START(wait_gs);
-			DEBUG_GS_INC_U64(wait_gs_count, 1);
 			u64 spin_iterations = 0;
 			while (true)
 			{
@@ -767,9 +738,6 @@ void MTGS::WaitGS(bool syncRegs, bool weakWait, bool isMTVU)
 				if ((spin_iterations & 7) == 0)
 					std::this_thread::yield();
 			}
-			DEBUG_GS_TIMING_END_U64(wait_gs, wait_gs);
-			DEBUG_GS_INC_U64(weak_wait_spin_total, spin_iterations);
-			DEBUG_GS_INC_U64(weak_wait_spin_count, 1);
 		}
 	}
 	else
@@ -855,9 +823,6 @@ void MTGS::GenericStall(uint size)
 	else
 		freeroom = RingBufferSize - (writepos - readpos);
 
-	// Track max ring buffer usage
-	DEBUG_GS_SET_MAX(ring_buffer_max_used, RingBufferSize - freeroom);
-
 	if (freeroom <= size)
 	{
 		// writepos will overlap readpos if we commit the data, so we need to wait until
@@ -883,9 +848,6 @@ void MTGS::GenericStall(uint size)
 
 			//Console.WriteLn( Color_Blue, "(EEcore Sleep) PrepDataPacker \tringpos=0x%06x, writepos=0x%06x, signalpos=0x%06x", readpos, writepos, m_SignalRingPosition );
 
-			DEBUG_GS_TIMING_START(ring_stall);
-			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
-			DEBUG_PROF_TIMING_START(mtgs_ring_stall);
 			while (true)
 			{
 				s_SignalRingEnable.store(true, std::memory_order_release);
@@ -902,17 +864,12 @@ void MTGS::GenericStall(uint size)
 				if (freeroom > size)
 					break;
 			}
-			DEBUG_GS_TIMING_END_U64(ring_stall, ring_buffer_stall);
-			DEBUG_PROF_TIMING_END(mtgs_ring_stall, mtgs_ring_stall);
 
 			pxAssertMsg(s_SignalRingPosition <= 0, "MTGS Thread Synchronization Error");
 		}
 		else
 		{
 			//Console.WriteLn( Color_StrongGray, "(EEcore Spin) PrepDataPacket!" );
-			DEBUG_GS_TIMING_START(ring_spin);
-			DEBUG_GS_INC_U64(ring_buffer_stall_count, 1);
-			DEBUG_PROF_TIMING_START(mtgs_ring_stall);
 			SetEvent();
 			u32 spin_count = 0;
 			while (true)
@@ -932,8 +889,6 @@ void MTGS::GenericStall(uint size)
 				if ((++spin_count & 63) == 0)
 					std::this_thread::yield();
 			}
-			DEBUG_GS_TIMING_END_U64(ring_spin, ring_buffer_stall);
-			DEBUG_PROF_TIMING_END(mtgs_ring_stall, mtgs_ring_stall);
 		}
 	}
 }

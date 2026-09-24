@@ -2,7 +2,6 @@
 #include "emucorex/retro_achievements_android.h"
 #include "emucorex/android_crash_diagnostics.h"
 #include "emucorex/android_runtime.h"
-#include "emucorex/debug_logcat.h"
 
 #include "pcsx2/CDVD/CDVDcommon.h"
 #include "pcsx2/Common.h"
@@ -345,17 +344,8 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 	si.SetBoolValue("Logging", "EnableEEConsole", autotest_mode);
 	si.SetBoolValue("Logging", "EnableIOPConsole", autotest_mode);
 
-	emucorex::SetDebugLogcatEnabled(
-		GetBoolSetting(config.settings, "EmuCoreX", "DebugLogcatGS", false));
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Debug GS logcat: %s",
-		emucorex::IsDebugLogcatEnabled() ? "enabled" : "disabled");
-
-	emucorex::SetProfilerLogcatEnabled(
-		GetBoolSetting(config.settings, "EmuCoreX", "ProfilerLogcat", false));
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Profiler logcat: %s",
-		emucorex::IsProfilerLogcatEnabled() ? "enabled" : "disabled");
 	si.SetIntValue("EmuCore/GS", "Renderer",
-		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::OGL)));
+		GetIntSetting(config.settings, "EmuCore/GS", "Renderer", static_cast<s32>(GSRendererType::VK)));
 	si.SetIntValue("EmuCore/GS", "CropLeft",
 		std::clamp(GetIntSetting(config.settings, "EmuCore/GS", "CropLeft", 0), 0, 64));
 	si.SetIntValue("EmuCore/GS", "CropTop",

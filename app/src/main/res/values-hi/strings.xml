@@ -1093,12 +1093,6 @@
     <string name="settings_ra_hardcore_pending">रीसेट के बाद हार्डकोर</string>
     <string name="settings_ra_softcore_active">सॉफ़्टकोर</string>
     <string name="settings_ra_hardcore_pending_desc">सेटिंग्स में हार्डकोर सक्षम है, लेकिन गेम को रीसेट या पुनरारंभ करने के बाद यह सक्रिय हो जाएगा।</string>
-    <string name="jit_profiler_title">JIT प्रोफाइलर</string>
-    <string name="jit_profiler_start">JIT प्रोफाइलर प्रारंभ करें</string>
-    <string name="jit_profiler_stop">रोकें और प्रोफ़ाइल सहेजें</string>
-    <string name="jit_profiler_desc">EE, IOP, VU0 और VU1 के लिए JIT रिकंपाइलर निष्पादन को प्रोफाइल करता है।</string>
-    <string name="hang_trace_title">हैंग ट्रेस</string>
-    <string name="hang_trace_desc">लोडिंग हैंग को पुन: उत्पन्न करते समय हाल के EE, IOP, VU0 और VU1 ऑपकोड को data/hang_trace.txt पर रिकॉर्ड करता है।</string>
     <string name="settings_fast_boot_desc">BIOS डिस्क बूट को छोड़ देता है - उन खेलों के लिए अक्षम करें जो शुरू होने से पहले हैंग होते हैं</string>
     <string name="settings_fast_boot">फ़ास्ट बूट</string>
     <string name="settings_help_fast_boot">सामान्य BIOS डिस्क बूट पथ को छोड़ देता है और गेम में तेज़ी से जाता है। अधिकांश खेलों के लिए इसे सक्षम रखें; उन शीर्षकों के लिए इसे बंद कर दें जो गेमप्ले से पहले हैंग होते हैं, लोडिंग स्क्रीन पर लूप करते हैं, या गेम शुरू होने से पहले हमेशा के लिए प्रतीक्षा करते हुए प्रतीत होते हैं。</string>
@@ -1725,7 +1719,6 @@
     <string name="settings_customization_touch_style_minimal">न्यूनतम</string>
     <string name="settings_game_menu_content_summary">इन-गेम मेनू में दिखाए गए टैब, सामग्री ब्लॉक और क्रम चुनें। भविष्य के अपडेट द्वारा जोड़े गए नए ब्लॉक स्वचालित रूप से शामिल हो जाते हैं।</string>
     <string name="settings_game_menu_tab_content_format">%1$s सामग्री</string>
-    <string name="settings_game_menu_section_debug_tools">डेवलपर डायग्नोस्टिक्स</string>
     <string name="settings_game_menu_section_controls_general">ओवरले और स्क्रीन व्यवहार</string>
     <string name="settings_game_menu_section_graphics_display">रेंडरर, रिज़ॉल्यूशन और आस्पेक्ट रेशियो</string>
     <string name="settings_game_menu_full_reset_desc">प्रत्येक टैब और सामग्री ब्लॉक को मूल क्रम में दिखाएं</string>
@@ -1986,9 +1979,6 @@
     <string name="settings_enable_fastmem">तेज़ मेमोरी (Fastmem)</string>
     <string name="settings_enable_fastmem_desc">EE JIT के लिए सीधे वर्चुअल मेमोरी एक्सेस का उपयोग करता है। केवल क्रैश या रीकंपाइलर समस्या की जाँच के लिए बंद करें।</string>
     <string name="settings_help_enable_fastmem">PS2 पतों को होस्ट मेमोरी की आरक्षित सीमा में मैप करता है, ताकि रीकंपाइल किए गए मेमोरी ऑपरेशन धीमे हैंडलरों से बच सकें। सामान्य खेल में इसे चालू रखें। इसे बंद करने से प्रदर्शन बहुत घटता है, लेकिन Fastmem त्रुटि या किसी डिवाइस की मेमोरी मैपिंग समस्या अलग करने में मदद मिल सकती है। लागू करने के लिए गेम दोबारा शुरू करें।</string>
-    <string name="settings_debug_logcat_gs">logcat में GS डीबग करें</string>
-    <string name="settings_debug_logcat_gs_desc">logcat में विस्तृत Vulkan/OpenGL GS इवेंट लॉग करें (टैग: DebugGS)।</string>
-    <string name="settings_help_debug_logcat_gs">Android logcat में विस्तृत Vulkan/OpenGL ग्राफ़िक्स सिंथेसाइज़र लॉगिंग सक्षम करता है। टैग \"DebugGS\" द्वारा फ़िल्टर करें। केवल रेंडरिंग क्रैश और GPU डिवाइस लॉस्ट त्रुटियों के निदान के लिए उपयोगी है। सामान्य खेल के लिए इसे बंद रखें。</string>
     <string name="settings_theme_custom">कस्टम</string>
     <string name="settings_theme_custom_locked">कस्टम (PRO)</string>
     <string name="settings_theme_manager">थीम प्रबंधक</string>
@@ -2207,9 +2197,6 @@
     <string name="settings_clear_cover_cache_action">साफ़ करें</string>
     <string name="settings_clear_cover_cache_success">कवर कैश साफ़ हो गया। कवर अपने आप फिर डाउनलोड होंगे।</string>
     <string name="settings_clear_cover_cache_partial">कुछ कैश किए गए कवर हटाए नहीं जा सके। मौजूदा डाउनलोड पूरे होने के बाद फिर कोशिश करें।</string>
-    <string name="settings_profiler_logcat">EE/IOP/VU प्रोफ़ाइलर</string>
-    <string name="settings_profiler_logcat_desc">logcat (टैग: Profiler) में EE, IOP, VU0, VU1 निष्पादन को प्रोफ़ाइल करें।</string>
-    <string name="settings_help_profiler_logcat">Android logcat में EE, IOP, VU0, VU1 निष्पादन प्रोफ़ाइलिंग को सक्षम करता है। \"Profiler\" टैग द्वारा फ़िल्टर करें। ईवेंट परीक्षणों, IOP ब्लॉक, DMA इंटरप्ट, VU सिंक के लिए समय दिखाता है। सामान्य खेल के लिए इसे बंद रखें。</string>
     <string name="settings_language_polish">पोलिश</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">चेक</string>

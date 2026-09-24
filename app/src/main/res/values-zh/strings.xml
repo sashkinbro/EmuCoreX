@@ -1095,12 +1095,6 @@
     <string name="settings_ra_hardcore_pending">重置后硬核</string>
     <string name="settings_ra_softcore_active">软核</string>
     <string name="settings_ra_hardcore_pending_desc">硬核模式已在设置中启用，但需要在重置或重新启动游戏后才会激活。</string>
-    <string name="jit_profiler_title">JIT 分析器</string>
-    <string name="jit_profiler_start">启动 JIT 分析器</string>
-    <string name="jit_profiler_stop">停止并保存分析</string>
-    <string name="jit_profiler_desc">分析 EE、IOP、VU0 和 VU1 的 JIT 重新编译器执行情况。</string>
-    <string name="hang_trace_title">挂起追踪</string>
-    <string name="hang_trace_desc">在重现加载挂起时，将最近的 EE、IOP、VU0 和 VU1 操作码记录到 data/hang_trace.txt。</string>
     <string name="settings_fast_boot_desc">跳过 BIOS 光盘启动 - 针对启动前挂起的游戏禁用</string>
     <string name="settings_fast_boot">快速启动</string>
     <string name="settings_help_fast_boot">跳过常规的 BIOS 光盘启动路径并更快地进入游戏。对大多数游戏保持开启；对于在游戏进入前挂起、在加载屏幕上循环，或者在游戏开始前似乎无休止等待的标题，请将其关闭。</string>
@@ -1726,7 +1720,6 @@
     <string name="settings_customization_touch_style_minimal">极简</string>
     <string name="settings_game_menu_content_summary">选择在游戏内菜单中显示的选项卡、内容块及其顺序。未来更新中添加的新区块将自动包含在内。</string>
     <string name="settings_game_menu_tab_content_format">%1$s 内容</string>
-    <string name="settings_game_menu_section_debug_tools">开发者诊断</string>
     <string name="settings_game_menu_section_controls_general">叠加层与屏幕行为</string>
     <string name="settings_game_menu_section_graphics_display">渲染器、分辨率与宽高比</string>
     <string name="settings_game_menu_full_reset_desc">按原始顺序显示所有选项卡和内容块</string>
@@ -1987,9 +1980,6 @@
     <string name="settings_enable_fastmem">快速内存（Fastmem）</string>
     <string name="settings_enable_fastmem_desc">为 EE JIT 使用直接虚拟内存访问。仅在诊断崩溃或重编译器问题时关闭。</string>
     <string name="settings_help_enable_fastmem">将 PS2 地址映射到预留的主机地址范围，使重编译后的内存操作绕过较慢的处理程序。正常游玩时请保持启用。关闭后性能会显著下降，但有助于排查 Fastmem 故障或特定设备的内存映射问题。重启游戏后生效。</string>
-    <string name="settings_debug_logcat_gs">在 logcat 中调试 GS</string>
-    <string name="settings_debug_logcat_gs_desc">将详细的 Vulkan/OpenGL GS 事件记录到 logcat（标签：DebugGS）。</string>
-    <string name="settings_help_debug_logcat_gs">启用将 Vulkan/OpenGL 图形合成器的详细日志记录到 Android logcat。按标签 \"DebugGS\" 过滤。仅在诊断渲染崩溃和 GPU 设备丢失错误时有用。在正常游戏时请保持此选项关闭。</string>
     <string name="settings_theme_custom">自定义</string>
     <string name="settings_theme_custom_locked">自定义 (PRO)</string>
     <string name="settings_theme_manager">主题管理器</string>
@@ -2208,9 +2198,6 @@
     <string name="settings_clear_cover_cache_action">清除</string>
     <string name="settings_clear_cover_cache_success">封面缓存已清除。封面将自动重新下载。</string>
     <string name="settings_clear_cover_cache_partial">部分缓存封面无法移除。请在当前下载完成后重试。</string>
-    <string name="settings_profiler_logcat">EE/IOP/VU 性能分析器</string>
-    <string name="settings_profiler_logcat_desc">将 EE、IOP、VU0、VU1 的执行情况分析记录到 logcat（标签：Profiler）。</string>
-    <string name="settings_help_profiler_logcat">启用将 EE、IOP、VU0、VU1 的执行情况分析记录到 Android logcat 中。按标签“Profiler”进行过滤。显示事件测试、IOP 块、DMA 中断、VU 同步的计时信息。正常游玩时请保持此选项处于关闭状态。</string>
     <string name="settings_language_polish">波兰语</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">捷克语</string>

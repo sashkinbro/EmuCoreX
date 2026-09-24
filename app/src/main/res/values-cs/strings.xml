@@ -683,10 +683,6 @@
     <string name="settings_show_home_search_desc">Zobrazit vyhledávací pole na domovské obrazovce.</string>
     <string name="settings_show_debug_options">Možnosti ladění (Debug)</string>
     <string name="settings_show_debug_options_desc">Zobrazit vývojářské profilovací nástroje v herním menu.</string>
-    <string name="settings_debug_logcat_gs">Ladit GS v logcat</string>
-    <string name="settings_debug_logcat_gs_desc">Zaznamenávat podrobné události Vulkan/OpenGL GS do logcat (štítek: DebugGS).</string>
-    <string name="settings_profiler_logcat">Profiler EE/IOP/VU</string>
-    <string name="settings_profiler_logcat_desc">Profilovat provádění EE, IOP, VU0, VU1 do logcat (štítek: Profiler).</string>
     <string name="settings_prefer_english_game_titles">Preferovat anglické názvy her</string>
     <string name="settings_prefer_english_game_titles_desc">Používat anglické názvy z databáze her PCSX2, pokud jsou k dispozici.</string>
     <string name="settings_help_content_description">Zobrazit podrobnosti nastavení</string>
@@ -707,8 +703,6 @@
     <string name="settings_help_recent_games">Zobrazí řádek pro rychlý přístup k naposledy hraným hrám. Užitečné, pokud často střídáte několik titulů; vypněte, pokud chcete mít čistší domovskou obrazovku.</string>
     <string name="settings_help_home_search">Zobrazí vyhledávací pole knihovny přímo na domovské obrazovce. Ponechte zapnuté pro velké knihovny; vypněte, pokud preferujete čistší vzhled a zřídka vyhledáváte podle jména.</string>
     <string name="settings_help_debug_options">Zobrazí v herním menu další diagnostické ovládací prvky, včetně JIT profileru a nástroje pro záznam zamrznutí (hang trace). Pro normální hraní ponechte vypnuté.</string>
-    <string name="settings_help_debug_logcat_gs">Povoluje podrobné logování grafického syntetizátoru Vulkan/OpenGL do Android logcat. Filtrovat podle štítku "DebugGS". Užitečné pouze k diagnostice pádů vykreslování a chyb ztráty zařízení GPU. Pro normální hraní ponechte vypnuté.</string>
-    <string name="settings_help_profiler_logcat">Povoluje profilování provádění EE, IOP, VU0 a VU1 do Android logcat. Filtrovat podle štítku "Profiler". Zobrazuje časování pro testy událostí, bloky IOP, přerušení DMA a synchronizaci VU. Pro normální hraní ponechte vypnuté.</string>
     <string name="settings_help_prefer_english_game_titles">Používá anglické názvy z databáze GameIndex emulátoru PCSX2 pro hry, které mají výchozí japonské nebo jiné regionální názvy. To pomáhá hlavně k tomu, aby se dovezené vydání v knihovně četla jasněji. Hry bez anglického názvu v databázi si zachovají své normální jméno.</string>
     <string name="settings_help_bios_path">Nasměruje EmuCoreX na soubor obrazu BIOSu PS2. Nejlepší volbou je čistý dump z vaší vlastní konzole. Aplikace očekává hlavní obraz BIOSu, obvykle soubor .bin nebo .rom, a jakékoli vygenerované soubory NVRAM/MEC ukládá vedle importované kopie.</string>
     <string name="settings_help_game_path">Přidává složky do knihovny her. EmuCoreX rekurzivně prohledá každou vybranou složku a sloučí výsledky bez duplicitních cest k souborům. Klepnutím na složku v seznamu ji odeberete. Podporované obrazy zahrnují .iso, .bin, .img, .mdf, .gz, .cso, .zso, .chd a .elf.</string>
@@ -1628,12 +1622,6 @@
     <string name="save">Uložit</string>
     <string name="edit">Upravit</string>
     <string name="delete">Smazat</string>
-    <string name="jit_profiler_title">JIT Profiler</string>
-    <string name="jit_profiler_start">Spustit JIT Profiler</string>
-    <string name="jit_profiler_stop">Zastavit a uložit profil</string>
-    <string name="jit_profiler_desc">Profiluje spouštění JIT rekompilátoru pro EE, IOP, VU0 a VU1.</string>
-    <string name="hang_trace_title">Trasování zamrznutí</string>
-    <string name="hang_trace_desc">Zaznamenává nedávné operační kódy EE, IOP, VU0 a VU1 do souboru data/hang_trace.txt při reprodukci zamrznutí během načítání.</string>
     <string name="error_otg_read_only">Tato složka je kvůli omezením systému Android pouze pro čtení. Vyberte prosím složku v interním úložišti nebo na podporované SD kartě.</string>
     <string name="error_storage_permission_not_persisted">Systém Android neudělil do tohoto umístění trvalý přístup. Vyberte jej prosím znovu v systémovém výběru.</string>
     <string name="settings_touch_haptics_strength">Síla haptické odezvy dotyku</string>
@@ -1809,7 +1797,6 @@
     <string name="settings_game_menu_section_quick_actions">Rychlé uložení a načtení</string>
     <string name="settings_game_menu_section_automation">Automatizace ukládání a načítání</string>
     <string name="settings_game_menu_section_game_profile">Profil pro jednotlivou hru</string>
-    <string name="settings_game_menu_section_debug_tools">Vývojářská diagnostika</string>
     <string name="settings_game_menu_section_controls_general">Chování překrytí a obrazovky</string>
     <string name="settings_game_menu_section_graphics_display">Vykreslovač, rozlišení a poměr stran</string>
     <string name="settings_game_menu_reset_section">Obnovit rozložení</string>

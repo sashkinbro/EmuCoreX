@@ -1093,12 +1093,6 @@
     <string name="settings_ra_hardcore_pending">리셋 후 하드코어</string>
     <string name="settings_ra_softcore_active">소프트코어</string>
     <string name="settings_ra_hardcore_pending_desc">설정에서 하드코어가 활성화되어 있지만, 게임을 리셋하거나 재시작한 후에 활성화됩니다.</string>
-    <string name="jit_profiler_title">JIT 프로파일러</string>
-    <string name="jit_profiler_start">JIT 프로파일러 시작</string>
-    <string name="jit_profiler_stop">중지 및 프로필 저장</string>
-    <string name="jit_profiler_desc">EE, IOP, VU0 및 VU1에 대한 JIT 리컴파일러 실행을 프로파일링합니다.</string>
-    <string name="hang_trace_title">중단 추적</string>
-    <string name="hang_trace_desc">로딩 중단을 재현하는 동안 최근 EE, IOP, VU0 및 VU1 연산 코드를 data/hang_trace.txt에 기록합니다.</string>
     <string name="settings_fast_boot_desc">BIOS 디스크 부팅을 건너뜁니다 - 시작하기 전에 멈추는 게임의 경우 비활성화하세요</string>
     <string name="settings_fast_boot">빠른 부팅</string>
     <string name="settings_help_fast_boot">일반적인 BIOS 디스크 부팅 경로를 건너뛰고 게임으로 더 빠르게 이동합니다. 대부분의 게임에서는 활성화 상태로 유지하세요. 게임 플레이 전에 멈추거나, 로딩 화면이 반복되거나, 게임이 시작되기 전 무한히 대기하는 것 같은 타이틀에서는 끄세요.</string>
@@ -1724,7 +1718,6 @@
     <string name="settings_customization_touch_style_minimal">미니멀</string>
     <string name="settings_game_menu_content_summary">게임 내 메뉴에 표시되는 탭, 콘텐츠 블록 및 순서를 선택하세요. 향후 업데이트에서 추가되는 새로운 블록은 자동으로 포함됩니다.</string>
     <string name="settings_game_menu_tab_content_format">%1$s 콘텐츠</string>
-    <string name="settings_game_menu_section_debug_tools">개발자 진단</string>
     <string name="settings_game_menu_section_controls_general">오버레이 및 화면 동작</string>
     <string name="settings_game_menu_section_graphics_display">렌더러, 해상도 및 가로 세로 비율</string>
     <string name="settings_game_menu_full_reset_desc">모든 탭과 콘텐츠 블록을 원래 순서대로 표시</string>
@@ -1985,9 +1978,6 @@
     <string name="settings_enable_fastmem">Fastmem</string>
     <string name="settings_enable_fastmem_desc">EE JIT 메모리 접근에 직접 가상 메모리를 사용합니다. 충돌이나 리컴파일러 문제를 진단할 때만 끄세요.</string>
     <string name="settings_help_enable_fastmem">PS2 주소를 예약된 호스트 영역에 매핑하여 재컴파일된 메모리 작업이 느린 처리기를 거치지 않도록 합니다. 일반 플레이에서는 활성화해 두세요. 비활성화하면 성능이 크게 저하되지만 Fastmem 오류나 기기별 메모리 매핑 문제를 구분하는 데 도움이 됩니다. 적용하려면 게임을 다시 시작하세요.</string>
-    <string name="settings_debug_logcat_gs">logcat에서 GS 디버그</string>
-    <string name="settings_debug_logcat_gs_desc">자세한 Vulkan/OpenGL GS 이벤트를 logcat에 기록합니다(태그: DebugGS).</string>
-    <string name="settings_help_debug_logcat_gs">Android logcat에 자세한 Vulkan/OpenGL 그래픽 신시사이저 로깅을 사용 설정합니다. \"DebugGS\" 태그로 필터링하세요. 렌더링 충돌 및 GPU 기기 손실 오류를 진단할 때만 유용합니다. 일반적인 게임 플레이 시에는 이 기능을 꺼두세요.</string>
     <string name="settings_theme_custom">사용자 지정</string>
     <string name="settings_theme_custom_locked">사용자 지정 (PRO)</string>
     <string name="settings_theme_manager">테마 관리자</string>
@@ -2206,9 +2196,6 @@
     <string name="settings_clear_cover_cache_action">지우기</string>
     <string name="settings_clear_cover_cache_success">커버 캐시를 지웠습니다. 커버가 자동으로 다시 다운로드됩니다.</string>
     <string name="settings_clear_cover_cache_partial">캐시된 일부 커버를 삭제하지 못했습니다. 현재 다운로드가 끝난 후 다시 시도하세요.</string>
-    <string name="settings_profiler_logcat">EE/IOP/VU 프로파일러</string>
-    <string name="settings_profiler_logcat_desc">EE, IOP, VU0, VU1 실행을 logcat에 프로파일링합니다(태그: Profiler).</string>
-    <string name="settings_help_profiler_logcat">Android logcat으로 EE, IOP, VU0, VU1 실행 프로파일링을 활성화합니다. \"Profiler\" 태그로 필터링하세요. 이벤트 테스트, IOP 블록, DMA 인터럽트, VU 동기화에 대한 타이밍을 표시합니다. 일반적인 게임 플레이 시에는 이 기능을 꺼두세요.</string>
     <string name="settings_language_polish">폴란드어</string>
     <string name="settings_language_native_polish">Polski</string>
     <string name="settings_language_czech">체코어</string>
