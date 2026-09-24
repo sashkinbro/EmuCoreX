@@ -206,6 +206,7 @@ import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ProvideGamepadMenuAction
 import com.sbro.emucorex.ui.common.ProvideGamepadShoulderActions
 import com.sbro.emucorex.ui.common.ProvideGamepadUiNavigation
+import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.SettingHelpButton
 import com.sbro.emucorex.ui.common.OverlayDpadDirection
 import com.sbro.emucorex.ui.common.VectorAnalogStick
@@ -3524,7 +3525,8 @@ private fun EmulationSidebarMenu(
                                             textStyle = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                                             modifier = Modifier
                                                 .width(108.dp)
-                                                .height(48.dp),
+                                                .height(48.dp)
+                                                .skipGamepadTextFieldFocus(),
                                             suffix = {
                                                 Text(stringResource(R.string.emulation_auto_save_interval_suffix))
                                             }

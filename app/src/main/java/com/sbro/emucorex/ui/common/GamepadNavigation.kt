@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import kotlin.math.abs
 import kotlin.math.hypot
 
@@ -236,15 +237,24 @@ fun ProvideGamepadUiNavigation(
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val view = LocalView.current
     val token = remember { Any() }
 
-    DisposableEffect(enabled, focusManager, keyboardController, onBack) {
+    DisposableEffect(enabled, focusManager, keyboardController, view, onBack) {
         if (enabled) {
             GamepadUiInputRouter.registerNavigation(
                 token = token,
                 onMove = { direction ->
                     keyboardController?.hide()
-                    focusManager.moveFocus(direction.toFocusDirection())
+                    val moved = focusManager.moveFocus(direction.toFocusDirection())
+                    if (view.onCheckIsTextEditor()) {
+                        // A focused text field keeps the system input session alive, and Android
+                        // then forwards every gamepad event to the IME (InputEventSender). End the
+                        // session so sticks stop flooding logcat and wasting CPU while navigating.
+                        focusManager.clearFocus(force = true)
+                        keyboardController?.hide()
+                    }
+                    moved
                 },
                 onBack = onBack
             )
