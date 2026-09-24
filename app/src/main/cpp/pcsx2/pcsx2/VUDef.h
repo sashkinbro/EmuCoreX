@@ -170,6 +170,40 @@ struct alignas(16) VURegs
     }
 };
 
+// Per-lane weight for the ARM64 microVU flag pack (see mVUupdateFlags_oaknut).
+// Lane `lane` contributes its zero bit at result bit `bit` and its sign bit at
+// bit `bit + 4`, where bit = reverse ? (3 - lane) : lane. PS2 MAC order is
+// bit0=W..bit3=X, the reverse of NEON lane order; the destination field mask
+// and the single-scalar rotate fold into the weight too, so neither costs an
+// instruction at the emit site. Lanes outside `keepMask` weigh zero.
+static constexpr u32 armPackLaneWeight(int lane, u32 keepMask, bool reverse, int shift)
+{
+	const int bit = reverse ? (3 - lane) : lane;
+	if (!(keepMask & (1u << bit)))
+		return 0;
+	const u32 w = 1u << (bit + shift);
+	return w | (w << 4);
+}
+
+struct mVU_MacWeights
+{
+	u32 byMask[2][16][4]; // [reverse][keepMask][lane]
+	u32 bySSShift[4][4];  // [shift][lane]
+};
+
+static constexpr mVU_MacWeights mVUmakeMacWeights()
+{
+	mVU_MacWeights t{};
+	for (int rev = 0; rev < 2; rev++)
+		for (u32 mask = 0; mask < 16; mask++)
+			for (int lane = 0; lane < 4; lane++)
+				t.byMask[rev][mask][lane] = armPackLaneWeight(lane, mask, rev != 0, 0);
+	for (int shift = 0; shift < 4; shift++)
+		for (int lane = 0; lane < 4; lane++)
+			t.bySSShift[shift][lane] = armPackLaneWeight(lane, 1, false, shift);
+	return t;
+}
+
 struct mVU_Globals
 {
 #define __four(val) { val, val, val, val }
@@ -205,6 +239,9 @@ struct mVU_Globals
     float ITOF_4  [4] = __four(0.0625f);
     float ITOF_12 [4] = __four(0.000244140625);
     float ITOF_15 [4] = __four(0.000030517578125);
+    // Flag-pack weight vectors. Appended last so existing [x27, #imm] offsets
+    // into mVUglob do not move.
+    mVU_MacWeights macWeights = mVUmakeMacWeights();
 #undef __four
 };
 

@@ -166,6 +166,21 @@ static __fi void mVUBranchTestFbrst_emit_oaknut(mV, u32 bits)
 
 static __fi void mVUBranchCmpBranchZero_emit_oaknut(mV)
 {
+	// A live IBcc condition may still sit in a pool GPR from the op before the
+	// delay slot; comparing it directly drops the LDRSH reload. End-program
+	// emission clears the carry, so this only fires on the normal path.
+	if (doBranchCondCarry && mVU.branchCondCarryGpr >= 0)
+	{
+		recBeginOaknutEmit();
+		// The memory path reads mVU.branch with LDRSH; reproduce that sign
+		// extension here (equality against zero is unaffected).
+		oakAsm->SXTH(oakWRegister(mVU.branchCondCarryGpr), oakWRegister(mVU.branchCondCarryGpr));
+		oakAsm->CMP(oakWRegister(mVU.branchCondCarryGpr), 0);
+		recEndOaknutEmit();
+		mVUclearBranchCondCarry(mVU);
+		return;
+	}
+
 	recBeginOaknutEmit();
 	const OakMemOperand branch_mem =
 		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].branch)));
@@ -358,6 +373,9 @@ static __fi void mVUSaveFlagRegs_emit_oaknut(mV, int fStatus, int fMac, int fCli
 
 void mVUDTendProgram(mV, microFlagCycles* mFC, int isEbit)
 {
+	// End-program emission BLs AAPCS helpers that clobber caller-saved pool
+	// regs - the branch-condition carry cannot survive past here.
+	mVUclearBranchCondCarry(mVU);
 
 	int fStatus = getLastFlagInst(mVUpBlock->pState, mFC->xStatus, 0, isEbit);
 	int fMac    = getLastFlagInst(mVUpBlock->pState, mFC->xMac, 1, isEbit);
@@ -426,6 +444,8 @@ void mVUDTendProgram(mV, microFlagCycles* mFC, int isEbit)
 
 void mVUendProgram(mV, microFlagCycles* mFC, int isEbit)
 {
+	// See mVUDTendProgram - end-program emission kills the condition carry.
+	mVUclearBranchCondCarry(mVU);
 
 	int fStatus = getLastFlagInst(mVUpBlock->pState, mFC->xStatus, 0, isEbit && isEbit != 3);
 	int fMac    = getLastFlagInst(mVUpBlock->pState, mFC->xMac, 1, isEbit && isEbit != 3);

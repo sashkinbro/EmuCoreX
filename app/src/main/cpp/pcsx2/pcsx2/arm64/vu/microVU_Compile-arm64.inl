@@ -625,6 +625,8 @@ __fi void mVUinitFirstPass(microVU& mVU, uptr pState, u8* thisPtr)
 	mVUblock.x86ptrStart = thisPtr;
 	mVUpBlock = mVUblocks[mVUstartPC >> 1]->add(mVU, &mVUblock); // Add this block to block manager (mVUstartPC / 2)
 	mVUregs.needExactMatch = (mVUpBlock->pState.blockType) ? 7 : 0; // ToDo: Fix 1-Op block flag linking (MGS2:Demo/Sly Cooper)
+	mVU.needFlagFinalize = false; // compile-scoped; see microVU-arm64.h
+	mVUclearBranchCondCarry(mVU); // compile-scoped
 	mVUregs.blockType = 0;
 	mVUregs.viBackUp  = 0;
 	mVUregs.flagInfo  = 0;
@@ -864,10 +866,12 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		if (curI & _Ebit_)
 		{
 			eBitPass1(mVU, branch);
-			// VU0 exposes these to COP2. VU1 also needs architectural flags at
-			// completion: the next microprogram may use the interpreter.
-			// Keep the final instances valid without disabling intra-block opts.
-			mVUregs.needExactMatch |= 7;
+			// End-of-program flags must be valid: mVUendProgram finalises them
+			// into VI[REG_*_FLAG], so an FMAC in this block whose flag write got
+			// elided would be finalised from a stale ring instance. Force only
+			// the last flag-writing instruction instead of exact-matching every
+			// flag instance (which also multiplied block variants).
+			mVU.needFlagFinalize = true;
 		}
 
 		if ((curI & _Mbit_) && isVU0)

@@ -251,6 +251,10 @@ static constexpr bool doJumpCaching = true; // Set to true to enable jump cachin
 // routine that is performed every indirect jump in order to find a block within a
 // program that matches the correct pipeline state.
 
+// Carry a live IBcc condition result in a pool GPR through the delay slot so
+// condBranch's tail can Cmp it directly instead of reloading mVU.branch.
+static constexpr bool doBranchCondCarry = true;
+
 // Indirect Jumps are part of same cached microProgram
 static constexpr bool doJumpAsSameProgram = false; // Set to true to treat jumps as same program
 // Enabling this treats indirect jumps (JR/JALR) as part of the same microProgram

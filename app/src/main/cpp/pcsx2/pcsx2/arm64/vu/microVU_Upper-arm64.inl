@@ -435,38 +435,50 @@ static __fi void mVUUpperGetQreg_oaknut(int dest, int qInstance)
 
 static constexpr int VU_HOST_NO_XMM = -1;
 
+// Weight vector for one flag pack, off the pinned mVUglob base (x27):
+//   reverse   - MAC path: lane i weighs bit (3 - i), PS2 MAC order
+//   keepMask  - destination field mask (x86's AND_XYZW)
+//   shift     - single-scalar rotate (x86's SHIFT_XYZW), folded into the weight
+static __fi OakMemOperand mVUmacWeightVecMem_oaknut(u32 keepMask, bool reverse, int shift)
+{
+	const s64 base = static_cast<s64>(offsetof(cpuRegistersPack, mVUglob)) +
+		static_cast<s64>(offsetof(mVU_Globals, macWeights));
+	if (shift != 0)
+		return mVUAllocOakCpuMem(base + static_cast<s64>(offsetof(mVU_MacWeights, bySSShift[shift][0])));
+	return mVUAllocOakCpuMem(base + static_cast<s64>(offsetof(mVU_MacWeights, byMask[reverse ? 1 : 0][keepMask & 0xF][0])));
+}
+
 static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int regT2in = VU_HOST_NO_XMM, bool modXYZW = true)
 {
 	const int mReg = VU_HOST_T1;
 	const int sReg = getFlagRegId(sFLAG.write);
-	bool regT1b = regT1in == VU_HOST_NO_XMM, regT2b = false;
+	(void)regT1in;
+	(void)regT2in;
 
 	if (!sFLAG.doFlag && !mFLAG.doFlag)
 		return;
 
-	const int regT1 = regT1b ? mVU.regAlloc->allocRegId() : regT1in;
-	int regT2 = reg;
-	if (mFLAG.doFlag && !(_XYZW_SS && modXYZW))
-	{
-		regT2 = regT2in;
-		if (regT2 == VU_HOST_NO_XMM)
-		{
-			regT2 = mVU.regAlloc->allocRegId();
-			regT2b = true;
-		}
-		recBeginOaknutEmit();
-		mVUUpperPshufd_oaknut(regT2, reg, 0x1B);
-		recEndOaknutEmit();
-	}
-
 	if (sFLAG.doFlag)
 		mVUallocSFLAGa(sReg, sFLAG.lastWrite);
 
-	const oak::QReg t2_q = oakQRegister(regT2);
-	const oak::QReg t1_q = oakQRegister(regT1);
+	const oak::QReg src_q = oakQRegister(reg);
+	const oak::QReg vSign = OAK_QSCRATCH3;
+	const oak::QReg vZero = OAK_QSCRATCH2;
 	const oak::WReg mac_w = oakWRegister(mReg);
 	const oak::WReg status_w = oakWRegister(sReg);
 	const oak::WReg temp_w = oakWRegister(VU_HOST_T2);
+
+	// One SLI + AND(weights) + ADDV packs the whole 8-bit MAC word. The MAC path
+	// reverses lane order through the weight vector instead of a PSHUF; the
+	// single-scalar rotate and the destination field mask ride there too.
+	const bool macPath = mFLAG.doFlag && !(_XYZW_SS && modXYZW);
+	const bool doOverflowHack = sFLAG.doFlag && CHECK_VUOVERFLOWHACK;
+	const int foldShift = (mFLAG.doFlag && !doOverflowHack) ? ADD_XYZW : 0;
+	const u32 keepMask = macPath ? static_cast<u32>(_X_Y_Z_W)
+		: ((_XYZW_SS && modXYZW) ? 1u : static_cast<u32>(flipMask[_X_Y_Z_W]));
+	// Overflow predicates are computed on the unreversed result, so the movemask
+	// lane mask is the forward one.
+	const u32 overflowMask = (_XYZW_SS && modXYZW) ? 1u : static_cast<u32>(flipMask[_X_Y_Z_W]);
 
 	recBeginOaknutEmit();
 	if (sFLAG.doFlag && sFLAG.doNonSticky)
@@ -475,34 +487,36 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 		oakAsm->AND(status_w, status_w, OAK_WSCRATCH);
 	}
 
-	mVUUpperMovmskps_oaknut(mac_w, t2_q);
-	oakAsm->MOVI(t1_q.B16(), 0);
-	oakAsm->FCMEQ(t1_q.S4(), t1_q.S4(), t2_q.S4());
-	mVUUpperMovmskps_oaknut(temp_w, t1_q, true);
-	mVUUpperMaskActiveLanes_oaknut(mac_w, AND_XYZW);
-	oakAsm->LSL(mac_w, mac_w, 4);
-	mVUUpperMaskActiveLanes_oaknut(temp_w, AND_XYZW);
-	oakAsm->ORR(mac_w, mac_w, temp_w);
+	oakAsm->CMLT(vSign.S4(), src_q.S4(), 0);
+	oakAsm->FCMEQ(vZero.S4(), src_q.S4(), 0.0);
+	oakAsm->SLI(vZero.S4(), vSign.S4(), 4);
+	oakLoad128(vSign, mVUmacWeightVecMem_oaknut(keepMask, macPath, foldShift));
+	oakAsm->AND(vZero.B16(), vZero.B16(), vSign.B16());
+	oakAsm->ADDV(OAK_SSCRATCH, vZero.S4());
+	oakAsm->FMOV(mac_w, OAK_SSCRATCH);
 
-	if ((sFLAG.doFlag || mFLAG.doFlag) && (CHECK_VUOVERFLOWHACK || !CHECK_VU_OVERFLOW(mVU.index)))
+	// Overflow flags are generated for unclamped results as well, matching
+	// VU_MAC_UPDATE; the overflow hack keeps its own path.
+	const bool want_overflow_flags = CHECK_VUOVERFLOWHACK || !CHECK_VU_OVERFLOW(mVU.index);
+	if ((sFLAG.doFlag || mFLAG.doFlag) && want_overflow_flags)
 	{
 		oak::Label no_overflow;
 		if (CHECK_VUOVERFLOWHACK)
 		{
 			oakLoad128(OAK_QSCRATCH3, mVUUpperOakSs4Mem(offsetof(mVU_SSE4, sse4_compvals[0][0])));
-			oakAsm->FACGE(t1_q.S4(), t2_q.S4(), OAK_QSCRATCH3.S4());
+			oakAsm->FACGE(vZero.S4(), src_q.S4(), OAK_QSCRATCH3.S4());
 		}
 		else
 		{
 			// Match VU_MAC_UPDATE for unclamped results, including NaNs.
 			// Integer exponent inspection does not depend on FP comparisons.
-			oakAsm->SHL(t1_q.S4(), t2_q.S4(), 1);
-			oakAsm->USHR(t1_q.S4(), t1_q.S4(), 24);
+			oakAsm->SHL(vZero.S4(), src_q.S4(), 1);
+			oakAsm->USHR(vZero.S4(), vZero.S4(), 24);
 			oakAsm->MOVI(OAK_QSCRATCH3.S4(), 255);
-			oakAsm->CMEQ(t1_q.S4(), t1_q.S4(), OAK_QSCRATCH3.S4());
+			oakAsm->CMEQ(vZero.S4(), vZero.S4(), OAK_QSCRATCH3.S4());
 		}
-		mVUUpperMovmskps_oaknut(temp_w, t1_q);
-		mVUUpperMaskActiveLanes_oaknut(temp_w, AND_XYZW);
+		mVUUpperMovmskps_oaknut(temp_w, vZero);
+		mVUUpperMaskActiveLanes_oaknut(temp_w, overflowMask);
 		oakAsm->CBZ(temp_w, no_overflow);
 		if (sFLAG.doFlag)
 		{
@@ -511,13 +525,15 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 		}
 		if (mFLAG.doFlag)
 		{
-			oakAsm->LSL(temp_w, temp_w, 12);
+			oakAsm->LSL(temp_w, temp_w, 12 + foldShift);
 			oakAsm->ORR(mac_w, mac_w, temp_w);
 		}
 		oakAsm->l(no_overflow);
 	}
 
-	if (_XYZW_SS && modXYZW && !_W)
+	// The gamefix packs at the unshifted position and rotates the whole word
+	// afterwards, exactly like the x86 path.
+	if (doOverflowHack && _XYZW_SS && modXYZW && !_W)
 		oakAsm->LSL(mac_w, mac_w, ADD_XYZW);
 	recEndOaknutEmit();
 
@@ -537,11 +553,6 @@ static void mVUupdateFlags_oaknut(mV, int reg, int regT1in = VU_HOST_NO_XMM, int
 		}
 		recEndOaknutEmit();
 	}
-
-	if (regT1b)
-		mVU.regAlloc->clearNeededXmmId(regT1);
-	if (regT2b)
-		mVU.regAlloc->clearNeededXmmId(regT2);
 }
 
 static bool mVUtryEmitNoLaneFmacFlags_oaknut(mV)

@@ -10,6 +10,12 @@ static __fi oak::WReg mVUFlagsOakW(int reg)
 
 static __fi void mVUFlagsMove32_emit_oaknut(int dst, int src)
 {
+	// An identity ring phase emits up to four no-op self-moves per block link.
+	// Flag registers are only ever read as 32-bit values, so the 64-bit clearing
+	// a W-register move would do is irrelevant here.
+	if (dst == src)
+		return;
+
 	recBeginOaknutEmit();
 	oakAsm->MOV(mVUFlagsOakW(dst), mVUFlagsOakW(src));
 	recEndOaknutEmit();
@@ -153,23 +159,33 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 	//bool writeProtect = false;
 
 	// Ensure last ~4+ instructions update mac/status flags (if next block's first 4 instructions will read them)
+	//
+	// Program-end finalisation is different: getLastFlagInst(isEbit) takes the
+	// most recent instance only, so needFlagFinalize forces just the last
+	// flag-writing instruction. Walking backwards, the first sFLAG.doFlag seen
+	// is the last one in program order; aCount stays untouched so the FSSET
+	// optimisation below is unaffected.
     int i;
+	const bool finalize = mVU.needFlagFinalize;
+	bool finalized = false;
 	for (i = mVUcount; i > 0; --i, ++aCount)
 	{
 		if (sFLAG.doFlag)
 		{
 
-			if (__Mac)
+			if (__Mac || (finalize && !finalized))
 			{
 				mFLAG.doFlag = true;
 				//writeProtect = true;
 			}
 
-			if (__Status)
+			if (__Status || (finalize && !finalized))
 			{
 				sFLAG.doNonSticky = true;
 				//writeProtect = true;
 			}
+
+			finalized = true;
 
 			if (aCount >= 3)
 			{
@@ -384,7 +400,14 @@ __fi void mVUsetupFlags(mV, microFlagCycles& mFC)
 			break; \
 		} \
 		else /*E-Bit End*/ \
+		{ \
+			/* The successor ends the program, and mVUendProgram finalises the */ \
+			/* flags into VI[REG_*_FLAG]. Without this the lookahead reports */ \
+			/* "successor reads no flags" and this block elides the very FMAC */ \
+			/* flag writes the E-bit will store. */ \
+			mVU.needFlagFinalize = true; \
 			break; \
+		} \
 	}
 
 // Scan through instructions and check if flags are read (FSxxx, FMxxx, FCxxx opcodes)
@@ -414,10 +437,10 @@ void _mVUflagPass(mV, u32 startPC, u32 sCount, u32 found, std::vector<u32>& v)
 		if (curI & _Ebit_)
 		{
 			// The E-bit epilogue reads the final architectural flags even
-			// without an explicit FS/FM/FC instruction. Keep incoming flag
-			// instances alive when the next block can exit before replacing
-			// them; marking only the terminating block loses earlier writes.
-			mVUregs.needExactMatch |= 7;
+			// without an explicit FS/FM/FC instruction. Force this block to
+			// finalise its last flag write so the terminating block sees a
+			// written ring instance instead of a stale one.
+			mVU.needFlagFinalize = true;
 			branch = 1;
 		}
 		if (curI & _Tbit_)

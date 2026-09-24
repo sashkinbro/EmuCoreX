@@ -142,6 +142,10 @@ struct microVU
 	u32 VIbackup;     // Holds a backup of a VI reg if modified before a branch
 	u32 VIxgkick;     // Holds a backup of a VI reg used for xgkick-delays
 	u32 branch;       // Holds branch compare result (IBxx) OR Holds address to Jump to (JALR/JR)
+	// Pool GPR holding a live IBxx condition result, or -1. Cleared wherever the
+	// pool may be clobbered (end-program emission, per-block compile) so the Cmp
+	// in condBranch only ever reads a register that survived the delay slot.
+	int branchCondCarryGpr = -1;
 	u32 badBranch;    // For Branches in Branch Delay Slots, holds Address the first Branch went to + 8
 	u32 evilBranch;   // For Branches in Branch Delay Slots, holds Address to Jump to
 	u32 evilevilBranch;// For Branches in Branch Delay Slots (chained), holds Address to Jump to
@@ -149,6 +153,13 @@ struct microVU
 	u32 q;            // Holds current Q instance index
 	u32 totalCycles;  // Total Cycles that mVU is expected to run for
 	s32 cycles;       // Cycles Counter
+
+	// Set when the block being compiled can reach a program end (E-bit), either
+	// directly or through a successor the flag lookahead found. mVUsetFlags then
+	// forces just the last flag-writing instruction to write MAC and STATUS, so
+	// mVUendProgram finalises a written ring instance instead of a stale one.
+	// Compile-scoped: reset in mVUinitFirstPass.
+	bool needFlagFinalize;
 
 	// The content map owns live programs. The entry PC is part of the key so
 	// indirect-jump targets remain separate programs; merging them makes ranges
@@ -173,6 +184,11 @@ struct microVU
 	}
 };
 
+static __fi void mVUclearBranchCondCarry(microVU& mVU)
+{
+	mVU.branchCondCarryGpr = -1;
+}
+
 class microBlockManager
 {
 private:
@@ -183,6 +199,7 @@ private:
 
 public:
 	inline int getFullListCount() const { return fListI; }
+	inline size_t getQuickLookupCount() const { return quickLookup.size(); }
 	inline microBlockLink* getQBlockList() const { return qBlockList; }
 	inline microBlockLink* getFBlockList() const { return fBlockList; }
 	microBlockManager()

@@ -3610,13 +3610,25 @@ static __fi void mVU_xorBranchSource_oaknut(mV, int dst, int vi, bool from_backu
 	}
 }
 
-static __fi void mVU_storeOrCondBranch_oaknut(mV, oak::Cond cond)
+// Normal branches compute into a pool temp that stays live through the delay
+// slot so condBranch's tail can Cmp it directly; bad/evil branches must leave
+// the value in gprT1, which condEvilBranch consumes.
+static __fi int mVUcondBranchDest_oaknut(mV)
+{
+	if (doBranchCondCarry && !(isBadOrEvil))
+		return mVU.regAlloc->allocGPRId();
+	return VU_HOST_T1;
+}
+
+static __fi void mVU_storeOrCondBranch_oaknut(mV, int condReg, oak::Cond cond)
 {
 	if (!(isBadOrEvil))
 	{
 		recBeginOaknutEmit();
-		mVU_storeGPRToBranchMem_oaknut(VU_HOST_T1, mVU_branch_oaknut(mVU));
+		mVU_storeGPRToBranchMem_oaknut(condReg, mVU_branch_oaknut(mVU));
 		recEndOaknutEmit();
+		if (doBranchCondCarry && condReg != VU_HOST_T1)
+			mVU.branchCondCarryGpr = condReg;
 	}
 	else
 	{
@@ -3626,9 +3638,10 @@ static __fi void mVU_storeOrCondBranch_oaknut(mV, oak::Cond cond)
 
 static void mVU_IBEQ_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_xorBranchSource_oaknut(mVU, VU_HOST_T1, _It_, mVUlow.memReadIt);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::EQ);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_xorBranchSource_oaknut(mVU, condReg, _It_, mVUlow.memReadIt);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::EQ);
 }
 
 static void mVU_IBEQ_emit(mP)
@@ -3644,8 +3657,9 @@ static void mVU_IBEQ_emit(mP)
 
 static void mVU_IBGEZ_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::GE);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::GE);
 }
 
 static void mVU_IBGEZ_emit(mP)
@@ -3661,8 +3675,9 @@ static void mVU_IBGEZ_emit(mP)
 
 static void mVU_IBGTZ_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::GT);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::GT);
 }
 
 static void mVU_IBGTZ_emit(mP)
@@ -3678,8 +3693,9 @@ static void mVU_IBGTZ_emit(mP)
 
 static void mVU_IBLEZ_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::LE);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::LE);
 }
 
 static void mVU_IBLEZ_emit(mP)
@@ -3695,8 +3711,9 @@ static void mVU_IBLEZ_emit(mP)
 
 static void mVU_IBLTZ_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::LT);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::LT);
 }
 
 static void mVU_IBLTZ_emit(mP)
@@ -3712,9 +3729,10 @@ static void mVU_IBLTZ_emit(mP)
 
 static void mVU_IBNE_direct_emit_oaknut(mP)
 {
-	mVU_loadBranchSource_oaknut(mVU, VU_HOST_T1, _Is_, mVUlow.memReadIs);
-	mVU_xorBranchSource_oaknut(mVU, VU_HOST_T1, _It_, mVUlow.memReadIt);
-	mVU_storeOrCondBranch_oaknut(mVU, oak::Cond::NE);
+	const int condReg = mVUcondBranchDest_oaknut(mVU);
+	mVU_loadBranchSource_oaknut(mVU, condReg, _Is_, mVUlow.memReadIs);
+	mVU_xorBranchSource_oaknut(mVU, condReg, _It_, mVUlow.memReadIt);
+	mVU_storeOrCondBranch_oaknut(mVU, condReg, oak::Cond::NE);
 }
 
 static void mVU_IBNE_emit(mP)
