@@ -239,11 +239,12 @@ namespace Threading
 
 		void Post(int count)
 		{
+			// The counter already records the surplus, so one kernel wake is enough:
+			// the woken waiter consumes a single kernel semaphore, and any further
+			// waiters (or later waits) observe the positive counter without sleeping.
+			// Posting per unit here cost a futex syscall per XGKICK packet batch.
 			if (m_counter.fetch_add(count, std::memory_order_release) < 0)
-			{
-				for (int i = 0; i < count && m_counter.load(std::memory_order_relaxed) <= 0; i++)
-					m_sema.Post();
-			}
+				m_sema.Post();
 		}
 
 		void Wait()
