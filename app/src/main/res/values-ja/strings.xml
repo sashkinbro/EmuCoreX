@@ -1348,7 +1348,7 @@
     <string name="pro_price_unavailable">Proはまだ利用できません</string>
     <string name="settings_help_mediatek_angle_opengl">MediaTek OpenGLレンダラーを同梱のANGLEライブラリ経由でルーティングします。変換のオーバーヘッドにより、ゲームによってはパフォーマンスが向上または低下する場合があります。MaliおよびPowerVRプロファイルで利用可能であり、デフォルトではオフのままです。</string>
     <string name="settings_mediatek_angle_opengl">OpenGL用ANGLE</string>
-    <string name="settings_mediatek_angle_opengl_desc">MediaTek OpenGLパスに同梱のANGLEライブラリを使用します。</string>
+    <string name="settings_mediatek_angle_opengl_desc">OpenGLレンダラーに同梱のANGLEライブラリを使用します（MaliおよびPowerVRで利用可能）。</string>
     <string name="settings_mediatek_notice_title">MediaTekの互換性</string>
     <string name="settings_mediatek_notice_message">MediaTekのサポートはまだ試験段階です。互換性とパフォーマンスの改善中は、クラッシュ、表示の乱れ、不安定な動作が発生する場合があります。\n\nグラフィックに問題がある場合は、ANGLEを有効にしたOpenGLをお試しください。問題が続く場合は、ソフトウェアレンダラーを使用してください。</string>
     <string name="settings_pro_tab">Pro</string>

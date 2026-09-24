@@ -2828,7 +2828,9 @@ private fun GpuBackendProfileControls(
         GpuDriverCompatibility.supportsAdrenoToolsCustomDrivers() &&
             !GpuHardwareProfiles.isMediaTekHardware()
     }
-    val isMediaTek = remember { GpuHardwareProfiles.isMediaTekHardware() }
+    val angleOpenGlSupported = remember {
+        GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile())
+    }
     val bundledAngleAvailable = remember { EmulatorBridge.isBundledAngleAvailable() }
     val frameGenerationReady = remember(context) { FrameGenerationManager(context).snapshot().isConfigured }
 
@@ -2934,7 +2936,7 @@ private fun GpuBackendProfileControls(
         )
     }
 
-    if (isMediaTek && bundledAngleAvailable) {
+    if (angleOpenGlSupported && bundledAngleAvailable) {
         ToggleRow(
             title = stringResource(R.string.settings_mediatek_angle_opengl),
             checked = draft.mediatekAngleOpenGl,

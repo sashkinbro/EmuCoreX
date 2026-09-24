@@ -1475,7 +1475,11 @@ private fun SettingsContent(
                                 onClick = onOpenFrameGeneration ?: {}
                             )
                         }
-                        if (GpuHardwareProfiles.isMediaTekHardware() && mediatekAngleAvailable) {
+                        // ANGLE also helps on Mali/PowerVR, not just MediaTek SoCs: the bundled
+                        // translation layer avoids the proprietary GLES driver paths entirely.
+                        if (GpuHardwareProfiles.isMediatekProfile(GpuHardwareProfiles.detectHardwareProfile()) &&
+                            mediatekAngleAvailable
+                        ) {
                             ToggleItem(
                                 icon = Icons.Rounded.SettingsSuggest,
                                 title = stringResource(R.string.settings_mediatek_angle_opengl),

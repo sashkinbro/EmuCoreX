@@ -9182,9 +9182,12 @@ __ri void GSRendererHW::DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Ta
 	// Multi-pass algorithms shouldn't be needed with full barrier and backends may not handle this correctly
 	pxAssert(!m_conf.require_full_barrier || !m_conf.ps.colclip_hw);
 
-	// Swap full barrier for one barrier when there's no overlap, or a shuffle.
+	// Swap full barrier for one barrier when there's no overlap, or a shuffle. On mobile tile
+	// GPUs the per-chunk barrier split costs thousands of pipeline barriers per frame and tanks
+	// performance, so overlapping draws also use a single barrier (matching AetherSX2).
 	if (GSHasBarrierFeedbackSupport(features) && m_conf.require_full_barrier &&
-		(m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle || m_channel_shuffle))
+		(g_gs_device->IsMobileGPUProfile() || m_prim_overlap == PRIM_OVERLAP_NO || m_conf.ps.shuffle ||
+			m_channel_shuffle))
 	{
 		m_conf.require_full_barrier = false;
 		m_conf.require_one_barrier = true;

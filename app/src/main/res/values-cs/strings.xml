@@ -1248,7 +1248,7 @@
     <string name="gpu_powervr_title">PowerVR</string>
     <string name="gpu_powervr_desc">Používá větev PowerVR pro grafické procesory Imagination.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE pro OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">Použít přibalené knihovny ANGLE pro vykreslování OpenGL na zařízeních MediaTek.</string>
+    <string name="settings_mediatek_angle_opengl_desc">Použít přibalené knihovny ANGLE pro vykreslování OpenGL (dostupné na Mali a PowerVR).</string>
     <string name="settings_mediatek_notice_title">Kompatibilita MediaTek</string>
     <string name="settings_mediatek_notice_message">Podpora pro MediaTek je stále experimentální. Během naší práce na vylepšení kompatibility a výkonu může docházet k pádům, vizuálním chybám a nestabilnímu chování.\n\nPokud zaznamenáte grafické problémy, zkuste OpenGL se zapnutým ANGLE. Pokud problémy přetrvávají, použijte softwarový vykreslovač.</string>
     <string name="onboarding_title">Připravte se hrát</string>

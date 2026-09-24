@@ -505,7 +505,8 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_memory_budget = SupportsExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_calibrated_timestamps =
 		SupportsExtension(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, false);
-	// Keep Vulkan feedback on the explicit-barrier path.
+	// Keep Vulkan feedback on the explicit-barrier path. The Arm ROAA path is not enabled:
+	// this driver returns wrong/zero input-attachment data with the ROAA subpass opt-in.
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access = false;
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
@@ -6843,6 +6844,23 @@ void GSDeviceVK::EndRenderPass()
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
 
 	vkCmdEndRenderPass(GetCurrentCommandBuffer());
+
+	// Mali (r-driver) does not reliably make attachment writes visible to later reads when a
+	// render pass ends; subsequent passes can then sample stale contents and flicker. Emit an
+	// explicit same-layout memory barrier for the current colour/depth attachments, matching the
+	// AetherSX2 Mali workaround. The barrier is recorded, not a GPU stall.
+	if (m_device_properties.vendorID == 0x13B5u)
+	{
+		for (GSTexture* attachment : {m_current_render_target, m_current_depth_target})
+		{
+			if (!attachment)
+				continue;
+
+			GSTextureVK* vktex = static_cast<GSTextureVK*>(attachment);
+			vktex->TransitionSubresourcesToLayout(
+				GetCurrentCommandBuffer(), 0, 1, vktex->GetLayout(), vktex->GetLayout());
+		}
+	}
 }
 
 void GSDeviceVK::SetViewport(const VkViewport& viewport)

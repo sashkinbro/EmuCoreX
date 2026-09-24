@@ -1348,7 +1348,7 @@
     <string name="pro_price_unavailable">Pro non è ancora disponibile</string>
     <string name="settings_help_mediatek_angle_opengl">Indirizza il renderer OpenGL di MediaTek tramite le librerie ANGLE in bundle. A causa del sovraccarico di traduzione, questo potrebbe aumentare o diminuire le prestazioni a seconda del gioco. Disponibile per i profili Mali e PowerVR e rimane disattivato per impostazione predefinita.</string>
     <string name="settings_mediatek_angle_opengl">ANGLE per OpenGL</string>
-    <string name="settings_mediatek_angle_opengl_desc">Usa le librerie ANGLE in bundle per il percorso OpenGL di MediaTek.</string>
+    <string name="settings_mediatek_angle_opengl_desc">Usa le librerie ANGLE incluse per il renderer OpenGL (disponibile su Mali e PowerVR).</string>
     <string name="settings_mediatek_notice_title">Compatibilità MediaTek</string>
     <string name="settings_mediatek_notice_message">Il supporto MediaTek è ancora sperimentale. Potrebbero verificarsi arresti anomali, artefatti grafici e comportamenti instabili mentre continuiamo a migliorare compatibilità e prestazioni.\n\nIn caso di problemi grafici, prova OpenGL con ANGLE attivato. Se persistono, usa il renderer Software.</string>
     <string name="settings_pro_tab">Pro</string>
