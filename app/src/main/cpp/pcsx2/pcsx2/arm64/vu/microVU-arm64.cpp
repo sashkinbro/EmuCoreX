@@ -390,25 +390,9 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 
 	if (!quick.prog) // If null, we need to search for new program
 	{
-		// An exact full-memory and entry-PC hit is O(1) and always safe. Keeping
-		// entry PCs separate preserves microVU's indirect-jump partitioning and
-		// prevents one giant program from being invalidated by every upload.
-		const MvuContentKey liveKey = mVUcomputeContentKey(mVU, regs_start_pc_8);
-		auto contentIt = mVU.contentPrograms.find(liveKey);
-		if (contentIt != mVU.contentPrograms.end())
-		{
-			microProgram* shared = contentIt->second;
-			mVUlistPushUnique(list, shared);
-			mVU.prog.cleared = 0;
-			mVU.prog.isSame = 1;
-			mVU.prog.cur = shared;
-			quick.prog = shared;
-			microBlockManager* block = shared->block[start_pc_8];
-			if (block == nullptr)
-				return mVUblockFetch(mVU, startPC, pState);
-			return mVUentryGet(mVU, block, startPC, pState);
-		}
-
+		// Walk the per-PC MRU list first: mVUcmpProg's range memcmp is cheap and
+		// early-exits, so the common re-entry case resolves without hashing the
+		// whole micro memory (4/16 KB per miss, thousands of misses per frame).
 		auto it(list->begin());
 		for (; it != list->end(); ++it)
 		{
@@ -431,9 +415,26 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 			}
 		}
 
-		// Hash only after the per-PC MRU list misses completely. Identical full
-		// micro-memory images reached through another start PC can share the same
-		// program and compile only the missing entry block.
+		// Deque miss - only now pay the whole-microMem hash. An exact full-memory
+		// and entry-PC hit is O(1) and always safe. Keeping entry PCs separate
+		// preserves microVU's indirect-jump partitioning and prevents one giant
+		// program from being invalidated by every upload.
+		const MvuContentKey liveKey = mVUcomputeContentKey(mVU, regs_start_pc_8);
+		auto contentIt = mVU.contentPrograms.find(liveKey);
+		if (contentIt != mVU.contentPrograms.end())
+		{
+			microProgram* shared = contentIt->second;
+			mVUlistPushUnique(list, shared);
+			mVU.prog.cleared = 0;
+			mVU.prog.isSame = 1;
+			mVU.prog.cur = shared;
+			quick.prog = shared;
+			microBlockManager* block = shared->block[start_pc_8];
+			if (block == nullptr)
+				return mVUblockFetch(mVU, startPC, pState);
+			return mVUentryGet(mVU, block, startPC, pState);
+		}
+
 		// If cleared and program not found, make a new program instance
 		mVU.prog.cleared = 0;
 		mVU.prog.isSame  = 1;
