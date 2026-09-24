@@ -5,6 +5,7 @@
 #include "common/Threading.h"
 #include "emucorex/android_runtime.h"
 
+#include <cerrno>
 #include <ctime>
 #include <cstdio>
 #include <string>
@@ -116,5 +117,11 @@ void Threading::SleepUntil(u64 ticks)
 	struct timespec ts = {};
 	ts.tv_sec = static_cast<time_t>(ticks / 1000000000ULL);
 	ts.tv_nsec = static_cast<long>(ticks % 1000000000ULL);
-	clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr);
+	// clock_nanosleep() is not restarted by SA_RESTART. Without retrying, a
+	// single signal (audio callbacks, profiler sampling, GC) aborts the wait and
+	// the caller is left to busy-spin the remainder of the frame against the
+	// monotonic clock. TIMER_ABSTIME makes re-issuing the call with the same
+	// absolute deadline correct.
+	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr) == EINTR)
+		;
 }

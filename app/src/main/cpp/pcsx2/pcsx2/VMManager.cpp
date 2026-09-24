@@ -2777,14 +2777,40 @@ void VMManager::Internal::Throttle()
 	// The old millisecond conversion intentionally left up to almost 2 ms to busy-spin,
 	// repeatedly querying the host clock.  That is a substantial amount of wasted CPU on
 	// high-resolution monotonic clocks, particularly on mobile devices.
-	constexpr u64 SPIN_TAIL_NS = 200'000;
+	constexpr u64 SPIN_TAIL_NS = 100'000;
 	const u64 spin_tail_ticks = std::max<u64>(1, GetTickFrequency() / (1'000'000'000ULL / SPIN_TAIL_NS));
-	if (iEnd + spin_tail_ticks < uExpectedEnd)
-		Threading::SleepUntil(uExpectedEnd - spin_tail_ticks);
 
-	// Finish the final fraction of the frame without relying on scheduler wake-up precision.
+	if (uExpectedEnd > iEnd + spin_tail_ticks)
+	{
+		// Threading::SleepUntil is signal-safe (it retries EINTR), but keep a
+		// progress check anyway: a stuck timer must never fall through into a
+		// full-frame spin below.
+		const u64 sleep_deadline = uExpectedEnd - spin_tail_ticks;
+		u64 last_tick = iEnd;
+		for (u32 attempt = 0; attempt < 4; ++attempt)
+		{
+			Threading::SleepUntil(sleep_deadline);
+			const u64 now = GetCPUTicks();
+			if (now + spin_tail_ticks >= uExpectedEnd || now <= last_tick)
+				break;
+			last_tick = now;
+		}
+	}
+
+	// Finish the final fraction of the frame without relying on scheduler wake-up
+	// precision. The spin is bounded so a broken sleep path cannot turn this into a
+	// full-frame clock_gettime busy loop.
+	const u64 spin_start = GetCPUTicks();
+	const u64 spin_limit = spin_start + spin_tail_ticks * 8;
 	while (GetCPUTicks() < uExpectedEnd)
 	{
+		if (GetCPUTicks() > spin_limit)
+		{
+			// Sleep returned far too early and the tail cannot cover it: fall
+			// back to a coarse sleep instead of burning the CPU.
+			Threading::Sleep(1);
+			break;
+		}
 	}
 
 	// Finally, set our next frame start to when this one ends
