@@ -68,6 +68,7 @@ void mVUreset(microVU& mVU, bool resetReserve)
 	mVUdispatcherCD(mVU);
 	mVUGenerateWaitMTVU(mVU);
 	mVUGenerateCopyPipelineState(mVU);
+	mVUGenerateBudgetExitStub(mVU);
 	mVUGenerateCompareState(mVU);
     ////
     mVU.prog.x86start = oakEndBlock();

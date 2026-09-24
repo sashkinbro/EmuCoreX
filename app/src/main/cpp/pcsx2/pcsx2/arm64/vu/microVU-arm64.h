@@ -118,25 +118,12 @@ struct microVU
 	alignas(16) u32 clipFlag[4]; // 4 instances of clip   flag (used in execution)
 	alignas(16) u32 xmmBackup[16][4]; // Backup for xmm0~xmm15
 
-	u32 index;        // VU Index (VU0 or VU1)
-	u32 cop2;         // VU is in COP2 mode?  (No/Yes)
-	u32 vuMemSize;    // VU Main  Memory Size (in bytes)
-	u32 microMemSize; // VU Micro Memory Size (in bytes)
-	u32 progSize;     // VU Micro Memory Size (in u32's)
-	u32 progMemMask;  // VU Micro Memory Size (in u32's)
-	u32 cacheSize;    // VU Cache Size
-
-	microProgManager               prog;     // Micro Program Data
-	std::unique_ptr<microRegAlloc> regAlloc; // Reg Alloc Class
-	u8* cache;        // Dynarec Cache Start (where we will start writing the recompiled code to)
-	u8* startFunct;   // Function Ptr to the recompiler dispatcher (start)
-	u8* exitFunct;    // Function Ptr to the recompiler dispatcher (exit)
-	u8* startFunctXG; // Function Ptr to the recompiler dispatcher (xgkick resume)
-	u8* exitFunctXG;  // Function Ptr to the recompiler dispatcher (xgkick exit)
-	u8* compareStateF;// Function Ptr to search which compares all state.
-	u8* waitMTVU;     // Ptr to function to save registers/sync VU1 thread
-	u8* copyPLState;  // Ptr to function to copy pipeline state into microVU
-	u8* resumePtrXG;  // Ptr to recompiled code position to resume xgkick
+	// Hot scalar state. Generated code touches these constantly: the block-entry
+	// guard reads/writes `cycles` on every block, branches park results in
+	// `branch`, xgkick uses `totalCycles`/`VIxgkick`. `prog` below is hundreds of
+	// kilobytes, so keeping this cluster ahead of it is what lets the JIT reach
+	// them with one split-immediate LDR/STR instead of a MOVZ/MOVK+ADD sequence
+	// per access.
 	u32 code;         // Contains the current Instruction
 	u32 divFlag;      // 1 instance of I/D flags
 	u32 VIbackup;     // Holds a backup of a VI reg if modified before a branch
@@ -160,6 +147,36 @@ struct microVU
 	// mVUendProgram finalises a written ring instance instead of a stale one.
 	// Compile-scoped: reset in mVUinitFirstPass.
 	bool needFlagFinalize;
+
+	u32 index;        // VU Index (VU0 or VU1)
+	u32 cop2;         // VU is in COP2 mode?  (No/Yes)
+	u32 vuMemSize;    // VU Main  Memory Size (in bytes)
+	u32 microMemSize; // VU Micro Memory Size (in bytes)
+	u32 progSize;     // VU Micro Memory Size (in u32's)
+	u32 progMemMask;  // VU Micro Memory Size (in u32's)
+	u32 cacheSize;    // VU Cache Size
+
+	// Micro Program Data. Lives in vuRegistersPack rather than inside microVU:
+	// the manager is hundreds of kilobytes (IR arrays, per-PC lists), and
+	// keeping it in-struct pushed every JIT-accessed scalar (cycles, branch,
+	// flags) past the range of a single split-immediate load/store, which made
+	// every access a MOVZ/MOVK+ADD+LDR sequence. A reference member keeps all
+	// existing mVU.prog.* uses working while microVU itself stays small.
+	microProgManager& prog;
+
+	explicit microVU(microProgManager& prog_ref) : prog(prog_ref) {}
+
+	std::unique_ptr<microRegAlloc> regAlloc; // Reg Alloc Class
+	u8* cache;        // Dynarec Cache Start (where we will start writing the recompiled code to)
+	u8* startFunct;   // Function Ptr to the recompiler dispatcher (start)
+	u8* exitFunct;    // Function Ptr to the recompiler dispatcher (exit)
+	u8* startFunctXG; // Function Ptr to the recompiler dispatcher (xgkick resume)
+	u8* exitFunctXG;  // Function Ptr to the recompiler dispatcher (xgkick exit)
+	u8* compareStateF;// Function Ptr to search which compares all state.
+	u8* waitMTVU;     // Ptr to function to save registers/sync VU1 thread
+	u8* copyPLState;  // Ptr to function to copy pipeline state into microVU
+	u8* budgetExitStub; // Ptr to shared block-entry budget-break exit stub (see mVUGenerateBudgetExitStub)
+	u8* resumePtrXG;  // Ptr to recompiled code position to resume xgkick
 
 	// The content map owns live programs. The entry PC is part of the key so
 	// indirect-jump targets remain separate programs; merging them makes ranges
@@ -358,7 +375,17 @@ static __fi microRegInfo* mVUcanonicalizeSearchState(microRegInfo* state, microR
 struct vuRegistersPack
 {
     alignas(16) microVU microVU[2];
+    // Program managers live after the VU structs so that every hot microVU field
+    // stays in the first few KiB, reachable by a single split-immediate access.
+    // The VU references below are only bound here; the storage itself is touched
+    // only after construction.
+    alignas(64) microProgManager prog[2];
     alignas(64) VU_Thread vu1Thread;
+
+    vuRegistersPack()
+        : microVU{::microVU(prog[0]), ::microVU(prog[1])}
+    {
+    }
 };
 alignas(64) extern vuRegistersPack g_vuRegistersPack;
 ////

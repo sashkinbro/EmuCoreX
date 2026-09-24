@@ -550,12 +550,26 @@ void mVUtestCycles(microVU& mVU, microFlagCycles& mFC)
 
 	u8* skip = mVUBranchCondPatchpoint_emit_oaknut();
 
-	mVUBranchCopyPipelineState_emit_oaknut(mVU, &mVUpBlock->pState);
+	if (!EmuConfig.Gamefixes.VUSyncHack && !EmuConfig.Gamefixes.FullVU0SyncHack && mVU.budgetExitStub)
+	{
+		// Cold path: hand the block's entry state and the resume PC to the
+		// shared exit stub instead of emitting the whole end-program sequence
+		// into every block. The hot path is unchanged (compare + B.PL).
+		recBeginOaknutEmit();
+		oakMoveAddressToReg(oak::util::X0, mVUpBlock);
+		oakAsm->MOV(oak::util::W1, xPC);
+		oakEmitJmp(mVU.budgetExitStub);
+		recEndOaknutEmit();
+	}
+	else
+	{
+		mVUBranchCopyPipelineState_emit_oaknut(mVU, &mVUpBlock->pState);
 
-	if (EmuConfig.Gamefixes.VUSyncHack || EmuConfig.Gamefixes.FullVU0SyncHack) {
-		mVUCompileStoreNextBlockCycles_emit_oaknut(mVU, mVUcycles);
-    }
-	mVUendProgram(mVU, &mFC, 0);
+		if (EmuConfig.Gamefixes.VUSyncHack || EmuConfig.Gamefixes.FullVU0SyncHack) {
+			mVUCompileStoreNextBlockCycles_emit_oaknut(mVU, mVUcycles);
+		}
+		mVUendProgram(mVU, &mFC, 0);
+	}
 
 //	skip.SetTarget();
 	mVUBranchPatchCondToHere_emit_oaknut(skip, oak::Cond::PL);

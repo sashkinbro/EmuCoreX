@@ -339,7 +339,7 @@ static void mVUGenerateCopyPipelineState(mV)
     mVU.copyPLState = recBeginOaknutEmit();
 
 	constexpr int state_size = 6;
-	const s64 dst_base = static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].prog.lpState));
+	const s64 dst_base = static_cast<s64>(offsetof(vuRegistersPack, prog[mVU.index].lpState));
 	for (int i = 0; i < state_size; i++)
 	{
 		oakLoad128(oakQRegister(i), {oak::util::X0, i * 16});

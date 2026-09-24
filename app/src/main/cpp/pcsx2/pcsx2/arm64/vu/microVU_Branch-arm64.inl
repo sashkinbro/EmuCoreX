@@ -93,12 +93,12 @@ static __fi void mVUBranchClearLpState_emit_oaknut(mV)
 
 	oak::Label done;
 	oakLoad32(OAK_WSCRATCH,
-		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].prog.cleared))));
+		mVUBranchOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, prog[mVU.index].cleared))));
 	oakAsm->CBNZ(OAK_WSCRATCH, done);
 
 	static_assert((sizeof(microRegInfo) % 16) == 0);
 	oakAsm->MOVI(OAK_QSCRATCH.B16(), 0);
-	const s64 lp_state = static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].prog.lpState));
+	const s64 lp_state = static_cast<s64>(offsetof(vuRegistersPack, prog[mVU.index].lpState));
 	for (size_t offset = 0; offset < sizeof(microRegInfo); offset += 16)
 		oakStore128(OAK_QSCRATCH, mVUBranchOakMvuMem(lp_state + static_cast<s64>(offset)));
 
@@ -322,6 +322,156 @@ static __fi void mVUBranchCopyPipelineState_emit_oaknut(mV, const void* state)
 	oakEmitCall(mVU.copyPLState);
 	recEndOaknutEmit();
 	mVUrestoreRegs(mVU, true, true);
+}
+
+// Shared block-entry budget-break exit. Called with:
+//   X0 = microBlock* (its pState is the first member, so also &block->pState)
+//   X1 = resume PC in guest bytes
+// The per-block block-entry guard branches here when the VU has no cycles left
+// for the block. Keeping this out of line removes the inline
+// copyPLState + mVUendProgram(0) sequence from every compiled block, which was
+// ~350 bytes per block (the single largest source of microVU code size).
+static void mVUGenerateBudgetExitStub(mV)
+{
+	mVU.budgetExitStub = recBeginOaknutEmit();
+
+	static_assert(offsetof(microBlock, pState) == 0, "block pointer doubles as the pState pointer");
+
+	const s64 state_need = offsetof(microBlock, pState) + 0; // microRegInfo::needExactMatch
+	const s64 state_flag = offsetof(microBlock, pState) + 1; // microRegInfo::flagInfo
+	const s64 off_vi_status = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_STATUS_FLAG].UL);
+	const s64 off_vi_mac = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_MAC_FLAG].UL);
+	const s64 off_vi_clip = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_CLIP_FLAG].UL);
+	const s64 off_vi_q = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_Q].UL);
+	const s64 off_vi_p = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_P].UL);
+	const s64 off_vi_tpc = offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_TPC].UL);
+	const s64 off_pending_q = offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_q);
+	const s64 off_pending_p = offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p);
+	const s64 off_status_flags = offsetof(cpuRegistersPack, vuRegs[mVU.index].micro_statusflags);
+	const s64 off_micro_mac = offsetof(cpuRegistersPack, vuRegs[mVU.index].micro_macflags);
+	const s64 off_micro_clip = offsetof(cpuRegistersPack, vuRegs[mVU.index].micro_clipflags);
+	const s64 off_mac_flag = offsetof(vuRegistersPack, microVU[mVU.index].macFlag);
+	const s64 off_clip_flag = offsetof(vuRegistersPack, microVU[mVU.index].clipFlag);
+
+	// The guard branches here instead of returning, so the resume PC is stored
+	// before any call can clobber it.
+	oakStore32(oak::util::W1, mVUBranchOakCpuMem(off_vi_tpc));
+
+	// The block was entered with no cached VF/VI (branch links flush first), so
+	// copyPLState is the only allocator-visible effect; mVUendProgram(0) writes
+	// back no guest registers here.
+	oakEmitCall(mVU.copyPLState);
+
+	// fStatus/fMac/fClip mirror getLastFlagInst() on the block's entry state.
+	oakAsm->LDRB(oak::util::W2, oak::util::X0, oak::POffset<12, 0>(static_cast<u32>(state_need)));
+	oakAsm->LDRB(oak::util::W4, oak::util::X0, oak::POffset<12, 0>(static_cast<u32>(state_flag)));
+
+	// Status flags live in the pinned F0..F3 GPRs. Back them up (like
+	// mVUSaveFlagRegs with backupFlagInstances) and select the ring instance
+	// with a register select rather than indexing the backup in memory.
+	oakStore32(oakWRegister(VU_HOST_F0), mVUBranchOakCpuMem(off_status_flags + 0));
+	oakStore32(oakWRegister(VU_HOST_F1), mVUBranchOakCpuMem(off_status_flags + 4));
+	oakStore32(oakWRegister(VU_HOST_F2), mVUBranchOakCpuMem(off_status_flags + 8));
+	oakStore32(oakWRegister(VU_HOST_F3), mVUBranchOakCpuMem(off_status_flags + 12));
+
+	// index = (needExactMatch & bit) ? 3 : ((flagInfo >> shift) & 3) - 1) & 3
+	const auto emit_flag_index = [&](int shift, u32 need_bit) {
+		oakAsm->UBFX(oak::util::W5, oak::util::W4, shift, 2);
+		oakAsm->SUB(oak::util::W5, oak::util::W5, 1);
+		oakAsm->AND(oak::util::W5, oak::util::W5, 3);
+		oakAsm->MOV(oak::util::W6, 3);
+		oakAsm->TST(oak::util::W2, need_bit);
+		oakAsm->CSEL(oak::util::W5, oak::util::W6, oak::util::W5, oak::Cond::NE);
+	};
+
+	// status instance -> normalize the four denormalized lane groups (mirrors
+	// mVUallocSFLAGc / mVUNormalizeSFLAGGroups_emit_oaknut).
+	{
+		emit_flag_index(2, 1);
+		oakAsm->TST(oak::util::W5, 1);
+		oakAsm->CSEL(oak::util::W6, oakWRegister(VU_HOST_F1), oakWRegister(VU_HOST_F0), oak::Cond::NE);
+		oakAsm->CSEL(oak::util::W7, oakWRegister(VU_HOST_F3), oakWRegister(VU_HOST_F2), oak::Cond::NE);
+		oakAsm->TST(oak::util::W5, 2);
+		oakAsm->CSEL(oak::util::W6, oak::util::W6, oak::util::W7, oak::Cond::EQ);
+
+		oakAsm->TST(oak::util::W6, 0x0f00);
+		oakAsm->CSET(oak::util::W7, oak::Cond::NE);
+		oakAsm->TST(oak::util::W6, 0xf000);
+		oakAsm->CSET(OAK_WSCRATCH, oak::Cond::NE);
+		oakAsm->ORR(oak::util::W7, oak::util::W7, OAK_WSCRATCH, oak::LogShift::LSL, 1);
+		oakAsm->TST(oak::util::W6, 0x000f);
+		oakAsm->CSET(OAK_WSCRATCH, oak::Cond::NE);
+		oakAsm->ORR(oak::util::W7, oak::util::W7, OAK_WSCRATCH, oak::LogShift::LSL, 6);
+		oakAsm->TST(oak::util::W6, 0x00f0);
+		oakAsm->CSET(OAK_WSCRATCH, oak::Cond::NE);
+		oakAsm->ORR(oak::util::W7, oak::util::W7, OAK_WSCRATCH, oak::LogShift::LSL, 7);
+		oakAsm->AND(oak::util::W6, oak::util::W6, 0xffff0000);
+		oakAsm->LSR(oak::util::W6, oak::util::W6, 14);
+		oakAsm->ORR(oak::util::W7, oak::util::W7, oak::util::W6);
+		oakStore32(oak::util::W7, mVUBranchOakCpuMem(off_vi_status));
+	}
+
+	// MAC flags: 16-bit entries in microVU.macFlag (mirrors mVUallocMFLAGa).
+	{
+		emit_flag_index(4, 2);
+		oakLoad16(oak::util::W6, mVUBranchOakMvuMem(off_mac_flag + 0));
+		oakLoad16(oak::util::W7, mVUBranchOakMvuMem(off_mac_flag + 4));
+		oakLoad16(oak::util::W8, mVUBranchOakMvuMem(off_mac_flag + 8));
+		oakLoad16(oak::util::W9, mVUBranchOakMvuMem(off_mac_flag + 12));
+		oakAsm->TST(oak::util::W5, 1);
+		oakAsm->CSEL(oak::util::W6, oak::util::W7, oak::util::W6, oak::Cond::NE);
+		oakAsm->CSEL(oak::util::W7, oak::util::W9, oak::util::W8, oak::Cond::NE);
+		oakAsm->TST(oak::util::W5, 2);
+		oakAsm->CSEL(oak::util::W6, oak::util::W6, oak::util::W7, oak::Cond::EQ);
+		oakStore32(oak::util::W6, mVUBranchOakCpuMem(off_vi_mac));
+	}
+
+	// CLIP flags: 32-bit entries (mirrors mVUallocCFLAGa).
+	{
+		emit_flag_index(6, 4);
+		oakLoad32(oak::util::W6, mVUBranchOakMvuMem(off_clip_flag + 0));
+		oakLoad32(oak::util::W7, mVUBranchOakMvuMem(off_clip_flag + 4));
+		oakLoad32(oak::util::W8, mVUBranchOakMvuMem(off_clip_flag + 8));
+		oakLoad32(oak::util::W9, mVUBranchOakMvuMem(off_clip_flag + 12));
+		oakAsm->TST(oak::util::W5, 1);
+		oakAsm->CSEL(oak::util::W6, oak::util::W7, oak::util::W6, oak::Cond::NE);
+		oakAsm->CSEL(oak::util::W7, oak::util::W9, oak::util::W8, oak::Cond::NE);
+		oakAsm->TST(oak::util::W5, 2);
+		oakAsm->CSEL(oak::util::W6, oak::util::W6, oak::util::W7, oak::Cond::EQ);
+		oakStore32(oak::util::W6, mVUBranchOakCpuMem(off_vi_clip));
+	}
+
+	// Back up all four flag instances for the interpreter/xgkick
+	// (mVUSaveFlagRegs with backupFlagInstances = !isEbit).
+	oakLoad128(OAK_QSCRATCH, mVUBranchOakMvuMem(off_mac_flag));
+	oakStore128(OAK_QSCRATCH, mVUBranchOakCpuMem(off_micro_mac));
+	oakLoad128(OAK_QSCRATCH, mVUBranchOakMvuMem(off_clip_flag));
+	oakStore128(OAK_QSCRATCH, mVUBranchOakCpuMem(off_micro_clip));
+
+	// P/Q always save instance 0 at a block entry (mVUSavePQRegs(0, 0)).
+	const oak::QReg pq = oakQRegister(VU_HOST_XMMPQ);
+	oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
+	oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_vi_q));
+	mVUBranchOakPshufd(pq, pq, 0xe1);
+	oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
+	oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_pending_q));
+	mVUBranchOakPshufd(pq, pq, 0xe1);
+	if (isVU1)
+	{
+		mVUBranchOakPshufd(pq, pq, 0xC6);
+		oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
+		oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_vi_p));
+		mVUBranchOakPshufd(pq, pq, 0x87);
+		oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
+		oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_pending_p));
+		mVUBranchOakPshufd(pq, pq, 0x27);
+	}
+
+	if (mVU.index && THREAD_VU1)
+		mVUBranchCallEBit_emit_oaknut();
+	mVUBranchEmitJmp_oaknut(mVU.exitFunct);
+
+	recEndOaknutEmit();
 }
 
 static __fi void mVUSaveFlagRegs_emit_oaknut(mV, int fStatus, int fMac, int fClip, bool backupFlagInstances)
