@@ -1918,10 +1918,16 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	u32 num_attachments = 0;
 	if (key.color_format != VK_FORMAT_UNDEFINED)
 	{
+		// On tile-based mobile GPUs every TFX draw reports feedback-capable attachments (see
+		// UpdateHWPipelineSelector), so keep the colour attachment in GENERAL for the whole frame.
+		// Switching between feedback and non-feedback passes flushes and reloads the tile buffer on
+		// every transition, which costs hundreds of render pass restarts per frame in games that
+		// alternate between the two.
 		const VkImageLayout layout =
 			key.color_feedback_loop ? (UseFeedbackLoopLayout() ? VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
 																 VK_IMAGE_LAYOUT_GENERAL) :
-									  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+									  (IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+															  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 		attachments[num_attachments] = {0, static_cast<VkFormat>(key.color_format), VK_SAMPLE_COUNT_1_BIT,
 			static_cast<VkAttachmentLoadOp>(key.color_load_op), static_cast<VkAttachmentStoreOp>(key.color_store_op),
 			VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, layout, layout};
@@ -1960,12 +1966,15 @@ VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 	}
 	if (key.depth_format != VK_FORMAT_UNDEFINED)
 	{
+		// Same as colour above: keep the depth attachment feedback-capable for the whole frame on
+		// tile-based mobile GPUs, so depth feedback draws do not restart the render pass.
 		const VkImageLayout layout =
 			key.depth_sampling ?
 				((m_features.depth_feedback != DepthFeedbackSupport::None && UseFeedbackLoopLayout()) ?
 					VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT :
 					VK_IMAGE_LAYOUT_GENERAL) :
-				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+				(IsMobileGPUProfile() ? VK_IMAGE_LAYOUT_GENERAL :
+										VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 		attachments[num_attachments] = {0, static_cast<VkFormat>(key.depth_format), VK_SAMPLE_COUNT_1_BIT,
 			static_cast<VkAttachmentLoadOp>(key.depth_load_op), static_cast<VkAttachmentStoreOp>(key.depth_store_op),
 			static_cast<VkAttachmentLoadOp>(key.stencil_load_op),
@@ -4418,7 +4427,8 @@ void GSDeviceVK::OMSetRenderTargets(
 			}
 			else
 			{
-				vkRt->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+				vkRt->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+																GSTextureVK::Layout::ColorAttachment);
 			}
 		}
 		if (vkDs)
@@ -4455,7 +4465,8 @@ void GSDeviceVK::OMSetRenderTargets(
 			}
 			else
 			{
-				vkDs->TransitionToLayout(GSTextureVK::Layout::DepthStencilAttachment);
+				vkDs->TransitionToLayout(IsMobileGPUProfile() ? GSTextureVK::Layout::FeedbackLoop :
+																GSTextureVK::Layout::DepthStencilAttachment);
 			}
 		}
 	}
@@ -7815,6 +7826,20 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 		pipe.feedback_loop_flags |= (config.tex && config.tex == config.ds) ? FeedbackLoopFlag_ReadDepth : FeedbackLoopFlag_None;
 	}
 
+	// On tile-based mobile GPUs, use one render pass variant for every TFX draw. Switching between
+	// feedback and non-feedback passes makes the driver end the pass and flush the tile buffer on
+	// every transition, which in feedback-heavy games costs hundreds of restarts per frame.
+	// AetherSX2 gets the same effect by enabling rasterization order attachment access for the
+	// entire pass; where that is unavailable (this driver renders black with it), keeping the
+	// attachments feedback-capable for the whole pass is equivalent.
+	if (IsMobileGPUProfile())
+	{
+		if (pipe.rt)
+			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteRT;
+		if (pipe.ds)
+			pipe.feedback_loop_flags |= FeedbackLoopFlag_ReadAndWriteDepth;
+	}
+
 	// enable point size in the vertex shader if we're rendering points regardless of upscaling.
 	pipe.vs.point_size |= (config.topology == GSHWDrawConfig::Topology::Point);
 }
@@ -7882,6 +7907,13 @@ void GSDeviceVK::SendHWDraw(const GSHWDrawConfig& config, GSTextureVK* draw_rt, 
 	if ((one_barrier || full_barrier) && !(config.IsFeedbackLoopRT(m_pipeline_selector.ps) || config.IsFeedbackLoopDepth(m_pipeline_selector.ps))) [[unlikely]]
 		Console.Warning("VK: Possible unnecessary barrier detected.");
 #endif
+
+	// With every mobile TFX pass carrying the subpass self-dependency (unified feedback pass), the
+	// explicit per-draw barrier is redundant: the dependency already orders attachment writes
+	// before the input-attachment reads of the following draws.
+	if (IsMobileGPUProfile())
+		one_barrier = false;
+
 	const VkDependencyFlags barrier_flags = GetFeedbackBarrierDependencyFlags();
 
 	std::array<VkImageMemoryBarrier, 2> barriers = {};
