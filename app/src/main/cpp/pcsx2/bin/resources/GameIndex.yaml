@@ -30774,6 +30774,7 @@ NM00001:
   clampModes:
     vuClampMode: 2
   gsHWFixes:
+    alignSprite: 1
     textureInsideRT: 1
     halfPixelOffset: 2
     roundSprite: 1
@@ -30824,8 +30825,14 @@ NM00007:
   bootprog: SCSLOAD
   media: DVD
   input: button
+  clampModes:
+    vuClampMode: 2 # Respawn issues, Fixes SPS, avoids teleporting characters.
+  gameFixes:
+    - EETimingHack # Fixes bad colours on character select when in Progressive Scan.
+    - SoftwareRendererFMVHack # Horizontal bottom line in FMV.
   gsHWFixes:
-    alignSprite: 1
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 2 # Fixes misaligned bloom
 NM00008:
   name: Wangan Midnight
   region: System246
@@ -30904,8 +30911,18 @@ NM00019:
   bootprog: TK5LOAD
   media: DVD
   input: button
+  compat: 5
+  clampModes:
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
-    alignSprite: 1
+    recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
+    halfPixelOffset: 2 # Align post.
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 1 # Fixes depth of field effect.
+    textureInsideRT: 1 # Fixes heat haze half screen problem.
+    cpuSpriteRenderBW: 1
+    getSkipCount: "GSC_NamcoGames"
+    autoFlush: 1
 NM00020:
   name: Dragon Chronicle Online - Great Sky Battle
   region: System246
@@ -30920,7 +30937,7 @@ NM00021:
   input: lightgun
 NM00022:
   name: The IDOLM@STER
-  region: System246
+  region: System256
   bootprog: IDLLOAD
   media: HDD
   input: touchscreen
@@ -30950,8 +30967,18 @@ NM00026:
   bootprog: T55LOAD
   media: DVD
   input: button
+  compat: 5
+  clampModes:
+    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
   gsHWFixes:
-    alignSprite: 1
+    recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
+    halfPixelOffset: 2 # Align post.
+    alignSprite: 1 # Fixes vertical lines.
+    nativeScaling: 1 # Fixes depth of field effect.
+    textureInsideRT: 1 # Fixes heat haze half screen problem.
+    cpuSpriteRenderBW: 1
+    getSkipCount: "GSC_NamcoGames"
+    autoFlush: 1
 NM00027:
   name: Super Dragon Ball Z
   region: System256
@@ -30982,6 +31009,7 @@ NM00031:
   bootprog: SC3LOAD
   media: DVD
   input: button
+  compat: 5
   clampModes:
     vuClampMode: 2 # Respawn issues, Fixes SPS, avoids teleporting characters.
   gameFixes:
@@ -31005,7 +31033,7 @@ NM00033:
     alignSprite: 1 # Fixes vertical lines.
 NM00034:
   name: Mobile Suit Gundam SEED Destiny - Federation vs. Z.A.F.T. II
-  region: System256
+  region: System246
   bootprog: SE2LOAD
   media: DVD
   input: button
