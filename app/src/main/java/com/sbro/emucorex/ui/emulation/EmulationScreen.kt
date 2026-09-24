@@ -135,7 +135,9 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -774,6 +776,19 @@ fun EmulationScreen(
         showAutoSaveLoadDialog ||
         showGamepadMappingDialog ||
         pendingGamepadActionId != null
+
+    // The in-game menu and dialogs contain text fields (auto-save interval, ...). A field keeping
+    // the input connection attached after the UI closes makes Android route every batched motion
+    // event (analog stick movement) through the IME and flood logcat with InputEventSender
+    // warnings. Drop focus and hide the keyboard on the way back to gameplay.
+    val softwareKeyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(gamepadUiActive) {
+        if (!gamepadUiActive) {
+            softwareKeyboardController?.hide()
+            focusManager.clearFocus(force = true)
+        }
+    }
 
     BackHandler(enabled = true) {
         when (resolveEmulationBackAction(uiState.backButtonExitsGame)) {
