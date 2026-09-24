@@ -5,15 +5,9 @@ object RendererDefaults {
     const val OPENGL = 12
     const val SOFTWARE = 13
     const val VULKAN = 14
-    const val DEFAULT = OPENGL
+    const val DEFAULT = VULKAN
 
-    fun defaultForHardware(): Int {
-        return if (GpuHardwareProfiles.detectHardwareProfile() == GpuHardwareProfiles.ADRENO) {
-            VULKAN
-        } else {
-            DEFAULT
-        }
-    }
+    fun defaultForHardware(): Int = VULKAN
 
     fun normalizeAndroidRenderer(value: Int): Int {
         return when (value) {

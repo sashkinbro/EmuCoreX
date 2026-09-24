@@ -295,10 +295,12 @@ GSRendererType GSUtil::GetPreferredRenderer()
 		// Use D3D device info to select renderer.
 		preferred_renderer = D3D::GetPreferredRenderer();
 #elif defined(__ANDROID__)
-#if defined(ENABLE_OPENGL)
-		preferred_renderer = GSRendererType::OGL;
-#elif defined(ENABLE_VULKAN)
+		// Android always defaults to Vulkan; ReopenGS falls back to OpenGL if the
+		// driver cannot create a Vulkan device.
+#if defined(ENABLE_VULKAN)
 		preferred_renderer = GSRendererType::VK;
+#elif defined(ENABLE_OPENGL)
+		preferred_renderer = GSRendererType::OGL;
 #else
 		preferred_renderer = GSRendererType::SW;
 #endif
