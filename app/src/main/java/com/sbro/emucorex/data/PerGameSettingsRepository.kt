@@ -133,6 +133,7 @@ data class PerGameSettings(
     val touchControlVisualStyle: TouchControlVisualStyle? = null,
     val touchControlPressEffect: TouchControlPressEffect? = null,
     val touchControlsLayout: TouchControlsLayoutProfile? = null,
+    val customTouchControls: CustomTouchControlLibrary? = null,
     val providedKeys: Set<String>? = null,
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -485,6 +486,9 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
             null
         },
         touchControlsLayout = optJSONObject("touchControlsLayout")?.toTouchControlsLayoutProfile(),
+        customTouchControls = CustomTouchControlLibrary.decodeOrNull(
+            optString("customTouchControls")
+        ),
         providedKeys = providedKeys,
         updatedAt = optLong("updatedAt", System.currentTimeMillis())
     )
@@ -654,6 +658,9 @@ private fun PerGameSettings.toJson(): JSONObject {
             touchControlPressEffect?.let { put("touchControlPressEffect", it.preferenceValue) }
         }
         if (shouldWrite("touchControlsLayout")) touchControlsLayout?.let { put("touchControlsLayout", it.toJson()) }
+        if (shouldWrite("customTouchControls")) {
+            customTouchControls?.sanitized()?.let { put("customTouchControls", it.encode()) }
+        }
         put("updatedAt", updatedAt)
     }
 }

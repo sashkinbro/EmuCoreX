@@ -1035,7 +1035,6 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setCustomTouchControls(library: CustomTouchControlLibrary) {
         context.dataStore.edit { prefs ->
-            if (prefs[PRO_UNLOCKED] != true) return@edit
             prefs[CUSTOM_TOUCH_CONTROLS_JSON] = library.sanitized().encode()
         }
     }

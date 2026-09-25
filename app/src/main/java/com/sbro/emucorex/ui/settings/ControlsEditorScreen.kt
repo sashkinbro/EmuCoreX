@@ -13,23 +13,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,9 +59,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -62,10 +74,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
+import com.sbro.emucorex.data.CustomTouchControl
+import com.sbro.emucorex.data.CustomTouchControlContent
+import com.sbro.emucorex.data.CustomTouchControlLibrary
+import com.sbro.emucorex.data.CustomTouchControlShape
 import com.sbro.emucorex.data.OverlayControlLayout
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlsLayoutProfile
+import com.sbro.emucorex.ui.common.ActionSelector
+import com.sbro.emucorex.ui.common.CustomControlVisual
 import com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasDpadClusterSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasStickSpec
@@ -75,6 +93,8 @@ import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.buildOverlayCanvasLayout
 import com.sbro.emucorex.ui.emulation.EmulationUiState
 import com.sbro.emucorex.ui.theme.neon.neonShape
+import java.util.UUID
+import kotlin.math.roundToInt
 
 data class ControlsEditorState(
     val overlayScale: Int = 100,
@@ -88,7 +108,8 @@ data class ControlsEditorState(
     val rbtnOffset: Pair<Float, Float> = AppPreferences.DEFAULT_RBTN_OFFSET_X to AppPreferences.DEFAULT_RBTN_OFFSET_Y,
     val centerOffset: Pair<Float, Float> = AppPreferences.DEFAULT_CENTER_OFFSET_X to AppPreferences.DEFAULT_CENTER_OFFSET_Y,
     val stickScale: Int = 100,
-    val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts()
+    val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
+    val customControls: CustomTouchControlLibrary = CustomTouchControlLibrary.Empty
 )
 
 fun EmulationUiState.toControlsEditorState(): ControlsEditorState = ControlsEditorState(
@@ -103,13 +124,15 @@ fun EmulationUiState.toControlsEditorState(): ControlsEditorState = ControlsEdit
     rbtnOffset = rbtnOffset,
     centerOffset = centerOffset,
     stickScale = stickScale,
-    controlLayouts = controlLayouts
+    controlLayouts = controlLayouts,
+    customControls = customTouchControls
 )
 
 fun TouchControlsLayoutProfile.toControlsEditorState(
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
-    overlayScale: Int
+    overlayScale: Int,
+    customControls: CustomTouchControlLibrary = CustomTouchControlLibrary.Empty
 ): ControlsEditorState = ControlsEditorState(
     overlayScale = overlayScale,
     touchControlVisualStyle = visualStyle,
@@ -122,7 +145,8 @@ fun TouchControlsLayoutProfile.toControlsEditorState(
     rbtnOffset = rbtnOffset,
     centerOffset = centerOffset,
     stickScale = stickScale,
-    controlLayouts = controlLayouts
+    controlLayouts = controlLayouts,
+    customControls = customControls
 )
 
 fun ControlsEditorState.toTouchControlsLayoutProfile(): TouchControlsLayoutProfile = TouchControlsLayoutProfile(
@@ -139,9 +163,25 @@ fun ControlsEditorState.toTouchControlsLayoutProfile(): TouchControlsLayoutProfi
 
 private const val ControlGroupDpad = "group_dpad"
 private const val ControlGroupActions = "group_actions"
+private const val CustomControlIdPrefix = "custom:"
+private const val CustomControlSizeStepDp = 4
 private val ControlGroupIds = setOf(ControlGroupDpad, ControlGroupActions)
 private val DpadControlIds = setOf("dpad_up", "dpad_down", "dpad_left", "dpad_right")
 private val ActionControlIds = setOf("triangle", "circle", "cross", "square")
+
+private fun customControlSelectionId(controlId: String): String =
+    "$CustomControlIdPrefix$controlId"
+
+private fun String.toCustomControlIdOrNull(): String? =
+    takeIf { it.startsWith(CustomControlIdPrefix) }?.removePrefix(CustomControlIdPrefix)
+
+private fun actionIdForControlId(controlId: String): String? = when (controlId) {
+    "dpad_up" -> "up"
+    "dpad_down" -> "down"
+    "dpad_left" -> "left"
+    "dpad_right" -> "right"
+    else -> controlId.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS }
+}
 
 private data class PreviewGroupBounds(
     val x: Dp,
@@ -149,6 +189,19 @@ private data class PreviewGroupBounds(
     val width: Dp,
     val height: Dp
 )
+
+private data class EditorControlGeometry(
+    val positionX: Float,
+    val positionY: Float,
+    val widthDp: Int,
+    val heightDp: Int
+)
+
+private fun CustomTouchControlLibrary.replacing(control: CustomTouchControl): CustomTouchControlLibrary =
+    copy(controls = controls.map { if (it.id == control.id) control else it })
+
+private fun CustomTouchControlLibrary.removing(controlId: String): CustomTouchControlLibrary =
+    copy(controls = controls.filterNot { it.id == controlId })
 
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -169,12 +222,20 @@ fun ControlsEditorScreen(
     onToggleLeftInputMode: () -> Unit,
     onSetControlVisible: (String, Boolean) -> Unit,
     onSetStickSurfaceMode: (String, Boolean) -> Unit,
-    onResetLayout: () -> Unit
+    onResetLayout: () -> Unit,
+    onCustomControlsChange: (CustomTouchControlLibrary) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val activity = context as? Activity
     var selectedControlId by rememberSaveable { mutableStateOf<String?>(null) }
     var editorControlLayouts by remember { mutableStateOf(state.controlLayouts) }
+    var editorCustomControls by remember { mutableStateOf(state.customControls.sanitized()) }
+    var selectedControlGeometry by remember { mutableStateOf<EditorControlGeometry?>(null) }
+    var comboDialogControlId by remember { mutableStateOf<String?>(null) }
+    var showCreateComboDialog by remember { mutableStateOf(false) }
+    var showControlAdjustDialog by remember { mutableStateOf(false) }
+    var deleteCustomCandidate by remember { mutableStateOf<CustomTouchControl?>(null) }
     val defaultLayouts = remember(state.stickScale) { AppPreferences.defaultOverlayControlLayouts(state.stickScale) }
     val isShowingLeftStick = (
         editorControlLayouts["left_stick"]
@@ -184,15 +245,162 @@ fun ControlsEditorScreen(
     val selectedLayout = selectedControlId?.let { id ->
         editorControlLayouts[id] ?: defaultLayouts[id] ?: OverlayControlLayout()
     }
+    val selectedCustomControlId = selectedControlId?.toCustomControlIdOrNull()
+    val selectedCustomControl = selectedCustomControlId?.let { id ->
+        editorCustomControls.controls.firstOrNull { it.id == id }
+    }
+    val selectedIsCustom = selectedCustomControl != null
     val selectedIsGroup = selectedControlId?.let { it in ControlGroupIds } == true
     val selectedIsStick = selectedControlId == "left_stick" || selectedControlId == "right_stick"
     val selectedStickSurfaceMode = selectedIsStick && (selectedLayout?.surfaceOnly == true)
+    val selectedStandardTitle = selectedControlId
+        ?.takeUnless { it in ControlGroupIds || it.toCustomControlIdOrNull() != null }
+        ?.let { controlTitle(it) }
+        .orEmpty()
+    val canDuplicateSelected = when {
+        editorCustomControls.controls.size >= CustomTouchControlLibrary.MAX_CONTROLS -> false
+        selectedCustomControl != null -> true
+        selectedControlId != null && !selectedIsGroup ->
+            actionIdForControlId(selectedControlId!!) != null && selectedControlGeometry != null
+        else -> false
+    }
+    val copiedNameFor: (String) -> String = { name ->
+        resources.getString(R.string.touch_control_creator_copy_name, name)
+            .take(CustomTouchControl.MAX_NAME_LENGTH)
+    }
     val originalOrientation = remember(activity) {
         activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
 
     LaunchedEffect(state.controlLayouts) {
         editorControlLayouts = state.controlLayouts
+    }
+
+    LaunchedEffect(state.customControls) {
+        editorCustomControls = state.customControls.sanitized()
+    }
+
+    LaunchedEffect(selectedControlId) {
+        showControlAdjustDialog = false
+    }
+
+    fun updateCustomControls(transform: (CustomTouchControlLibrary) -> CustomTouchControlLibrary) {
+        val updated = transform(editorCustomControls).sanitized()
+        editorCustomControls = updated
+        onCustomControlsChange(updated)
+    }
+
+    fun setCustomControlLocally(control: CustomTouchControl) {
+        editorCustomControls = editorCustomControls.replacing(control)
+    }
+
+    fun persistCustomControl(control: CustomTouchControl) {
+        updateCustomControls { it.replacing(control) }
+    }
+
+    fun persistCustomControlById(controlId: String) {
+        val current = editorCustomControls.controls.firstOrNull { it.id == controlId } ?: return
+        persistCustomControl(current.copy(updatedAtMillis = System.currentTimeMillis()))
+    }
+
+    fun duplicateSelectedControl() {
+        if (!canDuplicateSelected) return
+        val now = System.currentTimeMillis()
+        val sourceCustom = selectedCustomControl
+        val duplicate = if (sourceCustom != null) {
+            sourceCustom.duplicate(
+                id = UUID.randomUUID().toString(),
+                name = copiedNameFor(sourceCustom.name),
+                nowMillis = now
+            )
+        } else {
+            val controlId = selectedControlId ?: return
+            val actionId = actionIdForControlId(controlId) ?: return
+            val geometry = selectedControlGeometry ?: return
+            CustomTouchControl(
+                id = UUID.randomUUID().toString(),
+                name = copiedNameFor(selectedStandardTitle.ifEmpty { controlId }),
+                actionId = actionId,
+                label = CustomTouchControl.defaultLabelFor(actionId),
+                shape = if (controlId in ActionControlIds) {
+                    CustomTouchControlShape.CIRCLE
+                } else {
+                    CustomTouchControlShape.ROUNDED
+                },
+                positionX = (geometry.positionX + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
+                    .coerceIn(0f, 1f),
+                positionY = (geometry.positionY + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
+                    .coerceIn(0f, 1f),
+                widthDp = geometry.widthDp,
+                heightDp = geometry.heightDp,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+        }
+        val insertIndex = sourceCustom?.let { source ->
+            editorCustomControls.controls.indexOfFirst { it.id == source.id }
+                .takeIf { it >= 0 }
+                ?.plus(1)
+        } ?: editorCustomControls.controls.size
+        updateCustomControls { library ->
+            val controls = library.controls.toMutableList()
+            controls.add(insertIndex.coerceIn(0, controls.size), duplicate)
+            library.copy(controls = controls)
+        }
+        selectedControlId = customControlSelectionId(duplicate.id)
+        selectedControlGeometry = EditorControlGeometry(
+            positionX = duplicate.positionX,
+            positionY = duplicate.positionY,
+            widthDp = duplicate.widthDp,
+            heightDp = duplicate.heightDp
+        )
+    }
+
+    fun createComboControl(actionId: String, secondaryActionId: String?) {
+        if (editorCustomControls.controls.size >= CustomTouchControlLibrary.MAX_CONTROLS) return
+        if (actionId !in CustomTouchControl.ALLOWED_ACTION_IDS) return
+        val now = System.currentTimeMillis()
+        val created = CustomTouchControl(
+            id = UUID.randomUUID().toString(),
+            name = resources.getString(
+                R.string.touch_control_creator_default_name,
+                editorCustomControls.controls.size + 1
+            ).take(CustomTouchControl.MAX_NAME_LENGTH),
+            actionId = actionId,
+            secondaryActionId = secondaryActionId
+                ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS && it != actionId },
+            label = CustomTouchControl.defaultLabelFor(actionId),
+            positionX = 0.5f,
+            positionY = 0.5f,
+            createdAtMillis = now,
+            updatedAtMillis = now
+        )
+        updateCustomControls { it.copy(controls = it.controls + created) }
+        selectedControlId = customControlSelectionId(created.id)
+    }
+
+    fun applyComboActions(control: CustomTouchControl, actionId: String, secondaryActionId: String?) {
+        updateCustomControls { library ->
+            library.replacing(
+                control.copy(
+                    actionId = actionId,
+                    secondaryActionId = secondaryActionId?.takeUnless { it == actionId },
+                    label = if (control.content == CustomTouchControlContent.SYMBOL) {
+                        CustomTouchControl.defaultLabelFor(actionId)
+                    } else {
+                        control.label
+                    },
+                    updatedAtMillis = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun deleteCustomControl(control: CustomTouchControl) {
+        updateCustomControls { it.removing(control.id) }
+        if (selectedControlId == customControlSelectionId(control.id)) {
+            selectedControlId = null
+        }
     }
 
     fun currentLayoutFor(id: String, defaultScale: Int = 100): OverlayControlLayout {
@@ -297,11 +505,18 @@ fun ControlsEditorScreen(
         PreviewLayout(
             state = state,
             controlLayouts = editorControlLayouts,
+            customControls = editorCustomControls.controls,
             selectedControlId = selectedControlId,
             onSelectControl = { selectedControlId = it },
             onSetControlOffset = ::setControlOffsetLocally,
             onCommitControlPosition = ::persistControlPosition,
             onCommitControlPositions = ::persistControlPositions,
+            onSetCustomControlPosition = { controlId, x, y ->
+                val current = editorCustomControls.controls.firstOrNull { it.id == controlId } ?: return@PreviewLayout
+                setCustomControlLocally(current.copy(positionX = x, positionY = y))
+            },
+            onCommitCustomControlPosition = ::persistCustomControlById,
+            onSelectedGeometryChange = { selectedControlGeometry = it },
             overlayLeftSafeInset = overlayLeftSafeInset,
             overlayRightSafeInset = overlayRightSafeInset,
             overlayTopSafeInset = overlayTopSafeInset,
@@ -338,7 +553,7 @@ fun ControlsEditorScreen(
                     }
                     selectedControlId?.let {
                         Text(
-                            text = controlTitle(it),
+                            text = selectedCustomControl?.name ?: controlTitle(it),
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.White.copy(alpha = 0.84f)
                         )
@@ -379,9 +594,20 @@ fun ControlsEditorScreen(
 
                 OutlinedButton(
                     onClick = {
+                        val customControl = selectedCustomControl
                         selectedControlId?.let { controlId ->
-                            if (controlId !in ControlGroupIds) {
-                                setControlVisibleLocally(controlId, !(selectedLayout?.visible ?: true))
+                            when {
+                                customControl != null -> updateCustomControls { library ->
+                                    library.replacing(
+                                        customControl.copy(
+                                            enabled = !customControl.enabled,
+                                            updatedAtMillis = System.currentTimeMillis()
+                                        )
+                                    )
+                                }
+                                controlId !in ControlGroupIds -> {
+                                    setControlVisibleLocally(controlId, !(selectedLayout?.visible ?: true))
+                                }
                             }
                         }
                     },
@@ -393,35 +619,92 @@ fun ControlsEditorScreen(
                         contentColor = Color.White
                     )
                 ) {
+                    val isVisible = selectedCustomControl?.enabled ?: (selectedLayout?.visible != false)
                     Icon(
-                        imageVector = if (selectedLayout?.visible == false) {
-                            Icons.Rounded.VisibilityOff
-                        } else {
+                        imageVector = if (isVisible) {
                             Icons.Rounded.Visibility
+                        } else {
+                            Icons.Rounded.VisibilityOff
                         },
                         contentDescription = null
                     )
                 }
 
                 OutlinedButton(
-                    onClick = {
-                        selectedControlId?.let { controlId ->
-                            setStickSurfaceModeLocally(controlId, !selectedStickSurfaceMode)
-                        }
-                    },
-                    enabled = selectedIsStick,
+                    onClick = { showCreateComboDialog = true },
+                    enabled = editorCustomControls.controls.size < CustomTouchControlLibrary.MAX_CONTROLS,
                     shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (selectedStickSurfaceMode) {
-                            Color(0xFF3565FF).copy(alpha = 0.78f)
-                        } else {
-                            Color.White.copy(alpha = 0.06f)
-                        },
-                        contentColor = if (selectedStickSurfaceMode) Color.White else Color.White.copy(alpha = 0.58f)
-                    )
+                        containerColor = Color.White.copy(alpha = 0.08f),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("controls_editor_add_button")
                 ) {
-                    Icon(Icons.Rounded.TouchApp, contentDescription = null)
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = stringResource(R.string.touch_control_creator_create)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { duplicateSelectedControl() },
+                    enabled = canDuplicateSelected,
+                    shape = neonShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.08f),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("controls_editor_duplicate")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.ContentCopy,
+                        contentDescription = stringResource(R.string.touch_control_creator_duplicate)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { showControlAdjustDialog = true },
+                    enabled = selectedControlId != null && !selectedIsGroup,
+                    shape = neonShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.08f),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.testTag("controls_editor_adjust")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = stringResource(R.string.settings_edit_controls_action)
+                    )
+                }
+
+                if (selectedIsStick) {
+                    OutlinedButton(
+                        onClick = {
+                            selectedControlId?.let { controlId ->
+                                setStickSurfaceModeLocally(controlId, !selectedStickSurfaceMode)
+                            }
+                        },
+                        shape = neonShape(16.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (selectedStickSurfaceMode) {
+                                Color(0xFF3565FF).copy(alpha = 0.78f)
+                            } else {
+                                Color.White.copy(alpha = 0.06f)
+                            },
+                            contentColor = if (selectedStickSurfaceMode) {
+                                Color.White
+                            } else {
+                                Color.White.copy(alpha = 0.58f)
+                            }
+                        )
+                    ) {
+                        Icon(Icons.Rounded.TouchApp, contentDescription = null)
+                    }
                 }
 
                 Button(
@@ -438,98 +721,106 @@ fun ControlsEditorScreen(
             }
 
             selectedControlId?.takeUnless { it in ControlGroupIds }?.let { controlId ->
-                val scale = selectedLayout?.scale ?: if (controlId.contains("stick")) state.stickScale else 100
-                val isStickPanel = (controlId == "left_stick" || controlId == "right_stick") &&
-                    (selectedLayout?.surfaceOnly == true)
-                Surface(
-                    modifier = Modifier.padding(top = 8.dp),
-                    color = Color(0xFF111827).copy(alpha = 0.82f),
-                    shape = neonShape(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                val customControl = selectedCustomControl
+                if (showControlAdjustDialog) {
+                    val scale = selectedLayout?.scale
+                        ?: if (controlId.contains("stick")) state.stickScale else 100
+                    val isStickPanel = customControl == null &&
+                        (controlId == "left_stick" || controlId == "right_stick") &&
+                        (selectedLayout?.surfaceOnly == true)
+                    val opacity = customControl?.opacity
+                        ?: selectedLayout?.opacity
+                        ?: AppPreferences.OVERLAY_CONTROL_OPACITY_DEFAULT
+
+                    fun applyOpacity(next: Int) {
+                        if (customControl != null) {
+                            updateCustomControls { library ->
+                                library.replacing(
+                                    customControl.copy(
+                                        opacity = next.coerceIn(
+                                            CustomTouchControl.MIN_OPACITY,
+                                            CustomTouchControl.MAX_OPACITY
+                                        ),
+                                        updatedAtMillis = System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                        } else {
+                            setControlOpacityLocally(controlId, next)
+                        }
+                    }
+
+                    AdjustDialog(
+                        title = customControl?.name ?: controlTitle(controlId),
+                        onDismiss = { showControlAdjustDialog = false }
                     ) {
-                        OutlinedButton(
-                            onClick = { setControlScaleLocally(controlId, scale - 10) },
-                            enabled = scale > AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
-                            shape = neonShape(14.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.08f),
-                                contentColor = Color.White
+                        if (customControl != null) {
+                            AdjustStepper(
+                                valueText = "${customControl.widthDp}×${customControl.heightDp} dp",
+                                minusEnabled = customControl.widthDp > CustomTouchControl.MIN_SIZE_DP ||
+                                    customControl.heightDp > CustomTouchControl.MIN_SIZE_DP,
+                                plusEnabled = customControl.widthDp < CustomTouchControl.MAX_SIZE_DP ||
+                                    customControl.heightDp < CustomTouchControl.MAX_SIZE_DP,
+                                onMinus = {
+                                    updateCustomControls { library ->
+                                        library.replacing(
+                                            customControl.copy(
+                                                widthDp = (customControl.widthDp - CustomControlSizeStepDp)
+                                                    .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
+                                                heightDp = (customControl.heightDp - CustomControlSizeStepDp)
+                                                    .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
+                                                updatedAtMillis = System.currentTimeMillis()
+                                            )
+                                        )
+                                    }
+                                },
+                                onPlus = {
+                                    updateCustomControls { library ->
+                                        library.replacing(
+                                            customControl.copy(
+                                                widthDp = (customControl.widthDp + CustomControlSizeStepDp)
+                                                    .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
+                                                heightDp = (customControl.heightDp + CustomControlSizeStepDp)
+                                                    .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
+                                                updatedAtMillis = System.currentTimeMillis()
+                                            )
+                                        )
+                                    }
+                                }
                             )
-                        ) {
-                            Icon(Icons.Rounded.Remove, contentDescription = null)
+                        } else {
+                            AdjustStepper(
+                                valueText = "$scale%",
+                                minusEnabled = scale > AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
+                                plusEnabled = scale < AppPreferences.OVERLAY_CONTROL_SCALE_MAX,
+                                onMinus = { setControlScaleLocally(controlId, scale - 10) },
+                                onPlus = { setControlScaleLocally(controlId, scale + 10) }
+                            )
                         }
-                        Text(
-                            text = "$scale%",
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp)
+                        if (isStickPanel) {
+                            val widthScale = selectedLayout.widthScale
+                            AdjustStepper(
+                                valueText = "W $widthScale%",
+                                minusEnabled = widthScale > 100,
+                                plusEnabled = widthScale < 240,
+                                onMinus = { setControlWidthScaleLocally(controlId, widthScale - 10) },
+                                onPlus = { setControlWidthScaleLocally(controlId, widthScale + 10) }
+                            )
+                        }
+                        AdjustStepper(
+                            valueText = stringResource(
+                                R.string.controls_editor_opacity_value,
+                                opacity
+                            ),
+                            minusEnabled = opacity > AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
+                            plusEnabled = opacity < AppPreferences.OVERLAY_CONTROL_OPACITY_MAX,
+                            onMinus = { applyOpacity(opacity - 10) },
+                            onPlus = { applyOpacity(opacity + 10) }
                         )
-                        OutlinedButton(
-                            onClick = { setControlScaleLocally(controlId, scale + 10) },
-                            enabled = scale < AppPreferences.OVERLAY_CONTROL_SCALE_MAX,
-                            shape = neonShape(14.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.08f),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null)
-                        }
                     }
                 }
 
-                val opacity = selectedLayout?.opacity ?: AppPreferences.OVERLAY_CONTROL_OPACITY_DEFAULT
-                Surface(
-                    modifier = Modifier.padding(top = 8.dp),
-                    color = Color(0xFF111827).copy(alpha = 0.82f),
-                    shape = neonShape(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { setControlOpacityLocally(controlId, opacity - 10) },
-                            enabled = opacity > AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
-                            shape = neonShape(14.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.08f),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Rounded.Remove, contentDescription = null)
-                        }
-                        Text(
-                            text = stringResource(R.string.controls_editor_opacity_value, opacity),
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                        OutlinedButton(
-                            onClick = { setControlOpacityLocally(controlId, opacity + 10) },
-                            enabled = opacity < AppPreferences.OVERLAY_CONTROL_OPACITY_MAX,
-                            shape = neonShape(14.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = Color.White.copy(alpha = 0.08f),
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null)
-                        }
-                    }
-                }
-
-                if (isStickPanel) {
-                    val widthScale = selectedLayout.widthScale
+                if (customControl != null) {
                     Surface(
                         modifier = Modifier.padding(top = 8.dp),
                         color = Color(0xFF111827).copy(alpha = 0.82f),
@@ -541,34 +832,28 @@ fun ControlsEditorScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { setControlWidthScaleLocally(controlId, widthScale - 10) },
-                                enabled = widthScale > 100,
+                                onClick = { comboDialogControlId = customControl.id },
                                 shape = neonShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.White.copy(alpha = 0.08f),
                                     contentColor = Color.White
-                                )
+                                ),
+                                modifier = Modifier.testTag("controls_editor_combo")
                             ) {
-                                Icon(Icons.Rounded.Remove, contentDescription = null)
+                                Text(stringResource(R.string.touch_control_creator_combo_action))
                             }
-                            Text(
-                                text = "W $widthScale%",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
                             OutlinedButton(
-                                onClick = { setControlWidthScaleLocally(controlId, widthScale + 10) },
-                                enabled = widthScale < 240,
+                                onClick = { deleteCustomCandidate = customControl },
                                 shape = neonShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     containerColor = Color.White.copy(alpha = 0.08f),
                                     contentColor = Color.White
-                                )
+                                ),
+                                modifier = Modifier.testTag("controls_editor_delete_custom")
                             ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null)
+                                Icon(Icons.Rounded.Delete, contentDescription = null)
                             }
                         }
                     }
@@ -576,6 +861,201 @@ fun ControlsEditorScreen(
             }
         }
     }
+
+    if (showCreateComboDialog) {
+        ComboActionDialog(
+            title = stringResource(R.string.touch_control_creator_create),
+            initialActionId = CustomTouchControl.DEFAULT_ACTION_ID,
+            initialSecondaryActionId = null,
+            confirmLabel = stringResource(R.string.controls_editor_done),
+            onDismiss = { showCreateComboDialog = false },
+            onConfirm = { actionId, secondaryActionId ->
+                createComboControl(actionId, secondaryActionId)
+                showCreateComboDialog = false
+            }
+        )
+    }
+
+    val comboDialogControl = comboDialogControlId?.let { id ->
+        editorCustomControls.controls.firstOrNull { it.id == id }
+    }
+    if (comboDialogControl != null) {
+        ComboActionDialog(
+            title = stringResource(R.string.touch_control_creator_combo_action),
+            initialActionId = comboDialogControl.actionId,
+            initialSecondaryActionId = comboDialogControl.secondaryActionId,
+            confirmLabel = stringResource(R.string.controls_editor_done),
+            onDismiss = { comboDialogControlId = null },
+            onConfirm = { actionId, secondaryActionId ->
+                applyComboActions(comboDialogControl, actionId, secondaryActionId)
+                comboDialogControlId = null
+            }
+        )
+    }
+
+    deleteCustomCandidate?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { deleteCustomCandidate = null },
+            title = { Text(stringResource(R.string.touch_control_creator_delete_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.touch_control_creator_delete_message,
+                        candidate.name
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteCustomControl(candidate)
+                        deleteCustomCandidate = null
+                    },
+                    modifier = Modifier.testTag("controls_editor_confirm_delete_custom")
+                ) {
+                    Text(stringResource(R.string.touch_control_creator_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteCustomCandidate = null }) {
+                    Text(stringResource(R.string.theme_manager_cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AdjustDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.controls_editor_done))
+            }
+        }
+    )
+}
+
+@Composable
+private fun AdjustStepper(
+    valueText: String,
+    minusEnabled: Boolean,
+    plusEnabled: Boolean,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        OutlinedButton(
+            onClick = onMinus,
+            enabled = minusEnabled,
+            shape = neonShape(14.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Icon(Icons.Rounded.Remove, contentDescription = null)
+        }
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+        )
+        OutlinedButton(
+            onClick = onPlus,
+            enabled = plusEnabled,
+            shape = neonShape(14.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = null)
+        }
+    }
+}
+
+@Composable
+private fun ComboActionDialog(
+    title: String,
+    initialActionId: String,
+    initialSecondaryActionId: String?,
+    confirmLabel: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String?) -> Unit
+) {
+    var actionId by remember(initialActionId) { mutableStateOf(initialActionId) }
+    var secondaryActionId by remember(initialSecondaryActionId) {
+        mutableStateOf(initialSecondaryActionId)
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    stringResource(R.string.touch_control_creator_action),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                ActionSelector(
+                    selectedActionId = actionId,
+                    testTagPrefix = "controls_editor_combo_primary",
+                    onSelect = { selected ->
+                        selected?.let { action ->
+                            actionId = action
+                            if (secondaryActionId == action) secondaryActionId = null
+                        }
+                    }
+                )
+                Text(
+                    stringResource(R.string.touch_control_creator_combo_action),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    stringResource(R.string.touch_control_creator_combo_action_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ActionSelector(
+                    selectedActionId = secondaryActionId,
+                    excludedActionId = actionId,
+                    allowNone = true,
+                    testTagPrefix = "controls_editor_combo_secondary",
+                    onSelect = { secondaryActionId = it }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(actionId, secondaryActionId) },
+                modifier = Modifier.testTag("controls_editor_combo_confirm")
+            ) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.theme_manager_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -611,11 +1091,15 @@ private fun controlTitle(controlId: String): String = when (controlId) {
 private fun PreviewLayout(
     state: ControlsEditorState,
     controlLayouts: Map<String, OverlayControlLayout>,
+    customControls: List<CustomTouchControl>,
     selectedControlId: String?,
     onSelectControl: (String) -> Unit,
     onSetControlOffset: (String, Pair<Float, Float>) -> Unit,
     onCommitControlPosition: (String) -> Unit,
     onCommitControlPositions: (List<String>) -> Unit,
+    onSetCustomControlPosition: (String, Float, Float) -> Unit,
+    onCommitCustomControlPosition: (String) -> Unit,
+    onSelectedGeometryChange: (EditorControlGeometry?) -> Unit,
     modifier: Modifier = Modifier,
     overlayLeftSafeInset: Dp? = null,
     overlayRightSafeInset: Dp? = null,
@@ -888,6 +1372,94 @@ private fun PreviewLayout(
                 onMoveControlBy = { id, delta -> moveStick(id, spec, delta) },
                 onCommitControlPosition = onCommitControlPosition
             )
+        }
+
+        val canvasWidthPx = with(density) { maxWidth.toPx() }
+        val canvasHeightPx = with(density) { maxHeight.toPx() }
+        val safeLeftPx = with(density) { safeLeftInset.toPx() }
+        val safeRightPx = with(density) { safeRightInset.toPx() }
+        val safeTopPx = with(density) { safeTop.toPx() }
+        val safeBottomPx = with(density) { safeBottom.toPx() }
+
+        customControls.forEach { control ->
+            val widthPx = with(density) { control.widthDp.dp.toPx() }
+            val heightPx = with(density) { control.heightDp.dp.toPx() }
+            val travelX = (canvasWidthPx - safeLeftPx - safeRightPx - widthPx).coerceAtLeast(1f)
+            val travelY = (canvasHeightPx - safeTopPx - safeBottomPx - heightPx).coerceAtLeast(1f)
+            val selectionId = customControlSelectionId(control.id)
+            val selected = selectedControlId == selectionId
+            DraggableControl(
+                id = selectionId,
+                selected = selected,
+                onSelectControl = onSelectControl,
+                onMoveControlBy = { _, delta ->
+                    onSetCustomControlPosition(
+                        control.id,
+                        (control.positionX + delta.first / travelX).coerceIn(0f, 1f),
+                        (control.positionY + delta.second / travelY).coerceIn(0f, 1f)
+                    )
+                },
+                onCommitControlPosition = { onCommitCustomControlPosition(control.id) },
+                baseZIndex = 4f,
+                modifier = Modifier.offset {
+                    IntOffset(
+                        (safeLeftPx + travelX * control.positionX).roundToInt(),
+                        (safeTopPx + travelY * control.positionY).roundToInt()
+                    )
+                }
+            ) {
+                CustomControlVisual(
+                    control = control,
+                    pressed = selected,
+                    selected = selected,
+                    modifier = Modifier
+                        .size(control.widthDp.dp, control.heightDp.dp)
+                        .graphicsLayer(alpha = if (control.enabled) 1f else 0.38f)
+                        .testTag("controls_editor_custom_${control.id}")
+                )
+            }
+        }
+
+        LaunchedEffect(layout, controlLayouts, customControls, selectedControlId) {
+            val selection = selectedControlId
+            val geometry = when {
+                selection == null -> null
+                else -> {
+                    val customId = selection.toCustomControlIdOrNull()
+                    if (customId != null) {
+                        customControls.firstOrNull { it.id == customId }?.let { control ->
+                            EditorControlGeometry(
+                                positionX = control.positionX,
+                                positionY = control.positionY,
+                                widthDp = control.widthDp,
+                                heightDp = control.heightDp
+                            )
+                        }
+                    } else {
+                        layout.button(selection)?.let { spec ->
+                            val widthPx = with(density) { spec.width.toPx() }
+                            val heightPx = with(density) { spec.height.toPx() }
+                            val travelX = (canvasWidthPx - safeLeftPx - safeRightPx - widthPx)
+                                .coerceAtLeast(1f)
+                            val travelY = (canvasHeightPx - safeTopPx - safeBottomPx - heightPx)
+                                .coerceAtLeast(1f)
+                            EditorControlGeometry(
+                                positionX = (
+                                    (with(density) { spec.x.toPx() } - safeLeftPx) / travelX
+                                    ).coerceIn(0f, 1f),
+                                positionY = (
+                                    (with(density) { spec.y.toPx() } - safeTopPx) / travelY
+                                    ).coerceIn(0f, 1f),
+                                widthDp = spec.width.value.roundToInt()
+                                    .coerceIn(CustomTouchControl.MIN_SIZE_DP, CustomTouchControl.MAX_SIZE_DP),
+                                heightDp = spec.height.value.roundToInt()
+                                    .coerceIn(CustomTouchControl.MIN_SIZE_DP, CustomTouchControl.MAX_SIZE_DP)
+                            )
+                        }
+                    }
+                }
+            }
+            onSelectedGeometryChange(geometry)
         }
     }
 }

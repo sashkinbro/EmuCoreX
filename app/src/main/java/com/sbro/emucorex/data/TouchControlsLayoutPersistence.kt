@@ -1,6 +1,7 @@
 package com.sbro.emucorex.data
 
 const val PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY = "touchControlsLayout"
+const val PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY = "customTouchControls"
 
 fun TouchControlsLayoutProfile.toggleStick(target: Int): TouchControlsLayoutProfile {
     val layouts = controlLayouts.toMutableMap()
@@ -83,11 +84,39 @@ fun PerGameSettings?.withTouchControlsLayout(
     )
 }
 
+fun PerGameSettings?.withCustomTouchControls(
+    gameKey: String,
+    gameTitle: String,
+    gameSerial: String?,
+    library: CustomTouchControlLibrary
+): PerGameSettings {
+    val existing = this
+    val providedKeys = when {
+        existing == null -> setOf(PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY)
+        existing.providedKeys == null -> null
+        else -> existing.providedKeys + PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY
+    }
+    return (existing ?: PerGameSettings(
+        gameKey = gameKey,
+        gameTitle = gameTitle,
+        gameSerial = gameSerial,
+        providedKeys = providedKeys
+    )).copy(
+        gameTitle = gameTitle,
+        gameSerial = gameSerial ?: existing?.gameSerial,
+        customTouchControls = library.sanitized(),
+        providedKeys = providedKeys
+    )
+}
+
 fun PerGameSettings.withoutTouchControlsLayout(): PerGameSettings? {
-    val remainingKeys = providedKeys?.minus(PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY)
+    val remainingKeys = providedKeys
+        ?.minus(PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY)
+        ?.minus(PER_GAME_CUSTOM_TOUCH_CONTROLS_KEY)
     if (remainingKeys != null && remainingKeys.isEmpty()) return null
     return copy(
         touchControlsLayout = null,
+        customTouchControls = null,
         providedKeys = remainingKeys
     )
 }

@@ -54,6 +54,20 @@ data class CustomTouchControl(
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = createdAtMillis
 ) {
+    fun duplicate(
+        id: String,
+        name: String,
+        positionOffset: Float = DEFAULT_DUPLICATE_OFFSET,
+        nowMillis: Long = System.currentTimeMillis()
+    ): CustomTouchControl = copy(
+        id = id,
+        name = name.trim().take(MAX_NAME_LENGTH).ifEmpty { DEFAULT_NAME },
+        positionX = (positionX + positionOffset).coerceIn(0f, 1f),
+        positionY = (positionY + positionOffset).coerceIn(0f, 1f),
+        createdAtMillis = nowMillis,
+        updatedAtMillis = nowMillis
+    )
+
     fun sanitized(): CustomTouchControl? {
         val safeId = id.trim().take(MAX_ID_LENGTH)
         if (safeId.isEmpty()) return null
@@ -115,6 +129,7 @@ data class CustomTouchControl(
         const val MAX_SHADOW_DP = 16f
         const val MIN_PRESSED_SCALE_PERCENT = 85
         const val MAX_PRESSED_SCALE_PERCENT = 140
+        const val DEFAULT_DUPLICATE_OFFSET = 0.05f
 
         val ALLOWED_ACTION_IDS = setOf(
             "up", "down", "left", "right",
@@ -168,11 +183,13 @@ data class CustomTouchControlLibrary(
         const val MAX_CONTROLS = 32
         val Empty = CustomTouchControlLibrary()
 
-        fun decode(raw: String?): CustomTouchControlLibrary {
-            if (raw.isNullOrBlank()) return Empty
+        fun decode(raw: String?): CustomTouchControlLibrary = decodeOrNull(raw) ?: Empty
+
+        fun decodeOrNull(raw: String?): CustomTouchControlLibrary? {
+            if (raw.isNullOrBlank()) return null
             return runCatching {
                 JSON.decodeFromString(serializer(), raw).sanitized()
-            }.getOrDefault(Empty)
+            }.getOrNull()
         }
 
         private val JSON = Json {
