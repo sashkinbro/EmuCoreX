@@ -39,14 +39,14 @@ class GpuHardwareProfileTest {
         assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.OPENGL))
         assertEquals(RendererDefaults.SOFTWARE, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.SOFTWARE))
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(999))
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(999))
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.AUTO))
         // An explicit user selection must survive regardless of the hardware default.
         assertEquals(RendererDefaults.VULKAN, RendererDefaults.normalizeAndroidRenderer(RendererDefaults.VULKAN))
     }
 
     @Test
-    fun rendererDefaultsToOpenGlForSnapdragonAndMediaTek() {
-        assertEquals(RendererDefaults.OPENGL, RendererDefaults.defaultForHardware())
+    fun rendererDefaultsToVulkanOnAndroid() {
+        assertEquals(RendererDefaults.VULKAN, RendererDefaults.defaultForHardware())
     }
 }
