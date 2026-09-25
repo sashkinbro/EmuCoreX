@@ -1552,6 +1552,12 @@
     <string name="settings_game_folders_count">%1$d개의 폴더가 선택되었습니다</string>
     <string name="game_folders_remove">폴더 삭제</string>
     <string name="settings_gamepad_action_pressure">압력 조절기</string>
+    <string name="settings_gamepad_action_gun_trigger">라이트건 트리거</string>
+    <string name="settings_gamepad_action_gun_pedal">라이트건 페달</string>
+    <string name="settings_gamepad_action_gun_reload">라이트건 재장전</string>
+    <string name="settings_gamepad_action_gun_recalibrate">라이트건 재보정</string>
+    <string name="settings_gamepad_action_coin">코인 투입</string>
+    <string name="settings_gamepad_action_service">서비스 / 테스트</string>
     <string name="settings_pressure_modifier_amount">압력 조절기 수치</string>
     <string name="settings_help_pressure_modifier_amount">압력 조절기를 누르고 있는 동안 압력 감지 DualShock 2 버튼이 보내는 압력을 설정합니다. 일반 버튼 누르기는 여전히 100%를 사용합니다.</string>
     <string name="settings_network_tab">네트워크</string>

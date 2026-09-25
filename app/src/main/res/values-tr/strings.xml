@@ -1552,6 +1552,12 @@
     <string name="settings_game_folders_count">%1$d klasör seçildi</string>
     <string name="game_folders_remove">Klasörü kaldır</string>
     <string name="settings_gamepad_action_pressure">Basınç Düzenleyici</string>
+    <string name="settings_gamepad_action_gun_trigger">Işık tabancası tetiği</string>
+    <string name="settings_gamepad_action_gun_pedal">Işık tabancası pedalı</string>
+    <string name="settings_gamepad_action_gun_reload">Işık tabancası şarjör</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Işık tabancası kalibrasyon</string>
+    <string name="settings_gamepad_action_coin">Jeton at</string>
+    <string name="settings_gamepad_action_service">Servis / Test</string>
     <string name="settings_pressure_modifier_amount">Basınç Düzenleyici Miktarı</string>
     <string name="settings_help_pressure_modifier_amount">Basınç Düzenleyici basılı tutulurken basınca duyarlı DualShock 2 düğmeleri tarafından gönderilen basıncı ayarlar. Normal düğme basımları hala %100 kullanır.</string>
     <string name="settings_network_tab">Ağ</string>

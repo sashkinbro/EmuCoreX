@@ -1554,6 +1554,12 @@
     <string name="settings_game_folders_count">%1$d carpetas seleccionadas</string>
     <string name="game_folders_remove">Eliminar carpeta</string>
     <string name="settings_gamepad_action_pressure">Modificador de presión</string>
+    <string name="settings_gamepad_action_gun_trigger">Gatillo pistola de luz</string>
+    <string name="settings_gamepad_action_gun_pedal">Pedal pistola de luz</string>
+    <string name="settings_gamepad_action_gun_reload">Recarga pistola de luz</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Recalibrar pistola de luz</string>
+    <string name="settings_gamepad_action_coin">Insertar moneda</string>
+    <string name="settings_gamepad_action_service">Servicio / Prueba</string>
     <string name="settings_pressure_modifier_amount">Cantidad del modificador de presión</string>
     <string name="settings_help_pressure_modifier_amount">Establece la presión enviada por los botones del DualShock 2 sensibles a la presión mientras se mantiene presionado el modificador de presión. Las pulsaciones normales de botones siguen usando el 100%.</string>
     <string name="settings_network_tab">Red</string>

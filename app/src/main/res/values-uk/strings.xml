@@ -1579,6 +1579,12 @@
     <string name="settings_game_folders_count">Вибрано папок: %1$d</string>
     <string name="game_folders_remove">Видалити папку</string>
     <string name="settings_gamepad_action_pressure">Модифікатор натискання</string>
+    <string name="settings_gamepad_action_gun_trigger">Курок світлового пістолета</string>
+    <string name="settings_gamepad_action_gun_pedal">Педаль світлового пістолета</string>
+    <string name="settings_gamepad_action_gun_reload">Перезарядка світлового пістолета</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Калібрування світлового пістолета</string>
+    <string name="settings_gamepad_action_coin">Вставити монету</string>
+    <string name="settings_gamepad_action_service">Сервіс / Тест</string>
     <string name="settings_pressure_modifier_amount">Сила модифікатора натискання</string>
     <string name="settings_help_pressure_modifier_amount">Встановлює силу натискання, що передається чутливими до сили натискання кнопками DualShock 2, поки утримується модифікатор натискання. Звичайні натискання кнопок і далі використовують 100%.</string>
     <string name="settings_network_tab">Мережа</string>

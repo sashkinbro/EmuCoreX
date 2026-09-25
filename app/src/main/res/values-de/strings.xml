@@ -1554,6 +1554,12 @@
     <string name="settings_game_folders_count">%1$d Ordner ausgewählt</string>
     <string name="game_folders_remove">Ordner entfernen</string>
     <string name="settings_gamepad_action_pressure">Druckmodifikator</string>
+    <string name="settings_gamepad_action_gun_trigger">Lightgun-Abzug</string>
+    <string name="settings_gamepad_action_gun_pedal">Lightgun-Pedal</string>
+    <string name="settings_gamepad_action_gun_reload">Lightgun-Nachladen</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Lightgun-Kalibrierung</string>
+    <string name="settings_gamepad_action_coin">Münze einwerfen</string>
+    <string name="settings_gamepad_action_service">Service / Test</string>
     <string name="settings_pressure_modifier_amount">Stärke des Druckmodifikators</string>
     <string name="settings_help_pressure_modifier_amount">Legt den Druck fest, der von druckempfindlichen DualShock 2-Tasten gesendet wird, während der Druckmodifikator gehalten wird. Normale Tastendrücke verwenden weiterhin 100%.</string>
     <string name="settings_network_tab">Netzwerk</string>

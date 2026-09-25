@@ -7211,6 +7211,12 @@ private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "select" -> R.string.settings_gamepad_action_select
     "start" -> R.string.settings_gamepad_action_start
     "pressure" -> R.string.settings_gamepad_action_pressure
+    "gun_trigger" -> R.string.settings_gamepad_action_gun_trigger
+    "gun_pedal" -> R.string.settings_gamepad_action_gun_pedal
+    "gun_reload" -> R.string.settings_gamepad_action_gun_reload
+    "gun_recalibrate" -> R.string.settings_gamepad_action_gun_recalibrate
+    "coin" -> R.string.settings_gamepad_action_coin
+    "service" -> R.string.settings_gamepad_action_service
     GamepadManager.ACTION_QUICK_SAVE -> R.string.emulation_quick_save
     GamepadManager.ACTION_QUICK_LOAD -> R.string.emulation_quick_load
     "dpad_up" -> R.string.settings_gamepad_action_dpad_up

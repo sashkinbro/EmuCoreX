@@ -1552,6 +1552,12 @@
     <string name="settings_game_folders_count">%1$d個のフォルダを選択しました</string>
     <string name="game_folders_remove">フォルダを削除</string>
     <string name="settings_gamepad_action_pressure">圧力モディファイア</string>
+    <string name="settings_gamepad_action_gun_trigger">ライトガントリガー</string>
+    <string name="settings_gamepad_action_gun_pedal">ライトガンペダル</string>
+    <string name="settings_gamepad_action_gun_reload">ライトガンリロード</string>
+    <string name="settings_gamepad_action_gun_recalibrate">ライトガン再調整</string>
+    <string name="settings_gamepad_action_coin">コイン投入</string>
+    <string name="settings_gamepad_action_service">サービス / テスト</string>
     <string name="settings_pressure_modifier_amount">圧力モディファイア量</string>
     <string name="settings_help_pressure_modifier_amount">圧力モディファイアが押されている間、感圧式のDualShock 2ボタンによって送信される圧力を設定します。通常のボタン操作では引き続き100%が使用されます。</string>
     <string name="settings_network_tab">ネットワーク</string>

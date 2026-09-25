@@ -1567,6 +1567,12 @@
     <string name="settings_game_folders_count">%1$d folder dipilih</string>
     <string name="game_folders_remove">Hapus folder</string>
     <string name="settings_gamepad_action_pressure">Pengubah Tekanan</string>
+    <string name="settings_gamepad_action_gun_trigger">Pemicu pistol cahaya</string>
+    <string name="settings_gamepad_action_gun_pedal">Pedal pistol cahaya</string>
+    <string name="settings_gamepad_action_gun_reload">Muat ulang pistol cahaya</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Kalibrasi ulang pistol cahaya</string>
+    <string name="settings_gamepad_action_coin">Masukkan koin</string>
+    <string name="settings_gamepad_action_service">Layanan / Uji</string>
     <string name="settings_pressure_modifier_amount">Jumlah Pengubah Tekanan</string>
     <string name="settings_help_pressure_modifier_amount">Mengatur tekanan yang dikirim oleh tombol DualShock 2 yang sensitif terhadap tekanan saat Pengubah Tekanan ditahan. Penekanan tombol normal tetap menggunakan 100%.</string>
     <string name="settings_network_tab">Jaringan</string>

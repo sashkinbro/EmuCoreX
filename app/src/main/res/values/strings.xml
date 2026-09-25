@@ -1233,6 +1233,12 @@
     <string name="settings_gamepad_action_start">Start</string>
     <string name="settings_gamepad_action_left_input_toggle">Left Input Toggle</string>
     <string name="settings_gamepad_action_pressure">Pressure Modifier</string>
+    <string name="settings_gamepad_action_gun_trigger">Light Gun Trigger</string>
+    <string name="settings_gamepad_action_gun_pedal">Light Gun Pedal</string>
+    <string name="settings_gamepad_action_gun_reload">Light Gun Reload</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Light Gun Recalibrate</string>
+    <string name="settings_gamepad_action_coin">Insert Coin</string>
+    <string name="settings_gamepad_action_service">Service / Test</string>
     <string name="settings_pressure_modifier_amount">Pressure Modifier Amount</string>
     <string name="settings_help_pressure_modifier_amount">Sets the pressure sent by pressure-sensitive DualShock 2 buttons while the Pressure Modifier is held. Normal button presses still use 100%.</string>
     <string name="settings_gamepad_action_dpad_up">D-Pad Up</string>

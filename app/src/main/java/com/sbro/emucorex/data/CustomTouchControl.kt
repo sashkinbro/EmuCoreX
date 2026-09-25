@@ -119,7 +119,7 @@ data class CustomTouchControl(
         const val MIN_SIZE_DP = 32
         const val MAX_SIZE_DP = 180
         const val MAX_CORNER_DP = 72
-        const val MIN_OPACITY = 20
+        const val MIN_OPACITY = 5
         const val MAX_OPACITY = 100
         const val MAX_BORDER_DP = 6f
         const val MIN_ROTATION_DEGREES = -180
@@ -135,7 +135,9 @@ data class CustomTouchControl(
             "up", "down", "left", "right",
             "triangle", "cross", "square", "circle",
             "l1", "l2", "r1", "r2", "l3", "r3",
-            "select", "start", "pressure"
+            "select", "start", "pressure",
+            "gun_trigger", "gun_pedal", "gun_reload", "gun_recalibrate",
+            "coin", "service"
         )
 
         fun defaultLabelFor(actionId: String): String = when (actionId) {
@@ -151,6 +153,12 @@ data class CustomTouchControl(
             "select" -> "SEL"
             "start" -> "START"
             "pressure" -> "P"
+            "gun_trigger" -> "FIRE"
+            "gun_pedal" -> "PEDAL"
+            "gun_reload" -> "RELOAD"
+            "gun_recalibrate" -> "CALIB"
+            "coin" -> "COIN"
+            "service" -> "SVC"
             else -> "X"
         }
     }

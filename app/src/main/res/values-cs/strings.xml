@@ -1183,6 +1183,12 @@
     <string name="settings_gamepad_action_start">Start</string>
     <string name="settings_gamepad_action_left_input_toggle">Přepínač levého vstupu (Left Input Toggle)</string>
     <string name="settings_gamepad_action_pressure">Modifikátor tlaku (Pressure Modifier)</string>
+    <string name="settings_gamepad_action_gun_trigger">Spoušť světelné pistole</string>
+    <string name="settings_gamepad_action_gun_pedal">Pedál světelné pistole</string>
+    <string name="settings_gamepad_action_gun_reload">Přebití světelné pistole</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Kalibrace světelné pistole</string>
+    <string name="settings_gamepad_action_coin">Vložit minci</string>
+    <string name="settings_gamepad_action_service">Servis / Test</string>
     <string name="settings_pressure_modifier_amount">Množství (Síla) Modifikátoru tlaku</string>
     <string name="settings_help_pressure_modifier_amount">Nastavuje intenzitu (tlak), která se odesílá na tlakově citlivá (analogová) tlačítka (jako měl ovladač DualShock 2), zatímco je stisknut Modifikátor tlaku. Běžné, standardní klepnutí užije 100%.</string>
     <string name="settings_gamepad_action_dpad_up">D-Pad Nahoru</string>

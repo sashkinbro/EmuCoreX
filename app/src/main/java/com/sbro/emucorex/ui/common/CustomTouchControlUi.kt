@@ -43,14 +43,25 @@ fun CustomTouchControl.composeShape(): Shape = when (shape) {
     CustomTouchControlShape.PILL -> RoundedCornerShape(50)
 }
 
+@Composable
 fun actionLabel(actionId: String): String = when (actionId) {
-    "up" -> "D-pad Up"
-    "down" -> "D-pad Down"
-    "left" -> "D-pad Left"
-    "right" -> "D-pad Right"
-    "triangle", "cross", "square", "circle" ->
-        actionId.replaceFirstChar { it.uppercase() }
-    "select", "start", "pressure" -> actionId.replaceFirstChar { it.uppercase() }
+    "up" -> stringResource(R.string.settings_gamepad_action_dpad_up)
+    "down" -> stringResource(R.string.settings_gamepad_action_dpad_down)
+    "left" -> stringResource(R.string.settings_gamepad_action_dpad_left)
+    "right" -> stringResource(R.string.settings_gamepad_action_dpad_right)
+    "triangle" -> stringResource(R.string.settings_gamepad_action_triangle)
+    "cross" -> stringResource(R.string.settings_gamepad_action_cross)
+    "square" -> stringResource(R.string.settings_gamepad_action_square)
+    "circle" -> stringResource(R.string.settings_gamepad_action_circle)
+    "select" -> stringResource(R.string.settings_gamepad_action_select)
+    "start" -> stringResource(R.string.settings_gamepad_action_start)
+    "pressure" -> stringResource(R.string.settings_gamepad_action_pressure)
+    "gun_trigger" -> stringResource(R.string.settings_gamepad_action_gun_trigger)
+    "gun_pedal" -> stringResource(R.string.settings_gamepad_action_gun_pedal)
+    "gun_reload" -> stringResource(R.string.settings_gamepad_action_gun_reload)
+    "gun_recalibrate" -> stringResource(R.string.settings_gamepad_action_gun_recalibrate)
+    "coin" -> stringResource(R.string.settings_gamepad_action_coin)
+    "service" -> stringResource(R.string.settings_gamepad_action_service)
     else -> actionId.uppercase()
 }
 
@@ -117,6 +128,7 @@ fun ActionSelector(
     selectedActionId: String?,
     excludedActionId: String? = null,
     allowNone: Boolean = false,
+    enabled: Boolean = true,
     testTagPrefix: String? = null,
     onSelect: (String?) -> Unit
 ) {
@@ -134,6 +146,7 @@ fun ActionSelector(
                 } else {
                     null
                 },
+                enabled = enabled,
                 shape = neonShape(14.dp),
                 modifier = Modifier.actionChipTestTag(testTagPrefix, "none")
             )
@@ -150,6 +163,7 @@ fun ActionSelector(
                     } else {
                         null
                     },
+                    enabled = enabled,
                     shape = neonShape(14.dp),
                     modifier = Modifier.actionChipTestTag(testTagPrefix, action)
                 )

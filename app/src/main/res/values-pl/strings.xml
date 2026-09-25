@@ -1181,6 +1181,12 @@
     <string name="settings_gamepad_action_start">Start</string>
     <string name="settings_gamepad_action_left_input_toggle">Przełącznik podwójnego sterowania (Left Toggle)</string>
     <string name="settings_gamepad_action_pressure">Modyfikator stopnia wciśnięcia / nacisku w grach dla przycisków (Pressure Modifier)</string>
+    <string name="settings_gamepad_action_gun_trigger">Spust pistoletu świetlnego</string>
+    <string name="settings_gamepad_action_gun_pedal">Pedał pistoletu świetlnego</string>
+    <string name="settings_gamepad_action_gun_reload">Przeładowanie pistoletu świetlnego</string>
+    <string name="settings_gamepad_action_gun_recalibrate">Kalibracja pistoletu świetlnego</string>
+    <string name="settings_gamepad_action_coin">Wrzuć monetę</string>
+    <string name="settings_gamepad_action_service">Serwis / Test</string>
     <string name="settings_pressure_modifier_amount">Stopień nacisku dla wciśniętego modyfikatora dla przycisków (Pressure Amount)</string>
     <string name="settings_help_pressure_modifier_amount">Zmienia poziom mocy przesyłanego stopnia (siły naciśnięcia przycisku od gier kompatybilnych jak wyścigi od konsoli na DualShock 2), działając w momencie jednoczesnego przytrzymania kontrolki ustawionej dla Modyfikatora nacisku w opcjach.</string>
     <string name="settings_gamepad_action_dpad_up">Krzyżak Góra</string>

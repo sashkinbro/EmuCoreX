@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,11 +25,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Remove
@@ -41,6 +44,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -71,6 +75,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.AppPreferences
@@ -84,6 +90,7 @@ import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlsLayoutProfile
 import com.sbro.emucorex.ui.common.ActionSelector
 import com.sbro.emucorex.ui.common.CustomControlVisual
+import com.sbro.emucorex.ui.common.actionLabel
 import com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasDpadClusterSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasStickSpec
@@ -219,7 +226,7 @@ fun ControlsEditorScreen(
     onUpdateControlScale: (String, Int) -> Unit,
     onUpdateControlWidthScale: (String, Int) -> Unit,
     onUpdateControlOpacity: (String, Int) -> Unit,
-    onToggleLeftInputMode: () -> Unit,
+    onUpdateControlSecondaryAction: (String, String?) -> Unit,
     onSetControlVisible: (String, Boolean) -> Unit,
     onSetStickSurfaceMode: (String, Boolean) -> Unit,
     onResetLayout: () -> Unit,
@@ -233,15 +240,11 @@ fun ControlsEditorScreen(
     var editorCustomControls by remember { mutableStateOf(state.customControls.sanitized()) }
     var selectedControlGeometry by remember { mutableStateOf<EditorControlGeometry?>(null) }
     var comboDialogControlId by remember { mutableStateOf<String?>(null) }
+    var standardComboControlId by remember { mutableStateOf<String?>(null) }
     var showCreateComboDialog by remember { mutableStateOf(false) }
-    var showControlAdjustDialog by remember { mutableStateOf(false) }
+    var showControlAdjustPanel by remember { mutableStateOf(false) }
     var deleteCustomCandidate by remember { mutableStateOf<CustomTouchControl?>(null) }
     val defaultLayouts = remember(state.stickScale) { AppPreferences.defaultOverlayControlLayouts(state.stickScale) }
-    val isShowingLeftStick = (
-        editorControlLayouts["left_stick"]
-            ?: defaultLayouts["left_stick"]
-            ?: OverlayControlLayout(scale = state.stickScale, visible = true)
-        ).visible
     val selectedLayout = selectedControlId?.let { id ->
         editorControlLayouts[id] ?: defaultLayouts[id] ?: OverlayControlLayout()
     }
@@ -281,7 +284,7 @@ fun ControlsEditorScreen(
     }
 
     LaunchedEffect(selectedControlId) {
-        showControlAdjustDialog = false
+        showControlAdjustPanel = false
     }
 
     fun updateCustomControls(transform: (CustomTouchControlLibrary) -> CustomTouchControlLibrary) {
@@ -321,6 +324,7 @@ fun ControlsEditorScreen(
                 id = UUID.randomUUID().toString(),
                 name = copiedNameFor(selectedStandardTitle.ifEmpty { controlId }),
                 actionId = actionId,
+                secondaryActionId = selectedLayout?.secondaryActionId,
                 label = CustomTouchControl.defaultLabelFor(actionId),
                 shape = if (controlId in ActionControlIds) {
                     CustomTouchControlShape.CIRCLE
@@ -479,6 +483,20 @@ fun ControlsEditorScreen(
         onSetStickSurfaceMode(controlId, enabled)
     }
 
+    fun setControlSecondaryActionLocally(controlId: String, secondaryActionId: String?) {
+        val current = currentLayoutFor(
+            controlId,
+            if (controlId.contains("stick")) state.stickScale else 100
+        )
+        val sanitized = secondaryActionId
+            ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS }
+            ?.takeUnless { it == actionIdForControlId(controlId) }
+        editorControlLayouts = editorControlLayouts.toMutableMap().apply {
+            put(controlId, current.copy(secondaryActionId = sanitized))
+        }
+        onUpdateControlSecondaryAction(controlId, sanitized)
+    }
+
     BackHandler(onBack = onBackClick)
 
     if (manageActivityOrientation) {
@@ -566,21 +584,6 @@ fun ControlsEditorScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedButton(
-                    onClick = {
-                        onToggleLeftInputMode()
-                        selectedControlId = if (isShowingLeftStick) "dpad_up" else "left_stick"
-                    },
-                    shape = neonShape(16.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.08f),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(if (isShowingLeftStick) "D-pad" else "Stick")
-                }
-
-                OutlinedButton(
                     onClick = { onResetLayout() },
                     shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
@@ -665,12 +668,19 @@ fun ControlsEditorScreen(
                 }
 
                 OutlinedButton(
-                    onClick = { showControlAdjustDialog = true },
+                    onClick = {
+                        showControlAdjustPanel = !showControlAdjustPanel
+                        if (showControlAdjustPanel) comboDialogControlId = null
+                    },
                     enabled = selectedControlId != null && !selectedIsGroup,
                     shape = neonShape(16.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.08f),
+                        containerColor = if (showControlAdjustPanel) {
+                            Color(0xFF3565FF).copy(alpha = 0.78f)
+                        } else {
+                            Color.White.copy(alpha = 0.08f)
+                        },
                         contentColor = Color.White
                     ),
                     modifier = Modifier.testTag("controls_editor_adjust")
@@ -722,7 +732,7 @@ fun ControlsEditorScreen(
 
             selectedControlId?.takeUnless { it in ControlGroupIds }?.let { controlId ->
                 val customControl = selectedCustomControl
-                if (showControlAdjustDialog) {
+                if (showControlAdjustPanel) {
                     val scale = selectedLayout?.scale
                         ?: if (controlId.contains("stick")) state.stickScale else 100
                     val isStickPanel = customControl == null &&
@@ -750,99 +760,117 @@ fun ControlsEditorScreen(
                         }
                     }
 
-                    AdjustDialog(
+                    AdjustPanel(
                         title = customControl?.name ?: controlTitle(controlId),
-                        onDismiss = { showControlAdjustDialog = false }
+                        onDismiss = { showControlAdjustPanel = false },
+                        modifier = Modifier.padding(top = 8.dp)
                     ) {
                         if (customControl != null) {
                             AdjustStepper(
-                                valueText = "${customControl.widthDp}×${customControl.heightDp} dp",
-                                minusEnabled = customControl.widthDp > CustomTouchControl.MIN_SIZE_DP ||
-                                    customControl.heightDp > CustomTouchControl.MIN_SIZE_DP,
-                                plusEnabled = customControl.widthDp < CustomTouchControl.MAX_SIZE_DP ||
-                                    customControl.heightDp < CustomTouchControl.MAX_SIZE_DP,
-                                onMinus = {
-                                    updateCustomControls { library ->
-                                        library.replacing(
-                                            customControl.copy(
-                                                widthDp = (customControl.widthDp - CustomControlSizeStepDp)
-                                                    .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
-                                                heightDp = (customControl.heightDp - CustomControlSizeStepDp)
-                                                    .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
-                                                updatedAtMillis = System.currentTimeMillis()
+                                    valueText = "${customControl.widthDp}×${customControl.heightDp} dp",
+                                    minusEnabled = customControl.widthDp > CustomTouchControl.MIN_SIZE_DP ||
+                                        customControl.heightDp > CustomTouchControl.MIN_SIZE_DP,
+                                    plusEnabled = customControl.widthDp < CustomTouchControl.MAX_SIZE_DP ||
+                                        customControl.heightDp < CustomTouchControl.MAX_SIZE_DP,
+                                    onMinus = {
+                                        updateCustomControls { library ->
+                                            library.replacing(
+                                                customControl.copy(
+                                                    widthDp = (customControl.widthDp - CustomControlSizeStepDp)
+                                                        .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
+                                                    heightDp = (customControl.heightDp - CustomControlSizeStepDp)
+                                                        .coerceAtLeast(CustomTouchControl.MIN_SIZE_DP),
+                                                    updatedAtMillis = System.currentTimeMillis()
+                                                )
                                             )
-                                        )
-                                    }
-                                },
-                                onPlus = {
-                                    updateCustomControls { library ->
-                                        library.replacing(
-                                            customControl.copy(
-                                                widthDp = (customControl.widthDp + CustomControlSizeStepDp)
-                                                    .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
-                                                heightDp = (customControl.heightDp + CustomControlSizeStepDp)
-                                                    .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
-                                                updatedAtMillis = System.currentTimeMillis()
+                                        }
+                                    },
+                                    onPlus = {
+                                        updateCustomControls { library ->
+                                            library.replacing(
+                                                customControl.copy(
+                                                    widthDp = (customControl.widthDp + CustomControlSizeStepDp)
+                                                        .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
+                                                    heightDp = (customControl.heightDp + CustomControlSizeStepDp)
+                                                        .coerceAtMost(CustomTouchControl.MAX_SIZE_DP),
+                                                    updatedAtMillis = System.currentTimeMillis()
+                                                )
                                             )
-                                        )
+                                        }
                                     }
+                                )
+                            } else {
+                                AdjustStepper(
+                                    valueText = "$scale%",
+                                    minusEnabled = scale > AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
+                                    plusEnabled = scale < AppPreferences.OVERLAY_CONTROL_SCALE_MAX,
+                                    onMinus = { setControlScaleLocally(controlId, scale - 10) },
+                                    onPlus = { setControlScaleLocally(controlId, scale + 10) }
+                                )
+                            }
+                            if (isStickPanel) {
+                                val widthScale = selectedLayout.widthScale
+                                AdjustStepper(
+                                    valueText = "W $widthScale%",
+                                    minusEnabled = widthScale > 100,
+                                    plusEnabled = widthScale < 240,
+                                    onMinus = { setControlWidthScaleLocally(controlId, widthScale - 10) },
+                                    onPlus = { setControlWidthScaleLocally(controlId, widthScale + 10) }
+                                )
+                            }
+                            AdjustStepper(
+                                valueText = stringResource(
+                                    R.string.controls_editor_opacity_value,
+                                    opacity
+                                ),
+                                minusEnabled = opacity > AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
+                                plusEnabled = opacity < AppPreferences.OVERLAY_CONTROL_OPACITY_MAX,
+                                onMinus = { applyOpacity(opacity - 10) },
+                                onPlus = { applyOpacity(opacity + 10) }
+                            )
+                        }
+                    }
+
+                if (!showControlAdjustPanel) {
+                Surface(
+                    modifier = Modifier.padding(top = 8.dp),
+                    color = Color(0xFF111827).copy(alpha = 0.82f),
+                    shape = neonShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val currentSecondaryActionId =
+                            customControl?.secondaryActionId ?: selectedLayout?.secondaryActionId
+                        OutlinedButton(
+                            onClick = {
+                                showControlAdjustPanel = false
+                                if (customControl != null) {
+                                    comboDialogControlId = customControl.id
+                                } else {
+                                    standardComboControlId = controlId
+                                }
+                            },
+                            shape = neonShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White.copy(alpha = 0.08f),
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("controls_editor_combo")
+                        ) {
+                            Text(
+                                if (currentSecondaryActionId != null) {
+                                    stringResource(R.string.touch_control_creator_combo_action) +
+                                        " · " + actionLabel(currentSecondaryActionId)
+                                } else {
+                                    stringResource(R.string.touch_control_creator_combo_action)
                                 }
                             )
-                        } else {
-                            AdjustStepper(
-                                valueText = "$scale%",
-                                minusEnabled = scale > AppPreferences.OVERLAY_CONTROL_SCALE_MIN,
-                                plusEnabled = scale < AppPreferences.OVERLAY_CONTROL_SCALE_MAX,
-                                onMinus = { setControlScaleLocally(controlId, scale - 10) },
-                                onPlus = { setControlScaleLocally(controlId, scale + 10) }
-                            )
                         }
-                        if (isStickPanel) {
-                            val widthScale = selectedLayout.widthScale
-                            AdjustStepper(
-                                valueText = "W $widthScale%",
-                                minusEnabled = widthScale > 100,
-                                plusEnabled = widthScale < 240,
-                                onMinus = { setControlWidthScaleLocally(controlId, widthScale - 10) },
-                                onPlus = { setControlWidthScaleLocally(controlId, widthScale + 10) }
-                            )
-                        }
-                        AdjustStepper(
-                            valueText = stringResource(
-                                R.string.controls_editor_opacity_value,
-                                opacity
-                            ),
-                            minusEnabled = opacity > AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
-                            plusEnabled = opacity < AppPreferences.OVERLAY_CONTROL_OPACITY_MAX,
-                            onMinus = { applyOpacity(opacity - 10) },
-                            onPlus = { applyOpacity(opacity + 10) }
-                        )
-                    }
-                }
-
-                if (customControl != null) {
-                    Surface(
-                        modifier = Modifier.padding(top = 8.dp),
-                        color = Color(0xFF111827).copy(alpha = 0.82f),
-                        shape = neonShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { comboDialogControlId = customControl.id },
-                                shape = neonShape(14.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color.White.copy(alpha = 0.08f),
-                                    contentColor = Color.White
-                                ),
-                                modifier = Modifier.testTag("controls_editor_combo")
-                            ) {
-                                Text(stringResource(R.string.touch_control_creator_combo_action))
-                            }
+                        if (customControl != null) {
                             OutlinedButton(
                                 onClick = { deleteCustomCandidate = customControl },
                                 shape = neonShape(14.dp),
@@ -857,6 +885,7 @@ fun ControlsEditorScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
@@ -889,6 +918,27 @@ fun ControlsEditorScreen(
             onConfirm = { actionId, secondaryActionId ->
                 applyComboActions(comboDialogControl, actionId, secondaryActionId)
                 comboDialogControlId = null
+            }
+        )
+    }
+
+    val standardComboControlIdValue = standardComboControlId
+    if (standardComboControlIdValue != null) {
+        val standardSecondaryActionId = (
+            editorControlLayouts[standardComboControlIdValue]
+                ?: defaultLayouts[standardComboControlIdValue]
+            )?.secondaryActionId
+        ComboActionDialog(
+            title = stringResource(R.string.touch_control_creator_combo_action),
+            initialActionId = actionIdForControlId(standardComboControlIdValue)
+                ?: CustomTouchControl.DEFAULT_ACTION_ID,
+            initialSecondaryActionId = standardSecondaryActionId,
+            confirmLabel = stringResource(R.string.controls_editor_done),
+            primaryEditable = false,
+            onDismiss = { standardComboControlId = null },
+            onConfirm = { _, secondaryActionId ->
+                setControlSecondaryActionLocally(standardComboControlIdValue, secondaryActionId)
+                standardComboControlId = null
             }
         )
     }
@@ -926,27 +976,48 @@ fun ControlsEditorScreen(
 }
 
 @Composable
-private fun AdjustDialog(
+private fun AdjustPanel(
     title: String,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(
+    Surface(
+        modifier = modifier.testTag("controls_editor_adjust_panel"),
+        color = Color(0xFF111827).copy(alpha = 0.92f),
+        shape = neonShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 280.dp, max = 420.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = content
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.controls_editor_done))
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color.White,
+                    maxLines = 1
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.controls_editor_done),
+                        tint = Color.White.copy(alpha = 0.86f)
+                    )
+                }
             }
+            content()
         }
-    )
+    }
 }
 
 @Composable
@@ -966,19 +1037,32 @@ private fun AdjustStepper(
             onClick = onMinus,
             enabled = minusEnabled,
             shape = neonShape(14.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White.copy(alpha = 0.08f),
+                contentColor = Color.White
+            )
         ) {
             Icon(Icons.Rounded.Remove, contentDescription = null)
         }
         Text(
             text = valueText,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White,
+            maxLines = 1,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp)
         )
         OutlinedButton(
             onClick = onPlus,
             enabled = plusEnabled,
             shape = neonShape(14.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White.copy(alpha = 0.08f),
+                contentColor = Color.White
+            )
         ) {
             Icon(Icons.Rounded.Add, contentDescription = null)
         }
@@ -991,6 +1075,7 @@ private fun ComboActionDialog(
     initialActionId: String,
     initialSecondaryActionId: String?,
     confirmLabel: String,
+    primaryEditable: Boolean = true,
     onDismiss: () -> Unit,
     onConfirm: (String, String?) -> Unit
 ) {
@@ -998,64 +1083,203 @@ private fun ComboActionDialog(
     var secondaryActionId by remember(initialSecondaryActionId) {
         mutableStateOf(initialSecondaryActionId)
     }
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .testTag("controls_editor_combo_dialog"),
+            shape = neonShape(24.dp),
+            color = Color(0xFF0D1424).copy(alpha = 0.98f),
+            border = BorderStroke(1.dp, Color(0xFF6688FF).copy(alpha = 0.5f)),
+            shadowElevation = 16.dp
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    stringResource(R.string.touch_control_creator_action),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                ActionSelector(
-                    selectedActionId = actionId,
-                    testTagPrefix = "controls_editor_combo_primary",
-                    onSelect = { selected ->
-                        selected?.let { action ->
-                            actionId = action
-                            if (secondaryActionId == action) secondaryActionId = null
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        maxLines = 1
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = stringResource(R.string.theme_manager_cancel),
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
                     }
+                }
+
+                ComboActionPreview(
+                    primaryLabel = actionLabel(actionId),
+                    secondaryLabel = secondaryActionId?.let { actionLabel(it) }
                 )
-                Text(
-                    stringResource(R.string.touch_control_creator_combo_action),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    stringResource(R.string.touch_control_creator_combo_action_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ActionSelector(
-                    selectedActionId = secondaryActionId,
-                    excludedActionId = actionId,
-                    allowNone = true,
-                    testTagPrefix = "controls_editor_combo_secondary",
-                    onSelect = { secondaryActionId = it }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(actionId, secondaryActionId) },
-                modifier = Modifier.testTag("controls_editor_combo_confirm")
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.theme_manager_cancel))
+
+                ComboActionSection(
+                    title = stringResource(R.string.touch_control_creator_action)
+                ) {
+                    if (primaryEditable) {
+                        ActionSelector(
+                            selectedActionId = actionId,
+                            testTagPrefix = "controls_editor_combo_primary",
+                            onSelect = { selected ->
+                                selected?.let { action ->
+                                    actionId = action
+                                    if (secondaryActionId == action) secondaryActionId = null
+                                }
+                            }
+                        )
+                    } else {
+                        ComboActionBadge(
+                            label = actionLabel(actionId),
+                            highlighted = true
+                        )
+                    }
+                }
+
+                ComboActionSection(
+                    title = stringResource(R.string.touch_control_creator_combo_action),
+                    description = stringResource(R.string.touch_control_creator_combo_action_desc)
+                ) {
+                    ActionSelector(
+                        selectedActionId = secondaryActionId,
+                        excludedActionId = actionId,
+                        allowNone = true,
+                        testTagPrefix = "controls_editor_combo_secondary",
+                        onSelect = { secondaryActionId = it }
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.theme_manager_cancel))
+                    }
+                    Button(
+                        onClick = { onConfirm(actionId, secondaryActionId) },
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .testTag("controls_editor_combo_confirm"),
+                        shape = neonShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3565FF),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(confirmLabel)
+                    }
+                }
             }
         }
-    )
+    }
+}
+
+@Composable
+private fun ComboActionPreview(
+    primaryLabel: String,
+    secondaryLabel: String?
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.06f),
+        shape = neonShape(16.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            ComboActionBadge(label = primaryLabel, highlighted = true)
+            Text(
+                text = "+",
+                modifier = Modifier.padding(horizontal = 12.dp),
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White.copy(alpha = 0.6f)
+            )
+            if (secondaryLabel != null) {
+                ComboActionBadge(label = secondaryLabel, highlighted = false)
+            } else {
+                Text(
+                    text = "—",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White.copy(alpha = 0.35f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComboActionBadge(
+    label: String,
+    highlighted: Boolean
+) {
+    Surface(
+        color = if (highlighted) {
+            Color(0xFF3565FF).copy(alpha = 0.32f)
+        } else {
+            Color(0xFF45E6FF).copy(alpha = 0.22f)
+        },
+        shape = neonShape(12.dp),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (highlighted) {
+                Color(0xFF7CC8FF).copy(alpha = 0.7f)
+            } else {
+                Color(0xFF45E6FF).copy(alpha = 0.6f)
+            }
+        )
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = Color.White
+        )
+    }
+}
+
+@Composable
+private fun ComboActionSection(
+    title: String,
+    description: String? = null,
+    content: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = Color(0xFF9DB4FF)
+        )
+        description?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.62f)
+            )
+        }
+        content()
+    }
 }
 
 @Composable

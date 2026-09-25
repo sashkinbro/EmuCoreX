@@ -97,6 +97,25 @@ class CustomTouchControlTest {
     }
 
     @Test
+    fun arcadeGunActionsAreAcceptedAndKeepTheirIdentity() {
+        val actions = listOf(
+            "gun_trigger",
+            "gun_pedal",
+            "gun_reload",
+            "gun_recalibrate",
+            "coin",
+            "service"
+        )
+
+        actions.forEach { action ->
+            assertTrue(action in CustomTouchControl.ALLOWED_ACTION_IDS)
+            val control = CustomTouchControl(id = action, actionId = action).sanitized()
+            assertEquals(action, control?.actionId)
+            assertTrue(CustomTouchControl.defaultLabelFor(action).isNotBlank())
+        }
+    }
+
+    @Test
     fun duplicateCreatesOffsetCopyThatKeepsComboAction() {
         val source = CustomTouchControl(
             id = "jump",

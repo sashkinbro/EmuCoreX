@@ -1552,6 +1552,12 @@
     <string name="settings_game_folders_count">%1$d फ़ोल्डर चुने गए</string>
     <string name="game_folders_remove">फ़ोल्डर हटाएं</string>
     <string name="settings_gamepad_action_pressure">दबाव संशोधक</string>
+    <string name="settings_gamepad_action_gun_trigger">लाइट गन ट्रिगर</string>
+    <string name="settings_gamepad_action_gun_pedal">लाइट गन पेडल</string>
+    <string name="settings_gamepad_action_gun_reload">लाइट गन रीलोड</string>
+    <string name="settings_gamepad_action_gun_recalibrate">लाइट गन रीकैलिब्रेट</string>
+    <string name="settings_gamepad_action_coin">सिक्का डालें</string>
+    <string name="settings_gamepad_action_service">सेवा / परीक्षण</string>
     <string name="settings_pressure_modifier_amount">दबाव संशोधक की मात्रा</string>
     <string name="settings_help_pressure_modifier_amount">यह दबाव-संवेदनशील DualShock 2 बटनों द्वारा भेजे गए दबाव को सेट करता है जब दबाव संशोधक दबाया जाता है। सामान्य बटन प्रेस अभी भी 100% का उपयोग करते हैं।</string>
     <string name="settings_network_tab">नेटवर्क</string>

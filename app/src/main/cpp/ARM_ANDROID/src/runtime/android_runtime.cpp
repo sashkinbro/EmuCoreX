@@ -15,6 +15,8 @@
 #include "pcsx2/SIO/Pad/Pad.h"
 #include "emucorex/retro_achievements_android.h"
 #include "pcsx2/SIO/Pad/PadDualshock2.h"
+#include "pcsx2/DEV9/ACJV.h"
+#include "pcsx2/USB/USB.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/VMManager.h"
 
@@ -58,6 +60,41 @@ std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_press_valu
 std::array<std::atomic<u64>, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_events{};
 std::atomic<u32> s_pending_pressure_modifier{};
 std::atomic_bool s_pending_pressure_modifier_dirty{false};
+
+// Arcade/light-gun virtual keys live beside the DualShock2 pad. They use their own
+// held-bit mask so the CPU-thread poll can turn them into GunCon2 USB binds and JVS
+// actions (coin/service) without racing the UI thread.
+constexpr int ANDROID_KEY_GUN_TRIGGER = 125;
+constexpr int ANDROID_KEY_GUN_PEDAL = 126;
+constexpr int ANDROID_KEY_GUN_RELOAD = 127;
+constexpr int ANDROID_KEY_GUN_RECALIBRATE = 128;
+constexpr int ANDROID_KEY_COIN = 129;
+constexpr int ANDROID_KEY_SERVICE = 130;
+constexpr int ANDROID_KEY_ARCADE_LAST = ANDROID_KEY_SERVICE;
+
+constexpr u32 ArcadeKeyBit(int index)
+{
+	return 1u << static_cast<u32>(index - ANDROID_KEY_GUN_TRIGGER);
+}
+
+bool IsArcadePadKey(int index)
+{
+	return index >= ANDROID_KEY_GUN_TRIGGER && index <= ANDROID_KEY_ARCADE_LAST;
+}
+
+std::array<std::atomic<u32>, Pad::NUM_CONTROLLER_PORTS> s_pending_arcade_buttons{};
+// Coin and service are momentary cabinet actions: latch each press as a counter so a
+// tap that starts and ends between two CPU polls is still delivered exactly once.
+std::array<std::atomic<u32>, Pad::NUM_CONTROLLER_PORTS> s_pending_coin_edges{};
+std::array<std::atomic<u32>, Pad::NUM_CONTROLLER_PORTS> s_pending_service_edges{};
+// Owned by the CPU thread; only touched from the pending-input poll.
+std::array<u32, Pad::NUM_CONTROLLER_PORTS> s_applied_arcade_buttons{};
+
+// GunCon2 bind indices, kept in sync with pcsx2/USB/usb-lightgun/guncon2.cpp.
+constexpr u32 GUNCON2_BIND_PEDAL = 3;            // BID_A
+constexpr u32 GUNCON2_BIND_TRIGGER = 13;         // BID_TRIGGER
+constexpr u32 GUNCON2_BIND_SHOOT_OFFSCREEN = 16; // BID_SHOOT_OFFSCREEN
+constexpr u32 GUNCON2_BIND_RECALIBRATE = 17;     // BID_RECALIBRATE
 
 u32 FloatToBits(float value)
 {
@@ -914,6 +951,33 @@ void AndroidRuntime::SetPadButton(int pad_index, int index, int range, bool pres
 	if (!VMManager::HasValidVM())
 		return;
 
+	if (IsArcadePadKey(index))
+	{
+		const u32 controller =
+			static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
+		if (index == ANDROID_KEY_COIN)
+		{
+			if (pressed)
+				s_pending_coin_edges[controller].fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+		if (index == ANDROID_KEY_SERVICE)
+		{
+			if (pressed)
+				s_pending_service_edges[controller].fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+
+		const u32 bit = ArcadeKeyBit(index);
+		u32 current = s_pending_arcade_buttons[controller].load(std::memory_order_relaxed);
+		if (pressed)
+			current |= bit;
+		else
+			current &= ~bit;
+		s_pending_arcade_buttons[controller].store(current, std::memory_order_release);
+		return;
+	}
+
 	const std::optional<u32> bind = MapAndroidPadKeyToDualShock2Input(index);
 	if (!bind.has_value())
 		return;
@@ -940,6 +1004,9 @@ void AndroidRuntime::ResetPadState(int pad_index)
 
 	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
 	s_pending_pad_events[controller].store(0, std::memory_order_release);
+	s_pending_arcade_buttons[controller].store(0, std::memory_order_release);
+	s_pending_coin_edges[controller].store(0, std::memory_order_release);
+	s_pending_service_edges[controller].store(0, std::memory_order_release);
 	for (u32 i = 0; i < PadDualshock2::LENGTH; i++)
 		PublishPadValue(controller, i, 0.0f);
 }
@@ -950,12 +1017,60 @@ void AndroidRuntime::ResetKeyStatus()
 	ResetPadState(1);
 }
 
+void ApplyPendingArcadeButtonsOnCPUThread()
+{
+	for (u32 controller = 0; controller < Pad::NUM_CONTROLLER_PORTS; controller++)
+	{
+		const u32 coin_edges = s_pending_coin_edges[controller].exchange(0, std::memory_order_acquire);
+		const u32 service_edges =
+			s_pending_service_edges[controller].exchange(0, std::memory_order_acquire);
+		if (ACJV::enabled)
+		{
+			for (u32 i = 0; i < coin_edges; i++)
+				ACJV::InsertCoin(controller);
+			for (u32 i = 0; i < service_edges; i++)
+				ACJV::ToggleDIPSwitchState(0);
+		}
+
+		const u32 current = s_pending_arcade_buttons[controller].load(std::memory_order_acquire);
+		const u32 changed = current ^ s_applied_arcade_buttons[controller];
+		if (changed == 0)
+			continue;
+
+		s_applied_arcade_buttons[controller] = current;
+
+		const auto value_for = [current](int key) {
+			return (current & ArcadeKeyBit(key)) != 0 ? 1.0f : 0.0f;
+		};
+
+		// GunCon2 USB binds are a no-op when the port has no light gun, so these
+		// are safe for regular DualShock2 games too.
+		if ((changed & ArcadeKeyBit(ANDROID_KEY_GUN_TRIGGER)) != 0)
+			USB::SetDeviceBindValue(controller, GUNCON2_BIND_TRIGGER, value_for(ANDROID_KEY_GUN_TRIGGER));
+		if ((changed & ArcadeKeyBit(ANDROID_KEY_GUN_PEDAL)) != 0)
+			USB::SetDeviceBindValue(controller, GUNCON2_BIND_PEDAL, value_for(ANDROID_KEY_GUN_PEDAL));
+		if ((changed & ArcadeKeyBit(ANDROID_KEY_GUN_RELOAD)) != 0)
+			USB::SetDeviceBindValue(
+				controller, GUNCON2_BIND_SHOOT_OFFSCREEN, value_for(ANDROID_KEY_GUN_RELOAD));
+		if ((changed & ArcadeKeyBit(ANDROID_KEY_GUN_RECALIBRATE)) != 0)
+			USB::SetDeviceBindValue(
+				controller, GUNCON2_BIND_RECALIBRATE, value_for(ANDROID_KEY_GUN_RECALIBRATE));
+	}
+}
+
 void PollPendingPadUpdatesOnCPUThread()
 {
 	if (!VMManager::HasValidVM())
 	{
 		for (std::atomic<u64>& events : s_pending_pad_events)
 			events.store(0, std::memory_order_relaxed);
+		for (std::atomic<u32>& buttons : s_pending_arcade_buttons)
+			buttons.store(0, std::memory_order_relaxed);
+		for (std::atomic<u32>& edges : s_pending_coin_edges)
+			edges.store(0, std::memory_order_relaxed);
+		for (std::atomic<u32>& edges : s_pending_service_edges)
+			edges.store(0, std::memory_order_relaxed);
+		s_applied_arcade_buttons.fill(0);
 		s_pending_pressure_modifier_dirty.store(false, std::memory_order_relaxed);
 		return;
 	}
@@ -995,6 +1110,8 @@ void PollPendingPadUpdatesOnCPUThread()
 				pad->SetPressureModifier(amount);
 		}
 	}
+
+	ApplyPendingArcadeButtonsOnCPUThread();
 }
 
 void AndroidRuntime::OnHostKeyEvent(int key_code, bool pressed)

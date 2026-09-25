@@ -745,6 +745,7 @@ private fun OverlayControlLayout.toJson(): JSONObject {
         )
         .put("visible", visible)
         .put("surfaceOnly", surfaceOnly)
+        .apply { secondaryActionId?.let { put("secondaryActionId", it) } }
 }
 
 private fun JSONObject.toOverlayControlLayout(): OverlayControlLayout {
@@ -759,7 +760,9 @@ private fun JSONObject.toOverlayControlLayout(): OverlayControlLayout {
                 AppPreferences.OVERLAY_CONTROL_OPACITY_MAX
             ),
         visible = optBoolean("visible", true),
-        surfaceOnly = optBoolean("surfaceOnly", false)
+        surfaceOnly = optBoolean("surfaceOnly", false),
+        secondaryActionId = optString("secondaryActionId")
+            .takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS }
     )
 }
 

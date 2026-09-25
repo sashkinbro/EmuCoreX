@@ -54,6 +54,7 @@ import com.sbro.emucorex.data.withTouchControlsLayout
 import com.sbro.emucorex.data.withoutTouchControlsLayout
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
+import com.sbro.emucorex.data.CustomTouchControl
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.GameMenuLayoutStyle
 import com.sbro.emucorex.data.GameMenuTabId
@@ -2562,14 +2563,6 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun toggleLeftInputMode() {
-        viewModelScope.launch {
-            val current = _uiState.value
-            val layout = current.toTouchControlsLayoutProfile().toggleStick(AppPreferences.STICK_TOGGLE_LEFT)
-            persistTouchControlsLayout(current.withTouchControlsLayout(layout))
-        }
-    }
-
     fun updateTouchControlOffset(controlId: String, offset: Pair<Float, Float>) {
         viewModelScope.launch {
             val current = _uiState.value
@@ -2633,6 +2626,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     AppPreferences.OVERLAY_CONTROL_OPACITY_MIN,
                     AppPreferences.OVERLAY_CONTROL_OPACITY_MAX
                 )
+            )
+            persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
+        }
+    }
+
+    fun updateTouchControlSecondaryAction(controlId: String, secondaryActionId: String?) {
+        viewModelScope.launch {
+            val current = _uiState.value
+            val updatedLayouts = current.controlLayouts.toMutableMap()
+            val defaults = AppPreferences.defaultOverlayControlLayouts(current.stickScale)
+            val control = updatedLayouts[controlId] ?: defaults[controlId] ?: OverlayControlLayout()
+            updatedLayouts[controlId] = control.copy(
+                secondaryActionId = secondaryActionId
+                    ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS }
             )
             persistTouchControlsLayout(current.copy(controlLayouts = updatedLayouts))
         }

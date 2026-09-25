@@ -1554,6 +1554,12 @@
     <string name="settings_game_folders_count">已选择 %1$d 个文件夹</string>
     <string name="game_folders_remove">移除文件夹</string>
     <string name="settings_gamepad_action_pressure">压力修饰键</string>
+    <string name="settings_gamepad_action_gun_trigger">光枪扳机</string>
+    <string name="settings_gamepad_action_gun_pedal">光枪踏板</string>
+    <string name="settings_gamepad_action_gun_reload">光枪装弹</string>
+    <string name="settings_gamepad_action_gun_recalibrate">光枪重新校准</string>
+    <string name="settings_gamepad_action_coin">投币</string>
+    <string name="settings_gamepad_action_service">服务 / 测试</string>
     <string name="settings_pressure_modifier_amount">压力修饰键数值</string>
     <string name="settings_help_pressure_modifier_amount">设置按住压力修饰键时，支持压感的 DualShock 2 按键所发送的压力值。普通的按键操作依然使用 100%。</string>
     <string name="settings_network_tab">网络</string>

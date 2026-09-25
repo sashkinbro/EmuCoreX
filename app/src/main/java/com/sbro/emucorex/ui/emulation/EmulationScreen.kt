@@ -269,6 +269,12 @@ private object PadKey {
     const val RIGHT_STICK_DOWN = 122
     const val RIGHT_STICK_LEFT = 123
     const val PRESSURE = 124
+    const val GUN_TRIGGER = 125
+    const val GUN_PEDAL = 126
+    const val GUN_RELOAD = 127
+    const val GUN_RECALIBRATE = 128
+    const val COIN = 129
+    const val SERVICE = 130
 }
 
 private const val TRANSPORT_HOLD_DELAY_MS = 360L
@@ -1616,7 +1622,7 @@ fun EmulationScreen(
                     onUpdateControlScale = viewModel::updateTouchControlScale,
                     onUpdateControlWidthScale = viewModel::updateTouchControlWidthScale,
                     onUpdateControlOpacity = viewModel::updateTouchControlOpacity,
-                    onToggleLeftInputMode = viewModel::toggleLeftInputMode,
+                    onUpdateControlSecondaryAction = viewModel::updateTouchControlSecondaryAction,
                     onSetControlVisible = viewModel::setTouchControlVisible,
                     onSetStickSurfaceMode = viewModel::setTouchStickSurfaceMode,
                     onResetLayout = viewModel::resetTouchControlsLayout,
@@ -2406,6 +2412,12 @@ private fun OnScreenControls(
         "pressure" -> { pressed -> onPadInput(PadKey.PRESSURE, 0, pressed) }
         "l3" -> { pressed -> onPadInput(PadKey.L3, 0, pressed) }
         "r3" -> { pressed -> onPadInput(PadKey.R3, 0, pressed) }
+        "gun_trigger" -> { pressed -> onPadInput(PadKey.GUN_TRIGGER, 0, pressed) }
+        "gun_pedal" -> { pressed -> onPadInput(PadKey.GUN_PEDAL, 0, pressed) }
+        "gun_reload" -> { pressed -> onPadInput(PadKey.GUN_RELOAD, 0, pressed) }
+        "gun_recalibrate" -> { pressed -> onPadInput(PadKey.GUN_RECALIBRATE, 0, pressed) }
+        "coin" -> { pressed -> onPadInput(PadKey.COIN, 0, pressed) }
+        "service" -> { pressed -> onPadInput(PadKey.SERVICE, 0, pressed) }
         else -> null
     }
 
@@ -2467,6 +2479,10 @@ private fun OnScreenControls(
 
         fun runtimeSpecs(specs: List<com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec>): List<TouchButtonSpec> {
             return specs.filter { it.visible }.map { spec ->
+                val pressHandlers = listOfNotNull(
+                    buttonPressHandler(spec.id),
+                    controlLayouts[spec.id]?.secondaryActionId?.let(::buttonPressHandler)
+                )
                 TouchButtonSpec(
                     id = spec.id,
                     drawableRes = spec.drawableRes,
@@ -2476,7 +2492,11 @@ private fun OnScreenControls(
                     y = spec.y,
                     shape = spec.shape,
                     opacity = spec.opacity / 100f,
-                    onPressChange = buttonPressHandler(spec.id),
+                    onPressChange = if (pressHandlers.isNotEmpty()) {
+                        { pressed -> pressHandlers.forEach { handler -> handler(pressed) } }
+                    } else {
+                        null
+                    },
                     onClick = if (spec.id == "left_input_toggle") onToggleSelectedStick else null,
                     tapToHold = racingMode && isRacingTapToHoldButton(spec.id),
                     longPressDelayMs = if (spec.id == "start") TRANSPORT_HOLD_DELAY_MS else 0L,
@@ -6056,6 +6076,13 @@ private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
     "r3" -> R.string.settings_gamepad_action_r3
     "select" -> R.string.settings_gamepad_action_select
     "start" -> R.string.settings_gamepad_action_start
+    "pressure" -> R.string.settings_gamepad_action_pressure
+    "gun_trigger" -> R.string.settings_gamepad_action_gun_trigger
+    "gun_pedal" -> R.string.settings_gamepad_action_gun_pedal
+    "gun_reload" -> R.string.settings_gamepad_action_gun_reload
+    "gun_recalibrate" -> R.string.settings_gamepad_action_gun_recalibrate
+    "coin" -> R.string.settings_gamepad_action_coin
+    "service" -> R.string.settings_gamepad_action_service
     GamepadManager.ACTION_QUICK_SAVE -> R.string.emulation_quick_save
     GamepadManager.ACTION_QUICK_LOAD -> R.string.emulation_quick_load
     "dpad_up" -> R.string.settings_gamepad_action_dpad_up

@@ -302,6 +302,12 @@ object GamepadManager {
         const val RightStickDown = 122
         const val RightStickLeft = 123
         const val Pressure = 124
+        const val GunTrigger = 125
+        const val GunPedal = 126
+        const val GunReload = 127
+        const val GunRecalibrate = 128
+        const val Coin = 129
+        const val Service = 130
     }
 
     private val mappableActions = listOf(
@@ -318,6 +324,12 @@ object GamepadManager {
         MappableButtonAction("select", PadKey.Select, listOf(KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_9)),
         MappableButtonAction("start", PadKey.Start, listOf(KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_10)),
         MappableButtonAction("pressure", PadKey.Pressure, emptyList()),
+        MappableButtonAction("gun_trigger", PadKey.GunTrigger, emptyList()),
+        MappableButtonAction("gun_pedal", PadKey.GunPedal, emptyList()),
+        MappableButtonAction("gun_reload", PadKey.GunReload, emptyList()),
+        MappableButtonAction("gun_recalibrate", PadKey.GunRecalibrate, emptyList()),
+        MappableButtonAction("coin", PadKey.Coin, emptyList()),
+        MappableButtonAction("service", PadKey.Service, emptyList()),
         MappableButtonAction(ACTION_QUICK_SAVE, null, emptyList()),
         MappableButtonAction(ACTION_QUICK_LOAD, null, emptyList()),
         MappableButtonAction("dpad_up", PadKey.Up, listOf(KeyEvent.KEYCODE_DPAD_UP)),
