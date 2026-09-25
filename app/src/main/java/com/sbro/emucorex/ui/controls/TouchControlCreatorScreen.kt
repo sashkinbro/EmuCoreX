@@ -2,13 +2,9 @@ package com.sbro.emucorex.ui.controls
 
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -16,13 +12,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,14 +24,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -64,20 +56,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.data.CustomTouchControl
@@ -85,7 +69,10 @@ import com.sbro.emucorex.data.CustomTouchControlContent
 import com.sbro.emucorex.data.CustomTouchControlLibrary
 import com.sbro.emucorex.data.CustomTouchControlPressMode
 import com.sbro.emucorex.data.CustomTouchControlShape
+import com.sbro.emucorex.ui.common.ActionSelector
+import com.sbro.emucorex.ui.common.CustomControlVisual
 import com.sbro.emucorex.ui.common.ScreenTopBar
+import com.sbro.emucorex.ui.common.actionLabel
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import java.util.UUID
@@ -211,10 +198,6 @@ fun TouchControlCreatorScreen(
         R.string.touch_control_creator_default_name,
         library.controls.size + 1
     )
-    val copiedControlName = stringResource(
-        R.string.touch_control_creator_copy_name,
-        draft.name
-    ).take(CustomTouchControl.MAX_NAME_LENGTH)
 
     fun updateDraft(transform: (CustomTouchControl) -> CustomTouchControl) {
         val updated = transform(draft).copy(updatedAtMillis = System.currentTimeMillis())
@@ -232,16 +215,12 @@ fun TouchControlCreatorScreen(
         draft = control
     }
 
-    fun createControl(source: CustomTouchControl? = null) {
+    fun createControl() {
         if (!isProUnlocked || library.controls.size >= CustomTouchControlLibrary.MAX_CONTROLS) return
         val now = System.currentTimeMillis()
-        val created = (source ?: CustomTouchControl()).copy(
+        val created = CustomTouchControl().copy(
             id = UUID.randomUUID().toString(),
-            name = if (source == null) {
-                nextControlName
-            } else {
-                copiedControlName
-            },
+            name = nextControlName,
             createdAtMillis = now,
             updatedAtMillis = now
         )
@@ -430,34 +409,17 @@ fun TouchControlCreatorScreen(
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                OutlinedButton(
+                    onClick = { deleteCandidate = draft },
+                    enabled = isProUnlocked && draft.id != previewSeed.id,
+                    shape = creatorControlShape(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("touch_control_creator_delete_selected")
                 ) {
-                    OutlinedButton(
-                        onClick = { createControl(draft) },
-                        enabled = isProUnlocked &&
-                            draft.id != previewSeed.id &&
-                            library.controls.size < CustomTouchControlLibrary.MAX_CONTROLS,
-                        shape = creatorControlShape(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Rounded.ContentCopy, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.touch_control_creator_duplicate))
-                    }
-                    OutlinedButton(
-                        onClick = { deleteCandidate = draft },
-                        enabled = isProUnlocked && draft.id != previewSeed.id,
-                        shape = creatorControlShape(),
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("touch_control_creator_delete_selected")
-                    ) {
-                        Icon(Icons.Rounded.Delete, contentDescription = null)
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.touch_control_creator_delete))
-                    }
+                    Icon(Icons.Rounded.Delete, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text(stringResource(R.string.touch_control_creator_delete))
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -504,32 +466,6 @@ fun TouchControlCreatorScreen(
                         )
                     }
                 }
-            }
-        }
-        item {
-            CreatorSection(title = stringResource(R.string.touch_control_creator_live_canvas)) {
-                Text(
-                    stringResource(R.string.touch_control_creator_drag_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ControlCanvasPreview(
-                    controls = if (library.controls.isEmpty()) {
-                        listOf(draft)
-                    } else {
-                        library.controls.map { if (it.id == draft.id) draft else it }
-                    },
-                    selectedId = draft.id,
-                    onPositionChange = { x, y ->
-                        updateDraft {
-                            it.copy(
-                                positionX = x.coerceIn(0f, 1f),
-                                positionY = y.coerceIn(0f, 1f),
-                                updatedAtMillis = System.currentTimeMillis()
-                            )
-                        }
-                    }
-                )
             }
         }
         item {
@@ -600,24 +536,6 @@ fun TouchControlCreatorScreen(
                                 )
                             }
                         }
-                    }
-                )
-                Text(
-                    stringResource(R.string.touch_control_creator_combo_action),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    stringResource(R.string.touch_control_creator_combo_action_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ActionSelector(
-                    selectedActionId = draft.secondaryActionId,
-                    excludedActionId = draft.actionId,
-                    allowNone = true,
-                    onSelect = { action ->
-                        updateDraft { it.copy(secondaryActionId = action) }
                     }
                 )
                 ControlSectionPreview(control = draft)
@@ -739,16 +657,6 @@ fun TouchControlCreatorScreen(
                     onValueChange = { value ->
                         updateDraft { control -> control.copy(rotationDegrees = value) }
                     }
-                )
-                PercentCreatorSlider(
-                    title = stringResource(R.string.touch_control_creator_position_x),
-                    value = draft.positionX,
-                    onValueChange = { updateDraft { control -> control.copy(positionX = it) } }
-                )
-                PercentCreatorSlider(
-                    title = stringResource(R.string.touch_control_creator_position_y),
-                    value = draft.positionY,
-                    onValueChange = { updateDraft { control -> control.copy(positionY = it) } }
                 )
                 ControlSectionPreview(control = draft)
             }
@@ -1062,48 +970,6 @@ private fun ControlPresetCard(
 }
 
 @Composable
-private fun ActionSelector(
-    selectedActionId: String?,
-    excludedActionId: String? = null,
-    allowNone: Boolean = false,
-    onSelect: (String?) -> Unit
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (allowNone) {
-            FilterChip(
-                selected = selectedActionId == null,
-                onClick = { onSelect(null) },
-                label = { Text(stringResource(R.string.touch_control_creator_none)) },
-                leadingIcon = if (selectedActionId == null) {
-                    { Icon(Icons.Rounded.Check, contentDescription = null) }
-                } else {
-                    null
-                },
-                shape = neonShape(14.dp)
-            )
-        }
-        CustomTouchControl.ALLOWED_ACTION_IDS
-            .filterNot { it == excludedActionId }
-            .forEach { action ->
-                FilterChip(
-                    selected = selectedActionId == action,
-                    onClick = { onSelect(action) },
-                    label = { Text(actionLabel(action)) },
-                    leadingIcon = if (selectedActionId == action) {
-                        { Icon(Icons.Rounded.Check, contentDescription = null) }
-                    } else {
-                        null
-                    },
-                    shape = neonShape(14.dp)
-                )
-            }
-    }
-}
-
-@Composable
 private fun ControlSectionPreview(
     control: CustomTouchControl,
     showPressedState: Boolean = false
@@ -1200,184 +1066,6 @@ private fun ControlPreviewState(
             )
         }
     }
-}
-
-@Composable
-private fun ControlCanvasPreview(
-    controls: List<CustomTouchControl>,
-    selectedId: String,
-    onPositionChange: (Float, Float) -> Unit
-) {
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .clip(neonShape(22.dp))
-            .background(Color(0xFF080B12))
-    ) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val canvasWidthPx = with(density) { maxWidth.toPx() }
-        val canvasHeightPx = with(density) { maxHeight.toPx() }
-        val selectedName = controls.firstOrNull { it.id == selectedId }?.name.orEmpty()
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(Color(0xFF101A2A), Color(0xFF090B10), Color(0xFF1C1022))
-                    )
-                )
-        )
-        Canvas(Modifier.fillMaxSize()) {
-            val gridColor = Color.White.copy(alpha = 0.055f)
-            repeat(8) { index ->
-                val x = size.width * index / 8f
-                drawLine(gridColor, Offset(x, 0f), Offset(x, size.height), 1f)
-            }
-            repeat(5) { index ->
-                val y = size.height * index / 5f
-                drawLine(gridColor, Offset(0f, y), Offset(size.width, y), 1f)
-            }
-            drawRect(
-                color = Color(0xFF090D12).copy(alpha = 0.72f),
-                topLeft = Offset(0f, size.height * 0.68f),
-                size = Size(size.width, size.height * 0.32f)
-            )
-            val horizon = size.height * 0.7f
-            drawLine(
-                color = Color(0xFF6F87B7).copy(alpha = 0.28f),
-                start = Offset(size.width * 0.5f, horizon),
-                end = Offset(size.width * 0.18f, size.height),
-                strokeWidth = 2f
-            )
-            drawLine(
-                color = Color(0xFF6F87B7).copy(alpha = 0.28f),
-                start = Offset(size.width * 0.5f, horizon),
-                end = Offset(size.width * 0.82f, size.height),
-                strokeWidth = 2f
-            )
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
-                .border(
-                    1.dp,
-                    Color.White.copy(alpha = 0.16f),
-                    neonShape(16.dp)
-                )
-        )
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(12.dp),
-            shape = neonShape(12.dp),
-            color = Color.Black.copy(alpha = 0.48f),
-            contentColor = Color.White
-        ) {
-            Text(
-                stringResource(R.string.touch_control_creator_canvas_label),
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelSmall
-            )
-        }
-        if (selectedName.isNotBlank()) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp),
-                shape = neonShape(12.dp),
-                color = Color.Black.copy(alpha = 0.48f),
-                contentColor = Color.White
-            ) {
-                Text(
-                    selectedName,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1
-                )
-            }
-        }
-        controls.filter { it.enabled || it.id == selectedId }.forEach { control ->
-            val widthPx = with(density) { control.widthDp.dp.toPx() }
-            val heightPx = with(density) { control.heightDp.dp.toPx() }
-            val travelX = (canvasWidthPx - widthPx).coerceAtLeast(1f)
-            val travelY = (canvasHeightPx - heightPx).coerceAtLeast(1f)
-            val selected = control.id == selectedId
-            CustomControlVisual(
-                control = control,
-                pressed = selected,
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            (control.positionX * travelX).roundToInt(),
-                            (control.positionY * travelY).roundToInt()
-                        )
-                    }
-                    .size(control.widthDp.dp, control.heightDp.dp)
-                    .pointerInput(control.id, travelX, travelY) {
-                        if (!selected) return@pointerInput
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            onPositionChange(
-                                control.positionX + dragAmount.x / travelX,
-                                control.positionY + dragAmount.y / travelY
-                            )
-                        }
-                    }
-            )
-        }
-    }
-}
-
-@Composable
-fun CustomControlVisual(
-    control: CustomTouchControl,
-    pressed: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val shape = control.composeShape()
-    val opacity = control.opacity / 100f
-    Surface(
-        modifier = modifier
-            .scale(if (pressed) control.pressedScalePercent / 100f else 1f)
-            .rotate(control.rotationDegrees.toFloat()),
-        shape = shape,
-        color = Color(control.fillColor).copy(alpha = Color(control.fillColor).alpha * opacity),
-        contentColor = Color(control.contentColor).copy(alpha = opacity),
-        shadowElevation = control.shadowElevationDp.dp,
-        border = control.borderWidthDp.takeIf { it > 0f }?.let {
-            BorderStroke(
-                it.dp,
-                Color(control.borderColor).copy(alpha = Color(control.borderColor).alpha * opacity)
-            )
-        }
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (control.content != CustomTouchControlContent.NONE) {
-                Text(
-                    text = if (control.content == CustomTouchControlContent.SYMBOL) {
-                        CustomTouchControl.defaultLabelFor(control.actionId)
-                    } else {
-                        control.label
-                    },
-                    modifier = Modifier.scale(control.contentScalePercent / 100f),
-                    color = Color(control.contentColor).copy(alpha = opacity),
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
-        }
-    }
-}
-
-fun CustomTouchControl.composeShape(): Shape = when (shape) {
-    CustomTouchControlShape.CIRCLE -> CircleShape
-    CustomTouchControlShape.ROUNDED -> RoundedCornerShape(cornerDp.dp)
-    CustomTouchControlShape.SQUARE -> RoundedCornerShape(0.dp)
-    CustomTouchControlShape.PILL -> RoundedCornerShape(50)
 }
 
 @Composable
@@ -1544,18 +1232,6 @@ private fun FloatCreatorSlider(
 }
 
 @Composable
-private fun PercentCreatorSlider(
-    title: String,
-    value: Float,
-    onValueChange: (Float) -> Unit
-) {
-    Column {
-        CreatorSliderHeader(title, "${(value * 100).roundToInt()}%")
-        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
-    }
-}
-
-@Composable
 private fun CreatorSliderHeader(title: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(title, modifier = Modifier.weight(1f))
@@ -1598,17 +1274,6 @@ private fun CustomTouchControlShape.titleRes(): Int = when (this) {
     CustomTouchControlShape.ROUNDED -> R.string.touch_control_creator_shape_rounded
     CustomTouchControlShape.SQUARE -> R.string.touch_control_creator_shape_square
     CustomTouchControlShape.PILL -> R.string.touch_control_creator_shape_pill
-}
-
-fun actionLabel(actionId: String): String = when (actionId) {
-    "up" -> "D-pad Up"
-    "down" -> "D-pad Down"
-    "left" -> "D-pad Left"
-    "right" -> "D-pad Right"
-    "triangle", "cross", "square", "circle" ->
-        actionId.replaceFirstChar { it.uppercase() }
-    "select", "start", "pressure" -> actionId.replaceFirstChar { it.uppercase() }
-    else -> actionId.uppercase()
 }
 
 private fun Int.toRgbHex(): String = "#%06X".format(this and 0x00FFFFFF)
