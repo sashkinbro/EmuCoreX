@@ -1215,6 +1215,7 @@ private fun SettingsContent(
     val ignoredGamepadDevices by GamepadManager.ignoredGamepadDevicesState.collectAsState()
     val floatingQuickActionsEnabled by viewModel.floatingQuickActionsEnabled.collectAsState()
     val gyroStickTarget by viewModel.gyroStickTarget.collectAsState()
+    val lightGunAim by viewModel.lightGunAim.collectAsState()
     val orientationLock by viewModel.orientationLock.collectAsState()
     val emulationAllowsBothOrientations by viewModel.emulationAllowsBothOrientations.collectAsState()
     val defaults = remember { SettingsSnapshot() }
@@ -2068,6 +2069,17 @@ private fun SettingsContent(
                                 onSelect = viewModel::setGyroStickTarget,
                                 onResetToDefault = {
                                     viewModel.setGyroStickTarget(defaults.gyroStickTarget)
+                                }
+                            )
+                        }
+                        if (uiState.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN) {
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_light_gun_aim),
+                                options = lightGunAimOptions(),
+                                selectedValue = lightGunAim,
+                                onSelect = viewModel::setLightGunAim,
+                                onResetToDefault = {
+                                    viewModel.setLightGunAim(defaults.lightGunAim)
                                 }
                             )
                         }
@@ -6974,6 +6986,13 @@ private fun touchHapticsPresetOptions(): List<Pair<Int, String>> = listOf(
 private fun usbDeviceOptions(): List<Pair<Int, String>> = listOf(
     AppPreferences.USB_DEVICE_NONE to stringResource(R.string.settings_usb_none),
     AppPreferences.USB_DEVICE_GUNCON2 to stringResource(R.string.settings_usb_guncon2)
+)
+
+@Composable
+private fun lightGunAimOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.LIGHT_GUN_AIM_GYRO to stringResource(R.string.settings_light_gun_aim_gyro),
+    AppPreferences.LIGHT_GUN_AIM_LEFT_STICK to stringResource(R.string.settings_stick_toggle_left),
+    AppPreferences.LIGHT_GUN_AIM_RIGHT_STICK to stringResource(R.string.settings_stick_toggle_right)
 )
 
 @Composable

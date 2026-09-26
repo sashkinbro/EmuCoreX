@@ -1557,6 +1557,8 @@
     <string name="settings_help_gyro_smoothing">Filtre le bruit du capteur et les tremblements de la main. Des valeurs plus faibles réagissent plus rapidement ; des valeurs plus élevées offrent plus de stabilité mais ajoutent une légère latence.</string>
     <string name="settings_gyro_unavailable">Cet appareil ne dispose pas du capteur de mouvement requis par le mode sélectionné.</string>
     <string name="settings_gyro_stick">Stick gyroscopique</string>
+    <string name="settings_light_gun_aim">Viser au pistolet optique</string>
+    <string name="settings_light_gun_aim_gyro">Gyroscope</string>
     <string name="settings_gyro_aim_left">Viser - stick gauche</string>
     <string name="onboarding_games_selected_count">%1$d dossiers sélectionnés. Touchez pour en ajouter un autre.</string>
     <string name="settings_game_folders_count">%1$d dossiers sélectionnés</string>

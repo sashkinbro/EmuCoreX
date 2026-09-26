@@ -281,6 +281,7 @@ private object PadKey {
 }
 
 private const val TRANSPORT_HOLD_DELAY_MS = 360L
+private const val LIGHT_GUN_STICK_AIM_SPEED = 0.95f
 
 private enum class EmulationMenuTab {
     Session,
@@ -673,8 +674,39 @@ fun EmulationScreen(
     val overlayPadIndex = touchPadIndex ?: 0
     val currentOverlayPadIndex by rememberUpdatedState(overlayPadIndex)
     val currentGyroStickTarget by rememberUpdatedState(uiState.gyroStickTarget)
+    val currentLightGunAimSource by rememberUpdatedState(uiState.lightGunAim)
     val currentActivePlayTimeMs by rememberUpdatedState(uiState.activePlayTimeMs)
     val gyroView = LocalView.current
+    var lastLightGunStickNanos by remember { mutableLongStateOf(0L) }
+
+    fun publishLightGunAim(normalizedX: Float, normalizedY: Float) {
+        lightGunAim = Offset(normalizedX, normalizedY)
+        val viewWidth = gyroView.width.toFloat()
+        val viewHeight = gyroView.height.toFloat()
+        if (viewWidth > 0f && viewHeight > 0f) {
+            NativeApp.onHostMousePosition(normalizedX * viewWidth, normalizedY * viewHeight)
+        }
+    }
+
+    fun applyLightGunStickAim(dx: Float, dy: Float) {
+        if (dx == 0f && dy == 0f) {
+            lastLightGunStickNanos = 0L
+            return
+        }
+        val now = System.nanoTime()
+        val dt = if (lastLightGunStickNanos == 0L) {
+            0f
+        } else {
+            ((now - lastLightGunStickNanos) / 1_000_000_000f).coerceIn(0f, 0.05f)
+        }
+        lastLightGunStickNanos = now
+        val current = lightGunAim ?: Offset(0.5f, 0.5f)
+        publishLightGunAim(
+            (current.x + dx * dt * LIGHT_GUN_STICK_AIM_SPEED).coerceIn(0f, 1f),
+            (current.y + dy * dt * LIGHT_GUN_STICK_AIM_SPEED).coerceIn(0f, 1f)
+        )
+    }
+
     val gyroController = remember(context) {
         AndroidGyroscopeInput(
             context = context,
@@ -692,11 +724,8 @@ fun EmulationScreen(
                 )
             },
             onLightGunAim = { normalizedX, normalizedY ->
-                lightGunAim = Offset(normalizedX, normalizedY)
-                val viewWidth = gyroView.width.toFloat()
-                val viewHeight = gyroView.height.toFloat()
-                if (viewWidth > 0f && viewHeight > 0f) {
-                    NativeApp.onHostMousePosition(normalizedX * viewWidth, normalizedY * viewHeight)
+                if (currentLightGunAimSource == AppPreferences.LIGHT_GUN_AIM_GYRO) {
+                    publishLightGunAim(normalizedX, normalizedY)
                 }
             }
         )
@@ -1592,6 +1621,8 @@ fun EmulationScreen(
                     controlLayouts = uiState.controlLayouts,
                     racingMode = uiState.racingMode,
                     stickToggleTarget = uiState.stickToggleTarget,
+                    lightGunAimSource = uiState.lightGunAim,
+                    onLightGunStickAim = ::applyLightGunStickAim,
                     onLightGunRecalibrate = { gyroController.recalibrate() },
                     onToggleSelectedStick = viewModel::toggleSelectedStick,
                     onFastForwardHoldChange = viewModel::setFastForwardHeld,
@@ -2403,6 +2434,8 @@ private fun OnScreenControls(
     controlLayouts: Map<String, OverlayControlLayout>,
     racingMode: Boolean,
     stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
+    lightGunAimSource: Int = AppPreferences.DEFAULT_LIGHT_GUN_AIM,
+    onLightGunStickAim: ((Float, Float) -> Unit)? = null,
     onLightGunRecalibrate: () -> Unit = {},
     onToggleSelectedStick: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
@@ -2721,16 +2754,20 @@ private fun OnScreenControls(
                 visualStyle = visualStyle,
                 pressEffect = pressEffect,
                 onValueChange = { x, y ->
-                    updateAnalogStick(
-                        x = if (invertLeftStickHorizontal) -x else x,
-                        y = if (invertLeftStick) -y else y,
-                        sensitivity = leftStickSensitivity,
-                        upKey = PadKey.LEFT_STICK_UP,
-                        rightKey = PadKey.LEFT_STICK_RIGHT,
-                        downKey = PadKey.LEFT_STICK_DOWN,
-                        leftKey = PadKey.LEFT_STICK_LEFT,
-                        onPadInput = onPadInput
-                    )
+                    if (lightGunAimSource == AppPreferences.LIGHT_GUN_AIM_LEFT_STICK) {
+                        onLightGunStickAim?.invoke(x, y)
+                    } else {
+                        updateAnalogStick(
+                            x = if (invertLeftStickHorizontal) -x else x,
+                            y = if (invertLeftStick) -y else y,
+                            sensitivity = leftStickSensitivity,
+                            upKey = PadKey.LEFT_STICK_UP,
+                            rightKey = PadKey.LEFT_STICK_RIGHT,
+                            downKey = PadKey.LEFT_STICK_DOWN,
+                            leftKey = PadKey.LEFT_STICK_LEFT,
+                            onPadInput = onPadInput
+                        )
+                    }
                 },
                 modifier = Modifier.offset {
                     IntOffset(stickPanelX(stick).roundToPx(), stick.y.roundToPx())
@@ -2750,12 +2787,16 @@ private fun OnScreenControls(
                 pressEffect = pressEffect,
                 visualY = rightStickTriggerVisualY,
                 onValueChange = { x, y ->
-                    updateRightAnalogStick(
-                        x = if (invertRightStickHorizontal) -x else x,
-                        y = if (invertRightStick) -y else y,
-                        sensitivity = rightStickSensitivity,
-                        onPadInput = onPadInput
-                    )
+                    if (lightGunAimSource == AppPreferences.LIGHT_GUN_AIM_RIGHT_STICK) {
+                        onLightGunStickAim?.invoke(x, y)
+                    } else {
+                        updateRightAnalogStick(
+                            x = if (invertRightStickHorizontal) -x else x,
+                            y = if (invertRightStick) -y else y,
+                            sensitivity = rightStickSensitivity,
+                            onPadInput = onPadInput
+                        )
+                    }
                 },
                 modifier = Modifier.offset {
                     IntOffset(stickPanelX(stick).roundToPx(), stick.y.roundToPx())

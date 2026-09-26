@@ -1730,6 +1730,8 @@
     <string name="settings_help_gyro_smoothing">Filters sensor noise and hand shake. Lower values react faster; higher values feel steadier but add a small amount of latency.</string>
     <string name="settings_gyro_unavailable">This device does not expose the motion sensor required by the selected mode.</string>
     <string name="settings_gyro_stick">Gyro stick</string>
+    <string name="settings_light_gun_aim">Light gun aim</string>
+    <string name="settings_light_gun_aim_gyro">Gyroscope</string>
     <string name="settings_gyro_aim_left">Aim - left stick</string>
     <string name="settings_audio_tab">Audio</string>
     <string name="settings_audio_control">Audio control</string>

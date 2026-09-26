@@ -1555,6 +1555,8 @@
     <string name="settings_help_gyro_smoothing">センサーのノイズや手ブレをフィルタリングします。値を小さくすると反応が速くなり、値を大きくすると安定感が増しますが、わずかな遅延が生じます。</string>
     <string name="settings_gyro_unavailable">このデバイスには、選択したモードに必要なモーションセンサーがありません。</string>
     <string name="settings_gyro_stick">ジャイロスティック</string>
+    <string name="settings_light_gun_aim">ライトガンの照準</string>
+    <string name="settings_light_gun_aim_gyro">ジャイロ</string>
     <string name="settings_gyro_aim_left">エイム - 左スティック</string>
     <string name="onboarding_games_selected_count">%1$d個のフォルダを選択しました。タップして追加します。</string>
     <string name="settings_game_folders_count">%1$d個のフォルダを選択しました</string>

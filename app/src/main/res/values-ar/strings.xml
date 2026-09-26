@@ -1555,6 +1555,8 @@
     <string name="settings_help_gyro_smoothing">يصفي ضوضاء المستشعر واهتزاز اليد. تتفاعل القيم الأقل بشكل أسرع؛ وتشعر القيم الأعلى بثبات أكبر ولكنها تضيف مقدارًا صغيرًا من التأخير.</string>
     <string name="settings_gyro_unavailable">لا يوفر هذا الجهاز مستشعر الحركة المطلوب للوضع المحدد.</string>
     <string name="settings_gyro_stick">عصا الجيروسكوب</string>
+    <string name="settings_light_gun_aim">تصويب المسدس الضوئي</string>
+    <string name="settings_light_gun_aim_gyro">الجيروسكوب</string>
     <string name="settings_gyro_aim_left">التصويب - العصا اليسرى</string>
     <string name="onboarding_games_selected_count">تم تحديد %1$d مجلد/مجلدات. انقر لإضافة مجلد آخر.</string>
     <string name="settings_game_folders_count">تم تحديد %1$d مجلد/مجلدات</string>

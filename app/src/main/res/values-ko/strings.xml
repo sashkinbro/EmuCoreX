@@ -1555,6 +1555,8 @@
     <string name="settings_help_gyro_smoothing">센서 노이즈와 손떨림을 필터링합니다. 값이 낮을수록 더 빠르게 반응하고, 값이 높을수록 안정적이지만 약간의 지연(레이턴시)이 추가됩니다.</string>
     <string name="settings_gyro_unavailable">이 기기는 선택한 모드에 필요한 모션 센서를 지원하지 않습니다.</string>
     <string name="settings_gyro_stick">자이로 스틱</string>
+    <string name="settings_light_gun_aim">라이트건 조준</string>
+    <string name="settings_light_gun_aim_gyro">자이로스코프</string>
     <string name="settings_gyro_aim_left">조준 - 왼쪽 스틱</string>
     <string name="onboarding_games_selected_count">%1$d개의 폴더가 선택되었습니다. 탭하여 다른 폴더를 추가하세요.</string>
     <string name="settings_game_folders_count">%1$d개의 폴더가 선택되었습니다</string>

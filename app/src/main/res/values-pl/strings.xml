@@ -1654,6 +1654,8 @@
     <string name="settings_help_gyro_smoothing">Filtruje szumy z czujnika i drżenie rąk. Niższe wartości skutkują szybszą reakcją; wyższe sprawiają, że sterowanie jest płynniejsze, ale wprowadzają minimalne opóźnienie.</string>
     <string name="settings_gyro_unavailable">To urządzenie nie udostępnia czujnika ruchu wymaganego przez ten tryb.</string>
     <string name="settings_gyro_stick">Drążek żyroskopu</string>
+    <string name="settings_light_gun_aim">Celowanie pistoletem świetlnym</string>
+    <string name="settings_light_gun_aim_gyro">Żyroskop</string>
     <string name="settings_gyro_aim_left">Celowanie — lewy drążek</string>
     <string name="settings_audio_tab">Dźwięk</string>
     <string name="settings_audio_control">Kontrola dźwięku</string>

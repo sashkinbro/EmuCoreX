@@ -1557,6 +1557,8 @@
     <string name="settings_help_gyro_smoothing">Фильтрует шум датчика и дрожание рук. Более низкие значения реагируют быстрее; более высокие значения кажутся более стабильными, но добавляют небольшую задержку.</string>
     <string name="settings_gyro_unavailable">Данное устройство не оснащено датчиком движения, необходимым для выбранного режима.</string>
     <string name="settings_gyro_stick">Стик гироскопа</string>
+    <string name="settings_light_gun_aim">Прицел светового пистолета</string>
+    <string name="settings_light_gun_aim_gyro">Гироскоп</string>
     <string name="settings_gyro_aim_left">Прицеливание — левый стик</string>
     <string name="onboarding_games_selected_count">Выбрано папок: %1$d. Нажмите, чтобы добавить еще одну.</string>
     <string name="settings_game_folders_count">Выбрано папок: %1$d</string>

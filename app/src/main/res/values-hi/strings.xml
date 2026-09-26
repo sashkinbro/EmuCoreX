@@ -1555,6 +1555,8 @@
     <string name="settings_help_gyro_smoothing">सेंसर शोर और हाथ के कांपने को फ़िल्टर करता है। कम मान तेज़ी से प्रतिक्रिया करते हैं; उच्च मान अधिक स्थिर महसूस होते हैं लेकिन थोड़ी सी देरी (लेटेंसी) जोड़ते हैं。</string>
     <string name="settings_gyro_unavailable">यह डिवाइस चुने गए मोड के लिए आवश्यक मोशन सेंसर प्रदान नहीं करता है。</string>
     <string name="settings_gyro_stick">जायरो स्टिक</string>
+    <string name="settings_light_gun_aim">लाइट गन निशाना</string>
+    <string name="settings_light_gun_aim_gyro">जायरोस्कोप</string>
     <string name="settings_gyro_aim_left">निशाना - बायां स्टिक</string>
     <string name="onboarding_games_selected_count">%1$d फ़ोल्डर चुने गए। एक और जोड़ने के लिए टैप करें。</string>
     <string name="settings_game_folders_count">%1$d फ़ोल्डर चुने गए</string>

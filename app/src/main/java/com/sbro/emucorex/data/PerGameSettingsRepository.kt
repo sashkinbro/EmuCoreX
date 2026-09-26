@@ -41,6 +41,7 @@ data class PerGameSettings(
     val gyroInvertX: Boolean = false,
     val gyroInvertY: Boolean = false,
     val gyroStickTarget: Int? = null,
+    val lightGunAim: Int? = null,
     val gamepadRightStickUpToR2: Boolean = false,
     val gamepadRightStickDownToL2: Boolean = false,
     val gamepadButtonHaptics: Boolean = false,
@@ -339,6 +340,15 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         } else {
             null
         },
+        lightGunAim = if (has("lightGunAim")) {
+            optInt("lightGunAim", AppPreferences.DEFAULT_LIGHT_GUN_AIM)
+                .coerceIn(
+                    AppPreferences.LIGHT_GUN_AIM_GYRO,
+                    AppPreferences.LIGHT_GUN_AIM_RIGHT_STICK
+                )
+        } else {
+            null
+        },
         gamepadRightStickUpToR2 = optBoolean("gamepadRightStickUpToR2", false),
         gamepadRightStickDownToL2 = optBoolean("gamepadRightStickDownToL2", false),
         gamepadButtonHaptics = optBoolean("gamepadButtonHaptics", false),
@@ -548,6 +558,7 @@ private fun PerGameSettings.toJson(): JSONObject {
         if (shouldWrite("gyroInvertX")) put("gyroInvertX", gyroInvertX)
         if (shouldWrite("gyroInvertY")) put("gyroInvertY", gyroInvertY)
         if (shouldWrite("gyroStickTarget")) gyroStickTarget?.let { put("gyroStickTarget", it) }
+        if (shouldWrite("lightGunAim")) lightGunAim?.let { put("lightGunAim", it) }
         if (shouldWrite("gamepadRightStickUpToR2")) put("gamepadRightStickUpToR2", gamepadRightStickUpToR2)
         if (shouldWrite("gamepadRightStickDownToL2")) put("gamepadRightStickDownToL2", gamepadRightStickDownToL2)
         if (shouldWrite("gamepadButtonHaptics")) put("gamepadButtonHaptics", gamepadButtonHaptics)

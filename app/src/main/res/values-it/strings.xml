@@ -1555,6 +1555,8 @@
     <string name="settings_help_gyro_smoothing">Filtra il rumore del sensore e il tremolio della mano. Valori più bassi reagiscono più velocemente; valori più alti risultano più stabili ma aggiungono una leggera latenza.</string>
     <string name="settings_gyro_unavailable">Questo dispositivo non dispone del sensore di movimento richiesto dalla modalità selezionata.</string>
     <string name="settings_gyro_stick">Stick giroscopio</string>
+    <string name="settings_light_gun_aim">Mira pistola ottica</string>
+    <string name="settings_light_gun_aim_gyro">Giroscopio</string>
     <string name="settings_gyro_aim_left">Mira - stick sinistro</string>
     <string name="onboarding_games_selected_count">%1$d cartelle selezionate. Tocca per aggiungerne un\'altra.</string>
     <string name="settings_game_folders_count">%1$d cartelle selezionate</string>

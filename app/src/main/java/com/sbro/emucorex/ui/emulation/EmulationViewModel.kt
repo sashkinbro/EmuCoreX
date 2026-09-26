@@ -170,6 +170,7 @@ data class EmulationUiState(
     val gyroInvertX: Boolean = false,
     val gyroInvertY: Boolean = false,
     val gyroStickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET,
+    val lightGunAim: Int = AppPreferences.DEFAULT_LIGHT_GUN_AIM,
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
@@ -462,6 +463,7 @@ private data class LiveRuntimeSnapshot(
     val gyroInvertX: Boolean,
     val gyroInvertY: Boolean,
     val gyroStickTarget: Int,
+    val lightGunAim: Int,
     val gamepadRightStickUpToR2: Boolean,
     val gamepadRightStickDownToL2: Boolean,
     val gamepadButtonHaptics: Boolean,
@@ -1279,6 +1281,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { preferences.gyroInvertX.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(gyroInvertX = value) } } }
         viewModelScope.launch { preferences.gyroInvertY.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(gyroInvertY = value) } } }
         viewModelScope.launch { preferences.gyroStickTarget.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(gyroStickTarget = value) } } }
+        viewModelScope.launch { preferences.lightGunAim.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(lightGunAim = value) } } }
         viewModelScope.launch {
             preferences.ntscFramerate.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(ntscFramerate = value) }
@@ -1989,6 +1992,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gyroInvertX = liveRuntime.gyroInvertX,
                     gyroInvertY = liveRuntime.gyroInvertY,
                     gyroStickTarget = liveRuntime.gyroStickTarget,
+                    lightGunAim = liveRuntime.lightGunAim,
                     gamepadRightStickUpToR2 = liveRuntime.gamepadRightStickUpToR2,
                     gamepadRightStickDownToL2 = liveRuntime.gamepadRightStickDownToL2,
                     gamepadButtonHaptics = liveRuntime.gamepadButtonHaptics,
@@ -4247,6 +4251,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gyroInvertX = settings.gyroInvertX,
             gyroInvertY = settings.gyroInvertY,
             gyroStickTarget = settings.gyroStickTarget,
+            lightGunAim = settings.lightGunAim,
             gamepadRightStickUpToR2 = settings.gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = settings.gamepadRightStickDownToL2,
             gamepadButtonHaptics = settings.gamepadButtonHaptics,
@@ -4443,6 +4448,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gyroStickTarget = pick("gyroStickTarget", gyroStickTarget) {
                 gyroStickTarget ?: this@applyProfile.gyroStickTarget
             },
+            lightGunAim = pick("lightGunAim", lightGunAim) {
+                lightGunAim ?: this@applyProfile.lightGunAim
+            },
             gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2) { gamepadRightStickUpToR2 },
             gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2) { gamepadRightStickDownToL2 },
             gamepadButtonHaptics = pick("gamepadButtonHaptics", gamepadButtonHaptics) { gamepadButtonHaptics },
@@ -4536,54 +4544,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
-    private suspend fun EmulationUiState.toPerGameSettings(
+
+    private fun EmulationUiState.buildPerGameProfile(
         gameKey: String,
         gameTitle: String,
-        gameSerial: String?
-    ): PerGameSettings {
-        val globalFrameGeneration = frameGenerationManager.snapshot().settings
-        val globalShowFps = preferences.showFps.first()
-        val globalFpsOverlayMode = preferences.fpsOverlayMode.first()
-        val globalEnableInstantVu1 = preferences.enableInstantVu1.first()
-        val globalEnableMtvu = preferences.enableMtvu.first()
-        val globalEnableThreadPinning = preferences.enableThreadPinning.first()
-        val globalEnableFastCdvd = preferences.enableFastCdvd.first()
-        val globalEnableFastBoot = preferences.enableFastBoot.first()
-        val globalEnableCheats = preferences.enableCheats.first()
-        val globalHwDownloadMode = preferences.hwDownloadMode.first()
-        val globalEeCycleRate = preferences.eeCycleRate.first()
-        val globalEeCycleSkip = preferences.eeCycleSkip.first()
-        val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
-        val globalLowLatencyMode = preferences.lowLatencyMode.first()
-        val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
-        val globalRacingMode = preferences.racingMode.first()
-        val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
-        val globalTouchscreenRightStickSensitivity = preferences.touchscreenRightStickSensitivity.first()
-        val globalTouchHaptics = preferences.touchHaptics.first()
-        val globalStickToggleTarget = preferences.stickToggleTarget.first()
-        val globalTouchHapticsPreset = preferences.touchHapticsPreset.first()
-        val globalTouchControlVisualStyle = preferences.touchControlVisualStyle.first()
-        val globalTouchControlPressEffect = preferences.touchControlPressEffect.first()
-        val globalGyroMode = preferences.gyroMode.first()
-        val globalGyroSensitivity = preferences.gyroSensitivity.first()
-        val globalGyroSmoothing = preferences.gyroSmoothing.first()
-        val globalGyroInvertX = preferences.gyroInvertX.first()
-        val globalGyroInvertY = preferences.gyroInvertY.first()
-        val globalGyroStickTarget = preferences.gyroStickTarget.first()
-        val globalGamepadRightStickUpToR2 = preferences.gamepadRightStickUpToR2.first()
-        val globalGamepadRightStickDownToL2 = preferences.gamepadRightStickDownToL2.first()
-        val globalGamepadButtonHaptics = preferences.gamepadButtonHaptics.first()
-        val globalPressureModifierAmount = preferences.pressureModifierAmount.first()
-        val globalTargetFps = preferences.targetFps.first()
-        val globalNtscFramerate = preferences.ntscFramerate.first()
-        val globalPalFramerate = preferences.palFramerate.first()
-        val globalWidescreenPatches = preferences.enableWidescreenPatches.first()
-        val globalNoInterlacingPatches = preferences.enableNoInterlacingPatches.first()
-        val globalAntiBlur = preferences.antiBlur.first()
-        val globalDeinterlaceMode = preferences.deinterlaceMode.first()
-        val globalDithering = preferences.dithering.first()
-
-        val profile = PerGameSettings(
+        gameSerial: String?,
+        globalTouchControlVisualStyle: TouchControlVisualStyle,
+        globalTouchControlPressEffect: TouchControlPressEffect
+    ): PerGameSettings = PerGameSettings(
             gameKey = gameKey,
             gameTitle = gameTitle,
             gameSerial = gameSerial,
@@ -4626,6 +4594,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gyroInvertX = gyroInvertX,
             gyroInvertY = gyroInvertY,
             gyroStickTarget = gyroStickTarget,
+            lightGunAim = lightGunAim,
             gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
             gamepadButtonHaptics = gamepadButtonHaptics,
@@ -4693,6 +4662,61 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             mergeSprite = mergeSprite,
             forceEvenSpritePosition = forceEvenSpritePosition,
             nativePaletteDraw = nativePaletteDraw
+    )
+    private suspend fun EmulationUiState.toPerGameSettings(
+        gameKey: String,
+        gameTitle: String,
+        gameSerial: String?
+    ): PerGameSettings {
+        val globalFrameGeneration = frameGenerationManager.snapshot().settings
+        val globalShowFps = preferences.showFps.first()
+        val globalFpsOverlayMode = preferences.fpsOverlayMode.first()
+        val globalEnableInstantVu1 = preferences.enableInstantVu1.first()
+        val globalEnableMtvu = preferences.enableMtvu.first()
+        val globalEnableThreadPinning = preferences.enableThreadPinning.first()
+        val globalEnableFastCdvd = preferences.enableFastCdvd.first()
+        val globalEnableFastBoot = preferences.enableFastBoot.first()
+        val globalEnableCheats = preferences.enableCheats.first()
+        val globalHwDownloadMode = preferences.hwDownloadMode.first()
+        val globalEeCycleRate = preferences.eeCycleRate.first()
+        val globalEeCycleSkip = preferences.eeCycleSkip.first()
+        val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
+        val globalLowLatencyMode = preferences.lowLatencyMode.first()
+        val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
+        val globalRacingMode = preferences.racingMode.first()
+        val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
+        val globalTouchscreenRightStickSensitivity = preferences.touchscreenRightStickSensitivity.first()
+        val globalTouchHaptics = preferences.touchHaptics.first()
+        val globalStickToggleTarget = preferences.stickToggleTarget.first()
+        val globalTouchHapticsPreset = preferences.touchHapticsPreset.first()
+        val globalTouchControlVisualStyle = preferences.touchControlVisualStyle.first()
+        val globalTouchControlPressEffect = preferences.touchControlPressEffect.first()
+        val globalGyroMode = preferences.gyroMode.first()
+        val globalGyroSensitivity = preferences.gyroSensitivity.first()
+        val globalGyroSmoothing = preferences.gyroSmoothing.first()
+        val globalGyroInvertX = preferences.gyroInvertX.first()
+        val globalGyroInvertY = preferences.gyroInvertY.first()
+        val globalGyroStickTarget = preferences.gyroStickTarget.first()
+        val globalLightGunAim = preferences.lightGunAim.first()
+        val globalGamepadRightStickUpToR2 = preferences.gamepadRightStickUpToR2.first()
+        val globalGamepadRightStickDownToL2 = preferences.gamepadRightStickDownToL2.first()
+        val globalGamepadButtonHaptics = preferences.gamepadButtonHaptics.first()
+        val globalPressureModifierAmount = preferences.pressureModifierAmount.first()
+        val globalTargetFps = preferences.targetFps.first()
+        val globalNtscFramerate = preferences.ntscFramerate.first()
+        val globalPalFramerate = preferences.palFramerate.first()
+        val globalWidescreenPatches = preferences.enableWidescreenPatches.first()
+        val globalNoInterlacingPatches = preferences.enableNoInterlacingPatches.first()
+        val globalAntiBlur = preferences.antiBlur.first()
+        val globalDeinterlaceMode = preferences.deinterlaceMode.first()
+        val globalDithering = preferences.dithering.first()
+
+        val profile = buildPerGameProfile(
+            gameKey = gameKey,
+            gameTitle = gameTitle,
+            gameSerial = gameSerial,
+            globalTouchControlVisualStyle = globalTouchControlVisualStyle,
+            globalTouchControlPressEffect = globalTouchControlPressEffect
         )
 
         val providedKeys = buildSet {
@@ -4737,6 +4761,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             if (gyroInvertX != globalGyroInvertX) add("gyroInvertX")
             if (gyroInvertY != globalGyroInvertY) add("gyroInvertY")
             if (gyroStickTarget != globalGyroStickTarget) add("gyroStickTarget")
+            if (lightGunAim != globalLightGunAim) add("lightGunAim")
             if (gamepadRightStickUpToR2 != globalGamepadRightStickUpToR2) add("gamepadRightStickUpToR2")
             if (gamepadRightStickDownToL2 != globalGamepadRightStickDownToL2) add("gamepadRightStickDownToL2")
             if (gamepadButtonHaptics != globalGamepadButtonHaptics) add("gamepadButtonHaptics")

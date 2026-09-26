@@ -1429,6 +1429,19 @@ private fun GameSettingsTabContent(
                             }
                         )
                     }
+                    if (draft.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN) {
+                        SelectionRow(
+                            title = stringResource(R.string.settings_light_gun_aim),
+                            options = lightGunAimOptions(),
+                            selectedValue = draft.lightGunAim
+                                ?: defaultProfile.lightGunAim
+                                ?: AppPreferences.DEFAULT_LIGHT_GUN_AIM,
+                            onSelected = { onDraftChange(draft.copy(lightGunAim = it)) },
+                            onResetToDefault = {
+                                onDraftChange(draft.copy(lightGunAim = defaultProfile.lightGunAim))
+                            }
+                        )
+                    }
                     if (draft.gyroMode != AppPreferences.GYRO_MODE_OFF) {
                         SliderRow(stringResource(R.string.settings_gyro_sensitivity), draft.gyroSensitivity.toFloat(), "${draft.gyroSensitivity}%", 25f..300f, 10, { onDraftChange(draft.copy(gyroSensitivity = it.roundToInt())) }, helpText = stringResource(R.string.settings_help_gyro_sensitivity), onResetToDefault = { onDraftChange(draft.copy(gyroSensitivity = defaultProfile.gyroSensitivity)) })
                         SliderRow(stringResource(R.string.settings_gyro_smoothing), draft.gyroSmoothing.toFloat(), "${draft.gyroSmoothing}%", 0f..90f, 8, { onDraftChange(draft.copy(gyroSmoothing = it.roundToInt())) }, helpText = stringResource(R.string.settings_help_gyro_smoothing), onResetToDefault = { onDraftChange(draft.copy(gyroSmoothing = defaultProfile.gyroSmoothing)) })
@@ -2071,6 +2084,19 @@ private fun GameSettingsEditorDialog(
                                     onSelected = { draft = draft.copy(gyroStickTarget = it) },
                                     onResetToDefault = {
                                         draft = draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget)
+                                    }
+                                )
+                            }
+                            if (draft.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN) {
+                                SelectionRow(
+                                    title = stringResource(R.string.settings_light_gun_aim),
+                                    options = lightGunAimOptions(),
+                                    selectedValue = draft.lightGunAim
+                                        ?: defaultProfile.lightGunAim
+                                        ?: AppPreferences.DEFAULT_LIGHT_GUN_AIM,
+                                    onSelected = { draft = draft.copy(lightGunAim = it) },
+                                    onResetToDefault = {
+                                        draft = draft.copy(lightGunAim = defaultProfile.lightGunAim)
                                     }
                                 )
                             }
@@ -3817,6 +3843,13 @@ private fun gyroStickOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
+private fun lightGunAimOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.LIGHT_GUN_AIM_GYRO to stringResource(R.string.settings_light_gun_aim_gyro),
+    AppPreferences.LIGHT_GUN_AIM_LEFT_STICK to stringResource(R.string.settings_stick_toggle_left),
+    AppPreferences.LIGHT_GUN_AIM_RIGHT_STICK to stringResource(R.string.settings_stick_toggle_right)
+)
+
+@Composable
 private fun gyroModeOptions(
     stickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET
 ): List<Pair<Int, String>> = listOf(
@@ -4075,6 +4108,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gyroInvertX = gyroInvertX,
         gyroInvertY = gyroInvertY,
         gyroStickTarget = gyroStickTarget,
+        lightGunAim = lightGunAim,
         gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
         gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
         gamepadButtonHaptics = gamepadButtonHaptics,
@@ -4209,6 +4243,11 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
             "gyroStickTarget",
             gyroStickTarget,
             defaultProfile.gyroStickTarget
+        ),
+        lightGunAim = pick(
+            "lightGunAim",
+            lightGunAim,
+            defaultProfile.lightGunAim
         ),
         gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2, defaultProfile.gamepadRightStickUpToR2),
         gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2, defaultProfile.gamepadRightStickDownToL2),
