@@ -26,6 +26,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -125,6 +126,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -653,6 +655,7 @@ fun EmulationScreen(
     var showQuickLoadDialog by remember { mutableStateOf(false) }
     var floatingQuickSavePosition by remember { mutableStateOf<Offset?>(null) }
     var floatingQuickLoadPosition by remember { mutableStateOf<Offset?>(null) }
+    var lightGunAim by remember { mutableStateOf<Offset?>(null) }
     var showAutoSaveLoadDialog by remember { mutableStateOf(false) }
     var showControlsEditor by remember { mutableStateOf(false) }
     var showGamepadMappingDialog by remember { mutableStateOf(false) }
@@ -689,6 +692,7 @@ fun EmulationScreen(
                 )
             },
             onLightGunAim = { normalizedX, normalizedY ->
+                lightGunAim = Offset(normalizedX, normalizedY)
                 val viewWidth = gyroView.width.toFloat()
                 val viewHeight = gyroView.height.toFloat()
                 if (viewWidth > 0f && viewHeight > 0f) {
@@ -1516,6 +1520,35 @@ fun EmulationScreen(
             TransportStatusOverlay(uiState.transportMode)
         }
 
+        // Light-gun aim cursor: the gyroscope drives an absolute pointer, so players must
+        // see where they aim, especially in arcade shooters that draw no reticle.
+        val lightGunAimPosition = lightGunAim
+        if (
+            uiState.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN &&
+            uiState.isRunning &&
+            !uiState.isPaused &&
+            !uiState.showMenu &&
+            !showControlsEditor &&
+            lightGunAimPosition != null
+        ) {
+            val cursorSize = 40.dp
+            val cursorDensity = LocalDensity.current
+            Box(
+                modifier = Modifier
+                    .offset {
+                        val half = with(cursorDensity) { cursorSize.toPx() } / 2f
+                        IntOffset(
+                            (lightGunAimPosition.x * gyroView.width - half).roundToInt(),
+                            (lightGunAimPosition.y * gyroView.height - half).roundToInt()
+                        )
+                    }
+                    .size(cursorSize)
+                    .zIndex(30f)
+            ) {
+                LightGunCursor()
+            }
+        }
+
         // On-screen controls
         if (shouldShowOverlay && !uiState.showMenu && !showControlsEditor) {
             val scaleFactor = uiState.overlayScale / 100f
@@ -2118,6 +2151,57 @@ private fun GameMenuTabId.toEmulationMenuTab(): EmulationMenuTab = when (this) {
     GameMenuTabId.GRAPHICS -> EmulationMenuTab.Graphics
     GameMenuTabId.FIXES -> EmulationMenuTab.Fixes
     GameMenuTabId.ACHIEVEMENTS -> EmulationMenuTab.Achievements
+}
+
+@Composable
+private fun LightGunCursor(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val radius = size.minDimension / 2f
+        val ringRadius = (radius * 0.86f).coerceAtLeast(1f)
+        val gap = ringRadius * 0.42f
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.55f),
+            radius = ringRadius + 2.5f,
+            center = center
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = 0.95f),
+            radius = ringRadius,
+            center = center,
+            style = Stroke(width = 2.5f)
+        )
+        drawCircle(
+            color = Color(0xFF45E6FF),
+            radius = 2.8f,
+            center = center
+        )
+        val lineStyle = Stroke(width = 2.5f)
+        drawLine(
+            color = Color.White,
+            start = Offset(center.x - ringRadius, center.y),
+            end = Offset(center.x - gap, center.y),
+            strokeWidth = lineStyle.width
+        )
+        drawLine(
+            color = Color.White,
+            start = Offset(center.x + gap, center.y),
+            end = Offset(center.x + ringRadius, center.y),
+            strokeWidth = lineStyle.width
+        )
+        drawLine(
+            color = Color.White,
+            start = Offset(center.x, center.y - ringRadius),
+            end = Offset(center.x, center.y - gap),
+            strokeWidth = lineStyle.width
+        )
+        drawLine(
+            color = Color.White,
+            start = Offset(center.x, center.y + gap),
+            end = Offset(center.x, center.y + ringRadius),
+            strokeWidth = lineStyle.width
+        )
+    }
 }
 
 @Composable
