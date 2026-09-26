@@ -1531,7 +1531,7 @@ fun EmulationScreen(
             !showControlsEditor &&
             lightGunAimPosition != null
         ) {
-            val cursorSize = 40.dp
+            val cursorSize = 22.dp
             val cursorDensity = LocalDensity.current
             Box(
                 modifier = Modifier
@@ -2158,48 +2158,30 @@ private fun LightGunCursor(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize()) {
         val center = Offset(size.width / 2f, size.height / 2f)
         val radius = size.minDimension / 2f
-        val ringRadius = (radius * 0.86f).coerceAtLeast(1f)
-        val gap = ringRadius * 0.42f
+        val dotRadius = (radius * 0.32f).coerceAtLeast(1.6f)
+        val ringRadius = (radius * 0.8f).coerceAtLeast(dotRadius + 1.5f)
+        // Thin ring plus a small dot: readable on light and dark scenes without
+        // covering the target the way a full crosshair does.
         drawCircle(
-            color = Color.Black.copy(alpha = 0.55f),
-            radius = ringRadius + 2.5f,
+            color = Color.Black.copy(alpha = 0.45f),
+            radius = ringRadius + 1.5f,
             center = center
         )
         drawCircle(
-            color = Color.White.copy(alpha = 0.95f),
+            color = Color.White.copy(alpha = 0.88f),
             radius = ringRadius,
             center = center,
-            style = Stroke(width = 2.5f)
+            style = Stroke(width = 1.5f)
+        )
+        drawCircle(
+            color = Color.Black.copy(alpha = 0.55f),
+            radius = dotRadius + 1f,
+            center = center
         )
         drawCircle(
             color = Color(0xFF45E6FF),
-            radius = 2.8f,
+            radius = dotRadius,
             center = center
-        )
-        val lineStyle = Stroke(width = 2.5f)
-        drawLine(
-            color = Color.White,
-            start = Offset(center.x - ringRadius, center.y),
-            end = Offset(center.x - gap, center.y),
-            strokeWidth = lineStyle.width
-        )
-        drawLine(
-            color = Color.White,
-            start = Offset(center.x + gap, center.y),
-            end = Offset(center.x + ringRadius, center.y),
-            strokeWidth = lineStyle.width
-        )
-        drawLine(
-            color = Color.White,
-            start = Offset(center.x, center.y - ringRadius),
-            end = Offset(center.x, center.y - gap),
-            strokeWidth = lineStyle.width
-        )
-        drawLine(
-            color = Color.White,
-            start = Offset(center.x, center.y + gap),
-            end = Offset(center.x, center.y + ringRadius),
-            strokeWidth = lineStyle.width
         )
     }
 }
