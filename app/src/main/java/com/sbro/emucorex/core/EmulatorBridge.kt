@@ -280,7 +280,7 @@ object EmulatorBridge {
         val resolvedRenderer = normalizeRenderer(renderer)
         return runCatching { NativeApp.getMaxUpscaleMultiplier(resolvedRenderer) }
             .getOrDefault(UPSCALE_MAX.toInt())
-            .coerceAtLeast(UPSCALE_MIN.toInt())
+            .coerceAtLeast(1)
     }
 
     fun initializeOnce(context: Context) {

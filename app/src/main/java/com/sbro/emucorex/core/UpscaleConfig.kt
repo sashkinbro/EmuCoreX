@@ -2,7 +2,9 @@ package com.sbro.emucorex.core
 
 import kotlin.math.roundToInt
 
-const val UPSCALE_MIN = 1.0f
+// Sub-native steps (0.25x/0.5x/0.75x) let weak devices trade image sharpness for speed;
+// the GS core has always accepted fractional upscale multipliers and only clamps the top.
+const val UPSCALE_MIN = 0.25f
 const val UPSCALE_MAX = 10.0f
 
 private const val UPSCALE_STEP = 0.25f
@@ -14,7 +16,7 @@ fun normalizeUpscale(value: Float, maxMultiplier: Int = UPSCALE_MAX_MULTIPLIER.r
         .coerceAtMost(UPSCALE_MAX_MULTIPLIER.roundToInt())
         .toFloat()
     val stepped = (value / UPSCALE_STEP).roundToInt() * UPSCALE_STEP
-    return stepped.coerceIn(UPSCALE_NATIVE_MULTIPLIER, max)
+    return stepped.coerceIn(UPSCALE_MIN, max)
 }
 
 fun upscaleMultiplierValue(value: Float): Int = upscaleMultiplierKey(normalizeUpscale(value))
@@ -28,7 +30,12 @@ fun formatUpscaleLabel(value: Float, nativeLabel: String): String {
     return when {
         normalized == UPSCALE_NATIVE_MULTIPLIER -> nativeLabel
         normalized == normalized.roundToInt().toFloat() -> "${normalized.roundToInt()}x"
-        else -> "${"%.2f".format(java.util.Locale.US, normalized)}x"
+        else -> {
+            val formatted = "%.2f".format(java.util.Locale.US, normalized)
+                .trimEnd('0')
+                .trimEnd('.')
+            "${formatted}x"
+        }
     }
 }
 
@@ -36,9 +43,9 @@ fun buildUpscaleOptions(nativeLabel: String, maxMultiplier: Int = UPSCALE_MAX_MU
     val max = maxMultiplier.coerceAtLeast(UPSCALE_NATIVE_MULTIPLIER.roundToInt())
         .coerceAtMost(UPSCALE_MAX_MULTIPLIER.roundToInt())
         .toFloat()
-    val steps = ((max - UPSCALE_NATIVE_MULTIPLIER) / UPSCALE_STEP).roundToInt()
+    val steps = ((max - UPSCALE_MIN) / UPSCALE_STEP).roundToInt()
     return (0..steps).map { index ->
-        val multiplier = UPSCALE_NATIVE_MULTIPLIER + (index * UPSCALE_STEP)
+        val multiplier = UPSCALE_MIN + (index * UPSCALE_STEP)
         upscaleMultiplierKey(multiplier) to formatUpscaleLabel(multiplier, nativeLabel)
     }
 }
