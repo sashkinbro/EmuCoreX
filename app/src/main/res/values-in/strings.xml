@@ -1553,6 +1553,7 @@
     <string name="settings_gyro_off">Mati</string>
     <string name="settings_gyro_aim">Bidik — stik kanan</string>
     <string name="settings_gyro_steering">Kemudi — stik kiri</string>
+    <string name="settings_gyro_mode_light_gun">Pistol cahaya</string>
     <string name="settings_gyro_sensitivity">Sensitivitas giroskop</string>
     <string name="settings_gyro_smoothing">Penghalusan giroskop</string>
     <string name="settings_gyro_invert_x">Balikkan giroskop horizontal</string>

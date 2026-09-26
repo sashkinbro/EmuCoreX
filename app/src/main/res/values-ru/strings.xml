@@ -1540,6 +1540,7 @@
     <string name="settings_gyro_off">Выкл.</string>
     <string name="settings_gyro_aim">Прицеливание — правый стик</string>
     <string name="settings_gyro_steering">Руль — левый стик</string>
+    <string name="settings_gyro_mode_light_gun">Световой пистолет</string>
     <string name="settings_gyro_sensitivity">Чувствительность гироскопа</string>
     <string name="settings_gyro_smoothing">Сглаживание гироскопа</string>
     <string name="settings_gyro_invert_x">Инвертировать гироскоп по горизонтали</string>

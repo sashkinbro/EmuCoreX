@@ -2097,7 +2097,9 @@ private fun SettingsContent(
                                 onCheckedChange = viewModel::setGyroInvertX,
                                 onResetToDefault = { viewModel.setGyroInvertX(defaults.gyroInvertX) }
                             )
-                            if (uiState.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                            if (uiState.gyroMode == AppPreferences.GYRO_MODE_AIM ||
+                                uiState.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN
+                            ) {
                                 ToggleItem(
                                     icon = Icons.Rounded.SwapVert,
                                     title = stringResource(R.string.settings_gyro_invert_y),
@@ -6944,7 +6946,8 @@ private fun touchHapticsPresetOptions(): List<Pair<Int, String>> = listOf(
 private fun gyroModeOptions(): List<Pair<Int, String>> = listOf(
     AppPreferences.GYRO_MODE_OFF to stringResource(R.string.settings_gyro_off),
     AppPreferences.GYRO_MODE_AIM to stringResource(R.string.settings_gyro_aim),
-    AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering)
+    AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering),
+    AppPreferences.GYRO_MODE_LIGHT_GUN to stringResource(R.string.settings_gyro_mode_light_gun)
 )
 
 @Composable

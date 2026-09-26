@@ -1540,6 +1540,7 @@
     <string name="settings_gyro_off">Désactivé</string>
     <string name="settings_gyro_aim">Visée — joystick droit</string>
     <string name="settings_gyro_steering">Direction — joystick gauche</string>
+    <string name="settings_gyro_mode_light_gun">Pistolet optique</string>
     <string name="settings_gyro_sensitivity">Sensibilité du gyroscope</string>
     <string name="settings_gyro_smoothing">Lissage du gyroscope</string>
     <string name="settings_gyro_invert_x">Inverser le gyroscope horizontal</string>

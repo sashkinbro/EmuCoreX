@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">끄기</string>
     <string name="settings_gyro_aim">조준 — 오른쪽 스틱</string>
     <string name="settings_gyro_steering">조향 — 왼쪽 스틱</string>
+    <string name="settings_gyro_mode_light_gun">라이트건</string>
     <string name="settings_gyro_sensitivity">자이로스코프 민감도</string>
     <string name="settings_gyro_smoothing">자이로스코프 부드럽게</string>
     <string name="settings_gyro_invert_x">수평 자이로 반전</string>

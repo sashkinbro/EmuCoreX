@@ -1565,6 +1565,7 @@
     <string name="settings_gyro_off">Вимк.</string>
     <string name="settings_gyro_aim">Прицілювання — правий стік</string>
     <string name="settings_gyro_steering">Кермо — лівий стік</string>
+    <string name="settings_gyro_mode_light_gun">Світловий пістолет</string>
     <string name="settings_gyro_sensitivity">Чутливість гіроскопа</string>
     <string name="settings_gyro_smoothing">Згладжування гіроскопа</string>
     <string name="settings_gyro_invert_x">Інвертувати гіроскоп по горизонталі</string>

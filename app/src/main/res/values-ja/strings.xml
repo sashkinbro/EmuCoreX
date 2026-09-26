@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">オフ</string>
     <string name="settings_gyro_aim">エイム — 右スティック</string>
     <string name="settings_gyro_steering">ステアリング — 左スティック</string>
+    <string name="settings_gyro_mode_light_gun">ライトガン</string>
     <string name="settings_gyro_sensitivity">ジャイロスコープ感度</string>
     <string name="settings_gyro_smoothing">ジャイロスコープの平滑化</string>
     <string name="settings_gyro_invert_x">ジャイロの左右反転</string>

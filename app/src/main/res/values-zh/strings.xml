@@ -1540,6 +1540,7 @@
     <string name="settings_gyro_off">关闭</string>
     <string name="settings_gyro_aim">瞄准 — 右摇杆</string>
     <string name="settings_gyro_steering">转向 — 左摇杆</string>
+    <string name="settings_gyro_mode_light_gun">光枪</string>
     <string name="settings_gyro_sensitivity">陀螺仪灵敏度</string>
     <string name="settings_gyro_smoothing">陀螺仪平滑度</string>
     <string name="settings_gyro_invert_x">反转水平陀螺仪</string>

@@ -719,6 +719,18 @@ object GamepadManager {
             return true
         }
         val rawPadKey = mapKeyCodeToRawPadKey(padIndex, event.keyCode) ?: return false
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            val normalizedPadIndex = normalizePadIndex(padIndex)
+            val resolvedActionId = resolveMappedActionIdForKeyCode(
+                keyCode = event.keyCode,
+                customBindings = customBindingsByPad[normalizedPadIndex].orEmpty()
+            )
+            if (resolvedActionId == "gun_recalibrate") {
+                _gamepadShortcutActions.tryEmit(
+                    GamepadShortcutAction(padIndex, "gun_recalibrate")
+                )
+            }
+        }
         if (shouldUseAnalogTriggerAxisForRightStickMapping(event.device, rawPadKey)) {
             return true
         }

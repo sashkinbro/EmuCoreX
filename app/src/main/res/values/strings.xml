@@ -1713,6 +1713,7 @@
     <string name="settings_gyro_off">Off</string>
     <string name="settings_gyro_aim">Aim — right stick</string>
     <string name="settings_gyro_steering">Steering — left stick</string>
+    <string name="settings_gyro_mode_light_gun">Light gun</string>
     <string name="settings_gyro_sensitivity">Gyroscope sensitivity</string>
     <string name="settings_gyro_smoothing">Gyroscope smoothing</string>
     <string name="settings_gyro_invert_x">Invert horizontal gyro</string>

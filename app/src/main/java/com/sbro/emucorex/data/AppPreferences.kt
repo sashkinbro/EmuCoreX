@@ -499,6 +499,7 @@ class AppPreferences(private val context: Context) {
         const val GYRO_MODE_OFF = 0
         const val GYRO_MODE_AIM = 1
         const val GYRO_MODE_STEERING = 2
+        const val GYRO_MODE_LIGHT_GUN = 3
         const val DEFAULT_GYRO_SENSITIVITY = 100
         const val DEFAULT_GYRO_SMOOTHING = 45
         const val COVER_ART_STYLE_DISABLED = -1
@@ -1942,7 +1943,7 @@ class AppPreferences(private val context: Context) {
                 stickToggleTarget = normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET),
                 touchHapticsPreset = (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG),
                 touchHapticsStrength = (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100),
-                gyroMode = (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING),
+                gyroMode = (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN),
                 gyroSensitivity = (prefs[GYRO_SENSITIVITY] ?: DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300),
                 gyroSmoothing = (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90),
                 gyroInvertX = prefs[GYRO_INVERT_X] ?: false,
@@ -2231,8 +2232,8 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit { it[TOUCH_HAPTICS_STRENGTH] = value.coerceIn(10, 100) }
     }
 
-    val gyroMode: Flow<Int> = context.dataStore.data.map { (it[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING) }
-    suspend fun setGyroMode(value: Int) { context.dataStore.edit { it[GYRO_MODE] = value.coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING) } }
+    val gyroMode: Flow<Int> = context.dataStore.data.map { (it[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN) }
+    suspend fun setGyroMode(value: Int) { context.dataStore.edit { it[GYRO_MODE] = value.coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN) } }
     val gyroSensitivity: Flow<Int> = context.dataStore.data.map { (it[GYRO_SENSITIVITY] ?: DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300) }
     suspend fun setGyroSensitivity(value: Int) { context.dataStore.edit { it[GYRO_SENSITIVITY] = value.coerceIn(25, 300) } }
     val gyroSmoothing: Flow<Int> = context.dataStore.data.map { (it[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90) }
@@ -4061,7 +4062,7 @@ class AppPreferences(private val context: Context) {
             put("stickToggleTarget", normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET))
             put("touchHapticsPreset", (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG))
             put("touchHapticsStrength", (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100))
-            put("gyroMode", (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING))
+            put("gyroMode", (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN))
             put("gyroSensitivity", (prefs[GYRO_SENSITIVITY] ?: DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300))
             put("gyroSmoothing", (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90))
             put("gyroInvertX", prefs[GYRO_INVERT_X] ?: false)
@@ -4495,7 +4496,7 @@ class AppPreferences(private val context: Context) {
             prefs[STICK_TOGGLE_TARGET] = normalizeStickToggleTarget(json.optInt("stickToggleTarget", DEFAULT_STICK_TOGGLE_TARGET))
             prefs[TOUCH_HAPTICS_PRESET] = json.optInt("touchHapticsPreset", DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG)
             prefs[TOUCH_HAPTICS_STRENGTH] = json.optInt("touchHapticsStrength", DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100)
-            prefs[GYRO_MODE] = json.optInt("gyroMode", GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_STEERING)
+            prefs[GYRO_MODE] = json.optInt("gyroMode", GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN)
             prefs[GYRO_SENSITIVITY] = json.optInt("gyroSensitivity", DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300)
             prefs[GYRO_SMOOTHING] = json.optInt("gyroSmoothing", DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90)
             prefs[GYRO_INVERT_X] = json.optBoolean("gyroInvertX", false)

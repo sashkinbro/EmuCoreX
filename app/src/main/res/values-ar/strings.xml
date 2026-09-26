@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">إيقاف</string>
     <string name="settings_gyro_aim">التصويب — العصا اليمنى</string>
     <string name="settings_gyro_steering">التوجيه — العصا اليسرى</string>
+    <string name="settings_gyro_mode_light_gun">مسدس ضوئي</string>
     <string name="settings_gyro_sensitivity">حساسية الجيروسكوب</string>
     <string name="settings_gyro_smoothing">تنعيم الجيروسكوب</string>
     <string name="settings_gyro_invert_x">عكس الجيروسكوب الأفقي</string>

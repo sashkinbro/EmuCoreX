@@ -1637,6 +1637,7 @@
     <string name="settings_gyro_off">Wył.</string>
     <string name="settings_gyro_aim">Celowanie — prawa gałka</string>
     <string name="settings_gyro_steering">Kierowanie — lewa gałka</string>
+    <string name="settings_gyro_mode_light_gun">Pistolet świetlny</string>
     <string name="settings_gyro_sensitivity">Czułość żyroskopu</string>
     <string name="settings_gyro_smoothing">Wygładzanie żyroskopu</string>
     <string name="settings_gyro_invert_x">Odwróć żyroskop w poziomie</string>

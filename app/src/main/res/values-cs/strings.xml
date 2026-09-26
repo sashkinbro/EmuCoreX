@@ -1639,6 +1639,7 @@
     <string name="settings_gyro_off">Vypnuto</string>
     <string name="settings_gyro_aim">Zaměřování — pravá páčka</string>
     <string name="settings_gyro_steering">Řízení — levá páčka</string>
+    <string name="settings_gyro_mode_light_gun">Světelná pistole</string>
     <string name="settings_gyro_sensitivity">Citlivost gyroskopu</string>
     <string name="settings_gyro_smoothing">Vyhlazování gyroskopu</string>
     <string name="settings_gyro_invert_x">Invertovat horizontální gyroskop</string>

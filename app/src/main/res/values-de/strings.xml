@@ -1540,6 +1540,7 @@
     <string name="settings_gyro_off">Aus</string>
     <string name="settings_gyro_aim">Zielen — rechter Stick</string>
     <string name="settings_gyro_steering">Lenken — linker Stick</string>
+    <string name="settings_gyro_mode_light_gun">Lightgun</string>
     <string name="settings_gyro_sensitivity">Gyroskop-Empfindlichkeit</string>
     <string name="settings_gyro_smoothing">Gyroskop-Glättung</string>
     <string name="settings_gyro_invert_x">Horizontales Gyroskop umkehren</string>

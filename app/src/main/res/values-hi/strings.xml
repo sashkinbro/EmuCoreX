@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">बंद</string>
     <string name="settings_gyro_aim">निशाना — राइट स्टिक</string>
     <string name="settings_gyro_steering">स्टीयरिंग — लेफ्ट स्टिक</string>
+    <string name="settings_gyro_mode_light_gun">लाइट गन</string>
     <string name="settings_gyro_sensitivity">जाइरोस्कोप संवेदनशीलता</string>
     <string name="settings_gyro_smoothing">जाइरोस्कोप स्मूथिंग</string>
     <string name="settings_gyro_invert_x">क्षैतिज जाइरो को उल्टा करें</string>

@@ -326,7 +326,8 @@ private fun JSONObject.toPerGameSettings(): PerGameSettings {
         ),
         touchHapticsPreset = optInt("touchHapticsPreset", AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET)
             .coerceIn(AppPreferences.TOUCH_HAPTICS_PRESET_SOFT, AppPreferences.TOUCH_HAPTICS_PRESET_STRONG),
-        gyroMode = optInt("gyroMode", AppPreferences.GYRO_MODE_OFF).coerceIn(AppPreferences.GYRO_MODE_OFF, AppPreferences.GYRO_MODE_STEERING),
+        gyroMode = optInt("gyroMode", AppPreferences.GYRO_MODE_OFF)
+            .coerceIn(AppPreferences.GYRO_MODE_OFF, AppPreferences.GYRO_MODE_LIGHT_GUN),
         gyroSensitivity = optInt("gyroSensitivity", AppPreferences.DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300),
         gyroSmoothing = optInt("gyroSmoothing", AppPreferences.DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90),
         gyroInvertX = optBoolean("gyroInvertX", false),

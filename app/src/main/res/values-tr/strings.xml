@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">Kapalı</string>
     <string name="settings_gyro_aim">Nişan alma — sağ çubuk</string>
     <string name="settings_gyro_steering">Direksiyon — sol çubuk</string>
+    <string name="settings_gyro_mode_light_gun">Işık tabancası</string>
     <string name="settings_gyro_sensitivity">Jiroskop hassasiyeti</string>
     <string name="settings_gyro_smoothing">Jiroskop yumuşatma</string>
     <string name="settings_gyro_invert_x">Yatay jiroskopu ters çevir</string>

@@ -670,19 +670,30 @@ fun EmulationScreen(
     val overlayPadIndex = touchPadIndex ?: 0
     val currentOverlayPadIndex by rememberUpdatedState(overlayPadIndex)
     val currentActivePlayTimeMs by rememberUpdatedState(uiState.activePlayTimeMs)
+    val gyroView = LocalView.current
     val gyroController = remember(context) {
-        AndroidGyroscopeInput(context) { emittedMode, x, y ->
-            val targetRightStick = emittedMode == AppPreferences.GYRO_MODE_AIM
-            updateAnalogStick(
-                x = x,
-                y = y,
-                upKey = if (targetRightStick) PadKey.RIGHT_STICK_UP else PadKey.LEFT_STICK_UP,
-                rightKey = if (targetRightStick) PadKey.RIGHT_STICK_RIGHT else PadKey.LEFT_STICK_RIGHT,
-                downKey = if (targetRightStick) PadKey.RIGHT_STICK_DOWN else PadKey.LEFT_STICK_DOWN,
-                leftKey = if (targetRightStick) PadKey.RIGHT_STICK_LEFT else PadKey.LEFT_STICK_LEFT,
-                onPadInput = { key, range, pressed -> viewModel.onPadInput(currentOverlayPadIndex, key, range, pressed) }
-            )
-        }
+        AndroidGyroscopeInput(
+            context = context,
+            onAnalog = { emittedMode, x, y ->
+                val targetRightStick = emittedMode == AppPreferences.GYRO_MODE_AIM
+                updateAnalogStick(
+                    x = x,
+                    y = y,
+                    upKey = if (targetRightStick) PadKey.RIGHT_STICK_UP else PadKey.LEFT_STICK_UP,
+                    rightKey = if (targetRightStick) PadKey.RIGHT_STICK_RIGHT else PadKey.LEFT_STICK_RIGHT,
+                    downKey = if (targetRightStick) PadKey.RIGHT_STICK_DOWN else PadKey.LEFT_STICK_DOWN,
+                    leftKey = if (targetRightStick) PadKey.RIGHT_STICK_LEFT else PadKey.LEFT_STICK_LEFT,
+                    onPadInput = { key, range, pressed -> viewModel.onPadInput(currentOverlayPadIndex, key, range, pressed) }
+                )
+            },
+            onLightGunAim = { normalizedX, normalizedY ->
+                val viewWidth = gyroView.width.toFloat()
+                val viewHeight = gyroView.height.toFloat()
+                if (viewWidth > 0f && viewHeight > 0f) {
+                    NativeApp.onHostMousePosition(normalizedX * viewWidth, normalizedY * viewHeight)
+                }
+            }
+        )
     }
     DisposableEffect(
         lifecycleOwner,
@@ -1045,6 +1056,7 @@ fun EmulationScreen(
                         viewModel.quickLoad()
                     }
                 }
+                "gun_recalibrate" -> gyroController.recalibrate()
             }
         }
     }
@@ -1545,6 +1557,7 @@ fun EmulationScreen(
                     controlLayouts = uiState.controlLayouts,
                     racingMode = uiState.racingMode,
                     stickToggleTarget = uiState.stickToggleTarget,
+                    onLightGunRecalibrate = { gyroController.recalibrate() },
                     onToggleSelectedStick = viewModel::toggleSelectedStick,
                     onFastForwardHoldChange = viewModel::setFastForwardHeld,
                     onPadInput = { keyCode, range, pressed ->
@@ -2322,6 +2335,7 @@ private fun OnScreenControls(
     controlLayouts: Map<String, OverlayControlLayout>,
     racingMode: Boolean,
     stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
+    onLightGunRecalibrate: () -> Unit = {},
     onToggleSelectedStick: () -> Unit,
     onFastForwardHoldChange: (Boolean) -> Unit,
     onPadInput: (Int, Int, Boolean) -> Unit,
@@ -2419,7 +2433,10 @@ private fun OnScreenControls(
         "gun_trigger" -> { pressed -> onPadInput(PadKey.GUN_TRIGGER, 0, pressed) }
         "gun_pedal" -> { pressed -> onPadInput(PadKey.GUN_PEDAL, 0, pressed) }
         "gun_reload" -> { pressed -> onPadInput(PadKey.GUN_RELOAD, 0, pressed) }
-        "gun_recalibrate" -> { pressed -> onPadInput(PadKey.GUN_RECALIBRATE, 0, pressed) }
+        "gun_recalibrate" -> { pressed ->
+            if (pressed) onLightGunRecalibrate()
+            onPadInput(PadKey.GUN_RECALIBRATE, 0, pressed)
+        }
         "coin" -> { pressed -> onPadInput(PadKey.COIN, 0, pressed) }
         "service" -> { pressed -> onPadInput(PadKey.SERVICE, 0, pressed) }
         else -> null

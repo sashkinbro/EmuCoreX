@@ -1540,6 +1540,7 @@
     <string name="settings_gyro_off">Desativado</string>
     <string name="settings_gyro_aim">Mira — analógico direito</string>
     <string name="settings_gyro_steering">Direção — analógico esquerdo</string>
+    <string name="settings_gyro_mode_light_gun">Pistola de luz</string>
     <string name="settings_gyro_sensitivity">Sensibilidade do giroscópio</string>
     <string name="settings_gyro_smoothing">Suavização do giroscópio</string>
     <string name="settings_gyro_invert_x">Inverter giroscópio horizontal</string>

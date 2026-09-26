@@ -1538,6 +1538,7 @@
     <string name="settings_gyro_off">Disattivato</string>
     <string name="settings_gyro_aim">Mira — levetta destra</string>
     <string name="settings_gyro_steering">Sterzo — levetta sinistra</string>
+    <string name="settings_gyro_mode_light_gun">Pistola ottica</string>
     <string name="settings_gyro_sensitivity">Sensibilità giroscopio</string>
     <string name="settings_gyro_smoothing">Arrotondamento giroscopio</string>
     <string name="settings_gyro_invert_x">Inverti giroscopio orizzontale</string>

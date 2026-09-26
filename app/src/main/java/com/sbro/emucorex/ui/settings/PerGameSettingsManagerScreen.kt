@@ -2048,7 +2048,9 @@ private fun GameSettingsEditorDialog(
                                 SliderRow(stringResource(R.string.settings_gyro_sensitivity), draft.gyroSensitivity.toFloat(), "${draft.gyroSensitivity}%", 25f..300f, 10, { draft = draft.copy(gyroSensitivity = it.roundToInt()) }, helpText = stringResource(R.string.settings_help_gyro_sensitivity), onResetToDefault = { draft = draft.copy(gyroSensitivity = defaultProfile.gyroSensitivity) })
                                 SliderRow(stringResource(R.string.settings_gyro_smoothing), draft.gyroSmoothing.toFloat(), "${draft.gyroSmoothing}%", 0f..90f, 8, { draft = draft.copy(gyroSmoothing = it.roundToInt()) }, helpText = stringResource(R.string.settings_help_gyro_smoothing), onResetToDefault = { draft = draft.copy(gyroSmoothing = defaultProfile.gyroSmoothing) })
                                 ToggleRow(stringResource(R.string.settings_gyro_invert_x), draft.gyroInvertX, { draft = draft.copy(gyroInvertX = it) }, onResetToDefault = { draft = draft.copy(gyroInvertX = defaultProfile.gyroInvertX) })
-                                if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                                if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM ||
+                                draft.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN
+                            ) {
                                     ToggleRow(stringResource(R.string.settings_gyro_invert_y), draft.gyroInvertY, { draft = draft.copy(gyroInvertY = it) }, onResetToDefault = { draft = draft.copy(gyroInvertY = defaultProfile.gyroInvertY) })
                                 }
                             }
@@ -3782,7 +3784,8 @@ private fun touchHapticsPresetOptions(): List<Pair<Int, String>> = listOf(
 private fun gyroModeOptions(): List<Pair<Int, String>> = listOf(
     AppPreferences.GYRO_MODE_OFF to stringResource(R.string.settings_gyro_off),
     AppPreferences.GYRO_MODE_AIM to stringResource(R.string.settings_gyro_aim),
-    AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering)
+    AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering),
+    AppPreferences.GYRO_MODE_LIGHT_GUN to stringResource(R.string.settings_gyro_mode_light_gun)
 )
 
 @Composable

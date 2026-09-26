@@ -1553,6 +1553,7 @@
     <string name="settings_gyro_off">خاموش</string>
     <string name="settings_gyro_aim">هدف‌گیری — استیک راست</string>
     <string name="settings_gyro_steering">فرمان — استیک چپ</string>
+    <string name="settings_gyro_mode_light_gun">تفنگ نوری</string>
     <string name="settings_gyro_sensitivity">حساسیت ژیروسکوپ</string>
     <string name="settings_gyro_smoothing">هموارسازی ژیروسکوپ</string>
     <string name="settings_gyro_invert_x">معکوس کردن ژیروسکوپ افقی</string>
