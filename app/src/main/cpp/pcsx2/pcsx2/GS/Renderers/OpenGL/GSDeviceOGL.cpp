@@ -977,7 +977,6 @@ bool GSDeviceOGL::CheckFeatures()
 		GpuProfileDetector::RuntimeProfileToString(GetRuntimeGPUProfile()), renderer_str,
 		IsMediaTekSoC() ? ", MediaTek SoC" : "");
 	const bool gpu_profile_mobile = IsMobileGPUProfile();
-	const bool gpu_profile_adreno = IsAdrenoGPUProfile();
 
 	GLint major_gl = 0;
 	GLint minor_gl = 0;
@@ -1108,7 +1107,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.dxt_textures = GLAD_GL_EXT_texture_compression_s3tc;
 	m_features.bptc_textures =
 		GLAD_GL_VERSION_4_2 || GLAD_GL_ARB_texture_compression_bptc || GLAD_GL_EXT_texture_compression_bptc;
-	m_features.prefer_new_textures = m_is_gles || gpu_profile_mobile || gpu_profile_adreno;
+	m_features.prefer_new_textures = m_is_gles || gpu_profile_mobile;
 	m_features.stencil_buffer = true;
 
 	if (GSConfig.OverrideTextureBarriers == 0)
@@ -1939,7 +1938,7 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
 	// Uniform mobile shader defines: some ARM drivers miscompile vector bitwise AND, and some
 	// PowerVR GLSL compilers need the negated result stored in a temporary. Both are cheap
 	// and applied to the whole mobile path instead of individual driver rules.
-	const bool mobile_shader_defines = HasMobileGPUProfile();
+	const bool mobile_shader_defines = IsMobileGPUProfile();
 	header += fmt::format("#define DRIVER_SCALARIZE_VECTOR_BITWISE_AND {}\n", mobile_shader_defines ? 1 : 0);
 	header += fmt::format("#define DRIVER_STORE_BITWISE_NEGATION_IN_TEMPORARY {}\n", mobile_shader_defines ? 1 : 0);
 	header += R"(

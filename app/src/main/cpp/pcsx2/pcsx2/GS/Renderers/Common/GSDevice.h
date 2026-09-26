@@ -1621,14 +1621,13 @@ public:
 	__fi RuntimeGpuProfile GetRuntimeGPUProfile() const { return m_runtime_gpu_profile; }
 	__fi bool IsMediaTekSoC() const { return m_is_mediatek_soc; }
 
-	/// True for the unified Mali/PowerVR tile-GPU path.
-	__fi bool IsMobileGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::Mobile; }
+	/// True for every recognised mobile GPU (Mali, Immortalis, PowerVR and Adreno). All of them
+	/// share the one unified tile-friendly rendering path.
+	__fi bool IsMobileGPUProfile() const { return UsesMobileGpuPath(m_runtime_gpu_profile); }
 
-	/// True when the GPU is an Adreno part (identity only, rendering shares the mobile path).
+	/// True when the GPU is an Adreno part. Identity only: used by optional features (frame
+	/// generation, custom Vulkan drivers), never to fork the rendering path.
 	__fi bool IsAdrenoGPUProfile() const { return m_runtime_gpu_profile == RuntimeGpuProfile::Adreno; }
-
-	/// True when any mobile GPU path was recognized (Mali/PowerVR or Adreno).
-	__fi bool HasMobileGPUProfile() const { return m_runtime_gpu_profile != RuntimeGpuProfile::Unknown; }
 
 	__fi const WindowInfo& GetWindowInfo() const { return m_window_info; }
 	__fi s32 GetWindowWidth() const { return static_cast<s32>(m_window_info.surface_width); }

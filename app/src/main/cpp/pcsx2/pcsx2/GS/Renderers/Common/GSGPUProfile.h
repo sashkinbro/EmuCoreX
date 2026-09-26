@@ -7,19 +7,26 @@
 
 #include <string_view>
 
-// The renderer has two mobile GPU paths:
-//  - Mobile: Mali, Immortalis and PowerVR. They are treated identically. There are no model
-//    tables and no per-driver-version rules; every part resolves to one conservative,
-//    tile-friendly path.
-//  - Adreno: a separate identity only because a few optional features explicitly require
-//    Adreno hardware (frame generation, custom Vulkan drivers). Rendering uses the same
-//    unified mobile path.
+// Every recognised mobile GPU renders through one unified, driver-agnostic tile path:
+//  - Mobile: Mali, Immortalis and PowerVR.
+//  - Adreno: identity only. Rendering is identical to the Mobile path; the value is kept
+//    separate because a few optional features explicitly require Adreno hardware (frame
+//    generation, custom Vulkan drivers).
+// There are no model tables and no per-driver-version rules; every part resolves to the same
+// tile-friendly behaviour, and actual performance scales with the hardware itself.
 enum class RuntimeGpuProfile : u8
 {
 	Unknown,
 	Mobile,
 	Adreno,
 };
+
+// True for every recognised mobile GPU (Mali, Immortalis, PowerVR and Adreno). The profile
+// value only carries identity; rendering never forks on it.
+constexpr bool UsesMobileGpuPath(RuntimeGpuProfile value)
+{
+	return value != RuntimeGpuProfile::Unknown;
+}
 
 class GpuProfileDetector
 {
@@ -28,7 +35,8 @@ public:
 
 	// Classifies the GPU from the renderer/device name and the vendor string. The renderer
 	// name is authoritative; the vendor string is only consulted when the name is not
-	// conclusive. Any Mali, Immortalis or PowerVR part resolves to RuntimeGpuProfile::Mobile.
+	// conclusive. Every recognised mobile part resolves to a mobile profile, and all of them
+	// share the same rendering path.
 	static RuntimeGpuProfile Detect(std::string_view gpu_vendor, std::string_view gpu_renderer_or_name);
 
 	// Returns the Adreno generation (7 for 7xx, 8 for 8xx, 9 for the X series) parsed from a
