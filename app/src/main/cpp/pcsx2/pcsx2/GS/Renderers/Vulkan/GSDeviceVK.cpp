@@ -721,8 +721,8 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		IsAdrenoGPUProfile() ? GpuProfileDetector::ParseAdrenoGeneration(m_name) : 0);
 #endif
 
-	// The unified mobile path uses input attachments for feedback on every mobile GPU. The
-	// explicit feedback-loop layout stays a desktop-only path.
+	// The unified mobile path uses input attachments for feedback. Keep the explicit
+	// feedback-loop layout only on drivers that are trusted with it.
 	if (IsMobileGPUProfile())
 		m_optional_extensions.vk_ext_attachment_feedback_loop_layout = false;
 
@@ -4523,7 +4523,7 @@ static void AddShaderHeader(std::stringstream& ss)
 
 	// Some ARM proprietary drivers miscompile vector bitwise AND in shaders. Scalarize it on
 	// the whole mobile path rather than tracking individual driver versions.
-	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND", dev->IsMobileGPUProfile() ? 1 : 0);
+	AddMacro(ss, "DRIVER_SCALARIZE_VECTOR_BITWISE_AND", dev->HasMobileGPUProfile() ? 1 : 0);
 	ss << R"(
 #if DRIVER_SCALARIZE_VECTOR_BITWISE_AND
 uvec2 gpu_bitwise_and(uvec2 a, uvec2 b)
@@ -4717,9 +4717,9 @@ bool GSDeviceVK::CreatePipelineLayouts()
 		dslb.SetPushFlag();
 	dslb.AddBinding(TFX_TEXTURE_TEXTURE, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 	dslb.AddBinding(TFX_TEXTURE_PALETTE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
-	// This must match both tfx.glsl and CreateCachedRenderPass(). The descriptor type follows
-	// the selected feedback path: subpassInput needs a real input-attachment descriptor, while
-	// the sampled-image fallback uses a sampled image.
+	// This must match both tfx.glsl and CreateCachedRenderPass(). Adreno uses the attachment
+	// feedback-loop layout when the driver exposes it; devices without that extension use a
+	// real input-attachment descriptor for the subpassInput shader path.
 	const VkDescriptorType feedback_descriptor_type = UsesInputAttachmentFeedbackPath() ?
 		VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
 	dslb.AddBinding(TFX_TEXTURE_RT, feedback_descriptor_type, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -7274,7 +7274,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 	{
 		constexpr u32 kick_threshold_desktop = 4000;
 		constexpr u32 kick_threshold_mobile = 40000;
-		const u32 kick_threshold = IsMobileGPUProfile() ? kick_threshold_mobile : kick_threshold_desktop;
+		const u32 kick_threshold = HasMobileGPUProfile() ? kick_threshold_mobile : kick_threshold_desktop;
 		if (m_draws_in_command_buffer >= kick_threshold)
 		{
 			ScanForCommandBufferCompletion();

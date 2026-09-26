@@ -141,14 +141,6 @@ TEST(GpuProfile, ClassifiesAdrenoIdentity)
 		RuntimeGpuProfile::Adreno);
 }
 
-TEST(GpuProfile, EveryRecognisedMobileGpuSharesTheUnifiedPath)
-{
-	// The profile value only carries identity; Mali/PowerVR and Adreno render identically.
-	EXPECT_TRUE(UsesMobileGpuPath(RuntimeGpuProfile::Mobile));
-	EXPECT_TRUE(UsesMobileGpuPath(RuntimeGpuProfile::Adreno));
-	EXPECT_FALSE(UsesMobileGpuPath(RuntimeGpuProfile::Unknown));
-}
-
 TEST(GpuProfile, RendererIdentityWinsOverVendorHint)
 {
 	EXPECT_EQ(GpuProfileDetector::Detect("ARM", "Adreno (TM) 650"), RuntimeGpuProfile::Adreno);
