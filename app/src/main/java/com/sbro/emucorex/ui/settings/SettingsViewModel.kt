@@ -28,6 +28,7 @@ import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.StorageAccess
 import com.sbro.emucorex.core.TvInterfaceMode
 import com.sbro.emucorex.core.normalizeUpscale
+import com.sbro.emucorex.data.GyroSettings
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.AppFontChoice
@@ -265,11 +266,7 @@ data class SettingsUiState(
     val stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
-    val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
-    val gyroSensitivity: Int = AppPreferences.DEFAULT_GYRO_SENSITIVITY,
-    val gyroSmoothing: Int = AppPreferences.DEFAULT_GYRO_SMOOTHING,
-    val gyroInvertX: Boolean = false,
-    val gyroInvertY: Boolean = false,
+    val gyro: GyroSettings = GyroSettings(),
     val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
     val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
@@ -326,7 +323,17 @@ data class SettingsUiState(
     val targetFps: Int = 0,
     val ntscFramerate: Float = AppPreferences.DEFAULT_NTSC_FRAMERATE,
     val palFramerate: Float = AppPreferences.DEFAULT_PAL_FRAMERATE
-)
+) {
+    // Compatibility read-only views over the nested [gyro] group.
+    val gyroMode: Int get() = gyro.mode
+    val gyroSensitivity: Int get() = gyro.sensitivity
+    val gyroSmoothing: Int get() = gyro.smoothing
+    val gyroInvertX: Boolean get() = gyro.invertX
+    val gyroInvertY: Boolean get() = gyro.invertY
+    val gyroStickTarget: Int get() = gyro.stickTarget
+    val lightGunAim: Int get() = gyro.lightGunAim
+    val lightGunCursorEnabled: Boolean get() = gyro.lightGunCursorEnabled
+}
 
 data class AppUpdateUiState(
     val releaseHistory: List<AppUpdateRelease> = emptyList(),
@@ -570,11 +577,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             stickToggleTarget = snapshot.stickToggleTarget,
             touchHapticsPreset = snapshot.touchHapticsPreset,
             touchHapticsStrength = snapshot.touchHapticsStrength,
-            gyroMode = snapshot.gyroMode,
-            gyroSensitivity = snapshot.gyroSensitivity,
-            gyroSmoothing = snapshot.gyroSmoothing,
-            gyroInvertX = snapshot.gyroInvertX,
-            gyroInvertY = snapshot.gyroInvertY,
+            gyro = snapshot.gyro,
             usbPort1Device = snapshot.usbPort1Device,
             usbPort2Device = snapshot.usbPort2Device,
             leftStickSensitivity = snapshot.leftStickSensitivity,

@@ -223,14 +223,7 @@ data class SettingsSnapshot(
     val stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET,
     val touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     val touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
-    val gyroMode: Int = AppPreferences.GYRO_MODE_OFF,
-    val gyroSensitivity: Int = AppPreferences.DEFAULT_GYRO_SENSITIVITY,
-    val gyroSmoothing: Int = AppPreferences.DEFAULT_GYRO_SMOOTHING,
-    val gyroInvertX: Boolean = false,
-    val gyroInvertY: Boolean = false,
-    val gyroStickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET,
-    val lightGunAim: Int = AppPreferences.DEFAULT_LIGHT_GUN_AIM,
-    val lightGunCursorEnabled: Boolean = true,
+    val gyro: GyroSettings = GyroSettings(),
     val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
     val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
@@ -293,7 +286,17 @@ data class SettingsSnapshot(
     val achievementsUnlockSoundName: String? = null,
     val achievementsUsername: String? = null,
     val achievementsToken: String? = null
-)
+) {
+    // Compatibility read-only views over the nested [gyro] group.
+    val gyroMode: Int get() = gyro.mode
+    val gyroSensitivity: Int get() = gyro.sensitivity
+    val gyroSmoothing: Int get() = gyro.smoothing
+    val gyroInvertX: Boolean get() = gyro.invertX
+    val gyroInvertY: Boolean get() = gyro.invertY
+    val gyroStickTarget: Int get() = gyro.stickTarget
+    val lightGunAim: Int get() = gyro.lightGunAim
+    val lightGunCursorEnabled: Boolean get() = gyro.lightGunCursorEnabled
+}
 
 data class OverlayLayoutSnapshot(
     val overlayScale: Int = 100,
@@ -1964,16 +1967,21 @@ class AppPreferences(private val context: Context) {
                 stickToggleTarget = normalizeStickToggleTarget(prefs[STICK_TOGGLE_TARGET] ?: DEFAULT_STICK_TOGGLE_TARGET),
                 touchHapticsPreset = (prefs[TOUCH_HAPTICS_PRESET] ?: DEFAULT_TOUCH_HAPTICS_PRESET).coerceIn(TOUCH_HAPTICS_PRESET_SOFT, TOUCH_HAPTICS_PRESET_STRONG),
                 touchHapticsStrength = (prefs[TOUCH_HAPTICS_STRENGTH] ?: DEFAULT_TOUCH_HAPTICS_STRENGTH).coerceIn(10, 100),
-                gyroMode = (prefs[GYRO_MODE] ?: GYRO_MODE_OFF).coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN),
-                gyroSensitivity = (prefs[GYRO_SENSITIVITY] ?: DEFAULT_GYRO_SENSITIVITY).coerceIn(25, 300),
-                gyroSmoothing = (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90),
-                gyroInvertX = prefs[GYRO_INVERT_X] ?: false,
-                gyroInvertY = prefs[GYRO_INVERT_Y] ?: false,
-                gyroStickTarget = (prefs[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
-                    .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT),
-                lightGunAim = (prefs[LIGHT_GUN_AIM] ?: DEFAULT_LIGHT_GUN_AIM)
-                    .coerceIn(LIGHT_GUN_AIM_GYRO, LIGHT_GUN_AIM_RIGHT_STICK),
-                lightGunCursorEnabled = prefs[LIGHT_GUN_CURSOR] ?: true,
+                gyro = GyroSettings(
+                    mode = (prefs[GYRO_MODE] ?: GYRO_MODE_OFF)
+                        .coerceIn(GYRO_MODE_OFF, GYRO_MODE_LIGHT_GUN),
+                    sensitivity = (prefs[GYRO_SENSITIVITY] ?: DEFAULT_GYRO_SENSITIVITY)
+                        .coerceIn(25, 300),
+                    smoothing = (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING)
+                        .coerceIn(0, 90),
+                    invertX = prefs[GYRO_INVERT_X] ?: false,
+                    invertY = prefs[GYRO_INVERT_Y] ?: false,
+                    stickTarget = (prefs[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
+                        .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT),
+                    lightGunAim = (prefs[LIGHT_GUN_AIM] ?: DEFAULT_LIGHT_GUN_AIM)
+                        .coerceIn(LIGHT_GUN_AIM_GYRO, LIGHT_GUN_AIM_RIGHT_STICK),
+                    lightGunCursorEnabled = prefs[LIGHT_GUN_CURSOR] ?: true
+                ),
                 usbPort1Device = (prefs[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE)
                     .coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2),
                 usbPort2Device = (prefs[USB_PORT2_DEVICE] ?: USB_DEVICE_NONE)
