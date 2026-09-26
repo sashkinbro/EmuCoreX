@@ -347,6 +347,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val proPurchaseManager = ProPurchaseManager.getInstance(application)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+    // Kept outside SettingsUiState: that data class is at the JVM 255-argument limit.
+    val gyroStickTarget: StateFlow<Int> = preferences.gyroStickTarget
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_GYRO_STICK_TARGET)
     val floatingQuickActionsEnabled: StateFlow<Boolean> = preferences.floatingQuickActionsEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val orientationLock: StateFlow<Int> = preferences.orientationLock
@@ -1311,6 +1314,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGyroSmoothing(value: Int) { viewModelScope.launch { preferences.setGyroSmoothing(value) } }
     fun setGyroInvertX(value: Boolean) { viewModelScope.launch { preferences.setGyroInvertX(value) } }
     fun setGyroInvertY(value: Boolean) { viewModelScope.launch { preferences.setGyroInvertY(value) } }
+    fun setGyroStickTarget(value: Int) { viewModelScope.launch { preferences.setGyroStickTarget(value) } }
     fun setUsbPort1Device(value: Int) { viewModelScope.launch { preferences.setUsbPort1Device(value) } }
     fun setUsbPort2Device(value: Int) { viewModelScope.launch { preferences.setUsbPort2Device(value) } }
     fun testTouchHaptics(

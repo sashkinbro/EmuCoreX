@@ -228,6 +228,7 @@ data class SettingsSnapshot(
     val gyroSmoothing: Int = AppPreferences.DEFAULT_GYRO_SMOOTHING,
     val gyroInvertX: Boolean = false,
     val gyroInvertY: Boolean = false,
+    val gyroStickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET,
     val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
     val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
@@ -356,7 +357,7 @@ class AppPreferences(private val context: Context) {
             "overlayOpacity", "overlayShow", "racingMode", "touchscreenRightStick",
             "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset", "stickToggleTarget",
             "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
-            "gyroInvertX", "gyroInvertY", "usbPort1Device", "usbPort2Device",
+            "gyroInvertX", "gyroInvertY", "gyroStickTarget", "usbPort1Device", "usbPort2Device",
             "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
             "gamepadRightStickSensitivity", "gamepadLeftStickNegativeDeadzone",
             "gamepadRightStickNegativeDeadzone", "gamepadLeftStickAntiDeadzone",
@@ -503,6 +504,9 @@ class AppPreferences(private val context: Context) {
         const val GYRO_MODE_AIM = 1
         const val GYRO_MODE_STEERING = 2
         const val GYRO_MODE_LIGHT_GUN = 3
+        const val GYRO_STICK_RIGHT = 0
+        const val GYRO_STICK_LEFT = 1
+        const val DEFAULT_GYRO_STICK_TARGET = GYRO_STICK_RIGHT
         const val USB_DEVICE_NONE = 0
         const val USB_DEVICE_GUNCON2 = 1
         const val DEFAULT_GYRO_SENSITIVITY = 100
@@ -764,6 +768,7 @@ class AppPreferences(private val context: Context) {
         private val GYRO_SMOOTHING = intPreferencesKey("gyro_smoothing")
         private val GYRO_INVERT_X = booleanPreferencesKey("gyro_invert_x")
         private val GYRO_INVERT_Y = booleanPreferencesKey("gyro_invert_y")
+        private val GYRO_STICK_TARGET = intPreferencesKey("gyro_stick_target")
         private val USB_PORT1_DEVICE = intPreferencesKey("usb_port1_device")
         private val USB_PORT2_DEVICE = intPreferencesKey("usb_port2_device")
         private val GAMEPAD_BUTTON_HAPTICS = booleanPreferencesKey("gamepad_button_haptics")
@@ -1955,6 +1960,8 @@ class AppPreferences(private val context: Context) {
                 gyroSmoothing = (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90),
                 gyroInvertX = prefs[GYRO_INVERT_X] ?: false,
                 gyroInvertY = prefs[GYRO_INVERT_Y] ?: false,
+                gyroStickTarget = (prefs[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
+                    .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT),
                 usbPort1Device = (prefs[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE)
                     .coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2),
                 usbPort2Device = (prefs[USB_PORT2_DEVICE] ?: USB_DEVICE_NONE)
@@ -2251,6 +2258,15 @@ class AppPreferences(private val context: Context) {
     suspend fun setGyroSmoothing(value: Int) { context.dataStore.edit { it[GYRO_SMOOTHING] = value.coerceIn(0, 90) } }
     val gyroInvertX: Flow<Boolean> = context.dataStore.data.map { it[GYRO_INVERT_X] ?: false }
     suspend fun setGyroInvertX(value: Boolean) { context.dataStore.edit { it[GYRO_INVERT_X] = value } }
+    val gyroStickTarget: Flow<Int> = context.dataStore.data.map {
+        (it[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
+            .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT)
+    }
+    suspend fun setGyroStickTarget(value: Int) {
+        context.dataStore.edit {
+            it[GYRO_STICK_TARGET] = value.coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT)
+        }
+    }
     val usbPort1Device: Flow<Int> = context.dataStore.data.map {
         (it[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE).coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2)
     }
@@ -4090,6 +4106,7 @@ class AppPreferences(private val context: Context) {
             put("gyroSmoothing", (prefs[GYRO_SMOOTHING] ?: DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90))
         put("gyroInvertX", prefs[GYRO_INVERT_X] ?: false)
         put("gyroInvertY", prefs[GYRO_INVERT_Y] ?: false)
+        put("gyroStickTarget", prefs[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
         put("usbPort1Device", prefs[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE)
         put("usbPort2Device", prefs[USB_PORT2_DEVICE] ?: USB_DEVICE_NONE)
             put("gamepadStickDeadzone", prefs[GAMEPAD_STICK_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_DEADZONE)
@@ -4526,6 +4543,8 @@ class AppPreferences(private val context: Context) {
             prefs[GYRO_SMOOTHING] = json.optInt("gyroSmoothing", DEFAULT_GYRO_SMOOTHING).coerceIn(0, 90)
         prefs[GYRO_INVERT_X] = json.optBoolean("gyroInvertX", false)
         prefs[GYRO_INVERT_Y] = json.optBoolean("gyroInvertY", false)
+        prefs[GYRO_STICK_TARGET] = json.optInt("gyroStickTarget", DEFAULT_GYRO_STICK_TARGET)
+            .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT)
         prefs[USB_PORT1_DEVICE] = json.optInt("usbPort1Device", USB_DEVICE_NONE)
             .coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2)
         prefs[USB_PORT2_DEVICE] = json.optInt("usbPort2Device", USB_DEVICE_NONE)

@@ -1569,6 +1569,8 @@
     <string name="settings_help_gyro_sensitivity">Mengontrol seberapa kuat pergerakan ponsel menyimpangkan stik analog yang diemulasi. Pengaturan khusus per game disarankan karena game menggunakan kurva respons kamera dan kemudi yang berbeda.</string>
     <string name="settings_help_gyro_smoothing">Memfilter gangguan sensor dan getaran tangan. Nilai yang lebih rendah bereaksi lebih cepat; nilai yang lebih tinggi terasa lebih stabil tetapi menambah sedikit penundaan (latensi).</string>
     <string name="settings_gyro_unavailable">Perangkat ini tidak memiliki sensor gerak yang diperlukan oleh mode yang dipilih.</string>
+    <string name="settings_gyro_stick">Stik giroskop</string>
+    <string name="settings_gyro_aim_left">Bidik - stik kiri</string>
     <string name="onboarding_games_selected_count">%1$d folder dipilih. Ketuk untuk menambahkan lagi.</string>
     <string name="settings_game_folders_count">%1$d folder dipilih</string>
     <string name="game_folders_remove">Hapus folder</string>

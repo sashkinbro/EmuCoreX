@@ -1556,6 +1556,8 @@
     <string name="settings_help_gyro_sensitivity">Controla la fuerza con la que el movimiento del teléfono desvía el joystick analógico emulado. Se recomiendan ajustes específicos por juego porque usan diferentes curvas de respuesta de cámara y dirección.</string>
     <string name="settings_help_gyro_smoothing">Filtra el ruido del sensor y el temblor de las manos. Los valores más bajos reaccionan más rápido; los valores más altos se sienten más estables pero añaden un poco de latencia.</string>
     <string name="settings_gyro_unavailable">Este dispositivo no dispone del sensor de movimiento requerido por el modo seleccionado.</string>
+    <string name="settings_gyro_stick">Stick del giroscopio</string>
+    <string name="settings_gyro_aim_left">Apuntar - stick izquierdo</string>
     <string name="onboarding_games_selected_count">%1$d carpetas seleccionadas. Toca para añadir otra.</string>
     <string name="settings_game_folders_count">%1$d carpetas seleccionadas</string>
     <string name="game_folders_remove">Eliminar carpeta</string>

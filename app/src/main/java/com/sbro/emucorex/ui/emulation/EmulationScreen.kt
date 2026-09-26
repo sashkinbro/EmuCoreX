@@ -669,13 +669,15 @@ fun EmulationScreen(
     val touchPadIndex = GamepadManager.resolveTouchPadIndex()
     val overlayPadIndex = touchPadIndex ?: 0
     val currentOverlayPadIndex by rememberUpdatedState(overlayPadIndex)
+    val currentGyroStickTarget by rememberUpdatedState(uiState.gyroStickTarget)
     val currentActivePlayTimeMs by rememberUpdatedState(uiState.activePlayTimeMs)
     val gyroView = LocalView.current
     val gyroController = remember(context) {
         AndroidGyroscopeInput(
             context = context,
             onAnalog = { emittedMode, x, y ->
-                val targetRightStick = emittedMode == AppPreferences.GYRO_MODE_AIM
+                val targetRightStick = emittedMode == AppPreferences.GYRO_MODE_AIM &&
+                    currentGyroStickTarget == AppPreferences.GYRO_STICK_RIGHT
                 updateAnalogStick(
                     x = x,
                     y = y,

@@ -1554,6 +1554,8 @@
     <string name="settings_help_gyro_sensitivity">यह नियंत्रित करता है कि फ़ोन की गति एम्यूलेटेड एनालॉग स्टिक को कितनी मजबूती से विक्षेपित करती है। प्रति-गेम सेटिंग की अनुशंसा की जाती है क्योंकि गेम अलग-अलग कैमरा और स्टीयरिंग रिस्पॉन्स कर्व्स का उपयोग करते हैं。</string>
     <string name="settings_help_gyro_smoothing">सेंसर शोर और हाथ के कांपने को फ़िल्टर करता है। कम मान तेज़ी से प्रतिक्रिया करते हैं; उच्च मान अधिक स्थिर महसूस होते हैं लेकिन थोड़ी सी देरी (लेटेंसी) जोड़ते हैं。</string>
     <string name="settings_gyro_unavailable">यह डिवाइस चुने गए मोड के लिए आवश्यक मोशन सेंसर प्रदान नहीं करता है。</string>
+    <string name="settings_gyro_stick">जायरो स्टिक</string>
+    <string name="settings_gyro_aim_left">निशाना - बायां स्टिक</string>
     <string name="onboarding_games_selected_count">%1$d फ़ोल्डर चुने गए। एक और जोड़ने के लिए टैप करें。</string>
     <string name="settings_game_folders_count">%1$d फ़ोल्डर चुने गए</string>
     <string name="game_folders_remove">फ़ोल्डर हटाएं</string>

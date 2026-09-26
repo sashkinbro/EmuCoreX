@@ -1556,6 +1556,8 @@
     <string name="settings_help_gyro_sensitivity">Steuert, wie stark die Telefonbewegung den emulierten Analogstick ausschlägt. Spielspezifische Einstellungen werden empfohlen, da Spiele unterschiedliche Reaktionskurven für Kamera und Lenkung verwenden.</string>
     <string name="settings_help_gyro_smoothing">Filtert Sensorrauschen und Handzittern. Niedrigere Werte reagieren schneller; höhere Werte fühlen sich ruhiger an, fügen jedoch eine geringe Verzögerung hinzu.</string>
     <string name="settings_gyro_unavailable">Dieses Gerät verfügt nicht über den für den ausgewählten Modus erforderlichen Bewegungssensor.</string>
+    <string name="settings_gyro_stick">Gyro-Steuerknüppel</string>
+    <string name="settings_gyro_aim_left">Zielen - linker Stick</string>
     <string name="onboarding_games_selected_count">%1$d Ordner ausgewählt. Tippen, um einen weiteren hinzuzufügen.</string>
     <string name="settings_game_folders_count">%1$d Ordner ausgewählt</string>
     <string name="game_folders_remove">Ordner entfernen</string>

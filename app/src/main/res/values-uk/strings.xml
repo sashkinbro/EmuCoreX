@@ -1581,6 +1581,8 @@
     <string name="settings_help_gyro_sensitivity">Керує тим, наскільки сильно рух телефону відхиляє емульований аналоговий стік. Рекомендується налаштовувати цей параметр для кожної гри окремо, оскільки ігри використовують різні криві відгуку для камери та кермування.</string>
     <string name="settings_help_gyro_smoothing">Фільтрує шум датчика та тремтіння рук. Менші значення реагують швидше; більші значення здаються стабільнішими, але додають невелику затримку.</string>
     <string name="settings_gyro_unavailable">Цей пристрій не має датчика руху, необхідного для вибраного режиму.</string>
+    <string name="settings_gyro_stick">Стік гіроскопа</string>
+    <string name="settings_gyro_aim_left">Прицілювання — лівий стік</string>
     <string name="onboarding_games_selected_count">Вибрано папок: %1$d. Натисніть, щоб додати ще одну.</string>
     <string name="settings_game_folders_count">Вибрано папок: %1$d</string>
     <string name="game_folders_remove">Видалити папку</string>

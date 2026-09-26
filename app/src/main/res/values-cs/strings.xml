@@ -1655,6 +1655,8 @@
     <string name="settings_help_gyro_sensitivity">Řídí, jak silně pohyb telefonu vychyluje emulovanou analogovou páčku. Doporučuje se přepsat tuto hodnotu pro každou hru zvlášť, protože hry používají různé křivky odezvy kamery a řízení.</string>
     <string name="settings_help_gyro_smoothing">Filtruje šum senzoru a třes rukou. Nižší hodnoty reagují rychleji; vyšší hodnoty působí stabilněji, ale přidávají malou latenci.</string>
     <string name="settings_gyro_unavailable">Toto zařízení neposkytuje snímač pohybu vyžadovaný vybraným režimem.</string>
+    <string name="settings_gyro_stick">Gyro páčka</string>
+    <string name="settings_gyro_aim_left">Míření - levá páčka</string>
     <string name="settings_audio_tab">Zvuk</string>
     <string name="settings_audio_control">Ovládání zvuku</string>
     <string name="settings_audio_processing">Zpracování zvuku</string>

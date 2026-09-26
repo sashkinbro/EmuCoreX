@@ -1556,6 +1556,8 @@
     <string name="settings_help_gyro_sensitivity">控制手机移动对模拟摇杆产生的偏移强度。由于不同游戏具有不同的视角和转向响应曲线，建议为每个游戏单独设置。</string>
     <string name="settings_help_gyro_smoothing">过滤传感器噪声和手部抖动。数值越低反应越快；数值越高感觉越稳定，但会增加少许延迟。</string>
     <string name="settings_gyro_unavailable">此设备未提供所选模式所需的运动传感器。</string>
+    <string name="settings_gyro_stick">陀螺仪摇杆</string>
+    <string name="settings_gyro_aim_left">瞄准 - 左摇杆</string>
     <string name="onboarding_games_selected_count">已选择 %1$d 个文件夹。点击以添加其他文件夹。</string>
     <string name="settings_game_folders_count">已选择 %1$d 个文件夹</string>
     <string name="game_folders_remove">移除文件夹</string>

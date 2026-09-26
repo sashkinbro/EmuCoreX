@@ -1422,6 +1422,17 @@ private fun GameSettingsTabContent(
                         ToggleRow(stringResource(R.string.settings_gyro_invert_x), draft.gyroInvertX, { onDraftChange(draft.copy(gyroInvertX = it)) }, onResetToDefault = { onDraftChange(draft.copy(gyroInvertX = defaultProfile.gyroInvertX)) })
                         if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
                             ToggleRow(stringResource(R.string.settings_gyro_invert_y), draft.gyroInvertY, { onDraftChange(draft.copy(gyroInvertY = it)) }, onResetToDefault = { onDraftChange(draft.copy(gyroInvertY = defaultProfile.gyroInvertY)) })
+                            SelectionRow(
+                                title = stringResource(R.string.settings_gyro_stick),
+                                options = gyroStickOptions(),
+                                selectedValue = draft.gyroStickTarget
+                                    ?: defaultProfile.gyroStickTarget
+                                    ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
+                                onSelected = { onDraftChange(draft.copy(gyroStickTarget = it)) },
+                                onResetToDefault = {
+                                    onDraftChange(draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget))
+                                }
+                            )
                         }
                     }
                     ToggleRow(
@@ -2038,7 +2049,11 @@ private fun GameSettingsEditorDialog(
                             )
                             SelectionRow(
                                 title = stringResource(R.string.settings_gyro_mode),
-                                options = gyroModeOptions(),
+                        options = gyroModeOptions(
+                            draft.gyroStickTarget
+                                ?: defaultProfile.gyroStickTarget
+                                ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET
+                        ),
                                 selectedValue = draft.gyroMode,
                                 onSelected = { draft = draft.copy(gyroMode = it) },
                                 helpText = stringResource(R.string.settings_help_gyro_mode),
@@ -2052,6 +2067,19 @@ private fun GameSettingsEditorDialog(
                                 draft.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN
                             ) {
                                     ToggleRow(stringResource(R.string.settings_gyro_invert_y), draft.gyroInvertY, { draft = draft.copy(gyroInvertY = it) }, onResetToDefault = { draft = draft.copy(gyroInvertY = defaultProfile.gyroInvertY) })
+                                }
+                                if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                                    SelectionRow(
+                                        title = stringResource(R.string.settings_gyro_stick),
+                                        options = gyroStickOptions(),
+                                        selectedValue = draft.gyroStickTarget
+                                            ?: defaultProfile.gyroStickTarget
+                                            ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
+                                        onSelected = { draft = draft.copy(gyroStickTarget = it) },
+                                        onResetToDefault = {
+                                            draft = draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget)
+                                        }
+                                    )
                                 }
                             }
                             ToggleRow(
@@ -3781,9 +3809,23 @@ private fun touchHapticsPresetOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
-private fun gyroModeOptions(): List<Pair<Int, String>> = listOf(
+private fun gyroStickOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.GYRO_STICK_RIGHT to stringResource(R.string.settings_stick_toggle_right),
+    AppPreferences.GYRO_STICK_LEFT to stringResource(R.string.settings_stick_toggle_left)
+)
+
+@Composable
+private fun gyroModeOptions(
+    stickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET
+): List<Pair<Int, String>> = listOf(
     AppPreferences.GYRO_MODE_OFF to stringResource(R.string.settings_gyro_off),
-    AppPreferences.GYRO_MODE_AIM to stringResource(R.string.settings_gyro_aim),
+    AppPreferences.GYRO_MODE_AIM to stringResource(
+        if (stickTarget == AppPreferences.GYRO_STICK_LEFT) {
+            R.string.settings_gyro_aim_left
+        } else {
+            R.string.settings_gyro_aim
+        }
+    ),
     AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering),
     AppPreferences.GYRO_MODE_LIGHT_GUN to stringResource(R.string.settings_gyro_mode_light_gun)
 )
@@ -4030,6 +4072,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gyroSmoothing = gyroSmoothing,
         gyroInvertX = gyroInvertX,
         gyroInvertY = gyroInvertY,
+        gyroStickTarget = gyroStickTarget,
         gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
         gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
         gamepadButtonHaptics = gamepadButtonHaptics,
@@ -4160,6 +4203,11 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         gyroSmoothing = pick("gyroSmoothing", gyroSmoothing, defaultProfile.gyroSmoothing),
         gyroInvertX = pick("gyroInvertX", gyroInvertX, defaultProfile.gyroInvertX),
         gyroInvertY = pick("gyroInvertY", gyroInvertY, defaultProfile.gyroInvertY),
+        gyroStickTarget = pick(
+            "gyroStickTarget",
+            gyroStickTarget,
+            defaultProfile.gyroStickTarget
+        ),
         gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2, defaultProfile.gamepadRightStickUpToR2),
         gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2, defaultProfile.gamepadRightStickDownToL2),
         gamepadButtonHaptics = pick("gamepadButtonHaptics", gamepadButtonHaptics, defaultProfile.gamepadButtonHaptics),

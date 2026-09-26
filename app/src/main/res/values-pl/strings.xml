@@ -1653,6 +1653,8 @@
     <string name="settings_help_gyro_sensitivity">Kontroluje, jak silnie ruch telefonu wpływa na emulowaną gałkę analogową. Zalecane są ustawienia niestandardowe dla poszczególnych gier, ponieważ korzystają one z różnych krzywych reakcji dla kamery i sterowania.</string>
     <string name="settings_help_gyro_smoothing">Filtruje szumy z czujnika i drżenie rąk. Niższe wartości skutkują szybszą reakcją; wyższe sprawiają, że sterowanie jest płynniejsze, ale wprowadzają minimalne opóźnienie.</string>
     <string name="settings_gyro_unavailable">To urządzenie nie udostępnia czujnika ruchu wymaganego przez ten tryb.</string>
+    <string name="settings_gyro_stick">Drążek żyroskopu</string>
+    <string name="settings_gyro_aim_left">Celowanie — lewy drążek</string>
     <string name="settings_audio_tab">Dźwięk</string>
     <string name="settings_audio_control">Kontrola dźwięku</string>
     <string name="settings_audio_processing">Przetwarzanie dźwięku</string>

@@ -1214,6 +1214,7 @@ private fun SettingsContent(
     val gamepadDeviceAssignments by GamepadManager.gamepadDeviceAssignmentsState.collectAsState()
     val ignoredGamepadDevices by GamepadManager.ignoredGamepadDevicesState.collectAsState()
     val floatingQuickActionsEnabled by viewModel.floatingQuickActionsEnabled.collectAsState()
+    val gyroStickTarget by viewModel.gyroStickTarget.collectAsState()
     val orientationLock by viewModel.orientationLock.collectAsState()
     val emulationAllowsBothOrientations by viewModel.emulationAllowsBothOrientations.collectAsState()
     val defaults = remember { SettingsSnapshot() }
@@ -2053,7 +2054,7 @@ private fun SettingsContent(
                         )
                         ChoiceSection(
                             title = stringResource(R.string.settings_gyro_mode),
-                            options = gyroModeOptions(),
+                            options = gyroModeOptions(gyroStickTarget),
                             selectedValue = uiState.gyroMode,
                             onSelect = viewModel::setGyroMode,
                             helpText = stringResource(R.string.settings_help_gyro_mode),
@@ -2109,6 +2110,17 @@ private fun SettingsContent(
                                     onResetToDefault = { viewModel.setGyroInvertY(defaults.gyroInvertY) }
                                 )
                             }
+                        }
+                        if (uiState.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_gyro_stick),
+                                options = gyroStickOptions(),
+                                selectedValue = gyroStickTarget,
+                                onSelect = viewModel::setGyroStickTarget,
+                                onResetToDefault = {
+                                    viewModel.setGyroStickTarget(defaults.gyroStickTarget)
+                                }
+                            )
                         }
                         ChoiceSection(
                             title = stringResource(R.string.settings_usb_port1),
@@ -6965,9 +6977,23 @@ private fun usbDeviceOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
-private fun gyroModeOptions(): List<Pair<Int, String>> = listOf(
+private fun gyroStickOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.GYRO_STICK_RIGHT to stringResource(R.string.settings_stick_toggle_right),
+    AppPreferences.GYRO_STICK_LEFT to stringResource(R.string.settings_stick_toggle_left)
+)
+
+@Composable
+private fun gyroModeOptions(
+    stickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET
+): List<Pair<Int, String>> = listOf(
     AppPreferences.GYRO_MODE_OFF to stringResource(R.string.settings_gyro_off),
-    AppPreferences.GYRO_MODE_AIM to stringResource(R.string.settings_gyro_aim),
+    AppPreferences.GYRO_MODE_AIM to stringResource(
+        if (stickTarget == AppPreferences.GYRO_STICK_LEFT) {
+            R.string.settings_gyro_aim_left
+        } else {
+            R.string.settings_gyro_aim
+        }
+    ),
     AppPreferences.GYRO_MODE_STEERING to stringResource(R.string.settings_gyro_steering),
     AppPreferences.GYRO_MODE_LIGHT_GUN to stringResource(R.string.settings_gyro_mode_light_gun)
 )

@@ -1569,6 +1569,8 @@
     <string name="settings_help_gyro_sensitivity">میزان تأثیر حرکت گوشی بر انحراف استیک آنالوگ شبیه‌سازی‌شده را کنترل می‌کند. تنظیمات مجزا برای هر بازی توصیه می‌شود زیرا بازی‌ها از منحنی‌های پاسخ‌دهی متفاوتی برای دوربین و فرمان استفاده می‌کنند.</string>
     <string name="settings_help_gyro_smoothing">نویز حسگر و لرزش دست را فیلتر می‌کند. مقادیر پایین‌تر سریع‌تر واکنش نشان می‌دهند؛ مقادیر بالاتر پایدارتر احساس می‌شوند اما مقدار کمی تأخیر اضافه می‌کنند.</string>
     <string name="settings_gyro_unavailable">این دستگاه فاقد حسگر حرکتی مورد نیاز برای حالت انتخاب‌شده است.</string>
+    <string name="settings_gyro_stick">استیک ژیروسکوپ</string>
+    <string name="settings_gyro_aim_left">نشانه‌گیری - استیک چپ</string>
     <string name="onboarding_games_selected_count">%1$d پوشه انتخاب شد. برای افزودن پوشه دیگر ضربه بزنید.</string>
     <string name="settings_game_folders_count">%1$d پوشه انتخاب شد</string>
     <string name="game_folders_remove">حذف پوشه</string>
