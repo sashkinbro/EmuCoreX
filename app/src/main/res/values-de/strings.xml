@@ -1547,6 +1547,11 @@
     <string name="settings_gyro_invert_x_desc">Kehrt die linke und rechte Bewegung um.</string>
     <string name="settings_gyro_invert_y">Vertikales Gyroskop umkehren</string>
     <string name="settings_gyro_invert_y_desc">Kehrt die Auf- und Abwärtsbewegung beim Zielen um.</string>
+    <string name="settings_usb_port1">USB-Anschluss 1</string>
+    <string name="settings_usb_port2">USB-Anschluss 2</string>
+    <string name="settings_usb_none">Kein Gerät</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Lightgun (GunCon2) an diesen USB-Anschluss anschließen. Arcade-Titel steuern ihre USB-Geräte selbst.</string>
     <string name="settings_help_gyro_mode">„Zielen“ wandelt die Rotationsgeschwindigkeit des Telefons in den rechten Analogstick für die Kamerasteuerung in Shootern um und kehrt automatisch in die Mitte zurück, wenn das Telefon aufhört sich zu bewegen. „Lenken“ wandelt die Neigung des Telefons in den linken Analogstick für Rennspiele um und kalibriert den aktuellen Winkel beim Spielstart als Mitte. Der ausgewählte Modus wird nur verwendet, während ein Spiel läuft, und erfordert den entsprechenden Bewegungssensor.</string>
     <string name="settings_help_gyro_sensitivity">Steuert, wie stark die Telefonbewegung den emulierten Analogstick ausschlägt. Spielspezifische Einstellungen werden empfohlen, da Spiele unterschiedliche Reaktionskurven für Kamera und Lenkung verwenden.</string>
     <string name="settings_help_gyro_smoothing">Filtert Sensorrauschen und Handzittern. Niedrigere Werte reagieren schneller; höhere Werte fühlen sich ruhiger an, fügen jedoch eine geringe Verzögerung hinzu.</string>

@@ -1560,6 +1560,11 @@
     <string name="settings_gyro_invert_x_desc">Membalikkan gerakan kiri dan kanan.</string>
     <string name="settings_gyro_invert_y">Balikkan giroskop vertikal</string>
     <string name="settings_gyro_invert_y_desc">Membalikkan gerakan membidik ke atas dan ke bawah.</string>
+    <string name="settings_usb_port1">Port USB 1</string>
+    <string name="settings_usb_port2">Port USB 2</string>
+    <string name="settings_usb_none">Tidak ada</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Sambungkan pistol cahaya (GunCon2) ke port USB ini. Gim arcade mengelola perangkat USB sendiri.</string>
     <string name="settings_help_gyro_mode">"Bidik" mengubah kecepatan rotasi ponsel ke stik analog kanan untuk kontrol kamera dalam game penembak dan otomatis kembali ke tengah saat ponsel berhenti bergerak. "Kemudi" mengubah kemiringan ponsel ke stik analog kiri untuk game balap dan mengkalibrasi sudut saat ini sebagai titik tengah saat permainan dimulai. Mode yang dipilih hanya digunakan saat game berjalan dan memerlukan sensor gerak yang sesuai.</string>
     <string name="settings_help_gyro_sensitivity">Mengontrol seberapa kuat pergerakan ponsel menyimpangkan stik analog yang diemulasi. Pengaturan khusus per game disarankan karena game menggunakan kurva respons kamera dan kemudi yang berbeda.</string>
     <string name="settings_help_gyro_smoothing">Memfilter gangguan sensor dan getaran tangan. Nilai yang lebih rendah bereaksi lebih cepat; nilai yang lebih tinggi terasa lebih stabil tetapi menambah sedikit penundaan (latensi).</string>

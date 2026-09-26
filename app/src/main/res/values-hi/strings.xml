@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">बाएँ और दाएँ गति को उलट देता है।</string>
     <string name="settings_gyro_invert_y">लंबवत जाइरो को उल्टा करें</string>
     <string name="settings_gyro_invert_y_desc">ऊपर और नीचे निशाना लगाने की गति को उलट देता है。</string>
+    <string name="settings_usb_port1">USB पोर्ट 1</string>
+    <string name="settings_usb_port2">USB पोर्ट 2</string>
+    <string name="settings_usb_none">कोई नहीं</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">इस USB पोर्ट पर लाइट गन (GunCon2) लगाएं। आर्केड गेम अपने USB उपकरण खुद संभालते हैं।</string>
     <string name="settings_help_gyro_mode">"निशाना" शूटर गेम में कैमरा नियंत्रण के लिए फ़ोन के घूमने की गति को दाएँ एनालॉग स्टिक में बदल देता है और फ़ोन के रुकने पर स्वचालित रूप से केंद्र में वापस आ जाता है। "स्टीयरिंग" रेसिंग गेम के लिए फ़ोन के झुकाव को बाएँ एनालॉग स्टिक में बदल देता है और गेमप्ले शुरू होने पर वर्तमान कोण को केंद्र के रूप में कैलिब्रेट करता है। चुना गया मोड केवल गेम चलने के दौरान उपयोग किया जाता है और इसके लिए संबंधित मोशन सेंसर की आवश्यकता होती है。</string>
     <string name="settings_help_gyro_sensitivity">यह नियंत्रित करता है कि फ़ोन की गति एम्यूलेटेड एनालॉग स्टिक को कितनी मजबूती से विक्षेपित करती है। प्रति-गेम सेटिंग की अनुशंसा की जाती है क्योंकि गेम अलग-अलग कैमरा और स्टीयरिंग रिस्पॉन्स कर्व्स का उपयोग करते हैं。</string>
     <string name="settings_help_gyro_smoothing">सेंसर शोर और हाथ के कांपने को फ़िल्टर करता है। कम मान तेज़ी से प्रतिक्रिया करते हैं; उच्च मान अधिक स्थिर महसूस होते हैं लेकिन थोड़ी सी देरी (लेटेंसी) जोड़ते हैं。</string>

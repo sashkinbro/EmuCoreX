@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">좌우 움직임을 반전시킵니다.</string>
     <string name="settings_gyro_invert_y">수직 자이로 반전</string>
     <string name="settings_gyro_invert_y_desc">위아래 조준 움직임을 반전시킵니다.</string>
+    <string name="settings_usb_port1">USB 포트 1</string>
+    <string name="settings_usb_port2">USB 포트 2</string>
+    <string name="settings_usb_none">없음</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">이 USB 포트에 라이트건(GunCon2)을 연결합니다. 아케이드 게임은 USB 장치를 자체 관리합니다.</string>
     <string name="settings_help_gyro_mode">\'조준\'은 슈팅 게임의 카메라 제어를 위해 휴대전화의 회전 속도를 오른쪽 아날로그 스틱으로 변환하며, 휴대전화의 움직임이 멈추면 자동으로 중앙으로 돌아옵니다. \'조향\'은 레이싱 게임을 위해 기울어진 휴대전화의 각도를 왼쪽 아날로그 스틱으로 변환하고, 게임이 시작될 때 현재 각도를 중앙으로 보정합니다. 선택한 모드는 게임이 실행 중일 때만 사용되며 해당하는 모션 센서가 필요합니다.</string>
     <string name="settings_help_gyro_sensitivity">휴대전화의 움직임이 에뮬레이션된 아날로그 스틱을 얼마나 강하게 편향시키는지 제어합니다. 게임마다 카메라 및 조향 반응 곡선이 다르므로 게임별 개별 설정을 권장합니다.</string>
     <string name="settings_help_gyro_smoothing">센서 노이즈와 손떨림을 필터링합니다. 값이 낮을수록 더 빠르게 반응하고, 값이 높을수록 안정적이지만 약간의 지연(레이턴시)이 추가됩니다.</string>

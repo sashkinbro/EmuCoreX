@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">يعكس الحركة يمينًا ويسارًا.</string>
     <string name="settings_gyro_invert_y">عكس الجيروسكوب العمودي</string>
     <string name="settings_gyro_invert_y_desc">يعكس حركة التصويب لأعلى ولأسفل.</string>
+    <string name="settings_usb_port1">منفذ USB 1</string>
+    <string name="settings_usb_port2">منفذ USB 2</string>
+    <string name="settings_usb_none">لا شيء</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">وصّل مسدسًا ضوئيًا (GunCon2) بهذا المنفذ. ألعاب الأركيد تدير أجهزة USB بنفسها.</string>
     <string name="settings_help_gyro_mode">يحول "التصويب" سرعة دوران الهاتف إلى العصا التناظرية اليمنى للتحكم في الكاميرا في ألعاب التصويب ويعود تلقائيًا إلى المركز عندما يتوقف الهاتف عن الحركة. يحول "التوجيه" إمالة الهاتف إلى العصا التناظرية اليسرى لألعاب السباق ويعاير الزاوية الحالية كمركز عند بدء اللعب. يُستخدم الوضع المحدد فقط أثناء تشغيل اللعبة ويتطلب مستشعر الحركة المقابل.</string>
     <string name="settings_help_gyro_sensitivity">يتحكم في مدى قوة تأثير حركة الهاتف على العصا التناظرية المحاكية. يُوصى بتخصيص الإعدادات لكل لعبة لأن الألعاب تستخدم منحنيات استجابة مختلفة للكاميرا والتوجيه.</string>
     <string name="settings_help_gyro_smoothing">يصفي ضوضاء المستشعر واهتزاز اليد. تتفاعل القيم الأقل بشكل أسرع؛ وتشعر القيم الأعلى بثبات أكبر ولكنها تضيف مقدارًا صغيرًا من التأخير.</string>

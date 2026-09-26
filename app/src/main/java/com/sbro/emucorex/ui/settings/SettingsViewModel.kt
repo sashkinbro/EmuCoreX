@@ -270,6 +270,8 @@ data class SettingsUiState(
     val gyroSmoothing: Int = AppPreferences.DEFAULT_GYRO_SMOOTHING,
     val gyroInvertX: Boolean = false,
     val gyroInvertY: Boolean = false,
+    val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
+    val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
     val rightStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
     val invertLeftStick: Boolean = false,
@@ -566,6 +568,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             gyroSmoothing = snapshot.gyroSmoothing,
             gyroInvertX = snapshot.gyroInvertX,
             gyroInvertY = snapshot.gyroInvertY,
+            usbPort1Device = snapshot.usbPort1Device,
+            usbPort2Device = snapshot.usbPort2Device,
             leftStickSensitivity = snapshot.leftStickSensitivity,
             rightStickSensitivity = snapshot.rightStickSensitivity,
             invertLeftStick = snapshot.invertLeftStick,
@@ -1307,6 +1311,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGyroSmoothing(value: Int) { viewModelScope.launch { preferences.setGyroSmoothing(value) } }
     fun setGyroInvertX(value: Boolean) { viewModelScope.launch { preferences.setGyroInvertX(value) } }
     fun setGyroInvertY(value: Boolean) { viewModelScope.launch { preferences.setGyroInvertY(value) } }
+    fun setUsbPort1Device(value: Int) { viewModelScope.launch { preferences.setUsbPort1Device(value) } }
+    fun setUsbPort2Device(value: Int) { viewModelScope.launch { preferences.setUsbPort2Device(value) } }
     fun testTouchHaptics(
         strengthPercent: Int = _uiState.value.touchHapticsStrength,
         preset: Int = _uiState.value.touchHapticsPreset

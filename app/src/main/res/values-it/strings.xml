@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">Inverte il movimento a destra e a sinistra.</string>
     <string name="settings_gyro_invert_y">Inverti giroscopio verticale</string>
     <string name="settings_gyro_invert_y_desc">Inverte il movimento di mira verso l\'alto e verso il basso.</string>
+    <string name="settings_usb_port1">Porta USB 1</string>
+    <string name="settings_usb_port2">Porta USB 2</string>
+    <string name="settings_usb_none">Nessuno</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Collega una pistola ottica (GunCon2) a questa porta USB. I giochi arcade gestiscono le proprie periferiche USB.</string>
     <string name="settings_help_gyro_mode">"Mira" converte la velocità di rotazione del telefono nella levetta analogica destra per il controllo della telecamera negli sparatutto e torna automaticamente al centro quando il telefono si ferma. "Sterzo" converte l\'inclinazione del telefono nella levetta analogica sinistra per i giochi di corsa e calibra l\'angolo corrente come centro all\'avvio del gioco. La modalità selezionata viene utilizzata solo durante l\'esecuzione di un gioco e richiede il sensore di movimento corrispondente.</string>
     <string name="settings_help_gyro_sensitivity">Controlla la forza con cui il movimento del telefono devia la levetta analogica emulata. Si consigliano regolazioni per ogni singolo gioco poiché i titoli utilizzano curve di risposta della telecamera e dello sterzo differenti.</string>
     <string name="settings_help_gyro_smoothing">Filtra il rumore del sensore e il tremolio della mano. Valori più bassi reagiscono più velocemente; valori più alti risultano più stabili ma aggiungono una leggera latenza.</string>

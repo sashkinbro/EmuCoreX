@@ -2110,6 +2110,22 @@ private fun SettingsContent(
                                 )
                             }
                         }
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_usb_port1),
+                            options = usbDeviceOptions(),
+                            selectedValue = uiState.usbPort1Device,
+                            onSelect = viewModel::setUsbPort1Device,
+                            helpText = stringResource(R.string.settings_help_usb_guncon2),
+                            onResetToDefault = { viewModel.setUsbPort1Device(defaults.usbPort1Device) }
+                        )
+                        ChoiceSection(
+                            title = stringResource(R.string.settings_usb_port2),
+                            options = usbDeviceOptions(),
+                            selectedValue = uiState.usbPort2Device,
+                            onSelect = viewModel::setUsbPort2Device,
+                            helpText = stringResource(R.string.settings_help_usb_guncon2),
+                            onResetToDefault = { viewModel.setUsbPort2Device(defaults.usbPort2Device) }
+                        )
                         SliderItem(
                             icon = Icons.Rounded.Gamepad,
                             title = stringResource(R.string.settings_left_stick_sensitivity),
@@ -6940,6 +6956,12 @@ private fun touchHapticsPresetOptions(): List<Pair<Int, String>> = listOf(
     AppPreferences.TOUCH_HAPTICS_PRESET_BALANCED to stringResource(R.string.settings_touch_haptics_preset_balanced),
     AppPreferences.TOUCH_HAPTICS_PRESET_CRISP to stringResource(R.string.settings_touch_haptics_preset_crisp),
     AppPreferences.TOUCH_HAPTICS_PRESET_STRONG to stringResource(R.string.settings_touch_haptics_preset_strong)
+)
+
+@Composable
+private fun usbDeviceOptions(): List<Pair<Int, String>> = listOf(
+    AppPreferences.USB_DEVICE_NONE to stringResource(R.string.settings_usb_none),
+    AppPreferences.USB_DEVICE_GUNCON2 to stringResource(R.string.settings_usb_guncon2)
 )
 
 @Composable

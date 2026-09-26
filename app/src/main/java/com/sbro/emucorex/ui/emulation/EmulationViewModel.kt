@@ -4030,6 +4030,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val profile = activePerGameKey()?.let(perGameSettingsRepository::get)
         val ensuredAssignments = memoryCardRepository.ensureDefaultCardsAssigned()
         val settings = preferences.settingsSnapshot.first()
+        // Optional light-gun USB peripheral for disc-based games. Arcade manifests
+        // still override these values with their own USB configuration.
+        EmulatorBridge.setSetting(
+            "USB1",
+            "Type",
+            "string",
+            if (settings.usbPort1Device == AppPreferences.USB_DEVICE_GUNCON2) "guncon2" else "None"
+        )
+        EmulatorBridge.setSetting(
+            "USB2",
+            "Type",
+            "string",
+            if (settings.usbPort2Device == AppPreferences.USB_DEVICE_GUNCON2) "guncon2" else "None"
+        )
         val profileConfig = PerformanceProfiles.configFor(settings.performanceProfile)
         val savedGpuDriverType = settings.gpuDriverType
         val savedCustomDriverPath = settings.customDriverPath

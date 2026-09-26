@@ -1547,6 +1547,11 @@
     <string name="settings_gyro_invert_x_desc">Inverse les mouvements de gauche à droite.</string>
     <string name="settings_gyro_invert_y">Inverser le gyroscope vertical</string>
     <string name="settings_gyro_invert_y_desc">Inverse les mouvements de visée de haut en bas.</string>
+    <string name="settings_usb_port1">Port USB 1</string>
+    <string name="settings_usb_port2">Port USB 2</string>
+    <string name="settings_usb_none">Aucun</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Brancher un pistolet optique (GunCon2) sur ce port USB. Les jeux d\'arcade gèrent leurs propres périphériques USB.</string>
     <string name="settings_help_gyro_mode">Le mode "Visée" convertit la vitesse de rotation du téléphone vers le joystick analogique droit pour contrôler la caméra dans les jeux de tir et retourne automatiquement au centre lorsque le téléphone s\'arrête. Le mode "Direction" convertit l\'inclinaison du téléphone vers le joystick analogique gauche pour les jeux de course et calibre l\'angle actuel comme centre au lancement du jeu. Le mode sélectionné n\'est actif que pendant qu\'un jeu est en cours et nécessite le capteur de mouvement correspondant.</string>
     <string name="settings_help_gyro_sensitivity">Contrôle la force avec laquelle le mouvement du téléphone fait dévier le joystick analogique émulé. Il est recommandé de personnaliser ce réglage pour chaque jeu, car les jeux utilisent des courbes de réponse de caméra et de direction différentes.</string>
     <string name="settings_help_gyro_smoothing">Filtre le bruit du capteur et les tremblements de la main. Des valeurs plus faibles réagissent plus rapidement ; des valeurs plus élevées offrent plus de stabilité mais ajoutent une légère latence.</string>

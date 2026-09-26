@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">Sol ve sağ hareketi tersine çevirir.</string>
     <string name="settings_gyro_invert_y">Dikey jiroskopu ters çevir</string>
     <string name="settings_gyro_invert_y_desc">Yukarı ve aşağı nişan alma hareketini tersine çevirir.</string>
+    <string name="settings_usb_port1">USB bağlantı noktası 1</string>
+    <string name="settings_usb_port2">USB bağlantı noktası 2</string>
+    <string name="settings_usb_none">Yok</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Bu USB bağlantı noktasına ışık tabancası (GunCon2) takın. Arcade oyunları USB aygıtlarını kendileri yönetir.</string>
     <string name="settings_help_gyro_mode">"Nişan alma", nişancı oyunlarında kamera kontrolü için telefonun dönüş hızını sağ analog çubuğa dönüştürür ve telefon hareket etmeyi bıraktığında otomatik olarak merkeze döner. "Direksiyon", yarış oyunları için telefonun eğimini sol analog çubuğa dönüştürür ve oyun başladığında mevcut açıyı merkez olarak kalibre eder. Seçilen mod yalnızca oyun çalışırken kullanılır ve ilgili hareket sensörünü gerektirir.</string>
     <string name="settings_help_gyro_sensitivity">Telefon hareketinin emüle edilmiş analog çubuğu ne kadar güçlü saptıracağını kontrol eder. Oyunlar farklı kamera ve direksiyon tepki eğrileri kullandığından, oyuna özel ayarlamalar önerilir.</string>
     <string name="settings_help_gyro_smoothing">Sensör gürültüsünü ve el titremesini filtreler. Daha düşük değerler daha hızlı tepki verir; daha yüksek değerler daha dengeli hissettirir ancak az miktarda gecikme ekler.</string>

@@ -1560,6 +1560,11 @@
     <string name="settings_gyro_invert_x_desc">حرکت به چپ و راست را معکوس می‌کند.</string>
     <string name="settings_gyro_invert_y">معکوس کردن ژیروسکوپ عمودی</string>
     <string name="settings_gyro_invert_y_desc">حرکت هدف‌گیری به بالا و پایین را معکوس می‌کند.</string>
+    <string name="settings_usb_port1">درگاه USB ۱</string>
+    <string name="settings_usb_port2">درگاه USB ۲</string>
+    <string name="settings_usb_none">هیچ</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">تفنگ نوری (GunCon2) را به این درگاه USB وصل کنید. بازی‌های آرکید دستگاه‌های USB خود را مدیریت می‌کنند.</string>
     <string name="settings_help_gyro_mode">«هدف‌گیری» سرعت چرخش گوشی را به استیک آنالوگ راست برای کنترل دوربین در بازی‌های تیراندازی تبدیل می‌کند و با توقف حرکت گوشی به‌طور خودکار به مرکز برمی‌گردد. «فرمان» شیب نگه‌داشته‌شده گوشی را برای بازی‌های مسابقه‌ای به استیک آنالوگ چپ تبدیل می‌کند و هنگام شروع بازی، زاویه فعلی را به‌عنوان مرکز کالیبره می‌کند. حالت انتخاب‌شده فقط هنگام اجرای بازی استفاده می‌شود و به حسگر حرکتی مربوطه نیاز دارد.</string>
     <string name="settings_help_gyro_sensitivity">میزان تأثیر حرکت گوشی بر انحراف استیک آنالوگ شبیه‌سازی‌شده را کنترل می‌کند. تنظیمات مجزا برای هر بازی توصیه می‌شود زیرا بازی‌ها از منحنی‌های پاسخ‌دهی متفاوتی برای دوربین و فرمان استفاده می‌کنند.</string>
     <string name="settings_help_gyro_smoothing">نویز حسگر و لرزش دست را فیلتر می‌کند. مقادیر پایین‌تر سریع‌تر واکنش نشان می‌دهند؛ مقادیر بالاتر پایدارتر احساس می‌شوند اما مقدار کمی تأخیر اضافه می‌کنند.</string>

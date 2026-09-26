@@ -1545,6 +1545,11 @@
     <string name="settings_gyro_invert_x_desc">左右の動きを反転させます。</string>
     <string name="settings_gyro_invert_y">ジャイロの上下反転</string>
     <string name="settings_gyro_invert_y_desc">上下のエイムの動きを反転させます。</string>
+    <string name="settings_usb_port1">USBポート1</string>
+    <string name="settings_usb_port2">USBポート2</string>
+    <string name="settings_usb_none">なし</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">このUSBポートにライトガン（GunCon2）を接続します。アーケード作品はUSB機器を自前で管理します。</string>
     <string name="settings_help_gyro_mode">「エイム」は、シューティングゲームの視点操作においてスマートフォンの回転速度を右アナログスティックに変換し、スマートフォンの動きが止まると自動的に中央に戻ります。「ステアリング」は、レースゲームにおいてスマートフォンの傾きを左アナログスティックに変換し、ゲーム開始時の現在の角度を中央としてキャリブレーションします。選択したモードはゲーム実行中のみ使用され、対応するモーションセンサーが必要です。</string>
     <string name="settings_help_gyro_sensitivity">スマートフォンの動きがエミュレートされたアナログスティックをどれだけ強く傾けるかを制御します。ゲームによって視点操作やステアリングの応答曲線が異なるため、ゲームごとの個別設定をおすすめします。</string>
     <string name="settings_help_gyro_smoothing">センサーのノイズや手ブレをフィルタリングします。値を小さくすると反応が速くなり、値を大きくすると安定感が増しますが、わずかな遅延が生じます。</string>

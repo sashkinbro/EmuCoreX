@@ -1646,6 +1646,11 @@
     <string name="settings_gyro_invert_x_desc">Přehodí pohyb doleva a doprava.</string>
     <string name="settings_gyro_invert_y">Invertovat vertikální gyroskop</string>
     <string name="settings_gyro_invert_y_desc">Přehodí pohyb zaměřování nahoru a dolů.</string>
+    <string name="settings_usb_port1">USB port 1</string>
+    <string name="settings_usb_port2">USB port 2</string>
+    <string name="settings_usb_none">Žádné</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Připojte světelnou pistoli (GunCon2) k tomuto USB portu. Arkádové hry si USB zařízení řídí samy.</string>
     <string name="settings_help_gyro_mode">Zaměřování převádí rychlost otáčení telefonu do pravé analogové páčky pro ovládání kamery ve střílečkách a po zastavení pohybu telefonu se automaticky vrátí do středu. Řízení převádí naklonění telefonu do levé analogové páčky pro závodní hry a po spuštění hry zkalibruje aktuální úhel jako střed. Zvolený režim se používá pouze za běhu hry a vyžaduje odpovídající snímač pohybu.</string>
     <string name="settings_help_gyro_sensitivity">Řídí, jak silně pohyb telefonu vychyluje emulovanou analogovou páčku. Doporučuje se přepsat tuto hodnotu pro každou hru zvlášť, protože hry používají různé křivky odezvy kamery a řízení.</string>
     <string name="settings_help_gyro_smoothing">Filtruje šum senzoru a třes rukou. Nižší hodnoty reagují rychleji; vyšší hodnoty působí stabilněji, ale přidávají malou latenci.</string>

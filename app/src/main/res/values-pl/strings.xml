@@ -1644,6 +1644,11 @@
     <string name="settings_gyro_invert_x_desc">Odwraca ruch w lewo i w prawo.</string>
     <string name="settings_gyro_invert_y">Odwróć żyroskop w pionie</string>
     <string name="settings_gyro_invert_y_desc">Odwraca ruch celowania w górę i w dół.</string>
+    <string name="settings_usb_port1">Port USB 1</string>
+    <string name="settings_usb_port2">Port USB 2</string>
+    <string name="settings_usb_none">Brak</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Podłącz pistolet świetlny (GunCon2) do tego portu USB. Gry arcade same zarządzają urządzeniami USB.</string>
     <string name="settings_help_gyro_mode">"Celowanie" przekształca prędkość rotacji telefonu w wychylenie prawej gałki analogowej (do kontroli kamery w strzelankach) i automatycznie wraca do środka, gdy telefon przestaje się poruszać. "Kierowanie" przekształca pochylenie telefonu w wychylenie lewej gałki analogowej dla gier wyścigowych i ustawia aktualny kąt jako środek (punkt zerowy) w momencie rozpoczęcia rozgrywki. Wybrany tryb jest używany tylko podczas działania gry i wymaga posiadania odpowiedniego czujnika ruchu.</string>
     <string name="settings_help_gyro_sensitivity">Kontroluje, jak silnie ruch telefonu wpływa na emulowaną gałkę analogową. Zalecane są ustawienia niestandardowe dla poszczególnych gier, ponieważ korzystają one z różnych krzywych reakcji dla kamery i sterowania.</string>
     <string name="settings_help_gyro_smoothing">Filtruje szumy z czujnika i drżenie rąk. Niższe wartości skutkują szybszą reakcją; wyższe sprawiają, że sterowanie jest płynniejsze, ale wprowadzają minimalne opóźnienie.</string>

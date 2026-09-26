@@ -1547,6 +1547,11 @@
     <string name="settings_gyro_invert_x_desc">Invierte el movimiento de izquierda y derecha.</string>
     <string name="settings_gyro_invert_y">Invertir giroscopio vertical</string>
     <string name="settings_gyro_invert_y_desc">Invierte el movimiento de apuntado hacia arriba y hacia abajo.</string>
+    <string name="settings_usb_port1">Puerto USB 1</string>
+    <string name="settings_usb_port2">Puerto USB 2</string>
+    <string name="settings_usb_none">Ninguno</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Conecta una pistola de luz (GunCon2) a este puerto USB. Los juegos arcade gestionan sus propios dispositivos USB.</string>
     <string name="settings_help_gyro_mode">"Apuntar" convierte la velocidad de rotación del teléfono en el joystick analógico derecho para el control de la cámara en los juegos de disparos y vuelve automáticamente al centro cuando el teléfono deja de moverse. "Conducción" convierte la inclinación mantenida del teléfono en el joystick analógico izquierdo para los juegos de carreras y calibra el ángulo actual como centro cuando comienza el juego. El modo seleccionado se usa solo mientras se ejecuta un juego y requiere el sensor de movimiento correspondiente.</string>
     <string name="settings_help_gyro_sensitivity">Controla la fuerza con la que el movimiento del teléfono desvía el joystick analógico emulado. Se recomiendan ajustes específicos por juego porque usan diferentes curvas de respuesta de cámara y dirección.</string>
     <string name="settings_help_gyro_smoothing">Filtra el ruido del sensor y el temblor de las manos. Los valores más bajos reaccionan más rápido; los valores más altos se sienten más estables pero añaden un poco de latencia.</string>

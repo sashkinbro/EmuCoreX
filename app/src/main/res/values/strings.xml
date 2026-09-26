@@ -1720,6 +1720,11 @@
     <string name="settings_gyro_invert_x_desc">Reverses left and right motion.</string>
     <string name="settings_gyro_invert_y">Invert vertical gyro</string>
     <string name="settings_gyro_invert_y_desc">Reverses up and down aiming motion.</string>
+    <string name="settings_usb_port1">USB port 1</string>
+    <string name="settings_usb_port2">USB port 2</string>
+    <string name="settings_usb_none">None</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">Attach a light gun (GunCon2) to this USB port. Arcade titles manage their own USB devices.</string>
     <string name="settings_help_gyro_mode">Aim converts phone rotation speed into the right analog stick for camera control in shooters and automatically returns to center when the phone stops moving. Steering converts the phone’s held tilt into the left analog stick for racing games and calibrates the current angle as center when gameplay starts. The selected mode is used only while a game is running and requires the corresponding motion sensor.</string>
     <string name="settings_help_gyro_sensitivity">Controls how strongly phone movement deflects the emulated analog stick. Per-game overrides are recommended because games use different camera and steering response curves.</string>
     <string name="settings_help_gyro_smoothing">Filters sensor noise and hand shake. Lower values react faster; higher values feel steadier but add a small amount of latency.</string>

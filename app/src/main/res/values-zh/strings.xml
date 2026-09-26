@@ -1547,6 +1547,11 @@
     <string name="settings_gyro_invert_x_desc">反转左右移动方向。</string>
     <string name="settings_gyro_invert_y">反转垂直陀螺仪</string>
     <string name="settings_gyro_invert_y_desc">反转上下瞄准移动方向。</string>
+    <string name="settings_usb_port1">USB 端口 1</string>
+    <string name="settings_usb_port2">USB 端口 2</string>
+    <string name="settings_usb_none">无</string>
+    <string name="settings_usb_guncon2">GunCon2</string>
+    <string name="settings_help_usb_guncon2">在此 USB 端口连接光枪（GunCon2）。街机游戏自行管理 USB 设备。</string>
     <string name="settings_help_gyro_mode">“瞄准”将手机的旋转速度转换为射击游戏中的右摇杆来控制视角，并在手机停止移动时自动回中。“转向”将手机的倾斜角度转换为赛车游戏中的左摇杆，并在游戏开始时将当前角度校准为中心点。所选模式仅在游戏运行时生效，并且需要相应的运动传感器。</string>
     <string name="settings_help_gyro_sensitivity">控制手机移动对模拟摇杆产生的偏移强度。由于不同游戏具有不同的视角和转向响应曲线，建议为每个游戏单独设置。</string>
     <string name="settings_help_gyro_smoothing">过滤传感器噪声和手部抖动。数值越低反应越快；数值越高感觉越稳定，但会增加少许延迟。</string>
