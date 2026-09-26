@@ -51,6 +51,9 @@ data class CustomTouchControl(
     val pressedScalePercent: Int = 112,
     val haptics: Boolean = true,
     val enabled: Boolean = true,
+    // Buttons created from the layout editor mirror the built-in vector buttons;
+    // creator-made buttons keep their own custom look.
+    val usesVectorStyle: Boolean = false,
     val createdAtMillis: Long = 0L,
     val updatedAtMillis: Long = createdAtMillis
 ) {

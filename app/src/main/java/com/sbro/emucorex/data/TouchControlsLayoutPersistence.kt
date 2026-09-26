@@ -9,19 +9,19 @@ fun TouchControlsLayoutProfile.toggleStick(target: Int): TouchControlsLayoutProf
     val toggleLeft = AppPreferences.normalizeStickToggleTarget(target) == AppPreferences.STICK_TOGGLE_LEFT
     val stickId = if (toggleLeft) "left_stick" else "right_stick"
     val stick = layouts[stickId] ?: defaults.getValue(stickId)
-    layouts[stickId] = stick.copy(visible = !stick.visible)
-    if (!toggleLeft) return copy(controlLayouts = layouts)
+    // Dedicated second D-pad owned by the toggle. It replaces the selected stick and is
+    // never the extra D-pad users manage in the layout editor.
+    val toggleDpad = layouts["dpad_toggle"] ?: defaults.getValue("dpad_toggle")
 
-    // Preserve the existing left-stick/D-pad swap, including customized positions.
-    listOf("dpad_up", "dpad_down", "dpad_left", "dpad_right").forEach { id ->
-        val button = layouts[id] ?: defaults.getValue(id)
-        layouts[id] = button.copy(visible = stick.visible)
+    // Two-state cycle for the selected stick: stick <-> dedicated second D-pad.
+    val (nextStick, nextToggleDpad) = if (stick.visible) {
+        stick.copy(visible = false) to toggleDpad.copy(visible = true)
+    } else {
+        stick.copy(visible = true) to toggleDpad.copy(visible = false)
     }
-    return copy(
-        controlLayouts = layouts,
-        dpadOffset = lstickOffset,
-        lstickOffset = dpadOffset
-    )
+    layouts[stickId] = nextStick
+    layouts["dpad_toggle"] = nextToggleDpad
+    return copy(controlLayouts = layouts)
 }
 
 fun OverlayLayoutSnapshot.toTouchControlsLayoutProfile(): TouchControlsLayoutProfile {

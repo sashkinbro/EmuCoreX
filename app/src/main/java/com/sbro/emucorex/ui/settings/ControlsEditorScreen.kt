@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -90,7 +92,9 @@ import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlsLayoutProfile
 import com.sbro.emucorex.ui.common.ActionSelector
 import com.sbro.emucorex.ui.common.CustomControlVisual
+import com.sbro.emucorex.ui.common.actionDrawableRes
 import com.sbro.emucorex.ui.common.actionLabel
+import com.sbro.emucorex.ui.common.composeShape
 import com.sbro.emucorex.ui.common.OverlayCanvasButtonSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasDpadClusterSpec
 import com.sbro.emucorex.ui.common.OverlayCanvasStickSpec
@@ -210,6 +214,121 @@ private fun CustomTouchControlLibrary.replacing(control: CustomTouchControl): Cu
 private fun CustomTouchControlLibrary.removing(controlId: String): CustomTouchControlLibrary =
     copy(controls = controls.filterNot { it.id == controlId })
 
+private enum class ControlShapeKind { FACE, DIRECTIONAL, ROUNDED }
+
+private data class ControlAppearance(
+    val shape: CustomTouchControlShape,
+    val cornerDp: Int,
+    val fillColor: Int,
+    val contentColor: Int,
+    val borderColor: Int,
+    val borderWidthDp: Float,
+    val shadowElevationDp: Float,
+    val opacity: Int
+)
+
+private fun ControlAppearance.applyTo(control: CustomTouchControl): CustomTouchControl = control.copy(
+    shape = shape,
+    cornerDp = cornerDp,
+    fillColor = fillColor,
+    contentColor = contentColor,
+    borderColor = borderColor,
+    borderWidthDp = borderWidthDp,
+    shadowElevationDp = shadowElevationDp,
+    opacity = opacity
+)
+
+private fun controlShapeKindForControlId(controlId: String): ControlShapeKind = when {
+    controlId in ActionControlIds -> ControlShapeKind.FACE
+    controlId in DpadControlIds -> ControlShapeKind.DIRECTIONAL
+    else -> ControlShapeKind.ROUNDED
+}
+
+private fun controlShapeKindForAction(actionId: String): ControlShapeKind = when (actionId) {
+    "triangle", "cross", "square", "circle" -> ControlShapeKind.FACE
+    "up", "down", "left", "right" -> ControlShapeKind.DIRECTIONAL
+    else -> ControlShapeKind.ROUNDED
+}
+
+// New controls created from the layout editor must blend with the currently selected
+// touch-control visual style; buttons made in the creator keep their custom look.
+private fun editorControlAppearance(
+    style: TouchControlVisualStyle,
+    kind: ControlShapeKind,
+    scheme: ColorScheme
+): ControlAppearance = when (style) {
+    TouchControlVisualStyle.CLASSIC -> ControlAppearance(
+        shape = if (kind == ControlShapeKind.FACE) {
+            CustomTouchControlShape.CIRCLE
+        } else {
+            CustomTouchControlShape.ROUNDED
+        },
+        cornerDp = if (kind == ControlShapeKind.DIRECTIONAL) 8 else 10,
+        fillColor = 0xFF121824.toInt(),
+        contentColor = 0xFFFFFFFF.toInt(),
+        borderColor = 0xFF6688FF.toInt(),
+        borderWidthDp = 1.5f,
+        shadowElevationDp = 0f,
+        opacity = 90
+    )
+    TouchControlVisualStyle.LEGACY -> ControlAppearance(
+        shape = if (kind == ControlShapeKind.FACE) {
+            CustomTouchControlShape.CIRCLE
+        } else {
+            CustomTouchControlShape.ROUNDED
+        },
+        cornerDp = if (kind == ControlShapeKind.DIRECTIONAL) 12 else 16,
+        fillColor = 0xFF2A2F38.toInt(),
+        contentColor = 0xFFF3F5F8.toInt(),
+        borderColor = 0x8AFFFFFF.toInt(),
+        borderWidthDp = 1f,
+        shadowElevationDp = 0f,
+        opacity = 94
+    )
+    TouchControlVisualStyle.MODERN -> ControlAppearance(
+        shape = CustomTouchControlShape.ROUNDED,
+        cornerDp = when (kind) {
+            ControlShapeKind.FACE -> 32
+            ControlShapeKind.DIRECTIONAL -> 8
+            ControlShapeKind.ROUNDED -> 10
+        },
+        fillColor = 0xFF141B28.toInt(),
+        contentColor = 0xFFF2F6FF.toInt(),
+        borderColor = scheme.primary.toArgb(),
+        borderWidthDp = 1.5f,
+        shadowElevationDp = 4f,
+        opacity = 96
+    )
+    TouchControlVisualStyle.ARCADE -> ControlAppearance(
+        shape = if (kind == ControlShapeKind.ROUNDED) {
+            CustomTouchControlShape.ROUNDED
+        } else {
+            CustomTouchControlShape.CIRCLE
+        },
+        cornerDp = if (kind == ControlShapeKind.DIRECTIONAL) 14 else 12,
+        fillColor = 0xFF3A1430.toInt(),
+        contentColor = 0xFFFFFFFF.toInt(),
+        borderColor = 0xFFFFE29A.toInt(),
+        borderWidthDp = 2f,
+        shadowElevationDp = 0f,
+        opacity = 92
+    )
+    TouchControlVisualStyle.MINIMAL -> ControlAppearance(
+        shape = if (kind == ControlShapeKind.ROUNDED) {
+            CustomTouchControlShape.ROUNDED
+        } else {
+            CustomTouchControlShape.CIRCLE
+        },
+        cornerDp = if (kind == ControlShapeKind.DIRECTIONAL) 6 else 8,
+        fillColor = scheme.surface.toArgb(),
+        contentColor = scheme.onSurface.copy(alpha = 0.88f).toArgb(),
+        borderColor = scheme.onSurface.copy(alpha = 0.52f).toArgb(),
+        borderWidthDp = 1f,
+        shadowElevationDp = 0f,
+        opacity = 45
+    )
+}
+
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun ControlsEditorScreen(
@@ -271,6 +390,9 @@ fun ControlsEditorScreen(
         resources.getString(R.string.touch_control_creator_copy_name, name)
             .take(CustomTouchControl.MAX_NAME_LENGTH)
     }
+    val editorColorScheme = MaterialTheme.colorScheme
+    fun editorAppearance(kind: ControlShapeKind): ControlAppearance =
+        editorControlAppearance(state.touchControlVisualStyle, kind, editorColorScheme)
     val originalOrientation = remember(activity) {
         activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
@@ -320,26 +442,23 @@ fun ControlsEditorScreen(
             val controlId = selectedControlId ?: return
             val actionId = actionIdForControlId(controlId) ?: return
             val geometry = selectedControlGeometry ?: return
-            CustomTouchControl(
-                id = UUID.randomUUID().toString(),
-                name = copiedNameFor(selectedStandardTitle.ifEmpty { controlId }),
-                actionId = actionId,
-                secondaryActionId = selectedLayout?.secondaryActionId,
-                label = CustomTouchControl.defaultLabelFor(actionId),
-                shape = if (controlId in ActionControlIds) {
-                    CustomTouchControlShape.CIRCLE
-                } else {
-                    CustomTouchControlShape.ROUNDED
-                },
-                positionX = (geometry.positionX + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
-                    .coerceIn(0f, 1f),
-                positionY = (geometry.positionY + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
-                    .coerceIn(0f, 1f),
-                widthDp = geometry.widthDp,
-                heightDp = geometry.heightDp,
-                createdAtMillis = now,
-                updatedAtMillis = now
-            )
+            editorAppearance(controlShapeKindForControlId(controlId)).applyTo(
+                CustomTouchControl(
+                    id = UUID.randomUUID().toString(),
+                    name = copiedNameFor(selectedStandardTitle.ifEmpty { controlId }),
+                    actionId = actionId,
+                    secondaryActionId = selectedLayout?.secondaryActionId,
+                    label = CustomTouchControl.defaultLabelFor(actionId),
+                    positionX = (geometry.positionX + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
+                        .coerceIn(0f, 1f),
+                    positionY = (geometry.positionY + CustomTouchControl.DEFAULT_DUPLICATE_OFFSET)
+                        .coerceIn(0f, 1f),
+                    widthDp = geometry.widthDp,
+                    heightDp = geometry.heightDp,
+                    createdAtMillis = now,
+                    updatedAtMillis = now
+                )
+            ).copy(usesVectorStyle = true)
         }
         val insertIndex = sourceCustom?.let { source ->
             editorCustomControls.controls.indexOfFirst { it.id == source.id }
@@ -364,21 +483,23 @@ fun ControlsEditorScreen(
         if (editorCustomControls.controls.size >= CustomTouchControlLibrary.MAX_CONTROLS) return
         if (actionId !in CustomTouchControl.ALLOWED_ACTION_IDS) return
         val now = System.currentTimeMillis()
-        val created = CustomTouchControl(
-            id = UUID.randomUUID().toString(),
-            name = resources.getString(
-                R.string.touch_control_creator_default_name,
-                editorCustomControls.controls.size + 1
-            ).take(CustomTouchControl.MAX_NAME_LENGTH),
-            actionId = actionId,
-            secondaryActionId = secondaryActionId
-                ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS && it != actionId },
-            label = CustomTouchControl.defaultLabelFor(actionId),
-            positionX = 0.5f,
-            positionY = 0.5f,
-            createdAtMillis = now,
-            updatedAtMillis = now
-        )
+        val created = editorAppearance(controlShapeKindForAction(actionId)).applyTo(
+            CustomTouchControl(
+                id = UUID.randomUUID().toString(),
+                name = resources.getString(
+                    R.string.touch_control_creator_default_name,
+                    editorCustomControls.controls.size + 1
+                ).take(CustomTouchControl.MAX_NAME_LENGTH),
+                actionId = actionId,
+                secondaryActionId = secondaryActionId
+                    ?.takeIf { it in CustomTouchControl.ALLOWED_ACTION_IDS && it != actionId },
+                label = CustomTouchControl.defaultLabelFor(actionId),
+                positionX = 0.5f,
+                positionY = 0.5f,
+                createdAtMillis = now,
+                updatedAtMillis = now
+            )
+        ).copy(usesVectorStyle = true)
         updateCustomControls { it.copy(controls = it.controls + created) }
         selectedControlId = customControlSelectionId(created.id)
     }
@@ -1632,15 +1753,32 @@ private fun PreviewLayout(
                     )
                 }
             ) {
-                CustomControlVisual(
-                    control = control,
-                    pressed = selected,
-                    selected = selected,
-                    modifier = Modifier
-                        .size(control.widthDp.dp, control.heightDp.dp)
-                        .graphicsLayer(alpha = if (control.enabled) 1f else 0.38f)
-                        .testTag("controls_editor_custom_${control.id}")
-                )
+                val vectorDrawable = control.takeIf { it.usesVectorStyle }
+                    ?.let { actionDrawableRes(it.actionId) }
+                if (vectorDrawable != null) {
+                    VectorOverlayButton(
+                        drawableRes = vectorDrawable,
+                        width = control.widthDp.dp,
+                        height = control.heightDp.dp,
+                        shape = control.composeShape(),
+                        alpha = if (control.enabled) control.opacity / 100f else 0.38f,
+                        selected = selected,
+                        interactive = false,
+                        visualStyle = state.touchControlVisualStyle,
+                        pressEffect = state.touchControlPressEffect,
+                        modifier = Modifier.testTag("controls_editor_custom_${control.id}")
+                    )
+                } else {
+                    CustomControlVisual(
+                        control = control,
+                        pressed = selected,
+                        selected = selected,
+                        modifier = Modifier
+                            .size(control.widthDp.dp, control.heightDp.dp)
+                            .graphicsLayer(alpha = if (control.enabled) 1f else 0.38f)
+                            .testTag("controls_editor_custom_${control.id}")
+                    )
+                }
             }
         }
 

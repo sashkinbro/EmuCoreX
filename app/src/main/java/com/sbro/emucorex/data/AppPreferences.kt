@@ -486,7 +486,7 @@ class AppPreferences(private val context: Context) {
         const val DEFAULT_TOUCH_HAPTICS_STRENGTH = 60
         const val STICK_TOGGLE_LEFT = 0
         const val STICK_TOGGLE_RIGHT = 1
-        const val DEFAULT_STICK_TOGGLE_TARGET = STICK_TOGGLE_RIGHT
+        const val DEFAULT_STICK_TOGGLE_TARGET = STICK_TOGGLE_LEFT
 
         fun normalizeStickToggleTarget(value: Int): Int =
             if (value == STICK_TOGGLE_LEFT) STICK_TOGGLE_LEFT else STICK_TOGGLE_RIGHT
@@ -537,6 +537,9 @@ class AppPreferences(private val context: Context) {
             "dpad_left" to OverlayControlLayout(visible = false),
             "dpad_right" to OverlayControlLayout(visible = false),
             "dpad_cluster" to OverlayControlLayout(visible = true),
+            // Dedicated second D-pad owned by the stick toggle button: it replaces the
+            // selected stick and follows it. Never the editor-managed extra D-pad.
+            "dpad_toggle" to OverlayControlLayout(visible = false),
             "left_stick" to OverlayControlLayout(scale = stickScale, widthScale = 160, visible = true),
             "triangle" to OverlayControlLayout(),
             "cross" to OverlayControlLayout(),

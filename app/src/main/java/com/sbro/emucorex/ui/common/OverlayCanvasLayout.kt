@@ -54,7 +54,8 @@ data class OverlayCanvasLayout(
     val actionButtons: List<OverlayCanvasButtonSpec>,
     val centerButtons: List<OverlayCanvasButtonSpec>,
     val leftStick: OverlayCanvasStickSpec?,
-    val rightStick: OverlayCanvasStickSpec?
+    val rightStick: OverlayCanvasStickSpec?,
+    val toggleDpad: OverlayCanvasDpadClusterSpec? = null
 ) {
     val allButtons: List<OverlayCanvasButtonSpec> = buildList {
         addAll(leftShoulders)
@@ -92,7 +93,8 @@ fun buildOverlayCanvasLayout(
     safeRightInset: Dp,
     safeTopInset: Dp,
     safeBottomInset: Dp,
-    previewMode: Boolean = false
+    previewMode: Boolean = false,
+    stickToggleTarget: Int = AppPreferences.DEFAULT_STICK_TOGGLE_TARGET
 ): OverlayCanvasLayout {
     fun pxToDp(value: Float): Dp = with(density) { value.toDp() }
 
@@ -586,6 +588,27 @@ fun buildOverlayCanvasLayout(
         visible = rightStickLayout.visible
     )
 
+    // Dedicated toggle D-pad: it replaces whichever stick the on-screen toggle targets,
+    // so it always mirrors that stick's position and size.
+    val toggleDpadLayout = layoutFor("dpad_toggle")
+    val toggleDpadTargetStick = if (
+        AppPreferences.normalizeStickToggleTarget(stickToggleTarget) == AppPreferences.STICK_TOGGLE_LEFT
+    ) {
+        leftStick
+    } else {
+        rightStick
+    }
+    val toggleDpad = OverlayCanvasDpadClusterSpec(
+        id = "dpad_toggle",
+        size = toggleDpadTargetStick.size,
+        baseX = toggleDpadTargetStick.baseX,
+        baseY = toggleDpadTargetStick.baseY,
+        x = toggleDpadTargetStick.baseX + pxToDp(toggleDpadLayout.offset.first),
+        y = toggleDpadTargetStick.baseY + pxToDp(toggleDpadLayout.offset.second),
+        opacity = toggleDpadLayout.opacity,
+        visible = toggleDpadLayout.visible
+    )
+
     return OverlayCanvasLayout(
         leftShoulders = leftShoulders,
         rightShoulders = rightShoulders,
@@ -594,6 +617,7 @@ fun buildOverlayCanvasLayout(
         actionButtons = actionButtons,
         centerButtons = centerButtons.filter { previewMode || it.visible },
         leftStick = leftStick.takeIf { previewMode || it.visible },
-        rightStick = rightStick.takeIf { previewMode || it.visible }
+        rightStick = rightStick.takeIf { previewMode || it.visible },
+        toggleDpad = toggleDpad.takeIf { it.visible }
     )
 }
