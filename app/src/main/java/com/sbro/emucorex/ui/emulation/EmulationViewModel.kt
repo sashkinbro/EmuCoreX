@@ -171,6 +171,9 @@ data class EmulationUiState(
     val gyroInvertY: Boolean = false,
     val gyroStickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET,
     val lightGunAim: Int = AppPreferences.DEFAULT_LIGHT_GUN_AIM,
+    val lightGunCursorEnabled: Boolean = true,
+    val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
+    val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val gamepadStickDeadzone: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE,
     val gamepadLeftStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
     val gamepadRightStickSensitivity: Int = AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY,
@@ -464,6 +467,7 @@ private data class LiveRuntimeSnapshot(
     val gyroInvertY: Boolean,
     val gyroStickTarget: Int,
     val lightGunAim: Int,
+    val lightGunCursorEnabled: Boolean,
     val gamepadRightStickUpToR2: Boolean,
     val gamepadRightStickDownToL2: Boolean,
     val gamepadButtonHaptics: Boolean,
@@ -1282,6 +1286,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { preferences.gyroInvertY.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(gyroInvertY = value) } } }
         viewModelScope.launch { preferences.gyroStickTarget.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(gyroStickTarget = value) } } }
         viewModelScope.launch { preferences.lightGunAim.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(lightGunAim = value) } } }
+        viewModelScope.launch { preferences.lightGunCursorEnabled.collect { value -> applyGlobalRuntimePreferenceUpdate { it.copy(lightGunCursorEnabled = value) } } }
+        viewModelScope.launch { preferences.usbPort1Device.collect { value -> _uiState.value = _uiState.value.copy(usbPort1Device = value) } }
+        viewModelScope.launch { preferences.usbPort2Device.collect { value -> _uiState.value = _uiState.value.copy(usbPort2Device = value) } }
         viewModelScope.launch {
             preferences.ntscFramerate.collect { value ->
                 applyGlobalRuntimePreferenceUpdate { it.copy(ntscFramerate = value) }
@@ -1993,6 +2000,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     gyroInvertY = liveRuntime.gyroInvertY,
                     gyroStickTarget = liveRuntime.gyroStickTarget,
                     lightGunAim = liveRuntime.lightGunAim,
+                    lightGunCursorEnabled = liveRuntime.lightGunCursorEnabled,
                     gamepadRightStickUpToR2 = liveRuntime.gamepadRightStickUpToR2,
                     gamepadRightStickDownToL2 = liveRuntime.gamepadRightStickDownToL2,
                     gamepadButtonHaptics = liveRuntime.gamepadButtonHaptics,
@@ -4252,6 +4260,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gyroInvertY = settings.gyroInvertY,
             gyroStickTarget = settings.gyroStickTarget,
             lightGunAim = settings.lightGunAim,
+            lightGunCursorEnabled = settings.lightGunCursorEnabled,
             gamepadRightStickUpToR2 = settings.gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = settings.gamepadRightStickDownToL2,
             gamepadButtonHaptics = settings.gamepadButtonHaptics,
@@ -4451,6 +4460,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             lightGunAim = pick("lightGunAim", lightGunAim) {
                 lightGunAim ?: this@applyProfile.lightGunAim
             },
+            lightGunCursorEnabled = pick("lightGunCursorEnabled", lightGunCursorEnabled) {
+                lightGunCursorEnabled ?: this@applyProfile.lightGunCursorEnabled
+            },
             gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2) { gamepadRightStickUpToR2 },
             gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2) { gamepadRightStickDownToL2 },
             gamepadButtonHaptics = pick("gamepadButtonHaptics", gamepadButtonHaptics) { gamepadButtonHaptics },
@@ -4595,6 +4607,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             gyroInvertY = gyroInvertY,
             gyroStickTarget = gyroStickTarget,
             lightGunAim = lightGunAim,
+            lightGunCursorEnabled = lightGunCursorEnabled,
             gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
             gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
             gamepadButtonHaptics = gamepadButtonHaptics,
@@ -4663,54 +4676,133 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             forceEvenSpritePosition = forceEvenSpritePosition,
             nativePaletteDraw = nativePaletteDraw
     )
+    private suspend fun EmulationUiState.buildPerGameProvidedKeys(
+        profile: PerGameSettings
+    ): Set<String> {
+        val settings = preferences.settingsSnapshot.first()
+        val globalFrameGeneration = frameGenerationManager.snapshot().settings
+        return buildSet {
+            if (renderer != settings.renderer) add("renderer")
+            if (frameGenerationEnabled != globalFrameGeneration.enabled) add("frameGenerationEnabled")
+            if (frameGenerationMultiplier != globalFrameGeneration.multiplier) add("frameGenerationMultiplier")
+            if (frameGenerationPerformance != globalFrameGeneration.performanceMode) add("frameGenerationPerformance")
+            if (frameGenerationFlowScale != globalFrameGeneration.flowScalePercent) add("frameGenerationFlowScale")
+            if (frameGenerationTargetRate != globalFrameGeneration.targetRefreshRate) add("frameGenerationTargetRate")
+            if (upscale != settings.upscaleMultiplier) add("upscaleMultiplier")
+            if (aspectRatio != settings.aspectRatio) add("aspectRatio")
+            if (localMultiplayerMode != settings.localMultiplayerMode) add("localMultiplayerMode")
+            if (displayCrop != settings.displayCrop) add("displayCrop")
+            if (showFps != settings.showFps) add("showFps")
+            if (fpsOverlayMode != settings.fpsOverlayMode) add("fpsOverlayMode")
+            if (enableInstantVu1 != settings.enableInstantVu1) add("enableInstantVu1")
+            if (enableMtvu != settings.enableMtvu) add("enableMtvu")
+            if (enableThreadPinning != settings.enableThreadPinning) add("enableThreadPinning")
+            if (enableFastCdvd != settings.enableFastCdvd) add("enableFastCdvd")
+            if (enableFastBoot != settings.enableFastBoot) add("enableFastBoot")
+            if (enableCheats != settings.enableCheats) add("enableCheats")
+            if (hwDownloadMode != settings.hwDownloadMode) add("hwDownloadMode")
+            if (eeCycleRate != settings.eeCycleRate) add("eeCycleRate")
+            if (eeCycleSkip != settings.eeCycleSkip) add("eeCycleSkip")
+            if (profile.frameSkip != settings.frameSkip) add("frameSkip")
+            if (skipDuplicateFrames != settings.skipDuplicateFrames) add("skipDuplicateFrames")
+            if (lowLatencyMode != settings.lowLatencyMode) add("lowLatencyMode")
+            if (frameLimitEnabled != settings.frameLimitEnabled) add("frameLimitEnabled")
+            if (racingMode != settings.racingMode) add("racingMode")
+            if (touchscreenRightStick != settings.touchscreenRightStick) add("touchscreenRightStick")
+            if (touchscreenRightStickSensitivity != settings.touchscreenRightStickSensitivity) {
+                add("touchscreenRightStickSensitivity")
+            }
+            if (touchHaptics != settings.touchHaptics) add("touchHaptics")
+            if (stickToggleTarget != settings.stickToggleTarget) add("stickToggleTarget")
+            if (touchHapticsPreset != settings.touchHapticsPreset) add("touchHapticsPreset")
+            if (profile.touchControlVisualStyle != null) add("touchControlVisualStyle")
+            if (profile.touchControlPressEffect != null) add("touchControlPressEffect")
+            if (gyroMode != settings.gyroMode) add("gyroMode")
+            if (gyroSensitivity != settings.gyroSensitivity) add("gyroSensitivity")
+            if (gyroSmoothing != settings.gyroSmoothing) add("gyroSmoothing")
+            if (gyroInvertX != settings.gyroInvertX) add("gyroInvertX")
+            if (gyroInvertY != settings.gyroInvertY) add("gyroInvertY")
+            if (gyroStickTarget != settings.gyroStickTarget) add("gyroStickTarget")
+            if (lightGunAim != settings.lightGunAim) add("lightGunAim")
+            if (lightGunCursorEnabled != settings.lightGunCursorEnabled) add("lightGunCursorEnabled")
+            if (gamepadRightStickUpToR2 != settings.gamepadRightStickUpToR2) add("gamepadRightStickUpToR2")
+            if (gamepadRightStickDownToL2 != settings.gamepadRightStickDownToL2) add("gamepadRightStickDownToL2")
+            if (gamepadButtonHaptics != settings.gamepadButtonHaptics) add("gamepadButtonHaptics")
+            if (gamepadStickDeadzone != settings.gamepadStickDeadzone) add("gamepadStickDeadzone")
+            if (gamepadLeftStickSensitivity != settings.gamepadLeftStickSensitivity) add("gamepadLeftStickSensitivity")
+            if (gamepadRightStickSensitivity != settings.gamepadRightStickSensitivity) add("gamepadRightStickSensitivity")
+            if (gamepadLeftStickNegativeDeadzone != settings.gamepadLeftStickNegativeDeadzone) add("gamepadLeftStickNegativeDeadzone")
+            if (gamepadRightStickNegativeDeadzone != settings.gamepadRightStickNegativeDeadzone) add("gamepadRightStickNegativeDeadzone")
+            if (gamepadLeftStickAntiDeadzone != settings.gamepadLeftStickAntiDeadzone) add("gamepadLeftStickAntiDeadzone")
+            if (gamepadRightStickAntiDeadzone != settings.gamepadRightStickAntiDeadzone) add("gamepadRightStickAntiDeadzone")
+            if (gamepadLeftStickCurve != settings.gamepadLeftStickCurve) add("gamepadLeftStickCurve")
+            if (gamepadRightStickCurve != settings.gamepadRightStickCurve) add("gamepadRightStickCurve")
+            if (gamepadBindingsByPad.isNotEmpty()) add("gamepadBindingsByPad")
+            if (pressureModifierAmount != settings.pressureModifierAmount) add("pressureModifierAmount")
+            if (autoSaveOnExit) add("autoSaveOnExit")
+            if (autoLoadOnStart) add("autoLoadOnStart")
+            if (targetFps != settings.targetFps) add("targetFps")
+            if (ntscFramerate != settings.ntscFramerate) add("ntscFramerate")
+            if (palFramerate != settings.palFramerate) add("palFramerate")
+            if (textureFiltering != settings.textureFiltering) add("textureFiltering")
+            if (trilinearFiltering != settings.trilinearFiltering) add("trilinearFiltering")
+            if (blendingAccuracy != settings.blendingAccuracy) add("blendingAccuracy")
+            if (texturePreloading != settings.texturePreloading) add("texturePreloading")
+            if (enableFxaa != settings.enableFxaa) add("enableFxaa")
+            if (casMode != settings.casMode) add("casMode")
+            if (sgsrMode != settings.sgsrMode) add("sgsrMode")
+            if (casSharpness != settings.casSharpness) add("casSharpness")
+            if (tvShader != settings.tvShader) add("tvShader")
+            if (shadeBoostEnabled != settings.shadeBoostEnabled) add("shadeBoostEnabled")
+            if (shadeBoostBrightness != settings.shadeBoostBrightness) add("shadeBoostBrightness")
+            if (shadeBoostContrast != settings.shadeBoostContrast) add("shadeBoostContrast")
+            if (shadeBoostSaturation != settings.shadeBoostSaturation) add("shadeBoostSaturation")
+            if (shadeBoostGamma != settings.shadeBoostGamma) add("shadeBoostGamma")
+            if (anisotropicFiltering != settings.anisotropicFiltering) add("anisotropicFiltering")
+            if (enableHwMipmapping != settings.enableHwMipmapping) add("enableHwMipmapping")
+            if (antiBlur != settings.antiBlur) add("antiBlur")
+            if (deinterlaceMode != settings.deinterlaceMode) add("deinterlaceMode")
+            if (dithering != settings.dithering) add("dithering")
+            if (profile.enableWidescreenPatches != settings.enableWidescreenPatches) add("enableWidescreenPatches")
+            if (profile.enableNoInterlacingPatches != settings.enableNoInterlacingPatches) add("enableNoInterlacingPatches")
+            if (cpuSpriteRenderSize != settings.cpuSpriteRenderSize) add("cpuSpriteRenderSize")
+            if (cpuSpriteRenderLevel != settings.cpuSpriteRenderLevel) add("cpuSpriteRenderLevel")
+            if (softwareClutRender != settings.softwareClutRender) add("softwareClutRender")
+            if (gpuTargetClutMode != settings.gpuTargetClutMode) add("gpuTargetClutMode")
+            if (skipDrawStart != settings.skipDrawStart) add("skipDrawStart")
+            if (skipDrawEnd != settings.skipDrawEnd) add("skipDrawEnd")
+            if (autoFlushHardware != settings.autoFlushHardware) add("autoFlushHardware")
+            if (cpuFramebufferConversion != settings.cpuFramebufferConversion) add("cpuFramebufferConversion")
+            if (disableDepthConversion != settings.disableDepthConversion) add("disableDepthConversion")
+            if (disableSafeFeatures != settings.disableSafeFeatures) add("disableSafeFeatures")
+            if (disableRenderFixes != settings.disableRenderFixes) add("disableRenderFixes")
+            if (preloadFrameData != settings.preloadFrameData) add("preloadFrameData")
+            if (disablePartialInvalidation != settings.disablePartialInvalidation) add("disablePartialInvalidation")
+            if (textureInsideRt != settings.textureInsideRt) add("textureInsideRt")
+            if (readTargetsOnClose != settings.readTargetsOnClose) add("readTargetsOnClose")
+            if (estimateTextureRegion != settings.estimateTextureRegion) add("estimateTextureRegion")
+            if (gpuPaletteConversion != settings.gpuPaletteConversion) add("gpuPaletteConversion")
+            if (halfPixelOffset != settings.halfPixelOffset) add("halfPixelOffset")
+            if (nativeScaling != settings.nativeScaling) add("nativeScaling")
+            if (roundSprite != settings.roundSprite) add("roundSprite")
+            if (bilinearUpscale != settings.bilinearUpscale) add("bilinearUpscale")
+            if (textureOffsetX != settings.textureOffsetX) add("textureOffsetX")
+            if (textureOffsetY != settings.textureOffsetY) add("textureOffsetY")
+            if (alignSprite != settings.alignSprite) add("alignSprite")
+            if (mergeSprite != settings.mergeSprite) add("mergeSprite")
+            if (forceEvenSpritePosition != settings.forceEvenSpritePosition) add("forceEvenSpritePosition")
+            if (nativePaletteDraw != settings.nativePaletteDraw) add("nativePaletteDraw")
+        }
+    }
+
     private suspend fun EmulationUiState.toPerGameSettings(
         gameKey: String,
         gameTitle: String,
         gameSerial: String?
     ): PerGameSettings {
-        val globalFrameGeneration = frameGenerationManager.snapshot().settings
-        val globalShowFps = preferences.showFps.first()
-        val globalFpsOverlayMode = preferences.fpsOverlayMode.first()
-        val globalEnableInstantVu1 = preferences.enableInstantVu1.first()
-        val globalEnableMtvu = preferences.enableMtvu.first()
-        val globalEnableThreadPinning = preferences.enableThreadPinning.first()
-        val globalEnableFastCdvd = preferences.enableFastCdvd.first()
-        val globalEnableFastBoot = preferences.enableFastBoot.first()
-        val globalEnableCheats = preferences.enableCheats.first()
-        val globalHwDownloadMode = preferences.hwDownloadMode.first()
-        val globalEeCycleRate = preferences.eeCycleRate.first()
-        val globalEeCycleSkip = preferences.eeCycleSkip.first()
-        val globalSkipDuplicateFrames = preferences.skipDuplicateFrames.first()
-        val globalLowLatencyMode = preferences.lowLatencyMode.first()
-        val globalFrameLimitEnabled = preferences.frameLimitEnabled.first()
-        val globalRacingMode = preferences.racingMode.first()
-        val globalTouchscreenRightStick = preferences.touchscreenRightStick.first()
-        val globalTouchscreenRightStickSensitivity = preferences.touchscreenRightStickSensitivity.first()
-        val globalTouchHaptics = preferences.touchHaptics.first()
-        val globalStickToggleTarget = preferences.stickToggleTarget.first()
-        val globalTouchHapticsPreset = preferences.touchHapticsPreset.first()
-        val globalTouchControlVisualStyle = preferences.touchControlVisualStyle.first()
-        val globalTouchControlPressEffect = preferences.touchControlPressEffect.first()
-        val globalGyroMode = preferences.gyroMode.first()
-        val globalGyroSensitivity = preferences.gyroSensitivity.first()
-        val globalGyroSmoothing = preferences.gyroSmoothing.first()
-        val globalGyroInvertX = preferences.gyroInvertX.first()
-        val globalGyroInvertY = preferences.gyroInvertY.first()
-        val globalGyroStickTarget = preferences.gyroStickTarget.first()
-        val globalLightGunAim = preferences.lightGunAim.first()
-        val globalGamepadRightStickUpToR2 = preferences.gamepadRightStickUpToR2.first()
-        val globalGamepadRightStickDownToL2 = preferences.gamepadRightStickDownToL2.first()
-        val globalGamepadButtonHaptics = preferences.gamepadButtonHaptics.first()
-        val globalPressureModifierAmount = preferences.pressureModifierAmount.first()
-        val globalTargetFps = preferences.targetFps.first()
-        val globalNtscFramerate = preferences.ntscFramerate.first()
-        val globalPalFramerate = preferences.palFramerate.first()
-        val globalWidescreenPatches = preferences.enableWidescreenPatches.first()
-        val globalNoInterlacingPatches = preferences.enableNoInterlacingPatches.first()
-        val globalAntiBlur = preferences.antiBlur.first()
-        val globalDeinterlaceMode = preferences.deinterlaceMode.first()
-        val globalDithering = preferences.dithering.first()
-
+        val settings = preferences.settingsSnapshot.first()
+        val globalTouchControlVisualStyle = settings.touchControlVisualStyle
+        val globalTouchControlPressEffect = settings.touchControlPressEffect
         val profile = buildPerGameProfile(
             gameKey = gameKey,
             gameTitle = gameTitle,
@@ -4719,119 +4811,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             globalTouchControlPressEffect = globalTouchControlPressEffect
         )
 
-        val providedKeys = buildSet {
-            if (renderer != preferences.renderer.first()) add("renderer")
-            if (frameGenerationEnabled != globalFrameGeneration.enabled) add("frameGenerationEnabled")
-            if (frameGenerationMultiplier != globalFrameGeneration.multiplier) add("frameGenerationMultiplier")
-            if (frameGenerationPerformance != globalFrameGeneration.performanceMode) add("frameGenerationPerformance")
-            if (frameGenerationFlowScale != globalFrameGeneration.flowScalePercent) add("frameGenerationFlowScale")
-            if (frameGenerationTargetRate != globalFrameGeneration.targetRefreshRate) add("frameGenerationTargetRate")
-            if (upscale != preferences.upscaleMultiplier.first()) add("upscaleMultiplier")
-            if (aspectRatio != preferences.aspectRatio.first()) add("aspectRatio")
-            if (localMultiplayerMode != preferences.localMultiplayerMode.first()) add("localMultiplayerMode")
-            if (displayCrop != preferences.displayCrop.first()) add("displayCrop")
-            if (showFps != globalShowFps) add("showFps")
-            if (fpsOverlayMode != globalFpsOverlayMode) add("fpsOverlayMode")
-            if (enableInstantVu1 != globalEnableInstantVu1) add("enableInstantVu1")
-            if (enableMtvu != globalEnableMtvu) add("enableMtvu")
-            if (enableThreadPinning != globalEnableThreadPinning) add("enableThreadPinning")
-            if (enableFastCdvd != globalEnableFastCdvd) add("enableFastCdvd")
-            if (enableFastBoot != globalEnableFastBoot) add("enableFastBoot")
-            if (enableCheats != globalEnableCheats) add("enableCheats")
-            if (hwDownloadMode != globalHwDownloadMode) add("hwDownloadMode")
-            if (eeCycleRate != globalEeCycleRate) add("eeCycleRate")
-            if (eeCycleSkip != globalEeCycleSkip) add("eeCycleSkip")
-            if (profile.frameSkip != preferences.frameSkip.first()) add("frameSkip")
-            if (skipDuplicateFrames != globalSkipDuplicateFrames) add("skipDuplicateFrames")
-            if (lowLatencyMode != globalLowLatencyMode) add("lowLatencyMode")
-            if (frameLimitEnabled != globalFrameLimitEnabled) add("frameLimitEnabled")
-            if (racingMode != globalRacingMode) add("racingMode")
-            if (touchscreenRightStick != globalTouchscreenRightStick) add("touchscreenRightStick")
-            if (touchscreenRightStickSensitivity != globalTouchscreenRightStickSensitivity) {
-                add("touchscreenRightStickSensitivity")
-            }
-            if (touchHaptics != globalTouchHaptics) add("touchHaptics")
-            if (stickToggleTarget != globalStickToggleTarget) add("stickToggleTarget")
-            if (touchHapticsPreset != globalTouchHapticsPreset) add("touchHapticsPreset")
-            if (profile.touchControlVisualStyle != null) add("touchControlVisualStyle")
-            if (profile.touchControlPressEffect != null) add("touchControlPressEffect")
-            if (gyroMode != globalGyroMode) add("gyroMode")
-            if (gyroSensitivity != globalGyroSensitivity) add("gyroSensitivity")
-            if (gyroSmoothing != globalGyroSmoothing) add("gyroSmoothing")
-            if (gyroInvertX != globalGyroInvertX) add("gyroInvertX")
-            if (gyroInvertY != globalGyroInvertY) add("gyroInvertY")
-            if (gyroStickTarget != globalGyroStickTarget) add("gyroStickTarget")
-            if (lightGunAim != globalLightGunAim) add("lightGunAim")
-            if (gamepadRightStickUpToR2 != globalGamepadRightStickUpToR2) add("gamepadRightStickUpToR2")
-            if (gamepadRightStickDownToL2 != globalGamepadRightStickDownToL2) add("gamepadRightStickDownToL2")
-            if (gamepadButtonHaptics != globalGamepadButtonHaptics) add("gamepadButtonHaptics")
-            if (gamepadStickDeadzone != preferences.gamepadStickDeadzone.first()) add("gamepadStickDeadzone")
-            if (gamepadLeftStickSensitivity != preferences.gamepadLeftStickSensitivity.first()) add("gamepadLeftStickSensitivity")
-            if (gamepadRightStickSensitivity != preferences.gamepadRightStickSensitivity.first()) add("gamepadRightStickSensitivity")
-            if (gamepadLeftStickNegativeDeadzone != preferences.gamepadLeftStickNegativeDeadzone.first()) add("gamepadLeftStickNegativeDeadzone")
-            if (gamepadRightStickNegativeDeadzone != preferences.gamepadRightStickNegativeDeadzone.first()) add("gamepadRightStickNegativeDeadzone")
-            if (gamepadLeftStickAntiDeadzone != preferences.gamepadLeftStickAntiDeadzone.first()) add("gamepadLeftStickAntiDeadzone")
-            if (gamepadRightStickAntiDeadzone != preferences.gamepadRightStickAntiDeadzone.first()) add("gamepadRightStickAntiDeadzone")
-            if (gamepadLeftStickCurve != preferences.gamepadLeftStickCurve.first()) add("gamepadLeftStickCurve")
-            if (gamepadRightStickCurve != preferences.gamepadRightStickCurve.first()) add("gamepadRightStickCurve")
-            if (gamepadBindingsByPad.isNotEmpty()) add("gamepadBindingsByPad")
-            if (pressureModifierAmount != globalPressureModifierAmount) add("pressureModifierAmount")
-            if (autoSaveOnExit) add("autoSaveOnExit")
-            if (autoLoadOnStart) add("autoLoadOnStart")
-            if (targetFps != globalTargetFps) add("targetFps")
-            if (ntscFramerate != globalNtscFramerate) add("ntscFramerate")
-            if (palFramerate != globalPalFramerate) add("palFramerate")
-            if (textureFiltering != preferences.textureFiltering.first()) add("textureFiltering")
-            if (trilinearFiltering != preferences.trilinearFiltering.first()) add("trilinearFiltering")
-            if (blendingAccuracy != preferences.blendingAccuracy.first()) add("blendingAccuracy")
-            if (texturePreloading != preferences.texturePreloading.first()) add("texturePreloading")
-            if (enableFxaa != preferences.enableFxaa.first()) add("enableFxaa")
-            if (casMode != preferences.casMode.first()) add("casMode")
-            if (sgsrMode != preferences.sgsrMode.first()) add("sgsrMode")
-            if (casSharpness != preferences.casSharpness.first()) add("casSharpness")
-            if (tvShader != preferences.tvShader.first()) add("tvShader")
-            if (shadeBoostEnabled != preferences.shadeBoostEnabled.first()) add("shadeBoostEnabled")
-            if (shadeBoostBrightness != preferences.shadeBoostBrightness.first()) add("shadeBoostBrightness")
-            if (shadeBoostContrast != preferences.shadeBoostContrast.first()) add("shadeBoostContrast")
-            if (shadeBoostSaturation != preferences.shadeBoostSaturation.first()) add("shadeBoostSaturation")
-            if (shadeBoostGamma != preferences.shadeBoostGamma.first()) add("shadeBoostGamma")
-            if (anisotropicFiltering != preferences.anisotropicFiltering.first()) add("anisotropicFiltering")
-            if (enableHwMipmapping != preferences.enableHwMipmapping.first()) add("enableHwMipmapping")
-            if (antiBlur != globalAntiBlur) add("antiBlur")
-            if (deinterlaceMode != globalDeinterlaceMode) add("deinterlaceMode")
-            if (dithering != globalDithering) add("dithering")
-            if (profile.enableWidescreenPatches != globalWidescreenPatches) add("enableWidescreenPatches")
-            if (profile.enableNoInterlacingPatches != globalNoInterlacingPatches) add("enableNoInterlacingPatches")
-            if (cpuSpriteRenderSize != preferences.cpuSpriteRenderSize.first()) add("cpuSpriteRenderSize")
-            if (cpuSpriteRenderLevel != preferences.cpuSpriteRenderLevel.first()) add("cpuSpriteRenderLevel")
-            if (softwareClutRender != preferences.softwareClutRender.first()) add("softwareClutRender")
-            if (gpuTargetClutMode != preferences.gpuTargetClutMode.first()) add("gpuTargetClutMode")
-            if (skipDrawStart != preferences.skipDrawStart.first()) add("skipDrawStart")
-            if (skipDrawEnd != preferences.skipDrawEnd.first()) add("skipDrawEnd")
-            if (autoFlushHardware != preferences.autoFlushHardware.first()) add("autoFlushHardware")
-            if (cpuFramebufferConversion != preferences.cpuFramebufferConversion.first()) add("cpuFramebufferConversion")
-            if (disableDepthConversion != preferences.disableDepthConversion.first()) add("disableDepthConversion")
-            if (disableSafeFeatures != preferences.disableSafeFeatures.first()) add("disableSafeFeatures")
-            if (disableRenderFixes != preferences.disableRenderFixes.first()) add("disableRenderFixes")
-            if (preloadFrameData != preferences.preloadFrameData.first()) add("preloadFrameData")
-            if (disablePartialInvalidation != preferences.disablePartialInvalidation.first()) add("disablePartialInvalidation")
-            if (textureInsideRt != preferences.textureInsideRt.first()) add("textureInsideRt")
-            if (readTargetsOnClose != preferences.readTargetsOnClose.first()) add("readTargetsOnClose")
-            if (estimateTextureRegion != preferences.estimateTextureRegion.first()) add("estimateTextureRegion")
-            if (gpuPaletteConversion != preferences.gpuPaletteConversion.first()) add("gpuPaletteConversion")
-            if (halfPixelOffset != preferences.halfPixelOffset.first()) add("halfPixelOffset")
-            if (nativeScaling != preferences.nativeScaling.first()) add("nativeScaling")
-            if (roundSprite != preferences.roundSprite.first()) add("roundSprite")
-            if (bilinearUpscale != preferences.bilinearUpscale.first()) add("bilinearUpscale")
-            if (textureOffsetX != preferences.textureOffsetX.first()) add("textureOffsetX")
-            if (textureOffsetY != preferences.textureOffsetY.first()) add("textureOffsetY")
-            if (alignSprite != preferences.alignSprite.first()) add("alignSprite")
-            if (mergeSprite != preferences.mergeSprite.first()) add("mergeSprite")
-            if (forceEvenSpritePosition != preferences.forceEvenSpritePosition.first()) add("forceEvenSpritePosition")
-            if (nativePaletteDraw != preferences.nativePaletteDraw.first()) add("nativePaletteDraw")
-        }
 
-        return profile.copy(providedKeys = providedKeys)
+        return profile.copy(providedKeys = buildPerGameProvidedKeys(profile))
     }
 
     fun refreshAvailableCheats() {

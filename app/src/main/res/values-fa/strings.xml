@@ -1572,6 +1572,9 @@
     <string name="settings_gyro_stick">استیک ژیروسکوپ</string>
     <string name="settings_light_gun_aim">نشانه‌گیری تفنگ نوری</string>
     <string name="settings_light_gun_aim_gyro">ژیروسکوپ</string>
+    <string name="settings_light_gun_cursor">نمایش نشانگر نشانه‌گیری</string>
+    <string name="settings_light_gun_cursor_desc">نقطه‌ای را در محل نشانه‌گیری تفنگ نوری می‌کشد.</string>
+    <string name="settings_help_light_gun_cursor">اگر بازی خودش نشانگر دارد، خاموش کنید.</string>
     <string name="settings_gyro_aim_left">نشانه‌گیری - استیک چپ</string>
     <string name="onboarding_games_selected_count">%1$d پوشه انتخاب شد. برای افزودن پوشه دیگر ضربه بزنید.</string>
     <string name="settings_game_folders_count">%1$d پوشه انتخاب شد</string>

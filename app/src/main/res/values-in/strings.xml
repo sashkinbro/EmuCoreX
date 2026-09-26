@@ -1572,6 +1572,9 @@
     <string name="settings_gyro_stick">Stik giroskop</string>
     <string name="settings_light_gun_aim">Bidikan pistol cahaya</string>
     <string name="settings_light_gun_aim_gyro">Giroskop</string>
+    <string name="settings_light_gun_cursor">Tampilkan kursor bidik</string>
+    <string name="settings_light_gun_cursor_desc">Menggambar titik di tempat pistol cahaya membidik.</string>
+    <string name="settings_help_light_gun_cursor">Matikan jika gim sudah menggambar retikelnya sendiri.</string>
     <string name="settings_gyro_aim_left">Bidik - stik kiri</string>
     <string name="onboarding_games_selected_count">%1$d folder dipilih. Ketuk untuk menambahkan lagi.</string>
     <string name="settings_game_folders_count">%1$d folder dipilih</string>

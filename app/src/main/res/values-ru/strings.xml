@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">Стик гироскопа</string>
     <string name="settings_light_gun_aim">Прицел светового пистолета</string>
     <string name="settings_light_gun_aim_gyro">Гироскоп</string>
+    <string name="settings_light_gun_cursor">Показывать прицел</string>
+    <string name="settings_light_gun_cursor_desc">Рисует точку там, куда наводит световой пистолет.</string>
+    <string name="settings_help_light_gun_cursor">Отключи, если игра сама рисует прицел.</string>
     <string name="settings_gyro_aim_left">Прицеливание — левый стик</string>
     <string name="onboarding_games_selected_count">Выбрано папок: %1$d. Нажмите, чтобы добавить еще одну.</string>
     <string name="settings_game_folders_count">Выбрано папок: %1$d</string>

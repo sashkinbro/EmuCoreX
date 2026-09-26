@@ -1557,6 +1557,9 @@
     <string name="settings_gyro_stick">자이로 스틱</string>
     <string name="settings_light_gun_aim">라이트건 조준</string>
     <string name="settings_light_gun_aim_gyro">자이로스코프</string>
+    <string name="settings_light_gun_cursor">조준 커서 표시</string>
+    <string name="settings_light_gun_cursor_desc">라이트건이 가리키는 곳에 점을 그립니다.</string>
+    <string name="settings_help_light_gun_cursor">게임이 자체 조준점을 그리면 끄세요.</string>
     <string name="settings_gyro_aim_left">조준 - 왼쪽 스틱</string>
     <string name="onboarding_games_selected_count">%1$d개의 폴더가 선택되었습니다. 탭하여 다른 폴더를 추가하세요.</string>
     <string name="settings_game_folders_count">%1$d개의 폴더가 선택되었습니다</string>

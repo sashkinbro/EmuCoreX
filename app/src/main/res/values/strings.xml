@@ -1732,6 +1732,9 @@
     <string name="settings_gyro_stick">Gyro stick</string>
     <string name="settings_light_gun_aim">Light gun aim</string>
     <string name="settings_light_gun_aim_gyro">Gyroscope</string>
+    <string name="settings_light_gun_cursor">Show aim cursor</string>
+    <string name="settings_light_gun_cursor_desc">Draws a dot where the light gun points.</string>
+    <string name="settings_help_light_gun_cursor">Turn off if the game already draws its own reticle.</string>
     <string name="settings_gyro_aim_left">Aim - left stick</string>
     <string name="settings_audio_tab">Audio</string>
     <string name="settings_audio_control">Audio control</string>

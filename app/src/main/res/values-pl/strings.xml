@@ -1656,6 +1656,9 @@
     <string name="settings_gyro_stick">Drążek żyroskopu</string>
     <string name="settings_light_gun_aim">Celowanie pistoletem świetlnym</string>
     <string name="settings_light_gun_aim_gyro">Żyroskop</string>
+    <string name="settings_light_gun_cursor">Pokaż celownik</string>
+    <string name="settings_light_gun_cursor_desc">Rysuje kropkę tam, gdzie celuje pistolet świetlny.</string>
+    <string name="settings_help_light_gun_cursor">Wyłącz, jeśli gra sama rysuje celownik.</string>
     <string name="settings_gyro_aim_left">Celowanie — lewy drążek</string>
     <string name="settings_audio_tab">Dźwięk</string>
     <string name="settings_audio_control">Kontrola dźwięku</string>

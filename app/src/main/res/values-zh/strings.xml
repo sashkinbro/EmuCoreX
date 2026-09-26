@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">陀螺仪摇杆</string>
     <string name="settings_light_gun_aim">光枪瞄准</string>
     <string name="settings_light_gun_aim_gyro">陀螺仪</string>
+    <string name="settings_light_gun_cursor">显示瞄准光标</string>
+    <string name="settings_light_gun_cursor_desc">在光枪指向的位置绘制一个点。</string>
+    <string name="settings_help_light_gun_cursor">如果游戏自带准星，请关闭。</string>
     <string name="settings_gyro_aim_left">瞄准 - 左摇杆</string>
     <string name="onboarding_games_selected_count">已选择 %1$d 个文件夹。点击以添加其他文件夹。</string>
     <string name="settings_game_folders_count">已选择 %1$d 个文件夹</string>

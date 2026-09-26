@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">Stick del giroscopio</string>
     <string name="settings_light_gun_aim">Apuntado de pistola de luz</string>
     <string name="settings_light_gun_aim_gyro">Giroscopio</string>
+    <string name="settings_light_gun_cursor">Mostrar punto de mira</string>
+    <string name="settings_light_gun_cursor_desc">Dibuja un punto donde apunta la pistola de luz.</string>
+    <string name="settings_help_light_gun_cursor">Desactívalo si el juego ya dibuja su propia mira.</string>
     <string name="settings_gyro_aim_left">Apuntar - stick izquierdo</string>
     <string name="onboarding_games_selected_count">%1$d carpetas seleccionadas. Toca para añadir otra.</string>
     <string name="settings_game_folders_count">%1$d carpetas seleccionadas</string>

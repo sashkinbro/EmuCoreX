@@ -764,6 +764,20 @@ fun EmulationScreen(
             gyroController.stop()
         }
     }
+
+    // Gun bindings may share physical buttons with the normal pad mapping; they must take
+    // over only while a light-gun context (gyro gun mode or a GunCon2 USB port) is active.
+    val lightGunInputContext = uiState.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN ||
+        uiState.usbPort1Device == AppPreferences.USB_DEVICE_GUNCON2 ||
+        uiState.usbPort2Device == AppPreferences.USB_DEVICE_GUNCON2
+    LaunchedEffect(lightGunInputContext) {
+        GamepadManager.setLightGunModeActive(lightGunInputContext)
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            GamepadManager.setLightGunModeActive(false)
+        }
+    }
     var showGamepadIndicator by remember { mutableStateOf(gamepadConnected) }
 
     val tvUiEnabled = LocalTvUiEnvironment.current.enabled
@@ -1554,6 +1568,7 @@ fun EmulationScreen(
         val lightGunAimPosition = lightGunAim
         if (
             uiState.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN &&
+            uiState.lightGunCursorEnabled &&
             uiState.isRunning &&
             !uiState.isPaused &&
             !uiState.showMenu &&

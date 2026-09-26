@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">Stick gyroscopique</string>
     <string name="settings_light_gun_aim">Viser au pistolet optique</string>
     <string name="settings_light_gun_aim_gyro">Gyroscope</string>
+    <string name="settings_light_gun_cursor">Afficher le viseur</string>
+    <string name="settings_light_gun_cursor_desc">Dessine un point là où pointe le pistolet optique.</string>
+    <string name="settings_help_light_gun_cursor">Désactive si le jeu dessine déjà son propre réticule.</string>
     <string name="settings_gyro_aim_left">Viser - stick gauche</string>
     <string name="onboarding_games_selected_count">%1$d dossiers sélectionnés. Touchez pour en ajouter un autre.</string>
     <string name="settings_game_folders_count">%1$d dossiers sélectionnés</string>

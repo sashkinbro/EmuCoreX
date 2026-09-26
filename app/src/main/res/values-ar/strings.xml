@@ -1557,6 +1557,9 @@
     <string name="settings_gyro_stick">عصا الجيروسكوب</string>
     <string name="settings_light_gun_aim">تصويب المسدس الضوئي</string>
     <string name="settings_light_gun_aim_gyro">الجيروسكوب</string>
+    <string name="settings_light_gun_cursor">إظهار مؤشر التصويب</string>
+    <string name="settings_light_gun_cursor_desc">يرسم نقطة حيث يشير المسدس الضوئي.</string>
+    <string name="settings_help_light_gun_cursor">أوقفه إذا كانت اللعبة ترسم مؤشرها الخاص.</string>
     <string name="settings_gyro_aim_left">التصويب - العصا اليسرى</string>
     <string name="onboarding_games_selected_count">تم تحديد %1$d مجلد/مجلدات. انقر لإضافة مجلد آخر.</string>
     <string name="settings_game_folders_count">تم تحديد %1$d مجلد/مجلدات</string>

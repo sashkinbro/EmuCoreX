@@ -230,6 +230,7 @@ data class SettingsSnapshot(
     val gyroInvertY: Boolean = false,
     val gyroStickTarget: Int = AppPreferences.DEFAULT_GYRO_STICK_TARGET,
     val lightGunAim: Int = AppPreferences.DEFAULT_LIGHT_GUN_AIM,
+    val lightGunCursorEnabled: Boolean = true,
     val usbPort1Device: Int = AppPreferences.USB_DEVICE_NONE,
     val usbPort2Device: Int = AppPreferences.USB_DEVICE_NONE,
     val leftStickSensitivity: Int = AppPreferences.DEFAULT_STICK_SENSITIVITY,
@@ -359,7 +360,7 @@ class AppPreferences(private val context: Context) {
             "touchscreenRightStickSensitivity", "touchHaptics", "touchHapticsPreset", "stickToggleTarget",
             "touchHapticsStrength", "gyroMode", "gyroSensitivity", "gyroSmoothing",
             "gyroInvertX", "gyroInvertY", "gyroStickTarget", "lightGunAim",
-            "usbPort1Device", "usbPort2Device",
+            "lightGunCursorEnabled", "usbPort1Device", "usbPort2Device",
             "gamepadStickDeadzone", "gamepadLeftStickSensitivity",
             "gamepadRightStickSensitivity", "gamepadLeftStickNegativeDeadzone",
             "gamepadRightStickNegativeDeadzone", "gamepadLeftStickAntiDeadzone",
@@ -776,6 +777,7 @@ class AppPreferences(private val context: Context) {
         private val GYRO_INVERT_Y = booleanPreferencesKey("gyro_invert_y")
         private val GYRO_STICK_TARGET = intPreferencesKey("gyro_stick_target")
         private val LIGHT_GUN_AIM = intPreferencesKey("light_gun_aim")
+        private val LIGHT_GUN_CURSOR = booleanPreferencesKey("light_gun_cursor")
         private val USB_PORT1_DEVICE = intPreferencesKey("usb_port1_device")
         private val USB_PORT2_DEVICE = intPreferencesKey("usb_port2_device")
         private val GAMEPAD_BUTTON_HAPTICS = booleanPreferencesKey("gamepad_button_haptics")
@@ -1971,6 +1973,7 @@ class AppPreferences(private val context: Context) {
                     .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT),
                 lightGunAim = (prefs[LIGHT_GUN_AIM] ?: DEFAULT_LIGHT_GUN_AIM)
                     .coerceIn(LIGHT_GUN_AIM_GYRO, LIGHT_GUN_AIM_RIGHT_STICK),
+                lightGunCursorEnabled = prefs[LIGHT_GUN_CURSOR] ?: true,
                 usbPort1Device = (prefs[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE)
                     .coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2),
                 usbPort2Device = (prefs[USB_PORT2_DEVICE] ?: USB_DEVICE_NONE)
@@ -2284,6 +2287,12 @@ class AppPreferences(private val context: Context) {
         context.dataStore.edit {
             it[LIGHT_GUN_AIM] = value.coerceIn(LIGHT_GUN_AIM_GYRO, LIGHT_GUN_AIM_RIGHT_STICK)
         }
+    }
+    val lightGunCursorEnabled: Flow<Boolean> = context.dataStore.data.map {
+        it[LIGHT_GUN_CURSOR] ?: true
+    }
+    suspend fun setLightGunCursorEnabled(value: Boolean) {
+        context.dataStore.edit { it[LIGHT_GUN_CURSOR] = value }
     }
     val usbPort1Device: Flow<Int> = context.dataStore.data.map {
         (it[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE).coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2)
@@ -4126,6 +4135,7 @@ class AppPreferences(private val context: Context) {
         put("gyroInvertY", prefs[GYRO_INVERT_Y] ?: false)
         put("gyroStickTarget", prefs[GYRO_STICK_TARGET] ?: DEFAULT_GYRO_STICK_TARGET)
         put("lightGunAim", prefs[LIGHT_GUN_AIM] ?: DEFAULT_LIGHT_GUN_AIM)
+        put("lightGunCursorEnabled", prefs[LIGHT_GUN_CURSOR] ?: true)
         put("usbPort1Device", prefs[USB_PORT1_DEVICE] ?: USB_DEVICE_NONE)
         put("usbPort2Device", prefs[USB_PORT2_DEVICE] ?: USB_DEVICE_NONE)
             put("gamepadStickDeadzone", prefs[GAMEPAD_STICK_DEADZONE] ?: DEFAULT_GAMEPAD_STICK_DEADZONE)
@@ -4566,6 +4576,7 @@ class AppPreferences(private val context: Context) {
             .coerceIn(GYRO_STICK_RIGHT, GYRO_STICK_LEFT)
         prefs[LIGHT_GUN_AIM] = json.optInt("lightGunAim", DEFAULT_LIGHT_GUN_AIM)
             .coerceIn(LIGHT_GUN_AIM_GYRO, LIGHT_GUN_AIM_RIGHT_STICK)
+        prefs[LIGHT_GUN_CURSOR] = json.optBoolean("lightGunCursorEnabled", true)
         prefs[USB_PORT1_DEVICE] = json.optInt("usbPort1Device", USB_DEVICE_NONE)
             .coerceIn(USB_DEVICE_NONE, USB_DEVICE_GUNCON2)
         prefs[USB_PORT2_DEVICE] = json.optInt("usbPort2Device", USB_DEVICE_NONE)

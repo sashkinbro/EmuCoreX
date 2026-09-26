@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">Analógico do giroscópio</string>
     <string name="settings_light_gun_aim">Mira da pistola de luz</string>
     <string name="settings_light_gun_aim_gyro">Giroscópio</string>
+    <string name="settings_light_gun_cursor">Mostrar mira</string>
+    <string name="settings_light_gun_cursor_desc">Desenha um ponto onde a pistola de luz aponta.</string>
+    <string name="settings_help_light_gun_cursor">Desative se o jogo já desenha a própria mira.</string>
     <string name="settings_gyro_aim_left">Mirar - analógico esquerdo</string>
     <string name="onboarding_games_selected_count">%1$d pastas selecionadas. Toque para adicionar outra.</string>
     <string name="settings_game_folders_count">%1$d pastas selecionadas</string>

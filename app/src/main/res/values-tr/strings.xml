@@ -1557,6 +1557,9 @@
     <string name="settings_gyro_stick">Jiroskop çubuğu</string>
     <string name="settings_light_gun_aim">Işık tabancası nişanı</string>
     <string name="settings_light_gun_aim_gyro">Jiroskop</string>
+    <string name="settings_light_gun_cursor">Nişangahı göster</string>
+    <string name="settings_light_gun_cursor_desc">Işık tabancasının baktığı yere bir nokta çizer.</string>
+    <string name="settings_help_light_gun_cursor">Oyun kendi nişangahını çiziyorsa kapat.</string>
     <string name="settings_gyro_aim_left">Nişan - sol çubuk</string>
     <string name="onboarding_games_selected_count">%1$d klasör seçildi. Başka bir tane eklemek için dokunun.</string>
     <string name="settings_game_folders_count">%1$d klasör seçildi</string>

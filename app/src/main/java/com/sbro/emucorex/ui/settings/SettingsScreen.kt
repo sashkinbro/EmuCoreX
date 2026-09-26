@@ -99,6 +99,7 @@ import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Vibration
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material.icons.rounded.WarningAmber
@@ -1216,6 +1217,7 @@ private fun SettingsContent(
     val floatingQuickActionsEnabled by viewModel.floatingQuickActionsEnabled.collectAsState()
     val gyroStickTarget by viewModel.gyroStickTarget.collectAsState()
     val lightGunAim by viewModel.lightGunAim.collectAsState()
+    val lightGunCursorEnabled by viewModel.lightGunCursorEnabled.collectAsState()
     val orientationLock by viewModel.orientationLock.collectAsState()
     val emulationAllowsBothOrientations by viewModel.emulationAllowsBothOrientations.collectAsState()
     val defaults = remember { SettingsSnapshot() }
@@ -2080,6 +2082,17 @@ private fun SettingsContent(
                                 onSelect = viewModel::setLightGunAim,
                                 onResetToDefault = {
                                     viewModel.setLightGunAim(defaults.lightGunAim)
+                                }
+                            )
+                            ToggleItem(
+                                icon = Icons.Rounded.MyLocation,
+                                title = stringResource(R.string.settings_light_gun_cursor),
+                                subtitle = stringResource(R.string.settings_light_gun_cursor_desc),
+                                checked = lightGunCursorEnabled,
+                                onCheckedChange = viewModel::setLightGunCursorEnabled,
+                                helpText = stringResource(R.string.settings_help_light_gun_cursor),
+                                onResetToDefault = {
+                                    viewModel.setLightGunCursorEnabled(true)
                                 }
                             )
                         }

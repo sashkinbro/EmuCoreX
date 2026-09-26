@@ -1557,6 +1557,9 @@
     <string name="settings_gyro_stick">ジャイロスティック</string>
     <string name="settings_light_gun_aim">ライトガンの照準</string>
     <string name="settings_light_gun_aim_gyro">ジャイロ</string>
+    <string name="settings_light_gun_cursor">照準カーソルを表示</string>
+    <string name="settings_light_gun_cursor_desc">ライトガンの照準位置に点を描画します。</string>
+    <string name="settings_help_light_gun_cursor">ゲームが独自の照準を描画する場合はオフにします。</string>
     <string name="settings_gyro_aim_left">エイム - 左スティック</string>
     <string name="onboarding_games_selected_count">%1$d個のフォルダを選択しました。タップして追加します。</string>
     <string name="settings_game_folders_count">%1$d個のフォルダを選択しました</string>

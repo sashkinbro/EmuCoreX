@@ -1441,6 +1441,21 @@ private fun GameSettingsTabContent(
                                 onDraftChange(draft.copy(lightGunAim = defaultProfile.lightGunAim))
                             }
                         )
+                        ToggleRow(
+                            title = stringResource(R.string.settings_light_gun_cursor),
+                            checked = draft.lightGunCursorEnabled
+                                ?: defaultProfile.lightGunCursorEnabled
+                                ?: true,
+                            onCheckedChange = { onDraftChange(draft.copy(lightGunCursorEnabled = it)) },
+                            helpText = stringResource(R.string.settings_help_light_gun_cursor),
+                            onResetToDefault = {
+                                onDraftChange(
+                                    draft.copy(
+                                        lightGunCursorEnabled = defaultProfile.lightGunCursorEnabled
+                                    )
+                                )
+                            }
+                        )
                     }
                     if (draft.gyroMode != AppPreferences.GYRO_MODE_OFF) {
                         SliderRow(stringResource(R.string.settings_gyro_sensitivity), draft.gyroSensitivity.toFloat(), "${draft.gyroSensitivity}%", 25f..300f, 10, { onDraftChange(draft.copy(gyroSensitivity = it.roundToInt())) }, helpText = stringResource(R.string.settings_help_gyro_sensitivity), onResetToDefault = { onDraftChange(draft.copy(gyroSensitivity = defaultProfile.gyroSensitivity)) })
@@ -2097,6 +2112,21 @@ private fun GameSettingsEditorDialog(
                                     onSelected = { draft = draft.copy(lightGunAim = it) },
                                     onResetToDefault = {
                                         draft = draft.copy(lightGunAim = defaultProfile.lightGunAim)
+                                    }
+                                )
+                                ToggleRow(
+                                    title = stringResource(R.string.settings_light_gun_cursor),
+                                    checked = draft.lightGunCursorEnabled
+                                        ?: defaultProfile.lightGunCursorEnabled
+                                        ?: true,
+                                    onCheckedChange = {
+                                        draft = draft.copy(lightGunCursorEnabled = it)
+                                    },
+                                    helpText = stringResource(R.string.settings_help_light_gun_cursor),
+                                    onResetToDefault = {
+                                        draft = draft.copy(
+                                            lightGunCursorEnabled = defaultProfile.lightGunCursorEnabled
+                                        )
                                     }
                                 )
                             }
@@ -4109,6 +4139,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gyroInvertY = gyroInvertY,
         gyroStickTarget = gyroStickTarget,
         lightGunAim = lightGunAim,
+        lightGunCursorEnabled = lightGunCursorEnabled,
         gamepadRightStickUpToR2 = gamepadRightStickUpToR2,
         gamepadRightStickDownToL2 = gamepadRightStickDownToL2,
         gamepadButtonHaptics = gamepadButtonHaptics,
@@ -4248,6 +4279,11 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
             "lightGunAim",
             lightGunAim,
             defaultProfile.lightGunAim
+        ),
+        lightGunCursorEnabled = pick(
+            "lightGunCursorEnabled",
+            lightGunCursorEnabled,
+            defaultProfile.lightGunCursorEnabled
         ),
         gamepadRightStickUpToR2 = pick("gamepadRightStickUpToR2", gamepadRightStickUpToR2, defaultProfile.gamepadRightStickUpToR2),
         gamepadRightStickDownToL2 = pick("gamepadRightStickDownToL2", gamepadRightStickDownToL2, defaultProfile.gamepadRightStickDownToL2),

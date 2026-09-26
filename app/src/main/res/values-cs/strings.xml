@@ -1658,6 +1658,9 @@
     <string name="settings_gyro_stick">Gyro páčka</string>
     <string name="settings_light_gun_aim">Míření světelné pistole</string>
     <string name="settings_light_gun_aim_gyro">Gyroskop</string>
+    <string name="settings_light_gun_cursor">Zobrazit mířidla</string>
+    <string name="settings_light_gun_cursor_desc">Vykreslí tečku tam, kam míří světelná pistole.</string>
+    <string name="settings_help_light_gun_cursor">Vypněte, pokud hra kreslí vlastní zaměřovač.</string>
     <string name="settings_gyro_aim_left">Míření - levá páčka</string>
     <string name="settings_audio_tab">Zvuk</string>
     <string name="settings_audio_control">Ovládání zvuku</string>

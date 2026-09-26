@@ -1559,6 +1559,9 @@
     <string name="settings_gyro_stick">Gyro-Steuerknüppel</string>
     <string name="settings_light_gun_aim">Lightgun-Zielen</string>
     <string name="settings_light_gun_aim_gyro">Gyroskop</string>
+    <string name="settings_light_gun_cursor">Zielcursor anzeigen</string>
+    <string name="settings_light_gun_cursor_desc">Zeichnet einen Punkt dort, wohin die Lightgun zielt.</string>
+    <string name="settings_help_light_gun_cursor">Ausschalten, wenn das Spiel bereits ein Fadenkreuz zeichnet.</string>
     <string name="settings_gyro_aim_left">Zielen - linker Stick</string>
     <string name="onboarding_games_selected_count">%1$d Ordner ausgewählt. Tippen, um einen weiteren hinzuzufügen.</string>
     <string name="settings_game_folders_count">%1$d Ordner ausgewählt</string>

@@ -352,6 +352,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_GYRO_STICK_TARGET)
     val lightGunAim: StateFlow<Int> = preferences.lightGunAim
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.DEFAULT_LIGHT_GUN_AIM)
+    val lightGunCursorEnabled: StateFlow<Boolean> = preferences.lightGunCursorEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
     val floatingQuickActionsEnabled: StateFlow<Boolean> = preferences.floatingQuickActionsEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
     val orientationLock: StateFlow<Int> = preferences.orientationLock
@@ -1318,6 +1320,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setGyroInvertY(value: Boolean) { viewModelScope.launch { preferences.setGyroInvertY(value) } }
     fun setGyroStickTarget(value: Int) { viewModelScope.launch { preferences.setGyroStickTarget(value) } }
     fun setLightGunAim(value: Int) { viewModelScope.launch { preferences.setLightGunAim(value) } }
+    fun setLightGunCursorEnabled(value: Boolean) {
+        viewModelScope.launch { preferences.setLightGunCursorEnabled(value) }
+    }
     fun setUsbPort1Device(value: Int) { viewModelScope.launch { preferences.setUsbPort1Device(value) } }
     fun setUsbPort2Device(value: Int) { viewModelScope.launch { preferences.setUsbPort2Device(value) } }
     fun testTouchHaptics(

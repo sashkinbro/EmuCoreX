@@ -339,6 +339,22 @@ object GamepadManager {
     )
     private val actionsById = mappableActions.associateBy { it.id }
     private val shortcutActionIds = setOf(ACTION_QUICK_SAVE, ACTION_QUICK_LOAD)
+    // Gun cabinet actions must not permanently steal a controller button from the normal
+    // pad mapping: their custom bindings only win while a light-gun context is active.
+    private val gunActionIds = setOf(
+        "gun_trigger",
+        "gun_pedal",
+        "gun_reload",
+        "gun_recalibrate",
+        "coin",
+        "service"
+    )
+    @Volatile
+    private var lightGunModeActive = false
+
+    fun setLightGunModeActive(active: Boolean) {
+        lightGunModeActive = active
+    }
     private val _gamepadShortcutActions = MutableSharedFlow<GamepadShortcutAction>(extraBufferCapacity = 8)
     val gamepadShortcutActions: SharedFlow<GamepadShortcutAction> = _gamepadShortcutActions
     private val _gamepadFastForwardHolds = MutableSharedFlow<Boolean>(extraBufferCapacity = 8)
@@ -1160,8 +1176,14 @@ object GamepadManager {
         keyCode: Int,
         customBindings: Map<String, Int>
     ): String? {
-        customBindings.entries.firstOrNull { (_, mappedKeyCode) -> mappedKeyCode == keyCode }
-            ?.let { return it.key }
+        val customActionId = customBindings.entries
+            .firstOrNull { (_, mappedKeyCode) -> mappedKeyCode == keyCode }
+            ?.key
+        if (customActionId != null &&
+            (customActionId !in gunActionIds || lightGunModeActive)
+        ) {
+            return customActionId
+        }
         val defaultAction = mappableActions.firstOrNull { keyCode in it.defaultKeyCodes } ?: return null
         return defaultAction.id.takeUnless { it in customBindings }
     }
