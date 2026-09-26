@@ -2060,6 +2060,17 @@ private fun SettingsContent(
                             helpText = stringResource(R.string.settings_help_gyro_mode),
                             onResetToDefault = { viewModel.setGyroMode(defaults.gyroMode) }
                         )
+                        if (uiState.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                            ChoiceSection(
+                                title = stringResource(R.string.settings_gyro_stick),
+                                options = gyroStickOptions(),
+                                selectedValue = gyroStickTarget,
+                                onSelect = viewModel::setGyroStickTarget,
+                                onResetToDefault = {
+                                    viewModel.setGyroStickTarget(defaults.gyroStickTarget)
+                                }
+                            )
+                        }
                         if (uiState.gyroMode != AppPreferences.GYRO_MODE_OFF &&
                             !AndroidGyroscopeInput.isModeAvailable(context, uiState.gyroMode)
                         ) {
@@ -2110,17 +2121,6 @@ private fun SettingsContent(
                                     onResetToDefault = { viewModel.setGyroInvertY(defaults.gyroInvertY) }
                                 )
                             }
-                        }
-                        if (uiState.gyroMode == AppPreferences.GYRO_MODE_AIM) {
-                            ChoiceSection(
-                                title = stringResource(R.string.settings_gyro_stick),
-                                options = gyroStickOptions(),
-                                selectedValue = gyroStickTarget,
-                                onSelect = viewModel::setGyroStickTarget,
-                                onResetToDefault = {
-                                    viewModel.setGyroStickTarget(defaults.gyroStickTarget)
-                                }
-                            )
                         }
                         ChoiceSection(
                             title = stringResource(R.string.settings_usb_port1),

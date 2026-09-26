@@ -1416,23 +1416,25 @@ private fun GameSettingsTabContent(
                         helpText = stringResource(R.string.settings_help_gyro_mode),
                         onResetToDefault = { onDraftChange(draft.copy(gyroMode = defaultProfile.gyroMode)) }
                     )
+                    if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                        SelectionRow(
+                            title = stringResource(R.string.settings_gyro_stick),
+                            options = gyroStickOptions(),
+                            selectedValue = draft.gyroStickTarget
+                                ?: defaultProfile.gyroStickTarget
+                                ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
+                            onSelected = { onDraftChange(draft.copy(gyroStickTarget = it)) },
+                            onResetToDefault = {
+                                onDraftChange(draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget))
+                            }
+                        )
+                    }
                     if (draft.gyroMode != AppPreferences.GYRO_MODE_OFF) {
                         SliderRow(stringResource(R.string.settings_gyro_sensitivity), draft.gyroSensitivity.toFloat(), "${draft.gyroSensitivity}%", 25f..300f, 10, { onDraftChange(draft.copy(gyroSensitivity = it.roundToInt())) }, helpText = stringResource(R.string.settings_help_gyro_sensitivity), onResetToDefault = { onDraftChange(draft.copy(gyroSensitivity = defaultProfile.gyroSensitivity)) })
                         SliderRow(stringResource(R.string.settings_gyro_smoothing), draft.gyroSmoothing.toFloat(), "${draft.gyroSmoothing}%", 0f..90f, 8, { onDraftChange(draft.copy(gyroSmoothing = it.roundToInt())) }, helpText = stringResource(R.string.settings_help_gyro_smoothing), onResetToDefault = { onDraftChange(draft.copy(gyroSmoothing = defaultProfile.gyroSmoothing)) })
                         ToggleRow(stringResource(R.string.settings_gyro_invert_x), draft.gyroInvertX, { onDraftChange(draft.copy(gyroInvertX = it)) }, onResetToDefault = { onDraftChange(draft.copy(gyroInvertX = defaultProfile.gyroInvertX)) })
                         if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
                             ToggleRow(stringResource(R.string.settings_gyro_invert_y), draft.gyroInvertY, { onDraftChange(draft.copy(gyroInvertY = it)) }, onResetToDefault = { onDraftChange(draft.copy(gyroInvertY = defaultProfile.gyroInvertY)) })
-                            SelectionRow(
-                                title = stringResource(R.string.settings_gyro_stick),
-                                options = gyroStickOptions(),
-                                selectedValue = draft.gyroStickTarget
-                                    ?: defaultProfile.gyroStickTarget
-                                    ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
-                                onSelected = { onDraftChange(draft.copy(gyroStickTarget = it)) },
-                                onResetToDefault = {
-                                    onDraftChange(draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget))
-                                }
-                            )
                         }
                     }
                     ToggleRow(
@@ -2059,6 +2061,19 @@ private fun GameSettingsEditorDialog(
                                 helpText = stringResource(R.string.settings_help_gyro_mode),
                                 onResetToDefault = { draft = draft.copy(gyroMode = defaultProfile.gyroMode) }
                             )
+                            if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
+                                SelectionRow(
+                                    title = stringResource(R.string.settings_gyro_stick),
+                                    options = gyroStickOptions(),
+                                    selectedValue = draft.gyroStickTarget
+                                        ?: defaultProfile.gyroStickTarget
+                                        ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
+                                    onSelected = { draft = draft.copy(gyroStickTarget = it) },
+                                    onResetToDefault = {
+                                        draft = draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget)
+                                    }
+                                )
+                            }
                             if (draft.gyroMode != AppPreferences.GYRO_MODE_OFF) {
                                 SliderRow(stringResource(R.string.settings_gyro_sensitivity), draft.gyroSensitivity.toFloat(), "${draft.gyroSensitivity}%", 25f..300f, 10, { draft = draft.copy(gyroSensitivity = it.roundToInt()) }, helpText = stringResource(R.string.settings_help_gyro_sensitivity), onResetToDefault = { draft = draft.copy(gyroSensitivity = defaultProfile.gyroSensitivity) })
                                 SliderRow(stringResource(R.string.settings_gyro_smoothing), draft.gyroSmoothing.toFloat(), "${draft.gyroSmoothing}%", 0f..90f, 8, { draft = draft.copy(gyroSmoothing = it.roundToInt()) }, helpText = stringResource(R.string.settings_help_gyro_smoothing), onResetToDefault = { draft = draft.copy(gyroSmoothing = defaultProfile.gyroSmoothing) })
@@ -2067,19 +2082,6 @@ private fun GameSettingsEditorDialog(
                                 draft.gyroMode == AppPreferences.GYRO_MODE_LIGHT_GUN
                             ) {
                                     ToggleRow(stringResource(R.string.settings_gyro_invert_y), draft.gyroInvertY, { draft = draft.copy(gyroInvertY = it) }, onResetToDefault = { draft = draft.copy(gyroInvertY = defaultProfile.gyroInvertY) })
-                                }
-                                if (draft.gyroMode == AppPreferences.GYRO_MODE_AIM) {
-                                    SelectionRow(
-                                        title = stringResource(R.string.settings_gyro_stick),
-                                        options = gyroStickOptions(),
-                                        selectedValue = draft.gyroStickTarget
-                                            ?: defaultProfile.gyroStickTarget
-                                            ?: AppPreferences.DEFAULT_GYRO_STICK_TARGET,
-                                        onSelected = { draft = draft.copy(gyroStickTarget = it) },
-                                        onResetToDefault = {
-                                            draft = draft.copy(gyroStickTarget = defaultProfile.gyroStickTarget)
-                                        }
-                                    )
                                 }
                             }
                             ToggleRow(
