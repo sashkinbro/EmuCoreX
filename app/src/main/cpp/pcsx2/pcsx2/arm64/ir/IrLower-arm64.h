@@ -178,6 +178,7 @@ namespace Arm64Ir
 		u8 lane_mask = 0;
 		bool maximum = false;
 		bool delay_slot = false;
+		u8 rhs_lane = 4; // 0..3 broadcasts a raw RHS lane; 4 keeps the full vector.
 	};
 	enum class BoundVfMaxMinLayout : u8
 	{

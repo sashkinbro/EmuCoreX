@@ -2166,9 +2166,13 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_maxmin.inl"
 #include "jit_oracle_vu_maxmin_integration.inl"
 #include "jit_oracle_vu_maxmin_bench.inl"
+#include "jit_oracle_vu_maxmin_broadcast.inl"
+#include "jit_oracle_vu_maxmin_broadcast_integration.inl"
+#include "jit_oracle_vu_maxmin_broadcast_bench.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
-    bool maxmin_route_only = false)
+    bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
+    bool maxmin_broadcast_route_only = false)
 {
     struct VUOverrideReset
     {
@@ -2213,6 +2217,18 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
         VUSharedMaxMinIntegrationTests();
         return;
     }
+    if (maxmin_broadcast_only)
+    {
+        VUBoundVfMaxMinBroadcastTests();
+        VUSharedMaxMinBroadcastIntegrationTests();
+        VUSharedMaxMinBroadcastBenchmarks();
+        return;
+    }
+    if (maxmin_broadcast_route_only)
+    {
+        VUSharedMaxMinBroadcastIntegrationTests();
+        return;
+    }
     VUBoundIrTests();
     VUSharedIrProductionTests();
     VUSharedImmediateTests();
@@ -2226,6 +2242,9 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     VUBoundVfMaxMinTests();
     VUSharedMaxMinIntegrationTests();
     VUSharedMaxMinBenchmarks();
+    VUBoundVfMaxMinBroadcastTests();
+    VUSharedMaxMinBroadcastIntegrationTests();
+    VUSharedMaxMinBroadcastBenchmarks();
     VUSharedFtoiIntegrationTests();
     VUSharedFtoiBenchmarks();
     VUBoundVfViTransferTests();
@@ -3975,6 +3994,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_vu_itof.inl"
 #include "jit_oracle_ee_vu_ftoi.inl"
 #include "jit_oracle_ee_vu_maxmin.inl"
+#include "jit_oracle_ee_vu_maxmin_broadcast.inl"
 #include "jit_oracle_ee_bc1.inl"
 #include "jit_oracle_ee_hot_loads.inl"
 #include "jit_oracle_ee_fastmem.inl"
@@ -9807,7 +9827,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_itof_only = false, bool cop1_branch_only = false, bool hot_loads_only = false,
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
-    bool scalar_immediates_only = false)
+    bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9868,6 +9888,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     if (scalar_immediates_only)
     {
         CommonLogicalImmediateTests();
+        return;
+    }
+    if (vu_maxmin_broadcast_only)
+    {
+        EEVuMaxMinBroadcastMacroTests();
         return;
     }
     if (cop1_unary_only)
@@ -10019,6 +10044,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     EEVuItofMacroTests();
     EEVuFtoiMacroTests();
     EEVuMaxMinMacroTests();
+    EEVuMaxMinBroadcastMacroTests();
     EEIrCop1BranchTests();
     EEHotLoadBenchmarkTests();
     EEIrScalarStoreTests();
@@ -12083,6 +12109,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests(false, false, true);
     else if (std::strcmp(suite, "vu-maxmin-route") == 0)
         VUTests(false, false, false, true);
+    else if (std::strcmp(suite, "vu-maxmin-broadcast") == 0)
+        VUTests(false, false, false, false, true);
+    else if (std::strcmp(suite, "vu-maxmin-broadcast-route") == 0)
+        VUTests(false, false, false, false, false, true);
     else if (std::strcmp(suite, "sqrt-flags") == 0)
         SqrtFlagTests();
     else if (std::strcmp(suite, "div-edges") == 0)
@@ -12113,6 +12143,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ir-immediates") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-vu-maxmin-broadcast") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-bc1") == 0)
         EETests(false, false, false, false, true);
     else if (std::strcmp(suite, "ee-hot-loads") == 0)

@@ -38,6 +38,7 @@ static std::atomic<u64> s_vuSharedIrAbsInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrItofInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrFtoiInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrMaxMinInstructions[2] = {};
+static std::atomic<u64> s_vuSharedIrMaxMinBroadcastInstructions[2] = {};
 extern "C" void EmuCoreXOracleSetVUIR(u32 index, int enabled)
 {
 	if (index < 2) s_vuSharedIrOverride[index].store(enabled < 0 ? -1 : (enabled != 0), std::memory_order_relaxed);
@@ -81,6 +82,10 @@ extern "C" u64 EmuCoreXOracleVUIRFtoiInstructions(u32 index)
 extern "C" u64 EmuCoreXOracleVUIRMaxMinInstructions(u32 index)
 {
 	return index < 2 ? s_vuSharedIrMaxMinInstructions[index].load(std::memory_order_relaxed) : 0;
+}
+extern "C" u64 EmuCoreXOracleVUIRMaxMinBroadcastInstructions(u32 index)
+{
+	return index < 2 ? s_vuSharedIrMaxMinBroadcastInstructions[index].load(std::memory_order_relaxed) : 0;
 }
 #endif
 
@@ -218,6 +223,24 @@ void mVURecordSharedMaxMin(u32 index, u32 host_bytes)
 #else
 	(void)index;
 	(void)host_bytes;
+#endif
+}
+
+void mVURecordSharedMaxMinBroadcast(u32 index, u32 host_bytes, u32 selector, bool maximum)
+{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (index >= 2) return;
+	const u64 count = s_vuSharedIrMaxMinBroadcastInstructions[index].fetch_add(1, std::memory_order_relaxed) + 1;
+#if defined(__ANDROID__)
+	if ((count & (count - 1)) == 0)
+		__android_log_print(ANDROID_LOG_INFO, "VUIR", "core=%u compiled_maxmin_broadcast=%llu last_body_bytes=%u selector=%u maximum=%u",
+			index, static_cast<unsigned long long>(count), host_bytes, selector, maximum ? 1u : 0u);
+#endif
+#else
+	(void)index;
+	(void)host_bytes;
+	(void)selector;
+	(void)maximum;
 #endif
 }
 

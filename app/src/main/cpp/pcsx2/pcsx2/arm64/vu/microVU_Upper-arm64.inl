@@ -2189,7 +2189,7 @@ static void mVU_MSUBAw_emit(mP)
 }
 
 // MAX Opcode
-static bool mVUTrySharedMaxMin(mV, bool maximum)
+static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4)
 {
 	if (!_Fd_ || mVUtrySkipNoLaneWrite_oaknut(mVU) || !mVUSharedIrEnabled(mVU.index)) return false;
 	static thread_local ir::Function fn;
@@ -2197,8 +2197,8 @@ static bool mVUTrySharedMaxMin(mV, bool maximum)
 	{
 		ir::Builder init(fn);
 		init.CreateBlock(0);
-		fn.blocks[0].insts.reserve(17);
-		fn.value_types.reserve(16);
+		fn.blocks[0].insts.reserve(18);
+		fn.value_types.reserve(17);
 	}
 	fn.blocks[0].insts.clear();
 	fn.blocks[0].guest_start = mVU.prog.IRinfo.curPC * sizeof(u32);
@@ -2208,7 +2208,8 @@ static bool mVUTrySharedMaxMin(mV, bool maximum)
 	b.SetBlock(1);
 	b.SetDelaySlot(mVUinfo.isBdelay);
 	const u32 lhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Fs_);
-	const u32 rhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
+	const u32 raw_rhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
+	const u32 rhs = rhs_lane < 4 ? b.Emit1(ir::Op::VShuffle, ir::Type::V4I32, raw_rhs, rhs_lane * 0x55u) : raw_rhs;
 	const u32 shift31 = b.ConstI32(31), shift1 = b.ConstI32(1);
 	const u32 sign_lhs = b.Emit2(ir::Op::VShrS, ir::Type::V4I32, lhs, shift31);
 	const u32 flip_lhs = b.Emit2(ir::Op::VShrU, ir::Type::V4I32, sign_lhs, shift1);
@@ -2244,7 +2245,8 @@ static bool mVUTrySharedMaxMin(mV, bool maximum)
 	if (lowered)
 	{
 		mVURecordSharedIr(mVU.index, out.host_size);
-		mVURecordSharedMaxMin(mVU.index, out.host_size);
+		if (rhs_lane == 4) mVURecordSharedMaxMin(mVU.index, out.host_size);
+		else mVURecordSharedMaxMinBroadcast(mVU.index, out.host_size, rhs_lane, maximum);
 	}
 	return lowered;
 }
@@ -2399,7 +2401,7 @@ static void mVU_MAXx_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 0); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, true, 0)) mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 0); }
 	pass3 { mVUlog("MAX"); mVUlogFd(); mVUlog(", vf%02dx", _Ft_); }
 }
 
@@ -2410,7 +2412,7 @@ static void mVU_MAXy_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 1); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, true, 1)) mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 1); }
 	pass3 { mVUlog("MAX"); mVUlogFd(); mVUlog(", vf%02dy", _Ft_); }
 }
 
@@ -2421,7 +2423,7 @@ static void mVU_MAXz_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 2); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, true, 2)) mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 2); }
 	pass3 { mVUlog("MAX"); mVUlogFd(); mVUlog(", vf%02dz", _Ft_); }
 }
 
@@ -2432,7 +2434,7 @@ static void mVU_MAXw_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 3); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, true, 3)) mVU_MAX_lane_direct_emit_oaknut(mVU, recPass, 3); }
 	pass3 { mVUlog("MAX"); mVUlogFd(); mVUlog(", vf%02dw", _Ft_); }
 }
 
@@ -2480,7 +2482,7 @@ static void mVU_MINIw_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 3); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, false, 3)) mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 3); }
 	pass3 { mVUlog("MINI"); mVUlogFd(); mVUlog(", vf%02dw", _Ft_); }
 }
 
@@ -2598,7 +2600,7 @@ static void mVU_MINIx_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 0); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, false, 0)) mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 0); }
 	pass3 { mVUlog("MINI"); mVUlogFd(); mVUlog(", vf%02dx", _Ft_); }
 }
 
@@ -2609,7 +2611,7 @@ static void mVU_MINIy_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 1); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, false, 1)) mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 1); }
 	pass3 { mVUlog("MINI"); mVUlogFd(); mVUlog(", vf%02dy", _Ft_); }
 }
 
@@ -2620,7 +2622,7 @@ static void mVU_MINIz_emit(mP)
 		mVUanalyzeFMAC3(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 2); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, false, 2)) mVU_MINI_lane_direct_emit_oaknut(mVU, recPass, 2); }
 	pass3 { mVUlog("MINI"); mVUlogFd(); mVUlog(", vf%02dz", _Ft_); }
 }
 
