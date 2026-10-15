@@ -39,6 +39,12 @@ static std::atomic<u64> s_vuSharedIrItofInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrFtoiInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrMaxMinInstructions[2] = {};
 static std::atomic<u64> s_vuSharedIrMaxMinBroadcastInstructions[2] = {};
+static std::atomic<u64> s_vuSharedIrClipInstructions[2] = {};
+extern "C" void EmuCoreXOracleGetVuIrClipCounts(u64* vu0, u64* vu1)
+{
+	if (vu0) *vu0 = s_vuSharedIrClipInstructions[0].load(std::memory_order_relaxed);
+	if (vu1) *vu1 = s_vuSharedIrClipInstructions[1].load(std::memory_order_relaxed);
+}
 static std::atomic<u64> s_vuSharedIrMaxMinIInstructions[2] = {};
 extern "C" void EmuCoreXOracleSetVUIR(u32 index, int enabled)
 {
@@ -263,6 +269,22 @@ void mVURecordSharedMaxMinI(u32 index, u32 host_bytes, bool maximum)
 	(void)index;
 	(void)host_bytes;
 	(void)maximum;
+#endif
+}
+
+void mVURecordSharedClip(u32 index, u32 host_bytes)
+{
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (index >= 2) return;
+	const u64 count = s_vuSharedIrClipInstructions[index].fetch_add(1, std::memory_order_relaxed) + 1;
+#if defined(__ANDROID__)
+	if ((count & (count - 1)) == 0)
+		__android_log_print(ANDROID_LOG_INFO, "VUIR", "core=%u compiled_clip=%llu last_body_bytes=%u",
+			index, static_cast<unsigned long long>(count), host_bytes);
+#endif
+#else
+	(void)index;
+	(void)host_bytes;
 #endif
 }
 

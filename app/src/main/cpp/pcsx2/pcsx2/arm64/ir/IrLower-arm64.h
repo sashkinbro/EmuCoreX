@@ -196,6 +196,18 @@ namespace Arm64Ir
 		LowerOutput* out, std::string* error,
 		BoundVfMaxMinLayout layout = BoundVfMaxMinLayout::GuestLanes);
 
+	// Full raw read-only VF inputs and a caller-bound scheduled CLIP history.
+	// Only Q29-Q31/W16-W17 and clip_host are writable; no state/frame access.
+	struct BoundVfClipPlan
+	{
+		u8 lhs_vf = 0;
+		u8 rhs_vf = 0;
+		bool delay_slot = false;
+	};
+	bool PlanBoundVfClipBlock(const ir::Function& fn, BoundVfClipPlan* plan, std::string* error);
+	bool LowerBoundVfClipPlan(const BoundVfClipPlan& plan, u32 lhs_host, u32 rhs_host,
+		u32 clip_host, LowerOutput* out, std::string* error);
+
 	// Inline-mode exits are emitted through these hooks so the integration can
 	// reuse the legacy block-tail machinery (pc store, event test, linking).
 	struct LowerHooks

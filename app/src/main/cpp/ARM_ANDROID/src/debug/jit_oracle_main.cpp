@@ -13,7 +13,7 @@ int main(int argc, char** argv)
     const bool replay = argc == 4 && (fallback || std::strcmp(argv[2], "replay-vu1") == 0);
     if (argc != 3 && !replay)
     {
-        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu|vu-itof-codegen|vu-ftoi|vectors|sqrt-flags|div-edges|ee|ee-cop1-mov|ee-cop1-memory|ee-vu-abs|ee-stores|ee-vu-itof|ee-vu-ftoi|ee-bc1|ee-hot-loads|ee-fastmem|ee-cop1-unary|ee-cop1-maxmin|ee-vu-maxmin|ir-immediates|iop-nclip|iop-avsz|ee-fastmem-exit|ee-fastmem-cold|vu-maxmin-i|ee-vu-maxmin-i|ee-vu-maxmin-i-flags|vu-maxmin|vu-maxmin-route|vu-maxmin-broadcast|vu-maxmin-broadcast-route|ee-vu-maxmin-broadcast|iop|iop-cop2|iop-cop2-memory|gs-prepare|gs-job|gs-job-bridge|gs-job-runtime|gs-job-snapshot|replay-vu1 [capture.vuo]\n", argv[0]);
+        std::fprintf(stderr, "usage: %s /absolute/path/libemucore_4k.so classifier|vu|vu-itof-codegen|vu-ftoi|vectors|sqrt-flags|div-edges|ee|ee-cop1-mov|ee-cop1-memory|ee-vu-clip|ee-vu-abs|ee-stores|ee-vu-itof|ee-vu-ftoi|ee-bc1|ee-hot-loads|ee-fastmem|ee-cop1-unary|ee-cop1-maxmin|ee-vu-maxmin|ir-immediates|iop-nclip|iop-avsz|ee-fastmem-exit|ee-fastmem-cold|vu-maxmin-i|vu-clip|vu-clip-route|ee-vu-maxmin-i|ee-vu-maxmin-i-flags|vu-maxmin|vu-maxmin-route|vu-maxmin-broadcast|vu-maxmin-broadcast-route|ee-vu-maxmin-broadcast|iop|iop-cop2|iop-cop2-memory|gs-prepare|gs-job|gs-job-bridge|gs-job-runtime|gs-job-snapshot|replay-vu1 [capture.vuo]\n", argv[0]);
         return 2;
     }
     setvbuf(stdout, nullptr, _IONBF, 0);

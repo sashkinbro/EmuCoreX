@@ -67,6 +67,9 @@ namespace ir
 			if (inst.op == Op::ReadVfBits &&
 				(inst.imm >= 32 || (inst.aux & ~IF_DELAY_SLOT) != 0))
 				return Fail(error, "ReadVfBits: VF index or flags are out of range");
+			if ((inst.op == Op::ReadVuClip || inst.op == Op::WriteVuClip || inst.op == Op::VClip) &&
+				(inst.imm != 0 || (inst.aux & ~IF_DELAY_SLOT) != 0))
+				return Fail(error, "VU CLIP: invalid selector or flags");
 			if (inst.op == Op::ReadVuScalarBits &&
 				(inst.imm != static_cast<u64>(VuScalar::I) || (inst.aux & ~IF_DELAY_SLOT) != 0))
 				return Fail(error, "ReadVuScalarBits: scalar selector or flags are out of range");
@@ -222,6 +225,8 @@ namespace ir
 				}
 				case OpKind::StateWrite:
 				{
+					if (inst.op == Op::WriteVuClip && (inst.type != Type::Void || fn.ValueType(inst.args[0]) != Type::I32))
+						return Fail(error, "VU CLIP history: I32 write required");
 					if (inst.op == Op::WriteCp0 && fn.ValueType(inst.args[0]) != Type::I32)
 						return Fail(error, "COP0: 32-bit write required");
 					if ((inst.op == Op::WriteCp2Data || inst.op == Op::WriteCp2Control) &&
@@ -266,6 +271,10 @@ namespace ir
 					{
 						return false;
 					}
+					break;
+				case OpKind::VecClip:
+					if (fn.ValueType(inst.args[0]) != Type::V4I32 || fn.ValueType(inst.args[1]) != Type::V4I32)
+						return Fail(error, "VClip: raw V4I32 sources required");
 					break;
 				case OpKind::VecUnary:
 				{

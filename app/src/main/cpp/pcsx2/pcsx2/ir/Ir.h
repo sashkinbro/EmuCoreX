@@ -149,6 +149,9 @@ namespace ir
 	X(ReadVf,       StateRead,   0, 0, V4F32, false) \
 	/* Read all four VF words as signed raw integer lanes without FP reinterpretation. */ \
 	X(ReadVfBits,   StateRead,   0, 0, V4I32, false) \
+	/* Logical scheduled CLIP history; bounded VU callers bind the ring slots. */ \
+	X(ReadVuClip,   StateRead,   0, 0, I32, false) \
+	X(WriteVuClip,  StateWrite,  1, 1, Void, false) \
 	/* Raw 32-bit VU scalar state; imm is a VuScalar selector. */ \
 	X(ReadVuScalarBits, StateRead, 0, 0, I32, false) \
 	X(WriteVf,      StateWrite,  1, 1, Void, false) \
@@ -264,7 +267,8 @@ namespace ir
 	X(VPack8,       VecUnary,    1, 1, Any,  false) \
 	X(VUnpack8,     VecUnary,    1, 1, Any,  false) \
 	X(VUnpack16,    VecUnary,    1, 1, Any,  false) \
-	X(VClip,        VecCompare,  2, 2, Flags, false) \
+	/* Raw signed-word CLIP comparisons: x+/x-/y+/y-/z+/z- in low six bits. */ \
+	X(VClip,        VecClip,     2, 2, I32, false) \
 	X(VMr32,        VecUnary,    1, 1, Any,  false) \
 	X(VMove,        VecLane2,    2, 2, Any,  false) \
 	X(VF2I0,        VecConvert,  1, 1, V4I32, false) \
@@ -305,6 +309,7 @@ namespace ir
 		VecBinary,
 		VecTernary,
 		VecCompare,
+		VecClip,
 		VecConvert,
 		VecSplat,
 		VecLane,

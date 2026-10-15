@@ -3445,3 +3445,5 @@ namespace Arm64Ir
 #include "arm64/ir/IrIopNclip-arm64.inl"
 
 #include "IrIopAvsz-arm64.inl"
+
+#include "IrVfClip-arm64.inl"

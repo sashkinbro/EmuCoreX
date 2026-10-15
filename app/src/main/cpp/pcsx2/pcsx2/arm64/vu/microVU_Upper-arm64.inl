@@ -4092,12 +4092,60 @@ static void mVU_CLIP_direct_emit_oaknut(mP)
 	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
+static bool mVUTrySharedClip(mV)
+{
+	if (!mVUSharedIrEnabled(mVU.index)) return false;
+	static thread_local ir::Function fn;
+	if (fn.blocks.empty())
+	{
+		ir::Builder init(fn);
+		init.CreateBlock(0);
+		fn.blocks[0].insts.reserve(11);
+		fn.value_types.reserve(10);
+	}
+	fn.blocks[0].insts.clear();
+	fn.blocks[0].guest_start = mVU.prog.IRinfo.curPC * sizeof(u32);
+	fn.value_types.resize(1);
+	fn.next_value = 1;
+	ir::Builder b(fn);
+	b.SetBlock(1);
+	b.SetDelaySlot(mVUinfo.isBdelay);
+	const u32 fs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Fs_);
+	const u32 ft = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
+	const u32 mask = b.Emit2(ir::Op::VClip, ir::Type::I32, fs, ft);
+	const u32 old = b.Emit(ir::Op::ReadVuClip, ir::Type::I32, {}, 0);
+	const u32 shift = b.ConstI32(6);
+	const u32 history = b.Emit2(ir::Op::Shl, ir::Type::I32, old, shift);
+	const u32 joined = b.Emit2(ir::Op::Or, ir::Type::I32, history, mask);
+	const u32 keep24 = b.ConstI32(0xffffff);
+	const u32 next = b.Emit2(ir::Op::And, ir::Type::I32, joined, keep24);
+	b.Emit1(ir::Op::WriteVuClip, ir::Type::Void, next, 0);
+	b.Return();
+	Arm64Ir::BoundVfClipPlan plan;
+	std::string error;
+	if (!Arm64Ir::PlanBoundVfClipBlock(fn, &plan, &error)) return false;
+	// Bind full read-only words before the scheduled CLIP ring-slot access.
+	const int lhs = mVU.regAlloc->allocRegId(plan.lhs_vf);
+	const int rhs = mVU.regAlloc->allocRegId(plan.rhs_vf);
+	mVUallocCFLAGa(mVU, VU_HOST_T1, cFLAG.lastWrite);
+	Arm64Ir::LowerOutput out;
+	const bool lowered = Arm64Ir::LowerBoundVfClipPlan(plan, lhs, rhs, VU_HOST_T1, &out, &error);
+	pxAssertRel(lowered, error.c_str());
+	mVUallocCFLAGb(mVU, VU_HOST_T1, cFLAG.write);
+	mVU.regAlloc->clearNeededXmmId(rhs);
+	if (lhs != rhs) mVU.regAlloc->clearNeededXmmId(lhs);
+	mVURecordSharedIr(mVU.index, out.host_size);
+	mVURecordSharedClip(mVU.index, out.host_size);
+	return true;
+}
+
 static void mVU_CLIP_emit(mP)
 {
 	pass1 { mVUanalyzeFMAC4(mVU, _Fs_, _Ft_); }
 	pass2
 	{
-		mVU_CLIP_direct_emit_oaknut(mVU, recPass);
+		if (!mVUTrySharedClip(mVU))
+			mVU_CLIP_direct_emit_oaknut(mVU, recPass);
 	}
 	pass3
 	{

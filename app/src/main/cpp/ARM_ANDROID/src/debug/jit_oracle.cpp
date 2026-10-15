@@ -2171,10 +2171,13 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_maxmin_broadcast_bench.inl"
 #include "jit_oracle_vu_maxmin_i.inl"
 #include "jit_oracle_vu_maxmin_i_integration.inl"
+#include "jit_oracle_vu_clip_bound.inl"
+#include "jit_oracle_vu_clip_integration.inl"
+#include "jit_oracle_vu_clip_bench.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
-    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false)
+    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false, u32 clip_only = 0)
 {
     struct VUOverrideReset
     {
@@ -2231,6 +2234,13 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
         VUSharedMaxMinBroadcastIntegrationTests();
         return;
     }
+    if (clip_only)
+    {
+        if (clip_only == 1) VUBoundVfClipTests();
+        VUSharedClipIntegrationTests();
+        if (clip_only == 1) VUSharedClipBenchmarks();
+        return;
+    }
     if (maxmin_i_only)
     {
         VUBoundVfMaxMinITests();
@@ -2254,6 +2264,9 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     VUBoundVfMaxMinBroadcastTests();
     VUSharedMaxMinBroadcastIntegrationTests();
     VUSharedMaxMinBroadcastBenchmarks();
+    VUBoundVfClipTests();
+    VUSharedClipIntegrationTests();
+    VUSharedClipBenchmarks();
     VUBoundVfMaxMinITests();
     VUSharedMaxMinIIntegrationTests();
     VUSharedMaxMinIBenchmarks();
@@ -4594,6 +4607,7 @@ bool RunEEIrCop1Direct(const std::vector<u32>& program, const GPR_reg* initial_g
 #include "jit_oracle_ee_maxmin.inl"
 #include "jit_oracle_logical_immediates.inl"
 #include "jit_oracle_ee_cop1_memory.inl"
+#include "jit_oracle_ee_vu_clip.inl"
 
 void EEIrCop1TransferTests()
 {
@@ -8832,6 +8846,7 @@ void EEIrExecutionTests()
     EEIrCop1TransferTests();
     EEIrCop1MoveTests();
     EEIrCop1MemoryTests();
+    EEVuClipIrTests();
     EEIrCop1UnaryTests();
     EEIrCop1MaxMinTests();
     EEIrPackedKernelDceTests();
@@ -9845,7 +9860,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
     bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
-    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false)
+    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9877,6 +9892,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (vu_clip_only)
+    {
+        EEVuClipIrTests();
+        return;
+    }
     if (cop1_memory_only)
     {
         EEIrCop1MemoryTests();
@@ -12164,6 +12184,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests(false, false, false, false, true);
     else if (std::strcmp(suite, "vu-maxmin-broadcast-route") == 0)
         VUTests(false, false, false, false, false, true);
+    else if (std::strcmp(suite, "vu-clip") == 0)
+        VUTests(false, false, false, false, false, false, false, 1);
+    else if (std::strcmp(suite, "vu-clip-route") == 0)
+        VUTests(false, false, false, false, false, false, false, 2);
     else if (std::strcmp(suite, "vu-maxmin-i") == 0)
         VUTests(false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "sqrt-flags") == 0)
@@ -12196,6 +12220,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-vu-maxmin-i-flags") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 2);
+    else if (std::strcmp(suite, "ee-vu-clip") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0, false, true);
     else if (std::strcmp(suite, "ee-cop1-memory") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0, true);
     else if (std::strcmp(suite, "ee-cop1-maxmin") == 0)
