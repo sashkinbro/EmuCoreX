@@ -2466,6 +2466,16 @@ extern "C" void EmuCoreXOracleGetEeIrCop1Counts(u64* mfc1, u64* mtc1, u64* cfc1,
 	if (ctc1) *ctc1 = s_cop1_ctc1_compiles;
 }
 extern "C" u64 EmuCoreXOracleGetEeIrMovCounts() { return s_cop1_mov_s_compiles; }
+static u64 s_cop1_compare_compiles[4] = {};
+static u64 s_cop1_compare_fusions = 0;
+extern "C" u64 EmuCoreXOracleEeIrCompareFusions() { return s_cop1_compare_fusions; }
+extern "C" void EmuCoreXOracleGetEeIrCompareCounts(u64* clear, u64* equal, u64* less, u64* less_equal)
+{
+	if (clear) *clear = s_cop1_compare_compiles[0];
+	if (equal) *equal = s_cop1_compare_compiles[1];
+	if (less) *less = s_cop1_compare_compiles[2];
+	if (less_equal) *less_equal = s_cop1_compare_compiles[3];
+}
 extern "C" void EmuCoreXOracleGetEeIrCop1MemoryCounts(u64* lwc1, u64* swc1)
 {
 	if (lwc1) *lwc1 = s_cop1_lwc1_compiles;
@@ -2760,6 +2770,7 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 	}
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	s_direct_scalar_store_compiles += out.direct_ee_store_operations;
+	s_cop1_compare_fusions += out.fused_ee_cop1_compares;
 	s_oracleEeIrLastFrameSize = out.frame_size;
 	s_direct_scalar_load_compiles += out.direct_ee_load_operations;
 	s_fast_scalar_load_compiles += out.fastmem_ee_load_operations;
@@ -2792,6 +2803,21 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 		const u32 word = *reinterpret_cast<const u32*>(PSM(pc));
 		const u32 op = word >> 26;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (op == 0x11 && ((word >> 21) & 31u) == 16 && ((word >> 6) & 31u) == 0)
+		{
+			const u32 funct = word & 63u;
+			if (funct == 0x30 || funct == 0x32 || funct == 0x34 || funct == 0x36)
+			{
+				const u32 kind = (funct - 0x30) / 2;
+				const u64 count = ++s_cop1_compare_compiles[kind];
+				if ((count & (count - 1)) == 0)
+				{
+					static constexpr const char* names[] = {"c_f", "c_eq_s", "c_lt_s", "c_le_s"};
+					__android_log_print(ANDROID_LOG_INFO, "EEIR", "compiled_%s=%llu",
+						names[kind], static_cast<unsigned long long>(count));
+				}
+			}
+		}
 		if (op == 0x31 || op == 0x39)
 		{
 			const bool store = op == 0x39;

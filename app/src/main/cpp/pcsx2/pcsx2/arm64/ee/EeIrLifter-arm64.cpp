@@ -572,6 +572,63 @@ namespace EeIr
 					if (format == 0x10)
 					{
 						const u32 funct = Funct(word);
+						if (funct == 0x30 || funct == 0x32 || funct == 0x34 || funct == 0x36)
+						{
+							if (Sa(word) != 0)
+								return Fail(error, "unsupported COP1 compare condition code", pc);
+
+							if (funct == 0x30) // c.f: clear only FCR31.C.
+							{
+								const u32 old_fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
+								const u32 clear_condition = Const(0xff7fffffu);
+								const u32 result = Bin(ir::Op::And, old_fcr31, clear_condition);
+								m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void, result);
+								return true;
+							}
+
+							// Constants are deliberately emitted first so this compare family has
+							// a deterministic graph shape for strict planning and future fusion.
+							const u32 zero = Const(0);
+							const u32 exponent_mask = Const(0x7f800000u);
+							const u32 sign_mask = Const(0x80000000u);
+							const u32 max_finite = Const(0x7f7fffffu);
+							const u32 sign_shift = Const(31);
+							const u32 clear_condition = Const(0xff7fffffu);
+							const u32 condition_shift = Const(23);
+							const auto normalized_key = [&](u32 source_register) -> u32
+							{
+								const u32 raw = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, source_register);
+								const u32 exponent = Bin(ir::Op::And, raw, exponent_mask);
+								const u32 is_zero_exponent = Bin(ir::Op::CmpEq, exponent, zero);
+								const u32 sign = Bin(ir::Op::And, raw, sign_mask);
+								const u32 clamped = Bin(ir::Op::Or, sign, max_finite);
+								const u32 is_special_exponent = Bin(ir::Op::CmpEq, exponent, exponent_mask);
+								const u32 finite_or_clamped = m_b.Emit3(ir::Op::Select, ir::Type::I32,
+									is_special_exponent, clamped, raw);
+								const u32 normalized = m_b.Emit3(ir::Op::Select, ir::Type::I32,
+									is_zero_exponent, zero, finite_or_clamped);
+								const u32 sign_fill = Bin(ir::Op::ShrS, normalized, sign_shift);
+								const u32 key_mask = Bin(ir::Op::Or, sign_fill, sign_mask);
+								return Bin(ir::Op::Xor, normalized, key_mask);
+							};
+
+							const u32 lhs_key = normalized_key(fs);
+							const u32 rhs_key = normalized_key(Rt(word));
+							ir::Op predicate_op;
+							switch (funct)
+							{
+								case 0x32: predicate_op = ir::Op::CmpEq; break;
+								case 0x34: predicate_op = ir::Op::CmpLtU; break;
+								default: predicate_op = ir::Op::CmpLeU; break;
+							}
+							const u32 predicate = Bin(predicate_op, lhs_key, rhs_key);
+							const u32 old_fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
+							const u32 preserved = Bin(ir::Op::And, old_fcr31, clear_condition);
+							const u32 condition = Bin(ir::Op::Shl, predicate, condition_shift);
+							const u32 result = Bin(ir::Op::Or, preserved, condition);
+							m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void, result);
+							return true;
+						}
 						if (funct == 0x06) // mov.s: raw copy, flags are untouched
 						{
 							const u32 bits = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, fs);

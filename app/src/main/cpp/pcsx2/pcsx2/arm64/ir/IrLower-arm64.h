@@ -36,6 +36,14 @@ namespace Arm64Ir
 	bool PlanIopAvszWindow(const ir::Function& fn, u32 block_index, u32 first_inst,
 		IopAvszPlan* plan, std::string* error);
 	bool PlanIopNclipWindow(const ir::Function& fn, u32 block_index, u32 first_inst, std::string* error);
+	struct EeCop1ComparePlan
+	{
+		u32 inst_count = 0;
+		u8 lhs_fpr = 0, rhs_fpr = 0;
+		ir::Op predicate = ir::Op::Nop;
+	};
+	bool PlanEeCop1CompareWindow(const ir::Function& fn, u32 block_index, u32 first_inst,
+		EeCop1ComparePlan* plan, std::string* error);
 	enum class GuestState : u8 { EE, IOP };
 
 	// Narrow inline VU slice. microVU owns the VI mappings and backup/dirty
@@ -299,6 +307,7 @@ namespace Arm64Ir
 		u32 fused_multiply_pairs = 0;
 		u32 fused_iop_nclips = 0;
 		u32 fused_iop_avsz = 0;
+		u32 fused_ee_cop1_compares = 0;
 	};
 
 	// Both host W-register indices must be in [0,30], owned by the caller.

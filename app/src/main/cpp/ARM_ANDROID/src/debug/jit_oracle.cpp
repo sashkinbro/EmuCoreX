@@ -4608,6 +4608,9 @@ bool RunEEIrCop1Direct(const std::vector<u32>& program, const GPR_reg* initial_g
 #include "jit_oracle_logical_immediates.inl"
 #include "jit_oracle_ee_cop1_memory.inl"
 #include "jit_oracle_ee_vu_clip.inl"
+#include "jit_oracle_ee_cop1_compare.inl"
+#include "jit_oracle_ee_cop1_compare_fusion.inl"
+#include "jit_oracle_ee_cop1_compare_bench.inl"
 
 void EEIrCop1TransferTests()
 {
@@ -8847,6 +8850,9 @@ void EEIrExecutionTests()
     EEIrCop1MoveTests();
     EEIrCop1MemoryTests();
     EEVuClipIrTests();
+    EEIrCop1CompareTests();
+    EECop1CompareFusionTests();
+    EEIrCop1CompareBenchmarks();
     EEIrCop1UnaryTests();
     EEIrCop1MaxMinTests();
     EEIrPackedKernelDceTests();
@@ -9860,7 +9866,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
     bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
-    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false)
+    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false, bool cop1_compare_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9892,6 +9898,13 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (cop1_compare_only)
+    {
+        EEIrCop1CompareTests();
+        EECop1CompareFusionTests();
+        EEIrCop1CompareBenchmarks();
+        return;
+    }
     if (vu_clip_only)
     {
         EEVuClipIrTests();
@@ -12220,6 +12233,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-vu-maxmin-i-flags") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 2);
+    else if (std::strcmp(suite, "ee-cop1-compare") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0, false, false, true);
     else if (std::strcmp(suite, "ee-vu-clip") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0, false, true);
     else if (std::strcmp(suite, "ee-cop1-memory") == 0)

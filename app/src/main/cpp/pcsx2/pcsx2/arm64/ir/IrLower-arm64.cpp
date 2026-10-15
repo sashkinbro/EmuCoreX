@@ -999,6 +999,7 @@ namespace Arm64Ir
 				, m_inline_division(options.optimize_ir && options.inline_division)
 				, m_fuse_multiply_pairs(options.optimize_ir)
 				, m_fuse_iop_nclips(options.optimize_ir && options.guest_state == GuestState::IOP)
+				, m_fuse_ee_cop1_compares(options.optimize_ir && options.guest_state == GuestState::EE)
 				, m_direct_quad_memory(options.optimize_ir && options.direct_quad_memory && (!CHECK_CACHE || CHECK_EEREC))
 				, m_direct_ee_loads(options.guest_state == GuestState::EE && options.optimize_ir && options.direct_ee_loads && (!CHECK_CACHE || CHECK_EEREC))
 				, m_fastmem_ee_loads(options.fastmem_ee_loads && options.inline_body && options.hooks &&
@@ -1024,6 +1025,8 @@ namespace Arm64Ir
 			void EmitIopNclip();
 			void PlanIopAvsz();
 			void EmitIopAvsz(bool avsz4);
+			void PlanEeCop1Compares();
+			void EmitEeCop1Compare(const EeCop1ComparePlan& plan);
 			void AllocateVectorRegisters();
 			bool IsVectorBarrier(const ir::Inst& inst) const;
 			bool UsesDirectVectorMemory(const ir::Inst& inst) const
@@ -1228,8 +1231,11 @@ namespace Arm64Ir
 			bool m_fuse_iop_nclips = false;
 			u32 m_fused_iop_nclips = 0;
 			u32 m_fused_iop_avsz = 0;
+			bool m_fuse_ee_cop1_compares = false;
+			u32 m_fused_ee_cop1_compares = 0;
+			std::vector<EeCop1ComparePlan> m_ee_cop1_compare_starts;
 			std::vector<IopAvszPlan> m_iop_avsz_starts;
-			std::vector<bool> m_iop_nclip_starts, m_iop_fusion_values;
+			std::vector<bool> m_iop_nclip_starts, m_fused_values;
 			bool m_direct_quad_memory = true;
 			bool m_direct_ee_loads = true;
 			bool m_fastmem_ee_loads = false;
@@ -1256,7 +1262,7 @@ namespace Arm64Ir
 
 		void Lowerer::PlanIopNclips()
 		{
-			m_iop_fusion_values.assign(m_fn.value_types.size(), false);
+			m_fused_values.assign(m_fn.value_types.size(), false);
 			size_t instruction_count = 0;
 			for (const auto& block : m_fn.blocks) instruction_count += block.insts.size();
 			m_iop_nclip_starts.assign(instruction_count, false);
@@ -1271,7 +1277,7 @@ namespace Arm64Ir
 						!PlanIopNclipWindow(m_fn, block_index, i, nullptr)) continue;
 					m_iop_nclip_starts[position] = true;
 					for (u32 node = 0; node < 24; ++node)
-						if (const u32 value = insts[i + node].value) m_iop_fusion_values[value] = true;
+						if (const u32 value = insts[i + node].value) m_fused_values[value] = true;
 					i += 23;
 					position += 23;
 				}
@@ -1295,11 +1301,72 @@ namespace Arm64Ir
 						!PlanIopAvszWindow(m_fn, block_index, i, &plan, nullptr)) continue;
 					m_iop_avsz_starts[position] = plan;
 					for (u32 n = 0; n < plan.inst_count; ++n)
-						if (const u32 value = insts[i + n].value) m_iop_fusion_values[value] = true;
+						if (const u32 value = insts[i + n].value) m_fused_values[value] = true;
 					i += plan.inst_count - 1;
 					position += plan.inst_count - 1;
 				}
 			}
+		}
+
+		void Lowerer::PlanEeCop1Compares()
+		{
+			size_t count = 0;
+			for (const auto& block : m_fn.blocks) count += block.insts.size();
+			m_ee_cop1_compare_starts.resize(count);
+			if (!m_fuse_ee_cop1_compares) return;
+			u32 position = 0;
+			for (u32 block_index = 0; block_index < m_fn.blocks.size(); ++block_index)
+			{
+				const auto& insts = m_fn.blocks[block_index].insts;
+				for (u32 i = 0; i < insts.size(); ++i, ++position)
+				{
+					EeCop1ComparePlan plan;
+					if (insts.size() - i < 35 || insts[i].op != ir::Op::ConstI32 || insts[i].imm != 0 ||
+						insts[i + 1].op != ir::Op::ConstI32 || insts[i + 1].imm != 0x7f800000u ||
+						!PlanEeCop1CompareWindow(m_fn, block_index, i, &plan, nullptr)) continue;
+					m_ee_cop1_compare_starts[position] = plan;
+					for (u32 n = 0; n < plan.inst_count; ++n)
+						if (const u32 value = insts[i + n].value) m_fused_values[value] = true;
+					i += plan.inst_count - 1;
+					position += plan.inst_count - 1;
+				}
+			}
+		}
+
+		void Lowerer::EmitEeCop1Compare(const EeCop1ComparePlan& plan)
+		{
+			// The strict graph has no escaping values. All live allocator GPRs
+			// (X21-X23), stack homes, guest/frame bases and cycle registers survive.
+			recBeginOaknutEmit();
+			oakLoad32(oak::util::W0, {GuestBase(), FprBitsOffset(plan.lhs_fpr)});
+			oakLoad32(oak::util::W1, {GuestBase(), FprBitsOffset(plan.rhs_fpr)});
+			oakAsm->MOV(oak::util::W4, 0x7f800000u);
+			oakAsm->MOV(oak::util::W3, 0x7f7fffffu);
+			const auto normalize_key = [&](oak::WReg value) {
+				oakAsm->AND(oak::util::W2, value, oak::util::W4);
+				oakAsm->CMP(oak::util::W2, 0);
+				oakAsm->CSEL(value, oak::util::WZR, value, oak::Cond::EQ);
+				oakAsm->AND(oak::util::W5, value, 0x80000000u);
+				oakAsm->ORR(oak::util::W5, oak::util::W5, oak::util::W3);
+				oakAsm->CMP(oak::util::W2, oak::util::W4);
+				oakAsm->CSEL(value, oak::util::W5, value, oak::Cond::EQ);
+				oakAsm->ASR(oak::util::W2, value, 31);
+				oakAsm->ORR(oak::util::W2, oak::util::W2, 0x80000000u);
+				oakAsm->EOR(value, value, oak::util::W2);
+			};
+			// All exponent-zero words compare as zero. All exponent-255 words,
+			// including NaNs, compare as signed max-finite, matching EE fpuDouble.
+			normalize_key(oak::util::W0);
+			normalize_key(oak::util::W1);
+			oakAsm->CMP(oak::util::W0, oak::util::W1);
+			const oak::Cond condition = plan.predicate == ir::Op::CmpEq ? oak::Cond::EQ :
+				plan.predicate == ir::Op::CmpLtU ? oak::Cond::LO : oak::Cond::LS;
+			oakAsm->CSET(oak::util::W0, condition);
+			const s64 fcr31 = static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]));
+			oakLoad32(oak::util::W2, {GuestBase(), fcr31});
+			oakAsm->BFI(oak::util::W2, oak::util::W0, 23, 1);
+			oakStore32(oak::util::W2, {GuestBase(), fcr31});
+			recEndOaknutEmit();
 		}
 
 		void Lowerer::EmitIopAvsz(bool avsz4)
@@ -1410,7 +1477,7 @@ namespace Arm64Ir
 					const u32 operands = ir::ValueOperandCount(inst);
 					for (u32 i = 0; i < operands; ++i)
 						last_use[inst.args[i]] = position;
-					if (inst.value && !m_iop_fusion_values[inst.value] && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
+					if (inst.value && !m_fused_values[inst.value] && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
 						intervals.push_back({inst.value, position, position});
 					++position;
 				}
@@ -1632,6 +1699,7 @@ namespace Arm64Ir
 			}
 			PlanIopNclips();
 			PlanIopAvsz();
+			PlanEeCop1Compares();
 			AllocateRegisters();
 			AllocateVectorRegisters();
 			u32 next_slot = SaveArea();
@@ -1672,7 +1740,7 @@ namespace Arm64Ir
 						if (m_vector_homes[value])
 							++out->vector_save_values;
 					}
-					if (value && !m_iop_fusion_values[value] && !m_constants[value] && (!allocated || m_vector_homes[value]))
+					if (value && !m_fused_values[value] && !m_constants[value] && (!allocated || m_vector_homes[value]))
 					{
 						++out->spill_values;
 						const u32 size = std::max(8u, ir::TypeSize(inst.type));
@@ -1746,7 +1814,8 @@ namespace Arm64Ir
 				out->direct_iop_load_operations = m_direct_iop_load_operations;
 				out->fused_multiply_pairs = m_fused_multiply_pairs;
 				out->fused_iop_nclips = m_fused_iop_nclips;
-			out->fused_iop_avsz = m_fused_iop_avsz;
+				out->fused_iop_avsz = m_fused_iop_avsz;
+				out->fused_ee_cop1_compares = m_fused_ee_cop1_compares;
 				return true;
 			}
 
@@ -1776,6 +1845,7 @@ namespace Arm64Ir
 			out->fused_multiply_pairs = m_fused_multiply_pairs;
 			out->fused_iop_nclips = m_fused_iop_nclips;
 			out->fused_iop_avsz = m_fused_iop_avsz;
+			out->fused_ee_cop1_compares = m_fused_ee_cop1_compares;
 			return true;
 		}
 
@@ -1823,6 +1893,13 @@ namespace Arm64Ir
 					m_emit_position += plan.inst_count;
 					i += plan.inst_count - 1;
 					++m_fused_iop_avsz;
+				}
+				else if (const EeCop1ComparePlan& plan = m_ee_cop1_compare_starts[m_emit_position]; plan.inst_count != 0)
+				{
+					EmitEeCop1Compare(plan);
+					m_emit_position += plan.inst_count;
+					i += plan.inst_count - 1;
+					++m_fused_ee_cop1_compares;
 				}
 				else if (i + 1 < block.insts.size() && TryEmitMultiplyPair(block.insts[i], block.insts[i + 1]))
 					++i;
@@ -3447,3 +3524,5 @@ namespace Arm64Ir
 #include "IrIopAvsz-arm64.inl"
 
 #include "IrVfClip-arm64.inl"
+
+#include "IrEeCop1Compare-arm64.inl"
