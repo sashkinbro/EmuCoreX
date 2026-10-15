@@ -1069,6 +1069,9 @@ static void recMAX_S_emit_oaknut(int info)
 	oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2, oak::util::LE);
 	oakAsm->l(max_done);
 	oakAsm->FMOV(oakSRegister(EEREC_D), OAK_WSCRATCH);
+	oakLoad32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]))});
+	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH2, ~static_cast<u32>(FPUflagO | FPUflagU));
+	oakStore32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]))});
 	recEndOaknutEmit();
 }
 
@@ -1099,6 +1102,9 @@ static void recMIN_S_emit_oaknut(int info)
 	oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH, OAK_WSCRATCH2, oak::util::GE);
 	oakAsm->l(min_done);
 	oakAsm->FMOV(oakSRegister(EEREC_D), OAK_WSCRATCH);
+	oakLoad32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]))});
+	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH2, ~static_cast<u32>(FPUflagO | FPUflagU));
+	oakStore32(OAK_WSCRATCH2, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, fpuRegs.fprc[31]))});
 	recEndOaknutEmit();
 }
 

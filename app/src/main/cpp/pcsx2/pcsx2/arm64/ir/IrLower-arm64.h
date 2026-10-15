@@ -166,6 +166,29 @@ namespace Arm64Ir
 		LowerOutput* out, std::string* error,
 		BoundVfConvertLayout layout = BoundVfConvertLayout::GuestLanes);
 
+	// Strict raw-bit MAX/MINI expression slice. Both caller-owned inputs hold
+	// full VF words before the writable destination is bound. A shared input
+	// host register is valid only when both guest source identities match.
+	struct BoundVfMaxMinPlan
+	{
+		u8 lhs_vf = 0;
+		u8 rhs_vf = 0;
+		u8 dst_vf = 0;
+		u8 lane_mask = 0;
+		bool maximum = false;
+		bool delay_slot = false;
+	};
+	enum class BoundVfMaxMinLayout : u8
+	{
+		GuestLanes,
+		// One selected guest lane is packed to S0; other host lanes are scratch.
+		MicroVuPartial,
+	};
+	bool PlanBoundVfMaxMinBlock(const ir::Function& fn, BoundVfMaxMinPlan* plan, std::string* error);
+	bool LowerBoundVfMaxMinPlan(const BoundVfMaxMinPlan& plan, u32 lhs_host, u32 rhs_host, u32 dst_host,
+		LowerOutput* out, std::string* error,
+		BoundVfMaxMinLayout layout = BoundVfMaxMinLayout::GuestLanes);
+
 	// Inline-mode exits are emitted through these hooks so the integration can
 	// reuse the legacy block-tail machinery (pc store, event test, linking).
 	struct LowerHooks

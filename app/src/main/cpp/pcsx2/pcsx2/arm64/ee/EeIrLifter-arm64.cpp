@@ -565,7 +565,7 @@ namespace EeIr
 				case 0x0F: // lui
 					WriteGpr(rt, Const(uimm << 16));
 					return true;
-				case 0x11: // COP1 raw transfers and MOV.S
+				case 0x11: // COP1 raw transfers and selected raw S-format operations
 				{
 					const u32 format = rs;
 					const u32 fs = Rd(word);
@@ -588,6 +588,29 @@ namespace EeIr
 
 							// The interpreter clears only the current O/U cause bits for
 							// ABS.S and NEG.S. Sticky flags and all other FCR31 bits survive.
+							const u32 fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
+							m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void,
+								Bin(ir::Op::And, fcr31, Const(~0x0000c000u)));
+							return true;
+						}
+						if (funct == 0x28 || funct == 0x29) // max.s / min.s
+						{
+							// The EE orders these raw words as signed integers. When both
+							// operands are negative, that order is reversed for MAX/MIN.
+							const u32 lhs = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, fs);
+							const u32 rhs = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, Rt(word));
+							const u32 both_negative = Bin(ir::Op::CmpLtS,
+								Bin(ir::Op::And, lhs, rhs), Const(0));
+							const u32 lhs_less_raw = Bin(ir::Op::CmpLtS, lhs, rhs);
+							const u32 lhs_less_real = Bin(ir::Op::Xor, lhs_less_raw, both_negative);
+							const bool is_max = funct == 0x28;
+							// Equality can toggle the predicate for negative words, but either
+							// selected operand is then the same raw bit pattern.
+							const u32 result = m_b.Emit3(ir::Op::Select, ir::Type::I32,
+								lhs_less_real, is_max ? rhs : lhs, is_max ? lhs : rhs);
+							m_b.Emit1(ir::Op::WriteFprBits, ir::Type::Void, result, Sa(word));
+
+							// MAX.S and MIN.S clear current O/U causes only.
 							const u32 fcr31 = m_b.Emit0(ir::Op::ReadFcr31, ir::Type::I32);
 							m_b.Emit1(ir::Op::WriteFcr31, ir::Type::Void,
 								Bin(ir::Op::And, fcr31, Const(~0x0000c000u)));

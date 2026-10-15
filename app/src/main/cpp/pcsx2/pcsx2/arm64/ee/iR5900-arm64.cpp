@@ -84,6 +84,7 @@ static u64 s_cop1_ctc1_compiles = 0;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 static u64 s_cop1_mov_s_compiles = 0;
 static u64 s_cop1_unary_compiles = 0;
+static u64 s_cop1_max_s_compiles = 0, s_cop1_min_s_compiles = 0;
 static u64 s_direct_scalar_store_compiles = 0;
 static u64 s_direct_scalar_load_compiles = 0;
 static u64 s_cop1_bc1_compiles = 0;
@@ -2445,6 +2446,8 @@ static u8* recShortBlockLink_emit_oaknut(u32 next_pc, u32 scaled_cycles)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 static int s_oracleEeIrModeOverride = -1;
 static int s_oracleEeIrFastLoadOverride = -1;
+static int s_oracleEeIrRegisterAllocationOverride = -1;
+static u32 s_oracleEeIrLastFrameSize = 0;
 static u64 s_fast_scalar_load_compiles = 0;
 extern "C" void EmuCoreXOracleSetEeIrMode(int mode)
 {
@@ -2461,6 +2464,17 @@ extern "C" void EmuCoreXOracleGetEeIrCop1Counts(u64* mfc1, u64* mtc1, u64* cfc1,
 }
 extern "C" u64 EmuCoreXOracleGetEeIrMovCounts() { return s_cop1_mov_s_compiles; }
 extern "C" u64 EmuCoreXOracleGetEeIrUnaryCounts() { return s_cop1_unary_compiles; }
+extern "C" void EmuCoreXOracleGetEeIrCop1MaxMinCounts(u64* max_s, u64* min_s)
+{
+	if (max_s) *max_s = s_cop1_max_s_compiles;
+	if (min_s) *min_s = s_cop1_min_s_compiles;
+}
+extern "C" void EmuCoreXOracleSetEeIrRegisterAllocation(int mode)
+{
+	if (mode >= -1 && mode <= 1)
+		s_oracleEeIrRegisterAllocationOverride = mode;
+}
+extern "C" u32 EmuCoreXOracleGetEeIrLastFrameSize() { return s_oracleEeIrLastFrameSize; }
 extern "C" u64 EmuCoreXOracleGetEeIrDirectStoreCounts() { return s_direct_scalar_store_compiles; }
 extern "C" u64 EmuCoreXOracleGetEeIrDirectLoadCounts() { return s_direct_scalar_load_compiles; }
 extern "C" void EmuCoreXOracleSetEeIrFastLoads(int mode)
@@ -2662,6 +2676,10 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 		return __system_property_get("debug.emucorex.ee_ir_regalloc", value) == 0 || value[0] != '0';
 	}();
 	options.allocate_registers = allocate_registers;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (s_oracleEeIrRegisterAllocationOverride >= 0)
+		options.allocate_registers = s_oracleEeIrRegisterAllocationOverride == 1;
+#endif
 	static const bool allocate_vector_registers = []() {
 		char value[PROP_VALUE_MAX] = {};
 		return __system_property_get("debug.emucorex.ee_ir_vector_regalloc", value) == 0 || value[0] != '0';
@@ -2690,7 +2708,8 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static const bool fastmem_ee_loads = []() {
 		char value[PROP_VALUE_MAX] = {};
-		return __system_property_get("debug.emucorex.ee_ir_fastmem", value) > 0 && value[0] == '1';
+		// Measured Load32 path within opt-in EE IR; zero retains the VTLB A/B baseline.
+		return __system_property_get("debug.emucorex.ee_ir_fastmem", value) == 0 || value[0] != '0';
 	}();
 	options.fastmem_ee_loads = s_oracleEeIrFastLoadOverride >= 0 ? s_oracleEeIrFastLoadOverride == 1 : fastmem_ee_loads;
 #endif
@@ -2722,6 +2741,7 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 	}
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	s_direct_scalar_store_compiles += out.direct_ee_store_operations;
+	s_oracleEeIrLastFrameSize = out.frame_size;
 	s_direct_scalar_load_compiles += out.direct_ee_load_operations;
 	s_fast_scalar_load_compiles += out.fastmem_ee_load_operations;
 	if (out.fastmem_ee_load_operations && (s_fast_scalar_load_compiles & (s_fast_scalar_load_compiles - 1)) == 0)
@@ -2767,6 +2787,10 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 				++s_cop1_mov_s_compiles;
 			if (rs == 0x10 && ((word & 0x3f) == 0x05 || (word & 0x3f) == 0x07))
 				++s_cop1_unary_compiles;
+			if (rs == 0x10 && (word & 0x3f) == 0x28)
+				++s_cop1_max_s_compiles;
+			if (rs == 0x10 && (word & 0x3f) == 0x29)
+				++s_cop1_min_s_compiles;
 #endif
 		}
 		if (op == 0x1c)
@@ -2835,11 +2859,14 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 	{
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 		const unsigned long long cop1_mov_s_compiles = static_cast<unsigned long long>(s_cop1_mov_s_compiles);
+		const unsigned long long cop1_max_s_compiles = static_cast<unsigned long long>(s_cop1_max_s_compiles);
+		const unsigned long long cop1_min_s_compiles = static_cast<unsigned long long>(s_cop1_min_s_compiles);
 #else
 		constexpr unsigned long long cop1_mov_s_compiles = 0;
+		constexpr unsigned long long cop1_max_s_compiles = 0, cop1_min_s_compiles = 0;
 #endif
 		__android_log_print(ANDROID_LOG_INFO, "EEIR",
-			"compiled_blocks=%llu guest_instructions=%llu native_bytes=%llu last_pc=%08x regalloc=%u optimize=%u registers=%u spills=%u frame=%u native_div=%u division_pairs=%llu quad=%u quad_operations=%llu direct_quad=%llu spill_reuse=%u slots=%u vector_alu=%llu quad_forward=%u vector_regalloc=%u vector_registers=%llu vector_homes=%llu direct_vectors=%u direct_vector_quad=%llu packed_word_shifts=%llu vector_compare_minmax=%llu vector_shuffles=%llu fused_multiply_pairs=%llu merge_memory=%llu direct_reads=%u direct_read_operations=%llu packed_narrow=%llu packed_saturating=%llu packed_permutations=%llu hilo_bank1=%llu multiply_accumulate=%llu plzcw=%llu full_hilo_reads=%llu full_hilo_writes=%llu widening_products=%llu variable_shifts=%llu cop1_mfc1=%llu cop1_mtc1=%llu cop1_cfc1=%llu cop1_ctc1=%llu cop1_mov_s=%llu direct_stores=%u direct_store_operations=%llu",
+			"compiled_blocks=%llu guest_instructions=%llu native_bytes=%llu last_pc=%08x regalloc=%u optimize=%u registers=%u spills=%u frame=%u native_div=%u division_pairs=%llu quad=%u quad_operations=%llu direct_quad=%llu spill_reuse=%u slots=%u vector_alu=%llu quad_forward=%u vector_regalloc=%u vector_registers=%llu vector_homes=%llu direct_vectors=%u direct_vector_quad=%llu packed_word_shifts=%llu vector_compare_minmax=%llu vector_shuffles=%llu fused_multiply_pairs=%llu merge_memory=%llu direct_reads=%u direct_read_operations=%llu packed_narrow=%llu packed_saturating=%llu packed_permutations=%llu hilo_bank1=%llu multiply_accumulate=%llu plzcw=%llu full_hilo_reads=%llu full_hilo_writes=%llu widening_products=%llu variable_shifts=%llu cop1_mfc1=%llu cop1_mtc1=%llu cop1_cfc1=%llu cop1_ctc1=%llu cop1_mov_s=%llu cop1_max_s=%llu cop1_min_s=%llu direct_stores=%u direct_store_operations=%llu",
 			static_cast<unsigned long long>(compiled_blocks),
 			static_cast<unsigned long long>(guest_instructions),
 			static_cast<unsigned long long>(native_bytes), startpc, options.allocate_registers ? 1u : 0u,
@@ -2863,6 +2890,7 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 			static_cast<unsigned long long>(s_cop1_mfc1_compiles), static_cast<unsigned long long>(s_cop1_mtc1_compiles),
 			static_cast<unsigned long long>(s_cop1_cfc1_compiles), static_cast<unsigned long long>(s_cop1_ctc1_compiles),
 			cop1_mov_s_compiles,
+			cop1_max_s_compiles, cop1_min_s_compiles,
 			options.optimize_ir && options.direct_ee_stores && (!CHECK_CACHE || CHECK_EEREC) ? 1u : 0u,
 			static_cast<unsigned long long>(direct_ee_store_operations));
 	}

@@ -47,6 +47,9 @@
 // without initializing SPU2, DEV9 and friends. It must default to off: a debug
 // build is a real emulator too, and the event tests are required there.
 static bool s_oracleSkipEvents = false;
+void recExitExecutionImmediate();
+extern "C" void EmuCoreXOracleSetEeIrRegisterAllocation(int mode);
+extern "C" u32 EmuCoreXOracleGetEeIrLastFrameSize();
 
 extern "C" int EmuCoreXOracleSkipEvents()
 {
@@ -2160,8 +2163,12 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_ftoi.inl"
 #include "jit_oracle_vu_ftoi_integration.inl"
 #include "jit_oracle_vu_ftoi_bench.inl"
+#include "jit_oracle_vu_maxmin.inl"
+#include "jit_oracle_vu_maxmin_integration.inl"
+#include "jit_oracle_vu_maxmin_bench.inl"
 
-void VUTests(bool itof_codegen_only = false, bool ftoi_only = false)
+void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
+    bool maxmin_route_only = false)
 {
     struct VUOverrideReset
     {
@@ -2194,6 +2201,18 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false)
         VUSharedFtoiBenchmarks();
         return;
     }
+    if (maxmin_only)
+    {
+        VUBoundVfMaxMinTests();
+        VUSharedMaxMinIntegrationTests();
+        VUSharedMaxMinBenchmarks();
+        return;
+    }
+    if (maxmin_route_only)
+    {
+        VUSharedMaxMinIntegrationTests();
+        return;
+    }
     VUBoundIrTests();
     VUSharedIrProductionTests();
     VUSharedImmediateTests();
@@ -2204,6 +2223,9 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false)
     VUSharedItofIntegrationTests();
     VUSharedItofBenchmarks();
     VUBoundVfToIntTests();
+    VUBoundVfMaxMinTests();
+    VUSharedMaxMinIntegrationTests();
+    VUSharedMaxMinBenchmarks();
     VUSharedFtoiIntegrationTests();
     VUSharedFtoiBenchmarks();
     VUBoundVfViTransferTests();
@@ -3952,10 +3974,12 @@ void EECoverageCop2Spec2()
 
 #include "jit_oracle_ee_vu_itof.inl"
 #include "jit_oracle_ee_vu_ftoi.inl"
+#include "jit_oracle_ee_vu_maxmin.inl"
 #include "jit_oracle_ee_bc1.inl"
 #include "jit_oracle_ee_hot_loads.inl"
 #include "jit_oracle_ee_fastmem.inl"
 #include "jit_oracle_ee_fastmem_abi.inl"
+#include "jit_oracle_ee_fastmem_exit.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -4532,6 +4556,7 @@ bool RunEEIrCop1Direct(const std::vector<u32>& program, const GPR_reg* initial_g
 }
 
 #include "jit_oracle_ee_unary.inl"
+#include "jit_oracle_ee_maxmin.inl"
 
 void EEIrCop1TransferTests()
 {
@@ -5137,7 +5162,7 @@ void EEIrCop1MoveTests()
     bool rejected_non_move = true;
     for (u32 funct = 0; funct < 64; ++funct)
     {
-        if (funct == 0x05 || funct == 0x06 || funct == 0x07)
+        if (funct == 0x05 || funct == 0x06 || funct == 0x07 || funct == 0x28 || funct == 0x29)
             continue;
         const u32 word = MipsCop1(16, 9, 8, 10, funct);
         ir::Function fn;
@@ -5156,7 +5181,7 @@ void EEIrCop1MoveTests()
         rejected_non_move &= !EeIr::LiftBlock(&word, {EE_TEST_PC, 1}, fn, &end, &error);
     }
     Check(rejected_non_move,
-        "COP1 raw-sign slice admits ABS.S/MOV.S/NEG.S; other S functions, W format, and incomplete BC1 reject");
+        "COP1 raw-bit slice admits ABS/MOV/NEG/MAX/MIN; other S functions, W format, and incomplete BC1 reject");
 
     // MOV.S must behave as a branch delay-slot instruction on both routes.
     const u32 delay_bits = 0x7fc54321u;
@@ -8769,6 +8794,7 @@ void EEIrExecutionTests()
     EEIrCop1TransferTests();
     EEIrCop1MoveTests();
     EEIrCop1UnaryTests();
+    EEIrCop1MaxMinTests();
     EEIrPackedKernelDceTests();
     EEIrQuadHiLoStateTests();
     EEIrPackedProductBackendTests();
@@ -9777,7 +9803,8 @@ void EEGameCodeTests()
 
 void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_stores_only = false,
     bool vu_itof_only = false, bool cop1_branch_only = false, bool hot_loads_only = false,
-    bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false)
+    bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
+    bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9818,6 +9845,21 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     {
         EEFastmemIntegrationTests();
         EEFastmemAbiTests();
+        return;
+    }
+    if (fastmem_exit_only)
+    {
+        EEFastmemNonreturningHelperTests();
+        return;
+    }
+    if (cop1_maxmin_only)
+    {
+        EEIrCop1MaxMinTests();
+        return;
+    }
+    if (vu_maxmin_only)
+    {
+        EEVuMaxMinMacroTests();
         return;
     }
     if (cop1_unary_only)
@@ -9968,11 +10010,13 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     EEVuAbsSharedTests();
     EEVuItofMacroTests();
     EEVuFtoiMacroTests();
+    EEVuMaxMinMacroTests();
     EEIrCop1BranchTests();
     EEHotLoadBenchmarkTests();
     EEIrScalarStoreTests();
     EEFastmemIntegrationTests();
     EEFastmemAbiTests();
+    EEFastmemNonreturningHelperTests();
     EEIrScalarStoreGuestTests();
     EEIrScalarStoreBenchmark();
     EECoverageMmi();
@@ -12013,6 +12057,10 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests(true);
     else if (std::strcmp(suite, "vu-ftoi") == 0)
         VUTests(false, true);
+    else if (std::strcmp(suite, "vu-maxmin") == 0)
+        VUTests(false, false, true);
+    else if (std::strcmp(suite, "vu-maxmin-route") == 0)
+        VUTests(false, false, false, true);
     else if (std::strcmp(suite, "sqrt-flags") == 0)
         SqrtFlagTests();
     else if (std::strcmp(suite, "div-edges") == 0)
@@ -12035,6 +12083,12 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-cop1-unary") == 0)
         EETests(false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-fastmem-exit") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-cop1-maxmin") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-vu-maxmin") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-bc1") == 0)
         EETests(false, false, false, false, true);
     else if (std::strcmp(suite, "ee-hot-loads") == 0)

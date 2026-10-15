@@ -343,7 +343,11 @@ namespace
         std::string error;
         Check(EeIr::LiftBlock(&word, {EE_TEST_PC + 0x400, 1}, fn, &end, &error),
             "EE fastmem admission fixture lifts");
-        for (u32 mode = 0; mode < 8; ++mode)
+        ir::Function iop_fn;
+        u32 accepted = 0;
+        Check(IopIr::LiftSequence(&word, EE_TEST_PC + 0x400, 1, iop_fn, &accepted, &error) && accepted == 1,
+            "IOP Load32 domain-exclusion fixture lifts through its own frontend");
+        for (u32 mode = 0; mode < 10; ++mode)
         {
             EeIr::LowerHooks hooks;
             hooks.ee_fastmem_abi = mode != 1;
@@ -355,8 +359,11 @@ namespace
             options.inline_body = mode != 7;
             options.optimize_ir = mode != 4;
             options.direct_ee_loads = mode != 5;
+            if (mode == 9)
+                options.guest_state = Arm64Ir::GuestState::IOP;
             options.hooks = &hooks;
             EmuConfig.Cpu.Recompiler.EnableFastmem = mode != 6;
+            EmuConfig.Cpu.Recompiler.EnableEE = mode != 8;
             u8* const code = SysMemory::GetEERec() + 0x2000000;
             if (options.inline_body)
             {
@@ -364,11 +371,12 @@ namespace
                 oakStartBlock();
             }
             EeIr::LowerOutput out;
-            const bool lowered = EeIr::LowerBlock(fn, options, code, 0x10000, &out, &error);
+            ir::Function& fixture = mode == 9 ? iop_fn : fn;
+            const bool lowered = EeIr::LowerBlock(fixture, options, code, 0x10000, &out, &error);
             if (options.inline_body)
                 oakEndBlock();
             Check(lowered && out.host_size != 0 && out.fastmem_ee_load_operations == 0,
-                "EE fastmem rejects disabled option/ABI/hooks/optimization/direct/fastmem/standalone gates");
+                "EE fastmem rejects disabled option/ABI/hooks/optimization/direct/fastmem/standalone/EE-disabled/IOP gates");
         }
     }
 

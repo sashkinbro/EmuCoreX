@@ -2189,6 +2189,66 @@ static void mVU_MSUBAw_emit(mP)
 }
 
 // MAX Opcode
+static bool mVUTrySharedMaxMin(mV, bool maximum)
+{
+	if (!_Fd_ || mVUtrySkipNoLaneWrite_oaknut(mVU) || !mVUSharedIrEnabled(mVU.index)) return false;
+	static thread_local ir::Function fn;
+	if (fn.blocks.empty())
+	{
+		ir::Builder init(fn);
+		init.CreateBlock(0);
+		fn.blocks[0].insts.reserve(17);
+		fn.value_types.reserve(16);
+	}
+	fn.blocks[0].insts.clear();
+	fn.blocks[0].guest_start = mVU.prog.IRinfo.curPC * sizeof(u32);
+	fn.value_types.resize(1);
+	fn.next_value = 1;
+	ir::Builder b(fn);
+	b.SetBlock(1);
+	b.SetDelaySlot(mVUinfo.isBdelay);
+	const u32 lhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Fs_);
+	const u32 rhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
+	const u32 shift31 = b.ConstI32(31), shift1 = b.ConstI32(1);
+	const u32 sign_lhs = b.Emit2(ir::Op::VShrS, ir::Type::V4I32, lhs, shift31);
+	const u32 flip_lhs = b.Emit2(ir::Op::VShrU, ir::Type::V4I32, sign_lhs, shift1);
+	const u32 key_lhs = b.Emit2(ir::Op::VXor, ir::Type::V4I32, lhs, flip_lhs);
+	const u32 sign_rhs = b.Emit2(ir::Op::VShrS, ir::Type::V4I32, rhs, shift31);
+	const u32 flip_rhs = b.Emit2(ir::Op::VShrU, ir::Type::V4I32, sign_rhs, shift1);
+	const u32 key_rhs = b.Emit2(ir::Op::VXor, ir::Type::V4I32, rhs, flip_rhs);
+	const u32 choose_lhs = b.Emit2(ir::Op::VCmpLtS, ir::Type::V4I32,
+		maximum ? key_rhs : key_lhs, maximum ? key_lhs : key_rhs);
+	const u32 selected_lhs = b.Emit2(ir::Op::VAnd, ir::Type::V4I32, lhs, choose_lhs);
+	const u32 choose_rhs = b.Emit1(ir::Op::VNot, ir::Type::V4I32, choose_lhs);
+	const u32 selected_rhs = b.Emit2(ir::Op::VAnd, ir::Type::V4I32, rhs, choose_rhs);
+	const u32 result = b.Emit2(ir::Op::VOr, ir::Type::V4I32, selected_lhs, selected_rhs);
+	b.Emit1(ir::Op::WriteVfBitsMasked, ir::Type::Void, result, _Fd_, _X_Y_Z_W);
+	b.Return();
+	Arm64Ir::BoundVfMaxMinPlan plan;
+	std::string error;
+	if (!Arm64Ir::PlanBoundVfMaxMinBlock(fn, &plan, &error)) return false;
+	// Preserve both full source bindings before requesting a writable partial
+	// destination. microVU owns WAW/backup handling and packed-lane writeback.
+	const int lhs_reg = mVU.regAlloc->allocRegId(plan.lhs_vf);
+	const int rhs_reg = mVU.regAlloc->allocRegId(plan.rhs_vf);
+	const int dst_reg = mVU.regAlloc->allocRegId(-1, plan.dst_vf, plan.lane_mask);
+	Arm64Ir::LowerOutput out;
+	const bool lowered = Arm64Ir::LowerBoundVfMaxMinPlan(plan, lhs_reg, rhs_reg, dst_reg,
+		&out, &error, Arm64Ir::BoundVfMaxMinLayout::MicroVuPartial);
+	pxAssertRel(lowered, error.c_str());
+	// Release the writer first so the allocator merges/invalidate aliases.
+	// Repeated source identities may share the same cached host register.
+	mVU.regAlloc->clearNeededXmmId(dst_reg);
+	if (lhs_reg != dst_reg) mVU.regAlloc->clearNeededXmmId(lhs_reg);
+	if (rhs_reg != dst_reg && rhs_reg != lhs_reg) mVU.regAlloc->clearNeededXmmId(rhs_reg);
+	if (lowered)
+	{
+		mVURecordSharedIr(mVU.index, out.host_size);
+		mVURecordSharedMaxMin(mVU.index, out.host_size);
+	}
+	return lowered;
+}
+
 static void mVU_MAX_direct_emit_oaknut(mP)
 {
 	if (mVUtrySkipNoLaneWrite_oaknut(mVU))
@@ -2234,7 +2294,11 @@ static void mVU_MAX_emit(mP)
 		mVUanalyzeFMAC1(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAX_direct_emit_oaknut(mVU, recPass); }
+	pass2
+	{
+		if (!mVUTrySharedMaxMin(mVU, true))
+			mVU_MAX_direct_emit_oaknut(mVU, recPass);
+	}
 	pass3
 	{
 		mVUlog("MAX");
@@ -2466,7 +2530,11 @@ static void mVU_MINI_emit(mP)
 		mVUanalyzeFMAC1(mVU, _Fd_, _Fs_, _Ft_);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINI_direct_emit_oaknut(mVU, recPass); }
+	pass2
+	{
+		if (!mVUTrySharedMaxMin(mVU, false))
+			mVU_MINI_direct_emit_oaknut(mVU, recPass);
+	}
 	pass3
 	{
 		mVUlog("MINI");

@@ -3230,3 +3230,5 @@ namespace Arm64Ir
 		return LowerBlock(fn, LowerOptions{}, code, capacity, out, error);
 	}
 } // namespace Arm64Ir
+
+#include "arm64/ir/IrVfMaxMin-arm64.inl"
