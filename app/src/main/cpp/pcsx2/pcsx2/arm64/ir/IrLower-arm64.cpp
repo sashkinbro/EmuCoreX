@@ -14,6 +14,7 @@
 #include <cstring>
 #include <algorithm>
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 namespace Arm64Ir
@@ -519,14 +520,35 @@ namespace Arm64Ir
 			const u64 mask = type == ir::Type::I64 ? ~u64(0) : 0xffffffffull;
 			constant &= mask;
 			bool subtract = op == ir::Op::Sub;
-			if (constant > 4095)
+			if (!oak::AddSubImm::is_valid(constant))
 			{
 				constant = (u64(0) - constant) & mask;
 				subtract = !subtract;
 			}
-			if (constant > 4095) return false;
+			if (!oak::AddSubImm::is_valid(constant)) return false;
 			if (subtract) oakAsm->SUB(dst, src, constant);
 			else oakAsm->ADD(dst, src, constant);
+			return true;
+		}
+
+		template <typename Reg>
+		bool EmitSimpleLogicalImmediate(ir::Op op, const Reg& dst, const Reg& src, u64 constant)
+		{
+			if (op != ir::Op::And && op != ir::Op::Or && op != ir::Op::Xor) return false;
+			using Word = std::conditional_t<std::is_same_v<Reg, oak::XReg>, std::uint64_t, std::uint32_t>;
+			using Immediate = std::conditional_t<std::is_same_v<Reg, oak::XReg>, oak::BitImm64, oak::BitImm32>;
+			const Word narrowed = static_cast<Word>(constant);
+			// Query the encoder before constructing BitImm, whose invalid-input
+			// constructor throws. Zero, all-ones and irregular masks use registers.
+			if (!oak::detail::encode_bit_imm(narrowed)) return false;
+			const Immediate imm(narrowed);
+			switch (op)
+			{
+				case ir::Op::And: oakAsm->AND(dst, src, imm); break;
+				case ir::Op::Or: oakAsm->ORR(dst, src, imm); break;
+				case ir::Op::Xor: oakAsm->EOR(dst, src, imm); break;
+				default: return false;
+			}
 			return true;
 		}
 
@@ -976,6 +998,7 @@ namespace Arm64Ir
 				, m_allocate_vectors(options.allocate_registers && options.allocate_vector_registers)
 				, m_inline_division(options.optimize_ir && options.inline_division)
 				, m_fuse_multiply_pairs(options.optimize_ir)
+				, m_fuse_iop_nclips(options.optimize_ir && options.guest_state == GuestState::IOP)
 				, m_direct_quad_memory(options.optimize_ir && options.direct_quad_memory && (!CHECK_CACHE || CHECK_EEREC))
 				, m_direct_ee_loads(options.guest_state == GuestState::EE && options.optimize_ir && options.direct_ee_loads && (!CHECK_CACHE || CHECK_EEREC))
 				, m_fastmem_ee_loads(options.fastmem_ee_loads && options.inline_body && options.hooks &&
@@ -996,6 +1019,8 @@ namespace Arm64Ir
 			u32 SaveArea() const { return m_inline ? 0u : (m_allocate_registers ? 64u : 32u); }
 			static constexpr int kUnallocated = -1;
 			void AllocateRegisters();
+			void PlanIopNclips();
+			void EmitIopNclip();
 			void AllocateVectorRegisters();
 			bool IsVectorBarrier(const ir::Inst& inst) const;
 			bool UsesDirectVectorMemory(const ir::Inst& inst) const
@@ -1197,6 +1222,9 @@ namespace Arm64Ir
 			bool m_inline_division = true;
 			bool m_fuse_multiply_pairs = true;
 			u32 m_fused_multiply_pairs = 0;
+			bool m_fuse_iop_nclips = false;
+			u32 m_fused_iop_nclips = 0;
+			std::vector<bool> m_iop_nclip_starts, m_iop_nclip_values;
 			bool m_direct_quad_memory = true;
 			bool m_direct_ee_loads = true;
 			bool m_fastmem_ee_loads = false;
@@ -1220,6 +1248,66 @@ namespace Arm64Ir
 			std::vector<std::vector<u32>> m_vector_saves, m_vector_restores;
 		};
 
+		void Lowerer::PlanIopNclips()
+		{
+			m_iop_nclip_values.assign(m_fn.value_types.size(), false);
+			size_t instruction_count = 0;
+			for (const auto& block : m_fn.blocks) instruction_count += block.insts.size();
+			m_iop_nclip_starts.assign(instruction_count, false);
+			if (!m_fuse_iop_nclips) return;
+			u32 position = 0;
+			for (u32 block_index = 0; block_index < m_fn.blocks.size(); ++block_index)
+			{
+				const auto& insts = m_fn.blocks[block_index].insts;
+				for (u32 i = 0; i < insts.size(); ++i, ++position)
+				{
+					if (insts[i].op != ir::Op::ReadCp2Data || insts[i].imm != 12 ||
+						!PlanIopNclipWindow(m_fn, block_index, i, nullptr)) continue;
+					m_iop_nclip_starts[position] = true;
+					for (u32 node = 0; node < 24; ++node)
+						if (const u32 value = insts[i + node].value) m_iop_nclip_values[value] = true;
+					i += 23;
+					position += 23;
+				}
+			}
+		}
+
+		void Lowerer::EmitIopNclip()
+		{
+			// The strict common-IR graph has no escaping definitions. Its fused
+			// body uses only caller-save scratch; live SSA registers X21-X23 and
+			// their stack homes remain intact across this expression.
+			recBeginOaknutEmit();
+			for (u32 vertex = 0; vertex < 3; ++vertex)
+			{
+				const oak::WReg y(vertex * 2), x(vertex * 2 + 1);
+				constexpr size_t first = offsetof(cpuRegistersPack, psxRegs.CP2D.r[12]);
+				if constexpr ((first & 1u) == 0 && first + 10 < 8192)
+				{
+					// The ARM64 register pack stores each signed X/Y halfword in
+					// little-endian order. These are raw CPU-state reads, not guest
+					// bus accesses, so combine load and signed extraction directly.
+					oakAsm->LDRSH(x, GuestBase(), oak::POffset<13, 1>(first + vertex * 4));
+					oakAsm->LDRSH(y, GuestBase(), oak::POffset<13, 1>(first + vertex * 4 + 2));
+				}
+				else
+				{
+					oakLoad32(y, {GuestBase(), static_cast<s64>(first + vertex * sizeof(u32))});
+					oakAsm->SXTH(x, y);
+					oakAsm->ASR(y, y, 16);
+				}
+			}
+			oakAsm->SUB(oak::util::W16, oak::util::W2, oak::util::W4);
+			oakAsm->MUL(oak::util::W16, oak::util::W1, oak::util::W16);
+			oakAsm->SUB(oak::util::W17, oak::util::W4, oak::util::W0);
+			oakAsm->MADD(oak::util::W16, oak::util::W3, oak::util::W17, oak::util::W16);
+			oakAsm->SUB(oak::util::W17, oak::util::W0, oak::util::W2);
+			oakAsm->MADD(oak::util::W16, oak::util::W5, oak::util::W17, oak::util::W16);
+			oakStore32(oak::util::W16, {GuestBase(), static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[24]))});
+			oakStore32(oak::util::WZR, {GuestBase(), static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[31]))});
+			recEndOaknutEmit();
+		}
+
 		void Lowerer::AllocateRegisters()
 		{
 			m_registers.assign(m_fn.value_types.size(), kUnallocated);
@@ -1236,7 +1324,7 @@ namespace Arm64Ir
 					const u32 operands = ir::ValueOperandCount(inst);
 					for (u32 i = 0; i < operands; ++i)
 						last_use[inst.args[i]] = position;
-					if (inst.value && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
+					if (inst.value && !m_iop_nclip_values[inst.value] && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
 						intervals.push_back({inst.value, position, position});
 					++position;
 				}
@@ -1456,6 +1544,7 @@ namespace Arm64Ir
 					}
 				}
 			}
+			PlanIopNclips();
 			AllocateRegisters();
 			AllocateVectorRegisters();
 			u32 next_slot = SaveArea();
@@ -1496,7 +1585,7 @@ namespace Arm64Ir
 						if (m_vector_homes[value])
 							++out->vector_save_values;
 					}
-					if (value && !m_constants[value] && (!allocated || m_vector_homes[value]))
+					if (value && !m_iop_nclip_values[value] && !m_constants[value] && (!allocated || m_vector_homes[value]))
 					{
 						++out->spill_values;
 						const u32 size = std::max(8u, ir::TypeSize(inst.type));
@@ -1568,6 +1657,7 @@ namespace Arm64Ir
 				out->iop_memory_operations = m_iop_memory_operations;
 				out->direct_iop_load_operations = m_direct_iop_load_operations;
 				out->fused_multiply_pairs = m_fused_multiply_pairs;
+				out->fused_iop_nclips = m_fused_iop_nclips;
 				return true;
 			}
 
@@ -1595,6 +1685,7 @@ namespace Arm64Ir
 			out->iop_memory_operations = m_iop_memory_operations;
 			out->direct_iop_load_operations = m_direct_iop_load_operations;
 			out->fused_multiply_pairs = m_fused_multiply_pairs;
+			out->fused_iop_nclips = m_fused_iop_nclips;
 			return true;
 		}
 
@@ -1629,7 +1720,14 @@ namespace Arm64Ir
 		{
 			for (size_t i = 0; i < block.insts.size(); ++i)
 			{
-				if (i + 1 < block.insts.size() && TryEmitMultiplyPair(block.insts[i], block.insts[i + 1]))
+				if (m_iop_nclip_starts[m_emit_position])
+				{
+					EmitIopNclip();
+					m_emit_position += 24;
+					i += 23;
+					++m_fused_iop_nclips;
+				}
+				else if (i + 1 < block.insts.size() && TryEmitMultiplyPair(block.insts[i], block.insts[i + 1]))
 					++i;
 				else if (!EmitInst(block.insts[i], error))
 					return false;
@@ -1898,15 +1996,19 @@ namespace Arm64Ir
 					}
 					else if (inst.type == ir::Type::I64)
 					{
-						const auto lhs = Operand64(a[0], oak::util::X0);
+						const bool commute = (inst.op == ir::Op::And || inst.op == ir::Op::Or || inst.op == ir::Op::Xor) &&
+							m_constants[a[0]] && !m_constants[a[1]];
+						const u32 left = a[commute ? 1 : 0], right = a[commute ? 0 : 1];
+						const auto lhs = Operand64(left, oak::util::X0);
 						const auto dst = Result64(inst.value);
-						if (m_constants[a[1]] && EmitAddSubImmediate(inst, dst, lhs, *m_constants[a[1]]))
+						if (m_constants[right] && (EmitAddSubImmediate(inst, dst, lhs, *m_constants[right]) ||
+							EmitSimpleLogicalImmediate(inst.op, dst, lhs, *m_constants[right])))
 						{
 							Store64(inst.value, dst);
 							recEndOaknutEmit();
 							return true;
 						}
-						const auto rhs = Operand64(a[1], oak::util::X1);
+						const auto rhs = Operand64(right, oak::util::X1);
 						switch (inst.op)
 						{
 							case ir::Op::Add: oakAsm->ADD(dst, lhs, rhs); break;
@@ -1920,15 +2022,19 @@ namespace Arm64Ir
 					}
 					else
 					{
-						const auto lhs = Operand32(a[0], oak::util::W0);
+						const bool commute = (inst.op == ir::Op::And || inst.op == ir::Op::Or || inst.op == ir::Op::Xor) &&
+							m_constants[a[0]] && !m_constants[a[1]];
+						const u32 left = a[commute ? 1 : 0], right = a[commute ? 0 : 1];
+						const auto lhs = Operand32(left, oak::util::W0);
 						const auto dst = Result32(inst.value);
-						if (m_constants[a[1]] && EmitAddSubImmediate(inst, dst, lhs, *m_constants[a[1]]))
+						if (m_constants[right] && (EmitAddSubImmediate(inst, dst, lhs, *m_constants[right]) ||
+							EmitSimpleLogicalImmediate(inst.op, dst, lhs, *m_constants[right])))
 						{
 							Store32(inst.value, dst);
 							recEndOaknutEmit();
 							return true;
 						}
-						const auto rhs = Operand32(a[1], oak::util::W1);
+						const auto rhs = Operand32(right, oak::util::W1);
 						switch (inst.op)
 						{
 							case ir::Op::Add:
@@ -3232,3 +3338,4 @@ namespace Arm64Ir
 } // namespace Arm64Ir
 
 #include "arm64/ir/IrVfMaxMin-arm64.inl"
+#include "arm64/ir/IrIopNclip-arm64.inl"

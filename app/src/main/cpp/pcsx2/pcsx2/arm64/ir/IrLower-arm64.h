@@ -32,6 +32,7 @@ extern "C" u32 g_eeir_exit_valid;
 
 namespace Arm64Ir
 {
+	bool PlanIopNclipWindow(const ir::Function& fn, u32 block_index, u32 first_inst, std::string* error);
 	enum class GuestState : u8 { EE, IOP };
 
 	// Narrow inline VU slice. microVU owns the VI mappings and backup/dirty
@@ -274,6 +275,7 @@ namespace Arm64Ir
 		u32 iop_memory_operations = 0;
 		u32 direct_iop_load_operations = 0;
 		u32 fused_multiply_pairs = 0;
+		u32 fused_iop_nclips = 0;
 	};
 
 	// Both host W-register indices must be in [0,30], owned by the caller.

@@ -179,8 +179,43 @@ namespace IopIr
                         }
                         default: return false;
                     }
-                case 18: // COP2 register transfers; nonzero funct encodings dispatch GTE commands.
+                case 18: // COP2 transfers and the bounded canonical NCLIP command.
                 {
+                    if (rs == 16 && (word & 63u) == 6)
+                    {
+                        // Match the current core's raw signed-coordinate NCLIP:
+                        // products and sums wrap to I32, MAC0 receives the
+                        // determinant, and FLAG is cleared. SF/LM are ignored.
+                        // Capture all source words before committing either write.
+                        const u32 xy0 = ReadCp2Data(b, 12);
+                        const u32 xy1 = ReadCp2Data(b, 13);
+                        const u32 xy2 = ReadCp2Data(b, 14);
+                        const u32 shift16 = b.ConstI32(16);
+                        const auto x = [&](u32 xy) {
+                            return b.Emit2(ir::Op::ShrS, ir::Type::I32,
+                                b.Emit2(ir::Op::Shl, ir::Type::I32, xy, shift16), shift16);
+                        };
+                        const auto y = [&](u32 xy) {
+                            return b.Emit2(ir::Op::ShrS, ir::Type::I32, xy, shift16);
+                        };
+                        const u32 x0 = x(xy0), y0 = y(xy0);
+                        const u32 x1 = x(xy1), y1 = y(xy1);
+                        const u32 x2 = x(xy2), y2 = y(xy2);
+                        const auto product = [&](u32 a, u32 first, u32 second) {
+                            return b.Emit2(ir::Op::Mul, ir::Type::I32, a,
+                                b.Emit2(ir::Op::Sub, ir::Type::I32, first, second));
+                        };
+                        const u32 a = product(x0, y1, y2);
+                        const u32 c = product(x1, y2, y0);
+                        const u32 d = product(x2, y0, y1);
+                        const u32 determinant = b.Emit2(ir::Op::Add, ir::Type::I32,
+                            b.Emit2(ir::Op::Add, ir::Type::I32, a, c), d);
+                        WriteCp2Data(b, 24, determinant);
+                        b.Emit1(ir::Op::WriteCp2Control, ir::Type::Void, b.ConstI32(0), 31);
+                        return true;
+                    }
+                    // Other nonzero funct encodings retain legacy GTE dispatch,
+                    // even when their Rs field resembles a register transfer.
                     if (word & 63u) return false;
                     switch (rs)
                     {

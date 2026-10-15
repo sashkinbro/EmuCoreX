@@ -52,6 +52,8 @@ static u64 s_iopIrCop0Instructions = 0;
 static u64 s_iopIrCop2Instructions = 0;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 static int s_iopIrOverride = -1;
+static u64 s_iopIrNclipCompiles = 0;
+static u64 s_iopIrNclipFusions = 0;
 extern "C" void EmuCoreXOracleSetIOPIR(int enabled) { s_iopIrOverride = enabled < 0 ? -1 : (enabled != 0); }
 extern "C" u64 EmuCoreXOracleIOPIRInstructions() { return s_iopIrInstructions; }
 extern "C" u64 EmuCoreXOracleIOPIRSpillSequences() { return s_iopIrSpillSequences; }
@@ -61,6 +63,8 @@ extern "C" u64 EmuCoreXOracleIOPIRMulDivInstructions() { return s_iopIrMulDivIns
 extern "C" u64 EmuCoreXOracleIOPIRBranches() { return s_iopIrBranches; }
 extern "C" u64 EmuCoreXOracleIOPIRCop0Instructions() { return s_iopIrCop0Instructions; }
 extern "C" u64 EmuCoreXOracleIOPIRCop2Instructions() { return s_iopIrCop2Instructions; }
+extern "C" u64 EmuCoreXOracleIopIrNclipCompiles() { return s_iopIrNclipCompiles; }
+extern "C" u64 EmuCoreXOracleIopIrNclipFusions() { return s_iopIrNclipFusions; }
 #endif
 
 static bool IopIrEnabled()
@@ -1834,7 +1838,8 @@ static bool TryIopIrSequence()
     if (control) ++s_iopIrBranches;
     s_iopIrInstructions += accepted;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
-    // Count source COP2 transfers only after both LiftSequence and LowerBlock
+    s_iopIrNclipFusions += out.fused_iop_nclips;
+    // Count source COP2 operations only after both LiftSequence and LowerBlock
     // accepted the complete sequence. This isolates coverage from the legacy
     // terminator, delay slot, and block recompilation accounting.
     for (u32 i = 0; i < accepted; ++i)
@@ -1844,6 +1849,15 @@ static bool TryIopIrSequence()
         if ((word >> 26) == 18 && (word & 63u) == 0 &&
             (rs == 0 || rs == 2 || rs == 4 || rs == 6))
             ++s_iopIrCop2Instructions;
+        if ((word >> 26) == 18 && rs == 16 && (word & 63u) == 6)
+        {
+            ++s_iopIrNclipCompiles;
+#if defined(__ANDROID__)
+            if ((s_iopIrNclipCompiles & (s_iopIrNclipCompiles - 1)) == 0)
+                __android_log_print(ANDROID_LOG_INFO, "IOPIR", "compiled_nclip=%llu",
+                    static_cast<unsigned long long>(s_iopIrNclipCompiles));
+#endif
+        }
     }
 #endif
     s_iopIrMemoryOperations += out.iop_memory_operations;
