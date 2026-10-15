@@ -32,6 +32,9 @@ extern "C" u32 g_eeir_exit_valid;
 
 namespace Arm64Ir
 {
+	struct IopAvszPlan { u32 inst_count = 0; bool avsz4 = false; };
+	bool PlanIopAvszWindow(const ir::Function& fn, u32 block_index, u32 first_inst,
+		IopAvszPlan* plan, std::string* error);
 	bool PlanIopNclipWindow(const ir::Function& fn, u32 block_index, u32 first_inst, std::string* error);
 	enum class GuestState : u8 { EE, IOP };
 
@@ -283,6 +286,7 @@ namespace Arm64Ir
 		u32 direct_iop_load_operations = 0;
 		u32 fused_multiply_pairs = 0;
 		u32 fused_iop_nclips = 0;
+		u32 fused_iop_avsz = 0;
 	};
 
 	// Both host W-register indices must be in [0,30], owned by the caller.

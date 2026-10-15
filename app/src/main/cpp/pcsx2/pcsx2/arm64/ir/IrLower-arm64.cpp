@@ -1022,6 +1022,8 @@ namespace Arm64Ir
 			void AllocateRegisters();
 			void PlanIopNclips();
 			void EmitIopNclip();
+			void PlanIopAvsz();
+			void EmitIopAvsz(bool avsz4);
 			void AllocateVectorRegisters();
 			bool IsVectorBarrier(const ir::Inst& inst) const;
 			bool UsesDirectVectorMemory(const ir::Inst& inst) const
@@ -1225,7 +1227,9 @@ namespace Arm64Ir
 			u32 m_fused_multiply_pairs = 0;
 			bool m_fuse_iop_nclips = false;
 			u32 m_fused_iop_nclips = 0;
-			std::vector<bool> m_iop_nclip_starts, m_iop_nclip_values;
+			u32 m_fused_iop_avsz = 0;
+			std::vector<IopAvszPlan> m_iop_avsz_starts;
+			std::vector<bool> m_iop_nclip_starts, m_iop_fusion_values;
 			bool m_direct_quad_memory = true;
 			bool m_direct_ee_loads = true;
 			bool m_fastmem_ee_loads = false;
@@ -1252,7 +1256,7 @@ namespace Arm64Ir
 
 		void Lowerer::PlanIopNclips()
 		{
-			m_iop_nclip_values.assign(m_fn.value_types.size(), false);
+			m_iop_fusion_values.assign(m_fn.value_types.size(), false);
 			size_t instruction_count = 0;
 			for (const auto& block : m_fn.blocks) instruction_count += block.insts.size();
 			m_iop_nclip_starts.assign(instruction_count, false);
@@ -1267,11 +1271,91 @@ namespace Arm64Ir
 						!PlanIopNclipWindow(m_fn, block_index, i, nullptr)) continue;
 					m_iop_nclip_starts[position] = true;
 					for (u32 node = 0; node < 24; ++node)
-						if (const u32 value = insts[i + node].value) m_iop_nclip_values[value] = true;
+						if (const u32 value = insts[i + node].value) m_iop_fusion_values[value] = true;
 					i += 23;
 					position += 23;
 				}
 			}
+		}
+
+		void Lowerer::PlanIopAvsz()
+		{
+			size_t count = 0;
+			for (const auto& block : m_fn.blocks) count += block.insts.size();
+			m_iop_avsz_starts.resize(count);
+			if (!m_fuse_iop_nclips) return; // Same optimize/IOP domain contract.
+			u32 position = 0;
+			for (u32 block_index = 0; block_index < m_fn.blocks.size(); ++block_index)
+			{
+				const auto& insts = m_fn.blocks[block_index].insts;
+				for (u32 i = 0; i < insts.size(); ++i, ++position)
+				{
+					IopAvszPlan plan;
+					if (insts[i].op != ir::Op::ConstI32 || insts[i].imm != 0 ||
+						!PlanIopAvszWindow(m_fn, block_index, i, &plan, nullptr)) continue;
+					m_iop_avsz_starts[position] = plan;
+					for (u32 n = 0; n < plan.inst_count; ++n)
+						if (const u32 value = insts[i + n].value) m_iop_fusion_values[value] = true;
+					i += plan.inst_count - 1;
+					position += plan.inst_count - 1;
+				}
+			}
+		}
+
+		void Lowerer::EmitIopAvsz(bool avsz4)
+		{
+			// The exact graph has only private SSA definitions. Use caller-save
+			// scratch exclusively; X21-X23 and live spill slots remain untouched.
+			recBeginOaknutEmit();
+			const auto read_sz = [&](oak::WReg dst, u32 reg) {
+				constexpr size_t base = offsetof(cpuRegistersPack, psxRegs.CP2D.r[0]);
+				if constexpr ((base & 1u) == 0 && base + 19 * 4 < 8192)
+					oakAsm->LDRH(dst, GuestBase(), oak::POffset<13, 1>(base + reg * 4));
+				else
+				{
+					oakLoad32(dst, {GuestBase(), static_cast<s64>(base + reg * 4)});
+					oakAsm->UXTH(dst, dst);
+				}
+			};
+			read_sz(oak::util::W0, avsz4 ? 16 : 17);
+			for (u32 reg = avsz4 ? 17 : 18; reg <= 19; ++reg)
+			{
+				read_sz(oak::util::W1, reg);
+				oakAsm->ADD(oak::util::W0, oak::util::W0, oak::util::W1);
+			}
+			constexpr size_t scale_base = offsetof(cpuRegistersPack, psxRegs.CP2C.r[0]);
+			const size_t scale = scale_base + (avsz4 ? 30 : 29) * 4;
+			if constexpr ((scale_base & 1u) == 0 && scale_base + 30 * 4 < 8192)
+				oakAsm->LDRSH(oak::util::W1, GuestBase(), oak::POffset<13, 1>(scale));
+			else
+			{
+				oakLoad32(oak::util::W1, {GuestBase(), static_cast<s64>(scale)});
+				oakAsm->SXTH(oak::util::W1, oak::util::W1);
+			}
+			// W multiplication wraps before the arithmetic shift, as in GTE.
+			oakAsm->MUL(oak::util::W0, oak::util::W0, oak::util::W1);
+			oakAsm->ASR(oak::util::W0, oak::util::W0, 12);
+			oakStore32(oak::util::W0, {GuestBase(), static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2D.r[24]))});
+			oakAsm->CMP(oak::util::W0, 0);
+			oakAsm->CSEL(oak::util::W2, oak::util::W0, oak::util::WZR, oak::Cond::GE);
+			oakAsm->MOV(oak::util::W3, 0xffffu);
+			oakAsm->CMP(oak::util::W2, oak::util::W3);
+			oakAsm->CSEL(oak::util::W2, oak::util::W2, oak::util::W3, oak::Cond::LS);
+			// Raw CPU-state halfword write preserves D7's upper 16 bits.
+			constexpr size_t otz = offsetof(cpuRegistersPack, psxRegs.CP2D.r[7]);
+			if constexpr ((otz & 1u) == 0 && otz < 8192)
+				oakAsm->STRH(oak::util::W2, GuestBase(), oak::POffset<13, 1>(otz));
+			else
+			{
+				oakLoad32(oak::util::W1, {GuestBase(), static_cast<s64>(otz)});
+				oakAsm->BFI(oak::util::W1, oak::util::W2, 0, 16);
+				oakStore32(oak::util::W1, {GuestBase(), static_cast<s64>(otz)});
+			}
+			oakAsm->MOV(oak::util::W3, 0x80040000u);
+			oakAsm->CMP(oak::util::W0, oak::util::W2);
+			oakAsm->CSEL(oak::util::W3, oak::util::W3, oak::util::WZR, oak::Cond::NE);
+			oakStore32(oak::util::W3, {GuestBase(), static_cast<s64>(offsetof(cpuRegistersPack, psxRegs.CP2C.r[31]))});
+			recEndOaknutEmit();
 		}
 
 		void Lowerer::EmitIopNclip()
@@ -1326,7 +1410,7 @@ namespace Arm64Ir
 					const u32 operands = ir::ValueOperandCount(inst);
 					for (u32 i = 0; i < operands; ++i)
 						last_use[inst.args[i]] = position;
-					if (inst.value && !m_iop_nclip_values[inst.value] && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
+					if (inst.value && !m_iop_fusion_values[inst.value] && !m_constants[inst.value] && ir::IsIntegerType(inst.type))
 						intervals.push_back({inst.value, position, position});
 					++position;
 				}
@@ -1547,6 +1631,7 @@ namespace Arm64Ir
 				}
 			}
 			PlanIopNclips();
+			PlanIopAvsz();
 			AllocateRegisters();
 			AllocateVectorRegisters();
 			u32 next_slot = SaveArea();
@@ -1587,7 +1672,7 @@ namespace Arm64Ir
 						if (m_vector_homes[value])
 							++out->vector_save_values;
 					}
-					if (value && !m_iop_nclip_values[value] && !m_constants[value] && (!allocated || m_vector_homes[value]))
+					if (value && !m_iop_fusion_values[value] && !m_constants[value] && (!allocated || m_vector_homes[value]))
 					{
 						++out->spill_values;
 						const u32 size = std::max(8u, ir::TypeSize(inst.type));
@@ -1661,6 +1746,7 @@ namespace Arm64Ir
 				out->direct_iop_load_operations = m_direct_iop_load_operations;
 				out->fused_multiply_pairs = m_fused_multiply_pairs;
 				out->fused_iop_nclips = m_fused_iop_nclips;
+			out->fused_iop_avsz = m_fused_iop_avsz;
 				return true;
 			}
 
@@ -1689,6 +1775,7 @@ namespace Arm64Ir
 			out->direct_iop_load_operations = m_direct_iop_load_operations;
 			out->fused_multiply_pairs = m_fused_multiply_pairs;
 			out->fused_iop_nclips = m_fused_iop_nclips;
+			out->fused_iop_avsz = m_fused_iop_avsz;
 			return true;
 		}
 
@@ -1729,6 +1816,13 @@ namespace Arm64Ir
 					m_emit_position += 24;
 					i += 23;
 					++m_fused_iop_nclips;
+				}
+				else if (const IopAvszPlan& plan = m_iop_avsz_starts[m_emit_position]; plan.inst_count != 0)
+				{
+					EmitIopAvsz(plan.avsz4);
+					m_emit_position += plan.inst_count;
+					i += plan.inst_count - 1;
+					++m_fused_iop_avsz;
 				}
 				else if (i + 1 < block.insts.size() && TryEmitMultiplyPair(block.insts[i], block.insts[i + 1]))
 					++i;
@@ -3222,6 +3316,7 @@ namespace Arm64Ir
 						case ir::Op::Mul: case ir::Op::MulHiS: case ir::Op::MulHiU:
 						case ir::Op::DivS: case ir::Op::DivU: case ir::Op::Msub:
 						case ir::Op::Add: case ir::Op::Sub: case ir::Op::And:
+						case ir::Op::MinU: case ir::Op::MaxS: case ir::Op::Select:
 						case ir::Op::Or: case ir::Op::Xor: case ir::Op::Not: case ir::Op::Clz:
 						case ir::Op::Shl: case ir::Op::ShrU: case ir::Op::ShrS:
 						case ir::Op::CmpLtS: case ir::Op::CmpLtU:
@@ -3348,3 +3443,5 @@ namespace Arm64Ir
 
 #include "arm64/ir/IrVfMaxMin-arm64.inl"
 #include "arm64/ir/IrIopNclip-arm64.inl"
+
+#include "IrIopAvsz-arm64.inl"

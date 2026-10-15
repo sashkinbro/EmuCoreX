@@ -2451,6 +2451,7 @@ static int s_oracleEeIrRegisterAllocationOverride = -1;
 static u32 s_oracleEeIrLastFrameSize = 0;
 static u64 s_fast_scalar_load_compiles = 0;
 static u64 s_cold_context_load_compiles = 0;
+static u64 s_cop1_lwc1_compiles = 0, s_cop1_swc1_compiles = 0;
 extern "C" void EmuCoreXOracleSetEeIrMode(int mode)
 {
 	if (mode >= -1 && mode <= 1)
@@ -2465,6 +2466,11 @@ extern "C" void EmuCoreXOracleGetEeIrCop1Counts(u64* mfc1, u64* mtc1, u64* cfc1,
 	if (ctc1) *ctc1 = s_cop1_ctc1_compiles;
 }
 extern "C" u64 EmuCoreXOracleGetEeIrMovCounts() { return s_cop1_mov_s_compiles; }
+extern "C" void EmuCoreXOracleGetEeIrCop1MemoryCounts(u64* lwc1, u64* swc1)
+{
+	if (lwc1) *lwc1 = s_cop1_lwc1_compiles;
+	if (swc1) *swc1 = s_cop1_swc1_compiles;
+}
 extern "C" u64 EmuCoreXOracleGetEeIrUnaryCounts() { return s_cop1_unary_compiles; }
 extern "C" void EmuCoreXOracleGetEeIrCop1MaxMinCounts(u64* max_s, u64* min_s)
 {
@@ -2785,6 +2791,16 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 	{
 		const u32 word = *reinterpret_cast<const u32*>(PSM(pc));
 		const u32 op = word >> 26;
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+		if (op == 0x31 || op == 0x39)
+		{
+			const bool store = op == 0x39;
+			const u64 count = store ? ++s_cop1_swc1_compiles : ++s_cop1_lwc1_compiles;
+			if ((count & (count - 1)) == 0)
+				__android_log_print(ANDROID_LOG_INFO, "EEIR", "compiled_%s=%llu",
+					store ? "swc1" : "lwc1", static_cast<unsigned long long>(count));
+		}
+#endif
 		if (op == 0x11)
 		{
 			const u32 rs = (word >> 21) & 0x1f;
@@ -3491,4 +3507,3 @@ R5900cpu recCpu = {
 	recSafeExitExecution,
 	recCancelInstruction,
 	recClear};
-

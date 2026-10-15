@@ -179,8 +179,64 @@ namespace IopIr
                         }
                         default: return false;
                     }
-                case 18: // COP2 transfers and the bounded canonical NCLIP command.
+                case 18: // COP2 transfers and bounded canonical GTE commands.
                 {
+                    const u32 gte_funct = word & 63u;
+                    if (rs == 16 && (gte_funct == 0x2du || gte_funct == 0x2eu))
+                    {
+                        // AVSZ3/4 use unsigned SZ low halves and a signed ZSF
+                        // low half. The product is an I32 wrap before ASR 12;
+                        // MAC0 receives that shifted result, while OTZ clamps
+                        // it to [0, 65535] and preserves D7's upper half.
+                        const bool avsz4 = gte_funct == 0x2eu;
+                        const u32 first_sz = avsz4 ? 16u : 17u;
+                        const u32 zero = b.ConstI32(0);
+                        const u32 low16_mask = b.ConstI32(0xffff);
+                        const u32 shift16 = b.ConstI32(16);
+                        const u32 shift12 = b.ConstI32(12);
+                        const u32 upper16_mask = b.ConstI32(0xffff0000u);
+                        const u32 overflow_flag = b.ConstI32(0x80040000u);
+
+                        const u32 first_word = ReadCp2Data(b, first_sz);
+                        u32 sum = b.Emit2(ir::Op::And, ir::Type::I32,
+                            first_word, low16_mask);
+                        for (u32 reg = first_sz + 1; reg <= 19; ++reg)
+                        {
+                            const u32 word_value = ReadCp2Data(b, reg);
+                            const u32 sz = b.Emit2(ir::Op::And, ir::Type::I32,
+                                word_value, low16_mask);
+                            sum = b.Emit2(ir::Op::Add, ir::Type::I32, sum, sz);
+                        }
+                        const u32 scale_reg = avsz4 ? 30u : 29u;
+                        const u32 raw_scale = b.Emit(ir::Op::ReadCp2Control,
+                            ir::Type::I32, {}, scale_reg);
+                        const u32 scale_left = b.Emit2(ir::Op::Shl, ir::Type::I32,
+                            raw_scale, shift16);
+                        const u32 scale = b.Emit2(ir::Op::ShrS, ir::Type::I32,
+                            scale_left, shift16);
+                        const u32 product = b.Emit2(ir::Op::Mul, ir::Type::I32, sum, scale);
+                        const u32 shifted = b.Emit2(ir::Op::ShrS, ir::Type::I32,
+                            product, shift12);
+                        WriteCp2Data(b, 24, shifted);
+
+                        const u32 nonnegative = b.Emit2(ir::Op::MaxS, ir::Type::I32,
+                            shifted, zero);
+                        const u32 otz = b.Emit2(ir::Op::MinU, ir::Type::I32,
+                            nonnegative, low16_mask);
+                        const u32 old_d7 = ReadCp2Data(b, 7);
+                        const u32 kept_upper = b.Emit2(ir::Op::And, ir::Type::I32,
+                            old_d7, upper16_mask);
+                        const u32 merged_d7 = b.Emit2(ir::Op::Or, ir::Type::I32,
+                            kept_upper, otz);
+                        WriteCp2Data(b, 7, merged_d7);
+
+                        const u32 overflow = b.Emit2(ir::Op::CmpNe, ir::Type::I32,
+                            shifted, otz);
+                        const u32 flag = b.Emit3(ir::Op::Select, ir::Type::I32,
+                            overflow, overflow_flag, zero);
+                        b.Emit1(ir::Op::WriteCp2Control, ir::Type::Void, flag, 31);
+                        return true;
+                    }
                     if (rs == 16 && (word & 63u) == 6)
                     {
                         // Match the current core's raw signed-coordinate NCLIP:

@@ -4593,6 +4593,7 @@ bool RunEEIrCop1Direct(const std::vector<u32>& program, const GPR_reg* initial_g
 #include "jit_oracle_ee_unary.inl"
 #include "jit_oracle_ee_maxmin.inl"
 #include "jit_oracle_logical_immediates.inl"
+#include "jit_oracle_ee_cop1_memory.inl"
 
 void EEIrCop1TransferTests()
 {
@@ -8830,6 +8831,7 @@ void EEIrExecutionTests()
     CommonLogicalImmediateTests();
     EEIrCop1TransferTests();
     EEIrCop1MoveTests();
+    EEIrCop1MemoryTests();
     EEIrCop1UnaryTests();
     EEIrCop1MaxMinTests();
     EEIrPackedKernelDceTests();
@@ -9843,7 +9845,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
     bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
-    bool cold_context_only = false, u32 vu_maxmin_i_only = 0)
+    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9875,6 +9877,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (cop1_memory_only)
+    {
+        EEIrCop1MemoryTests();
+        return;
+    }
     if (cop1_mov_only)
     {
         EEIrCop1MoveTests();
@@ -11703,8 +11710,11 @@ void IOPSharedStateTests()
 #include "jit_oracle_iop_nclip_fusion.inl"
 #include "jit_oracle_iop_nclip_live.inl"
 #include "jit_oracle_iop_cop2_memory.inl"
+#include "jit_oracle_iop_avsz.inl"
+#include "jit_oracle_iop_avsz_fusion.inl"
 
-void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false)
+void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false,
+    bool avsz_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -11720,6 +11730,13 @@ void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_
     psxCpu = &psxRec;
     psxCpu->Reserve();
 
+    if (avsz_only)
+    {
+        IOPSharedAvszTests();
+        IOPSharedAvszFusionTests();
+        IOPSharedAvszBenchmarks();
+        return;
+    }
     if (nclip_only)
     {
         IOPSharedNclipTests();
@@ -11796,6 +11813,9 @@ void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_
     IOPCoverageGte();
     IOPCop2FrontendRedTests();
     IOPSharedNclipTests();
+    IOPSharedAvszTests();
+    IOPSharedAvszFusionTests();
+        IOPSharedAvszBenchmarks();
     IOPSharedNclipFusionTests();
     IOPSharedNclipLiveValueTests();
     IOPCop2IntegrationRedTests();
@@ -12176,6 +12196,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-vu-maxmin-i-flags") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 2);
+    else if (std::strcmp(suite, "ee-cop1-memory") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 0, true);
     else if (std::strcmp(suite, "ee-cop1-maxmin") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-vu-maxmin") == 0)
@@ -12196,6 +12218,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, true);
     else if (std::strcmp(suite, "iop-nclip") == 0)
         IOPTests(false, false, true);
+    else if (std::strcmp(suite, "iop-avsz") == 0)
+        IOPTests(false, false, false, true);
     else if (std::strcmp(suite, "gs-prepare") == 0)
         GSPreparationDeviceTests();
     else

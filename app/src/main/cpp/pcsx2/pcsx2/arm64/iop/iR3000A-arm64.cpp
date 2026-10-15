@@ -54,6 +54,8 @@ static u64 s_iopIrCop2Instructions = 0;
 static int s_iopIrOverride = -1;
 static u64 s_iopIrNclipCompiles = 0;
 static u64 s_iopIrNclipFusions = 0;
+static u64 s_iopIrAvszFusions = 0;
+static u64 s_iopIrAvsz3Compiles = 0, s_iopIrAvsz4Compiles = 0;
 extern "C" void EmuCoreXOracleSetIOPIR(int enabled) { s_iopIrOverride = enabled < 0 ? -1 : (enabled != 0); }
 extern "C" u64 EmuCoreXOracleIOPIRInstructions() { return s_iopIrInstructions; }
 extern "C" u64 EmuCoreXOracleIOPIRSpillSequences() { return s_iopIrSpillSequences; }
@@ -64,7 +66,13 @@ extern "C" u64 EmuCoreXOracleIOPIRBranches() { return s_iopIrBranches; }
 extern "C" u64 EmuCoreXOracleIOPIRCop0Instructions() { return s_iopIrCop0Instructions; }
 extern "C" u64 EmuCoreXOracleIOPIRCop2Instructions() { return s_iopIrCop2Instructions; }
 extern "C" u64 EmuCoreXOracleIopIrNclipCompiles() { return s_iopIrNclipCompiles; }
+extern "C" u64 EmuCoreXOracleIopIrAvszFusions() { return s_iopIrAvszFusions; }
 extern "C" u64 EmuCoreXOracleIopIrNclipFusions() { return s_iopIrNclipFusions; }
+extern "C" void EmuCoreXOracleGetIopIrGteAvszCounts(u64* avsz3, u64* avsz4)
+{
+    if (avsz3) *avsz3 = s_iopIrAvsz3Compiles;
+    if (avsz4) *avsz4 = s_iopIrAvsz4Compiles;
+}
 #endif
 
 static bool IopIrEnabled()
@@ -1839,6 +1847,7 @@ static bool TryIopIrSequence()
     s_iopIrInstructions += accepted;
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
     s_iopIrNclipFusions += out.fused_iop_nclips;
+    s_iopIrAvszFusions += out.fused_iop_avsz;
     // Count source COP2 operations only after both LiftSequence and LowerBlock
     // accepted the complete sequence. This isolates coverage from the legacy
     // terminator, delay slot, and block recompilation accounting.
@@ -1856,6 +1865,16 @@ static bool TryIopIrSequence()
             if ((s_iopIrNclipCompiles & (s_iopIrNclipCompiles - 1)) == 0)
                 __android_log_print(ANDROID_LOG_INFO, "IOPIR", "compiled_nclip=%llu",
                     static_cast<unsigned long long>(s_iopIrNclipCompiles));
+#endif
+        }
+        if ((word >> 26) == 18 && rs == 16 && ((word & 63u) == 0x2d || (word & 63u) == 0x2e))
+        {
+            const bool avsz4 = (word & 63u) == 0x2e;
+            const u64 count = avsz4 ? ++s_iopIrAvsz4Compiles : ++s_iopIrAvsz3Compiles;
+#if defined(__ANDROID__)
+            if ((count & (count - 1)) == 0)
+                __android_log_print(ANDROID_LOG_INFO, "IOPIR", "compiled_avsz%u=%llu",
+                    avsz4 ? 4u : 3u, static_cast<unsigned long long>(count));
 #endif
         }
     }

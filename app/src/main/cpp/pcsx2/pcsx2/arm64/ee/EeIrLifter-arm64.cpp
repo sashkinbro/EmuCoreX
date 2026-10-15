@@ -901,6 +901,18 @@ namespace EeIr
 				case 0x2B: // sw
 					m_b.Emit2(ir::Op::Store32, ir::Type::Void, Addr(rs, simm), ReadGpr(rt));
 					return true;
+				case 0x31: // lwc1: preserve the raw word, including FPR0 as a writable EE register
+				{
+					const u32 bits = m_b.Emit1(ir::Op::Load32, ir::Type::I32, Addr(rs, simm));
+					m_b.Emit1(ir::Op::WriteFprBits, ir::Type::Void, bits, rt);
+					return true;
+				}
+				case 0x39: // swc1: store the raw FPR word without numeric conversion
+				{
+					const u32 bits = m_b.Emit(ir::Op::ReadFprBits, ir::Type::I32, {}, rt);
+					m_b.Emit2(ir::Op::Store32, ir::Type::Void, Addr(rs, simm), bits);
+					return true;
+				}
 				default:
 					return Fail(error, "unsupported instruction", pc);
 			}
@@ -1227,7 +1239,7 @@ namespace EeIr
 		// Unsupported instructions must fail so the caller can fall back.
 		{
 			alignas(4) static const u32 code[] = {
-				0xc5280000, // lwc1 f8, 0(t1)
+				0x46020800, // add.s f0, f1, f2: arithmetic semantics remain unsupported
 			};
 			ir::Function fn;
 			u32 end = 0;
