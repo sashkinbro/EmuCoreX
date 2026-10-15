@@ -2446,9 +2446,11 @@ static u8* recShortBlockLink_emit_oaknut(u32 next_pc, u32 scaled_cycles)
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 static int s_oracleEeIrModeOverride = -1;
 static int s_oracleEeIrFastLoadOverride = -1;
+static int s_oracleEeIrColdContextOverride = -1;
 static int s_oracleEeIrRegisterAllocationOverride = -1;
 static u32 s_oracleEeIrLastFrameSize = 0;
 static u64 s_fast_scalar_load_compiles = 0;
+static u64 s_cold_context_load_compiles = 0;
 extern "C" void EmuCoreXOracleSetEeIrMode(int mode)
 {
 	if (mode >= -1 && mode <= 1)
@@ -2483,6 +2485,12 @@ extern "C" void EmuCoreXOracleSetEeIrFastLoads(int mode)
 		s_oracleEeIrFastLoadOverride = mode;
 }
 extern "C" u64 EmuCoreXOracleGetEeIrFastLoadCounts() { return s_fast_scalar_load_compiles; }
+extern "C" void EmuCoreXOracleSetEeIrColdContext(int mode)
+{
+	if (mode >= -1 && mode <= 1)
+		s_oracleEeIrColdContextOverride = mode;
+}
+extern "C" u64 EmuCoreXOracleGetEeIrColdContextCompiles() { return s_cold_context_load_compiles; }
 extern "C" u64 EmuCoreXOracleGetEeIrBc1Counts() { return s_cop1_bc1_compiles; }
 extern "C" bool EmuCoreXOracleGetEeCompiledBlock(u32 guest_pc, const void** host, u32* bytes)
 {
@@ -2712,6 +2720,11 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 		return __system_property_get("debug.emucorex.ee_ir_fastmem", value) == 0 || value[0] != '0';
 	}();
 	options.fastmem_ee_loads = s_oracleEeIrFastLoadOverride >= 0 ? s_oracleEeIrFastLoadOverride == 1 : fastmem_ee_loads;
+	static const bool cold_context = []() {
+		char value[PROP_VALUE_MAX] = {};
+		return __system_property_get("debug.emucorex.ee_ir_cold_context", value) > 0 && value[0] == '1';
+	}();
+	options.fastmem_ee_cold_context = s_oracleEeIrColdContextOverride >= 0 ? s_oracleEeIrColdContextOverride == 1 : cold_context;
 #endif
 	static const bool direct_ee_stores = []() {
 		char value[PROP_VALUE_MAX] = {};
@@ -2744,6 +2757,9 @@ static bool TryCompileEeIrBlock(const u32 startpc)
 	s_oracleEeIrLastFrameSize = out.frame_size;
 	s_direct_scalar_load_compiles += out.direct_ee_load_operations;
 	s_fast_scalar_load_compiles += out.fastmem_ee_load_operations;
+	s_cold_context_load_compiles += out.cold_context_ee_load_operations;
+	if (out.cold_context_ee_load_operations && (s_cold_context_load_compiles & (s_cold_context_load_compiles - 1)) == 0)
+		__android_log_print(ANDROID_LOG_INFO, "EEIR", "compiled_cold_context_loads=%llu", static_cast<unsigned long long>(s_cold_context_load_compiles));
 	if (out.fastmem_ee_load_operations && (s_fast_scalar_load_compiles & (s_fast_scalar_load_compiles - 1)) == 0)
 		__android_log_print(ANDROID_LOG_INFO, "EEIR", "compiled_fast_loads=%llu", static_cast<unsigned long long>(s_fast_scalar_load_compiles));
 #endif

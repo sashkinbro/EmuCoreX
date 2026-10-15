@@ -167,9 +167,10 @@ namespace Arm64Ir
 		LowerOutput* out, std::string* error,
 		BoundVfConvertLayout layout = BoundVfConvertLayout::GuestLanes);
 
-	// Strict raw-bit MAX/MINI expression slice. Both caller-owned inputs hold
-	// full VF words before the writable destination is bound. A shared input
-	// host register is valid only when both guest source identities match.
+	// Strict raw-bit MAX/MINI expression slice. The VF inputs hold full words;
+	// ScalarI binds the raw I word in S0 and is read-only. Bind inputs before
+	// the writable destination; only identical VF sources may share a host.
+	enum class BoundVfMaxMinRhs : u8 { Vector, ScalarI };
 	struct BoundVfMaxMinPlan
 	{
 		u8 lhs_vf = 0;
@@ -179,6 +180,7 @@ namespace Arm64Ir
 		bool maximum = false;
 		bool delay_slot = false;
 		u8 rhs_lane = 4; // 0..3 broadcasts a raw RHS lane; 4 keeps the full vector.
+		BoundVfMaxMinRhs rhs_kind = BoundVfMaxMinRhs::Vector;
 	};
 	enum class BoundVfMaxMinLayout : u8
 	{
@@ -246,6 +248,9 @@ namespace Arm64Ir
 		bool direct_ee_loads = true;
 		// Bounded inline Load32 experiment; standalone callers never use X19.
 		bool fastmem_ee_loads = false;
+		// Opt-in fast Load32 only: exact PC/BD is established by the cold fault
+		// thunk. Successful accesses still clear BD; generic hooks are retained.
+		bool fastmem_ee_cold_context = false;
 		// Direct mapped EE scalar writes; handlers/cache retain their helpers.
 		bool direct_ee_stores = true;
 		// Keep SIMD values in registers on direct RAM paths; spill on fallback.
@@ -269,6 +274,7 @@ namespace Arm64Ir
 		u32 direct_quad_operations = 0;
 		u32 direct_ee_load_operations = 0;
 		u32 fastmem_ee_load_operations = 0;
+		u32 cold_context_ee_load_operations = 0;
 		u32 direct_ee_store_operations = 0;
 		u32 direct_quad_vector_operations = 0;
 		u32 vector_register_values = 0;

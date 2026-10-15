@@ -51,8 +51,8 @@ extern void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 gue
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
 // Fixed IR inline Load32 fastmem contract: faulting host instruction is a
 // four-byte scalar load using W0 for both the effective address and result.
-extern void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc);
-extern void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr);
+extern void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc, bool delay_slot);
+extern void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr, bool delay_slot);
 #endif
 extern bool vtlb_IsFaultingPC(u32 guest_pc);
 

@@ -119,13 +119,14 @@ namespace
             ++s_ee_fastmem_compile_count;
     }
 
-    void EEFastmemResidentExecute(const std::array<GPR_reg, 32>& gpr)
+    void EEFastmemResidentExecute(const std::array<GPR_reg, 32>& gpr, u32 initial_bd = 0)
     {
         std::memset(&cpuRegs, 0, sizeof(cpuRegs));
         std::memset(&fpuRegs, 0, sizeof(fpuRegs));
         std::memcpy(cpuRegs.GPR.r, gpr.data(), sizeof(cpuRegs.GPR.r));
         cpuRegs.CP0.n.Status.val = 0x20000000u;
         cpuRegs.pc = EE_TEST_PC;
+        cpuRegs.IsDelaySlot = initial_bd;
         cpuRegs.nextEventCycle = 0x7fffffffu;
         EEsCycle = EEoCycle = 0;
         EmuCoreXEEForceExitAfterFirstBlock();

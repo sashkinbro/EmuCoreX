@@ -2169,10 +2169,12 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_maxmin_broadcast.inl"
 #include "jit_oracle_vu_maxmin_broadcast_integration.inl"
 #include "jit_oracle_vu_maxmin_broadcast_bench.inl"
+#include "jit_oracle_vu_maxmin_i.inl"
+#include "jit_oracle_vu_maxmin_i_integration.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
-    bool maxmin_broadcast_route_only = false)
+    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false)
 {
     struct VUOverrideReset
     {
@@ -2229,6 +2231,13 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
         VUSharedMaxMinBroadcastIntegrationTests();
         return;
     }
+    if (maxmin_i_only)
+    {
+        VUBoundVfMaxMinITests();
+        VUSharedMaxMinIIntegrationTests();
+        VUSharedMaxMinIBenchmarks();
+        return;
+    }
     VUBoundIrTests();
     VUSharedIrProductionTests();
     VUSharedImmediateTests();
@@ -2245,6 +2254,9 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     VUBoundVfMaxMinBroadcastTests();
     VUSharedMaxMinBroadcastIntegrationTests();
     VUSharedMaxMinBroadcastBenchmarks();
+    VUBoundVfMaxMinITests();
+    VUSharedMaxMinIIntegrationTests();
+    VUSharedMaxMinIBenchmarks();
     VUSharedFtoiIntegrationTests();
     VUSharedFtoiBenchmarks();
     VUBoundVfViTransferTests();
@@ -3995,11 +4007,14 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_vu_ftoi.inl"
 #include "jit_oracle_ee_vu_maxmin.inl"
 #include "jit_oracle_ee_vu_maxmin_broadcast.inl"
+#include "jit_oracle_ee_vu_maxmin_i.inl"
+#include "jit_oracle_ee_vu_maxmin_i_flags.inl"
 #include "jit_oracle_ee_bc1.inl"
 #include "jit_oracle_ee_hot_loads.inl"
 #include "jit_oracle_ee_fastmem.inl"
 #include "jit_oracle_ee_fastmem_abi.inl"
 #include "jit_oracle_ee_fastmem_exit.inl"
+#include "jit_oracle_ee_fastmem_cold.inl"
 
 void EEVuAbsSharedTests()
 {
@@ -9827,7 +9842,8 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_itof_only = false, bool cop1_branch_only = false, bool hot_loads_only = false,
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
-    bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false)
+    bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
+    bool cold_context_only = false, u32 vu_maxmin_i_only = 0)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9893,6 +9909,18 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     if (vu_maxmin_broadcast_only)
     {
         EEVuMaxMinBroadcastMacroTests();
+        return;
+    }
+    if (cold_context_only)
+    {
+        EEFastmemColdContextTests();
+        return;
+    }
+    if (vu_maxmin_i_only)
+    {
+        if (vu_maxmin_i_only != 2)
+            EEVuMaxMinIMacroTests();
+        EEVuMaxMinIFlagTests();
         return;
     }
     if (cop1_unary_only)
@@ -10045,12 +10073,15 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     EEVuFtoiMacroTests();
     EEVuMaxMinMacroTests();
     EEVuMaxMinBroadcastMacroTests();
+    EEVuMaxMinIMacroTests();
+    EEVuMaxMinIFlagTests();
     EEIrCop1BranchTests();
     EEHotLoadBenchmarkTests();
     EEIrScalarStoreTests();
     EEFastmemIntegrationTests();
     EEFastmemAbiTests();
     EEFastmemNonreturningHelperTests();
+    EEFastmemColdContextTests();
     EEIrScalarStoreGuestTests();
     EEIrScalarStoreBenchmark();
     EECoverageMmi();
@@ -12113,6 +12144,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUTests(false, false, false, false, true);
     else if (std::strcmp(suite, "vu-maxmin-broadcast-route") == 0)
         VUTests(false, false, false, false, false, true);
+    else if (std::strcmp(suite, "vu-maxmin-i") == 0)
+        VUTests(false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "sqrt-flags") == 0)
         SqrtFlagTests();
     else if (std::strcmp(suite, "div-edges") == 0)
@@ -12137,6 +12170,12 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EETests(false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-fastmem-exit") == 0)
         EETests(false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-fastmem-cold") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-vu-maxmin-i") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true);
+    else if (std::strcmp(suite, "ee-vu-maxmin-i-flags") == 0)
+        EETests(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, 2);
     else if (std::strcmp(suite, "ee-cop1-maxmin") == 0)
         EETests(false, false, false, false, false, false, false, false, false, false, true);
     else if (std::strcmp(suite, "ee-vu-maxmin") == 0)

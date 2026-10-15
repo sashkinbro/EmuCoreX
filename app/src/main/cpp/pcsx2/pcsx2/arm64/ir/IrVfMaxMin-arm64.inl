@@ -22,6 +22,7 @@ namespace Arm64Ir
 		const auto base = [&](u32 node) -> const ir::Inst& {
 			return i[node + (broadcast && node >= 2 ? 1 : 0)];
 		};
+		const bool scalar_i = broadcast && base(1).op == ir::Op::ReadVuScalarBits;
 		constexpr ir::Op ops[] = {ir::Op::ReadVfBits, ir::Op::ReadVfBits,
 			ir::Op::ConstI32, ir::Op::ConstI32, ir::Op::VShrS, ir::Op::VShrU,
 			ir::Op::VXor, ir::Op::VShrS, ir::Op::VShrU, ir::Op::VXor,
@@ -29,17 +30,19 @@ namespace Arm64Ir
 			ir::Op::VOr, ir::Op::WriteVfBitsMasked, ir::Op::Return};
 		// Check opcodes before the generic verifier indexes their OpInfo entries.
 		for (u32 node = 0; node < 17; ++node)
-			if (base(node).op != ops[node])
+			if (base(node).op != (scalar_i && node == 1 ? ir::Op::ReadVuScalarBits : ops[node]))
 				return fail("unsupported bound VF MAX/MINI expression operation");
-		if (broadcast && i[2].op != ir::Op::VShuffle)
-			return fail("bound VF MAX/MINI requires an explicit RHS shuffle");
+		if (broadcast && i[2].op != (scalar_i ? ir::Op::VSplat32 : ir::Op::VShuffle))
+			return fail("bound VF MAX/MINI requires an explicit typed RHS splat");
 		if (!ir::Verify(fn, error)) return false;
 		if (block.id != 1 || block.flags != 0 || !block.predecessors.empty() || !block.successors.empty() ||
 			block.guest_end != block.guest_start + 4 ||
 			(fn.guest_entry != 0 && fn.guest_entry != block.guest_start) ||
 			!fn.vec_consts.empty() || fn.value_types.size() != 16u + broadcast || fn.next_value != 16u + broadcast)
 			return fail("bound VF MAX/MINI has unsupported block or value metadata");
-		if (base(0).imm >= 32 || base(1).imm >= 32 || base(15).imm == 0 || base(15).imm >= 32 ||
+		if (base(0).imm >= 32 ||
+			(scalar_i ? base(1).imm != static_cast<u64>(ir::VuScalar::I) : base(1).imm >= 32) ||
+			base(15).imm == 0 || base(15).imm >= 32 ||
 			(base(15).aux & 0x0f) == 0 || base(2).imm != 31 || base(3).imm != 1)
 			return fail("bound VF MAX/MINI has invalid register, lane mask, or shift constant");
 		const u16 delay = base(0).aux & ir::IF_DELAY_SLOT;
@@ -47,19 +50,21 @@ namespace Arm64Ir
 		if (broadcast)
 		{
 			const auto& splat = i[2];
-			if ((splat.imm != 0x00 && splat.imm != 0x55 && splat.imm != 0xaa && splat.imm != 0xff) ||
+			if ((scalar_i ? splat.imm != 0 :
+				(splat.imm != 0x00 && splat.imm != 0x55 && splat.imm != 0xaa && splat.imm != 0xff)) ||
 				splat.type != ir::Type::V4I32 || splat.value == 0 ||
 				splat.num_args != 1 || splat.args[0] != base(1).value ||
 				splat.args[1] != 0 || splat.args[2] != 0 || splat.args[3] != 0 ||
 				splat.aux != delay || splat.guest_pc != block.guest_start)
 				return fail("bound VF MAX/MINI has an invalid raw RHS splat");
-			rhs_lane = static_cast<u8>(splat.imm / 0x55);
+			if (!scalar_i)
+				rhs_lane = static_cast<u8>(splat.imm / 0x55);
 		}
 		for (u32 node = 0; node < 17; ++node)
 		{
 			const auto& inst = base(node);
 			const ir::Type type = node >= 15 ? ir::Type::Void :
-				(node == 2 || node == 3) ? ir::Type::I32 : ir::Type::V4I32;
+				(node == 2 || node == 3 || (scalar_i && node == 1)) ? ir::Type::I32 : ir::Type::V4I32;
 			const u16 aux = delay | (node == 15 ? base(15).aux & 0x0f : 0);
 			if (inst.type != type || inst.aux != aux || inst.guest_pc != block.guest_start ||
 				(node >= 4 && node != 15 && inst.imm != 0))
@@ -86,8 +91,9 @@ namespace Arm64Ir
 			!args(12, 1, 10) || !args(13, 2, 1, 12) || !args(14, 2, 11, 13) ||
 			!args(15, 1, 14) || !args(16, 0))
 			return fail("bound VF MAX/MINI SSA links do not match the raw ordering expression");
-		*plan = {static_cast<u8>(base(0).imm), static_cast<u8>(base(1).imm),
-			static_cast<u8>(base(15).imm), static_cast<u8>(base(15).aux & 0x0f), maximum, delay != 0, rhs_lane};
+		*plan = {static_cast<u8>(base(0).imm), static_cast<u8>(scalar_i ? 0 : base(1).imm),
+			static_cast<u8>(base(15).imm), static_cast<u8>(base(15).aux & 0x0f), maximum, delay != 0, rhs_lane,
+			scalar_i ? BoundVfMaxMinRhs::ScalarI : BoundVfMaxMinRhs::Vector};
 		if (error) error->clear();
 		return true;
 	}
@@ -96,10 +102,13 @@ namespace Arm64Ir
 		LowerOutput* out, std::string* error, BoundVfMaxMinLayout layout)
 	{
 		if (out) *out = {};
+		const bool scalar_i = plan.rhs_kind == BoundVfMaxMinRhs::ScalarI;
 		if (!out || !oakHasBlock() || plan.lhs_vf >= 32 || plan.rhs_vf >= 32 ||
 			plan.dst_vf == 0 || plan.dst_vf >= 32 || plan.lane_mask == 0 || plan.lane_mask > 15 || plan.rhs_lane > 4 ||
+			(plan.rhs_kind != BoundVfMaxMinRhs::Vector && !scalar_i) ||
+			(scalar_i && (plan.rhs_vf != 0 || plan.rhs_lane != 4 || dst_host == rhs_host)) ||
 			lhs_host >= 29 || rhs_host >= 29 || dst_host >= 29 ||
-			(lhs_host == rhs_host && plan.lhs_vf != plan.rhs_vf) ||
+			(lhs_host == rhs_host && (scalar_i || plan.lhs_vf != plan.rhs_vf)) ||
 			(layout != BoundVfMaxMinLayout::GuestLanes && layout != BoundVfMaxMinLayout::MicroVuPartial))
 		{
 			if (error) *error = "invalid bound VF MAX/MINI plan, host bindings, or destination layout";
@@ -107,11 +116,13 @@ namespace Arm64Ir
 		}
 
 		const u8* start = recBeginOaknutEmit();
-		const bool broadcast = plan.rhs_lane < 4;
+		const bool broadcast = scalar_i || plan.rhs_lane < 4;
 		const u32 effective_rhs_host = broadcast ? 29 : rhs_host;
 		const oak::QReg lhs(lhs_host), rhs(effective_rhs_host), dst(dst_host);
+		// ScalarI binds only the raw word in S0. Its other lanes are unspecified,
+		// and the complete caller-owned I binding remains read-only.
 		if (broadcast)
-			oakAsm->DUP(rhs.S4(), oak::QReg(rhs_host).Selem()[plan.rhs_lane]);
+			oakAsm->DUP(rhs.S4(), oak::QReg(rhs_host).Selem()[scalar_i ? 0 : plan.rhs_lane]);
 		const oak::QReg key_a = OAK_QSCRATCH, key_b = OAK_QSCRATCH2;
 		// Fuse the two sign-key graphs into six integer SIMD instructions.
 		// The signed comparison orders all raw words, including NaN payloads

@@ -75,6 +75,7 @@ struct LoadstoreBackpatchInfo
 	bool is_load;
 	bool is_fpr;
 	LoadstoreBackpatchOrigin origin = LoadstoreBackpatchOrigin::Legacy;
+	bool ir_delay_slot = false;
 };
 
 static constexpr size_t FASTMEM_AREA_SIZE = 0x100000000ULL;
@@ -1220,7 +1221,8 @@ void vtlb_ClearLoadStoreInfo()
 
 static void vtlb_AddLoadStoreInfoImpl(uptr code_address, u32 code_size, u32 guest_pc,
 	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register,
-	u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr, LoadstoreBackpatchOrigin origin)
+	u8 size_in_bits, bool is_signed, bool is_load, bool is_fpr, LoadstoreBackpatchOrigin origin,
+	bool ir_delay_slot = false)
 {
 	pxAssert(code_size < std::numeric_limits<u8>::max());
 
@@ -1229,7 +1231,7 @@ static void vtlb_AddLoadStoreInfoImpl(uptr code_address, u32 code_size, u32 gues
 		s_fastmem_backpatch_info.erase(iter);
 
 	LoadstoreBackpatchInfo info{guest_pc, gpr_bitmask, fpr_bitmask, static_cast<u8>(code_size),
-		address_register, data_register, size_in_bits, is_signed, is_load, is_fpr, origin};
+		address_register, data_register, size_in_bits, is_signed, is_load, is_fpr, origin, ir_delay_slot};
 	s_fastmem_backpatch_info.emplace(code_address, info);
 }
 
@@ -1243,7 +1245,7 @@ void vtlb_AddLoadStoreInfo(uptr code_address, u32 code_size, u32 guest_pc, u32 g
 }
 
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
-void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc)
+void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc, bool delay_slot)
 {
 	constexpr u32 IR_LIVE_Q2_Q7 = 0xFC;
 	constexpr u8 IR_ADDRESS_REGISTER = 0;
@@ -1252,7 +1254,7 @@ void vtlb_AddLoadStoreInfoIr32(uptr code_address, u32 guest_pc)
 	pxAssert((code_address & 3) == 0);
 	vtlb_AddLoadStoreInfoImpl(code_address, 4, guest_pc, 0, IR_LIVE_Q2_Q7,
 		IR_ADDRESS_REGISTER, IR_RESULT_REGISTER, IR_LOAD_BITS, false, true, false,
-		LoadstoreBackpatchOrigin::EeIrLoad32);
+		LoadstoreBackpatchOrigin::EeIrLoad32, delay_slot);
 }
 #endif
 
@@ -1276,7 +1278,7 @@ bool vtlb_BackpatchLoadStore(uptr code_address, uptr fault_address)
 	if (info.origin == LoadstoreBackpatchOrigin::EeIrLoad32)
 	{
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
-		vtlb_DynBackpatchLoad32Ir(code_address, info.guest_pc, guest_addr);
+		vtlb_DynBackpatchLoad32Ir(code_address, info.guest_pc, guest_addr, info.ir_delay_slot);
 #else
 		pxFail("EE IR Load32 backpatch metadata on unsupported platform");
 #endif

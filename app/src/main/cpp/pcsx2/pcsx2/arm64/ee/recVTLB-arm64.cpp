@@ -1399,7 +1399,8 @@ void vtlb_DynV2P()
 
 static void DynBackpatchLoadStoreImpl(uptr code_address, u32 code_size, u32 guest_pc, u32 guest_addr,
 	u32 gpr_bitmask, u32 fpr_bitmask, u8 address_register, u8 data_register,
-	u8 size_in_bits, bool is_signed, bool is_load, bool is_xmm, bool ir_fastmem_load)
+	u8 size_in_bits, bool is_signed, bool is_load, bool is_xmm, bool ir_fastmem_load,
+	bool ir_delay_slot = false)
 {
 	static constexpr u32 GPR_SIZE = 8;
 	static constexpr u32 XMM_SIZE = 16;
@@ -1466,6 +1467,13 @@ static void DynBackpatchLoadStoreImpl(uptr code_address, u32 code_size, u32 gues
 	{
 		recBeginOaknutEmit();
 		vtlbWriteGuestPC_emit_oaknut(guest_pc);
+		if (ir_fastmem_load)
+		{
+			// IR fast loads may omit hot PC/BD stores. Establish exact fault
+			// context before any VTLB handler, including nonreturning ones.
+			oakAsm->MOV(OAK_WSCRATCH, ir_delay_slot ? 1u : 0u);
+			oakStore32(OAK_WSCRATCH, {oak::util::X27, static_cast<s64>(offsetof(cpuRegistersPack, cpuRegs.IsDelaySlot))});
+		}
 		DynGen_PrepRegs_emit_oaknut(address_register, -1, size_in_bits, is_xmm, ir_fastmem_load);
 		DynGen_HandlerTest_emit_oaknut([size_in_bits, is_signed]() {DynGen_DirectRead_emit_oaknut(size_in_bits, is_signed); },  0, size_in_bits, is_signed && size_in_bits <= 32);
 		recEndOaknutEmit();
@@ -1549,14 +1557,14 @@ void vtlb_DynBackpatchLoadStore(uptr code_address, u32 code_size, u32 guest_pc, 
 }
 
 #if defined(ARCH_ARM64) && defined(__ANDROID__)
-void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr)
+void vtlb_DynBackpatchLoad32Ir(uptr code_address, u32 guest_pc, u32 guest_addr, bool delay_slot)
 {
 	constexpr u32 IR_LIVE_Q2_Q7 = 0xFC;
 	constexpr u8 IR_REGISTER_W0 = 0;
 	constexpr u8 IR_LOAD_BITS = 32;
 	DynBackpatchLoadStoreImpl(code_address, 4, guest_pc, guest_addr, 0,
 		IR_LIVE_Q2_Q7, IR_REGISTER_W0, IR_REGISTER_W0, IR_LOAD_BITS,
-		false, true, false, true);
+		false, true, false, true, delay_slot);
 }
 #endif
 

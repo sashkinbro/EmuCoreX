@@ -47,6 +47,13 @@ namespace ir
 	bool IsIntegerType(Type type);
 	u32 TypeSize(Type type);
 
+	// Raw VU scalar state selectors, independent of physical VI/cache indexes.
+	// I is the current architectural 32-bit word; reading it applies no clamp.
+	enum class VuScalar : u8
+	{
+		I = 0,
+	};
+
 	// ------------------------------------------------------------------
 	// Opcodes
 	// ------------------------------------------------------------------
@@ -142,6 +149,8 @@ namespace ir
 	X(ReadVf,       StateRead,   0, 0, V4F32, false) \
 	/* Read all four VF words as signed raw integer lanes without FP reinterpretation. */ \
 	X(ReadVfBits,   StateRead,   0, 0, V4I32, false) \
+	/* Raw 32-bit VU scalar state; imm is a VuScalar selector. */ \
+	X(ReadVuScalarBits, StateRead, 0, 0, I32, false) \
 	X(WriteVf,      StateWrite,  1, 1, Void, false) \
 	/* Write selected raw VU VF lanes from a V4F32 bit vector; aux bits 0..3 are x/y/z/w. */ \
 	X(WriteVfMasked, StateWrite, 1, 1, Void, false) \
@@ -236,6 +245,8 @@ namespace ir
 	X(VCmpLeS,      VecCompare,  2, 2, Any,  false) \
 	X(VCmpLeU,      VecCompare,  2, 2, Any,  false) \
 	X(VBroadcast,   VecLane,     1, 1, Any,  false) \
+	/* Repeat one I32 word in all four V4I32 lanes without FP conversion. */ \
+	X(VSplat32,     VecSplat,    1, 1, V4I32, false) \
 	/* Bit-preserving packed permutations. imm is lane width 8/16/32 (0=32). */ \
 	X(VZipLo,       VecBinary,   2, 2, Any,  false) \
 	X(VZipHi,       VecBinary,   2, 2, Any,  false) \
@@ -295,6 +306,7 @@ namespace ir
 		VecTernary,
 		VecCompare,
 		VecConvert,
+		VecSplat,
 		VecLane,
 		VecLane2,
 	};

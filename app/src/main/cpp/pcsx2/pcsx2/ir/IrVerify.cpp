@@ -67,6 +67,9 @@ namespace ir
 			if (inst.op == Op::ReadVfBits &&
 				(inst.imm >= 32 || (inst.aux & ~IF_DELAY_SLOT) != 0))
 				return Fail(error, "ReadVfBits: VF index or flags are out of range");
+			if (inst.op == Op::ReadVuScalarBits &&
+				(inst.imm != static_cast<u64>(VuScalar::I) || (inst.aux & ~IF_DELAY_SLOT) != 0))
+				return Fail(error, "ReadVuScalarBits: scalar selector or flags are out of range");
 			if (inst.op == Op::WriteVfLaneSplatBits &&
 				(inst.imm >= 32 || !(inst.aux & 0x0f) || (inst.aux & ~(u16(0x0f) | IF_DELAY_SLOT)) != 0))
 				return Fail(error, "WriteVfLaneSplatBits: VF index, lane mask, or flags are out of range");
@@ -307,6 +310,10 @@ namespace ir
 					}
 					break;
 				}
+				case OpKind::VecSplat:
+					if (fn.ValueType(inst.args[0]) != Type::I32 || inst.type != Type::V4I32 || inst.imm != 0)
+						return Fail(error, "VSplat32: I32 input, V4I32 result, and zero immediate required");
+					break;
 				case OpKind::VecLane:
 				{
 					const Type t0 = fn.ValueType(inst.args[0]);

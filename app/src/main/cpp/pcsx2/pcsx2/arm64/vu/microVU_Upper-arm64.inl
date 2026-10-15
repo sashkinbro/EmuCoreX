@@ -2189,7 +2189,7 @@ static void mVU_MSUBAw_emit(mP)
 }
 
 // MAX Opcode
-static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4)
+static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4, bool scalar_i = false)
 {
 	if (!_Fd_ || mVUtrySkipNoLaneWrite_oaknut(mVU) || !mVUSharedIrEnabled(mVU.index)) return false;
 	static thread_local ir::Function fn;
@@ -2208,8 +2208,11 @@ static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4)
 	b.SetBlock(1);
 	b.SetDelaySlot(mVUinfo.isBdelay);
 	const u32 lhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Fs_);
-	const u32 raw_rhs = b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
-	const u32 rhs = rhs_lane < 4 ? b.Emit1(ir::Op::VShuffle, ir::Type::V4I32, raw_rhs, rhs_lane * 0x55u) : raw_rhs;
+	const u32 raw_rhs = scalar_i ?
+		b.Emit(ir::Op::ReadVuScalarBits, ir::Type::I32, {}, static_cast<u64>(ir::VuScalar::I)) :
+		b.Emit(ir::Op::ReadVfBits, ir::Type::V4I32, {}, _Ft_);
+	const u32 rhs = scalar_i ? b.Emit1(ir::Op::VSplat32, ir::Type::V4I32, raw_rhs) :
+		rhs_lane < 4 ? b.Emit1(ir::Op::VShuffle, ir::Type::V4I32, raw_rhs, rhs_lane * 0x55u) : raw_rhs;
 	const u32 shift31 = b.ConstI32(31), shift1 = b.ConstI32(1);
 	const u32 sign_lhs = b.Emit2(ir::Op::VShrS, ir::Type::V4I32, lhs, shift31);
 	const u32 flip_lhs = b.Emit2(ir::Op::VShrU, ir::Type::V4I32, sign_lhs, shift1);
@@ -2231,7 +2234,9 @@ static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4)
 	// Preserve both full source bindings before requesting a writable partial
 	// destination. microVU owns WAW/backup handling and packed-lane writeback.
 	const int lhs_reg = mVU.regAlloc->allocRegId(plan.lhs_vf);
-	const int rhs_reg = mVU.regAlloc->allocRegId(plan.rhs_vf);
+	// Allocator identity 33 is the cached architectural I word, not VF33.
+	// Bind it read-only and full-width before allocating a masked VF writer.
+	const int rhs_reg = mVU.regAlloc->allocRegId(plan.rhs_kind == Arm64Ir::BoundVfMaxMinRhs::ScalarI ? 33 : plan.rhs_vf);
 	const int dst_reg = mVU.regAlloc->allocRegId(-1, plan.dst_vf, plan.lane_mask);
 	Arm64Ir::LowerOutput out;
 	const bool lowered = Arm64Ir::LowerBoundVfMaxMinPlan(plan, lhs_reg, rhs_reg, dst_reg,
@@ -2245,7 +2250,8 @@ static bool mVUTrySharedMaxMin(mV, bool maximum, u32 rhs_lane = 4)
 	if (lowered)
 	{
 		mVURecordSharedIr(mVU.index, out.host_size);
-		if (rhs_lane == 4) mVURecordSharedMaxMin(mVU.index, out.host_size);
+		if (scalar_i) mVURecordSharedMaxMinI(mVU.index, out.host_size, maximum);
+		else if (rhs_lane == 4) mVURecordSharedMaxMin(mVU.index, out.host_size);
 		else mVURecordSharedMaxMinBroadcast(mVU.index, out.host_size, rhs_lane, maximum);
 	}
 	return lowered;
@@ -2348,7 +2354,7 @@ static void mVU_MAXi_emit(mP)
 		mVUanalyzeFMAC1(mVU, _Fd_, _Fs_, 0);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MAXi_direct_emit_oaknut(mVU, recPass); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, true, 4, true)) mVU_MAXi_direct_emit_oaknut(mVU, recPass); }
 	pass3
 	{
 		mVUlog("MAXi");
@@ -2584,7 +2590,7 @@ static void mVU_MINIi_emit(mP)
 		mVUanalyzeFMAC1(mVU, _Fd_, _Fs_, 0);
 		sFLAG.doFlag = false;
 	}
-	pass2 { mVU_MINIi_direct_emit_oaknut(mVU, recPass); }
+	pass2 { if (!mVUTrySharedMaxMin(mVU, false, 4, true)) mVU_MINIi_direct_emit_oaknut(mVU, recPass); }
 	pass3
 	{
 		mVUlog("MINIi");
