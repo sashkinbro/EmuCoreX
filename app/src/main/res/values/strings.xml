@@ -14,6 +14,10 @@
     <string name="home_empty_subtitle">Add game folders to build your library.</string>
     <string name="home_add_folder">Choose Games Folder</string>
     <string name="home_refresh">Refresh</string>
+    <string name="home_library_options">Library options</string>
+    <string name="home_sort_platform">By platform</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">Show as list</string>
     <string name="home_view_grid">Show as grid</string>
     <string name="home_view_shelf">Show cover shelf</string>

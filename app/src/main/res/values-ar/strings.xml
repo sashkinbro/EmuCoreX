@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">اختر مجلد الألعاب الخاص بك لإنشاء مكتبتك.</string>
     <string name="home_add_folder">اختر مجلد الألعاب</string>
     <string name="home_refresh">تحديث</string>
+    <string name="home_library_options">خيارات المكتبة</string>
+    <string name="home_sort_platform">حسب المنصة</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">عرض كقائمة</string>
     <string name="home_view_grid">عرض كشبكة</string>
     <string name="home_view_shelf">عرض كرف أغلفة</string>

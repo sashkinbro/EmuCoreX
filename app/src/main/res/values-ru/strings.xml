@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">Выберите папку с играми, чтобы создать свою библиотеку.</string>
     <string name="home_add_folder">Выбрать папку с играми</string>
     <string name="home_refresh">Обновить</string>
+    <string name="home_library_options">Параметры библиотеки</string>
+    <string name="home_sort_platform">По платформе</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">Показать списком</string>
     <string name="home_view_grid">Показать сеткой</string>
     <string name="home_search">Поиск игр</string>

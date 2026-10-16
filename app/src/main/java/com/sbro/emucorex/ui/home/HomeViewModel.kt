@@ -56,21 +56,13 @@ import kotlinx.coroutines.withContext
 import java.text.Normalizer
 import kotlin.time.Duration.Companion.milliseconds
 
-enum class HomeSortOption {
-    TITLE_ASC,
-    TITLE_DESC,
-    RECENT_DESC,
-    RECENT_ASC,
-    SIZE_DESC,
-    SIZE_ASC
-}
-
 enum class HomeLibraryViewMode {
     GRID, LIST, SHELF
 }
 
 data class HomeUiState(
     val games: List<GameItem> = emptyList(),
+    val librarySections: List<HomeLibrarySection> = emptyList(),
     val recentGames: List<GameItem> = emptyList(),
     val hiddenGames: List<GameItem> = emptyList(),
     val visibilityMessageResId: Int? = null,
@@ -765,32 +757,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 normalizeSearchToken(game.serial).contains(query)
             )
         }
-        val sorted = when (state.sortOption) {
-            HomeSortOption.TITLE_ASC -> filtered.sortedWith(
-                compareBy<GameItem> { normalizeSortToken(it.title) }
-                    .thenBy { normalizeSortToken(it.fileName) }
-            )
-            HomeSortOption.TITLE_DESC -> filtered.sortedWith(
-                compareByDescending<GameItem> { normalizeSortToken(it.title) }
-                    .thenByDescending { normalizeSortToken(it.fileName) }
-            )
-            HomeSortOption.RECENT_DESC -> filtered.sortedWith(
-                compareByDescending<GameItem> { it.lastModified }
-                    .thenBy { normalizeSortToken(it.title) }
-            )
-            HomeSortOption.RECENT_ASC -> filtered.sortedWith(
-                compareBy<GameItem> { it.lastModified }
-                    .thenBy { normalizeSortToken(it.title) }
-            )
-            HomeSortOption.SIZE_DESC -> filtered.sortedWith(
-                compareByDescending<GameItem> { it.fileSize }
-                    .thenBy { normalizeSortToken(it.title) }
-            )
-            HomeSortOption.SIZE_ASC -> filtered.sortedWith(
-                compareBy<GameItem> { it.fileSize }
-                    .thenBy { normalizeSortToken(it.title) }
-            )
-        }
+        val sections = buildHomeLibrarySections(filtered, state.sortOption)
         val gamesByPath = filtered.associateBy { it.path }
         val recentGames = recentEntries.mapNotNull { entry ->
             gamesByPath[entry.path]
@@ -801,7 +768,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 normalizeSearchToken(game.serial).contains(query)
         }.takeIf { state.showRecentGames }.orEmpty()
         _uiState.value = _uiState.value.copy(
-            games = sorted,
+            games = sections.flatMap { it.games },
+            librarySections = sections,
             recentGames = recentGames,
             hiddenGames = allGames.filter { it.path in hiddenGamePaths }.distinctBy { it.path }
                 .sortedWith(compareBy<GameItem> { normalizeSortToken(it.title) }.thenBy { it.path })

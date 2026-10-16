@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">ライブラリを作成するには、ゲームフォルダを選択してください。</string>
     <string name="home_add_folder">ゲームフォルダを選択</string>
     <string name="home_refresh">更新</string>
+    <string name="home_library_options">ライブラリのオプション</string>
+    <string name="home_sort_platform">プラットフォーム別</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">リスト表示</string>
     <string name="home_view_grid">グリッド表示</string>
     <string name="home_view_shelf">カバーシェルフ表示</string>

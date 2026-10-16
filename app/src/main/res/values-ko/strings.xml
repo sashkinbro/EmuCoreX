@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">게임 폴더를 선택하여 라이브러리를 구성하세요.</string>
     <string name="home_add_folder">게임 폴더 선택</string>
     <string name="home_refresh">새로고침</string>
+    <string name="home_library_options">라이브러리 옵션</string>
+    <string name="home_sort_platform">플랫폼별</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">목록으로 보기</string>
     <string name="home_view_grid">그리드로 보기</string>
     <string name="home_view_shelf">커버 책장 보기</string>

@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">अपनी लाइब्रेरी बनाने के लिए अपने गेम्स का फ़ोल्डर चुनें।</string>
     <string name="home_add_folder">गेम्स फ़ोल्डर चुनें</string>
     <string name="home_refresh">रिफ्रेश करें</string>
+    <string name="home_library_options">लाइब्रेरी विकल्प</string>
+    <string name="home_sort_platform">प्लेटफ़ॉर्म के अनुसार</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">लिस्ट के रूप में दिखाएं</string>
     <string name="home_view_grid">ग्रिड के रूप में दिखाएं</string>
     <string name="home_view_shelf">कवर शेल्फ दिखाएं</string>

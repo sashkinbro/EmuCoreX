@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">請選擇您的遊戲資料夾以建立遊戲庫。</string>
     <string name="home_add_folder">選擇遊戲資料夾</string>
     <string name="home_refresh">重新整理</string>
+    <string name="home_library_options">游戏库选项</string>
+    <string name="home_sort_platform">按平台</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">以清單顯示</string>
     <string name="home_view_grid">以網格顯示</string>
     <string name="home_search">搜尋遊戲</string>

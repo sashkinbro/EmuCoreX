@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">Wähle deinen Spieleordner, um deine Bibliothek aufzubauen.</string>
     <string name="home_add_folder">Spieleordner auswählen</string>
     <string name="home_refresh">Aktualisieren</string>
+    <string name="home_library_options">Bibliotheksoptionen</string>
+    <string name="home_sort_platform">Nach Plattform</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">Als Liste anzeigen</string>
     <string name="home_view_grid">Als Raster anzeigen</string>
     <string name="home_search">Spiele suchen</string>

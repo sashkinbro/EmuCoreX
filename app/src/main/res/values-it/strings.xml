@@ -12,6 +12,10 @@
     <string name="home_empty_subtitle">Seleziona la cartella dei giochi per creare la tua libreria.</string>
     <string name="home_add_folder">Scegli cartella giochi</string>
     <string name="home_refresh">Aggiorna</string>
+    <string name="home_library_options">Opzioni della libreria</string>
+    <string name="home_sort_platform">Per piattaforma</string>
+    <string name="home_platform_ps2">PlayStation 2</string>
+    <string name="home_platform_arcade">Namco Arcade</string>
     <string name="home_view_list">Mostra come elenco</string>
     <string name="home_view_grid">Mostra come griglia</string>
     <string name="home_view_shelf">Mostra scaffale copertine</string>
