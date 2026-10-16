@@ -72,10 +72,21 @@ EGLSurface GLContextEGLAndroid::CreatePlatformSurface(EGLConfig config, void* wi
 		return EGL_NO_SURFACE;
 	}
 
-	ANativeWindow_setBuffersGeometry(native_window, 0, 0, static_cast<int32_t>(native_visual_id));
-	m_wi.surface_width = static_cast<u32>(ANativeWindow_getWidth(native_window));
-	m_wi.surface_height = static_cast<u32>(ANativeWindow_getHeight(native_window));
-
+	// The window's buffer format must match the EGL config's native visual. Some vendor
+	// stacks (UNISOC/Mali gralloc) reject the requested format or hand back a zero-size
+	// window here; the resulting black frames are otherwise completely silent, so trace
+	// the attach parameters and any failure instead of ignoring them.
+	const int32_t buffers_result =
+		ANativeWindow_setBuffersGeometry(native_window, 0, 0, static_cast<int32_t>(native_visual_id));
+	const int32_t window_width = ANativeWindow_getWidth(native_window);
+	const int32_t window_height = ANativeWindow_getHeight(native_window);
+	if (buffers_result != 0 || window_width <= 0 || window_height <= 0)
+	{
+		Console.Warning("Android EGL: window buffers geometry visual=0x%X result=%d size=%dx%d",
+			static_cast<unsigned>(native_visual_id), buffers_result, window_width, window_height);
+	}
+	m_wi.surface_width = static_cast<u32>(window_width);
+	m_wi.surface_height = static_cast<u32>(window_height);
 	EGLSurface surface = eglCreateWindowSurface(m_display, config, native_window, nullptr);
 	if (surface == EGL_NO_SURFACE)
 	{

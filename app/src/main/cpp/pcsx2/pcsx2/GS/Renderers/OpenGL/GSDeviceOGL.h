@@ -360,6 +360,9 @@ private:
 	// the Vulkan driver's AcquireNextImage, which faults on some drivers (MTK).
 	bool HasDrawableSurface() const;
 
+	// Rate limit for the "skipping present, no drawable surface" diagnostic on Android.
+	u64 m_last_skip_present_log_time = 0;
+
 	void OMAttachRt(GSTexture* rt = nullptr);
 	void OMAttachDsAsRt(GSTexture* ds_as_rt = nullptr);
 	void OMAttachDs(GSTexture* ds = nullptr);

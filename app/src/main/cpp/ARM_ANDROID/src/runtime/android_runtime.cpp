@@ -3,6 +3,7 @@
 #include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
 
 #include "common/Error.h"
+#include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/Path.h"
 #include "pcsx2/Input/InputManager.h"
@@ -56,6 +57,18 @@ constexpr const char* LOG_TAG = "EmuCoreX";
 // reader. Keep them mutually exclusive so a library scan cannot close or replace the
 // reader while another thread is detecting a disc or while the VM is starting/stopping.
 std::mutex s_disc_access_mutex;
+
+// PCSX2 core diagnostics (GS/Vulkan/OpenGL errors, warnings and status lines) are
+// written to stdout, which Android discards for app processes. Without this bridge a
+// black-screen bug on a specific device leaves no evidence anywhere, so route the
+// core log to logcat. INFO keeps dev/trace spam out while keeping every error and
+// warning from the graphics stack visible.
+void AndroidConsoleLogCallback(LOGLEVEL level, ConsoleColors, std::string_view message)
+{
+	const int priority = (level <= LOGLEVEL_ERROR) ? ANDROID_LOG_ERROR :
+		((level <= LOGLEVEL_WARNING) ? ANDROID_LOG_WARN : ANDROID_LOG_INFO);
+	__android_log_print(priority, LOG_TAG, "%.*s", static_cast<int>(message.size()), message.data());
+}
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 struct TFXPreparationTestBarrier
@@ -446,6 +459,7 @@ void AndroidRuntime::Initialize(std::string data_root, int api_version)
 {
 	std::lock_guard lock(mutex_);
 	SDL_SetMainReady();
+	Log::SetHostOutputLevel(LOGLEVEL_INFO, &AndroidConsoleLogCallback);
 	paths_.data_root = std::move(data_root);
 	if (IsTFXPreparationActiveLocked())
 	{

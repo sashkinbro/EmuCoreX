@@ -445,6 +445,12 @@ private:
 
 	bool m_last_submit_failed = false;
 
+	// Rate limit for the "skipping present, no swap chain" diagnostic on Android.
+	u64 m_last_no_swapchain_log_time = 0;
+
+	// Rate limit for the "swap chain image acquire timed out" diagnostic on Android.
+	u64 m_last_acquire_timeout_log_time = 0;
+
 	std::map<u32, VkRenderPass> m_render_pass_cache;
 
 	VkDebugUtilsMessengerEXT m_debug_messenger_callback = VK_NULL_HANDLE;

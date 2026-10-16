@@ -287,6 +287,12 @@ private object PadKey {
 private const val TRANSPORT_HOLD_DELAY_MS = 360L
 private const val LIGHT_GUN_STICK_AIM_SPEED = 0.95f
 
+// Hard limit for how long the stale-frame cover may hide the emulator SurfaceView.
+// The cover exists to mask the previous game's final buffer across a fast restart;
+// it must never become a permanent black screen when the first authoritative frame
+// is delayed or never published by the renderer.
+private const val DISPLAY_COVER_MAX_HOLD_MS = 6_000L
+
 private enum class EmulationMenuTab {
     Session,
     Controls,
@@ -1380,6 +1386,18 @@ fun EmulationScreen(
         }
     }
 
+    // Never let the stale-frame cover outlive its purpose: if the renderer has not
+    // published a draw rect within the grace period, lift the cover regardless so a
+    // presentation problem can never masquerade as a permanently black screen.
+    var displayCoverExpired by remember(uiState.isRunning, uiState.currentGameTitle) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(uiState.isRunning, uiState.currentGameTitle) {
+        if (!uiState.isRunning) return@LaunchedEffect
+        delay(DISPLAY_COVER_MAX_HOLD_MS.milliseconds)
+        displayCoverExpired = true
+    }
+
     val requestedFrameGenerationRate = FrameGenerationRefreshRate.requested(
         FrameGenerationSettings(
             enabled = uiState.frameGenerationEnabled,
@@ -1468,8 +1486,9 @@ fun EmulationScreen(
         )
 
         // SurfaceView can retain the previous game's final buffer across a fast restart.
-        // Keep it covered until the new renderer publishes its first authoritative draw rect.
-        if (nativeDisplayDrawRect == null) {
+        // Keep it covered until the new renderer publishes its first authoritative draw rect,
+        // but only for a bounded grace period (see DISPLAY_COVER_MAX_HOLD_MS).
+        if (nativeDisplayDrawRect == null && !displayCoverExpired) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

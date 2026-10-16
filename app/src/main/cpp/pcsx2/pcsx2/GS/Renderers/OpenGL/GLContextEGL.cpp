@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <cstdlib>
 #include <optional>
@@ -306,7 +307,24 @@ void GLContextEGL::ResizeSurface(u32 new_surface_width /*= 0*/, u32 new_surface_
 
 bool GLContextEGL::SwapBuffers()
 {
-	return eglSwapBuffers(m_display, m_surface);
+	if (eglSwapBuffers(m_display, m_surface))
+		return true;
+
+	// All call sites ignore this result, so a broken BufferQueue (black screen while
+	// emulation keeps running) would leave no trace at all. Log rate-limited: some
+	// vendor stacks fail once per frame, which must not flood logcat.
+	static std::atomic<u64> s_last_swap_failure_log_time{0};
+	const std::chrono::steady_clock::duration since_epoch = std::chrono::steady_clock::now().time_since_epoch();
+	const u64 now_ms = static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(since_epoch).count());
+	u64 last_log = s_last_swap_failure_log_time.load(std::memory_order_relaxed);
+	if (now_ms - last_log >= 1000 &&
+		s_last_swap_failure_log_time.compare_exchange_strong(last_log, now_ms, std::memory_order_relaxed))
+	{
+		Console.ErrorFmt("eglSwapBuffers() failed: 0x{:x} ({}x{})", eglGetError(),
+			m_wi.surface_width, m_wi.surface_height);
+	}
+
+	return false;
 }
 
 bool GLContextEGL::IsCurrent()

@@ -721,6 +721,25 @@ void GSRenderer::EndPresentFrame()
 
 void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 {
+#ifdef __ANDROID__
+	// The SurfaceView can attach after the GS device was created (the surface callback
+	// races VM startup), or a transient failure can leave the device without a drawable
+	// surface. The runtime only notifies us through surface callbacks, so if that
+	// notification is missed nothing would ever recover and the screen stays black while
+	// emulation keeps running. Retry the display-window attach until presentation works.
+	if (!g_gs_device->HasSurface() && !m_gpu_device_failed)
+	{
+		const u64 now = GetCPUTicks();
+		if (m_last_surface_reattach_time == 0 ||
+			(now - m_last_surface_reattach_time) >= (GetTickFrequency() * 2))
+		{
+			m_last_surface_reattach_time = now;
+			Console.Warning("GS: no presentable surface, retrying display window attach");
+			GSUpdateDisplayWindow();
+		}
+	}
+#endif
+
 	if (GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()))
 	{
 		if (GSConfig.SaveInfo)

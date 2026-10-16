@@ -564,8 +564,10 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		return false;
 	};
 
-	if (enable_surface && !SupportsExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME, true))
-		return false;
+	// Always request the swap chain extension when the driver supports it: on Android the
+	// SurfaceView can attach after device creation (its callback races VM startup) and
+	// device extensions cannot be enabled later. A pre-existing surface makes it required.
+	SupportsExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME, enable_surface);
 
 	// Required extensions.
 	for (const char* extension_name : s_required_device_extensions)
@@ -685,6 +687,12 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 			// Quit now, no need for a present queue.
 			if (!surface)
 			{
+				// The surface can still arrive after device creation (the Android SurfaceView
+				// callback races VM startup). Queues can only be fixed at device creation, so
+				// assume the graphics queue can present, as Android drivers expose a single
+				// universal queue family. If that assumption is wrong, swap chain creation
+				// fails later with the usual logged error.
+				m_present_queue_family_index = i;
 				break;
 			}
 		}
@@ -909,8 +917,10 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 
 	// Grab the graphics and present queues.
 	vkGetDeviceQueue(m_device, m_graphics_queue_family_index, 0, &m_graphics_queue);
-	if (surface)
+	if (m_present_queue_family_index != queue_family_count)
 	{
+		// Also fetched when the device was created before a surface existed (see the
+		// queue-family search above), so a late-arriving surface can present.
 		vkGetDeviceQueue(m_device, m_present_queue_family_index, 0, &m_present_queue);
 	}
 	m_spinning_supported = m_spin_queue_family_index != queue_family_count &&
@@ -2890,6 +2900,19 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	// If we're running surfaceless, kick the command buffer so we don't run out of descriptors.
 	if (!m_swap_chain)
 	{
+#ifdef __ANDROID__
+		// The swap chain should recover through UpdateWindow(), but if it does not the
+		// screen stays black while emulation runs with no other evidence. Log rate-limited.
+		const u64 now = GetCPUTicks();
+		if (m_last_no_swapchain_log_time == 0 ||
+			(now - m_last_no_swapchain_log_time) >= GetTickFrequency())
+		{
+			m_last_no_swapchain_log_time = now;
+			Console.Warning("VK: Skipping present, no swap chain (type=%u %ux%u)",
+				static_cast<u32>(m_window_info.type), m_window_info.surface_width,
+				m_window_info.surface_height);
+		}
+#endif
 		ExecuteCommandBuffer(false);
 		return PresentResult::FrameSkipped;
 	}
@@ -2911,7 +2934,25 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 	{
 		m_swap_chain->ReleaseCurrentImage();
 
-		if (res == VK_ERROR_OUT_OF_DATE_KHR)
+		if (res == VK_TIMEOUT)
+		{
+			// The compositor did not return an image within the bounded Android acquire
+			// window. Retry on the next VSync; this is not an error (and must not raise
+			// the device-lost recovery path), but log it rate-limited in case it persists.
+#ifdef __ANDROID__
+			const u64 now = GetCPUTicks();
+			if (m_last_acquire_timeout_log_time == 0 ||
+				(now - m_last_acquire_timeout_log_time) >= GetTickFrequency())
+			{
+				m_last_acquire_timeout_log_time = now;
+				Console.Warning("VK: Timed out acquiring a swap chain image; retrying next frame");
+			}
+#endif
+			// Still submit the command buffer, otherwise we'll end up with several frames waiting.
+			ExecuteCommandBuffer(false);
+			return PresentResult::FrameSkipped;
+		}
+		else if (res == VK_ERROR_OUT_OF_DATE_KHR)
 		{
 			ResizeWindow(0, 0, m_window_info.surface_scale);
 			ImGuiManager::WindowResized();

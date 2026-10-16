@@ -15,6 +15,7 @@
 #include "common/Console.h"
 #include "common/Error.h"
 #include "common/FileSystem.h"
+#include "common/HostSys.h"
 #include "common/Path.h"
 #include "common/ScopedGuard.h"
 #include "common/StringUtil.h"
@@ -378,7 +379,10 @@ RenderAPI GSDeviceOGL::GetRenderAPI() const
 
 bool GSDeviceOGL::HasSurface() const
 {
-	return m_window_info.type != WindowInfo::Type::Surfaceless;
+	// A zero-extent EGL surface cannot accept default-framebuffer work, so treat it the
+	// same as having no surface at all. The Android GS path uses this to decide when to
+	// retry the display-window attach after a missed surface callback.
+	return HasDrawableSurface();
 }
 
 void GSDeviceOGL::SetVSyncMode(GSVSyncMode mode, bool allow_present_throttle)
@@ -1401,8 +1405,27 @@ bool GSDeviceOGL::HasDrawableSurface() const
 GSDevice::PresentResult GSDeviceOGL::BeginPresent(bool frame_skip)
 {
 	FlushDeferredDraws();
-	if (frame_skip || !HasDrawableSurface())
+	if (frame_skip)
 		return PresentResult::FrameSkipped;
+
+	if (!HasDrawableSurface())
+	{
+#ifdef __ANDROID__
+		// This is the silent black-screen state: emulation runs, but no frame can be
+		// presented and nothing else logs why. Rate-limit so a wedged surface does not
+		// spam logcat; the Android GS path retries the window attach while this persists.
+		const u64 now = GetCPUTicks();
+		if (m_last_skip_present_log_time == 0 ||
+			(now - m_last_skip_present_log_time) >= GetTickFrequency())
+		{
+			m_last_skip_present_log_time = now;
+			Console.Warning("GL: Skipping present, no drawable surface (type=%u %ux%u)",
+				static_cast<u32>(m_window_info.type), m_window_info.surface_width,
+				m_window_info.surface_height);
+		}
+#endif
+		return PresentResult::FrameSkipped;
+	}
 
 	// Get the pipeline statistics for this frame before postprocessing.
 	if (m_gpu_pipeline_statistics_enabled)

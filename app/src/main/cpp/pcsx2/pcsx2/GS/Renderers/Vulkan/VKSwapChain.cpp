@@ -665,8 +665,24 @@ VkResult VKSwapChain::AcquireNextImage()
 	// Use a different semaphore for each image.
 	m_current_semaphore = (m_current_semaphore + 1) % static_cast<u32>(m_semaphores.size());
 
-	const VkResult res = vkAcquireNextImageKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, UINT64_MAX,
+	// Android presentation is compositor-driven; if the compositor stops returning images
+	// (vendor BLAST stalls), an infinite wait would wedge the GS thread, presentation and
+	// shutdown with no way out. Bound the wait there and retry on the next VSync instead.
+#ifdef __ANDROID__
+	constexpr u64 acquire_timeout = 250'000'000ull; // 250 ms
+#else
+	constexpr u64 acquire_timeout = UINT64_MAX;
+#endif
+
+	const VkResult res = vkAcquireNextImageKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, acquire_timeout,
 		m_semaphores[m_current_semaphore].available_semaphore, VK_NULL_HANDLE, &m_current_image);
+	if (res == VK_TIMEOUT)
+	{
+		// No image was acquired and the semaphore was not signaled, so nothing to release;
+		// leave the result uncached so the next call retries the acquire.
+		return res;
+	}
+
 	m_image_acquire_result = res;
 	if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR)
 	{
