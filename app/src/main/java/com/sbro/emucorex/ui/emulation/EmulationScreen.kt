@@ -35,6 +35,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -1825,40 +1826,14 @@ fun EmulationScreen(
             }
         }
 
-        val showPerformanceHud = uiState.showFps &&
-            !uiState.showMenu &&
-            !showControlsEditor &&
-            (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE || uiState.performanceOverlayText.isNotBlank())
-        AnimatedVisibility(
-            visible = showPerformanceHud,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(160)),
-            modifier = Modifier
-                .align(uiState.fpsOverlayCorner.toOverlayAlignment())
-                .padding(
-                    start = if (uiState.fpsOverlayCorner.isRightOverlayCorner()) 0.dp else overlayHorizontalSafeInset + 12.dp,
-                    top = if (uiState.fpsOverlayCorner.isTopOverlayCorner()) overlayTopSafeInset + 12.dp else 0.dp,
-                    end = if (uiState.fpsOverlayCorner.isRightOverlayCorner()) overlayHorizontalSafeInset + 12.dp else 0.dp,
-                    bottom = if (uiState.fpsOverlayCorner.isBottomOverlayCorner()) overlayBottomSafeInset + 12.dp else 0.dp
-                )
-                .zIndex(30f)
-        ) {
-            if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
-                SimpleFpsCounter(
-                    fps = uiState.fps,
-                    fontScale = uiState.fpsOverlayScale / 100f
-                )
-            } else {
-                SystemPerformanceHud(
-                    speedPercent = uiState.speedPercent,
-                    text = uiState.performanceOverlayText,
-                    fixedHeaderLine = uiState.performanceOverlayHeader,
-                    isRightCorner = uiState.fpsOverlayCorner.isRightOverlayCorner(),
-                    fontScale = uiState.fpsOverlayScale / 100f,
-                    metricsMask = uiState.fpsOverlayMetrics
-                )
-            }
-        }
+        EmulationPerformanceOverlay(
+            viewModel = viewModel,
+            uiState = uiState,
+            showControlsEditor = showControlsEditor,
+            overlayHorizontalSafeInset = overlayHorizontalSafeInset,
+            overlayTopSafeInset = overlayTopSafeInset,
+            overlayBottomSafeInset = overlayBottomSafeInset
+        )
 
         AnimatedVisibility(
             visible = uiState.transportMode != EmulationTransportMode.None && !uiState.showMenu && !showControlsEditor,
@@ -2512,6 +2487,54 @@ fun EmulationScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun BoxScope.EmulationPerformanceOverlay(
+    viewModel: EmulationViewModel,
+    uiState: EmulationUiState,
+    showControlsEditor: Boolean,
+    overlayHorizontalSafeInset: Dp,
+    overlayTopSafeInset: Dp,
+    overlayBottomSafeInset: Dp
+) {
+    // Metrics change four times per second; keep their state reads below the
+    // screen's restart scope so they only recompose the monitoring overlay.
+    val performance by viewModel.performanceState.collectAsState()
+    val showPerformanceHud = uiState.showFps &&
+        !uiState.showMenu &&
+        !showControlsEditor &&
+        (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE || performance.overlayText.isNotBlank())
+    AnimatedVisibility(
+        visible = showPerformanceHud,
+        enter = fadeIn(tween(160)),
+        exit = fadeOut(tween(160)),
+        modifier = Modifier
+            .align(uiState.fpsOverlayCorner.toOverlayAlignment())
+            .padding(
+                start = if (uiState.fpsOverlayCorner.isRightOverlayCorner()) 0.dp else overlayHorizontalSafeInset + 12.dp,
+                top = if (uiState.fpsOverlayCorner.isTopOverlayCorner()) overlayTopSafeInset + 12.dp else 0.dp,
+                end = if (uiState.fpsOverlayCorner.isRightOverlayCorner()) overlayHorizontalSafeInset + 12.dp else 0.dp,
+                bottom = if (uiState.fpsOverlayCorner.isBottomOverlayCorner()) overlayBottomSafeInset + 12.dp else 0.dp
+            )
+            .zIndex(30f)
+    ) {
+        if (uiState.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
+            SimpleFpsCounter(
+                fps = performance.fps,
+                fontScale = uiState.fpsOverlayScale / 100f
+            )
+        } else {
+            SystemPerformanceHud(
+                speedPercent = performance.speedPercent,
+                text = performance.overlayText,
+                fixedHeaderLine = uiState.performanceOverlayHeader,
+                isRightCorner = uiState.fpsOverlayCorner.isRightOverlayCorner(),
+                fontScale = uiState.fpsOverlayScale / 100f,
+                metricsMask = uiState.fpsOverlayMetrics
+            )
+        }
     }
 }
 

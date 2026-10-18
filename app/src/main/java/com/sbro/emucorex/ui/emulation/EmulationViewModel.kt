@@ -204,11 +204,8 @@ data class EmulationUiState(
     val pressureModifierAmount: Int = AppPreferences.DEFAULT_PRESSURE_MODIFIER_AMOUNT,
     val stickSurfaceMode: Boolean = false,
     val controlLayouts: Map<String, OverlayControlLayout> = AppPreferences.defaultOverlayControlLayouts(),
-    val fps: String = "0.0",
     val fpsOverlayMode: Int = FPS_OVERLAY_MODE_DETAILED,
-    val performanceOverlayText: String = "",
     val performanceOverlayHeader: String = "",
-    val speedPercent: Float = 100f,
     val transportMode: EmulationTransportMode = EmulationTransportMode.None,
     val toastMessage: String? = null,
     val statusMessage: String? = null,
@@ -594,6 +591,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         )
     )
     val uiState: StateFlow<EmulationUiState> = _uiState.asStateFlow()
+    private val _performanceState = MutableStateFlow(EmulationPerformanceState())
+    val performanceState: StateFlow<EmulationPerformanceState> = _performanceState.asStateFlow()
     private val _shaderPreparationUiState = MutableStateFlow(
         ShaderPreparationUiSnapshot(
             phase = ShaderPreparationUiPhase.Hidden,
@@ -1588,21 +1587,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val raw = NativeApp.getPerformanceMetricsSnapshot().orEmpty()
         if (raw.isBlank()) return
 
-        val parts = raw.split('\n', limit = 3)
-        if (parts.size < 3) return
-        val fps = parts[0].toFloatOrNull() ?: return
-        val speedPercent = parts[1].toFloatOrNull() ?: return
-        val overlayText = replacePerformanceCpuName(parts[2], performanceCpuName)
-        val displayedFps = if (state.fpsOverlayMode == FPS_OVERLAY_MODE_SIMPLE) {
-            effectivePerformanceFps(fps, overlayText)
-        } else {
-            fps
-        }
-        _uiState.value = state.copy(
-            performanceOverlayText = overlayText,
-            fps = "%.1f".format(displayedFps),
-            speedPercent = speedPercent
-        )
+        _performanceState.value = parseEmulationPerformanceSnapshot(raw, state.fpsOverlayMode, performanceCpuName) ?: return
     }
 
     private fun publishShaderPreparationStatus(status: com.sbro.emucorex.core.ShaderPreparationStatus) {
@@ -5314,12 +5299,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     showMenu = false,
                     isActionInProgress = false,
                     actionLabel = null,
-                    fps = "0",
-                    performanceOverlayText = "",
-                    speedPercent = 100f,
                     transportMode = EmulationTransportMode.None,
                     statusMessage = null
                 )
+                _performanceState.value = EmulationPerformanceState(fps = "0")
                 syncNativePerformanceOverlayState(_uiState.value)
                 clearCrashContext()
                 if (completedRunningSession) {
