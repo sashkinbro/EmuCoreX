@@ -4032,6 +4032,7 @@ void EECoverageCop2Spec2()
 #include "jit_oracle_ee_vu_maxmin_i_flags.inl"
 #include "jit_oracle_ee_bc1.inl"
 #include "jit_oracle_ee_hot_loads.inl"
+#include "jit_oracle_ee_branch_immediates.inl"
 #include "jit_oracle_ee_fastmem.inl"
 #include "jit_oracle_ee_fastmem_abi.inl"
 #include "jit_oracle_ee_fastmem_exit.inl"
@@ -9874,7 +9875,8 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     bool vu_ftoi_only = false, bool fastmem_only = false, bool cop1_unary_only = false,
     bool fastmem_exit_only = false, bool cop1_maxmin_only = false, bool vu_maxmin_only = false,
     bool scalar_immediates_only = false, bool vu_maxmin_broadcast_only = false,
-    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false, bool cop1_compare_only = false)
+    bool cold_context_only = false, u32 vu_maxmin_i_only = 0, bool cop1_memory_only = false, bool vu_clip_only = false, bool cop1_compare_only = false,
+    bool branch_immediates_only = false)
 {
     EmuCoreXOracleSetSkipEvents(1);
     cpuinfo_initialize();
@@ -9906,6 +9908,11 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     psxRegs.pc = IOP_TEST_SCRATCH;
     psxRegs.cycle = 0;
 
+    if (branch_immediates_only)
+    {
+        EEBranchImmediateTests();
+        return;
+    }
     if (cop1_compare_only)
     {
         EEIrCop1CompareTests();
@@ -10111,6 +10118,7 @@ void EETests(bool cop1_mov_only = false, bool vu_abs_only = false, bool scalar_s
     EECoverageDynamicAddress(false);
     EECoverageDynamicAddress(true);
     EECoverageBranches();
+    EEBranchImmediateTests();
     EECoverageCop0();
     EECoverageCop1Modes();
     EECoverageFpuModeSemantics();
@@ -12219,6 +12227,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         DivEdgeTests();
     else if (std::strcmp(suite, "vectors") == 0)
         VectorsTests();
+    else if (std::strcmp(suite, "ee-branch-immediates") == 0)
+        EETests(false, false, false, false, false, false, false, false, false,
+            false, false, false, false, false, false, 0, false, false, false, true);
     else if (std::strcmp(suite, "ee") == 0)
         EETests();
     else if (std::strcmp(suite, "ee-cop1-mov") == 0)

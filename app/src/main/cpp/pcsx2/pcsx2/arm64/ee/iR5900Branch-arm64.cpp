@@ -110,27 +110,34 @@ static u8* recSetBranchEQExact_emit_oaknut()
 	};
 
 	recBeginOaknutEmit();
+	auto compare_constant = [&](int host_gpr, int host_xmm, int guest_gpr, int constant_gpr) {
+		const oak::XReg operand = get_operand(host_gpr, host_xmm, guest_gpr, OAK_XSCRATCH);
+		const u64 constant = g_cpuConstRegs[constant_gpr].UD[0];
+		if (constant <= 4095)
+		{
+			oakAsm->CMP(operand, constant);
+		}
+		else
+		{
+			const int constant_xmm = _checkXMMreg(XMMTYPE_GPRREG, constant_gpr, MODE_READ);
+			if (constant_xmm >= 0)
+				oakAsm->FMOV(OAK_XSCRATCH2, oakDRegister(constant_xmm));
+			else
+				oakAsm->MOV(OAK_XSCRATCH2, constant);
+			oakAsm->CMP(operand, OAK_XSCRATCH2);
+		}
+	};
 	if constexpr ((Process & PROCESS_CONSTS) != 0)
 	{
 		const int regt = _checkX86reg(X86TYPE_GPR, _Rt_, MODE_READ);
 		const int regtxmm = (regt < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rt_, MODE_READ) : -1;
-		const int constsxmm = _checkXMMreg(XMMTYPE_GPRREG, _Rs_, MODE_READ);
-		if (constsxmm >= 0)
-			oakAsm->FMOV(OAK_XSCRATCH2, oakDRegister(constsxmm));
-		else
-			oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rs_].UD[0]);
-		oakAsm->CMP(get_operand(regt, regtxmm, _Rt_, OAK_XSCRATCH), OAK_XSCRATCH2);
+		compare_constant(regt, regtxmm, _Rt_, _Rs_);
 	}
 	else if constexpr ((Process & PROCESS_CONSTT) != 0)
 	{
 		const int regs = _checkX86reg(X86TYPE_GPR, _Rs_, MODE_READ);
 		const int regsxmm = (regs < 0) ? _checkXMMreg(XMMTYPE_GPRREG, _Rs_, MODE_READ) : -1;
-		const int consttxmm = _checkXMMreg(XMMTYPE_GPRREG, _Rt_, MODE_READ);
-		if (consttxmm >= 0)
-			oakAsm->FMOV(OAK_XSCRATCH2, oakDRegister(consttxmm));
-		else
-			oakAsm->MOV(OAK_XSCRATCH2, g_cpuConstRegs[_Rt_].UD[0]);
-		oakAsm->CMP(get_operand(regs, regsxmm, _Rs_, OAK_XSCRATCH), OAK_XSCRATCH2);
+		compare_constant(regs, regsxmm, _Rs_, _Rt_);
 	}
 	else
 	{
