@@ -2903,4 +2903,15 @@
     <string name="shader_prep_error_internal_error">शेडर तैयार करते समय त्रुटि हुई।</string>
     <string name="gamedb_setting_coalesce_render_passes">रेंडर पास को संयोजित करें</string>
     <string name="gamedb_setting_copy_road_maximum_blending">रेंडर लक्ष्य कॉपी करते समय अधिकतम ब्लेंडिंग स्तर</string>
+
+    <string name="home_game_menu_restore_cover">डिफ़ॉल्ट कवर बहाल करें</string>
+    <string name="home_game_menu_restore_cover_success">डिफ़ॉल्ट कवर बहाल हो गया।</string>
+    <string name="home_game_menu_restore_cover_failed">डिफ़ॉल्ट कवर बहाल नहीं किया जा सका।</string>
+    <string name="settings_reset_custom_covers">कस्टम कवर रीसेट करें</string>
+    <string name="settings_reset_custom_covers_desc">सभी गेम के डिफ़ॉल्ट कवर बहाल करें।</string>
+    <string name="settings_reset_custom_covers_confirm_title">सभी कस्टम कवर रीसेट करें?</string>
+    <string name="settings_reset_custom_covers_confirm_body">कस्टम कवर लाइब्रेरी से हटाकर उनकी जगह डिफ़ॉल्ट कवर लगा दिए जाएँगे। आपकी मूल तस्वीरें और गेम की फ़ाइलें सुरक्षित रहेंगी।</string>
+    <string name="settings_reset_custom_covers_action">रीसेट करें</string>
+    <string name="settings_reset_custom_covers_success">कस्टम कवर रीसेट हो गए।</string>
+    <string name="settings_reset_custom_covers_partial">कुछ कस्टम कवर रीसेट नहीं किए जा सके। कृपया फिर कोशिश करें।</string>
 </resources>

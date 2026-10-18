@@ -103,6 +103,7 @@ internal fun HomeShelfMode(
     onLongClickHide: (GameItem) -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: (GameItem) -> Unit,
+    onLongClickRestoreCover: (GameItem) -> Unit,
     onLongClickChangeSerial: ((GameItem) -> Unit)? = null
 ) {
     if (games.isEmpty()) {
@@ -275,6 +276,7 @@ internal fun HomeShelfMode(
                                 onLongClickHide = { onLongClickHide(game) },
                                 onShowHiddenGames = onShowHiddenGames,
                                 onLongClickCustomCover = { onLongClickCustomCover(game) },
+                                onLongClickRestoreCover = { onLongClickRestoreCover(game) },
                                 onLongClickChangeSerial = onLongClickChangeSerial?.let { action ->
                                     { action(game) }
                                 },
@@ -494,6 +496,7 @@ private fun ShelfCoverCard(
     onLongClickHide: () -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
+    onLongClickRestoreCover: () -> Unit,
     onLongClickChangeSerial: (() -> Unit)?,
     onNavigateLeft: () -> Unit,
     onNavigateRight: () -> Unit
@@ -589,6 +592,7 @@ private fun ShelfCoverCard(
     }
 
     GameCardContextMenu(
+        game = game,
         expanded = showMenu.value,
         offset = DpOffset.Zero,
         onDismiss = { showMenu.value = false },
@@ -599,6 +603,7 @@ private fun ShelfCoverCard(
         onCreateShortcut = { dismissMenu(onLongClickCreateShortcut) },
         onOpenGameDb = { dismissMenu(onLongClickOpenGameDb) },
         onCustomCover = { dismissMenu(onLongClickCustomCover) },
+        onRestoreCover = { dismissMenu(onLongClickRestoreCover) },
         onHide = { dismissMenu(onLongClickHide) },
         onShowHiddenGames = onShowHiddenGames?.let { action -> { dismissMenu(action) } },
         onChangeSerial = onLongClickChangeSerial?.let { action -> { dismissMenu(action) } }

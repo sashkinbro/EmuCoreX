@@ -2903,4 +2903,15 @@
     <string name="shader_prep_error_internal_error">Si è verificato un errore durante la preparazione degli shader.</string>
     <string name="gamedb_setting_coalesce_render_passes">Unisci i passaggi di rendering</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Livello massimo di blending durante la copia del render target</string>
+
+    <string name="home_game_menu_restore_cover">Ripristina copertina predefinita</string>
+    <string name="home_game_menu_restore_cover_success">Copertina predefinita ripristinata.</string>
+    <string name="home_game_menu_restore_cover_failed">Impossibile ripristinare la copertina predefinita.</string>
+    <string name="settings_reset_custom_covers">Reimposta copertine personalizzate</string>
+    <string name="settings_reset_custom_covers_desc">Ripristina le copertine predefinite di tutti i giochi.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Reimpostare tutte le copertine personalizzate?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Le copertine personalizzate saranno rimosse dalla libreria e sostituite con quelle predefinite. Le immagini originali e i file dei giochi saranno conservati.</string>
+    <string name="settings_reset_custom_covers_action">Reimposta</string>
+    <string name="settings_reset_custom_covers_success">Copertine personalizzate reimpostate.</string>
+    <string name="settings_reset_custom_covers_partial">Impossibile reimpostare alcune copertine personalizzate. Riprova.</string>
 </resources>

@@ -9,14 +9,20 @@ import java.util.Locale
 
 class CustomGameCoverRepository(context: Context) {
 
+    private companion object {
+        // Home and Settings use separate repository instances for the same files.
+        val filesLock = Any()
+        val savedCoverName = Regex("[a-f0-9]{40}\\..+")
+    }
+
     private val appContext = context.applicationContext
     private val directory by lazy {
         File(appContext.filesDir, "library/custom-game-covers").apply { mkdirs() }
     }
 
-    fun findCustomCoverPath(gamePath: String): String? {
+    fun findCustomCoverPath(gamePath: String): String? = synchronized(filesLock) {
         val key = stableKey(gamePath)
-        return directory
+        directory
             .listFiles()
             .orEmpty()
             .filter {
@@ -29,13 +35,13 @@ class CustomGameCoverRepository(context: Context) {
             ?.absolutePath
     }
 
-    fun saveCustomCover(gamePath: String, sourceUri: Uri): String? {
+    fun saveCustomCover(gamePath: String, sourceUri: Uri): String? = synchronized(filesLock) {
         val key = stableKey(gamePath)
         val extension = resolveExtension(sourceUri)
         val targetFile = File(directory, "$key.$extension")
         val tempFile = File(directory, "$key.$extension.tmp")
 
-        return runCatching {
+        runCatching {
             directory.mkdirs()
             if (tempFile.exists()) {
                 tempFile.delete()
@@ -44,11 +50,11 @@ class CustomGameCoverRepository(context: Context) {
                 tempFile.outputStream().use { output ->
                     input.copyTo(output)
                 }
-            } ?: return null
+            } ?: return@runCatching null
 
             if (tempFile.length() <= 0L) {
                 tempFile.delete()
-                return null
+                return@runCatching null
             }
 
             existingFiles(key).forEach { existing ->
@@ -70,12 +76,31 @@ class CustomGameCoverRepository(context: Context) {
         }.getOrNull()
     }
 
+    fun removeCustomCover(gamePath: String): Boolean = synchronized(filesLock) {
+        val files = directory.listFiles() ?: return@synchronized !directory.exists()
+        val prefix = "${stableKey(gamePath)}."
+        deleteCoverFiles(files.filter { it.isFile && it.name.startsWith(prefix) && !it.name.endsWith(".tmp") })
+    }
+
+    fun resetAllCustomCovers(): Boolean = synchronized(filesLock) {
+        val files = directory.listFiles() ?: return@synchronized !directory.exists()
+        deleteCoverFiles(files.filter {
+            it.isFile && savedCoverName.matches(it.name) && !it.name.endsWith(".tmp")
+        })
+    }
+
+    private fun deleteCoverFiles(files: List<File>): Boolean =
+        files.map { file -> runCatching { !file.exists() || file.delete() }.getOrDefault(false) }.all { it }
+
     fun isCustomCoverPath(coverPath: String?): Boolean {
         if (coverPath.isNullOrBlank()) return false
         return runCatching {
             File(coverPath).absolutePath.startsWith(directory.absolutePath, ignoreCase = true)
         }.getOrDefault(false)
     }
+
+    fun isMissingCustomCover(coverPath: String?): Boolean =
+        isCustomCoverPath(coverPath) && !File(coverPath!!).isFile
 
     private fun existingFiles(key: String): List<File> {
         return directory

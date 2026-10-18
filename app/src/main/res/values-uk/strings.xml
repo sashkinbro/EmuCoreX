@@ -2907,4 +2907,15 @@
     <string name="shader_prep_error_internal_error">Під час підготовки шейдерів сталася помилка.</string>
     <string name="gamedb_setting_coalesce_render_passes">Об’єднувати проходи рендерингу</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Максимальний рівень змішування під час копіювання цілі рендерингу</string>
+
+    <string name="home_game_menu_restore_cover">Повернути стандартну обкладинку</string>
+    <string name="home_game_menu_restore_cover_success">Стандартну обкладинку відновлено.</string>
+    <string name="home_game_menu_restore_cover_failed">Не вдалося відновити стандартну обкладинку.</string>
+    <string name="settings_reset_custom_covers">Скинути власні обкладинки</string>
+    <string name="settings_reset_custom_covers_desc">Повернути стандартні обкладинки для всіх ігор.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Скинути всі власні обкладинки?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Власні обкладинки буде видалено з бібліотеки й замінено стандартними. Оригінальні зображення та файли ігор збережуться.</string>
+    <string name="settings_reset_custom_covers_action">Скинути</string>
+    <string name="settings_reset_custom_covers_success">Власні обкладинки скинуто.</string>
+    <string name="settings_reset_custom_covers_partial">Деякі власні обкладинки не вдалося скинути. Спробуйте ще раз.</string>
 </resources>

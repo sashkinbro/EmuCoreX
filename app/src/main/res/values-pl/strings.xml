@@ -2925,4 +2925,15 @@
     <string name="shader_prep_error_internal_error">Podczas przygotowania shaderów wystąpił błąd.</string>
     <string name="gamedb_setting_coalesce_render_passes">Scalaj przebiegi renderowania</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Maksymalny poziom mieszania podczas kopiowania celu renderowania</string>
+
+    <string name="home_game_menu_restore_cover">Przywróć domyślną okładkę</string>
+    <string name="home_game_menu_restore_cover_success">Przywrócono domyślną okładkę.</string>
+    <string name="home_game_menu_restore_cover_failed">Nie udało się przywrócić domyślnej okładki.</string>
+    <string name="settings_reset_custom_covers">Zresetuj własne okładki</string>
+    <string name="settings_reset_custom_covers_desc">Przywróć domyślne okładki wszystkich gier.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Zresetować wszystkie własne okładki?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Własne okładki zostaną usunięte z biblioteki i zastąpione domyślnymi. Oryginalne obrazy i pliki gier zostaną zachowane.</string>
+    <string name="settings_reset_custom_covers_action">Resetuj</string>
+    <string name="settings_reset_custom_covers_success">Własne okładki zostały zresetowane.</string>
+    <string name="settings_reset_custom_covers_partial">Nie udało się zresetować niektórych własnych okładek. Spróbuj ponownie.</string>
 </resources>

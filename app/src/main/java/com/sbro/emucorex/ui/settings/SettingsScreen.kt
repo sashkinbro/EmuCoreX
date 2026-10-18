@@ -306,6 +306,7 @@ fun SettingsScreen(
     val showCoverUrlDialog = remember { mutableStateOf(false) }
     var editingArcadeCoverUrl by remember { mutableStateOf(false) }
     var showClearCoverCacheDialog by rememberSaveable { mutableStateOf(false) }
+    var showResetCustomCoversDialog by rememberSaveable { mutableStateOf(false) }
     var showNamcoArcadeGuide by rememberSaveable { mutableStateOf(false) }
     var showGamepadAssignmentDialog by rememberSaveable { mutableStateOf(false) }
     val showBiosDialog = remember { mutableStateOf(false) }
@@ -332,6 +333,8 @@ fun SettingsScreen(
     val coverUrlInvalidMessage = stringResource(R.string.settings_cover_download_url_invalid)
     val coverCacheClearedMessage = stringResource(R.string.settings_clear_cover_cache_success)
     val coverCachePartiallyClearedMessage = stringResource(R.string.settings_clear_cover_cache_partial)
+    val customCoversResetMessage = stringResource(R.string.settings_reset_custom_covers_success)
+    val customCoversResetFailedMessage = stringResource(R.string.settings_reset_custom_covers_partial)
     stringResource(R.string.settings_not_set)
     val settingsScrollState = rememberScrollState()
     val proPurchaseMessage = uiState.proPurchaseMessageResId?.let { stringResource(it) }
@@ -586,6 +589,7 @@ fun SettingsScreen(
                 },
                 onOpenNamcoArcadeGuide = { showNamcoArcadeGuide = true },
                 onClearCoverCache = { showClearCoverCacheDialog = true },
+                onResetCustomCovers = { showResetCustomCoversDialog = true },
                 launchSettingsBackupExport = {
                     includeSaveStatesInBackup = false
                     showBackupExportDialog = true
@@ -781,6 +785,42 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearCoverCacheDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showResetCustomCoversDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetCustomCoversDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.DeleteOutline,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text(stringResource(R.string.settings_reset_custom_covers_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_reset_custom_covers_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetCustomCoversDialog = false
+                        viewModel.resetCustomCovers { result ->
+                            Toast.makeText(
+                                context,
+                                if (result) customCoversResetMessage else customCoversResetFailedMessage,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.settings_reset_custom_covers_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetCustomCoversDialog = false }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             }
@@ -1190,6 +1230,7 @@ private fun SettingsContent(
     onOpenArcadeCoverUrlEditor: () -> Unit,
     onOpenNamcoArcadeGuide: () -> Unit,
     onClearCoverCache: () -> Unit,
+    onResetCustomCovers: () -> Unit,
     launchSettingsBackupExport: () -> Unit,
     launchSettingsBackupImport: () -> Unit,
     launchCloudBackup: () -> Unit,
@@ -2686,6 +2727,12 @@ private fun SettingsContent(
                             label = stringResource(R.string.settings_clear_cover_cache),
                             value = stringResource(R.string.settings_clear_cover_cache_desc),
                             onClick = onClearCoverCache
+                        )
+                        SettingsItem(
+                            icon = Icons.Rounded.Restore,
+                            label = stringResource(R.string.settings_reset_custom_covers),
+                            value = stringResource(R.string.settings_reset_custom_covers_desc),
+                            onClick = onResetCustomCovers
                         )
                     }
 
@@ -5713,6 +5760,7 @@ private fun rememberSettingsSearchEntries(): List<SettingsSearchEntry> {
         entry(SettingsTab.Library, R.string.settings_cover_art_style),
         entry(SettingsTab.Library, R.string.settings_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_clear_cover_cache),
+        entry(SettingsTab.Library, R.string.settings_reset_custom_covers),
         entry(SettingsTab.Arcade, R.string.namco_guide_title),
         entry(SettingsTab.Arcade, R.string.settings_arcade_cover_download_url),
         entry(SettingsTab.Library, R.string.settings_backup_export_title),

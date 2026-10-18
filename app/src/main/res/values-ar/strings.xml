@@ -2907,4 +2907,15 @@
     <string name="shader_prep_error_internal_error">حدث خطأ أثناء تحضير المظللات.</string>
     <string name="gamedb_setting_coalesce_render_passes">دمج مراحل العرض</string>
     <string name="gamedb_setting_copy_road_maximum_blending">أقصى مستوى مزج عند نسخ هدف العرض</string>
+
+    <string name="home_game_menu_restore_cover">استعادة الغلاف الافتراضي</string>
+    <string name="home_game_menu_restore_cover_success">تمت استعادة الغلاف الافتراضي.</string>
+    <string name="home_game_menu_restore_cover_failed">تعذرت استعادة الغلاف الافتراضي.</string>
+    <string name="settings_reset_custom_covers">إعادة ضبط الأغلفة المخصصة</string>
+    <string name="settings_reset_custom_covers_desc">استعادة الأغلفة الافتراضية لجميع الألعاب.</string>
+    <string name="settings_reset_custom_covers_confirm_title">هل تريد إعادة ضبط جميع الأغلفة المخصصة؟</string>
+    <string name="settings_reset_custom_covers_confirm_body">ستُزال الأغلفة المخصصة من المكتبة وتُستبدل بالأغلفة الافتراضية. ستُحفظ الصور الأصلية وملفات الألعاب.</string>
+    <string name="settings_reset_custom_covers_action">إعادة الضبط</string>
+    <string name="settings_reset_custom_covers_success">تمت إعادة ضبط الأغلفة المخصصة.</string>
+    <string name="settings_reset_custom_covers_partial">تعذرت إعادة ضبط بعض الأغلفة المخصصة. يُرجى المحاولة مجددًا.</string>
 </resources>

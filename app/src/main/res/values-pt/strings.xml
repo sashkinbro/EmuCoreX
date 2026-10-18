@@ -2905,4 +2905,15 @@
     <string name="shader_prep_error_internal_error">Ocorreu um erro durante a preparação de shaders.</string>
     <string name="gamedb_setting_coalesce_render_passes">Agrupar passagens de renderização</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Nível máximo de mistura ao copiar o destino de renderização</string>
+
+    <string name="home_game_menu_restore_cover">Restaurar capa padrão</string>
+    <string name="home_game_menu_restore_cover_success">Capa padrão restaurada.</string>
+    <string name="home_game_menu_restore_cover_failed">Não foi possível restaurar a capa padrão.</string>
+    <string name="settings_reset_custom_covers">Redefinir capas personalizadas</string>
+    <string name="settings_reset_custom_covers_desc">Restaurar as capas padrão de todos os jogos.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Redefinir todas as capas personalizadas?</string>
+    <string name="settings_reset_custom_covers_confirm_body">As capas personalizadas serão removidas da biblioteca e substituídas pelas capas padrão. As imagens originais e os arquivos dos jogos serão preservados.</string>
+    <string name="settings_reset_custom_covers_action">Redefinir</string>
+    <string name="settings_reset_custom_covers_success">Capas personalizadas redefinidas.</string>
+    <string name="settings_reset_custom_covers_partial">Não foi possível redefinir algumas capas personalizadas. Tente novamente.</string>
 </resources>

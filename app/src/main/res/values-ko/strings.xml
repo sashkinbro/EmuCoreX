@@ -2902,4 +2902,15 @@
     <string name="shader_prep_error_internal_error">셰이더 준비 중 오류가 발생했습니다.</string>
     <string name="gamedb_setting_coalesce_render_passes">렌더 패스 병합</string>
     <string name="gamedb_setting_copy_road_maximum_blending">렌더 타깃 복사 시 최대 블렌딩 단계</string>
+
+    <string name="home_game_menu_restore_cover">기본 커버로 되돌리기</string>
+    <string name="home_game_menu_restore_cover_success">기본 커버로 되돌렸습니다.</string>
+    <string name="home_game_menu_restore_cover_failed">기본 커버로 되돌리지 못했습니다.</string>
+    <string name="settings_reset_custom_covers">사용자 지정 커버 초기화</string>
+    <string name="settings_reset_custom_covers_desc">모든 게임의 커버를 기본 커버로 되돌립니다.</string>
+    <string name="settings_reset_custom_covers_confirm_title">모든 사용자 지정 커버를 초기화할까요?</string>
+    <string name="settings_reset_custom_covers_confirm_body">라이브러리에서 사용자 지정 커버를 삭제하고 기본 커버로 되돌립니다. 원본 이미지와 게임 파일은 유지됩니다.</string>
+    <string name="settings_reset_custom_covers_action">초기화</string>
+    <string name="settings_reset_custom_covers_success">사용자 지정 커버를 초기화했습니다.</string>
+    <string name="settings_reset_custom_covers_partial">일부 사용자 지정 커버를 초기화하지 못했습니다. 다시 시도해 주세요.</string>
 </resources>

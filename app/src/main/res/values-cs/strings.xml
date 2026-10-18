@@ -2923,4 +2923,15 @@
     <string name="shader_prep_error_internal_error">Při přípravě shaderů došlo k chybě.</string>
     <string name="gamedb_setting_coalesce_render_passes">Sloučit vykreslovací průchody</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Maximální úroveň prolínání při kopírování renderovacího cíle</string>
+
+    <string name="home_game_menu_restore_cover">Obnovit výchozí obal</string>
+    <string name="home_game_menu_restore_cover_success">Výchozí obal byl obnoven.</string>
+    <string name="home_game_menu_restore_cover_failed">Výchozí obal se nepodařilo obnovit.</string>
+    <string name="settings_reset_custom_covers">Obnovit výchozí obaly</string>
+    <string name="settings_reset_custom_covers_desc">Obnovit výchozí obaly všech her.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Obnovit výchozí obaly u všech her?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Vlastní obaly budou odebrány z knihovny a nahrazeny výchozími. Původní obrázky a soubory her zůstanou zachovány.</string>
+    <string name="settings_reset_custom_covers_action">Obnovit</string>
+    <string name="settings_reset_custom_covers_success">Vlastní obaly byly nahrazeny výchozími.</string>
+    <string name="settings_reset_custom_covers_partial">U některých her se nepodařilo obnovit výchozí obal. Zkuste to znovu.</string>
 </resources>

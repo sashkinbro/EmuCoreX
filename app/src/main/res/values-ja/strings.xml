@@ -2902,4 +2902,15 @@
     <string name="shader_prep_error_internal_error">シェーダーの準備中にエラーが発生しました。</string>
     <string name="gamedb_setting_coalesce_render_passes">レンダーパスを統合</string>
     <string name="gamedb_setting_copy_road_maximum_blending">レンダーターゲットのコピー時の最大ブレンドレベル</string>
+
+    <string name="home_game_menu_restore_cover">標準のカバーに戻す</string>
+    <string name="home_game_menu_restore_cover_success">標準のカバーに戻しました。</string>
+    <string name="home_game_menu_restore_cover_failed">標準のカバーに戻せませんでした。</string>
+    <string name="settings_reset_custom_covers">カスタムカバーをリセット</string>
+    <string name="settings_reset_custom_covers_desc">すべてのゲームを標準のカバーに戻します。</string>
+    <string name="settings_reset_custom_covers_confirm_title">すべてのカスタムカバーをリセットしますか？</string>
+    <string name="settings_reset_custom_covers_confirm_body">カスタムカバーをライブラリから削除し、標準のカバーに戻します。元の画像とゲームファイルは保持されます。</string>
+    <string name="settings_reset_custom_covers_action">リセット</string>
+    <string name="settings_reset_custom_covers_success">カスタムカバーをリセットしました。</string>
+    <string name="settings_reset_custom_covers_partial">一部のカスタムカバーをリセットできませんでした。もう一度お試しください。</string>
 </resources>

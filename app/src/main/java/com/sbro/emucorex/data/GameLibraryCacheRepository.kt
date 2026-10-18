@@ -25,6 +25,7 @@ class GameLibraryCacheRepository(context: Context) {
     private val appContext = context.applicationContext
     private val compatibilityRepository = Pcsx2CompatibilityRepository(appContext)
     private val preferences = AppPreferences(appContext)
+    private val customCovers = CustomGameCoverRepository(appContext)
     private val cacheFile = File(appContext.filesDir, "library/game_library_cache.json")
     private val lock = Any()
 
@@ -75,7 +76,8 @@ class GameLibraryCacheRepository(context: Context) {
                                 fileName = fileName,
                                 fileSize = fileSize,
                                 lastModified = game.optLong("last_modified"),
-                                coverArtPath = game.optString("cover_art_path").takeIf { it.isNotBlank() },
+                                coverArtPath = game.optString("cover_art_path").takeIf { it.isNotBlank() }
+                                    ?.takeUnless(customCovers::isMissingCustomCover),
                                 serial = serial,
                                 pcsx2Compatibility = compatibilityRepository.findBySerial(serial)
                             )

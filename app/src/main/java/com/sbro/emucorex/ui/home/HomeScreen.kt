@@ -353,6 +353,15 @@ fun HomeScreen(
     }
     val customCoverAppliedMessage = stringResource(R.string.home_game_menu_custom_cover_applied)
     val customCoverFailedMessage = stringResource(R.string.home_game_menu_custom_cover_failed)
+    val defaultCoverRestoredMessage = stringResource(R.string.home_game_menu_restore_cover_success)
+    val defaultCoverFailedMessage = stringResource(R.string.home_game_menu_restore_cover_failed)
+    val restoreCustomCover: (GameItem) -> Unit = { game ->
+        scope.launch {
+            val success = viewModel.resetCustomCover(game)
+            Toast.makeText(context, if (success) defaultCoverRestoredMessage else defaultCoverFailedMessage,
+                Toast.LENGTH_SHORT).show()
+        }
+    }
     val customCoverPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -532,6 +541,7 @@ fun HomeScreen(
                         onLongClickCustomCover = { game ->
                             gameAwaitingPickerLaunch = game
                         },
+                        onLongClickRestoreCover = { game -> restoreCustomCover(game) },
                         onLongClickChangeSerial = requestSerialChange
                     )
                 } else {
@@ -641,6 +651,7 @@ fun HomeScreen(
                                                         onLongClickCustomCover = {
                                                             gameAwaitingPickerLaunch = game
                                                         },
+                                                        onLongClickRestoreCover = { restoreCustomCover(game) },
                                                         onLongClickChangeSerial = requestSerialChange?.let { action ->
                                                             { action(game) }
                                                         },
@@ -700,6 +711,7 @@ fun HomeScreen(
                                                                     onLongClickCustomCover = {
                                                                         gameAwaitingPickerLaunch = game
                                                                     },
+                                                                    onLongClickRestoreCover = { restoreCustomCover(game) },
                                                                     onLongClickChangeSerial = requestSerialChange?.let { action ->
                                                                         { action(game) }
                                                                     }
@@ -721,6 +733,7 @@ fun HomeScreen(
                                                                     onLongClickCustomCover = {
                                                                         gameAwaitingPickerLaunch = game
                                                                     },
+                                                                    onLongClickRestoreCover = { restoreCustomCover(game) },
                                                                     onLongClickChangeSerial = requestSerialChange?.let { action ->
                                                                         { action(game) }
                                                                     }
@@ -1629,6 +1642,7 @@ private fun RecentGameCard(
     onLongClickHide: () -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
+    onLongClickRestoreCover: () -> Unit,
     onLongClickChangeSerial: (() -> Unit)?,
     compact: Boolean,
     coverScale: Float
@@ -1708,6 +1722,7 @@ private fun RecentGameCard(
                 .padding(end = 8.dp, bottom = 8.dp)
         ) {
             GameCardContextMenu(
+                game = game,
                 expanded = showMenu,
                 offset = DpOffset(x = 0.dp, y = 10.dp),
                 onDismiss = { showMenu = false },
@@ -1746,6 +1761,10 @@ private fun RecentGameCard(
                     showMenu = false
                     onLongClickCustomCover()
                 },
+                onRestoreCover = {
+                    showMenu = false
+                    onLongClickRestoreCover()
+                },
                 onChangeSerial = onLongClickChangeSerial?.let { action ->
                     { showMenu = false; action() }
                 }
@@ -1770,6 +1789,7 @@ private fun GameCard(
     onLongClickHide: () -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
+    onLongClickRestoreCover: () -> Unit,
     onLongClickChangeSerial: (() -> Unit)?
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
@@ -1854,6 +1874,7 @@ private fun GameCard(
                 .padding(end = 8.dp, bottom = 8.dp)
         ) {
             GameCardContextMenu(
+                game = game,
                 expanded = showMenu,
                 offset = DpOffset(x = 0.dp, y = 10.dp),
                 onDismiss = { showMenu = false },
@@ -1892,6 +1913,10 @@ private fun GameCard(
                     showMenu = false
                     onLongClickCustomCover()
                 },
+                onRestoreCover = {
+                    showMenu = false
+                    onLongClickRestoreCover()
+                },
                 onChangeSerial = onLongClickChangeSerial?.let { action ->
                     { showMenu = false; action() }
                 }
@@ -1916,6 +1941,7 @@ private fun GameListCard(
     onLongClickHide: () -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onLongClickCustomCover: () -> Unit,
+    onLongClickRestoreCover: () -> Unit,
     onLongClickChangeSerial: (() -> Unit)?
 ) {
     val debouncedClick = rememberDebouncedClick(onClick = onClick)
@@ -2012,6 +2038,7 @@ private fun GameListCard(
                 .padding(end = 8.dp, bottom = 8.dp)
         ) {
             GameCardContextMenu(
+                game = game,
                 expanded = showMenu,
                 offset = DpOffset.Zero,
                 onDismiss = { showMenu = false },
@@ -2049,6 +2076,10 @@ private fun GameListCard(
                 onCustomCover = {
                     showMenu = false
                     onLongClickCustomCover()
+                },
+                onRestoreCover = {
+                    showMenu = false
+                    onLongClickRestoreCover()
                 },
                 onChangeSerial = onLongClickChangeSerial?.let { action ->
                     { showMenu = false; action() }
@@ -2162,6 +2193,7 @@ private fun HiddenGamesDialog(
 
 @Composable
 internal fun GameCardContextMenu(
+    game: GameItem,
     expanded: Boolean,
     offset: DpOffset,
     onDismiss: () -> Unit,
@@ -2172,10 +2204,16 @@ internal fun GameCardContextMenu(
     onCreateShortcut: () -> Unit,
     onOpenGameDb: () -> Unit,
     onCustomCover: () -> Unit,
+    onRestoreCover: () -> Unit,
     onHide: () -> Unit,
     onShowHiddenGames: (() -> Unit)?,
     onChangeSerial: (() -> Unit)?
 ) {
+    val context = LocalContext.current
+    val customCovers = remember(context) { CustomGameCoverRepository(context) }
+    val hasCustomCover = remember(game.coverArtPath, customCovers) {
+        customCovers.isCustomCoverPath(game.coverArtPath)
+    }
     DropdownMenu(
         expanded = expanded,
         offset = offset,
@@ -2229,6 +2267,11 @@ internal fun GameCardContextMenu(
             text = stringResource(R.string.home_game_menu_custom_cover),
             icon = Icons.Rounded.Image,
             onClick = onCustomCover
+        )
+        if (hasCustomCover) GameContextMenuItem(
+            text = stringResource(R.string.home_game_menu_restore_cover),
+            icon = Icons.Rounded.Restore,
+            onClick = onRestoreCover
         )
         GameContextMenuDivider()
         GameContextMenuItem(

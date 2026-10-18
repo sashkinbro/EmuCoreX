@@ -2904,4 +2904,15 @@
     <string name="shader_prep_error_internal_error">准备着色器时发生错误。</string>
     <string name="gamedb_setting_coalesce_render_passes">合并渲染阶段</string>
     <string name="gamedb_setting_copy_road_maximum_blending">复制渲染目标时的最大混合级别</string>
+
+    <string name="home_game_menu_restore_cover">恢复默认封面</string>
+    <string name="home_game_menu_restore_cover_success">已恢复默认封面。</string>
+    <string name="home_game_menu_restore_cover_failed">无法恢复默认封面。</string>
+    <string name="settings_reset_custom_covers">重置自定义封面</string>
+    <string name="settings_reset_custom_covers_desc">将所有游戏的封面恢复为默认封面。</string>
+    <string name="settings_reset_custom_covers_confirm_title">重置所有自定义封面？</string>
+    <string name="settings_reset_custom_covers_confirm_body">自定义封面将从游戏库中移除并替换为默认封面。原始图片和游戏文件将保留。</string>
+    <string name="settings_reset_custom_covers_action">重置</string>
+    <string name="settings_reset_custom_covers_success">已重置自定义封面。</string>
+    <string name="settings_reset_custom_covers_partial">部分自定义封面无法重置，请重试。</string>
 </resources>

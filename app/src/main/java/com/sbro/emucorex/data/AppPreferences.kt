@@ -599,6 +599,7 @@ class AppPreferences(private val context: Context) {
         private val EMULATION_SIDE_ARTWORK_DIM = intPreferencesKey("emulation_side_artwork_dim")
         private val LOCAL_MULTIPLAYER_MODE = intPreferencesKey("local_multiplayer_mode")
         private val COVER_CACHE_REVISION = intPreferencesKey("cover_cache_revision")
+        private val CUSTOM_COVERS_REVISION = intPreferencesKey("custom_covers_revision")
         private val TOUCH_CONTROL_VISUAL_STYLE = intPreferencesKey("touch_control_visual_style")
         private val TOUCH_CONTROL_PRESS_EFFECT = intPreferencesKey("touch_control_press_effect")
         private val CUSTOM_TOUCH_CONTROLS_JSON = stringPreferencesKey("custom_touch_controls_json")
@@ -985,6 +986,10 @@ class AppPreferences(private val context: Context) {
         .map { prefs -> (prefs[COVER_CACHE_REVISION] ?: 0).coerceAtLeast(0) }
         .distinctUntilChanged()
 
+    val customCoversRevision: Flow<Int> = context.dataStore.data
+        .map { prefs -> (prefs[CUSTOM_COVERS_REVISION] ?: 0).coerceAtLeast(0) }
+        .distinctUntilChanged()
+
     val touchControlVisualStyle: Flow<TouchControlVisualStyle> = context.dataStore.data
         .map { prefs -> TouchControlVisualStyle.fromPreference(prefs[TOUCH_CONTROL_VISUAL_STYLE]) }
         .distinctUntilChanged()
@@ -1168,6 +1173,12 @@ class AppPreferences(private val context: Context) {
     suspend fun notifyCoverCacheCleared() {
         context.dataStore.edit { prefs ->
             prefs[COVER_CACHE_REVISION] = (prefs[COVER_CACHE_REVISION] ?: 0) + 1
+        }
+    }
+
+    suspend fun notifyCustomCoversReset() {
+        context.dataStore.edit { prefs ->
+            prefs[CUSTOM_COVERS_REVISION] = (prefs[CUSTOM_COVERS_REVISION] ?: 0) + 1
         }
     }
 

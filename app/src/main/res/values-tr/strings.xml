@@ -2903,4 +2903,15 @@
     <string name="shader_prep_error_internal_error">Gölgelendirici hazırlığı sırasında bir hata oluştu.</string>
     <string name="gamedb_setting_coalesce_render_passes">İşleme geçişlerini birleştir</string>
     <string name="gamedb_setting_copy_road_maximum_blending">İşleme hedefi kopyalanırken en yüksek harmanlama düzeyi</string>
+
+    <string name="home_game_menu_restore_cover">Varsayılan kapağı geri yükle</string>
+    <string name="home_game_menu_restore_cover_success">Varsayılan kapak geri yüklendi.</string>
+    <string name="home_game_menu_restore_cover_failed">Varsayılan kapak geri yüklenemedi.</string>
+    <string name="settings_reset_custom_covers">Özel kapakları sıfırla</string>
+    <string name="settings_reset_custom_covers_desc">Tüm oyunların varsayılan kapaklarını geri yükle.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Tüm özel kapaklar sıfırlansın mı?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Özel kapaklar kütüphaneden kaldırılacak ve varsayılan kapaklarla değiştirilecek. Özgün görselleriniz ve oyun dosyalarınız korunacak.</string>
+    <string name="settings_reset_custom_covers_action">Sıfırla</string>
+    <string name="settings_reset_custom_covers_success">Özel kapaklar sıfırlandı.</string>
+    <string name="settings_reset_custom_covers_partial">Bazı özel kapaklar sıfırlanamadı. Lütfen tekrar deneyin.</string>
 </resources>

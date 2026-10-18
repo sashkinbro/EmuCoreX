@@ -2905,4 +2905,15 @@
     <string name="shader_prep_error_internal_error">Une erreur est survenue pendant la préparation des shaders.</string>
     <string name="gamedb_setting_coalesce_render_passes">Regrouper les passes de rendu</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Niveau maximal de fusion lors de la copie de la cible de rendu</string>
+
+    <string name="home_game_menu_restore_cover">Rétablir la jaquette par défaut</string>
+    <string name="home_game_menu_restore_cover_success">Jaquette par défaut rétablie.</string>
+    <string name="home_game_menu_restore_cover_failed">Impossible de rétablir la jaquette par défaut.</string>
+    <string name="settings_reset_custom_covers">Réinitialiser les jaquettes personnalisées</string>
+    <string name="settings_reset_custom_covers_desc">Rétablir les jaquettes par défaut de tous les jeux.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Réinitialiser toutes les jaquettes personnalisées ?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Les jaquettes personnalisées seront retirées de la bibliothèque et remplacées par les jaquettes par défaut. Vos images originales et les fichiers des jeux seront conservés.</string>
+    <string name="settings_reset_custom_covers_action">Réinitialiser</string>
+    <string name="settings_reset_custom_covers_success">Jaquettes personnalisées réinitialisées.</string>
+    <string name="settings_reset_custom_covers_partial">Certaines jaquettes personnalisées n’ont pas pu être réinitialisées. Veuillez réessayer.</string>
 </resources>

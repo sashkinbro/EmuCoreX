@@ -2905,4 +2905,15 @@
     <string name="shader_prep_error_internal_error">Bei der Shader-Vorbereitung ist ein Fehler aufgetreten.</string>
     <string name="gamedb_setting_coalesce_render_passes">Render-Pässe zusammenfassen</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Maximale Überblendungsstufe beim Kopieren des Renderziels</string>
+
+    <string name="home_game_menu_restore_cover">Standardcover wiederherstellen</string>
+    <string name="home_game_menu_restore_cover_success">Standardcover wiederhergestellt.</string>
+    <string name="home_game_menu_restore_cover_failed">Das Standardcover konnte nicht wiederhergestellt werden.</string>
+    <string name="settings_reset_custom_covers">Eigene Cover zurücksetzen</string>
+    <string name="settings_reset_custom_covers_desc">Standardcover für alle Spiele wiederherstellen.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Alle eigenen Cover zurücksetzen?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Eigene Cover werden aus der Bibliothek entfernt und durch Standardcover ersetzt. Die ursprünglichen Bilder und Spieldateien bleiben erhalten.</string>
+    <string name="settings_reset_custom_covers_action">Zurücksetzen</string>
+    <string name="settings_reset_custom_covers_success">Eigene Cover zurückgesetzt.</string>
+    <string name="settings_reset_custom_covers_partial">Einige eigene Cover konnten nicht zurückgesetzt werden. Bitte erneut versuchen.</string>
 </resources>

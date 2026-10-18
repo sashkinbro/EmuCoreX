@@ -134,6 +134,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var coverArtStyleInitialized = false
     private var coverBaseUrlInitialized = false
     private var coverCacheRevisionInitialized = false
+    private var customCoversRevisionInitialized = false
     private var currentCoverArtStyle = AppPreferences.COVER_ART_STYLE_3D
     private var currentCoverDownloadBaseUrl: String? = null
     private val scanMutex = Mutex()
@@ -387,6 +388,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+        viewModelScope.launch {
+            preferences.customCoversRevision.collect {
+                if (customCoversRevisionInitialized) handleCustomCoversReset()
+                else customCoversRevisionInitialized = true
+            }
+        }
     }
 
     fun onFolderSelected(uri: Uri) {
@@ -427,21 +434,51 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    suspend fun setCustomCover(game: GameItem, sourceUri: Uri): Boolean {
-        val customCoverPath = withContext(Dispatchers.IO) {
-            customGameCoverRepository.saveCustomCover(game.path, sourceUri)
-        } ?: return false
-
-        synchronized(this) {
-            allGames = allGames.map { current ->
-                if (current.path == game.path) current.copy(coverArtPath = customCoverPath) else current
+    suspend fun setCustomCover(game: GameItem, sourceUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        scanMutex.withLock {
+            val customCoverPath = customGameCoverRepository.saveCustomCover(game.path, sourceUri)
+                ?: return@withLock false
+            synchronized(this@HomeViewModel) {
+                // Reset may have removed the file after its save completed.
+                if (customGameCoverRepository.findCustomCoverPath(game.path) != customCoverPath)
+                    return@withLock false
+                allGames = allGames.map { current ->
+                    if (current.path == game.path) current.copy(coverArtPath = customCoverPath) else current
+                }
             }
+            publishVisibleGames()
+            currentLibraryRoot?.let { libraryCacheRepository.save(it, allGames, preferEnglishGameTitles) }
+            true
         }
-        publishVisibleGames()
-        currentLibraryRoot?.let { rootPath ->
-            libraryCacheRepository.save(rootPath, allGames, preferEnglishGameTitles)
+    }
+
+    suspend fun resetCustomCover(game: GameItem): Boolean = withContext(Dispatchers.IO) {
+        val result = customGameCoverRepository.removeCustomCover(game.path)
+        preferences.notifyCustomCoversReset()
+        result
+    }
+
+    private suspend fun handleCustomCoversReset() = withContext(Dispatchers.IO) {
+        scanMutex.withLock {
+            coverSyncJob?.cancel()
+            val context = getApplication<Application>()
+            val replacements = allGames.filter { customGameCoverRepository.isCustomCoverPath(it.coverArtPath) }
+                .associate { game ->
+                    game.path to (game.coverArtPath to repository.findCoverForGame(game.path, context, game.serial, game.title))
+                }
+            synchronized(this@HomeViewModel) {
+                allGames = allGames.map { game ->
+                    val replacement = replacements[game.path]
+                    if (replacement != null && game.coverArtPath == replacement.first &&
+                        customGameCoverRepository.findCustomCoverPath(game.path) == null) {
+                        game.copy(coverArtPath = replacement.second)
+                    } else game
+                }
+            }
+            publishVisibleGames()
+            currentLibraryRoot?.let { libraryCacheRepository.save(it, allGames, preferEnglishGameTitles) }
+            syncMissingCovers()
         }
-        return true
     }
 
     fun clearSerialMessage() {
@@ -722,7 +759,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         if (currentCoverArtStyle != AppPreferences.COVER_ART_STYLE_DISABLED &&
             cacheSnapshot.games.any {
                 it.serial.isNullOrBlank() || it.coverArtPath.isNullOrBlank() ||
-                    coverRepository.isMissingManagedCover(it.coverArtPath)
+                    coverRepository.isMissingManagedCover(it.coverArtPath) ||
+                    customGameCoverRepository.isMissingCustomCover(it.coverArtPath)
             }
         ) {
             return false
@@ -866,7 +904,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             var removedStalePaths = false
             synchronized(this@HomeViewModel) {
                 allGames = allGames.map { game ->
-                    if (coverRepository.isMissingManagedCover(game.coverArtPath)) {
+                    if (coverRepository.isMissingManagedCover(game.coverArtPath) ||
+                        customGameCoverRepository.isMissingCustomCover(game.coverArtPath)) {
                         removedStalePaths = true
                         game.copy(coverArtPath = null)
                     } else {
@@ -899,7 +938,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                             if (downloadedCover != null && downloadedCover != game.coverArtPath) {
                                 synchronized(this@HomeViewModel) {
                                     allGames = allGames.map {
-                                        if (it.path == game.path) it.copy(coverArtPath = downloadedCover) else it
+                                        if (it.path == game.path && !customGameCoverRepository.isCustomCoverPath(it.coverArtPath))
+                                            it.copy(coverArtPath = downloadedCover) else it
                                     }
                                 }
                                 publishVisibleGames()

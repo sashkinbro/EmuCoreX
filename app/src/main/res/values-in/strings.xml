@@ -2917,4 +2917,15 @@
     <string name="shader_prep_error_internal_error">Terjadi kesalahan saat menyiapkan shader.</string>
     <string name="gamedb_setting_coalesce_render_passes">Gabungkan tahap render</string>
     <string name="gamedb_setting_copy_road_maximum_blending">Level blending maksimum saat menyalin target render</string>
+
+    <string name="home_game_menu_restore_cover">Pulihkan sampul bawaan</string>
+    <string name="home_game_menu_restore_cover_success">Sampul bawaan dipulihkan.</string>
+    <string name="home_game_menu_restore_cover_failed">Tidak dapat memulihkan sampul bawaan.</string>
+    <string name="settings_reset_custom_covers">Reset sampul kustom</string>
+    <string name="settings_reset_custom_covers_desc">Pulihkan sampul bawaan untuk semua gim.</string>
+    <string name="settings_reset_custom_covers_confirm_title">Reset semua sampul kustom?</string>
+    <string name="settings_reset_custom_covers_confirm_body">Sampul kustom akan dihapus dari pustaka dan diganti dengan sampul bawaan. Gambar asli dan berkas gim Anda akan tetap disimpan.</string>
+    <string name="settings_reset_custom_covers_action">Reset</string>
+    <string name="settings_reset_custom_covers_success">Sampul kustom direset.</string>
+    <string name="settings_reset_custom_covers_partial">Beberapa sampul kustom tidak dapat direset. Silakan coba lagi.</string>
 </resources>
