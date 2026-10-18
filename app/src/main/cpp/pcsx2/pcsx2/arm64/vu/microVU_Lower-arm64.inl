@@ -36,16 +36,23 @@ static __fi void mVU_storeDivFlag_oaknut(mV, u32 value)
 	oakStore32(flag, mVU_divFlag_oaknut(mVU));
 }
 
-static __fi void mVU_testZero_oaknut(int xmmReg, int xmmTemp, int gprTemp)
+static __fi void mVU_testZero_oaknut(int xmmReg)
 {
-	const oak::QReg temp_q = oakQRegister(xmmTemp);
-	const oak::WReg temp_w = oakWRegister(gprTemp);
-
-	oakAsm->EOR(temp_q.B16(), temp_q.B16(), temp_q.B16());
-	oakAsm->FCMEQ(oakSRegister(xmmTemp), oakSRegister(xmmTemp), oakSRegister(xmmReg));
-	oakAsm->FMOV(temp_w, oakSRegister(xmmTemp));
-	oakAsm->CMP(temp_w, 0);
+	// EQ selects either signed zero; unordered NaNs remain on the nonzero path.
+	oakAsm->FCMP(oakSRegister(xmmReg), 0.0);
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitDivNonzeroTest()
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	mVU_testZero_oaknut(0);
+	oakAsm->CSET(oak::util::W4, oak::Cond::NE);
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 static __fi void mVU_prepareSqrtOperand_oaknut(mV, int xmmReg)
 {
@@ -274,7 +281,6 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 	else
 		Ft = mVU.regAlloc->allocRegId(_Ft_);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, (1 << (3 - _Fsf_)));
-	const int t1 = mVU.regAlloc->allocRegId();
 	const bool host_denormals_enabled = !(mVU.index ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR).GetDenormalsAreZero();
 
 	recBeginOaknutEmit();
@@ -290,13 +296,13 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 		mVUClamp1ScalarBits_oaknut(Fs);
 		mVUClamp1ScalarBits_oaknut(Ft);
 	}
-	mVU_testZero_oaknut(Ft, t1, VU_HOST_T1);
+	mVU_testZero_oaknut(Ft);
 	oak::Label cjmp;
-	oakAsm->B(oak::util::EQ, cjmp);
+	oakAsm->B(oak::util::NE, cjmp);
 
-	mVU_testZero_oaknut(Fs, t1, VU_HOST_T1);
+	mVU_testZero_oaknut(Fs);
 	oak::Label ajmp;
-	oakAsm->B(oak::util::EQ, ajmp);
+	oakAsm->B(oak::util::NE, ajmp);
 	mVU_storeDivFlag_oaknut(mVU, divI);
 	oak::Label bjmp;
 	oakAsm->B(bjmp);
@@ -332,7 +338,6 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Ft);
-	mVU.regAlloc->clearNeededXmmId(t1);
 }
 
 static void mVU_DIV_emit(mP)
