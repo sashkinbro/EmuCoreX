@@ -1,3 +1,4 @@
+#include "common/AndroidLogging.h"
 #include "emucorex/android_runtime.h"
 #include "emucorex/upstream_vm_bridge.h"
 #include "pcsx2/GS/Renderers/Vulkan/VKShaderCache.h"
@@ -215,13 +216,13 @@ void ApplyCustomDriverPathEnvironment(const std::string& value)
 	{
 		setenv("LIBVULKAN_PATH", value.c_str(), 1);
 		const std::size_t slash = value.find_last_of("/\\");
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Runtime custom Vulkan driver path set: %s",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "Runtime custom Vulkan driver path set: %s",
 			value.c_str() + ((slash == std::string::npos) ? 0 : slash + 1));
 	}
 	else
 	{
 		unsetenv("LIBVULKAN_PATH");
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Runtime custom Vulkan driver path cleared");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Runtime custom Vulkan driver path cleared");
 	}
 }
 
@@ -429,12 +430,12 @@ void AndroidRuntime::ApplyDeferredRuntimeGlobalsLocked()
 		if (paths_.native_library_dir.empty())
 		{
 			unsetenv("ANDROID_NATIVE_LIB_DIR");
-			__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment cleared");
+			EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment cleared");
 		}
 		else
 		{
 			setenv("ANDROID_NATIVE_LIB_DIR", paths_.native_library_dir.c_str(), 1);
-			__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment set");
+			EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment set");
 		}
 		deferred_native_library_environment_ = false;
 	}
@@ -459,7 +460,11 @@ void AndroidRuntime::Initialize(std::string data_root, int api_version)
 {
 	std::lock_guard lock(mutex_);
 	SDL_SetMainReady();
+#if !defined(NDEBUG) || defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	Log::SetHostOutputLevel(LOGLEVEL_INFO, &AndroidConsoleLogCallback);
+#else
+	Log::SetHostOutputLevel(LOGLEVEL_WARNING, &AndroidConsoleLogCallback);
+#endif
 	paths_.data_root = std::move(data_root);
 	if (IsTFXPreparationActiveLocked())
 	{
@@ -473,7 +478,7 @@ void AndroidRuntime::Initialize(std::string data_root, int api_version)
 	}
 	api_version_ = api_version;
 	initialized_ = true;
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Android runtime initialized for PCSX2 v2.8.0 adapter");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Android runtime initialized for PCSX2 v2.8.0 adapter");
 }
 
 void AndroidRuntime::ReloadDataRoot(std::string data_root)
@@ -497,12 +502,12 @@ void AndroidRuntime::SetNativeLibraryDir(std::string path)
 	else if (!paths_.native_library_dir.empty())
 	{
 		setenv("ANDROID_NATIVE_LIB_DIR", paths_.native_library_dir.c_str(), 1);
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment set");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment set");
 	}
 	else
 	{
 		unsetenv("ANDROID_NATIVE_LIB_DIR");
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment cleared");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Native library directory environment cleared");
 	}
 }
 
@@ -645,7 +650,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 {
 	const float safe_refresh_rate =
 		(std::isfinite(refresh_rate) && refresh_rate > 0.0f) ? std::min(refresh_rate, 240.0f) : 0.0f;
-	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: window=%p size=%dx%d rate=%.2f",
 		window, width, height, safe_refresh_rate);
 	bool update_display_window = false;
 	ANativeWindow* old_window = nullptr;
@@ -664,7 +669,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 
 	if (update_display_window)
 	{
-		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "SetNativeSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		// Surface callbacks run on Android's UI/Binder threads, while the MTGS ring
 		// buffer has exactly one producer: the CPU thread. Keep the old window alive
 		// until the serialized GS update has detached from it.
@@ -689,7 +694,7 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 
 void AndroidRuntime::ClearSurface()
 {
-	__android_log_write(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: clearing native window");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: clearing native window");
 	ANativeWindow* old_window = nullptr;
 	bool update_display_window = false;
 	{
@@ -704,7 +709,7 @@ void AndroidRuntime::ClearSurface()
 
 	if (update_display_window)
 	{
-		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "ClearSurface: scheduling MTGS::UpdateDisplayWindow (old_window=%p)", old_window);
 		auto old_window_ref = std::shared_ptr<ANativeWindow>(old_window, [](ANativeWindow* value) {
 			if (value)
 				ANativeWindow_release(value);
@@ -1321,7 +1326,7 @@ void AndroidRuntime::Pause()
 	if (!active || already_paused)
 		return;
 
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM pause requested");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM pause requested");
 	if (Cpu)
 		Cpu->ExitExecution();
 	Host::RunOnCPUThread([]() {
@@ -1340,7 +1345,7 @@ void AndroidRuntime::Resume()
 		paused_ = false;
 	}
 
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM resume requested");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM resume requested");
 	Host::RunOnCPUThread([]() {
 		VMManager::SetPaused(false);
 	}, false);
@@ -1354,7 +1359,7 @@ void AndroidRuntime::Shutdown()
 	std::thread preparation_thread_to_join;
 	{
 		std::lock_guard lock(mutex_);
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "VM shutdown requested active=%d joinable=%d",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "VM shutdown requested active=%d joinable=%d",
 			vm_active_ ? 1 : 0, vm_thread_.joinable() ? 1 : 0);
 		vm_active_ = false;
 		paused_ = false;
@@ -1791,7 +1796,7 @@ void AndroidRuntime::OnHostMouseWheel(float horizontal, float vertical)
 
 void AndroidRuntime::Log(const std::string& message) const
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, message.c_str());
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, message.c_str());
 }
 
 VmLaunchConfig AndroidRuntime::CreateLaunchConfigLocked(std::string path, bool boot_elf, int probe_steps, bool boot_irx) const
@@ -1821,6 +1826,9 @@ void AndroidRuntime::VmThreadMain(VmLaunchConfig config)
 		current_path_.clear();
 	}
 
+#if defined(NDEBUG) && !defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (!result)
+#endif
 	__android_log_print(result ? ANDROID_LOG_INFO : ANDROID_LOG_ERROR, LOG_TAG,
 		"VM thread finished result=%s", result ? "true" : "false");
 }

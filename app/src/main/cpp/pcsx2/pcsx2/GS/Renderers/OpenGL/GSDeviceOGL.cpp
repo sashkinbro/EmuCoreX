@@ -38,7 +38,7 @@
 #include <type_traits>
 
 #if defined(__ANDROID__)
-#include <android/log.h>
+#include "common/AndroidLogging.h"
 #endif
 
 static constexpr u32 g_vs_pc_index = 4;
@@ -846,7 +846,7 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	if (!m_has_clip_control)
 		Console.Warning("GL: Using legacy clip depth; small GS Z values lose precision.");
 #if defined(__ANDROID__)
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "OpenGL depth mapping: %s (GLES=%d EXT_clip_control=%d)",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "OpenGL depth mapping: %s (GLES=%d EXT_clip_control=%d)",
 		m_has_clip_control ? "zero-to-one" : "negative-one-to-one", m_is_gles, GLAD_GL_EXT_clip_control);
 #endif
 
@@ -1160,7 +1160,7 @@ bool GSDeviceOGL::CheckFeatures()
 	m_features.multidraw_fb_copy = !m_features.texture_barrier;
 
 #if defined(__ANDROID__)
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"OpenGL GS vendor=%s renderer=%s version=%s profile=%s "
 		"armFetch=%d extFetch=%d fbfetch=%d textureBarrier=%d copyFallback=%d dualSrcBlend=%d",
 		vendor_str, renderer_str, version_str ? version_str : "Unknown",

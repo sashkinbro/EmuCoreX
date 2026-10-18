@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+#include "common/AndroidLogging.h"
 
 #include "emucorex/android_crash_diagnostics.h"
 #include "emucorex/android_runtime.h"
@@ -80,6 +81,10 @@ bool s_performance_gpu_timing_active = false;
 
 void LogHostMessage(android_LogPriority priority, std::string_view title, std::string_view message)
 {
+#if defined(NDEBUG) && !defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+	if (priority < ANDROID_LOG_WARN)
+		return;
+#endif
 	if (title.empty())
 		__android_log_write(priority, LOG_TAG, std::string(message).c_str());
 	else
@@ -366,14 +371,14 @@ std::optional<WindowInfo> Host::GetTopLevelWindowInfo()
 
 void Host::OnInputDeviceConnected(const std::string_view identifier, const std::string_view device_name)
 {
-		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "input connected: %.*s (%.*s)",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "input connected: %.*s (%.*s)",
 		static_cast<int>(identifier.size()), identifier.data(),
 		static_cast<int>(device_name.size()), device_name.data());
 }
 
 void Host::OnInputDeviceDisconnected(const InputBindingKey, const std::string_view identifier)
 {
-	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "input disconnected: %.*s",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "input disconnected: %.*s",
 		static_cast<int>(identifier.size()), identifier.data());
 }
 
@@ -401,7 +406,7 @@ std::optional<WindowInfo> Host::AcquireRenderWindow(bool)
 	info.surface_height = static_cast<u32>(std::max(height, 0));
 	info.surface_scale = (width > 0 && height > 0) ? (static_cast<float>(std::max(width, height)) / 800.0f) : 1.0f;
 	info.surface_refresh_rate = refresh_rate;
-	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "AcquireRenderWindow: type=%s window=%p size=%dx%d",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "AcquireRenderWindow: type=%s window=%p size=%dx%d",
 		info.type == WindowInfo::Type::Android ? "Android" : "Surfaceless", window, width, height);
 	return info;
 }
@@ -416,39 +421,39 @@ void Host::BeginPresentFrame()
 
 void Host::RequestResizeHostDisplay(s32 width, s32 height)
 {
-	__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "resize requested: %dx%d", width, height);
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_DEBUG, LOG_TAG, "resize requested: %dx%d", width, height);
 }
 
 void Host::OnVMStarting()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM starting");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM starting");
 }
 
 void Host::OnVMStarted()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM started");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM started");
 }
 
 void Host::OnVMDestroyed()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM destroyed");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM destroyed");
 }
 
 void Host::OnVMPaused()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM paused");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM paused");
 }
 
 void Host::OnVMResumed()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "VM resumed");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "VM resumed");
 }
 
 void Host::OnGameChanged(const std::string& title, const std::string&, const std::string& disc_path,
 	const std::string& disc_serial, u32 disc_crc, u32 current_crc)
 {
 	emucorex::android::RecordGameForCrashDiagnostics(title, disc_serial, disc_crc, current_crc);
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "game changed: title=%s path=%s serial=%s disc_crc=%08x current_crc=%08x",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "game changed: title=%s path=%s serial=%s disc_crc=%08x current_crc=%08x",
 		title.c_str(), disc_path.c_str(), disc_serial.c_str(), disc_crc, current_crc);
 	QueryAndNotifyAchievementsState();
 }
@@ -462,7 +467,7 @@ void Host::OnPerformanceMetricsUpdated()
 		if (now - last_log >= std::chrono::seconds(1))
 		{
 			last_log = now;
-			__android_log_print(ANDROID_LOG_INFO, "EmuPerf",
+			EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuPerf",
 				"frames=%llu vps=%.2f speed=%.2f ee_ms=%.3f gs_ms=%.3f frame_ms=%.3f",
 				static_cast<unsigned long long>(PerformanceMetrics::GetFrameNumber()),
 				PerformanceMetrics::GetFPS(), PerformanceMetrics::GetSpeed(),
@@ -626,11 +631,11 @@ void Host::OnSaveStateLoading(const std::string_view filename)
 
 void Host::OnSaveStateLoaded(const std::string_view filename, bool was_successful)
 {
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "save state loaded: %.*s success=%s",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "save state loaded: %.*s success=%s",
 		static_cast<int>(filename.size()), filename.data(), was_successful ? "true" : "false");
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	if (was_successful)
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 			"VU state after load: jit=%u/%u masks=0x%llx/0x%llx vpu=0x%x pc=%x/%x flags=%x/%x cycles=%u/%u",
 			static_cast<unsigned>(EmuConfig.Cpu.Recompiler.EnableVU0),
 			static_cast<unsigned>(EmuConfig.Cpu.Recompiler.EnableVU1),
@@ -731,7 +736,7 @@ void Host::OnCaptureStarted(const std::string& filename)
 
 void Host::OnCaptureStopped()
 {
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "capture stopped");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "capture stopped");
 }
 
 void Host::RequestExitApplication(bool)

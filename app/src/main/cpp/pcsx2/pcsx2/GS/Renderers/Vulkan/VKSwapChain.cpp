@@ -16,7 +16,7 @@
 #include <cmath>
 
 #if defined(__ANDROID__)
-#include <android/log.h>
+#include "common/AndroidLogging.h"
 #endif
 
 #if defined(VK_USE_PLATFORM_XLIB_KHR)
@@ -564,7 +564,7 @@ bool VKSwapChain::CreateSwapChain()
 	}
 
 #if defined(__ANDROID__)
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan swapchain presentMode=%s requestedImages=%u actualImages=%u surfaceMin=%u surfaceMax=%u",
 		PresentModeToString(m_present_mode), requested_image_count, image_count,
 		surface_capabilities.minImageCount, surface_capabilities.maxImageCount);

@@ -1,3 +1,4 @@
+#include "common/AndroidLogging.h"
 #include "emucorex/android_crash_diagnostics.h"
 
 #include "pcsx2/Gif.h"
@@ -474,7 +475,7 @@ void SetNativeCrashLogFilePath(const char* path)
 		return;
 	}
 	std::snprintf(s_log_file_path, sizeof(s_log_file_path), "%s", path);
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Native crash log path set: %s", s_log_file_path);
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "Native crash log path set: %s", s_log_file_path);
 }
 
 void InstallNativeCrashSignalHandler()
@@ -492,7 +493,7 @@ void InstallNativeCrashSignalHandler()
 	sigaction(SIGBUS,  &sa, &s_prev_sigbus);
 	sigaction(SIGFPE,  &sa, &s_prev_sigfpe);
 
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG,
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG,
 		"Native crash signal handler installed (SIGSEGV/SIGABRT/SIGBUS/SIGFPE)");
 }
 } // namespace emucorex::android

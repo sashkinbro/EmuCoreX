@@ -1,3 +1,4 @@
+#include "common/AndroidLogging.h"
 #include "emucorex/upstream_vm_bridge.h"
 #include "emucorex/retro_achievements_android.h"
 #include "emucorex/android_crash_diagnostics.h"
@@ -225,7 +226,7 @@ void ApplyOpcodeFamilyBlocklists(const RuntimeSettings& settings)
 		OpcodeFamilies::SetFamilyMask(ck.core, mask);
 		OpcodeFamilies::SetDisabledOpcodes(ck.core, ids);
 
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 			"Opcode family blocklist core=%u mask=0x%llx ids=%zu", ck.core,
 			static_cast<unsigned long long>(mask), ids.size());
 
@@ -344,7 +345,7 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		instant_vu1);
 	si.SetBoolValue("EmuCore/Speedhacks", "vuThread",
 		vu_thread);
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 		"Effective speedhacks waitLoop=%d intcStat=%d vuFlag=%d instantVu1=%d vuThread=%d",
 		wait_loop_speedhack ? 1 : 0, intc_stat_speedhack ? 1 : 0,
 		vu_flag_hack ? 1 : 0, instant_vu1 ? 1 : 0, vu_thread ? 1 : 0);
@@ -377,7 +378,7 @@ void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config
 		(audio_backend_setting != config.settings.end()) ? std::string_view(audio_backend_setting->second) : std::string_view("SDL");
 	const char* const audio_backend = (requested_audio_backend == "OpenSLES") ? "OpenSLES" : "SDL";
 	si.SetStringValue("SPU2/Output", "Backend", audio_backend);
-	__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Effective audio backend=%s", audio_backend);
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "Effective audio backend=%s", audio_backend);
 	si.SetStringValue("SPU2/Output", "DriverName", "");
 	si.SetStringValue("SPU2/Output", "DeviceName", "");
 	si.SetIntValue("SPU2/Output", "BufferMS",
@@ -442,13 +443,13 @@ bool InstallHostSettings(const VmLaunchConfig& config, bool initialize_frontend 
 	{
 		setenv("LIBVULKAN_PATH", driver_it->second.c_str(), 1);
 		const std::size_t slash = driver_it->second.find_last_of("/\\");
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Custom Vulkan driver path set: %s",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG, "Custom Vulkan driver path set: %s",
 			driver_it->second.c_str() + ((slash == std::string::npos) ? 0 : slash + 1));
 	}
 	else
 	{
 		unsetenv("LIBVULKAN_PATH");
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Custom Vulkan driver path not set");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Custom Vulkan driver path not set");
 	}
 
 	std::unique_lock settings_lock = Host::GetSettingsLock();
@@ -701,10 +702,10 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	{
 		Host::PumpMessagesOnCPUThread();
 		JitProfiler::Start();
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler auto-started for this VM session");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler auto-started for this VM session");
 	}
 	else if (!auto_profile)
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler auto-start disabled by debug.emucorex.jit_profile");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler auto-start disabled by debug.emucorex.jit_profile");
 	if (!HangTrace::IsActive())
 	{
 		char trace_value[PROP_VALUE_MAX] = {};
@@ -714,7 +715,7 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 			// Register this thread even when profiler auto-start was opted out.
 			Host::PumpMessagesOnCPUThread();
 			HangTrace::Start();
-			__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Hang trace auto-started for this VM session");
+			EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Hang trace auto-started for this VM session");
 		}
 	}
 #endif
@@ -745,12 +746,12 @@ bool RunUpstreamVm(const VmLaunchConfig& config, VmStartupCallback startup_callb
 	if (JitProfiler::IsActive())
 	{
 		JitProfiler::Stop();
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler report written to jit_profile.txt");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "JIT profiler report written to jit_profile.txt");
 	}
 	if (HangTrace::IsActive())
 	{
 		HangTrace::Stop();
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Hang trace report written to hang_trace.txt");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Hang trace report written to hang_trace.txt");
 	}
 #endif
 	VMManager::Shutdown(false);

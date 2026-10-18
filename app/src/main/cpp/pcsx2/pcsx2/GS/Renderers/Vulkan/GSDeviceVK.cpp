@@ -54,7 +54,7 @@
 #include <utility>
 
 #if defined(__ANDROID__)
-#include <android/log.h>
+#include "common/AndroidLogging.h"
 #include <sys/resource.h>
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include <sys/system_properties.h>
@@ -386,7 +386,7 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 	u32 gpu_count = 0;
 	VkResult res = vkEnumeratePhysicalDevices(instance, &gpu_count, nullptr);
 #ifdef __ANDROID__
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device enumeration: result=%d count=%u", res, gpu_count);
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device enumeration: result=%d count=%u", res, gpu_count);
 #endif
 	if ((res != VK_SUCCESS && res != VK_INCOMPLETE) || gpu_count == 0)
 	{
@@ -417,7 +417,7 @@ GSDeviceVK::GPUList GSDeviceVK::EnumerateGPUs(VkInstance instance)
 		VkPhysicalDeviceProperties props = {};
 		vkGetPhysicalDeviceProperties(device, &props);
 #ifdef __ANDROID__
-		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device candidate: name=%s api=%u.%u.%u", props.deviceName,
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan device candidate: name=%s api=%u.%u.%u", props.deviceName,
 			VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion), VK_API_VERSION_PATCH(props.apiVersion));
 #endif
 
@@ -3436,7 +3436,7 @@ bool GSDeviceVK::CheckFeatures()
 		m_features.texture_barrier ? " texture_barrier" : "", m_features.framebuffer_fetch ? " framebuffer_fetch" : "",
 		m_features.provoking_vertex_last ? " provoking_vertex_last" : "", m_features.vs_expand ? " vs_expand" : "");
 #if defined(__ANDROID__)
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan GS device=%s vendor=0x%04x driver=0x%08x profile=%s soc=%s "
 		"roaa=%d fbfetch=%d textureBarrier=%d inputAttachmentFeedback=%d "
 		"dualSrcBlend=%d depthFormat=%u rgba16unorm=%d pointExpand=%d",
@@ -6010,7 +6010,7 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 		if (records.fetch_add(1, std::memory_order_relaxed) >= (lock_pipeline_cache ? 512u : 128u)) return;
 		const double total_ms = std::chrono::duration<double, std::milli>(CompileClock::now() - compile_start).count();
 		const double shader_ms = std::chrono::duration<double, std::milli>(shaders_end - compile_start).count();
-		__android_log_print(ANDROID_LOG_INFO, "GSCompile",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "GSCompile",
 			"foreground=%u success=%u total_ms=%.3f shader_ms=%.3f driver_ms=%.3f vs=%08x ps=%016" PRIX64 "_%016" PRIX64 " baked_hits_total=%u",
 			lock_pipeline_cache ? 1u : 0u, compile_success ? 1u : 0u, total_ms, shader_ms, driver_ms, p.vs.key, p.ps.key_hi, p.ps.key_lo,
 			GSShaderCompileIndicator::GetBakedHitCount());
@@ -7553,7 +7553,7 @@ namespace
 		char value[PROP_VALUE_MAX]{};
 		if (__system_property_get("debug.emucorex.gs_compile_trace", value) == 1 && value[0] == '1')
 		{
-			__android_log_print(ANDROID_LOG_INFO, "GSPrepare",
+			EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "GSPrepare",
 				"total=%u compiled=%u available=%u failed=%u cancelled=%u in_flight=%u cancel_requested=%u finished=%u checkpoint_saved=%u",
 				progress.total, progress.completed, progress.already_available, progress.failed, progress.cancelled,
 				progress.in_flight, progress.cancel_requested ? 1u : 0u, progress.finished ? 1u : 0u,
@@ -8359,7 +8359,7 @@ void GSDeviceVK::ExecuteCommandBufferAndRestartPresent(bool wait_for_completion,
 		va_start(ap, reason);
 		const std::string reason_str(StringUtil::StdStringFromFormatV(reason, ap));
 		va_end(ap);
-		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan present pass restart: %s", reason_str.c_str());
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan present pass restart: %s", reason_str.c_str());
 	}
 #else
 	(void)reason;

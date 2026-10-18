@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+#include "common/AndroidLogging.h"
 
 #include "Input/SDLInputSource.h"
 
@@ -23,7 +24,7 @@ bool SDLInputSource::Initialize(SettingsInterface& si, std::unique_lock<std::mut
 {
 	m_android_vibration_enabled = si.GetBoolValue("InputSources", "PadVibration", true);
 	m_sdl_subsystem_initialized = true;
-	__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "Android input source initialized without SDL joystick subsystem");
+	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "Android input source initialized without SDL joystick subsystem");
 	return true;
 }
 

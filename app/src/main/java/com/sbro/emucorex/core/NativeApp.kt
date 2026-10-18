@@ -1,5 +1,6 @@
 package com.sbro.emucorex.core
 
+import com.sbro.emucorex.BuildConfig
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -626,7 +627,7 @@ object NativeApp {
                 }
             }
             require(patchCount > 0) { "Bundled patches.zip contains no PNACH files" }
-            Log.i(TAG, "Bundled PCSX2 patch archive ready: $patchCount patches, ${archive.length()} bytes")
+            if (BuildConfig.DEBUG) Log.i(TAG, "Bundled PCSX2 patch archive ready: $patchCount patches, ${archive.length()} bytes")
         }.onFailure { error ->
             Log.e(TAG, "Bundled PCSX2 patch archive is unavailable", error)
             CrashLogger.logError(TAG, "Bundled PCSX2 patch archive unavailable", error)

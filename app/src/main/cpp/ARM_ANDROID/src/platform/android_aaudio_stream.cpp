@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+#include "common/AndroidLogging.h"
 
 #include "Host/AudioStream.h"
 
@@ -185,7 +186,7 @@ private:
 		m_disconnected.store(false, std::memory_order_release);
 		m_callback_silent.store(false, std::memory_order_release);
 
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 			"AAudio stream started rate=%u channels=%u output_buffer=%d/%d frames internal_buffer=%u ms minimal=%d",
 			m_sample_rate, static_cast<unsigned>(m_output_channels), AAudioStream_getBufferSizeInFrames(m_stream),
 			AAudioStream_getBufferCapacityInFrames(m_stream), static_cast<unsigned>(m_parameters.buffer_ms),
@@ -204,7 +205,7 @@ private:
 			return false;
 		}
 
-		__android_log_write(ANDROID_LOG_INFO, LOG_TAG, "AAudio stream recovered after disconnect");
+		EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG, "AAudio stream recovered after disconnect");
 		return true;
 	}
 

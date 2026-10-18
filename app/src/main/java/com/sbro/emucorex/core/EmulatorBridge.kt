@@ -350,8 +350,10 @@ object EmulatorBridge {
             NativeApp.setNativeLibraryDir(context.applicationInfo.nativeLibraryDir ?: "")
             NativeApp.initializeOnce(context.applicationContext)
             NativeApp.setSetting("EmuCoreX", "AppVersion", "string", appVersionName(context.applicationContext))
-            val jitSmokeOk = runCatching { NativeApp.runJitExecutableMemorySmokeTest() }.getOrDefault(false)
-            Log.i(TAG, "JIT executable-memory smoke result=$jitSmokeOk")
+            if (BuildConfig.DEBUG) {
+                val jitSmokeOk = runCatching { NativeApp.runJitExecutableMemorySmokeTest() }.getOrDefault(false)
+                Log.i(TAG, "JIT executable-memory smoke result=$jitSmokeOk")
+            }
             val preferEnglishTitles = runBlocking {
                 AppPreferences(context.applicationContext).preferEnglishGameTitles.first()
             }

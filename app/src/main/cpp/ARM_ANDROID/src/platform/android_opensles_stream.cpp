@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0+
+#include "common/AndroidLogging.h"
 
 #include "Host/AudioStream.h"
 
@@ -227,7 +228,7 @@ public:
 			return false;
 		}
 
-		__android_log_print(ANDROID_LOG_INFO, LOG_TAG,
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, LOG_TAG,
 			"OpenSL ES stream started: rate=%u channels=%u buffer=%u frames x %zu internal=%u ms minimal=%d",
 			m_sample_rate, static_cast<unsigned>(m_output_channels), m_frames_per_buffer, NUM_BUFFERS,
 			static_cast<unsigned>(m_parameters.buffer_ms), m_parameters.minimal_output_latency ? 1 : 0);

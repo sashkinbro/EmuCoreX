@@ -23,7 +23,7 @@
 #endif
 
 #ifdef __ANDROID__
-#include <android/log.h>
+#include "common/AndroidLogging.h"
 #include <adrenotools/driver.h>
 #include <dlfcn.h>
 #include "emucorex/android_runtime.h"
@@ -130,7 +130,7 @@ static bool LoadVulkanLibraryWithAdrenoTools(const std::string& custom_driver_pa
 		setenv("VK_LAYER_PATH", layer_path.c_str(), 1);
 	}
 
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan custom driver: adrenotools open driver=%s hookDir=%s layer=%s",
 		custom_driver_name.c_str(), hook_lib_dir, has_layer_json ? "yes" : "no");
 	void* handle = adrenotools_open_libvulkan(
@@ -155,7 +155,7 @@ static bool LoadVulkanLibraryWithAdrenoTools(const std::string& custom_driver_pa
 	// The hook chain is in place, but the Android Vulkan loader loads the ICD
 	// lazily on first instance creation. The real outcome is reported by
 	// CheckCustomDriverLoadStatus() right after vkCreateInstance.
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 		"Vulkan custom driver: adrenotools handshake driver=%s", custom_driver_name.c_str());
 	return true;
 }
@@ -168,7 +168,7 @@ void Vulkan::CheckCustomDriverLoadStatus()
 
 	if (adrenotools_custom_driver_library_loaded())
 	{
-		__android_log_print(ANDROID_LOG_INFO, "EmuCoreX",
+		EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX",
 			"Vulkan custom driver: loaded driver=%s", s_custom_driver_name.c_str());
 		Console.WriteLn(Color_StrongGreen, "Vulkan: Loaded custom GPU driver: %s", s_custom_driver_name.c_str());
 		return;
@@ -204,7 +204,7 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 		custom_driver_path = libvulkan_env;
 	if (custom_driver_path.empty())
 		custom_driver_path = emucorex::android::AndroidRuntime::Instance().GetSetting("EmuCoreX", "CustomDriverPath");
-	__android_log_print(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan loader entry customDriver=%s",
+	EMUCOREX_DIAGNOSTIC_LOG_PRINT(ANDROID_LOG_INFO, "EmuCoreX", "Vulkan loader entry customDriver=%s",
 		custom_driver_path.empty() ? "<none>" : BasenameForLog(custom_driver_path));
 
 	s_custom_driver_requested = !custom_driver_path.empty();
