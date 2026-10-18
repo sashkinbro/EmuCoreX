@@ -5247,24 +5247,8 @@ __forceinline void GSState::VertexKick(u32 skip)
 			}
 		}
 
-		// Do scissor test.
-		const GSVector4i bbox_ex = bbox + GSVector4i(0, 0, 1, 1); // Exclusive coords for the scissor test.
-		const GSVector4i& scissor = m_context->scissor.cull;
-		u32 test = static_cast<u32>(!bbox_ex.rintersects(scissor));
-
-		// Test for empty bbox.
-		if constexpr (primclass == GS_TRIANGLE_CLASS || primclass == GS_SPRITE_CLASS)
-		{
-			test |= static_cast<u32>(bbox.rempty());
-		}
-
-		// Test for degenerate triangle.
-		if constexpr (primclass == GS_TRIANGLE_CLASS)
-		{
-			test |= static_cast<u32>(v0.eq(v1)) | static_cast<u32>(v1.eq(v2)) | static_cast<u32>(v0.eq(v2));
-		}
-
-		skip |= test;
+		skip |= static_cast<u32>(GSVertexIsRejected<static_cast<GS_PRIM_CLASS>(primclass)>(
+			bbox, m_context->scissor.cull, v0, v1, v2));
 	}
 
 	if (skip != 0)
