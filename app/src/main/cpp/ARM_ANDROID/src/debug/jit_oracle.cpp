@@ -2203,6 +2203,7 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     if (pq_only)
     {
         VUSavePQTests();
+        VULoadPQTests();
         return;
     }
     if (itof_codegen_only)

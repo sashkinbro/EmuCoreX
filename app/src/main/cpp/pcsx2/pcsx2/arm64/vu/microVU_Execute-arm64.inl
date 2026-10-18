@@ -54,19 +54,34 @@ static __fi void mVUExecuteOakLoadFpcr(OakMemOperand mem)
 	oakAsm->MSR(oak::SystemReg::FPCR, OAK_XSCRATCH);
 }
 
-static __fi void mVUExecuteOakPshufd(oak::QReg dst, oak::QReg src, int pIndex)
+static void mVUExecuteOakLoadPQ(mV)
 {
-	oakLoad128(OAK_QSCRATCH3, mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[pIndex][0]))));
-	oakAsm->TBL(dst.B16(), oak::List(src.B16()), OAK_QSCRATCH3.B16());
+    const oak::QReg pq = oakQRegister(VU_HOST_XMMPQ);
+    // Build [Q, pending Q, P, pending P] without table loads or SIMD shuffles.
+    oakLoadScalar32(oakSRegister(VU_HOST_XMMPQ),
+        mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_Q].UL))));
+    oakLoad32(OAK_WSCRATCH,
+        mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_q))));
+    oakAsm->MOV(pq.Selem()[1], OAK_WSCRATCH);
+    oakLoad32(OAK_WSCRATCH,
+        mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_P].UL))));
+    oakAsm->MOV(pq.Selem()[2], OAK_WSCRATCH);
+    // VU0 has no EFU; retain its original duplicated P lanes.
+    if (isVU1)
+        oakLoad32(OAK_WSCRATCH,
+            mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p))));
+    oakAsm->MOV(pq.Selem()[3], OAK_WSCRATCH);
 }
 
-static __fi void mVUExecuteOakShufps(oak::QReg dst, oak::QReg src, int pIndex)
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitLoadPQ(u32 index)
 {
-	oakLoad128(OAK_QSCRATCH3, mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[pIndex][1]))));
-	oakAsm->MOV(OAK_QSCRATCH.B16(), dst.B16());
-	oakAsm->MOV(OAK_QSCRATCH2.B16(), src.B16());
-	oakAsm->TBX(dst.B16(), oak::List(OAK_QSCRATCH.B16(), OAK_QSCRATCH2.B16()), OAK_QSCRATCH3.B16());
+    microVU& mVU = index ? microVU1 : microVU0;
+    const u8* start = oakGetCurrentCodePointer();
+    mVUExecuteOakLoadPQ(mVU);
+    return static_cast<u32>(oakGetCurrentCodePointer() - start);
 }
+#endif
 
 static void mVUExecuteOakBeginStackFrame(bool save_fpr = true)
 {
@@ -160,27 +175,7 @@ void mVUdispatcherAB(mV)
         }
 
         // Load Regs
-        oakLoad128(oakQRegister(VU_HOST_XMMT1), mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_P].UL))));
-        oakLoad128(oakQRegister(VU_HOST_XMMPQ), mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_Q].UL))));
-        oakAsm->MOVI(oakQRegister(VU_HOST_XMMT2).B16(), 0);
-        oakLoad32(OAK_WSCRATCH, mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_q))));
-        oakAsm->MOV(oakQRegister(VU_HOST_XMMT2).Selem()[0], OAK_WSCRATCH);
-        mVUExecuteOakShufps(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMT1), 0);
-        //Load in other Q instance
-        mVUExecuteOakPshufd(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMPQ), 0xe1);
-        oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(VU_HOST_XMMT2).Selem()[0]);
-        mVUExecuteOakPshufd(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMPQ), 0xe1);
-
-        if (isVU1)
-        {
-            //Load in other P instance
-            oakAsm->MOVI(oakQRegister(VU_HOST_XMMT2).B16(), 0);
-            oakLoad32(OAK_WSCRATCH, mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p))));
-            oakAsm->MOV(oakQRegister(VU_HOST_XMMT2).Selem()[0], OAK_WSCRATCH);
-            mVUExecuteOakPshufd(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMPQ), 0x1B);
-            oakAsm->MOV(oakQRegister(VU_HOST_XMMPQ).Selem()[0], oakQRegister(VU_HOST_XMMT2).Selem()[0]);
-            mVUExecuteOakPshufd(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMPQ), 0x1B);
-        }
+        mVUExecuteOakLoadPQ(mVU);
 
         oakLoad128(oakQRegister(VU_HOST_XMMT1), mVUExecuteOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].micro_macflags))));
         oakStore128(oakQRegister(VU_HOST_XMMT1), mVUExecuteOakMvuMem(static_cast<s64>(offsetof(vuRegistersPack, microVU[mVU.index].macFlag))));
