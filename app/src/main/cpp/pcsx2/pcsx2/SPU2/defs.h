@@ -134,12 +134,21 @@ public:
 	{
 	}
 
-	void Update();
+	void Update()
+	{
+		// Most channels use fixed volume. Keep the enabled test at the mixer
+		// call site so those channels do not enter the sweep routine at all.
+		if (Enable)
+			UpdateEnabled();
+	}
 	void RegSet(u16 src); // used to set the volume from a register source
 
 #ifdef PCSX2_DEVBUILD
 	void DebugDump(FILE* dump, const char* title, const char* nameLR);
 #endif
+
+private:
+	void UpdateEnabled();
 };
 
 struct V_VolumeSlideLR

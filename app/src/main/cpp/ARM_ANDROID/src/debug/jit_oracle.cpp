@@ -6,6 +6,7 @@
 #include "COP0.h"
 #include "OpcodeFamilies.h"
 #include "JitProfiler.h"
+#include "SPU2/defs.h"
 #include "ir/Ir.h"
 #include "arm64/ee/EeIrLifter-arm64.h"
 #include "arm64/ee/iCore-arm64.h"
@@ -51,6 +52,7 @@ static bool s_oracleSkipEvents = false;
 void recExitExecutionImmediate();
 extern "C" void EmuCoreXOracleSetEeIrRegisterAllocation(int mode);
 extern "C" void EmuCoreXOracleTestVUQuick(void (*check)(bool, const char*));
+extern "C" void EmuCoreXOracleTestVolumeSlide(void (*check)(bool, const char*));
 extern "C" u32 EmuCoreXOracleGetEeIrLastFrameSize();
 
 extern "C" int EmuCoreXOracleSkipEvents()
@@ -61,6 +63,21 @@ extern "C" int EmuCoreXOracleSkipEvents()
 extern "C" void EmuCoreXOracleSetSkipEvents(int enabled)
 {
     s_oracleSkipEvents = enabled != 0;
+}
+
+// Keep the production-facing volume call in a separate translation unit from
+// ADSR.cpp, exactly as in Mixer.cpp. Otherwise the baseline can inline Update()
+// from its definition even before the guarded header fast path exists.
+extern "C" __attribute__((noinline)) void EmuCoreXOracleUpdateMixerVolumes(V_VolumeSlideLR* volumes, u32 frames)
+{
+    for (u32 frame = 0; frame < frames; ++frame)
+        for (u32 channel = 0; channel < 50; ++channel)
+            volumes[channel].Update();
+}
+
+extern "C" __attribute__((noinline)) void EmuCoreXOracleUpdateVolume(V_VolumeSlide* volume)
+{
+    volume->Update();
 }
 
 extern "C" void EmuCoreXOracleSetIOPIR(int enabled);
@@ -12205,6 +12222,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         BlockCacheTests();
     else if (std::strcmp(suite, "vu-cache") == 0)
         EmuCoreXOracleTestVUQuick(Check);
+    else if (std::strcmp(suite, "spu2-volume") == 0)
+        EmuCoreXOracleTestVolumeSlide(Check);
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)

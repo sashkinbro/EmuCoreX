@@ -5,6 +5,13 @@
 
 #include "common/Assertions.h"
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include <array>
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#endif
+
 static constexpr s32 ADSR_MAX_VOL = 0x7fff;
 
 void V_ADSR::UpdateCache()
@@ -116,11 +123,8 @@ void V_VolumeSlide::RegSet(u16 src)
 	}
 }
 
-void V_VolumeSlide::Update()
+void V_VolumeSlide::UpdateEnabled()
 {
-	if (!Enable)
-		return;
-
 	s32 step_size = 7 - Step;
 
 	if (Decr)
@@ -180,3 +184,7 @@ void V_VolumeSlide::Update()
 		}
 	}
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include "VolumeSlideTests.inl"
+#endif
