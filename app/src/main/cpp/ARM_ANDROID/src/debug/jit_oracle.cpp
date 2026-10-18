@@ -2203,6 +2203,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_pq.inl"
 #include "jit_oracle_vif_mpg.inl"
 #include "jit_oracle_vu_div_zero.inl"
+#include "jit_oracle_vu_operand_clamp.inl"
 #include "jit_oracle_vu_scalar_clamp.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,

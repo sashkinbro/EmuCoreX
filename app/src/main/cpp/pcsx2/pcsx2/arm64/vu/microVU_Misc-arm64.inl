@@ -268,7 +268,34 @@ static __fi void mVULoadClampLimits_oaknut(const oak::QReg& min_dst, const oak::
 		oak::SOffset<11, 4>(static_cast<s64>(offsetof(mVU_Globals, minvals))));
 }
 
-static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg, int mask_reg,
+static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg, int /*mask_reg*/,
+	bool clamp_overflow, bool bounds_ready = false)
+{
+	const oak::QReg reg_q = oakQRegister(reg);
+	const oak::QReg exponent_q = oakQRegister(exponent_reg);
+	// Extract the original exponent independently of the overflow clamps.
+	// This keeps their dependency chains parallel on Cortex-A76.
+	oakAsm->SHL(exponent_q.S4(), reg_q.S4(), 1);
+	oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 24);
+	if (clamp_overflow)
+	{
+		if (!bounds_ready)
+			mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
+		// Signed min caps positive infinities/NaNs; unsigned min caps the
+		// negative ones. Both preserve their sign and every finite bit pattern.
+		oakAsm->SMIN(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH2.S4());
+		oakAsm->UMIN(reg_q.S4(), reg_q.S4(), OAK_QSCRATCH3.S4());
+	}
+	// Neither overflow clamp turns a nonzero exponent into zero, so the
+	// original exponent still identifies exactly the denormals and zeros.
+	oakAsm->CMEQ(exponent_q.S4(), exponent_q.S4(), 0);
+	oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 1);
+	oakAsm->BIC(reg_q.B16(), reg_q.B16(), exponent_q.B16());
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+// Preserve the original emitted algorithm as an independent regression fixture.
+static __fi void mVUClampVuDoubleVectorReference_oaknut(int reg, int exponent_reg, int mask_reg,
 	bool clamp_overflow, bool maxvals_ready = false)
 {
 	// Adjacent exact FMAC clamps can retain maxvals in Q30 instead of rebuilding it.
@@ -304,6 +331,59 @@ static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg, in
 		oakAsm->BIT(reg_q.B16(), mask_q.B16(), exponent_q.B16());
 	}
 }
+
+#endif
+
+static __fi void mVUClampVuDoubleBroadcastBits_oaknut(int to, int from, int lane, bool clamp_overflow)
+{
+	// Normalize the selected bits once before replicating identical SIMD lanes.
+	// AND (without S) preserves the exponent test for the first CSEL.
+	oakAsm->MOV(OAK_WSCRATCH, oakQRegister(from).Selem()[lane]);
+	oakAsm->ANDS(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7f800000u);
+	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x80000000u);
+	oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH2, OAK_WSCRATCH, oak::Cond::EQ);
+	if (clamp_overflow)
+	{
+		// Only exponent 255 makes this masked XOR zero. Form signed max
+		// without another register, retaining the test flags through ORR/EOR.
+		oakAsm->EOR(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7f800000u);
+		oakAsm->TST(OAK_WSCRATCH2, 0x7f800000u);
+		oakAsm->ORR(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7fffffffu);
+		oakAsm->EOR(OAK_WSCRATCH2, OAK_WSCRATCH2, 0x00800000u);
+		oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH2, OAK_WSCRATCH, oak::Cond::EQ);
+	}
+	oakAsm->DUP(oakQRegister(to).S4(), OAK_WSCRATCH);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitBroadcastClamp(u32 lane, bool overflow, bool reference)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	if (reference)
+	{
+		oakAsm->DUP(oak::util::Q1.S4(), oak::util::Q0.Selem()[lane]);
+		mVUClampVuDoubleVectorReference_oaknut(1, 2, 3, overflow, true);
+	}
+	else
+		mVUClampVuDoubleBroadcastBits_oaknut(1, 0, lane, overflow);
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+extern "C" u32 EmuCoreXOracleEmitVectorClamp(bool overflow, bool reference)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	oakAsm->MOV(oak::util::Q1.B16(), oak::util::Q0.B16());
+	if (reference)
+		mVUClampVuDoubleVectorReference_oaknut(1, 2, 3, overflow, true);
+	else
+		mVUClampVuDoubleVectorBits_oaknut(1, 2, 3, overflow, true);
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+
+#endif
 
 static __fi void mVUClampDenormalScalarBits_oaknut(int reg)
 {

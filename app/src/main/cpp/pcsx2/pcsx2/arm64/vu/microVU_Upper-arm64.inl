@@ -214,17 +214,17 @@ static __fi void mVUUpperFmlaSsLane_oaknut(int acc, int left, int right, int lan
 	oakAsm->MOV(oakQRegister(acc).Selem()[0], OAK_QSCRATCH.Selem()[0]);
 }
 
-static __fi void mVUUpperPrepareVuDoubleMaxvals_oaknut(mV)
+static __fi void mVUUpperPrepareVuDoubleBounds_oaknut(mV)
 {
-	// Q30 is reserved scratch and remains intact across the selected adjacent
-	// clamps. Do not carry this through mVUUpperPshufd_oaknut(), which uses Q30.
+	// Keep both bounds in reserved scratch across adjacent clamps. Load them
+	// after any mVUUpperPshufd_oaknut(), which uses the same Q29 scratch.
 	if (CHECK_VU_OVERFLOW(mVU.index))
-		mVUEmitMaxvalsVector_oaknut(OAK_QSCRATCH2);
+		mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
 }
 
-static __fi void mVUUpperVuDoubleVector_oaknut(mV, int reg, int t1, int t2, bool maxvals_ready = false)
+static __fi void mVUUpperVuDoubleVector_oaknut(mV, int reg, int t1, int t2, bool bounds_ready = false)
 {
-	mVUClampVuDoubleVectorBits_oaknut(reg, t1, t2, CHECK_VU_OVERFLOW(mVU.index), maxvals_ready);
+	mVUClampVuDoubleVectorBits_oaknut(reg, t1, t2, CHECK_VU_OVERFLOW(mVU.index), bounds_ready);
 }
 
 static __fi void mVUUpperMulPsLane_oaknut(int to, int from, int lane)
@@ -644,7 +644,7 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 	if (needsOperandClamp)
 	{
 		oakAsm->MOV(oakQRegister(FtDouble).B16(), oakQRegister(Ft).B16());
-		mVUUpperPrepareVuDoubleMaxvals_oaknut(mVU);
+		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, FtDouble, t1, t2, true);
 	}
@@ -1340,14 +1340,14 @@ static void mVU_MADD_cop2_emit_oaknut(mP)
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(Ft).B16(), oakQRegister(FtRaw).B16());
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
-	mVUUpperPrepareVuDoubleMaxvals_oaknut(mVU);
+	mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 	mVUUpperVuDoubleVector_oaknut(mVU, Ft, t1, t2, true);
 	mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(ACC).B16());
 	if (_XYZW_SS2)
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
-	// The SS2 shuffle above clobbers Q30 (maxvals); without it the values
-	// loaded by PrepareVuDoubleMaxvals are still live and must not be rebuilt.
+	// The SS2 shuffle above may clobber Q29 (negative bound); without it the values
+	// loaded by PrepareVuDoubleBounds are still live and must not be rebuilt.
 	mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, !_XYZW_SS2);
 	if (_XYZW_SS)
 	{
@@ -1406,7 +1406,7 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
 	if (needsVu0Exact)
 	{
-		mVUUpperPrepareVuDoubleMaxvals_oaknut(mVU);
+		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fi, t1, t2, true);
@@ -1520,7 +1520,10 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	{
 		FtL = mVU.regAlloc->allocRegId();
 		recBeginOaknutEmit();
-		mVUUpperDupLane_oaknut(FtL, FtRaw, lane);
+		if (needsVu1MaddLaneVuDouble)
+			mVUClampVuDoubleBroadcastBits_oaknut(FtL, FtRaw, lane, CHECK_VU_OVERFLOW(mVU.index));
+		else
+			mVUUpperDupLane_oaknut(FtL, FtRaw, lane);
 		recEndOaknutEmit();
 		mVU.regAlloc->clearNeededXmmId(FtRaw);
 	}
@@ -1538,10 +1541,9 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
 	if (needsVu1MaddLaneVuDouble)
 	{
-		mVUUpperPrepareVuDoubleMaxvals_oaknut(mVU);
+		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FtL, t1, t2, true);
 	}
 	if (_XYZW_SS)
 	{
@@ -1649,7 +1651,7 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 	{
 		oakAsm->MOV(oakQRegister(FsWork).B16(), oakQRegister(Fs).B16());
 		oakAsm->MOV(oakQRegister(FtWork).B16(), oakQRegister(Ft).B16());
-		mVUUpperPrepareVuDoubleMaxvals_oaknut(mVU);
+		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
 		mVUUpperVuDoubleVector_oaknut(mVU, Fd, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, FsWork, t1, t2, true);
 		mVUUpperVuDoubleVector_oaknut(mVU, FtWork, t1, t2, true);
