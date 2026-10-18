@@ -89,8 +89,35 @@ static u8* recBranchPatchpoint_emit_oaknut()
 	return branch;
 }
 
+struct RecEqBranchPatchpoint
+{
+	u8* branch;
+	int zero_register;
+};
+
+static void recPatchEqBranch(const RecEqBranchPatchpoint& patch, const void* target, oak::Cond cond)
+{
+	if (patch.zero_register < 0)
+	{
+		oakPatchCondBranch(patch.branch, target, cond, false);
+		return;
+	}
+
+	// The branch stays before either delay-slot copy, so it reads the original
+	// full-width operand even when the delay slot overwrites that register.
+	pxAssert(cond == oak::Cond::EQ || cond == oak::Cond::NE);
+	pxAssert(patch.zero_register < 32);
+	const s64 displacement = static_cast<s64>(reinterpret_cast<intptr_t>(target) - reinterpret_cast<intptr_t>(patch.branch));
+	pxAssert((displacement & 3) == 0);
+	pxAssert(displacement >= -(1ll << 20) && displacement < (1ll << 20));
+	const u32 imm19 = static_cast<u32>((displacement >> 2) & 0x7ffff);
+	const u32 encoded = 0xb4000000u | (cond == oak::Cond::NE ? 0x01000000u : 0) |
+		(imm19 << 5) | static_cast<u32>(patch.zero_register);
+	std::memcpy(patch.branch, &encoded, sizeof(encoded));
+}
+
 template <int Process>
-static u8* recSetBranchEQExact_emit_oaknut()
+static RecEqBranchPatchpoint recSetBranchEQExact_emit_oaknut()
 {
 	_eeFlushAllDirty();
 
@@ -109,11 +136,16 @@ static u8* recSetBranchEQExact_emit_oaknut()
 		return scratch;
 	};
 
+	int zero_register = -1;
 	recBeginOaknutEmit();
 	auto compare_constant = [&](int host_gpr, int host_xmm, int guest_gpr, int constant_gpr) {
 		const oak::XReg operand = get_operand(host_gpr, host_xmm, guest_gpr, OAK_XSCRATCH);
 		const u64 constant = g_cpuConstRegs[constant_gpr].UD[0];
-		if (constant <= 4095)
+		if (constant == 0)
+		{
+			zero_register = static_cast<int>(operand.index());
+		}
+		else if (constant <= 4095)
 		{
 			oakAsm->CMP(operand, constant);
 		}
@@ -158,7 +190,7 @@ static u8* recSetBranchEQExact_emit_oaknut()
 	}
 	recEndOaknutEmit();
 
-	return recBranchPatchpoint_emit_oaknut();
+	return {recBranchPatchpoint_emit_oaknut(), zero_register};
 }
 
 template <bool BranchOnLessThanZero, bool FlushBeforeCompare = true>
@@ -248,7 +280,7 @@ static void recBEQ_process()
 	{
 		const bool swap = TrySwapDelaySlot(_Rs_, _Rt_, 0, true);
 
-		u8* j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
+		const RecEqBranchPatchpoint j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
 
 		if (!swap)
 		{
@@ -258,7 +290,7 @@ static void recBEQ_process()
 
 		SetBranchImm(branchTo);
 
-		oakPatchCondBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE, false);
+		recPatchEqBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE);
 
 		if (!swap)
 		{
@@ -313,7 +345,7 @@ static void recBNE_process()
 
 	const bool swap = TrySwapDelaySlot(_Rs_, _Rt_, 0, true);
 
-	u8* j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
+	const RecEqBranchPatchpoint j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
 
 	if (!swap)
 	{
@@ -323,7 +355,7 @@ static void recBNE_process()
 
 	SetBranchImm(branchTo);
 
-	oakPatchCondBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::EQ, false);
+	recPatchEqBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::EQ);
 
 	if (!swap)
 	{
@@ -368,13 +400,13 @@ static void recBEQL_process()
 {
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
 
-	u8* j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
+	const RecEqBranchPatchpoint j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
 
 	SaveBranchState();
 	recompileNextInstruction(true, false);
 	SetBranchImm(branchTo);
 
-	oakPatchCondBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE, false);
+	recPatchEqBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE);
 
 	LoadBranchState();
 	SetBranchImm(pc);
@@ -412,12 +444,12 @@ static void recBNEL_process()
 {
 	u32 branchTo = ((s32)_Imm_ * 4) + pc;
 
-	u8* j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
+	const RecEqBranchPatchpoint j32Ptr = recSetBranchEQExact_emit_oaknut<Process>();
 
 	SaveBranchState();
 	SetBranchImm(pc + 4);
 
-	oakPatchCondBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE, false);
+	recPatchEqBranch(j32Ptr, oakGetCurrentCodePointer(), oak::Cond::NE);
 
 	// recopy the next inst
 	LoadBranchState();
