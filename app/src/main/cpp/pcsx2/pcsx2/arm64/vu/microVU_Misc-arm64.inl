@@ -333,14 +333,37 @@ static __fi void mVUClampDenormalVectorBits_oaknut(int reg)
 }
 
 
-static __fi void mVUClamp1ScalarBits_oaknut(int reg)
+static __fi void mVUClamp1ScalarBits_oaknut(int reg, bool limits_ready = false)
 {
-	oakAsm->MOV(OAK_QSCRATCH2.B16(), oakQRegister(reg).B16());
-	mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH);
-	oakAsm->SMIN(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), OAK_QSCRATCH.S4());
+	if (!limits_ready)
+		mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH);
+	oakAsm->SMIN(OAK_QSCRATCH2.S4(), oakQRegister(reg).S4(), OAK_QSCRATCH.S4());
 	oakAsm->UMIN(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), OAK_QSCRATCH3.S4());
 	oakAsm->MOV(oakQRegister(reg).Selem()[0], OAK_QSCRATCH2.Selem()[0]);
 }
+
+static __fi void mVUClamp1ScalarPairBits_oaknut(int first, int second)
+{
+	mVUClamp1ScalarBits_oaknut(first);
+	// The scalar insert leaves both clamp-limit registers intact. Identical
+	// allocated operands already contain the clamped value after the first call.
+	if (first != second)
+		mVUClamp1ScalarBits_oaknut(second, true);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitScalarClamp(u32 mode)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	if (!mode)
+		mVUClamp1ScalarBits_oaknut(0);
+	else
+		mVUClamp1ScalarPairBits_oaknut(0, mode == 1 ? 1 : 0);
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 static __fi void mVUClamp1ScalarFast_oaknut(int reg)
 {

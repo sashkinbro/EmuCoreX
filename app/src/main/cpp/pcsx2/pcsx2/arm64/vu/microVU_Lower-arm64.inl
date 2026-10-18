@@ -220,8 +220,7 @@ static void mVU_RSQRT_direct_emit_oaknut(mP)
 		// vuDouble() converts exponent-255 operands to signed VU max before
 		// RSQRT. Do this before the sign/zero paths so NaNs and infinities
 		// follow the same arithmetic and flag behavior as the interpreter.
-		mVUClamp1ScalarBits_oaknut(Fs);
-		mVUClamp1ScalarBits_oaknut(Ft);
+		mVUClamp1ScalarPairBits_oaknut(Fs, Ft);
 	}
 	mVU_storeDivFlag_oaknut(mVU, 0);
 	mVU_makeRsqrtZeroSign_oaknut(t1, Fs);
@@ -293,8 +292,7 @@ static void mVU_DIV_direct_emit_oaknut(mP)
 	{
 		// Match vuDouble() input conversion for the accurate clamp modes.
 		// The bitwise path keeps the original sign of NaNs.
-		mVUClamp1ScalarBits_oaknut(Fs);
-		mVUClamp1ScalarBits_oaknut(Ft);
+		mVUClamp1ScalarPairBits_oaknut(Fs, Ft);
 	}
 	mVU_testZero_oaknut(Ft);
 	oak::Label cjmp;

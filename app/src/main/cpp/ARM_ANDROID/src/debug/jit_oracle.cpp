@@ -2200,6 +2200,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_pq.inl"
 #include "jit_oracle_vif_mpg.inl"
 #include "jit_oracle_vu_div_zero.inl"
+#include "jit_oracle_vu_scalar_clamp.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
@@ -12232,6 +12233,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VifMpgTests();
     else if (std::strcmp(suite, "vu-div-zero") == 0)
         VUDivZeroTests();
+    else if (std::strcmp(suite, "vu-scalar-clamp") == 0)
+        VUScalarClampTests();
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
