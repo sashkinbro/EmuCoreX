@@ -2062,7 +2062,6 @@ fun EmulationScreen(
                     onSetAutoSaveIntervalMinutes = { viewModel.setAutoSaveIntervalMinutes(it) },
                     onSetAutoSaveOnExit = { viewModel.setAutoSaveOnExit(it) },
                     onSetAutoLoadOnStart = { viewModel.setAutoLoadOnStart(it) },
-                    onSaveGameSettingsProfile = { viewModel.saveCurrentGameSettingsProfile() },
                     onResetGameSettingsProfile = { viewModel.resetCurrentGameSettingsProfile() },
                     onNextSlot = { viewModel.setSlot(uiState.currentSlot + 1) },
                     onPrevSlot = { viewModel.setSlot(uiState.currentSlot - 1) },
@@ -3714,7 +3713,6 @@ private fun EmulationSidebarMenu(
     onSetAutoSaveIntervalMinutes: (Int) -> Unit,
     onSetAutoSaveOnExit: (Boolean) -> Unit,
     onSetAutoLoadOnStart: (Boolean) -> Unit,
-    onSaveGameSettingsProfile: () -> Unit,
     onResetGameSettingsProfile: () -> Unit,
     onNextSlot: () -> Unit,
     onPrevSlot: () -> Unit,
@@ -4301,15 +4299,6 @@ private fun EmulationSidebarMenu(
                         ) {
                             Box(modifier = Modifier.weight(1f)) {
                                 MenuButton(
-                                    icon = Icons.Rounded.Save,
-                                    text = stringResource(R.string.game_settings_overlay_save),
-                                    onClick = onSaveGameSettingsProfile,
-                                    enabled = !uiState.isActionInProgress,
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f)
-                                )
-                            }
-                            Box(modifier = Modifier.weight(1f)) {
-                                MenuButton(
                                     icon = Icons.Rounded.Restore,
                                     text = stringResource(R.string.game_settings_overlay_reset),
                                     onClick = onResetGameSettingsProfile,
@@ -4407,7 +4396,7 @@ private fun EmulationSidebarMenu(
                             currentValue = uiState.stickToggleTarget,
                             onValueChange = onSetStickToggleTarget,
                             helpText = stringResource(R.string.settings_help_stick_toggle_target),
-                            onResetToDefault = { onSetStickToggleTarget(AppPreferences.DEFAULT_STICK_TOGGLE_TARGET) }
+                            onResetToDefault = { onSetStickToggleTarget(globalDefaults.stickToggleTarget) }
                         )
 
                         LiveSliderRow(
@@ -4431,7 +4420,7 @@ private fun EmulationSidebarMenu(
                             steps = 149,
                             onValueChange = { onSetLeftStickSensitivity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_left_stick_sensitivity),
-                            onResetToDefault = { onSetLeftStickSensitivity(AppPreferences.DEFAULT_STICK_SENSITIVITY) }
+                            onResetToDefault = { onSetLeftStickSensitivity(overlayDefaults.leftStickSensitivity) }
                         )
 
                         LiveSliderRow(
@@ -4442,7 +4431,7 @@ private fun EmulationSidebarMenu(
                             steps = 149,
                             onValueChange = { onSetRightStickSensitivity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_right_stick_sensitivity),
-                            onResetToDefault = { onSetRightStickSensitivity(AppPreferences.DEFAULT_STICK_SENSITIVITY) }
+                            onResetToDefault = { onSetRightStickSensitivity(overlayDefaults.rightStickSensitivity) }
                         )
 
                         SettingsToggle(
@@ -4450,7 +4439,7 @@ private fun EmulationSidebarMenu(
                             checked = uiState.invertLeftStick,
                             onCheckedChange = onSetInvertLeftStick,
                             helpText = stringResource(R.string.settings_help_invert_left_stick),
-                            onResetToDefault = { onSetInvertLeftStick(false) }
+                            onResetToDefault = { onSetInvertLeftStick(overlayDefaults.invertLeftStick) }
                         )
 
                         SettingsToggle(
@@ -4458,7 +4447,7 @@ private fun EmulationSidebarMenu(
                             checked = uiState.invertLeftStickHorizontal,
                             onCheckedChange = onSetInvertLeftStickHorizontal,
                             helpText = stringResource(R.string.settings_help_invert_left_stick_horizontal),
-                            onResetToDefault = { onSetInvertLeftStickHorizontal(false) }
+                            onResetToDefault = { onSetInvertLeftStickHorizontal(overlayDefaults.invertLeftStickHorizontal) }
                         )
 
                         SettingsToggle(
@@ -4466,7 +4455,7 @@ private fun EmulationSidebarMenu(
                             checked = uiState.invertRightStick,
                             onCheckedChange = onSetInvertRightStick,
                             helpText = stringResource(R.string.settings_help_invert_right_stick),
-                            onResetToDefault = { onSetInvertRightStick(false) }
+                            onResetToDefault = { onSetInvertRightStick(overlayDefaults.invertRightStick) }
                         )
 
                         SettingsToggle(
@@ -4474,7 +4463,7 @@ private fun EmulationSidebarMenu(
                             checked = uiState.invertRightStickHorizontal,
                             onCheckedChange = onSetInvertRightStickHorizontal,
                             helpText = stringResource(R.string.settings_help_invert_right_stick_horizontal),
-                            onResetToDefault = { onSetInvertRightStickHorizontal(false) }
+                            onResetToDefault = { onSetInvertRightStickHorizontal(overlayDefaults.invertRightStickHorizontal) }
                         )
 
                         MenuButton(
@@ -4507,7 +4496,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadStickDeadzone(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_deadzone),
-                            onResetToDefault = { onSetGamepadStickDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_DEADZONE) }
+                            onResetToDefault = { onSetGamepadStickDeadzone(globalDefaults.gamepadStickDeadzone) }
                         )
 
                         LiveSliderRow(
@@ -4519,7 +4508,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadLeftStickSensitivity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_left_stick_sensitivity),
-                            onResetToDefault = { onSetGamepadLeftStickSensitivity(AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY) }
+                            onResetToDefault = { onSetGamepadLeftStickSensitivity(globalDefaults.gamepadLeftStickSensitivity) }
                         )
 
                         LiveSliderRow(
@@ -4531,7 +4520,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadRightStickSensitivity(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_right_stick_sensitivity),
-                            onResetToDefault = { onSetGamepadRightStickSensitivity(AppPreferences.DEFAULT_GAMEPAD_STICK_SENSITIVITY) }
+                            onResetToDefault = { onSetGamepadRightStickSensitivity(globalDefaults.gamepadRightStickSensitivity) }
                         )
 
                         LiveSliderRow(
@@ -4543,7 +4532,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadLeftStickNegativeDeadzone(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
-                            onResetToDefault = { onSetGamepadLeftStickNegativeDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE) }
+                            onResetToDefault = { onSetGamepadLeftStickNegativeDeadzone(globalDefaults.gamepadLeftStickNegativeDeadzone) }
                         )
 
                         LiveSliderRow(
@@ -4555,7 +4544,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadRightStickNegativeDeadzone(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_negative_deadzone),
-                            onResetToDefault = { onSetGamepadRightStickNegativeDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_NEGATIVE_DEADZONE) }
+                            onResetToDefault = { onSetGamepadRightStickNegativeDeadzone(globalDefaults.gamepadRightStickNegativeDeadzone) }
                         )
 
                         LiveSliderRow(
@@ -4567,7 +4556,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadLeftStickAntiDeadzone(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
-                            onResetToDefault = { onSetGamepadLeftStickAntiDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE) }
+                            onResetToDefault = { onSetGamepadLeftStickAntiDeadzone(globalDefaults.gamepadLeftStickAntiDeadzone) }
                         )
 
                         LiveSliderRow(
@@ -4579,7 +4568,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadRightStickAntiDeadzone(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_anti_deadzone),
-                            onResetToDefault = { onSetGamepadRightStickAntiDeadzone(AppPreferences.DEFAULT_GAMEPAD_STICK_ANTI_DEADZONE) }
+                            onResetToDefault = { onSetGamepadRightStickAntiDeadzone(globalDefaults.gamepadRightStickAntiDeadzone) }
                         )
 
                         LiveSliderRow(
@@ -4591,7 +4580,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadLeftStickCurve(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
-                            onResetToDefault = { onSetGamepadLeftStickCurve(AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE) }
+                            onResetToDefault = { onSetGamepadLeftStickCurve(globalDefaults.gamepadLeftStickCurve) }
                         )
 
                         LiveSliderRow(
@@ -4603,7 +4592,7 @@ private fun EmulationSidebarMenu(
                             enabled = gamepadConnected,
                             onValueChange = { onSetGamepadRightStickCurve(it.toInt()) },
                             helpText = stringResource(R.string.settings_help_gamepad_stick_curve),
-                            onResetToDefault = { onSetGamepadRightStickCurve(AppPreferences.DEFAULT_GAMEPAD_STICK_CURVE) }
+                            onResetToDefault = { onSetGamepadRightStickCurve(globalDefaults.gamepadRightStickCurve) }
                         )
 
                         SettingsToggle(
@@ -5047,7 +5036,7 @@ private fun EmulationSidebarMenu(
                             horizontalScrolling = true,
                             helpText = stringResource(R.string.emulation_local_multiplayer_help),
                             onResetToDefault = {
-                                onSetLocalMultiplayerMode(AppPreferences.LOCAL_MULTIPLAYER_OFF)
+                                onSetLocalMultiplayerMode(globalDefaults.localMultiplayerMode)
                             }
                         )
 

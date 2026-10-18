@@ -6976,7 +6976,7 @@ internal fun ChoiceSection(
 }
 
 @Composable
-private fun BitmaskChoiceSection(
+internal fun BitmaskChoiceSection(
     title: String,
     options: List<Pair<Int, String>>,
     selectedMask: Int,
@@ -7349,7 +7349,7 @@ private fun nativeScalingOptions(): List<Pair<Int, String>> = listOf(
 )
 
 @Composable
-private fun fpsOverlayMetricOptions(): List<Pair<Int, String>> = listOf(
+internal fun fpsOverlayMetricOptions(): List<Pair<Int, String>> = listOf(
     PerformanceOverlayMetrics.VERSION to stringResource(R.string.settings_fps_metric_version),
     PerformanceOverlayMetrics.FPS to stringResource(R.string.settings_fps_metric_fps),
     PerformanceOverlayMetrics.VPS to stringResource(R.string.settings_fps_metric_vps),

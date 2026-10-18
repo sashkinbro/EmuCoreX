@@ -114,6 +114,7 @@ import com.sbro.emucorex.data.GameItem
 import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.MemoryCardInfo
 import com.sbro.emucorex.data.MemoryCardRepository
+import com.sbro.emucorex.data.PerGameInterfaceSettings
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.RetroArchShaderPreset
@@ -121,6 +122,8 @@ import com.sbro.emucorex.data.RetroArchShaderRepository
 import com.sbro.emucorex.data.SettingsSnapshot
 import com.sbro.emucorex.data.TouchControlPressEffect
 import com.sbro.emucorex.data.TouchControlVisualStyle
+import com.sbro.emucorex.data.toInterfaceSettings
+import com.sbro.emucorex.data.withOnlyOverridesComparedWith
 import com.sbro.emucorex.ui.common.GameCoverArt
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
@@ -129,6 +132,7 @@ import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
+import com.sbro.emucorex.ui.emulation.readInterfaceSettings
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorex.ui.theme.neon.NeonSystemBanner
@@ -136,6 +140,7 @@ import org.json.JSONObject
 import java.text.DateFormat
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -167,6 +172,8 @@ fun PerGameSettingsManagerScreen(
     val preferences = remember(context) { AppPreferences(context) }
     val libraryCacheRepository = remember(context) { GameLibraryCacheRepository(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val autoSaveEnabled by preferences.autoSaveEnabled.collectAsState(initial = false)
+    val autoSaveIntervalMinutes by preferences.autoSaveIntervalMinutes.collectAsState(initial = 1)
     val rootPaths by preferences.gamePaths.collectAsState(initial = emptyList())
     val preferEnglishTitles by preferences.preferEnglishGameTitles.collectAsState(initial = false)
     val scope = rememberCoroutineScope()
@@ -202,12 +209,28 @@ fun PerGameSettingsManagerScreen(
     suspend fun persistDraft(draft: PerGameSettings): List<PerGameSettings> {
         return profileMutationMutex.withLock {
             withContext(Dispatchers.IO) {
-                val currentLayout = repository.get(draft.gameKey)?.touchControlsLayout
+                val global = preferences.settingsSnapshot.first().toPerGameSettings(
+                    GameItem(path = draft.gameKey, title = draft.gameTitle, fileName = draft.gameTitle,
+                        fileSize = 0L, lastModified = 0L, serial = draft.gameSerial)
+                )
+                val generation = FrameGenerationManager(context).snapshot().settings
+                val defaults = global.copy(
+                    frameGenerationEnabled = generation.enabled,
+                    frameGenerationMultiplier = generation.multiplier,
+                    frameGenerationPerformance = generation.performanceMode,
+                    frameGenerationFlowScale = generation.flowScalePercent,
+                    frameGenerationTargetRate = generation.targetRefreshRate,
+                    interfaceSettings = preferences.readInterfaceSettings()
+                )
+                val existing = repository.get(draft.gameKey)
+                val retainedGsKeys = if (existing == null) emptySet() else
+                    existing.providedKeys?.intersect(setOf("hwDownloadMode", "blendingAccuracy"))
+                        ?: setOf("hwDownloadMode", "blendingAccuracy")
                 repository.save(
                     draft.copy(
-                        touchControlsLayout = currentLayout,
-                        providedKeys = null
-                    )
+                        touchControlsLayout = existing?.touchControlsLayout,
+                        customTouchControls = existing?.customTouchControls
+                    ).withOnlyOverridesComparedWith(defaults, retainedGsKeys)
                 )
                 repository.getAll()
             }
@@ -506,13 +529,14 @@ fun PerGameSettingsManagerScreen(
                     val frameGenerationForDefault = remember(context, settingsSnapshot) {
                         FrameGenerationManager(context).snapshot()
                     }
-                    val defaultProfile = remember(settingsSnapshot, game, frameGenerationForDefault) {
+                    val defaultProfile = remember(settingsSnapshot, game, frameGenerationForDefault, autoSaveEnabled, autoSaveIntervalMinutes) {
                         settingsSnapshot.toPerGameSettings(game).copy(
                             frameGenerationEnabled = frameGenerationForDefault.settings.enabled,
                             frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
                             frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
                             frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
-                            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
+                            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate,
+                            interfaceSettings = settingsSnapshot.toInterfaceSettings(autoSaveEnabled, autoSaveIntervalMinutes)
                         )
                     }
                     val editableProfile = remember(storedProfile, defaultProfile) {
@@ -1165,6 +1189,7 @@ private fun GameSettingsTabContent(
             }
             GameSettingsManagerTab.System -> {
                 EditorSection(title = stringResource(R.string.game_settings_manager_section_runtime)) {
+                    PerGameInterfaceSettingsEditor(draft, defaultProfile, controls = false, onDraftChange = onDraftChange)
                     ToggleRow(
                         title = stringResource(R.string.settings_show_fps),
                         checked = draft.showFps,
@@ -1409,6 +1434,7 @@ private fun GameSettingsTabContent(
             }
             GameSettingsManagerTab.Controls -> {
                 EditorSection(title = stringResource(R.string.settings_customization_touch_controls_section)) {
+                    PerGameInterfaceSettingsEditor(draft, defaultProfile, controls = true, onDraftChange = onDraftChange)
                     SelectionRow(
                         title = stringResource(R.string.settings_customization_touch_controls_style),
                         options = listOf(
@@ -1771,17 +1797,28 @@ fun PerGameSettingsQuickEditorDialog(
     val repository = remember(context) { PerGameSettingsRepository(context) }
     val preferences = remember(context) { AppPreferences(context) }
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val autoSaveEnabled by preferences.autoSaveEnabled.collectAsState(initial = false)
+    val autoSaveIntervalMinutes by preferences.autoSaveIntervalMinutes.collectAsState(initial = 1)
     val frameGenerationForDefault = remember(context, settingsSnapshot) {
         FrameGenerationManager(context).snapshot()
     }
-    val initialProfile = remember(game.path, game.title, game.serial, settingsSnapshot, frameGenerationForDefault) {
+    val initialProfile = remember(
+        game.path,
+        game.title,
+        game.serial,
+        settingsSnapshot,
+        frameGenerationForDefault,
+        autoSaveEnabled,
+        autoSaveIntervalMinutes
+    ) {
         val base = settingsSnapshot.toPerGameSettings(game)
         val withLsfg = base.copy(
             frameGenerationEnabled = frameGenerationForDefault.settings.enabled,
             frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
             frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
             frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
-            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
+            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate,
+            interfaceSettings = settingsSnapshot.toInterfaceSettings(autoSaveEnabled, autoSaveIntervalMinutes)
         )
         repository.get(game.path) ?: withLsfg
     }
@@ -1940,11 +1977,13 @@ private fun GameSettingsEditorDialog(
     val createCardLabel = stringResource(R.string.per_game_memory_card_create)
     val createCardFailedMessage = stringResource(R.string.memory_card_create_failed)
     val settingsSnapshot by preferences.settingsSnapshot.collectAsState(initial = SettingsSnapshot())
+    val autoSaveEnabled by preferences.autoSaveEnabled.collectAsState(initial = false)
+    val autoSaveIntervalMinutes by preferences.autoSaveIntervalMinutes.collectAsState(initial = 1)
     val frameGenerationForDefault = remember(context, settingsSnapshot) {
         FrameGenerationManager(context).snapshot()
     }
     val nativeUpscaleLabel = stringResource(R.string.settings_upscale_native)
-    val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial, frameGenerationForDefault) {
+    val defaultProfile = remember(settingsSnapshot, profile.gameKey, profile.gameTitle, profile.gameSerial, frameGenerationForDefault, autoSaveEnabled, autoSaveIntervalMinutes) {
         val base = settingsSnapshot.toPerGameSettings(
             GameItem(
                 path = profile.gameKey,
@@ -1960,7 +1999,8 @@ private fun GameSettingsEditorDialog(
             frameGenerationMultiplier = frameGenerationForDefault.settings.multiplier,
             frameGenerationPerformance = frameGenerationForDefault.settings.performanceMode,
             frameGenerationFlowScale = frameGenerationForDefault.settings.flowScalePercent,
-            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate
+            frameGenerationTargetRate = frameGenerationForDefault.settings.targetRefreshRate,
+            interfaceSettings = settingsSnapshot.toInterfaceSettings(autoSaveEnabled, autoSaveIntervalMinutes)
         )
     }
     val editableProfile = remember(profile, defaultProfile) {
@@ -2012,7 +2052,17 @@ private fun GameSettingsEditorDialog(
     ) {
         LaunchedEffect(draft) {
             if (hasUserChange) {
-                onSave(draft.copy(providedKeys = null))
+                val preservedDraft = draft.copy(
+                    touchControlsLayout = profile.touchControlsLayout ?: draft.touchControlsLayout,
+                    customTouchControls = profile.customTouchControls ?: draft.customTouchControls
+                )
+                onSave(
+                    preservedDraft.withOnlyOverridesComparedWith(
+                        defaultProfile,
+                        profile.providedKeys?.intersect(setOf("hwDownloadMode", "blendingAccuracy"))
+                            ?: setOf("hwDownloadMode", "blendingAccuracy")
+                    )
+                )
             } else {
                 hasUserChange = true
             }
@@ -2165,6 +2215,7 @@ private fun GameSettingsEditorDialog(
                             )
                         }
                         EditorSection(title = stringResource(R.string.settings_customization_touch_controls_section)) {
+                            PerGameInterfaceSettingsEditor(draft, defaultProfile, controls = true, onDraftChange = { draft = it })
                             SelectionRow(
                                 title = stringResource(R.string.settings_customization_touch_controls_style),
                                 options = listOf(
@@ -2206,6 +2257,7 @@ private fun GameSettingsEditorDialog(
                             )
                         }
                         EditorSection(title = stringResource(R.string.game_settings_manager_section_runtime)) {
+                            PerGameInterfaceSettingsEditor(draft, defaultProfile, controls = false, onDraftChange = { draft = it })
                             ToggleRow(
                                 title = stringResource(R.string.settings_show_fps),
                                 checked = draft.showFps,
@@ -4343,6 +4395,7 @@ private fun SettingsSnapshot.toPerGameSettings(game: GameItem): PerGameSettings 
         gameKey = game.path,
         gameTitle = game.title,
         gameSerial = game.serial,
+        interfaceSettings = toInterfaceSettings(),
         renderer = renderer,
         gpuDriverType = gpuDriverType,
         customDriverPath = customDriverPath,
@@ -4532,9 +4585,12 @@ private fun MemoryCardSlotSelectionRow(
 }
 
 private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): PerGameSettings {
-    val keys = providedKeys ?: return copy(providedKeys = null)
+    val effectiveInterface = interfaceSettings?.resolveAgainst(defaultProfile.interfaceSettings ?: PerGameInterfaceSettings())
+        ?: defaultProfile.interfaceSettings
+    val keys = providedKeys ?: return copy(interfaceSettings = effectiveInterface, providedKeys = null)
     fun <T> pick(key: String, current: T, fallback: T): T = if (key in keys) current else fallback
     return defaultProfile.copy(
+        interfaceSettings = effectiveInterface,
         gameKey = gameKey,
         gameTitle = gameTitle,
         gameSerial = gameSerial,
@@ -4685,4 +4741,128 @@ private fun PerGameSettings.resolveAgainst(defaultProfile: PerGameSettings): Per
         providedKeys = null,
         updatedAt = updatedAt
     )
+}
+
+@Composable
+private fun PerGameInterfaceSettingsEditor(
+    draft: PerGameSettings,
+    defaultProfile: PerGameSettings,
+    controls: Boolean,
+    onDraftChange: (PerGameSettings) -> Unit
+) {
+    val base = defaultProfile.interfaceSettings ?: PerGameInterfaceSettings()
+    val current = draft.interfaceSettings ?: base
+    fun update(settings: PerGameInterfaceSettings) = onDraftChange(draft.copy(interfaceSettings = settings.sanitized()))
+    if (controls) {
+        ToggleRow(
+            title = stringResource(R.string.emulation_show_controls), checked = current.overlayShow,
+            onCheckedChange = { update(current.copy(overlayShow = it)) },
+            onResetToDefault = { update(current.copy(overlayShow = base.overlayShow)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_gamepad_hide_overlay), checked = current.hideOverlayOnGamepad,
+            onCheckedChange = { update(current.copy(hideOverlayOnGamepad = it)) },
+            helpText = stringResource(R.string.settings_help_hide_overlay_on_gamepad),
+            onResetToDefault = { update(current.copy(hideOverlayOnGamepad = base.hideOverlayOnGamepad)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_compact_controls), checked = current.compactControls,
+            onCheckedChange = { update(current.copy(compactControls = it)) },
+            helpText = stringResource(R.string.settings_help_compact_controls),
+            onResetToDefault = { update(current.copy(compactControls = base.compactControls)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_keep_screen_on), checked = current.keepScreenOn,
+            onCheckedChange = { update(current.copy(keepScreenOn = it)) },
+            helpText = stringResource(R.string.settings_help_keep_screen_on),
+            onResetToDefault = { update(current.copy(keepScreenOn = base.keepScreenOn)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_invert_left_stick), checked = current.invertLeftStick,
+            onCheckedChange = { update(current.copy(invertLeftStick = it)) },
+            helpText = stringResource(R.string.settings_help_invert_left_stick),
+            onResetToDefault = { update(current.copy(invertLeftStick = base.invertLeftStick)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_invert_right_stick), checked = current.invertRightStick,
+            onCheckedChange = { update(current.copy(invertRightStick = it)) },
+            helpText = stringResource(R.string.settings_help_invert_right_stick),
+            onResetToDefault = { update(current.copy(invertRightStick = base.invertRightStick)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_invert_left_stick_horizontal), checked = current.invertLeftStickHorizontal,
+            onCheckedChange = { update(current.copy(invertLeftStickHorizontal = it)) },
+            helpText = stringResource(R.string.settings_help_invert_left_stick_horizontal),
+            onResetToDefault = { update(current.copy(invertLeftStickHorizontal = base.invertLeftStickHorizontal)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.settings_invert_right_stick_horizontal), checked = current.invertRightStickHorizontal,
+            onCheckedChange = { update(current.copy(invertRightStickHorizontal = it)) },
+            helpText = stringResource(R.string.settings_help_invert_right_stick_horizontal),
+            onResetToDefault = { update(current.copy(invertRightStickHorizontal = base.invertRightStickHorizontal)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.settings_overlay_scale), value = current.overlayScale.toFloat(),
+            valueLabel = "${current.overlayScale}%", range = 50f..150f, steps = 99,
+            onValueChange = { update(current.copy(overlayScale = it.roundToInt())) },
+            onResetToDefault = { update(current.copy(overlayScale = base.overlayScale)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.settings_overlay_opacity), value = current.overlayOpacity.toFloat(),
+            valueLabel = "${current.overlayOpacity}%", range = 0f..100f, steps = 99,
+            onValueChange = { update(current.copy(overlayOpacity = it.roundToInt())) },
+            onResetToDefault = { update(current.copy(overlayOpacity = base.overlayOpacity)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.settings_left_stick_sensitivity), value = current.leftStickSensitivity.toFloat(),
+            valueLabel = "${current.leftStickSensitivity}%", range = 50f..200f, steps = 149,
+            onValueChange = { update(current.copy(leftStickSensitivity = it.roundToInt())) },
+            onResetToDefault = { update(current.copy(leftStickSensitivity = base.leftStickSensitivity)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.settings_right_stick_sensitivity), value = current.rightStickSensitivity.toFloat(),
+            valueLabel = "${current.rightStickSensitivity}%", range = 50f..200f, steps = 149,
+            onValueChange = { update(current.copy(rightStickSensitivity = it.roundToInt())) },
+            onResetToDefault = { update(current.copy(rightStickSensitivity = base.rightStickSensitivity)) }
+        )
+    } else {
+        SelectionRow(
+            title = stringResource(R.string.settings_fps_overlay_position),
+            options = listOf(
+                0 to stringResource(R.string.settings_fps_overlay_corner_top_left),
+                1 to stringResource(R.string.settings_fps_overlay_corner_top_right),
+                2 to stringResource(R.string.settings_fps_overlay_corner_bottom_left),
+                3 to stringResource(R.string.settings_fps_overlay_corner_bottom_right)
+            ),
+            selectedValue = current.fpsOverlayCorner,
+            onSelected = { update(current.copy(fpsOverlayCorner = it)) },
+            onResetToDefault = { update(current.copy(fpsOverlayCorner = base.fpsOverlayCorner)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.settings_fps_overlay_scale), value = current.fpsOverlayScale.toFloat(),
+            valueLabel = "${current.fpsOverlayScale}%", range = 75f..200f, steps = 124,
+            onValueChange = { update(current.copy(fpsOverlayScale = it.roundToInt())) },
+            helpText = stringResource(R.string.settings_help_fps_overlay_scale),
+            onResetToDefault = { update(current.copy(fpsOverlayScale = base.fpsOverlayScale)) }
+        )
+        BitmaskChoiceSection(
+            title = stringResource(R.string.settings_fps_overlay_metrics), options = fpsOverlayMetricOptions(),
+            selectedMask = current.fpsOverlayMetrics,
+            onToggle = { update(current.copy(fpsOverlayMetrics = current.fpsOverlayMetrics xor it)) },
+            helpText = stringResource(R.string.settings_help_fps_overlay_metrics),
+            onResetToDefault = { update(current.copy(fpsOverlayMetrics = base.fpsOverlayMetrics)) }
+        )
+        ToggleRow(
+            title = stringResource(R.string.emulation_auto_save_title), checked = current.autoSaveEnabled,
+            onCheckedChange = { update(current.copy(autoSaveEnabled = it)) },
+            onResetToDefault = { update(current.copy(autoSaveEnabled = base.autoSaveEnabled)) }
+        )
+        SliderRow(
+            title = stringResource(R.string.emulation_auto_save_interval_label), value = current.autoSaveIntervalMinutes.toFloat(),
+            valueLabel = "${current.autoSaveIntervalMinutes} ${stringResource(R.string.emulation_auto_save_interval_suffix)}",
+            range = 1f..999f, steps = 997,
+            onValueChange = { update(current.copy(autoSaveIntervalMinutes = it.roundToInt())) },
+            onResetToDefault = { update(current.copy(autoSaveIntervalMinutes = base.autoSaveIntervalMinutes)) }
+        )
+    }
 }

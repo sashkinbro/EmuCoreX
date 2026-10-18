@@ -44,6 +44,7 @@ import com.sbro.emucorex.data.GameRepository
 import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.OverlayLayoutSnapshot
 import com.sbro.emucorex.data.PerGameSettings
+import com.sbro.emucorex.data.PerGameInterfaceSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
 import com.sbro.emucorex.data.resolveShaderChain
 import com.sbro.emucorex.data.toggleStick
@@ -643,6 +644,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     private var currentGameCrc: String = ""
     @Volatile
     private var currentGameSource: String = ""
+    @Volatile
+    private var globalInterfaceSettings = PerGameInterfaceSettings()
+    @Volatile
+    private var currentInterfaceSettingsProfile: PerGameInterfaceSettings? = null
     private var currentTouchControlsLayoutProfile: TouchControlsLayoutProfile? = null
     private var currentCustomTouchControlsProfile: CustomTouchControlLibrary? = null
     private var lastAutoSavePlayTimeMs: Long = 0L
@@ -671,6 +676,69 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 .distinctUntilChanged()
                 .collect(androidGamePerformance::update)
         }
+    }
+
+    private fun applyInterfaceSettings(state: EmulationUiState): EmulationUiState =
+        state.withInterfaceSettings(currentInterfaceSettingsProfile?.resolveAgainst(globalInterfaceSettings) ?: globalInterfaceSettings)
+
+    private fun applyGlobalInterfacePreferenceUpdate(transform: (PerGameInterfaceSettings) -> PerGameInterfaceSettings) {
+        globalInterfaceSettings = transform(globalInterfaceSettings).sanitized()
+        _uiState.value = applyInterfaceSettings(_uiState.value)
+        syncNativePerformanceOverlayState(_uiState.value)
+        syncGamepadAnalogSettings(_uiState.value)
+    }
+
+    private suspend fun persistInterfaceSettings(updatedState: EmulationUiState, persistGlobal: suspend () -> Unit) {
+        val normalized = updatedState.toInterfaceSettings().sanitized()
+        val gameKey = activePerGameKey()
+        var profileActive = false
+        if (gameKey == null) {
+            globalInterfaceSettings = normalized.copy(providedKeys = emptySet())
+            currentInterfaceSettingsProfile = null
+            persistGlobal()
+        } else {
+            val overrides = normalized.overridesComparedWith(globalInterfaceSettings)
+            val existing = perGameSettingsRepository.get(gameKey)
+            val keys = existing?.providedKeys
+                ?.minus("interfaceSettings")
+                ?.let { if (overrides != null) it + "interfaceSettings" else it }
+            profileActive = existing != null || overrides != null
+            if (profileActive) {
+                perGameSettingsRepository.save((existing ?: PerGameSettings(
+                    gameKey = gameKey,
+                    gameTitle = resolvePerGameTitle(updatedState),
+                    gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+                )).copy(interfaceSettings = overrides, providedKeys = keys))
+            }
+            currentInterfaceSettingsProfile = overrides
+        }
+        val finalState = updatedState.withInterfaceSettings(normalized).copy(
+            gameSettingsProfileActive = gameKey != null && profileActive
+        )
+        if (!_uiState.value.autoSaveEnabled && finalState.autoSaveEnabled) lastAutoSavePlayTimeMs = finalState.activePlayTimeMs
+        _uiState.value = finalState
+        syncNativePerformanceOverlayState(finalState)
+        syncGamepadAnalogSettings(finalState)
+    }
+
+    private fun syncGamepadAnalogSettings(state: EmulationUiState) {
+        if (!state.gameSettingsProfileActive) return
+        GamepadManager.applyPerGameOverrides(
+            bindingsByPad = null,
+            deadzone = state.gamepadStickDeadzone,
+            leftSensitivity = state.gamepadLeftStickSensitivity,
+            rightSensitivity = state.gamepadRightStickSensitivity,
+            leftNegativeDeadzone = state.gamepadLeftStickNegativeDeadzone,
+            rightNegativeDeadzone = state.gamepadRightStickNegativeDeadzone,
+            leftAntiDeadzone = state.gamepadLeftStickAntiDeadzone,
+            rightAntiDeadzone = state.gamepadRightStickAntiDeadzone,
+            leftStickCurve = state.gamepadLeftStickCurve,
+            rightStickCurve = state.gamepadRightStickCurve,
+            invertLeftStick = state.invertLeftStick,
+            invertRightStick = state.invertRightStick,
+            invertLeftStickHorizontal = state.invertLeftStickHorizontal,
+            invertRightStickHorizontal = state.invertRightStickHorizontal
+        )
     }
 
     private inline fun applyGlobalRuntimePreferenceUpdate(
@@ -755,7 +823,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         viewModelScope.launch {
             preferences.overlayShow.collect { enabled ->
-                _uiState.value = _uiState.value.copy(controlsVisible = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(overlayShow = enabled) }
             }
         }
         viewModelScope.launch {
@@ -827,89 +895,87 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.fpsOverlayCorner.collect { corner ->
-                _uiState.value = _uiState.value.copy(fpsOverlayCorner = corner)
+                applyGlobalInterfacePreferenceUpdate { it.copy(fpsOverlayCorner = corner) }
             }
         }
         viewModelScope.launch {
             preferences.fpsOverlayScale.collect { scale ->
-                _uiState.value = _uiState.value.copy(fpsOverlayScale = scale)
+                applyGlobalInterfacePreferenceUpdate { it.copy(fpsOverlayScale = scale) }
             }
         }
         viewModelScope.launch {
             preferences.fpsOverlayMetrics.collect { metrics ->
-                val updated = _uiState.value.copy(fpsOverlayMetrics = metrics)
-                _uiState.value = updated
-                syncNativePerformanceOverlayState(updated)
+                applyGlobalInterfacePreferenceUpdate { it.copy(fpsOverlayMetrics = metrics) }
             }
         }
         viewModelScope.launch {
             preferences.compactControls.collect { enabled ->
-                _uiState.value = _uiState.value.copy(compactControls = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(compactControls = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadStickDeadzone.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadStickDeadzone = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadStickDeadzone = value) }
             }
         }
         viewModelScope.launch {
             preferences.invertLeftStick.collect { enabled ->
-                _uiState.value = _uiState.value.copy(invertLeftStick = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(invertLeftStick = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.invertRightStick.collect { enabled ->
-                _uiState.value = _uiState.value.copy(invertRightStick = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(invertRightStick = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.invertLeftStickHorizontal.collect { enabled ->
-                _uiState.value = _uiState.value.copy(invertLeftStickHorizontal = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(invertLeftStickHorizontal = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.invertRightStickHorizontal.collect { enabled ->
-                _uiState.value = _uiState.value.copy(invertRightStickHorizontal = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(invertRightStickHorizontal = enabled) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadLeftStickSensitivity.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadLeftStickSensitivity = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadLeftStickSensitivity = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadRightStickSensitivity.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadRightStickSensitivity = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadLeftStickNegativeDeadzone.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadLeftStickNegativeDeadzone = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadLeftStickNegativeDeadzone = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadRightStickNegativeDeadzone.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadRightStickNegativeDeadzone = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadRightStickNegativeDeadzone = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadLeftStickAntiDeadzone.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadLeftStickAntiDeadzone = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadLeftStickAntiDeadzone = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadRightStickAntiDeadzone.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadRightStickAntiDeadzone = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadRightStickAntiDeadzone = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadLeftStickCurve.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadLeftStickCurve = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadLeftStickCurve = value) }
             }
         }
         viewModelScope.launch {
             preferences.gamepadRightStickCurve.collect { value ->
-                _uiState.value = _uiState.value.copy(gamepadRightStickCurve = value)
+                applyGlobalRuntimePreferenceUpdate { it.copy(gamepadRightStickCurve = value) }
             }
         }
         viewModelScope.launch {
@@ -944,7 +1010,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.keepScreenOn.collect { enabled ->
-                _uiState.value = _uiState.value.copy(keepScreenOn = enabled)
+                applyGlobalInterfacePreferenceUpdate { it.copy(keepScreenOn = enabled) }
             }
         }
         viewModelScope.launch {
@@ -1364,15 +1430,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
         viewModelScope.launch {
             preferences.autoSaveEnabled.collect { enabled ->
-                _uiState.value = _uiState.value.copy(autoSaveEnabled = enabled)
-                if (enabled) {
+                applyGlobalInterfacePreferenceUpdate { it.copy(autoSaveEnabled = enabled) }
+                if (_uiState.value.autoSaveEnabled) {
                     lastAutoSavePlayTimeMs = _uiState.value.activePlayTimeMs
                 }
             }
         }
         viewModelScope.launch {
             preferences.autoSaveIntervalMinutes.collect { value ->
-                _uiState.value = _uiState.value.copy(autoSaveIntervalMinutes = value.coerceIn(1, 999))
+                applyGlobalInterfacePreferenceUpdate { it.copy(autoSaveIntervalMinutes = value.coerceIn(1, 999)) }
             }
         }
         
@@ -2002,6 +2068,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         } else {
             null
         }
+        currentInterfaceSettingsProfile = launchProfile?.interfaceSettings
         currentTouchControlsLayoutProfile = launchProfile?.touchControlsLayout
         currentCustomTouchControlsProfile = launchProfile?.customTouchControls
         currentGameCoverArtPath = null
@@ -2009,18 +2076,20 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         pendingPlayTimeSyncMs = 0L
         shouldCountCurrentProfileSession = false
         shouldTrackCurrentProfilePlayTime = false
-        _uiState.value = _uiState.value
-            .copy(
-                activePlayTimeMs = 0L,
-                currentSlotLastModified = 0L,
-                autoSaveLastModified = 0L,
-                isAutoSaveInProgress = false,
-                currentGameCoverArtPath = null
-            )
-            .withTouchControlsProfile(
-                layout = currentTouchControlsLayoutProfile,
-                customControls = currentCustomTouchControlsProfile
-            )
+        _uiState.value = applyInterfaceSettings(
+            _uiState.value
+                .copy(
+                    activePlayTimeMs = 0L,
+                    currentSlotLastModified = 0L,
+                    autoSaveLastModified = 0L,
+                    isAutoSaveInProgress = false,
+                    currentGameCoverArtPath = null
+                )
+                .withTouchControlsProfile(
+                    layout = currentTouchControlsLayoutProfile,
+                    customControls = currentCustomTouchControlsProfile
+                )
+        )
 
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.value = _uiState.value.copy(
@@ -2079,135 +2148,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 )
                 delay(200.milliseconds)
 
-                EmulatorBridge.applyRuntimeConfig(
-                    biosPath = config.biosPath,
-                    emulatorDataPath = config.emulatorDataPath,
-                    memoryCardSlot1 = config.memoryCardSlot1,
-                    memoryCardSlot2 = config.memoryCardSlot2,
+                applyRuntimeConfigToNative(
+                    config = config,
                     renderer = renderer,
-                    upscaleMultiplier = config.upscaleMultiplier,
-                    gpuDriverType = config.gpuDriverType,
-                    customDriverPath = config.customDriverPath,
-                    gpuHardwareProfile = config.gpuHardwareProfile,
-                    mediatekAngleOpenGl = config.mediatekAngleOpenGl,
-                    aspectRatio = config.aspectRatio,
-                    localMultiplayerMode = config.localMultiplayerMode,
-                    displayCrop = config.displayCrop,
-                    audioVolume = config.audioVolume,
-                    audioFastForwardVolume = config.audioFastForwardVolume,
-                    audioMuted = config.audioMuted,
-                    audioInterpolation = config.audioInterpolation,
-                    audioSyncMode = config.audioSyncMode,
-                    audioLightweightSpu2 = config.audioLightweightSpu2,
-                    audioBackend = config.audioBackend,
-                    audioBufferMs = config.audioBufferMs,
-                    audioOutputLatencyMs = config.audioOutputLatencyMs,
-                    audioMinimalOutputLatency = config.audioMinimalOutputLatency,
                     enableEeRecompiler = enableEeRecompiler,
                     enableIopRecompiler = enableIopRecompiler,
                     enableVu0Recompiler = enableVu0Recompiler,
                     enableVu1Recompiler = enableVu1Recompiler,
-                    eeFpuRoundMode = config.eeFpuRoundMode,
-                    vu0RoundMode = config.vu0RoundMode,
-                    vu1RoundMode = config.vu1RoundMode,
-                    eeFpuClampingMode = config.eeFpuClampingMode,
-                    vu0ClampingMode = config.vu0ClampingMode,
-                    vu1ClampingMode = config.vu1ClampingMode,
-                    enableGameFixes = config.enableGameFixes,
-                    autoGsHardwareFixes = config.autoGsHardwareFixes,
-                    eeTimingHack = config.eeTimingHack,
                     enableFastmem = enableFastmem,
-                    waitLoopSpeedhack = config.waitLoopSpeedhack,
-                    intcStatSpeedhack = config.intcStatSpeedhack,
-                    vuFlagHack = config.vuFlagHack,
-                    instantVu1 = config.instantVu1,
-                    mtvu = enableMtvu,
-                    enableThreadPinning = config.enableThreadPinning,
-                    enableFastBoot = config.enableFastBoot,
-                    fastCdvd = config.fastCdvd,
-                    enableCheats = config.enableCheats,
-                    hwDownloadMode = config.hwDownloadMode,
-                    hwDownloadModeUserOverride = config.hwDownloadModeUserOverride,
-                    eeCycleRate = config.eeCycleRate,
-                    eeCycleSkip = config.eeCycleSkip,
-                    frameSkip = config.frameSkip,
-                    skipDuplicateFrames = config.skipDuplicateFrames,
-                    lowLatencyMode = config.lowLatencyMode,
-                    frameLimitEnabled = config.frameLimitEnabled,
-                    vSyncEnabled = config.vSyncEnabled,
-                    fastForwardSpeed = config.fastForwardSpeed,
-                    targetFps = config.targetFps,
-                    ntscFramerate = config.ntscFramerate,
-                    palFramerate = config.palFramerate,
-                    textureFiltering = config.textureFiltering,
-                    trilinearFiltering = config.trilinearFiltering,
-                    blendingAccuracy = config.blendingAccuracy,
-                    blendingAccuracyUserOverride = config.blendingAccuracyUserOverride,
-                    texturePreloading = config.texturePreloading,
-                    shaderChainEnabled = config.shaderChainEnabled,
-                    shaderChainPreset = config.shaderChainPreset,
-                    enableFxaa = config.enableFxaa,
-                    casMode = config.casMode,
-                    sgsrMode = config.sgsrMode,
-                    casSharpness = config.casSharpness,
-                    tvShader = config.tvShader,
-                    shadeBoostEnabled = config.shadeBoostEnabled,
-                    shadeBoostBrightness = config.shadeBoostBrightness,
-                    shadeBoostContrast = config.shadeBoostContrast,
-                    shadeBoostSaturation = config.shadeBoostSaturation,
-                    shadeBoostGamma = config.shadeBoostGamma,
-                    deinterlaceMode = config.deinterlaceMode,
-                    dithering = config.dithering,
-                    anisotropicFiltering = config.anisotropicFiltering,
-                    enableHwMipmapping = config.enableHwMipmapping,
-                    hwRov = config.hwRov,
-                    antiBlur = config.antiBlur,
-                    widescreenPatches = config.widescreenPatches,
-                    noInterlacingPatches = config.noInterlacingPatches,
-                    cpuSpriteRenderSize = config.cpuSpriteRenderSize,
-                    cpuSpriteRenderLevel = config.cpuSpriteRenderLevel,
-                    softwareClutRender = config.softwareClutRender,
-                    gpuTargetClutMode = config.gpuTargetClutMode,
-                    skipDrawStart = config.skipDrawStart,
-                    skipDrawEnd = config.skipDrawEnd,
-                    autoFlushHardware = config.autoFlushHardware,
-                    cpuFramebufferConversion = config.cpuFramebufferConversion,
-                    disableDepthConversion = config.disableDepthConversion,
-                    disableSafeFeatures = config.disableSafeFeatures,
-                    disableRenderFixes = config.disableRenderFixes,
-                    preloadFrameData = config.preloadFrameData,
-                    disablePartialInvalidation = config.disablePartialInvalidation,
-                    textureInsideRt = config.textureInsideRt,
-                    readTargetsOnClose = config.readTargetsOnClose,
-                    estimateTextureRegion = config.estimateTextureRegion,
-                    gpuPaletteConversion = config.gpuPaletteConversion,
-                    halfPixelOffset = config.halfPixelOffset,
-                    nativeScaling = config.nativeScaling,
-                    roundSprite = config.roundSprite,
-                    bilinearUpscale = config.bilinearUpscale,
-                    textureOffsetX = config.textureOffsetX,
-                    textureOffsetY = config.textureOffsetY,
-                    alignSprite = config.alignSprite,
-                    mergeSprite = config.mergeSprite,
-                    forceEvenSpritePosition = config.forceEvenSpritePosition,
-                    nativePaletteDraw = config.nativePaletteDraw,
-                    pressureModifierAmount = config.pressureModifierAmount,
+                    enableMtvu = enableMtvu,
                     autotestMode = autotestMode || bootSmokeProbe,
-                    fpuCorrectAddSub = config.fpuCorrectAddSub,
-                    dev9EthernetEnabled = config.dev9EthernetEnabled,
-                    dev9EthernetDevice = config.dev9EthernetDevice,
-                    dev9InterceptDhcp = config.dev9InterceptDhcp,
-                    dev9Dns1Mode = config.dev9Dns1Mode,
-                    dev9Dns1 = config.dev9Dns1,
-                    dev9Dns2Mode = config.dev9Dns2Mode,
-                    dev9Dns2 = config.dev9Dns2,
-                    dev9LogDhcp = config.dev9LogDhcp,
-                    dev9LogDns = config.dev9LogDns,
-                    dev9LocalLinkMode = config.dev9LocalLinkMode,
-                    dev9LocalLinkAddress = config.dev9LocalLinkAddress,
-                    dev9LocalLinkPort = config.dev9LocalLinkPort,
-                    dev9LocalLinkPeerId = config.dev9LocalLinkPeerId,
-                    dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode,
                     vu0FamilyMaskOverride = vu0FamilyMaskOverride,
                     vu1FamilyMaskOverride = vu1FamilyMaskOverride
                 )
@@ -2311,6 +2261,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     val safePath = path.orEmpty()
                     val existingProfile = currentGamePath?.let(perGameSettingsRepository::get)
                     hasPerGameProfile = existingProfile != null
+                    currentInterfaceSettingsProfile = existingProfile?.interfaceSettings
                     currentTouchControlsLayoutProfile = existingProfile?.touchControlsLayout
                     currentCustomTouchControlsProfile = existingProfile?.customTouchControls
                     val detectedMetadata = EmulatorBridge.getGameMetadata(safePath)
@@ -2380,128 +2331,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val liveRuntime = loadLiveRuntimeSnapshot()
                 val overlaySnapshot = preferences.overlayLayoutSnapshot.first()
 
-                val runtimeState = _uiState.value.copy(
-                    ps2GunProfileActive = isPerGameGunProfileActive(hasPerGameProfile, liveRuntime.gyroMode),
-                    showFps = liveRuntime.showFps,
-                    fpsOverlayMode = liveRuntime.fpsOverlayMode,
-                    confirmSaveLoadActions = liveRuntime.confirmSaveLoadActions,
-                    backButtonExitsGame = liveRuntime.backButtonExitsGame,
-                    renderer = liveRuntime.renderer,
-                    frameGenerationReady = liveRuntime.frameGenerationReady,
-                    frameGenerationEnabled = liveRuntime.frameGenerationEnabled,
-                    frameGenerationMultiplier = liveRuntime.frameGenerationMultiplier,
-                    frameGenerationPerformance = liveRuntime.frameGenerationPerformance,
-                    frameGenerationFlowScale = liveRuntime.frameGenerationFlowScale,
-                    frameGenerationTargetRate = liveRuntime.frameGenerationTargetRate,
-                    upscale = liveRuntime.upscale,
-                    aspectRatio = liveRuntime.aspectRatio,
-                    localMultiplayerMode = liveRuntime.localMultiplayerMode,
-                    displayCrop = liveRuntime.displayCrop,
-                    performancePreset = liveRuntime.performancePreset,
-                    enableInstantVu1 = liveRuntime.enableInstantVu1,
-                    enableMtvu = liveRuntime.enableMtvu,
-                    enableThreadPinning = liveRuntime.enableThreadPinning,
-                    enableFastCdvd = liveRuntime.enableFastCdvd,
-                    enableFastBoot = liveRuntime.enableFastBoot,
-                    enableCheats = liveRuntime.enableCheats,
-                    hwDownloadMode = liveRuntime.hwDownloadMode,
-                    hwDownloadModeUserOverride = liveRuntime.hwDownloadModeUserOverride,
-                    eeCycleRate = liveRuntime.eeCycleRate,
-                    eeCycleSkip = liveRuntime.eeCycleSkip,
-                    frameSkip = liveRuntime.frameSkip,
-                    skipDuplicateFrames = liveRuntime.skipDuplicateFrames,
-                    lowLatencyMode = liveRuntime.lowLatencyMode,
-                    textureFiltering = liveRuntime.textureFiltering,
-                    trilinearFiltering = liveRuntime.trilinearFiltering,
-                    blendingAccuracy = liveRuntime.blendingAccuracy,
-                    blendingAccuracyUserOverride = liveRuntime.blendingAccuracyUserOverride,
-                    texturePreloading = liveRuntime.texturePreloading,
-                    enableFxaa = liveRuntime.enableFxaa,
-                    casMode = liveRuntime.casMode,
-                    sgsrMode = liveRuntime.sgsrMode,
-                    casSharpness = liveRuntime.casSharpness,
-                    tvShader = liveRuntime.tvShader,
-                    shadeBoostEnabled = liveRuntime.shadeBoostEnabled,
-                    shadeBoostBrightness = liveRuntime.shadeBoostBrightness,
-                    shadeBoostContrast = liveRuntime.shadeBoostContrast,
-                    shadeBoostSaturation = liveRuntime.shadeBoostSaturation,
-                    shadeBoostGamma = liveRuntime.shadeBoostGamma,
-                    anisotropicFiltering = liveRuntime.anisotropicFiltering,
-                    enableHwMipmapping = liveRuntime.enableHwMipmapping,
-                    antiBlur = liveRuntime.antiBlur,
-                    deinterlaceMode = liveRuntime.deinterlaceMode,
-                    dithering = liveRuntime.dithering,
-                    widescreenPatches = liveRuntime.widescreenPatches,
-                    noInterlacingPatches = liveRuntime.noInterlacingPatches,
-                    cpuSpriteRenderSize = liveRuntime.cpuSpriteRenderSize,
-                    cpuSpriteRenderLevel = liveRuntime.cpuSpriteRenderLevel,
-                    softwareClutRender = liveRuntime.softwareClutRender,
-                    gpuTargetClutMode = liveRuntime.gpuTargetClutMode,
-                    skipDrawStart = liveRuntime.skipDrawStart,
-                    skipDrawEnd = liveRuntime.skipDrawEnd,
-                    autoFlushHardware = liveRuntime.autoFlushHardware,
-                    cpuFramebufferConversion = liveRuntime.cpuFramebufferConversion,
-                    disableDepthConversion = liveRuntime.disableDepthConversion,
-                    disableSafeFeatures = liveRuntime.disableSafeFeatures,
-                    disableRenderFixes = liveRuntime.disableRenderFixes,
-                    preloadFrameData = liveRuntime.preloadFrameData,
-                    disablePartialInvalidation = liveRuntime.disablePartialInvalidation,
-                    textureInsideRt = liveRuntime.textureInsideRt,
-                    readTargetsOnClose = liveRuntime.readTargetsOnClose,
-                    estimateTextureRegion = liveRuntime.estimateTextureRegion,
-                    gpuPaletteConversion = liveRuntime.gpuPaletteConversion,
-                    halfPixelOffset = liveRuntime.halfPixelOffset,
-                    nativeScaling = liveRuntime.nativeScaling,
-                    roundSprite = liveRuntime.roundSprite,
-                    bilinearUpscale = liveRuntime.bilinearUpscale,
-                    textureOffsetX = liveRuntime.textureOffsetX,
-                    textureOffsetY = liveRuntime.textureOffsetY,
-                    alignSprite = liveRuntime.alignSprite,
-                    mergeSprite = liveRuntime.mergeSprite,
-                    forceEvenSpritePosition = liveRuntime.forceEvenSpritePosition,
-                    nativePaletteDraw = liveRuntime.nativePaletteDraw,
-                    frameLimitEnabled = liveRuntime.frameLimitEnabled,
-                    fastForwardSpeed = liveRuntime.fastForwardSpeed,
-                    racingMode = liveRuntime.racingMode,
-                    stickyButtons = liveRuntime.stickyButtons,
-                    touchscreenRightStick = liveRuntime.touchscreenRightStick,
-                    touchscreenRightStickSensitivity = liveRuntime.touchscreenRightStickSensitivity,
-                    touchHaptics = liveRuntime.touchHaptics,
-                    stickToggleTarget = liveRuntime.stickToggleTarget,
-                    touchHapticsPreset = liveRuntime.touchHapticsPreset,
-                    touchHapticsStrength = liveRuntime.touchHapticsStrength,
-                    touchControlVisualStyle = liveRuntime.touchControlVisualStyle,
-                    touchControlPressEffect = liveRuntime.touchControlPressEffect,
-                    gyroMode = liveRuntime.gyroMode,
-                    gyroSensitivity = liveRuntime.gyroSensitivity,
-                    gyroSmoothing = liveRuntime.gyroSmoothing,
-                    gyroInvertX = liveRuntime.gyroInvertX,
-                    gyroInvertY = liveRuntime.gyroInvertY,
-                    gyroStickTarget = liveRuntime.gyroStickTarget,
-                    lightGunAim = liveRuntime.lightGunAim,
-                    lightGunCursorEnabled = liveRuntime.lightGunCursorEnabled,
-                    gamepadRightStickUpToR2 = liveRuntime.gamepadRightStickUpToR2,
-                    gamepadRightStickDownToL2 = liveRuntime.gamepadRightStickDownToL2,
-                    gamepadButtonHaptics = liveRuntime.gamepadButtonHaptics,
-                    gamepadStickDeadzone = liveRuntime.gamepadStickDeadzone,
-                    gamepadLeftStickSensitivity = liveRuntime.gamepadLeftStickSensitivity,
-                    gamepadRightStickSensitivity = liveRuntime.gamepadRightStickSensitivity,
-                    gamepadLeftStickNegativeDeadzone = liveRuntime.gamepadLeftStickNegativeDeadzone,
-                    gamepadRightStickNegativeDeadzone = liveRuntime.gamepadRightStickNegativeDeadzone,
-                    gamepadLeftStickAntiDeadzone = liveRuntime.gamepadLeftStickAntiDeadzone,
-                    gamepadRightStickAntiDeadzone = liveRuntime.gamepadRightStickAntiDeadzone,
-                    gamepadLeftStickCurve = liveRuntime.gamepadLeftStickCurve,
-                    gamepadRightStickCurve = liveRuntime.gamepadRightStickCurve,
-                    gamepadBindingsByPad = liveRuntime.gamepadBindingsByPad,
-                    pressureModifierAmount = liveRuntime.pressureModifierAmount,
-                    autoSaveOnExit = liveRuntime.autoSaveOnExit,
-                    autoLoadOnStart = liveRuntime.autoLoadOnStart,
-                    targetFps = liveRuntime.targetFps,
-                    ntscFramerate = liveRuntime.ntscFramerate,
-                    palFramerate = liveRuntime.palFramerate
-                )
+                val runtimeState = _uiState.value
+                    .copy(ps2GunProfileActive = isPerGameGunProfileActive(hasPerGameProfile, liveRuntime.gyroMode))
+                    .withLiveRuntimeSnapshot(liveRuntime)
                 val overlayState = runtimeState.withOverlayLayoutSnapshot(overlaySnapshot)
-                _uiState.value = currentTouchControlsLayoutProfile?.let { overlayState.withTouchControlsLayout(it) } ?: overlayState
+                _uiState.value = applyInterfaceSettings(currentTouchControlsLayoutProfile?.let { overlayState.withTouchControlsLayout(it) } ?: overlayState)
                 syncNativePerformanceOverlayState(_uiState.value)
                 syncGamepadRuntimeSettings(_uiState.value)
                 if (_uiState.value.gameSettingsProfileActive) {
@@ -2516,7 +2350,11 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                         leftAntiDeadzone = state.gamepadLeftStickAntiDeadzone,
                         rightAntiDeadzone = state.gamepadRightStickAntiDeadzone,
                         leftStickCurve = state.gamepadLeftStickCurve,
-                        rightStickCurve = state.gamepadRightStickCurve
+                        rightStickCurve = state.gamepadRightStickCurve,
+                        invertLeftStick = state.invertLeftStick,
+                        invertRightStick = state.invertRightStick,
+                        invertLeftStickHorizontal = state.invertLeftStickHorizontal,
+                        invertRightStickHorizontal = state.invertRightStickHorizontal
                     )
                 }
                 updateCrashContext(
@@ -2809,14 +2647,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleControlsVisibility() {
         viewModelScope.launch {
             val newValue = !_uiState.value.controlsVisible
-            preferences.setOverlayShow(newValue)
-            _uiState.value = _uiState.value.copy(controlsVisible = newValue)
-        }
-    }
-
-    fun saveCurrentGameSettingsProfile() {
-        viewModelScope.launch {
-            persistRuntimeState(_uiState.value)
+            persistInterfaceSettings(_uiState.value.copy(controlsVisible = newValue)) {
+                preferences.setOverlayShow(newValue)
+            }
         }
     }
 
@@ -2828,41 +2661,46 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setOverlayScale(value: Int) {
         viewModelScope.launch {
-            preferences.setOverlayScale(value)
-            _uiState.value = _uiState.value.copy(overlayScale = value.coerceIn(50, 150))
+            persistInterfaceSettings(_uiState.value.copy(overlayScale = value.coerceIn(50, 150))) {
+                preferences.setOverlayScale(value)
+            }
         }
     }
 
     fun setOverlayOpacity(value: Int) {
         viewModelScope.launch {
-            preferences.setOverlayOpacity(value)
-            _uiState.value = _uiState.value.copy(
+            persistInterfaceSettings(_uiState.value.copy(
                 overlayOpacity = value.coerceIn(
                     AppPreferences.OVERLAY_OPACITY_MIN,
                     AppPreferences.OVERLAY_OPACITY_MAX
                 )
-            )
+            )) {
+                preferences.setOverlayOpacity(value)
+            }
         }
     }
 
     fun setHideOverlayOnGamepad(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setHideOverlayOnGamepad(enabled)
-            _uiState.value = _uiState.value.copy(hideOverlayOnGamepad = enabled)
+            persistInterfaceSettings(_uiState.value.copy(hideOverlayOnGamepad = enabled)) {
+                preferences.setHideOverlayOnGamepad(enabled)
+            }
         }
     }
 
     fun setCompactControls(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setCompactControls(enabled)
-            _uiState.value = _uiState.value.copy(compactControls = enabled)
+            persistInterfaceSettings(_uiState.value.copy(compactControls = enabled)) {
+                preferences.setCompactControls(enabled)
+            }
         }
     }
 
     fun setKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setKeepScreenOn(enabled)
-            _uiState.value = _uiState.value.copy(keepScreenOn = enabled)
+            persistInterfaceSettings(_uiState.value.copy(keepScreenOn = enabled)) {
+                preferences.setKeepScreenOn(enabled)
+            }
         }
     }
 
@@ -2892,100 +2730,113 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     fun setLeftStickSensitivity(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(50, 200)
-            preferences.setLeftStickSensitivity(normalized)
-            _uiState.value = _uiState.value.copy(leftStickSensitivity = normalized)
+            persistInterfaceSettings(_uiState.value.copy(leftStickSensitivity = normalized)) {
+                preferences.setLeftStickSensitivity(normalized)
+            }
         }
     }
 
     fun setRightStickSensitivity(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(50, 200)
-            preferences.setRightStickSensitivity(normalized)
-            _uiState.value = _uiState.value.copy(rightStickSensitivity = normalized)
+            persistInterfaceSettings(_uiState.value.copy(rightStickSensitivity = normalized)) {
+                preferences.setRightStickSensitivity(normalized)
+            }
         }
     }
 
     fun setInvertLeftStick(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setInvertLeftStick(enabled)
-            _uiState.value = _uiState.value.copy(invertLeftStick = enabled)
+            persistInterfaceSettings(_uiState.value.copy(invertLeftStick = enabled)) {
+                preferences.setInvertLeftStick(enabled)
+            }
         }
     }
 
     fun setInvertRightStick(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setInvertRightStick(enabled)
-            _uiState.value = _uiState.value.copy(invertRightStick = enabled)
+            persistInterfaceSettings(_uiState.value.copy(invertRightStick = enabled)) {
+                preferences.setInvertRightStick(enabled)
+            }
         }
     }
 
     fun setInvertLeftStickHorizontal(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setInvertLeftStickHorizontal(enabled)
-            _uiState.value = _uiState.value.copy(invertLeftStickHorizontal = enabled)
+            persistInterfaceSettings(_uiState.value.copy(invertLeftStickHorizontal = enabled)) {
+                preferences.setInvertLeftStickHorizontal(enabled)
+            }
         }
     }
 
     fun setInvertRightStickHorizontal(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setInvertRightStickHorizontal(enabled)
-            _uiState.value = _uiState.value.copy(invertRightStickHorizontal = enabled)
+            persistInterfaceSettings(_uiState.value.copy(invertRightStickHorizontal = enabled)) {
+                preferences.setInvertRightStickHorizontal(enabled)
+            }
         }
     }
 
     fun setGamepadStickDeadzone(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(0, 35)
-            preferences.setGamepadStickDeadzone(normalized)
-            _uiState.value = _uiState.value.copy(gamepadStickDeadzone = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadStickDeadzone = normalized)) {
+                preferences.setGamepadStickDeadzone(normalized)
+            }
         }
     }
 
     fun setGamepadLeftStickSensitivity(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(50, 200)
-            preferences.setGamepadLeftStickSensitivity(normalized)
-            _uiState.value = _uiState.value.copy(gamepadLeftStickSensitivity = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadLeftStickSensitivity = normalized)) {
+                preferences.setGamepadLeftStickSensitivity(normalized)
+            }
         }
     }
 
     fun setGamepadRightStickSensitivity(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(50, 200)
-            preferences.setGamepadRightStickSensitivity(normalized)
-            _uiState.value = _uiState.value.copy(gamepadRightStickSensitivity = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadRightStickSensitivity = normalized)) {
+                preferences.setGamepadRightStickSensitivity(normalized)
+            }
         }
     }
 
     fun setGamepadLeftStickNegativeDeadzone(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
-            preferences.setGamepadLeftStickNegativeDeadzone(normalized)
-            _uiState.value = _uiState.value.copy(gamepadLeftStickNegativeDeadzone = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadLeftStickNegativeDeadzone = normalized)) {
+                preferences.setGamepadLeftStickNegativeDeadzone(normalized)
+            }
         }
     }
 
     fun setGamepadRightStickNegativeDeadzone(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_NEGATIVE_DEADZONE_MAX)
-            preferences.setGamepadRightStickNegativeDeadzone(normalized)
-            _uiState.value = _uiState.value.copy(gamepadRightStickNegativeDeadzone = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadRightStickNegativeDeadzone = normalized)) {
+                preferences.setGamepadRightStickNegativeDeadzone(normalized)
+            }
         }
     }
 
     fun setGamepadLeftStickAntiDeadzone(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
-            preferences.setGamepadLeftStickAntiDeadzone(normalized)
-            _uiState.value = _uiState.value.copy(gamepadLeftStickAntiDeadzone = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadLeftStickAntiDeadzone = normalized)) {
+                preferences.setGamepadLeftStickAntiDeadzone(normalized)
+            }
         }
     }
 
     fun setGamepadRightStickAntiDeadzone(value: Int) {
         viewModelScope.launch {
             val normalized = value.coerceIn(0, AppPreferences.GAMEPAD_STICK_ANTI_DEADZONE_MAX)
-            preferences.setGamepadRightStickAntiDeadzone(normalized)
-            _uiState.value = _uiState.value.copy(gamepadRightStickAntiDeadzone = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadRightStickAntiDeadzone = normalized)) {
+                preferences.setGamepadRightStickAntiDeadzone(normalized)
+            }
         }
     }
 
@@ -2995,8 +2846,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 AppPreferences.GAMEPAD_STICK_CURVE_MIN,
                 AppPreferences.GAMEPAD_STICK_CURVE_MAX
             )
-            preferences.setGamepadLeftStickCurve(normalized)
-            _uiState.value = _uiState.value.copy(gamepadLeftStickCurve = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadLeftStickCurve = normalized)) {
+                preferences.setGamepadLeftStickCurve(normalized)
+            }
         }
     }
 
@@ -3006,8 +2858,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 AppPreferences.GAMEPAD_STICK_CURVE_MIN,
                 AppPreferences.GAMEPAD_STICK_CURVE_MAX
             )
-            preferences.setGamepadRightStickCurve(normalized)
-            _uiState.value = _uiState.value.copy(gamepadRightStickCurve = normalized)
+            persistRuntimeState(_uiState.value.copy(gamepadRightStickCurve = normalized)) {
+                preferences.setGamepadRightStickCurve(normalized)
+            }
         }
     }
 
@@ -3226,8 +3079,9 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setFpsOverlayCorner(corner: Int) {
         viewModelScope.launch {
-            preferences.setFpsOverlayCorner(corner)
-            _uiState.value = _uiState.value.copy(fpsOverlayCorner = corner)
+            persistInterfaceSettings(_uiState.value.copy(fpsOverlayCorner = corner)) {
+                preferences.setFpsOverlayCorner(corner)
+            }
         }
     }
 
@@ -3333,13 +3187,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setFpsOverlayScale(scale: Int) {
         viewModelScope.launch {
-            preferences.setFpsOverlayScale(scale)
+            persistInterfaceSettings(_uiState.value.copy(fpsOverlayScale = scale)) {
+                preferences.setFpsOverlayScale(scale)
+            }
         }
     }
 
     fun setFpsOverlayMetrics(metrics: Int) {
         viewModelScope.launch {
-            preferences.setFpsOverlayMetrics(metrics)
+            persistInterfaceSettings(_uiState.value.copy(fpsOverlayMetrics = metrics)) {
+                preferences.setFpsOverlayMetrics(metrics)
+            }
         }
     }
 
@@ -4294,7 +4152,16 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun applyOverlayLayoutSnapshot(snapshot: OverlayLayoutSnapshot) {
         val overlayState = _uiState.value.withOverlayLayoutSnapshot(snapshot)
-        _uiState.value = currentTouchControlsLayoutProfile?.let { overlayState.withTouchControlsLayout(it) } ?: overlayState
+        globalInterfaceSettings = globalInterfaceSettings.copy(
+            overlayScale = snapshot.overlayScale, overlayOpacity = snapshot.overlayOpacity,
+            hideOverlayOnGamepad = snapshot.hideOverlayOnGamepad,
+            leftStickSensitivity = snapshot.leftStickSensitivity, rightStickSensitivity = snapshot.rightStickSensitivity,
+            invertLeftStick = snapshot.invertLeftStick, invertRightStick = snapshot.invertRightStick,
+            invertLeftStickHorizontal = snapshot.invertLeftStickHorizontal,
+            invertRightStickHorizontal = snapshot.invertRightStickHorizontal
+        )
+        _uiState.value = applyInterfaceSettings(currentTouchControlsLayoutProfile?.let { overlayState.withTouchControlsLayout(it) } ?: overlayState)
+        syncGamepadAnalogSettings(_uiState.value)
     }
 
     private fun EmulationUiState.withOverlayLayoutSnapshot(snapshot: OverlayLayoutSnapshot): EmulationUiState {
@@ -4485,13 +4352,15 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     memoryCardSlot2 = existingProfile?.memoryCardSlot2 ?: runtimeProfile.memoryCardSlot2,
                     dedicatedMemoryCards = existingProfile?.dedicatedMemoryCards ?: runtimeProfile.dedicatedMemoryCards,
                     mediatekAngleOpenGl = existingProfile?.mediatekAngleOpenGl ?: runtimeProfile.mediatekAngleOpenGl,
+                    interfaceSettings = perGameSettingsRepository.get(gameKey)?.interfaceSettings,
                     shaderChainOverrideEnabled = existingProfile?.shaderChainOverrideEnabled,
                     shaderChainPreset = existingProfile?.shaderChainPreset.orEmpty(),
                     providedKeys = providedKeys
                 )
             )
-            val finalState = updatedState.copy(gameSettingsProfileActive = true)
+            val finalState = applyInterfaceSettings(updatedState.copy(gameSettingsProfileActive = true))
             _uiState.value = finalState
+            syncGamepadAnalogSettings(finalState)
             syncNativePerformanceOverlayState(finalState)
             finalState
         } else {
@@ -4519,43 +4388,210 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     private fun resetCurrentGameProfile() {
         val gameKey = activePerGameKey() ?: return
+        val previousProfile = perGameSettingsRepository.get(gameKey)
         perGameSettingsRepository.delete(gameKey)
+        currentInterfaceSettingsProfile = null
         currentTouchControlsLayoutProfile = null
         currentCustomTouchControlsProfile = null
         GamepadManager.clearPerGameOverrides()
         _uiState.value = _uiState.value.copy(
             gameSettingsProfileActive = false,
-            gamepadBindingsByPad = emptyMap(),
             ps2GunProfileActive = false
         )
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val settings = preferences.settingsSnapshot.first()
+            val overlaySnapshot = preferences.overlayLayoutSnapshot.first()
+            val interfaceSettings = preferences.readInterfaceSettings()
+            globalInterfaceSettings = interfaceSettings
             val frameGeneration = frameGenerationManager.snapshot()
-            frameGenerationManager.applyToNative(frameGeneration)
-            _uiState.value = _uiState.value
-                .withOverlayLayoutSnapshot(preferences.overlayLayoutSnapshot.first())
+            val liveRuntime = loadLiveRuntimeSnapshot()
+            val resetState = _uiState.value
+                .withLiveRuntimeSnapshot(liveRuntime)
+                .withOverlayLayoutSnapshot(overlaySnapshot)
+                .withInterfaceSettings(interfaceSettings)
                 .copy(
-                    touchControlVisualStyle = settings.touchControlVisualStyle,
-                    touchControlPressEffect = settings.touchControlPressEffect,
-                    frameGenerationReady = frameGeneration.isConfigured,
-                    frameGenerationEnabled = frameGeneration.settings.enabled,
-                    frameGenerationMultiplier = frameGeneration.settings.multiplier,
-                    frameGenerationPerformance = frameGeneration.settings.performanceMode,
-                    frameGenerationFlowScale = frameGeneration.settings.flowScalePercent,
-                    frameGenerationTargetRate = frameGeneration.settings.targetRefreshRate,
                     customTouchControls = settings.customTouchControls,
                     gameSettingsProfileActive = false,
-                    gamepadStickDeadzone = settings.gamepadStickDeadzone,
-                    gamepadLeftStickSensitivity = settings.gamepadLeftStickSensitivity,
-                    gamepadRightStickSensitivity = settings.gamepadRightStickSensitivity,
-                    gamepadLeftStickNegativeDeadzone = settings.gamepadLeftStickNegativeDeadzone,
-                    gamepadRightStickNegativeDeadzone = settings.gamepadRightStickNegativeDeadzone,
-                    gamepadLeftStickAntiDeadzone = settings.gamepadLeftStickAntiDeadzone,
-                    gamepadRightStickAntiDeadzone = settings.gamepadRightStickAntiDeadzone,
-                    gamepadLeftStickCurve = settings.gamepadLeftStickCurve,
-                    gamepadRightStickCurve = settings.gamepadRightStickCurve
+                    ps2GunProfileActive = false
                 )
+            if (resetState.autoSaveEnabled) {
+                lastAutoSavePlayTimeMs = resetState.activePlayTimeMs
+            }
+            _uiState.value = resetState
+            syncNativePerformanceOverlayState(resetState)
+            syncGamepadRuntimeSettings(resetState)
+            frameGenerationManager.applyToNative(frameGeneration)
+            val globalConfig = loadLaunchConfig()
+            applyRuntimeConfigToNative(
+                globalConfig.keepCurrentDriverAndCards(previousProfile)
+            )
+            runCatching { EmulatorBridge.reloadPatches() }
         }
+    }
+
+    private fun EmulationLaunchConfig.keepCurrentDriverAndCards(
+        profile: PerGameSettings?
+    ): EmulationLaunchConfig {
+        if (profile == null) return this
+        fun owns(key: String): Boolean = profile.providedKeys == null || key in profile.providedKeys
+        return copy(
+            gpuDriverType = if (owns("gpuDriverType")) profile.gpuDriverType else gpuDriverType,
+            customDriverPath = if (owns("customDriverPath")) {
+                GpuDriverManager(getApplication()).resolveUsableDriverPath(profile.customDriverPath)
+            } else {
+                customDriverPath
+            },
+            memoryCardSlot1 = profile.memoryCardSlot1 ?: memoryCardSlot1,
+            memoryCardSlot2 = profile.memoryCardSlot2 ?: memoryCardSlot2,
+            mediatekAngleOpenGl = if (owns("mediatekAngleOpenGl")) profile.mediatekAngleOpenGl else mediatekAngleOpenGl
+        )
+    }
+
+    private suspend fun applyRuntimeConfigToNative(
+        config: EmulationLaunchConfig,
+        renderer: Int = config.renderer,
+        enableEeRecompiler: Boolean = config.enableEeRecompiler,
+        enableIopRecompiler: Boolean = config.enableIopRecompiler,
+        enableVu0Recompiler: Boolean = config.enableVu0Recompiler,
+        enableVu1Recompiler: Boolean = config.enableVu1Recompiler,
+        enableFastmem: Boolean = config.enableFastmem,
+        enableMtvu: Boolean = config.mtvu,
+        autotestMode: Boolean = false,
+        vu0FamilyMaskOverride: Int? = null,
+        vu1FamilyMaskOverride: Int? = null
+    ) {
+        EmulatorBridge.applyRuntimeConfig(
+            biosPath = config.biosPath,
+            emulatorDataPath = config.emulatorDataPath,
+            memoryCardSlot1 = config.memoryCardSlot1,
+            memoryCardSlot2 = config.memoryCardSlot2,
+            renderer = renderer,
+            upscaleMultiplier = config.upscaleMultiplier,
+            gpuDriverType = config.gpuDriverType,
+            customDriverPath = config.customDriverPath,
+            gpuHardwareProfile = config.gpuHardwareProfile,
+            mediatekAngleOpenGl = config.mediatekAngleOpenGl,
+            aspectRatio = config.aspectRatio,
+            localMultiplayerMode = config.localMultiplayerMode,
+            displayCrop = config.displayCrop,
+            audioVolume = config.audioVolume,
+            audioFastForwardVolume = config.audioFastForwardVolume,
+            audioMuted = config.audioMuted,
+            audioInterpolation = config.audioInterpolation,
+            audioSyncMode = config.audioSyncMode,
+            audioLightweightSpu2 = config.audioLightweightSpu2,
+            audioBackend = config.audioBackend,
+            audioBufferMs = config.audioBufferMs,
+            audioOutputLatencyMs = config.audioOutputLatencyMs,
+            audioMinimalOutputLatency = config.audioMinimalOutputLatency,
+            enableEeRecompiler = enableEeRecompiler,
+            enableIopRecompiler = enableIopRecompiler,
+            enableVu0Recompiler = enableVu0Recompiler,
+            enableVu1Recompiler = enableVu1Recompiler,
+            eeFpuRoundMode = config.eeFpuRoundMode,
+            vu0RoundMode = config.vu0RoundMode,
+            vu1RoundMode = config.vu1RoundMode,
+            eeFpuClampingMode = config.eeFpuClampingMode,
+            vu0ClampingMode = config.vu0ClampingMode,
+            vu1ClampingMode = config.vu1ClampingMode,
+            enableGameFixes = config.enableGameFixes,
+            autoGsHardwareFixes = config.autoGsHardwareFixes,
+            eeTimingHack = config.eeTimingHack,
+            enableFastmem = enableFastmem,
+            waitLoopSpeedhack = config.waitLoopSpeedhack,
+            intcStatSpeedhack = config.intcStatSpeedhack,
+            vuFlagHack = config.vuFlagHack,
+            instantVu1 = config.instantVu1,
+            mtvu = enableMtvu,
+            enableThreadPinning = config.enableThreadPinning,
+            enableFastBoot = config.enableFastBoot,
+            fastCdvd = config.fastCdvd,
+            enableCheats = config.enableCheats,
+            hwDownloadMode = config.hwDownloadMode,
+            hwDownloadModeUserOverride = config.hwDownloadModeUserOverride,
+            eeCycleRate = config.eeCycleRate,
+            eeCycleSkip = config.eeCycleSkip,
+            frameSkip = config.frameSkip,
+            skipDuplicateFrames = config.skipDuplicateFrames,
+            lowLatencyMode = config.lowLatencyMode,
+            frameLimitEnabled = config.frameLimitEnabled,
+            vSyncEnabled = config.vSyncEnabled,
+            fastForwardSpeed = config.fastForwardSpeed,
+            targetFps = config.targetFps,
+            ntscFramerate = config.ntscFramerate,
+            palFramerate = config.palFramerate,
+            textureFiltering = config.textureFiltering,
+            trilinearFiltering = config.trilinearFiltering,
+            blendingAccuracy = config.blendingAccuracy,
+            blendingAccuracyUserOverride = config.blendingAccuracyUserOverride,
+            texturePreloading = config.texturePreloading,
+            shaderChainEnabled = config.shaderChainEnabled,
+            shaderChainPreset = config.shaderChainPreset,
+            enableFxaa = config.enableFxaa,
+            casMode = config.casMode,
+            sgsrMode = config.sgsrMode,
+            casSharpness = config.casSharpness,
+            tvShader = config.tvShader,
+            shadeBoostEnabled = config.shadeBoostEnabled,
+            shadeBoostBrightness = config.shadeBoostBrightness,
+            shadeBoostContrast = config.shadeBoostContrast,
+            shadeBoostSaturation = config.shadeBoostSaturation,
+            shadeBoostGamma = config.shadeBoostGamma,
+            deinterlaceMode = config.deinterlaceMode,
+            dithering = config.dithering,
+            anisotropicFiltering = config.anisotropicFiltering,
+            enableHwMipmapping = config.enableHwMipmapping,
+            hwRov = config.hwRov,
+            antiBlur = config.antiBlur,
+            widescreenPatches = config.widescreenPatches,
+            noInterlacingPatches = config.noInterlacingPatches,
+            cpuSpriteRenderSize = config.cpuSpriteRenderSize,
+            cpuSpriteRenderLevel = config.cpuSpriteRenderLevel,
+            softwareClutRender = config.softwareClutRender,
+            gpuTargetClutMode = config.gpuTargetClutMode,
+            skipDrawStart = config.skipDrawStart,
+            skipDrawEnd = config.skipDrawEnd,
+            autoFlushHardware = config.autoFlushHardware,
+            cpuFramebufferConversion = config.cpuFramebufferConversion,
+            disableDepthConversion = config.disableDepthConversion,
+            disableSafeFeatures = config.disableSafeFeatures,
+            disableRenderFixes = config.disableRenderFixes,
+            preloadFrameData = config.preloadFrameData,
+            disablePartialInvalidation = config.disablePartialInvalidation,
+            textureInsideRt = config.textureInsideRt,
+            readTargetsOnClose = config.readTargetsOnClose,
+            estimateTextureRegion = config.estimateTextureRegion,
+            gpuPaletteConversion = config.gpuPaletteConversion,
+            halfPixelOffset = config.halfPixelOffset,
+            nativeScaling = config.nativeScaling,
+            roundSprite = config.roundSprite,
+            bilinearUpscale = config.bilinearUpscale,
+            textureOffsetX = config.textureOffsetX,
+            textureOffsetY = config.textureOffsetY,
+            alignSprite = config.alignSprite,
+            mergeSprite = config.mergeSprite,
+            forceEvenSpritePosition = config.forceEvenSpritePosition,
+            nativePaletteDraw = config.nativePaletteDraw,
+            pressureModifierAmount = config.pressureModifierAmount,
+            autotestMode = autotestMode,
+            fpuCorrectAddSub = config.fpuCorrectAddSub,
+            dev9EthernetEnabled = config.dev9EthernetEnabled,
+            dev9EthernetDevice = config.dev9EthernetDevice,
+            dev9InterceptDhcp = config.dev9InterceptDhcp,
+            dev9Dns1Mode = config.dev9Dns1Mode,
+            dev9Dns1 = config.dev9Dns1,
+            dev9Dns2Mode = config.dev9Dns2Mode,
+            dev9Dns2 = config.dev9Dns2,
+            dev9LogDhcp = config.dev9LogDhcp,
+            dev9LogDns = config.dev9LogDns,
+            dev9LocalLinkMode = config.dev9LocalLinkMode,
+            dev9LocalLinkAddress = config.dev9LocalLinkAddress,
+            dev9LocalLinkPort = config.dev9LocalLinkPort,
+            dev9LocalLinkPeerId = config.dev9LocalLinkPeerId,
+            dev9LocalLinkRoomCode = config.dev9LocalLinkRoomCode,
+            vu0FamilyMaskOverride = vu0FamilyMaskOverride,
+            vu1FamilyMaskOverride = vu1FamilyMaskOverride
+        )
     }
 
     private suspend fun loadLaunchConfig(): EmulationLaunchConfig {
@@ -4953,13 +4989,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setAutoSaveEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            preferences.setAutoSaveEnabled(enabled)
+            persistInterfaceSettings(_uiState.value.copy(autoSaveEnabled = enabled)) {
+                preferences.setAutoSaveEnabled(enabled)
+            }
         }
     }
 
     fun setAutoSaveIntervalMinutes(value: Int) {
         viewModelScope.launch {
-            preferences.setAutoSaveIntervalMinutes(value)
+            persistInterfaceSettings(_uiState.value.copy(autoSaveIntervalMinutes = value)) {
+                preferences.setAutoSaveIntervalMinutes(value)
+            }
         }
     }
 

@@ -270,6 +270,14 @@ object GamepadManager {
     private var savedGlobalLeftStickCurve: Float = leftStickCurve
     @Volatile
     private var savedGlobalRightStickCurve: Float = rightStickCurve
+    @Volatile
+    private var savedGlobalInvertLeftStick: Boolean = invertLeftStick
+    @Volatile
+    private var savedGlobalInvertRightStick: Boolean = invertRightStick
+    @Volatile
+    private var savedGlobalInvertLeftStickHorizontal: Boolean = invertLeftStickHorizontal
+    @Volatile
+    private var savedGlobalInvertRightStickHorizontal: Boolean = invertRightStickHorizontal
 
     private val connectionLock = Any()
     private var appContext: Context? = null
@@ -439,67 +447,76 @@ object GamepadManager {
         }
         scope.launch {
             preferences.gamepadStickDeadzone.collectLatest { value ->
-                analogDeadzone = (value.coerceIn(0, 35) / 100f)
+                val normalized = value.coerceIn(0, 35) / 100f
+                if (perGameBindingsActive) savedGlobalAnalogDeadzone = normalized else analogDeadzone = normalized
             }
         }
         scope.launch {
             preferences.gamepadLeftStickSensitivity.collectLatest { value ->
-                leftStickSensitivity = value.coerceIn(50, 200) / 100f
+                val normalized = value.coerceIn(50, 200) / 100f
+                if (perGameBindingsActive) savedGlobalLeftStickSensitivity = normalized else leftStickSensitivity = normalized
             }
         }
         scope.launch {
             preferences.gamepadRightStickSensitivity.collectLatest { value ->
-                rightStickSensitivity = value.coerceIn(50, 200) / 100f
+                val normalized = value.coerceIn(50, 200) / 100f
+                if (perGameBindingsActive) savedGlobalRightStickSensitivity = normalized else rightStickSensitivity = normalized
             }
         }
         scope.launch {
             preferences.gamepadLeftStickNegativeDeadzone.collectLatest { value ->
-                leftNegativeDeadzone = value.coerceIn(0, 30) / 100f
+                val normalized = value.coerceIn(0, 30) / 100f
+                if (perGameBindingsActive) savedGlobalLeftNegativeDeadzone = normalized else leftNegativeDeadzone = normalized
             }
         }
         scope.launch {
             preferences.gamepadRightStickNegativeDeadzone.collectLatest { value ->
-                rightNegativeDeadzone = value.coerceIn(0, 30) / 100f
+                val normalized = value.coerceIn(0, 30) / 100f
+                if (perGameBindingsActive) savedGlobalRightNegativeDeadzone = normalized else rightNegativeDeadzone = normalized
             }
         }
         scope.launch {
             preferences.gamepadLeftStickAntiDeadzone.collectLatest { value ->
-                leftAntiDeadzone = value.coerceIn(0, 50) / 100f
+                val normalized = value.coerceIn(0, 50) / 100f
+                if (perGameBindingsActive) savedGlobalLeftAntiDeadzone = normalized else leftAntiDeadzone = normalized
             }
         }
         scope.launch {
             preferences.gamepadRightStickAntiDeadzone.collectLatest { value ->
-                rightAntiDeadzone = value.coerceIn(0, 50) / 100f
+                val normalized = value.coerceIn(0, 50) / 100f
+                if (perGameBindingsActive) savedGlobalRightAntiDeadzone = normalized else rightAntiDeadzone = normalized
             }
         }
         scope.launch {
             preferences.gamepadLeftStickCurve.collectLatest { value ->
-                leftStickCurve = value.coerceIn(50, 200) / 100f
+                val normalized = value.coerceIn(50, 200) / 100f
+                if (perGameBindingsActive) savedGlobalLeftStickCurve = normalized else leftStickCurve = normalized
             }
         }
         scope.launch {
             preferences.gamepadRightStickCurve.collectLatest { value ->
-                rightStickCurve = value.coerceIn(50, 200) / 100f
+                val normalized = value.coerceIn(50, 200) / 100f
+                if (perGameBindingsActive) savedGlobalRightStickCurve = normalized else rightStickCurve = normalized
             }
         }
         scope.launch {
             preferences.invertLeftStick.collectLatest { enabled ->
-                invertLeftStick = enabled
+                if (perGameBindingsActive) savedGlobalInvertLeftStick = enabled else invertLeftStick = enabled
             }
         }
         scope.launch {
             preferences.invertRightStick.collectLatest { enabled ->
-                invertRightStick = enabled
+                if (perGameBindingsActive) savedGlobalInvertRightStick = enabled else invertRightStick = enabled
             }
         }
         scope.launch {
             preferences.invertLeftStickHorizontal.collectLatest { enabled ->
-                invertLeftStickHorizontal = enabled
+                if (perGameBindingsActive) savedGlobalInvertLeftStickHorizontal = enabled else invertLeftStickHorizontal = enabled
             }
         }
         scope.launch {
             preferences.invertRightStickHorizontal.collectLatest { enabled ->
-                invertRightStickHorizontal = enabled
+                if (perGameBindingsActive) savedGlobalInvertRightStickHorizontal = enabled else invertRightStickHorizontal = enabled
             }
         }
         scope.launch {
@@ -687,7 +704,11 @@ object GamepadManager {
         leftAntiDeadzone: Int? = null,
         rightAntiDeadzone: Int? = null,
         leftStickCurve: Int? = null,
-        rightStickCurve: Int? = null
+        rightStickCurve: Int? = null,
+        invertLeftStick: Boolean? = null,
+        invertRightStick: Boolean? = null,
+        invertLeftStickHorizontal: Boolean? = null,
+        invertRightStickHorizontal: Boolean? = null
     ) {
         if (!perGameBindingsActive) {
             savedGlobalBindingsByPad = customBindingsByPad
@@ -700,6 +721,10 @@ object GamepadManager {
             savedGlobalRightAntiDeadzone = this.rightAntiDeadzone
             savedGlobalLeftStickCurve = this.leftStickCurve
             savedGlobalRightStickCurve = this.rightStickCurve
+            savedGlobalInvertLeftStick = this.invertLeftStick
+            savedGlobalInvertRightStick = this.invertRightStick
+            savedGlobalInvertLeftStickHorizontal = this.invertLeftStickHorizontal
+            savedGlobalInvertRightStickHorizontal = this.invertRightStickHorizontal
             perGameBindingsActive = true
         }
         if (bindingsByPad != null) {
@@ -740,6 +765,10 @@ object GamepadManager {
         if (rightStickCurve != null) {
             this.rightStickCurve = rightStickCurve.coerceIn(50, 200) / 100f
         }
+        invertLeftStick?.let { this.invertLeftStick = it }
+        invertRightStick?.let { this.invertRightStick = it }
+        invertLeftStickHorizontal?.let { this.invertLeftStickHorizontal = it }
+        invertRightStickHorizontal?.let { this.invertRightStickHorizontal = it }
     }
 
     fun clearPerGameOverrides() {
@@ -762,6 +791,10 @@ object GamepadManager {
         rightAntiDeadzone = savedGlobalRightAntiDeadzone
         leftStickCurve = savedGlobalLeftStickCurve
         rightStickCurve = savedGlobalRightStickCurve
+        invertLeftStick = savedGlobalInvertLeftStick
+        invertRightStick = savedGlobalInvertRightStick
+        invertLeftStickHorizontal = savedGlobalInvertLeftStickHorizontal
+        invertRightStickHorizontal = savedGlobalInvertRightStickHorizontal
         resetChangedBindingStates(previousBindingsByPad, savedGlobalBindingsByPad)
     }
 
