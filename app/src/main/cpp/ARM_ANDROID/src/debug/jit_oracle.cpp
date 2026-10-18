@@ -9,6 +9,7 @@
 #include "ir/Ir.h"
 #include "arm64/ee/EeIrLifter-arm64.h"
 #include "arm64/ee/iCore-arm64.h"
+#include "arm64/ee/BaseblockEx-arm64.h"
 #include "arm64/ee/iR5900-arm64.h"
 #include "arm64/iop/IopIrLifter-arm64.h"
 #include "arm64/ee/EeIrLower-arm64.h"
@@ -256,6 +257,8 @@ void GSPreparationDeviceTests()
         g_gs_device.reset();
     }
 }
+
+#include "jit_oracle_block_cache.inl"
 
 void ClassifierTests()
 {
@@ -12197,7 +12200,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXReplayVU1Fallback(
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const char* suite)
 {
     failures = checks = 0;
-    if (std::strcmp(suite, "classifier") == 0)
+    if (std::strcmp(suite, "jit-cache") == 0)
+        BlockCacheTests();
+    else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
         VUTests();

@@ -70,5 +70,6 @@ void BaseBlocks::Link(u32 pc, s32* jumpptr)
 //        *jumpptr = (s32) (recompiler - (sptr) (jumpptr + 1));
         oakEmitJmpPtr(jumpptr, (void*)recompiler);
     }
-	links.insert(std::pair<u32, uptr>(pc, (uptr)jumpptr));
+	const auto link = links.emplace(pc, reinterpret_cast<uptr>(jumpptr));
+	source_links.emplace(reinterpret_cast<uptr>(jumpptr), link);
 }
