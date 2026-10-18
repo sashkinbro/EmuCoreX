@@ -38,8 +38,13 @@ class SharedIrGameplayDeviceTest {
         val sampleCount = arguments.getString("sampleCount")?.toIntOrNull() ?: 40
         val sampleIntervalMs = arguments.getString("sampleIntervalMs")?.toLongOrNull() ?: 500L
         val unlimited = arguments.getString("unlimited")?.toBooleanStrictOrNull() ?: false
+        val inputScript = arguments.getString("inputScript") ?: "none"
+        require(inputScript in setOf("none", "walk-camera", "combat")) { "Unknown inputScript: $inputScript" }
         require(sampleCount > 0) { "sampleCount must be positive" }
         require(sampleIntervalMs >= 0L) { "sampleIntervalMs must not be negative" }
+        require(inputScript == "none" || sampleIntervalMs in 100L..500L) {
+            "Active input scripts require sampling every 100 to 500ms"
+        }
 
         val stateFile = File(requestedStateFilePath)
         assertTrue("State file must exist: $stateFilePath", stateFile.isFile)
@@ -53,6 +58,8 @@ class SharedIrGameplayDeviceTest {
             "logs"
         ).apply { mkdirs() }
         val samples = JSONArray()
+        val inputEvents = JSONArray()
+        var activeInputs = emptyMap<Int, Int>()
         val screenshotPaths = JSONObject()
         val launchedIntent = Intent("$packageName.action.LAUNCH_GAME").apply {
             setClassName(packageName, "$packageName.MainActivity")
@@ -115,7 +122,25 @@ class SharedIrGameplayDeviceTest {
                 captureScreenshot(instrumentation, File(outputDirectory, "shared-ir-$requestedLabel-before.png"))
             )
 
+            val inputStartMs = SystemClock.elapsedRealtime()
             repeat(sampleCount) { index ->
+                val elapsedMs = SystemClock.elapsedRealtime() - inputStartMs
+                if (inputScript != "none") {
+                    val desiredInputs = scriptedInputs(inputScript, elapsedMs)
+                    (activeInputs.keys + desiredInputs.keys).forEach { key ->
+                        val previous = activeInputs[key] ?: 0
+                        val desired = desiredInputs[key] ?: 0
+                        if (previous != desired) {
+                            NativeApp.setPadButton(0, key, desired, desired > 0)
+                            inputEvents.put(JSONObject().apply {
+                                put("elapsedMs", elapsedMs)
+                                put("key", key)
+                                put("range", desired)
+                            })
+                        }
+                    }
+                    activeInputs = desiredInputs
+                }
                 val snapshot = NativeApp.getPerformanceMetricsSnapshot().orEmpty()
                 val fps = snapshot.lineSequence().firstOrNull()?.trim()?.toFloatOrNull()
                 if (snapshot.isNotBlank()) nonblankMetricSamples++
@@ -130,6 +155,7 @@ class SharedIrGameplayDeviceTest {
                 samples.put(JSONObject().apply {
                     put("sample", index)
                     put("elapsedRealtimeMs", SystemClock.elapsedRealtime())
+                    put("inputElapsedMs", elapsedMs)
                     put("snapshot", snapshot)
                     put("fps", fps ?: JSONObject.NULL)
                     put("clocks", clocks)
@@ -145,7 +171,11 @@ class SharedIrGameplayDeviceTest {
             try {
                 if (launched) {
                     try {
-                        if (frameLimitChanged) NativeApp.setFrameLimitEnabled(true)
+                        try {
+                            NativeApp.resetPadState(0)
+                        } finally {
+                            if (frameLimitChanged) NativeApp.setFrameLimitEnabled(true)
+                        }
                     } finally {
                         NativeApp.shutdown()
                     }
@@ -166,6 +196,8 @@ class SharedIrGameplayDeviceTest {
                     put("sampleCountRequested", sampleCount)
                     put("sampleIntervalMs", sampleIntervalMs)
                     put("unlimited", unlimited)
+                    put("inputScript", inputScript)
+                    put("inputEvents", inputEvents)
                     put("positiveFpsSamples", positiveFpsSamples)
                     put("nonblankMetricSamples", nonblankMetricSamples)
                     put("screenshots", screenshotPaths)
@@ -179,6 +211,17 @@ class SharedIrGameplayDeviceTest {
         assertEquals("Every requested sample must be recorded", sampleCount, samples.length())
         assertEquals("Every requested sample must contain live performance metrics", sampleCount, nonblankMetricSamples)
         assertEquals("Every requested sample must contain positive FPS", sampleCount, positiveFpsSamples)
+    }
+
+    private fun scriptedInputs(script: String, elapsedMs: Long): Map<Int, Int> {
+        val phase = ((elapsedMs / 4_000L) % 4).toInt()
+        val walking = listOf(110, 111, 112, 113)[phase] // Left stick: up, right, down, left.
+        val camera = if (phase % 2 == 0) 121 else 123 // Right stick: right/left.
+        return buildMap {
+            put(walking, 180)
+            put(camera, 96)
+            if (script == "combat" && (elapsedMs / 500L) % 2 == 0L) put(99, 255) // Square.
+        }
     }
 
     private fun captureScreenshot(instrumentation: android.app.Instrumentation, file: File): String =
