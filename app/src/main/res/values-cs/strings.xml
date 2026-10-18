@@ -118,6 +118,7 @@
     <string name="emulation_exit">Ukončit</string>
     <string name="emulation_exit_confirm">Ukončit hru?</string>
     <string name="emulation_exit_confirm_desc">Neuložený postup bude ztracen.</string>
+    <string name="emulation_widescreen_patches_restart_required">Širokoúhlé patche se vypnou po restartu hry.</string>
     <string name="emulation_saved">Uloženo</string>
     <string name="emulation_save_failed">Stav se nepodařilo uložit.</string>
     <string name="emulation_loaded">Načteno</string>

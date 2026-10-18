@@ -76,6 +76,7 @@
     <string name="emulation_exit">Выход</string>
     <string name="emulation_exit_confirm">Выйти из игры?</string>
     <string name="emulation_exit_confirm_desc">Несохраненный прогресс будет потерян.</string>
+    <string name="emulation_widescreen_patches_restart_required">Широкоформатные патчи будут отключены после перезапуска игры.</string>
     <string name="emulation_saved">Сохранено</string>
     <string name="emulation_save_failed">Не удалось сохранить состояние.</string>
     <string name="emulation_loaded">Загружено</string>

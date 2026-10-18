@@ -118,6 +118,7 @@
     <string name="emulation_exit">Exit</string>
     <string name="emulation_exit_confirm">Exit the game?</string>
     <string name="emulation_exit_confirm_desc">Unsaved progress will be lost.</string>
+    <string name="emulation_widescreen_patches_restart_required">Widescreen patches will be disabled after restarting the game.</string>
     <string name="emulation_saved">Saved</string>
     <string name="emulation_save_failed">Failed to save state.</string>
     <string name="emulation_loaded">Loaded</string>

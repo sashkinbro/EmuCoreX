@@ -118,6 +118,7 @@
     <string name="emulation_exit">Keluar</string>
     <string name="emulation_exit_confirm">Keluar dari game?</string>
     <string name="emulation_exit_confirm_desc">Progres yang belum disimpan akan hilang.</string>
+    <string name="emulation_widescreen_patches_restart_required">Patch layar lebar akan dinonaktifkan setelah game dimulai ulang.</string>
     <string name="emulation_saved">Disimpan</string>
     <string name="emulation_save_failed">Gagal menyimpan state.</string>
     <string name="emulation_loaded">Dimuat</string>

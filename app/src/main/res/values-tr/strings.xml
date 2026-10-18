@@ -108,6 +108,7 @@
     <string name="emulation_exit">Çıkış</string>
     <string name="emulation_exit_confirm">Oyundan çıkılsın mı?</string>
     <string name="emulation_exit_confirm_desc">Kaydedilmemiş ilerleme kaybolacak.</string>
+    <string name="emulation_widescreen_patches_restart_required">Geniş ekran yamaları oyun yeniden başlatıldıktan sonra devre dışı bırakılır.</string>
     <string name="emulation_saved">Kaydedildi</string>
     <string name="emulation_save_failed">Durum kaydedilemedi.</string>
     <string name="emulation_loaded">Yüklendi</string>

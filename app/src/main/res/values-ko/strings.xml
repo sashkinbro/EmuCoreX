@@ -108,6 +108,7 @@
     <string name="emulation_exit">종료</string>
     <string name="emulation_exit_confirm">게임을 종료하시겠습니까?</string>
     <string name="emulation_exit_confirm_desc">저장하지 않은 진행 상황은 손실됩니다.</string>
+    <string name="emulation_widescreen_patches_restart_required">와이드스크린 패치는 게임을 다시 시작한 후 비활성화됩니다.</string>
     <string name="emulation_saved">저장됨</string>
     <string name="emulation_save_failed">상태를 저장하지 못했습니다.</string>
     <string name="emulation_loaded">불러옴</string>

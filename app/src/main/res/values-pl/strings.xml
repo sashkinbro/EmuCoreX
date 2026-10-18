@@ -118,6 +118,7 @@
     <string name="emulation_exit">Wyjście</string>
     <string name="emulation_exit_confirm">Wyjść z gry?</string>
     <string name="emulation_exit_confirm_desc">Niezapisane postępy zostaną utracone.</string>
+    <string name="emulation_widescreen_patches_restart_required">Patche szerokoekranowe zostaną wyłączone po ponownym uruchomieniu gry.</string>
     <string name="emulation_saved">Zapisano</string>
     <string name="emulation_save_failed">Nie udało się zapisać stanu.</string>
     <string name="emulation_loaded">Wczytano</string>

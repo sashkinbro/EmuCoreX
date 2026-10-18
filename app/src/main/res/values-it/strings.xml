@@ -99,6 +99,7 @@
     <string name="emulation_exit">Esci</string>
     <string name="emulation_exit_confirm">Uscire dal gioco?</string>
     <string name="emulation_exit_confirm_desc">I progressi non salvati andranno persi.</string>
+    <string name="emulation_widescreen_patches_restart_required">Le patch widescreen verranno disattivate dopo il riavvio del gioco.</string>
     <string name="emulation_saved">Salvato</string>
     <string name="emulation_save_failed">Impossibile salvare lo stato.</string>
     <string name="emulation_loaded">Caricato</string>

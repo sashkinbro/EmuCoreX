@@ -76,6 +76,7 @@
     <string name="emulation_exit">Quitter</string>
     <string name="emulation_exit_confirm">Quitter le jeu ?</string>
     <string name="emulation_exit_confirm_desc">La progression non sauvegardée sera perdue.</string>
+    <string name="emulation_widescreen_patches_restart_required">Les patchs grand écran seront désactivés après le redémarrage du jeu.</string>
     <string name="emulation_saved">Sauvegardé</string>
     <string name="emulation_save_failed">Échec de l\'enregistrement de l\'état.</string>
     <string name="emulation_loaded">Chargé</string>

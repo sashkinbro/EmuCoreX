@@ -117,6 +117,7 @@ import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.data.PerGameInterfaceSettings
 import com.sbro.emucorex.data.PerGameSettings
 import com.sbro.emucorex.data.PerGameSettingsRepository
+import com.sbro.emucorex.data.PerformanceOverlayMetrics
 import com.sbro.emucorex.data.RetroArchShaderPreset
 import com.sbro.emucorex.data.RetroArchShaderRepository
 import com.sbro.emucorex.data.SettingsSnapshot
@@ -3402,6 +3403,70 @@ private fun SelectionRow(
 }
 
 @Composable
+private fun BitmaskChoiceRow(
+    title: String,
+    options: List<Pair<Int, String>>,
+    selectedMask: Int,
+    onToggle: (Int) -> Unit,
+    helpText: String? = null,
+    onResetToDefault: (() -> Unit)? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    val resetToast = stringResource(R.string.settings_reset_to_default_toast)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {},
+                onLongClick = onResetToDefault?.let {
+                    {
+                        it()
+                        Toast.makeText(context, resetToast, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            helpText?.let {
+                SettingHelpButton(title = title, description = it)
+            }
+        }
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .sectionContentFullBleed(GameSettingsSectionContentPadding)
+                .tvFocusGroup(),
+            contentPadding = PaddingValues(horizontal = GameSettingsSectionContentPadding),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(options, key = { it.first }) { (metric, label) ->
+                val optionInteractionSource = remember { MutableInteractionSource() }
+                FilterChip(
+                    modifier = Modifier.tvGamepadFocusableCard(
+                        shape = neonShape(16.dp),
+                        interactionSource = optionInteractionSource,
+                        addFocusTarget = false
+                    ),
+                    selected = PerformanceOverlayMetrics.isEnabled(selectedMask, metric),
+                    onClick = { onToggle(metric) },
+                    interactionSource = optionInteractionSource,
+                    label = { Text(label) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ToggleRow(
     title: String,
     checked: Boolean,
@@ -4845,7 +4910,7 @@ private fun PerGameInterfaceSettingsEditor(
             helpText = stringResource(R.string.settings_help_fps_overlay_scale),
             onResetToDefault = { update(current.copy(fpsOverlayScale = base.fpsOverlayScale)) }
         )
-        BitmaskChoiceSection(
+        BitmaskChoiceRow(
             title = stringResource(R.string.settings_fps_overlay_metrics), options = fpsOverlayMetricOptions(),
             selectedMask = current.fpsOverlayMetrics,
             onToggle = { update(current.copy(fpsOverlayMetrics = current.fpsOverlayMetrics xor it)) },

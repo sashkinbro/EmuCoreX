@@ -1601,6 +1601,7 @@ fun EmulationScreen(
                 "disc_swap_success" -> stringResource(R.string.emulation_swap_disc_success)
                 "disc_swap_failed" -> stringResource(R.string.emulation_swap_disc_failed)
                 "disc_swap_invalid" -> stringResource(R.string.emulation_swap_disc_invalid)
+                "widescreen_patches_restart_required" -> stringResource(R.string.emulation_widescreen_patches_restart_required)
                 else -> uiState.toastMessage?.takeIf { it.startsWith("launch_error:") }
                     ?.removePrefix("launch_error:").orEmpty()
             }

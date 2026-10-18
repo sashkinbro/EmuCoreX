@@ -76,6 +76,7 @@
     <string name="emulation_exit">Sair</string>
     <string name="emulation_exit_confirm">Sair do jogo?</string>
     <string name="emulation_exit_confirm_desc">O progresso não salvo será perdido.</string>
+    <string name="emulation_widescreen_patches_restart_required">Os patches de tela widescreen serão desativados após reiniciar o jogo.</string>
     <string name="emulation_saved">Salvo</string>
     <string name="emulation_save_failed">Falha ao salvar o estado.</string>
     <string name="emulation_loaded">Carregado</string>

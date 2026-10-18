@@ -108,6 +108,7 @@
     <string name="emulation_exit">終了</string>
     <string name="emulation_exit_confirm">ゲームを終了しますか？</string>
     <string name="emulation_exit_confirm_desc">セーブされていない進行状況は失われます。</string>
+    <string name="emulation_widescreen_patches_restart_required">ワイドスクリーンパッチはゲームを再起動した後に無効になります。</string>
     <string name="emulation_saved">セーブしました</string>
     <string name="emulation_save_failed">ステートを保存できませんでした。</string>
     <string name="emulation_loaded">ロードしました</string>

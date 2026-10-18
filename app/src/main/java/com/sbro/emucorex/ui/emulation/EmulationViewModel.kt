@@ -3694,6 +3694,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun setEnableWidescreenPatches(enabled: Boolean) {
         viewModelScope.launch {
+            val wasEnabled = _uiState.value.widescreenPatches
             val newState = markPerformancePresetCustom(_uiState.value).copy(widescreenPatches = enabled)
             persistRuntimeState(newState) {
                 preferences.setPerformancePreset(PerformancePresets.CUSTOM)
@@ -3704,6 +3705,17 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 NativeApp.reloadPatches()
             }
             updateCrashContext()
+            if (wasEnabled && !enabled && _uiState.value.isRunning) {
+                showWidescreenPatchesRestartToast()
+            }
+        }
+    }
+
+    private suspend fun showWidescreenPatchesRestartToast() {
+        _uiState.value = _uiState.value.copy(toastMessage = "widescreen_patches_restart_required")
+        delay(2500.milliseconds)
+        if (_uiState.value.toastMessage == "widescreen_patches_restart_required") {
+            _uiState.value = _uiState.value.copy(toastMessage = null)
         }
     }
 
