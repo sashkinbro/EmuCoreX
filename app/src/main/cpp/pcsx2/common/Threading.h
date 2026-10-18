@@ -224,6 +224,7 @@ namespace Threading
 	/// A semaphore that definitely has a fast userspace path
 	class alignas(__cachelinesize) UserspaceSemaphore
 	{
+		friend struct UserspaceSemaphoreOracle;
 		KernelSemaphore m_sema;
 		alignas(__cachelinesize) std::atomic<int32_t> m_counter{0};
 
@@ -239,12 +240,18 @@ namespace Threading
 
 		void Post(int count)
 		{
-			// The counter already records the surplus, so one kernel wake is enough:
-			// the woken waiter consumes a single kernel semaphore, and any further
-			// waiters (or later waits) observe the positive counter without sleeping.
-			// Posting per unit here cost a futex syscall per XGKICK packet batch.
-			if (m_counter.fetch_add(count, std::memory_order_release) < 0)
+			s32 previous = m_counter.fetch_add(count, std::memory_order_release);
+			if (previous >= 0)
+				return;
+			// Each already-registered waiter needs a kernel wake. Surplus permits
+			// remain in the userspace counter, so an XGKICK batch with one waiting
+			// consumer still needs only one kernel post, regardless of batch size.
+			while (previous < 0 && count > 0)
+			{
 				m_sema.Post();
+				++previous;
+				--count;
+			}
 		}
 
 		void Wait()

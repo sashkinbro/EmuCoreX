@@ -33,6 +33,7 @@
 #include "GS/Renderers/Common/GSPassScheduler.h"
 #include "common/FileSystem.h"
 #include "common/ScopedGuard.h"
+#include "common/Threading.h"
 
 #include <array>
 #include <algorithm>
@@ -45,6 +46,8 @@
 #include <unistd.h>
 #include <android/log.h>
 #include <cerrno>
+
+#include "jit_oracle_semaphore.inl"
 
 // Self-test builds only. The differential oracle enables this so it can run
 // without initializing SPU2, DEV9 and friends. It must default to off: a debug
@@ -12235,6 +12238,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         VUDivZeroTests();
     else if (std::strcmp(suite, "vu-scalar-clamp") == 0)
         VUScalarClampTests();
+    else if (std::strcmp(suite, "semaphore") == 0)
+        Threading::UserspaceSemaphoreOracle::Run(Check);
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
