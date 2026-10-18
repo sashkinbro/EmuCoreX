@@ -28,10 +28,20 @@ static __fi OakMemOperand mVUBranchOakMvuMem(s64 offset)
 	return {oak::util::X28, offset};
 }
 
-static __fi void mVUBranchOakPshufd(oak::QReg dst, oak::QReg src, int pIndex)
+static __fi void mVUBranchOakSwapPQ(oak::QReg pq, bool swapQ, bool swapP)
 {
-	oakLoad128(OAK_QSCRATCH3, mVUBranchOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[pIndex][0]))));
-	oakAsm->TBL(dst.B16(), oak::List(src.B16()), OAK_QSCRATCH3.B16());
+	if (swapQ && swapP)
+	{
+		oakAsm->REV64(pq.S4(), pq.S4());
+	}
+	else if (swapQ || swapP)
+	{
+		// A single-half REV64 + INS has a longer dependency chain on Cortex-A76.
+		// Keep TBL for one pair; REV64 handles both pairs in one instruction.
+		const u32 shuffle = swapP ? 0xb4 : 0xe1;
+		oakLoad128(OAK_QSCRATCH3, mVUBranchOakCpuMem(static_cast<s64>(offsetof(cpuRegistersPack, shuffle.data[shuffle][0]))));
+		oakAsm->TBL(pq.B16(), oak::List(pq.B16()), OAK_QSCRATCH3.B16());
+	}
 }
 
 static __fi void mVUBranchOakStoreXmmPQScalar(s64 offset, u32 lane)
@@ -54,10 +64,7 @@ static __fi void mVUSavePQRegs_emit_oaknut(mV, int qInst, int pInst)
 		mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p)), 2 + (pInst ^ 1));
 	}
 	// Preserve the exit's selected-instance layout without shuffling to extract scalars.
-	if (qInst)
-		mVUBranchOakPshufd(pq, pq, 0xe1);
-	if (isVU1 && pInst)
-		mVUBranchOakPshufd(pq, pq, 0xb4);
+	mVUBranchOakSwapPQ(pq, qInst != 0, isVU1 && pInst != 0);
 
 	recEndOaknutEmit();
 }
@@ -277,9 +284,24 @@ static __fi void mVUBranchOrVuFlags_emit_oaknut(mV, u32 bits)
 static __fi void mVUBranchSetupPqShuffle_emit_oaknut(mV)
 {
 	recBeginOaknutEmit();
-	mVUBranchOakPshufd(oakQRegister(VU_HOST_XMMPQ), oakQRegister(VU_HOST_XMMPQ), shufflePQ);
+	mVUBranchOakSwapPQ(oakQRegister(VU_HOST_XMMPQ), mVU.q != 0, mVU.p != 0);
 	recEndOaknutEmit();
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitShufflePQ(u32 q, u32 p)
+{
+	microVU& mVU = microVU1;
+	const auto old_q = mVU.q, old_p = mVU.p;
+	mVU.q = q;
+	mVU.p = p;
+	const u8* start = oakGetCurrentCodePointer();
+	mVUBranchSetupPqShuffle_emit_oaknut(mVU);
+	mVU.q = old_q;
+	mVU.p = old_p;
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 static __fi void mVUBranchLoadJumpArgs_emit_oaknut(mV, bool isEvilJump, const void* blockArg)
 {

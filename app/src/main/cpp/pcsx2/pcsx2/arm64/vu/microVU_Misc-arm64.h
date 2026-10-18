@@ -162,7 +162,6 @@ typedef Fntype_mVUrecInst* Fnptr_mVUrecInst;
 #define curI         ((u32*)mVU.regs().Micro)[iPC] //mVUcurProg.data[iPC]
 #define setCode()    { mVU.code = curI; }
 #define bSaveAddr    (((xPC + 16) & (mVU.microMemSize-8)) / 8)
-#define shufflePQ    (((mVU.p) ? 0xb0 : 0xe0) | ((mVU.q) ? 0x01 : 0x04))
 #define Rmem         &mVU.regs().VI[REG_R].UL
 #define aWrap(x, m)  ((x > m) ? 0 : x)
 #define shuffleSS(x) ((x == 1) ? (0x27) : ((x == 2) ? (0xc6) : ((x == 4) ? (0xe1) : (0xe4))))
