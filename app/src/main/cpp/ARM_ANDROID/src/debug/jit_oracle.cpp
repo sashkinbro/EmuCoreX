@@ -2175,9 +2175,11 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_clip_integration.inl"
 #include "jit_oracle_vu_clip_bench.inl"
 
+#include "jit_oracle_vu_pq.inl"
+
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
-    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false, u32 clip_only = 0)
+    bool maxmin_broadcast_route_only = false, bool maxmin_i_only = false, u32 clip_only = 0, bool pq_only = false)
 {
     struct VUOverrideReset
     {
@@ -2198,6 +2200,11 @@ void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin
     CpuVU1 = &CpuMicroVU1;
     CpuMicroVU0.Reserve();
     CpuMicroVU1.Reserve();
+    if (pq_only)
+    {
+        VUSavePQTests();
+        return;
+    }
     if (itof_codegen_only)
     {
         VUBoundItofCodegenTests();
@@ -12185,6 +12192,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
         VUTests();
+    else if (std::strcmp(suite, "vu-pq") == 0)
+        VUTests(false, false, false, false, false, false, false, 0, true);
     else if (std::strcmp(suite, "vu-itof-codegen") == 0)
         VUTests(true);
     else if (std::strcmp(suite, "vu-ftoi") == 0)

@@ -34,9 +34,9 @@ static __fi void mVUBranchOakPshufd(oak::QReg dst, oak::QReg src, int pIndex)
 	oakAsm->TBL(dst.B16(), oak::List(src.B16()), OAK_QSCRATCH3.B16());
 }
 
-static __fi void mVUBranchOakStoreXmmPQScalar(s64 offset)
+static __fi void mVUBranchOakStoreXmmPQScalar(s64 offset, u32 lane)
 {
-	oakAsm->MOV(OAK_WSCRATCH, oakQRegister(VU_HOST_XMMPQ).Selem()[0]);
+	oakAsm->MOV(OAK_WSCRATCH, oakQRegister(VU_HOST_XMMPQ).Selem()[lane]);
 	oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(offset));
 }
 
@@ -45,26 +45,32 @@ static __fi void mVUSavePQRegs_emit_oaknut(mV, int qInst, int pInst)
 	recBeginOaknutEmit();
 	const oak::QReg pq = oakQRegister(VU_HOST_XMMPQ);
 
-	if (qInst)
-		mVUBranchOakPshufd(pq, pq, 0xe1);
-	mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_Q].UL)));
-	mVUBranchOakPshufd(pq, pq, 0xe1);
-	mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_q)));
-	mVUBranchOakPshufd(pq, pq, 0xe1);
+	mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_Q].UL)), qInst);
+	mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_q)), qInst ^ 1);
 
 	if (isVU1)
 	{
-		if (pInst)
-			mVUBranchOakPshufd(pq, pq, 0xb4);
-		mVUBranchOakPshufd(pq, pq, 0xC6);
-		mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_P].UL)));
-		mVUBranchOakPshufd(pq, pq, 0x87);
-		mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p)));
-		mVUBranchOakPshufd(pq, pq, 0x27);
+		mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].VI[REG_P].UL)), 2 + pInst);
+		mVUBranchOakStoreXmmPQScalar(static_cast<s64>(offsetof(cpuRegistersPack, vuRegs[mVU.index].pending_p)), 2 + (pInst ^ 1));
 	}
+	// Preserve the exit's selected-instance layout without shuffling to extract scalars.
+	if (qInst)
+		mVUBranchOakPshufd(pq, pq, 0xe1);
+	if (isVU1 && pInst)
+		mVUBranchOakPshufd(pq, pq, 0xb4);
 
 	recEndOaknutEmit();
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitSavePQ(u32 index, int qInst, int pInst)
+{
+	microVU& mVU = index ? microVU1 : microVU0;
+	const u8* start = oakGetCurrentCodePointer();
+	mVUSavePQRegs_emit_oaknut(mVU, qInst, pInst);
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 static __fi void mVUBranchEmitCall_oaknut(const void* fn)
 {
@@ -470,22 +476,12 @@ static void mVUGenerateBudgetExitStub(mV)
 	oakStore128(OAK_QSCRATCH, mVUBranchOakCpuMem(off_micro_clip));
 
 	// P/Q always save instance 0 at a block entry (mVUSavePQRegs(0, 0)).
-	const oak::QReg pq = oakQRegister(VU_HOST_XMMPQ);
-	oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
-	oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_vi_q));
-	mVUBranchOakPshufd(pq, pq, 0xe1);
-	oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
-	oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_pending_q));
-	mVUBranchOakPshufd(pq, pq, 0xe1);
+	mVUBranchOakStoreXmmPQScalar(off_vi_q, 0);
+	mVUBranchOakStoreXmmPQScalar(off_pending_q, 1);
 	if (isVU1)
 	{
-		mVUBranchOakPshufd(pq, pq, 0xC6);
-		oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
-		oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_vi_p));
-		mVUBranchOakPshufd(pq, pq, 0x87);
-		oakAsm->MOV(OAK_WSCRATCH, pq.Selem()[0]);
-		oakStore32(OAK_WSCRATCH, mVUBranchOakCpuMem(off_pending_p));
-		mVUBranchOakPshufd(pq, pq, 0x27);
+		mVUBranchOakStoreXmmPQScalar(off_vi_p, 2);
+		mVUBranchOakStoreXmmPQScalar(off_pending_p, 3);
 	}
 
 	if (mVU.index && THREAD_VU1)
