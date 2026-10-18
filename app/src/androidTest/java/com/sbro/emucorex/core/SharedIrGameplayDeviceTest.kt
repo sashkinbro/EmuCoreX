@@ -35,15 +35,32 @@ class SharedIrGameplayDeviceTest {
         require(requestedLabel.matches(Regex("[a-zA-Z0-9_-]+"))) { "label may contain only letters, numbers, underscores, and hyphens" }
         val slot = (arguments.getString("slot") ?: arguments.getString("slot1"))?.toIntOrNull() ?: 1
         require(slot in 1..10) { "slot must be between 1 and 10" }
+        val captureSlot = arguments.getString("captureSlot")?.takeIf { it.isNotBlank() }?.let {
+            requireNotNull(it.toIntOrNull()) { "captureSlot must be an integer" }
+        }
+        require(captureSlot == null || (captureSlot in 1..10 && captureSlot != slot)) {
+            "captureSlot must be between 1 and 10 and differ from the loaded slot"
+        }
         val sampleCount = arguments.getString("sampleCount")?.toIntOrNull() ?: 40
         val sampleIntervalMs = arguments.getString("sampleIntervalMs")?.toLongOrNull() ?: 500L
         val unlimited = arguments.getString("unlimited")?.toBooleanStrictOrNull() ?: false
         val inputScript = arguments.getString("inputScript") ?: "none"
-        require(inputScript in setOf("none", "walk-camera", "combat")) { "Unknown inputScript: $inputScript" }
+        require(inputScript in setOf("none", "walk-camera", "combat", "drive")) { "Unknown inputScript: $inputScript" }
         require(sampleCount > 0) { "sampleCount must be positive" }
         require(sampleIntervalMs >= 0L) { "sampleIntervalMs must not be negative" }
         require(inputScript == "none" || sampleIntervalMs in 100L..500L) {
             "Active input scripts require sampling every 100 to 500ms"
+        }
+
+        val setupButtons = JSONArray(arguments.getString("setupButtons") ?: "[]")
+        require(setupButtons.length() <= 32) { "At most 32 setup buttons are allowed" }
+        for (index in 0 until setupButtons.length()) {
+            val button = setupButtons.getJSONObject(index)
+            require(button.getInt("key") in setOf(19, 20, 21, 22, 96, 97, 99, 100, 102, 103, 104, 105, 106, 107, 108, 109)) {
+                "Setup buttons must use a supported digital pad key"
+            }
+            require(button.optLong("holdMs", 200L) in 1L..5_000L) { "Setup holdMs must be between 1 and 5000" }
+            require(button.optLong("waitMs", 1_000L) in 0L..60_000L) { "Setup waitMs must be between 0 and 60000" }
         }
 
         val stateFile = File(requestedStateFilePath)
@@ -59,6 +76,7 @@ class SharedIrGameplayDeviceTest {
         ).apply { mkdirs() }
         val samples = JSONArray()
         val inputEvents = JSONArray()
+        val setupInputEvents = JSONArray()
         var activeInputs = emptyMap<Int, Int>()
         val screenshotPaths = JSONObject()
         val launchedIntent = Intent("$packageName.action.LAUNCH_GAME").apply {
@@ -71,6 +89,8 @@ class SharedIrGameplayDeviceTest {
         var frameLimitChanged = false
         var stateHashAfter: String? = null
         var nativeResolvedStatePath: String? = null
+        var capturedStatePath: String? = null
+        var capturedStateSha256: String? = null
         var stateLoadSucceeded = false
         var positiveFpsSamples = 0
         var nonblankMetricSamples = 0
@@ -97,6 +117,25 @@ class SharedIrGameplayDeviceTest {
             assertTrue("Saved gameplay state must load from slot $slot", stateLoadSucceeded)
             NativeApp.setPerformanceMetricsEnabled(true, true, false)
             Thread.sleep(WARMUP_MS)
+            val setupStartMs = SystemClock.elapsedRealtime()
+            for (index in 0 until setupButtons.length()) {
+                val button = setupButtons.getJSONObject(index)
+                val key = button.getInt("key")
+                NativeApp.setPadButton(0, key, 255, true)
+                val pressedMs = SystemClock.elapsedRealtime() - setupStartMs
+                try {
+                    Thread.sleep(button.optLong("holdMs", 200L))
+                } finally {
+                    NativeApp.setPadButton(0, key, 0, false)
+                    setupInputEvents.put(JSONObject().apply {
+                        put("key", key)
+                        put("pressedMs", pressedMs)
+                        put("releasedMs", SystemClock.elapsedRealtime() - setupStartMs)
+                    })
+                }
+                Thread.sleep(button.optLong("waitMs", 1_000L))
+            }
+            if (setupButtons.length() > 0) Thread.sleep(WARMUP_MS)
             NativeApp.setPerformanceMetricsEnabled(true, true, false)
 
             val metricsReadyTimeout = SystemClock.elapsedRealtime() + METRICS_READY_TIMEOUT_MS
@@ -112,6 +151,17 @@ class SharedIrGameplayDeviceTest {
                 "Live metrics must refresh with positive FPS within ${METRICS_READY_TIMEOUT_MS}ms after enabling",
                 firstSnapshot.isNotBlank() && firstFps != null && firstFps > 0f
             )
+
+            if (captureSlot != null) {
+                val path = requireNotNull(NativeApp.getSaveStatePathForFile(requestedGamePath, captureSlot))
+                val captureFile = File(path)
+                check(!captureFile.exists()) { "Refusing to overwrite an existing checkpoint: $path" }
+                check(NativeApp.saveStateToSlot(captureSlot)) { "Unable to capture checkpoint in slot $captureSlot" }
+                NativeApp.waitForSaveStateFlush()
+                check(captureFile.isFile && captureFile.length() > 0L) { "Checkpoint was not written: $path" }
+                capturedStatePath = path
+                capturedStateSha256 = sha256(captureFile)
+            }
 
             if (unlimited) {
                 frameLimitChanged = true
@@ -193,10 +243,14 @@ class SharedIrGameplayDeviceTest {
                     put("stateSha256After", stateHashAfter)
                     put("stateUnchanged", stateHashBefore == stateHashAfter)
                     put("slot", slot)
+                    put("capturedStatePath", capturedStatePath ?: JSONObject.NULL)
+                    put("capturedStateSha256", capturedStateSha256 ?: JSONObject.NULL)
                     put("sampleCountRequested", sampleCount)
                     put("sampleIntervalMs", sampleIntervalMs)
                     put("unlimited", unlimited)
                     put("inputScript", inputScript)
+                    put("setupButtons", setupButtons)
+                    put("setupInputEvents", setupInputEvents)
                     put("inputEvents", inputEvents)
                     put("positiveFpsSamples", positiveFpsSamples)
                     put("nonblankMetricSamples", nonblankMetricSamples)
@@ -214,6 +268,12 @@ class SharedIrGameplayDeviceTest {
     }
 
     private fun scriptedInputs(script: String, elapsedMs: Long): Map<Int, Int> {
+        if (script == "drive") {
+            return buildMap {
+                put(96, 255) // Cross: accelerate with the game's default controller layout.
+                put(if ((elapsedMs / 4_000L) % 2 == 0L) 111 else 113, 48)
+            }
+        }
         val phase = ((elapsedMs / 4_000L) % 4).toInt()
         val walking = listOf(110, 111, 112, 113)[phase] // Left stick: up, right, down, left.
         val camera = if (phase % 2 == 0) 121 else 123 // Right stick: right/left.
