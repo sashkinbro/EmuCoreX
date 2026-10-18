@@ -1380,9 +1380,10 @@ fun EmulationScreen(
     ) {
         if (!uiState.isRunning) return@produceState
         while (true) {
-            value = runCatching { NativeApp.getDisplayDrawRect() }
-                .getOrNull()
-                ?.takeIf { it.size >= 4 && it[2] > it[0] && it[3] > it[1] }
+            value = updatedNativeDisplayDrawRect(
+                value,
+                runCatching { NativeApp.getDisplayDrawRect() }.getOrNull()
+            )
             delay(250.milliseconds)
         }
     }
