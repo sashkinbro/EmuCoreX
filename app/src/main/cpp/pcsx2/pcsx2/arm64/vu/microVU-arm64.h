@@ -103,6 +103,28 @@ struct microProgManager
 	u8*                x86start;           // Start of program's rec-cache
 	u8*                x86end;             // Cleanup threshold; safe zone continues to the physical rec-cache end
 	microRegInfo       lpState;            // Pipeline state from where program left off (useful for continuing execution)
+
+	// Dense, non-owning index of non-null quick slots. Only the search miss
+	// paths populate quick entries; generated code still reads quick directly.
+	u16 activeQuick[mProgSizeHalf];
+	u32 activeQuickCount = 0;
+
+	void cacheQuick(u32 slot, microProgram* program)
+	{
+		pxAssert(slot < mProgSizeHalf && program);
+		if (!quick[slot].prog)
+		{
+			pxAssert(activeQuickCount < mProgSizeHalf);
+			activeQuick[activeQuickCount++] = static_cast<u16>(slot);
+		}
+		quick[slot].prog = program;
+	}
+
+	void clearQuick()
+	{
+		std::memset(quick, 0, sizeof(quick));
+		activeQuickCount = 0;
+	}
 };
 
 // Space past x86end which an in-flight compile may use before dispatcher-exit

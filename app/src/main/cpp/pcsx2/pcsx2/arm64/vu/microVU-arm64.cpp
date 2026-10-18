@@ -9,6 +9,9 @@
 
 #include <unordered_set>
 #include <atomic>
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+#include <chrono>
+#endif
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -350,6 +353,7 @@ void mVUreset(microVU& mVU, bool resetReserve)
 	mVU.prog.cur      = NULL;
 	mVU.prog.total    =  0;
 	mVU.prog.curFrame =  0;
+	mVU.prog.clearQuick();
 
 	// Setup Dynarec Cache Limits for Each Program
 //	mVU.prog.x86start = xGetAlignedCallTarget();
@@ -375,7 +379,6 @@ void mVUreset(microVU& mVU, bool resetReserve)
 			continue;
 		}
 		mVU.prog.prog[i]->clear();
-		mVU.prog.quick[i].prog = nullptr;
 	}
 }
 
@@ -388,6 +391,7 @@ void mVUclose(microVU& mVU)
 	for (microProgram*& prog : mVU.orphanedPrograms)
 		mVUdeleteProg(mVU, prog);
 	mVU.orphanedPrograms.clear();
+	mVU.prog.clearQuick();
 
 	// Per-PC lists are non-owning shells.
     u32 i, e = (mVU.progSize >> 1); // mVU.progSize / 2
@@ -432,7 +436,7 @@ __fi void mVUclear(mV, u32 addr, u32 size)
 		{
 			mVU.prog.cleared = 1;
 			std::memset(&mVU.prog.lpState, 0, sizeof(mVU.prog.lpState));
-			std::memset(mVU.prog.quick, 0, (mVU.progSize >> 1) * sizeof(microProgramQuick));
+			mVU.prog.clearQuick();
 		}
 		return;
 	}
@@ -440,21 +444,47 @@ __fi void mVUclear(mV, u32 addr, u32 size)
 	// Partial-program mode only invalidates entries whose compiled code can
 	// observe the write. Unrelated boot/menu/gameplay programs remain on the
 	// quick path instead of forcing another walk through an ever-growing list.
-	for (u32 i = 0; i < (mVU.progSize >> 1); i++)
+	microProgManager& programs = mVU.prog;
+	u32 active_count = programs.activeQuickCount;
+	for (u32 i = 0; i < active_count;)
 	{
-		microProgramQuick& quick = mVU.prog.quick[i];
-		if (!quick.prog)
-			continue;
+		microProgramQuick& quick = programs.quick[programs.activeQuick[i]];
+		pxAssert(quick.prog);
 		if (mVUProgRangesOverlap(quick.prog, addr, size))
+		{
 			quick.prog = nullptr;
+			// Slot order has no execution meaning. Recheck the swapped entry.
+			programs.activeQuick[i] = programs.activeQuick[--active_count];
+		}
+		else
+			++i;
 	}
+	programs.activeQuickCount = active_count;
 
 	// lpState is a carried entry-search key and becomes invalid after every
 	// micro-memory write, including writes disjoint from cached code. Do not set
 	// cleared here: surviving quick entries do not pass through mVUsearchProg(),
 	// so the full-invalidation latch would remain stale on that path.
-	std::memset(&mVU.prog.lpState, 0, sizeof(mVU.prog.lpState));
+	std::memset(&programs.lpState, 0, sizeof(programs.lpState));
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" __attribute__((noinline)) void EmuCoreXOracleClearVUQuick(microVU* mVU, u32 addr, u32 size)
+{
+	mVUclear(*mVU, addr, size);
+}
+
+extern "C" void EmuCoreXOracleSetVUQuick(microVU* mVU, u32 slot, microProgram* prog)
+{
+	mVU->prog.cacheQuick(slot, prog);
+}
+
+extern "C" void EmuCoreXOracleResetVUQuick(microVU* mVU)
+{
+	mVU->prog.clearQuick();
+}
+#include "microVU_QuickCacheTests-arm64.inl"
+#endif
 
 //------------------------------------------------------------------
 // Micro VU - Private Functions
@@ -670,7 +700,7 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 			if (b)
 			{
 				microBlockManager* block = it[0]->block[start_pc_8];
-				quick.prog = it[0];
+				mVU.prog.cacheQuick(regs_start_pc_8, it[0]);
 				list->erase(it);
 				list->push_front(quick.prog);
 
@@ -697,7 +727,7 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 			mVU.prog.cleared = 0;
 			mVU.prog.isSame = 1;
 			mVU.prog.cur = shared;
-			quick.prog = shared;
+			mVU.prog.cacheQuick(regs_start_pc_8, shared);
 			microBlockManager* block = shared->block[start_pc_8];
 			if (block == nullptr)
 				return mVUblockFetch(mVU, startPC, pState);
@@ -709,7 +739,7 @@ _mVUt __fi void* mVUsearchProg(u32 startPC, uptr pState)
 		mVU.prog.isSame  = 1;
 		mVU.prog.cur     = mVUcreateProg(mVU, regs_start_pc_8, liveKey);
 		void* entryPoint = mVUblockFetch(mVU,  startPC, pState);
-		quick.prog       = mVU.prog.cur;
+		mVU.prog.cacheQuick(regs_start_pc_8, mVU.prog.cur);
 		list->push_front(mVU.prog.cur);
 		//mVUprintUniqueRatio(mVU);
 		return entryPoint;

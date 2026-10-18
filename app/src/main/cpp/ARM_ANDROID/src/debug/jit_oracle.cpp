@@ -50,6 +50,7 @@
 static bool s_oracleSkipEvents = false;
 void recExitExecutionImmediate();
 extern "C" void EmuCoreXOracleSetEeIrRegisterAllocation(int mode);
+extern "C" void EmuCoreXOracleTestVUQuick(void (*check)(bool, const char*));
 extern "C" u32 EmuCoreXOracleGetEeIrLastFrameSize();
 
 extern "C" int EmuCoreXOracleSkipEvents()
@@ -12202,6 +12203,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
     failures = checks = 0;
     if (std::strcmp(suite, "jit-cache") == 0)
         BlockCacheTests();
+    else if (std::strcmp(suite, "vu-cache") == 0)
+        EmuCoreXOracleTestVUQuick(Check);
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)
