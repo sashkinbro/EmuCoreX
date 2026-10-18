@@ -1055,7 +1055,11 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 				if (JitProfiler::IsActive())
 					control_scope.Begin(isVU1 ? 5 : 4, profiler_pc, 21);
 				mVUsetupRange(mVU, xPC + 8, false);
-				mVUsetupRange(mVU, 0, 1);
+				// Open head coverage only when another instruction follows. An
+				// E-bit delay ending here otherwise leaves an empty [0, 0) range,
+				// forcing conservative cache invalidation on every unrelated write.
+				if (!mVUinfo.isEOB && x + 1 < endCount)
+					mVUsetupRange(mVU, 0, 1);
 			}
 			incPC(1);
 		}

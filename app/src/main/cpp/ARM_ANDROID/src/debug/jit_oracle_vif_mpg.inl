@@ -61,7 +61,7 @@ void VifMpgTests()
         initial.Mem = vu.Mem;
         initial.idx = index;
         initial.VF[0].f.w = 1.0f;
-        auto run = [&](bool recompiled, u32 pc) {
+        auto execute = [&](bool recompiled, u32 pc) {
             const FPControlRegisterBackup caller_fpcr(EmuConfig.Cpu.FPUFPCR);
             vu = initial;
             VU0.VI[REG_VPU_STAT].UL = index ? 0x100 : 1;
@@ -72,6 +72,9 @@ void VifMpgTests()
             cpu->SetStartPC(pc);
             for (u32 call = 0; call < 128 && (VU0.VI[REG_VPU_STAT].UL & (index ? 0x100 : 1)); ++call)
                 cpu->Execute(128);
+        };
+        auto run = [&](bool recompiled, u32 pc) {
+            execute(recompiled, pc);
             return Snapshot{vu, std::vector<u8>(vu.Mem, vu.Mem + size), VU0.VI[REG_VPU_STAT].UL,
                 false, std::vector<u8>(vu.Micro, vu.Micro + size), {}, false};
         };
@@ -83,6 +86,37 @@ void VifMpgTests()
         const void* tail_cache = EmuCoreXOracleGetVUQuick(index, size - 16);
         Check(old_head.regs.VI[1].UL == 17 && old_middle.regs.VI[2].UL == 5 && old_tail.regs.VI[3].UL == 9 &&
             head_cache && middle_cache && tail_cache, "VIF MPG fixture warms head, middle and tail JIT programs");
+
+        if (tail_bytes == 16 && head_bytes == 0)
+        {
+            // An E-bit delay slot at the last instruction consumes no head
+            // bytes. Unrelated writes must retain this actual compiled entry.
+            jit->Clear(middle_pc + 32, 4);
+            Check(EmuCoreXOracleGetVUQuick(index, size - 16) == tail_cache,
+                "microVU exact-boundary E-bit program survives a disjoint write");
+            std::array<double, 9> warm_times{}, write_times{};
+            auto timed = [&](bool clear) {
+                const auto start = std::chrono::steady_clock::now();
+                for (u32 repeat = 0; repeat < 10000; ++repeat)
+                {
+                    if (clear)
+                        jit->Clear(middle_pc + 32, 4);
+                    execute(true, size - 16);
+                }
+                return std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - start).count() / 10000;
+            };
+            for (u32 batch = 0; batch < warm_times.size(); ++batch)
+            {
+                if (batch & 1) { write_times[batch] = timed(true); warm_times[batch] = timed(false); }
+                else { warm_times[batch] = timed(false); write_times[batch] = timed(true); }
+            }
+            std::sort(warm_times.begin(), warm_times.end());
+            std::sort(write_times.begin(), write_times.end());
+            std::printf("VUBOUNDARY vu=%u warm_median_ns=%.1f disjoint_write_median_ns=%.1f\n",
+                index, warm_times[4], write_times[4]);
+            Check(vu.VI[3].UL == 9 && EmuCoreXOracleGetVUQuick(index, size - 16) == tail_cache,
+                "microVU repeated disjoint writes retain exact-boundary code and behavior");
+        }
 
         std::vector<u32> payload((tail_bytes + head_bytes) / 4);
         for (u32 word = 0; word < payload.size(); ++word)
@@ -104,10 +138,8 @@ void VifMpgTests()
         Check(std::memcmp(expected_memory.data(), vu.Micro, size) == 0 && vif.tag.addr == (head_bytes ? head_bytes : size),
             "VIF MPG upload writes the wrapped byte stream and advances its continuation address");
         Check((head_bytes ? EmuCoreXOracleGetVUQuick(index, 0) == nullptr : EmuCoreXOracleGetVUQuick(index, 0) == head_cache) &&
-            // A program ending at the memory boundary can carry an empty
-            // wrapped range and be invalidated conservatively even by a zero
-            // length tail clear. Only known-disjoint middle coverage must survive.
-            (!tail_bytes || EmuCoreXOracleGetVUQuick(index, size - 16) == nullptr) &&
+            (tail_bytes ? EmuCoreXOracleGetVUQuick(index, size - 16) == nullptr :
+                EmuCoreXOracleGetVUQuick(index, size - 16) == tail_cache) &&
             EmuCoreXOracleGetVUQuick(index, middle_pc) == middle_cache,
             "VIF MPG invalidates both written segments while preserving disjoint cached programs");
 
@@ -120,5 +152,30 @@ void VifMpgTests()
         const auto middle = run(true, middle_pc);
         Check(middle.regs.VI[2].UL == 5 && EmuCoreXOracleGetVUQuick(index, middle_pc) == middle_cache,
             "VIF MPG disjoint program retains its compiled quick entry and behavior");
+
+        if (tail_bytes == 16 && head_bytes == 0)
+        {
+            jit->Reset();
+            // E at the last instruction really executes its delay at zero.
+            // Its head coverage must remain tracked and invalidated on write.
+            program(size - 8, 3, 9);
+            const u32 head[] = {(8u << 25) | (1u << 16) | 17u, NOP_U};
+            std::memcpy(vu.Micro, head, sizeof(head));
+            const auto wrapped = run(true, size - 8);
+            const void* wrapped_cache = EmuCoreXOracleGetVUQuick(index, size - 8);
+            jit->Clear(middle_pc + 32, 4);
+            Check(wrapped.regs.VI[1].UL == 17 && wrapped.regs.VI[3].UL == 9 && wrapped_cache &&
+                EmuCoreXOracleGetVUQuick(index, size - 8) == wrapped_cache,
+                "microVU wrapped E-bit delay program retains disjoint coverage");
+            const u32 new_lower = (8u << 25) | (1u << 16) | 23u;
+            vif.tag.addr = 0;
+            EmuCoreXOracleUploadVifMpg(index, 0, &new_lower, 1);
+            Check(EmuCoreXOracleGetVUQuick(index, size - 8) == nullptr,
+                "microVU wrapped E-bit delay program invalidates on a head write");
+            const auto new_wrapped = run(true, size - 8);
+            Compare(run(false, size - 8), new_wrapped, "wrapped E-bit delay after head upload");
+            Check(new_wrapped.regs.VI[1].UL == 23 && new_wrapped.regs.VI[3].UL == 9,
+                "microVU wrapped E-bit delay executes the uploaded instruction");
+        }
     }
 }
