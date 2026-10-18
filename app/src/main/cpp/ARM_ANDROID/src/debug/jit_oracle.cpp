@@ -22,6 +22,7 @@
 #include "VUmicro.h"
 #include "cpuinfo.h"
 #include "Gif_Unit.h"
+#include "Vif_Dma.h"
 #include "GS/GSState.h"
 #include "GS/GS.h"
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
@@ -2197,6 +2198,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_clip_bench.inl"
 
 #include "jit_oracle_vu_pq.inl"
+#include "jit_oracle_vif_mpg.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,
     bool maxmin_route_only = false, bool maxmin_broadcast_only = false,
@@ -12224,6 +12226,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         EmuCoreXOracleTestVUQuick(Check);
     else if (std::strcmp(suite, "spu2-volume") == 0)
         EmuCoreXOracleTestVolumeSlide(Check);
+    else if (std::strcmp(suite, "vif-mpg") == 0)
+        VifMpgTests();
     else if (std::strcmp(suite, "classifier") == 0)
         ClassifierTests();
     else if (std::strcmp(suite, "vu") == 0)

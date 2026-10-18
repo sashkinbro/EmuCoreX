@@ -383,6 +383,9 @@ static __fi void _vifCode_MPG(int idx, u32 addr, const u32* data, int size)
 		memcpy(VUx.Micro + addr, data, vuMemSize - addr);
 		size -= (vuMemSize - addr) / 4;
 		data += (vuMemSize - addr) / 4;
+		// Selective microVU invalidation must cover the wrapped head as well
+		// as the tail; clearing only the tail leaves stale head programs live.
+		(idx ? CpuVU1 : CpuVU0)->Clear(0, size * 4);
 		memcpy(VUx.Micro, data, size * 4);
 
 		if (idx && VU1Fingerprint::Enabled())
@@ -411,6 +414,13 @@ static __fi void _vifCode_MPG(int idx, u32 addr, const u32* data, int size)
 		vifX.tag.addr += size * 4;
 	}
 }
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" void EmuCoreXOracleUploadVifMpg(u32 index, u32 addr, const u32* data, u32 words)
+{
+	_vifCode_MPG(static_cast<int>(index), addr, data, static_cast<int>(words));
+}
+#endif
 
 vifOp(vifCode_MPG)
 {

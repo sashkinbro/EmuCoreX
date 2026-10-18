@@ -483,6 +483,11 @@ extern "C" void EmuCoreXOracleResetVUQuick(microVU* mVU)
 {
 	mVU->prog.clearQuick();
 }
+
+extern "C" const void* EmuCoreXOracleGetVUQuick(u32 index, u32 start_pc)
+{
+	return (index ? microVU1 : microVU0).prog.quick[start_pc >> 3].prog;
+}
 #include "microVU_QuickCacheTests-arm64.inl"
 #endif
 
