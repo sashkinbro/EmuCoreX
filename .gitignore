@@ -62,7 +62,10 @@ Logs/
 build_output.txt
 hs_err_pid*
 autotests/
-tests/
+# Local test suites, gameplay runs, and benchmark artifacts
+/test/
+/tests/
+**/tests/
 !app/src/main/cpp/pcsx2/tests/
 !app/src/main/cpp/pcsx2/tests/ctest/
 !app/src/main/cpp/pcsx2/tests/ctest/core/
