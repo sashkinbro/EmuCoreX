@@ -2203,6 +2203,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_vu_pq.inl"
 #include "jit_oracle_vif_mpg.inl"
 #include "jit_oracle_vu_div_zero.inl"
+#include "jit_oracle_arm64_branches.inl"
 #include "jit_oracle_vu_operand_clamp.inl"
 #include "jit_oracle_vu_scalar_clamp.inl"
 
@@ -12227,7 +12228,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXReplayVU1Fallback(
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const char* suite)
 {
     failures = checks = 0;
-    if (std::strcmp(suite, "jit-cache") == 0)
+    if (std::strcmp(suite, "arm64-branches") == 0)
+        Arm64BranchTests();
+    else if (std::strcmp(suite, "jit-cache") == 0)
         BlockCacheTests();
     else if (std::strcmp(suite, "vu-cache") == 0)
         EmuCoreXOracleTestVUQuick(Check);

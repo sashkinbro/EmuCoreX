@@ -158,9 +158,25 @@ void oakMoveAddressToReg(oak::XReg reg, const void* addr)
 	oakAsm->MOVP2R(reg, addr);
 }
 
+template<unsigned Bits>
+static bool oakBranchTargetInRange(const void* ptr)
+{
+	// Unsigned subtraction also handles backwards targets without subtracting
+	// unrelated pointers or overflowing signed address arithmetic.
+	const uintptr_t offset = reinterpret_cast<uintptr_t>(ptr) -
+		reinterpret_cast<uintptr_t>(oakGetCurrentCodePointer());
+	constexpr uintptr_t reach = uintptr_t{1} << (Bits - 1);
+	return (offset & 3) == 0 && offset + reach < reach * 2;
+}
+
 void oakEmitJmp(const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<28>(ptr))
+	{
+		oakAsm->B(ptr);
+		return;
+	}
 	oakMoveAddressToReg(OAK_XSCRATCH, ptr);
 	oakAsm->BR(OAK_XSCRATCH);
 }
@@ -168,6 +184,11 @@ void oakEmitJmp(const void* ptr)
 void oakEmitCall(const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<28>(ptr))
+	{
+		oakAsm->BL(ptr);
+		return;
+	}
 	oakMoveAddressToReg(OAK_XSCRATCH, ptr);
 	oakAsm->BLR(OAK_XSCRATCH);
 }
@@ -175,6 +196,11 @@ void oakEmitCall(const void* ptr)
 void oakEmitCondBranch(oak::Cond cond, const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (static_cast<unsigned>(cond) < 14 && oakBranchTargetInRange<21>(ptr))
+	{
+		oakAsm->B(cond, ptr);
+		return;
+	}
 	oak::Label branch_not_taken;
 	oakAsm->B(oak::invert(cond), branch_not_taken);
 	oakEmitJmp(ptr);
@@ -184,6 +210,11 @@ void oakEmitCondBranch(oak::Cond cond, const void* ptr)
 void oakEmitCbz(oak::WReg reg, const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<21>(ptr))
+	{
+		oakAsm->CBZ(reg, ptr);
+		return;
+	}
 	oak::Label branch_not_taken;
 	oakAsm->CBNZ(reg, branch_not_taken);
 	oakEmitJmp(ptr);
@@ -193,6 +224,11 @@ void oakEmitCbz(oak::WReg reg, const void* ptr)
 void oakEmitCbz(oak::XReg reg, const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<21>(ptr))
+	{
+		oakAsm->CBZ(reg, ptr);
+		return;
+	}
 	oak::Label branch_not_taken;
 	oakAsm->CBNZ(reg, branch_not_taken);
 	oakEmitJmp(ptr);
@@ -202,6 +238,11 @@ void oakEmitCbz(oak::XReg reg, const void* ptr)
 void oakEmitCbnz(oak::WReg reg, const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<21>(ptr))
+	{
+		oakAsm->CBNZ(reg, ptr);
+		return;
+	}
 	oak::Label branch_not_taken;
 	oakAsm->CBZ(reg, branch_not_taken);
 	oakEmitJmp(ptr);
@@ -211,6 +252,11 @@ void oakEmitCbnz(oak::WReg reg, const void* ptr)
 void oakEmitCbnz(oak::XReg reg, const void* ptr)
 {
 	pxAssert(oakAsm);
+	if (oakBranchTargetInRange<21>(ptr))
+	{
+		oakAsm->CBNZ(reg, ptr);
+		return;
+	}
 	oak::Label branch_not_taken;
 	oakAsm->CBZ(reg, branch_not_taken);
 	oakEmitJmp(ptr);
