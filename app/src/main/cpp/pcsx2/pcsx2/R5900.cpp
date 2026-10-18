@@ -374,6 +374,25 @@ static bool cpuIntsEnabled(int Interrupt)
 		!cpuRegs.CP0.n.Status.b.EXL && (cpuRegs.CP0.n.Status.b.ERL == 0);
 }
 
+static __fi void cpuSyncEventVUs()
+{
+	if (VU0.VI[REG_VPU_STAT].UL & 0x1)
+		CpuVU0->ExecuteBlock();
+	// Read the status again after VU0: running it can change VU1's state.
+	// MTVU messages must be consumed even when VPU_STAT already reads idle.
+	if (THREAD_VU1)
+		vu1Thread.Get_MTVUChanges();
+	else if (VU0.VI[REG_VPU_STAT].UL & 0x100)
+		CpuVU1->ExecuteBlock();
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" __attribute__((noinline)) void EmuCoreXOracleSyncEventVUs()
+{
+	cpuSyncEventVUs();
+}
+#endif
+
 // Shared portion of the branch test, called from both the Interpreter
 // and the recompiler.  (moved here to help alleviate redundant code)
 __fi void _cpuEventTest_Shared()
@@ -425,8 +444,7 @@ __fi void _cpuEventTest_Shared()
 	}
 
 	// ---- VU Sync -------------
-	CpuVU0->ExecuteBlock();
-	CpuVU1->ExecuteBlock();
+	cpuSyncEventVUs();
 
     // ---- Schedule Next Event Test --------------
 #if defined(ANDROID)

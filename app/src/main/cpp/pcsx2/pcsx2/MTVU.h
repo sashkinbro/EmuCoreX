@@ -87,7 +87,14 @@ public:
 	// Waits till MTVU is done processing
 	void WaitVU();
 
-	void Get_MTVUChanges();
+	// Most EE/GS polling points have no new VU-thread messages. Keep the
+	// acquire load here and call out only when something needs applying.
+	__fi void Get_MTVUChanges()
+	{
+		const u32 interrupts = mtvuInterrupts.load(std::memory_order_acquire);
+		if (interrupts)
+			Apply_MTVUChanges(interrupts);
+	}
 
 	void ExecuteVU(u32 vu_addr, u32 vif_top, u32 vif_itop, u32 fbrst);
 
@@ -108,6 +115,7 @@ public:
 	void WriteRow(vifStruct& _vif);
 
 private:
+	void Apply_MTVUChanges(u32 interrupts);
 	void ExecuteRingBuffer();
 
 	void WaitOnSize(s32 size);
