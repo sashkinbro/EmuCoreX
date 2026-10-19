@@ -11,16 +11,6 @@ class HomeDialogPolicyTest {
             HomeDialogPolicy.activeDialog(
                 canPresent = true,
                 welcomePending = true,
-                coreResetPending = true,
-                hardwareWarningPending = true
-            )
-        )
-        assertEquals(
-            HomeActiveDialog.CORE_RESET,
-            HomeDialogPolicy.activeDialog(
-                canPresent = true,
-                welcomePending = false,
-                coreResetPending = true,
                 hardwareWarningPending = true
             )
         )
@@ -29,7 +19,6 @@ class HomeDialogPolicyTest {
             HomeDialogPolicy.activeDialog(
                 canPresent = true,
                 welcomePending = false,
-                coreResetPending = false,
                 hardwareWarningPending = true
             )
         )
@@ -42,7 +31,6 @@ class HomeDialogPolicyTest {
             HomeDialogPolicy.activeDialog(
                 canPresent = false,
                 welcomePending = true,
-                coreResetPending = true,
                 hardwareWarningPending = true
             )
         )
@@ -55,7 +43,6 @@ class HomeDialogPolicyTest {
             HomeDialogPolicy.activeDialog(
                 canPresent = true,
                 welcomePending = false,
-                coreResetPending = false,
                 hardwareWarningPending = false
             )
         )

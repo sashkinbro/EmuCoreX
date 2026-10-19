@@ -87,7 +87,6 @@ data class HomeUiState(
     val lastStandardLibraryViewMode: HomeLibraryViewMode = HomeLibraryViewMode.GRID,
     val isCoverArtDisabled: Boolean = true,
     val showWelcomeDialog: Boolean = false,
-    val showCoreResetDialog: Boolean = false,
     val showHardwareWarning: Boolean = false,
     val hardwareWarningGpu: String = "",
     val isProUnlocked: Boolean = false,
@@ -141,7 +140,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private var deferredLibraryScan: DeferredLibraryScan? = null
     private var deferredWorkJob: Job? = null
     private var deferredCoverSync = false
-    private var pendingCoreFingerprint: String? = null
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -215,14 +213,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val currentFingerprint = withContext(Dispatchers.IO) {
                 CoreBinaryFingerprint.current(context)
             }
-            pendingCoreFingerprint = currentFingerprint
             val storedFingerprint = preferences.lastCoreBinaryFingerprint.first()
             val hadExistingInstall = preferences.welcomeDialogShown.first()
             when (decideCoreUpdateResetAction(storedFingerprint, currentFingerprint, hadExistingInstall)) {
                 CoreUpdateResetAction.STORE_SILENTLY ->
                     preferences.setLastCoreBinaryFingerprint(currentFingerprint)
-                CoreUpdateResetAction.PROMPT ->
-                    _uiState.value = _uiState.value.copy(showCoreResetDialog = true)
+                CoreUpdateResetAction.RESET_AUTOMATICALLY -> {
+                    withContext(Dispatchers.IO) {
+                        CoreMaintenanceRepository(context).resetGeneratedCoreState()
+                        preferences.setLastCoreBinaryFingerprint(currentFingerprint)
+                    }
+                    android.widget.Toast.makeText(
+                        context,
+                        R.string.core_update_reset_done,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
                 CoreUpdateResetAction.NONE -> Unit
             }
         }
@@ -844,35 +850,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissHardwareWarning() {
         viewModelScope.launch { preferences.setHardwareWarningShown(true) }
     }
-
-    fun resetGeneratedCoreState() {
-        if (!_uiState.value.showCoreResetDialog) return
-        _uiState.value = _uiState.value.copy(showCoreResetDialog = false)
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                CoreMaintenanceRepository(getApplication()).resetGeneratedCoreState()
-                preferences.setLastCoreBinaryFingerprint(resolveCoreFingerprint())
-            }
-            android.widget.Toast.makeText(
-                getApplication(),
-                com.sbro.emucorex.R.string.core_update_reset_done,
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    fun dismissCoreResetPrompt() {
-        if (!_uiState.value.showCoreResetDialog) return
-        _uiState.value = _uiState.value.copy(showCoreResetDialog = false)
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                preferences.setLastCoreBinaryFingerprint(resolveCoreFingerprint())
-            }
-        }
-    }
-
-    private suspend fun resolveCoreFingerprint(): String? =
-        pendingCoreFingerprint ?: CoreBinaryFingerprint.current(getApplication())
 
     fun purchasePro(
         activity: Activity,

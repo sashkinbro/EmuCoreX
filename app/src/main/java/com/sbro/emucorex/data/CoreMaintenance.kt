@@ -25,13 +25,13 @@ internal fun clearRegenerableCoreState(dataRoot: File): Int {
     return deletedFiles
 }
 
-internal enum class CoreUpdateResetAction { NONE, STORE_SILENTLY, PROMPT }
+internal enum class CoreUpdateResetAction { NONE, STORE_SILENTLY, RESET_AUTOMATICALLY }
 
 /**
  * Decides how to react to the core fingerprint of the installed build.
  *
- * Fresh installs only record the fingerprint, upgrades prompt once per changed core,
- * and an unchanged core does nothing.
+ * Fresh installs only record the fingerprint, upgrades reset the regenerable core state
+ * automatically, and an unchanged core does nothing.
  */
 internal fun decideCoreUpdateResetAction(
     storedFingerprint: String?,
@@ -41,7 +41,7 @@ internal fun decideCoreUpdateResetAction(
     if (currentFingerprint.isNullOrBlank()) return CoreUpdateResetAction.NONE
     if (storedFingerprint.isNullOrBlank()) {
         return if (hadExistingInstall) {
-            CoreUpdateResetAction.PROMPT
+            CoreUpdateResetAction.RESET_AUTOMATICALLY
         } else {
             CoreUpdateResetAction.STORE_SILENTLY
         }
@@ -49,7 +49,7 @@ internal fun decideCoreUpdateResetAction(
     return if (storedFingerprint == currentFingerprint) {
         CoreUpdateResetAction.NONE
     } else {
-        CoreUpdateResetAction.PROMPT
+        CoreUpdateResetAction.RESET_AUTOMATICALLY
     }
 }
 
