@@ -1985,6 +1985,11 @@
     <string name="settings_help_touchscreen_right_stick">Ordnet Ziehgesten in ungenutzten Bereichen des Spielbildschirms den Achsen des virtuellen rechten Sticks zu. So lässt sich die Kamera bewegen, ohne den sichtbaren Stick zu berühren. Touch-Tasten und sichtbare Sticks funktionieren weiterhin wie gewohnt.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Touchscreen-Empfindlichkeit des rechten Sticks</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Legt fest, wie stark die Ziehstrecke auf dem Bildschirm den virtuellen rechten Stick auslenkt. Die Empfindlichkeit des sichtbaren rechten Sticks wird nicht verändert.</string>
+    <string name="settings_touchscreen_left_stick">Linker Stick per Touchscreen</string>
+    <string name="settings_touchscreen_left_stick_desc">Wische über freie Bildschirmflächen, um den virtuellen linken Stick zu steuern.</string>
+    <string name="settings_help_touchscreen_left_stick">Ordnet Ziehgesten in ungenutzten Bereichen des Spielbildschirms den Achsen des virtuellen linken Sticks zu, sodass Bewegung ohne Berühren des sichtbaren Sticks möglich ist. Touch-Tasten und sichtbare Sticks behalten ihr normales Verhalten.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Touchscreen-Empfindlichkeit des linken Sticks</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Legt fest, wie stark die Ziehstrecke auf dem Bildschirm den virtuellen linken Stick steuert. Die Empfindlichkeit des sichtbaren linken Sticks bleibt unverändert.</string>
     <string name="shell_cheat_manager">Cheat-Verwaltung</string>
     <string name="content_select_game">Spiel aus der Bibliothek auswählen</string>
     <string name="content_library_empty">In der Bibliothek wurden keine kompatiblen Spiele gefunden.</string>

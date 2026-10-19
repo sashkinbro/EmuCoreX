@@ -1,19 +1,24 @@
 package com.sbro.emucorex.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TouchControlsDefaultsTest {
     @Test
-    fun `touchscreen right stick is enabled by default`() {
+    fun `touchscreen gesture sticks are disabled by default`() {
         val global = SettingsSnapshot()
         val perGame = PerGameSettings(gameKey = "game", gameTitle = "Game")
 
-        assertTrue(global.touchscreenRightStick)
-        assertTrue(perGame.touchscreenRightStick)
+        assertFalse(global.touchscreenRightStick)
+        assertFalse(perGame.touchscreenRightStick)
+        assertFalse(global.touchscreenLeftStick)
+        assertFalse(perGame.touchscreenLeftStick)
         assertEquals(100, global.touchscreenRightStickSensitivity)
         assertEquals(100, perGame.touchscreenRightStickSensitivity)
+        assertEquals(100, global.touchscreenLeftStickSensitivity)
+        assertEquals(100, perGame.touchscreenLeftStickSensitivity)
     }
 
     @Test

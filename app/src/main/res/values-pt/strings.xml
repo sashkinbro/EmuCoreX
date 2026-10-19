@@ -1985,6 +1985,11 @@
     <string name="settings_help_touchscreen_right_stick">Mapeia gestos de arrastar nas áreas livres da tela do jogo para os eixos do analógico direito virtual, permitindo mover a câmera sem tocar no analógico visível. Os botões de toque e os analógicos visíveis mantêm o comportamento normal.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Sensibilidade tátil do analógico direito</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Ajusta o quanto a distância arrastada na tela move o analógico direito virtual. Não altera a sensibilidade do analógico direito visível.</string>
+    <string name="settings_touchscreen_left_stick">Analógico esquerdo na tela sensível ao toque</string>
+    <string name="settings_touchscreen_left_stick_desc">Deslize em um espaço livre da tela para controlar o analógico esquerdo virtual.</string>
+    <string name="settings_help_touchscreen_left_stick">Mapeia gestos de arrastar nas áreas não utilizadas da tela do jogo para os eixos do analógico esquerdo virtual, permitindo mover sem tocar no analógico visível. Os botões de toque e os analógicos visíveis mantêm o comportamento normal.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Sensibilidade tátil do analógico esquerdo</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Ajusta a força com que a distância de arrasto na tela controla o analógico esquerdo virtual. Isso não altera a sensibilidade do analógico esquerdo visível.</string>
     <string name="shell_cheat_manager">Gestor de cheats</string>
     <string name="content_select_game">Selecione um jogo da biblioteca</string>
     <string name="content_library_empty">Nenhum jogo compatível foi encontrado na biblioteca.</string>

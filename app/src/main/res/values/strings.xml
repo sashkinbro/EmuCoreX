@@ -2076,6 +2076,11 @@
     <string name="settings_help_touchscreen_right_stick">Maps drag gestures in unused areas of the game screen to the virtual right-stick axes, allowing camera movement without touching the visible stick. Touch buttons and visible sticks keep their normal behavior.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Touchscreen right-stick sensitivity</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Adjusts how strongly drag distance on the screen drives the virtual right stick. This does not change the sensitivity of the visible right stick.</string>
+    <string name="settings_touchscreen_left_stick">Touchscreen left stick</string>
+    <string name="settings_touchscreen_left_stick_desc">Swipe on free screen space to control the virtual left stick.</string>
+    <string name="settings_help_touchscreen_left_stick">Maps drag gestures in unused areas of the game screen to the virtual left-stick axes, allowing movement without touching the visible stick. Touch buttons and visible sticks keep their normal behavior.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Touchscreen left-stick sensitivity</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Adjusts how strongly drag distance on the screen drives the virtual left stick. This does not change the sensitivity of the visible left stick.</string>
     <string name="shell_cheat_manager">Cheat manager</string>
     <string name="content_select_game">Select a game from your library</string>
     <string name="content_library_empty">No compatible games were found in the library.</string>

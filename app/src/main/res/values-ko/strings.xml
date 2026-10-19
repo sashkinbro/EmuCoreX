@@ -1982,6 +1982,11 @@
     <string name="settings_help_touchscreen_right_stick">게임 화면의 사용하지 않는 영역에서 드래그하는 동작을 가상 오른쪽 스틱 축에 연결하여, 보이는 스틱을 만지지 않고 카메라를 움직일 수 있습니다. 터치 버튼과 보이는 스틱은 평소처럼 작동합니다.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">터치스크린 오른쪽 스틱 감도</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">화면에서 드래그한 거리가 가상 오른쪽 스틱을 얼마나 움직일지 조절합니다. 보이는 오른쪽 스틱의 감도는 변경하지 않습니다.</string>
+    <string name="settings_touchscreen_left_stick">터치스크린 왼쪽 스틱</string>
+    <string name="settings_touchscreen_left_stick_desc">화면의 빈 공간을 밀어 가상 왼쪽 스틱을 조작합니다.</string>
+    <string name="settings_help_touchscreen_left_stick">게임 화면의 사용하지 않는 영역에서 드래그 제스처를 가상 왼쪽 스틱 축에 매핑하여 보이는 스틱을 만지지 않고 이동할 수 있습니다. 터치 버튼과 보이는 스틱은 정상적으로 동작합니다.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">터치스크린 왼쪽 스틱 감도</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">화면의 드래그 거리가 가상 왼쪽 스틱을 얼마나 강하게 조작하는지 조정합니다. 보이는 왼쪽 스틱의 감도는 바뀌지 않습니다.</string>
     <string name="shell_cheat_manager">치트 관리자</string>
     <string name="content_select_game">라이브러리에서 게임 선택</string>
     <string name="content_library_empty">라이브러리에 호환 게임이 없습니다.</string>

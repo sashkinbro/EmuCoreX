@@ -1983,6 +1983,11 @@
     <string name="settings_help_touchscreen_right_stick">गेम स्क्रीन के खाली क्षेत्रों में ड्रैग जेस्चर को वर्चुअल दाएँ स्टिक के अक्षों से जोड़ता है, जिससे दिखाई देने वाले स्टिक को छुए बिना कैमरा घुमाया जा सकता है। टच बटन और दिखाई देने वाले स्टिक सामान्य रूप से काम करते रहते हैं।</string>
     <string name="settings_touchscreen_right_stick_sensitivity">टचस्क्रीन दाएँ स्टिक की संवेदनशीलता</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">यह तय करता है कि स्क्रीन पर खींचने की दूरी वर्चुअल दाएँ स्टिक को कितनी तेज़ी से चलाएगी। इससे दिखाई देने वाले दाएँ स्टिक की संवेदनशीलता नहीं बदलती।</string>
+    <string name="settings_touchscreen_left_stick">टचस्क्रीन बायाँ स्टिक</string>
+    <string name="settings_touchscreen_left_stick_desc">वर्चुअल बाएँ स्टिक को नियंत्रित करने के लिए स्क्रीन के खाली हिस्से पर स्वाइप करें।</string>
+    <string name="settings_help_touchscreen_left_stick">गेम स्क्रीन के अप्रयुक्त हिस्सों में ड्रैग इशारों को वर्चुअल बाएँ स्टिक अक्षों से मैप करता है, जिससे दिखाई देने वाले स्टिक को छुए बिना चलना संभव होता है। टच बटन और दिखाई देने वाले स्टिक अपना सामान्य व्यवहार बनाए रखते हैं।</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">टचस्क्रीन बाएँ स्टिक की संवेदनशीलता</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">समायोजित करता है कि स्क्रीन पर ड्रैग दूरी वर्चुअल बाएँ स्टिक को कितनी मजबूती से नियंत्रित करती है। यह दिखाई देने वाले बाएँ स्टिक की संवेदनशीलता नहीं बदलता।</string>
     <string name="shell_cheat_manager">चीट प्रबंधक</string>
     <string name="content_select_game">अपनी लाइब्रेरी से गेम चुनें</string>
     <string name="content_library_empty">लाइब्रेरी में कोई संगत गेम नहीं मिला।</string>

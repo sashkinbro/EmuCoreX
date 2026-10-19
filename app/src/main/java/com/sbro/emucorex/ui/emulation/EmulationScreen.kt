@@ -1909,6 +1909,8 @@ fun EmulationScreen(
                     rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
                     touchscreenRightStick = uiState.touchscreenRightStick,
                     touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
+                    touchscreenLeftStick = uiState.touchscreenLeftStick,
+                    touchscreenLeftStickSensitivity = uiState.touchscreenLeftStickSensitivity / 100f,
                     touchHaptics = uiState.touchHaptics,
                     touchHapticsPreset = uiState.touchHapticsPreset,
                     touchHapticsStrength = uiState.touchHapticsStrength,
@@ -2098,6 +2100,10 @@ fun EmulationScreen(
                     onSetGamepadRightStickCurve = { viewModel.setGamepadRightStickCurve(it) },
                     onSetGamepadRightStickUpToR2 = { viewModel.setGamepadRightStickUpToR2(it) },
                     onSetGamepadRightStickDownToL2 = { viewModel.setGamepadRightStickDownToL2(it) },
+                    onSetTouchscreenRightStick = { viewModel.setTouchscreenRightStick(it) },
+                    onSetTouchscreenRightStickSensitivity = { viewModel.setTouchscreenRightStickSensitivity(it) },
+                    onSetTouchscreenLeftStick = { viewModel.setTouchscreenLeftStick(it) },
+                    onSetTouchscreenLeftStickSensitivity = { viewModel.setTouchscreenLeftStickSensitivity(it) },
                     onToggleControls = toggleControlsClick,
                     onOpenControlsEditor = { showControlsEditor = true },
                     onOpenGamepadMapping = { showGamepadMappingDialog = true },
@@ -2695,6 +2701,8 @@ private fun LocalMultiplayerTouchZone(
             rightStickDownToL2 = uiState.gamepadRightStickDownToL2,
             touchscreenRightStick = uiState.touchscreenRightStick,
             touchscreenRightStickSensitivity = uiState.touchscreenRightStickSensitivity / 100f,
+            touchscreenLeftStick = uiState.touchscreenLeftStick,
+            touchscreenLeftStickSensitivity = uiState.touchscreenLeftStickSensitivity / 100f,
             touchHaptics = uiState.touchHaptics,
             touchHapticsPreset = uiState.touchHapticsPreset,
             touchHapticsStrength = uiState.touchHapticsStrength,
@@ -2755,6 +2763,8 @@ private fun OnScreenControls(
     rightStickDownToL2: Boolean = false,
     touchscreenRightStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_RIGHT_STICK,
     touchscreenRightStickSensitivity: Float = 1.0f,
+    touchscreenLeftStick: Boolean = AppPreferences.DEFAULT_TOUCHSCREEN_LEFT_STICK,
+    touchscreenLeftStickSensitivity: Float = 1.0f,
     touchHaptics: Boolean = false,
     touchHapticsPreset: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_PRESET,
     touchHapticsStrength: Int = AppPreferences.DEFAULT_TOUCH_HAPTICS_STRENGTH,
@@ -3039,15 +3049,19 @@ private fun OnScreenControls(
                 )
             }
             .toList()
-        if (allButtonSpecs.isNotEmpty() || touchscreenRightStick) {
+        if (allButtonSpecs.isNotEmpty() || touchscreenRightStick || touchscreenLeftStick) {
             TouchButtonGroup(
                 specs = allButtonSpecs,
                 inputWidth = maxWidth,
                 inputHeight = maxHeight,
                 touchscreenRightStick = touchscreenRightStick,
                 touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
+                touchscreenLeftStick = touchscreenLeftStick,
+                touchscreenLeftStickSensitivity = touchscreenLeftStickSensitivity,
                 invertRightStick = invertRightStick,
                 invertRightStickHorizontal = invertRightStickHorizontal,
+                invertLeftStick = invertLeftStick,
+                invertLeftStickHorizontal = invertLeftStickHorizontal,
                 onPadInput = onPadInput,
                 visualStyle = visualStyle,
                 pressEffect = pressEffect,
@@ -3243,8 +3257,12 @@ internal fun TouchButtonGroup(
     inputHeight: Dp,
     touchscreenRightStick: Boolean,
     touchscreenRightStickSensitivity: Float,
+    touchscreenLeftStick: Boolean = false,
+    touchscreenLeftStickSensitivity: Float = 1f,
     invertRightStick: Boolean,
     invertRightStickHorizontal: Boolean,
+    invertLeftStick: Boolean = false,
+    invertLeftStickHorizontal: Boolean = false,
     onPadInput: (Int, Int, Boolean) -> Unit,
     visualStyle: TouchControlVisualStyle,
     pressEffect: TouchControlPressEffect,
@@ -3265,10 +3283,16 @@ internal fun TouchButtonGroup(
     val currentSpecById by rememberUpdatedState(specById)
     val currentOnPadInput by rememberUpdatedState(onPadInput)
     val currentTouchscreenRightStickSensitivity by rememberUpdatedState(touchscreenRightStickSensitivity)
+    val currentTouchscreenLeftStickSensitivity by rememberUpdatedState(touchscreenLeftStickSensitivity)
     val currentInvertRightStick by rememberUpdatedState(invertRightStick)
     val currentInvertRightStickHorizontal by rememberUpdatedState(invertRightStickHorizontal)
-    var gesturePointerId by remember { mutableStateOf<Long?>(null) }
-    var gestureOrigin by remember { mutableStateOf(Offset.Zero) }
+    val currentInvertLeftStick by rememberUpdatedState(invertLeftStick)
+    val currentInvertLeftStickHorizontal by rememberUpdatedState(invertLeftStickHorizontal)
+    // One independent pointer per gesture stick so both can be dragged at the same time.
+    var leftGesturePointerId by remember { mutableStateOf<Long?>(null) }
+    var rightGesturePointerId by remember { mutableStateOf<Long?>(null) }
+    var leftGestureOrigin by remember { mutableStateOf(Offset.Zero) }
+    var rightGestureOrigin by remember { mutableStateOf(Offset.Zero) }
     val gestureRadiusPx = with(density) { 96.dp.toPx() }
     val layoutKey = specs.map { spec ->
         TouchButtonLayoutKey(
@@ -3431,17 +3455,36 @@ internal fun TouchButtonGroup(
         }
     }
 
-    fun releaseTouchscreenRightStick() {
-        updateRightAnalogStick(
-            x = 0f,
-            y = 0f,
-            sensitivity = currentTouchscreenRightStickSensitivity,
-            onPadInput = currentOnPadInput
-        )
-        gesturePointerId = null
+    fun releaseTouchscreenStick(target: TouchscreenStickGestureTarget) {
+        when (target) {
+            TouchscreenStickGestureTarget.LEFT -> {
+                updateLeftAnalogStick(
+                    x = 0f,
+                    y = 0f,
+                    sensitivity = currentTouchscreenLeftStickSensitivity,
+                    onPadInput = currentOnPadInput
+                )
+                leftGesturePointerId = null
+            }
+            TouchscreenStickGestureTarget.RIGHT -> {
+                updateRightAnalogStick(
+                    x = 0f,
+                    y = 0f,
+                    sensitivity = currentTouchscreenRightStickSensitivity,
+                    onPadInput = currentOnPadInput
+                )
+                rightGesturePointerId = null
+            }
+            TouchscreenStickGestureTarget.NONE -> Unit
+        }
     }
 
-    DisposableEffect(routingKey, touchscreenRightStick) {
+    fun releaseTouchscreenGestures() {
+        releaseTouchscreenStick(TouchscreenStickGestureTarget.LEFT)
+        releaseTouchscreenStick(TouchscreenStickGestureTarget.RIGHT)
+    }
+
+    DisposableEffect(routingKey, touchscreenRightStick, touchscreenLeftStick) {
         val stateAtStart = pointerState
         val specsAtStart = specById
         val pressActionsAtStart = pressActionsByOwner
@@ -3472,7 +3515,7 @@ internal fun TouchButtonGroup(
             latchedTargets.clear()
             longPressJobs.clear()
             longPressActiveTargets.clear()
-            releaseTouchscreenRightStick()
+            releaseTouchscreenGestures()
         }
     }
 
@@ -3486,7 +3529,7 @@ internal fun TouchButtonGroup(
             // - pointerInput delivers proper per-pointer press/move/release events and cancellation
             // - pointerInteropFilter could miss ACTION_UP under rapid multitouch / Samsung OneUI
             //   which caused stuck keys and completely dead overlay on some devices (e.g., Samsung S26)
-            .pointerInput(routingKey, touchscreenRightStick) {
+            .pointerInput(routingKey, touchscreenRightStick, touchscreenLeftStick) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
@@ -3501,10 +3544,32 @@ internal fun TouchButtonGroup(
                                     downTargets[pointerId] = targets.toCollection(LinkedHashSet())
                                     updatePointerTargets(pointerId, targets)
                                     change.consume()
-                                } else if (touchscreenRightStick && gesturePointerId == null) {
-                                    gesturePointerId = pointerId
-                                    gestureOrigin = change.position
-                                    change.consume()
+                                } else {
+                                    val target = resolveTouchscreenStickGestureTarget(
+                                        leftEnabled = touchscreenLeftStick,
+                                        rightEnabled = touchscreenRightStick,
+                                        startX = change.position.x,
+                                        widthPx = groupRect.width
+                                    )
+                                    val targetFree = when (target) {
+                                        TouchscreenStickGestureTarget.LEFT -> leftGesturePointerId == null
+                                        TouchscreenStickGestureTarget.RIGHT -> rightGesturePointerId == null
+                                        TouchscreenStickGestureTarget.NONE -> false
+                                    }
+                                    if (targetFree) {
+                                        when (target) {
+                                            TouchscreenStickGestureTarget.LEFT -> {
+                                                leftGesturePointerId = pointerId
+                                                leftGestureOrigin = change.position
+                                            }
+                                            TouchscreenStickGestureTarget.RIGHT -> {
+                                                rightGesturePointerId = pointerId
+                                                rightGestureOrigin = change.position
+                                            }
+                                            TouchscreenStickGestureTarget.NONE -> Unit
+                                        }
+                                        change.consume()
+                                    }
                                 }
                             } else if (isUp) {
                                 val downTargetSet = downTargets.remove(pointerId)
@@ -3538,8 +3603,11 @@ internal fun TouchButtonGroup(
                                         clickTargets.forEach { it.onClick?.invoke() }
                                     }
                                     change.consume()
-                                } else if (gesturePointerId == pointerId) {
-                                    releaseTouchscreenRightStick()
+                                } else if (pointerId == leftGesturePointerId) {
+                                    releaseTouchscreenStick(TouchscreenStickGestureTarget.LEFT)
+                                    change.consume()
+                                } else if (pointerId == rightGesturePointerId) {
+                                    releaseTouchscreenStick(TouchscreenStickGestureTarget.RIGHT)
                                     change.consume()
                                 }
                             } else if (change.pressed) {
@@ -3547,10 +3615,23 @@ internal fun TouchButtonGroup(
                                     val newTargets = hitTargets(change.position.x, change.position.y)
                                     updatePointerTargets(pointerId, newTargets)
                                     change.consume()
-                                } else if (gesturePointerId == pointerId) {
+                                } else if (pointerId == leftGesturePointerId) {
                                     val value = calculateRightStickGestureValue(
-                                        deltaX = change.position.x - gestureOrigin.x,
-                                        deltaY = change.position.y - gestureOrigin.y,
+                                        deltaX = change.position.x - leftGestureOrigin.x,
+                                        deltaY = change.position.y - leftGestureOrigin.y,
+                                        radiusPx = gestureRadiusPx
+                                    )
+                                    updateLeftAnalogStick(
+                                        x = if (currentInvertLeftStickHorizontal) -value.x else value.x,
+                                        y = if (currentInvertLeftStick) -value.y else value.y,
+                                        sensitivity = currentTouchscreenLeftStickSensitivity,
+                                        onPadInput = currentOnPadInput
+                                    )
+                                    change.consume()
+                                } else if (pointerId == rightGesturePointerId) {
+                                    val value = calculateRightStickGestureValue(
+                                        deltaX = change.position.x - rightGestureOrigin.x,
+                                        deltaY = change.position.y - rightGestureOrigin.y,
                                         radiusPx = gestureRadiusPx
                                     )
                                     updateRightAnalogStick(
@@ -3572,8 +3653,11 @@ internal fun TouchButtonGroup(
                                 downTargets.remove(pid)
                             }
                         }
-                        if (gesturePointerId != null && gesturePointerId !in presentIds) {
-                            releaseTouchscreenRightStick()
+                        if (leftGesturePointerId != null && leftGesturePointerId !in presentIds) {
+                            releaseTouchscreenStick(TouchscreenStickGestureTarget.LEFT)
+                        }
+                        if (rightGesturePointerId != null && rightGesturePointerId !in presentIds) {
+                            releaseTouchscreenStick(TouchscreenStickGestureTarget.RIGHT)
                         }
                     }
                 }
@@ -3650,6 +3734,24 @@ private fun updateRightAnalogStick(
     )
 }
 
+private fun updateLeftAnalogStick(
+    x: Float,
+    y: Float,
+    sensitivity: Float = 1f,
+    onPadInput: (Int, Int, Boolean) -> Unit
+) {
+    updateAnalogStick(
+        x = x,
+        y = y,
+        sensitivity = sensitivity,
+        upKey = PadKey.LEFT_STICK_UP,
+        rightKey = PadKey.LEFT_STICK_RIGHT,
+        downKey = PadKey.LEFT_STICK_DOWN,
+        leftKey = PadKey.LEFT_STICK_LEFT,
+        onPadInput = onPadInput
+    )
+}
+
 private fun formatSaveTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return ""
     return DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
@@ -3717,6 +3819,10 @@ private fun EmulationSidebarMenu(
     onSetGamepadRightStickCurve: (Int) -> Unit,
     onSetGamepadRightStickUpToR2: (Boolean) -> Unit,
     onSetGamepadRightStickDownToL2: (Boolean) -> Unit,
+    onSetTouchscreenRightStick: (Boolean) -> Unit,
+    onSetTouchscreenRightStickSensitivity: (Int) -> Unit,
+    onSetTouchscreenLeftStick: (Boolean) -> Unit,
+    onSetTouchscreenLeftStickSensitivity: (Int) -> Unit,
     onToggleControls: () -> Unit,
     onOpenControlsEditor: () -> Unit,
     onOpenGamepadMapping: () -> Unit,
@@ -4308,6 +4414,13 @@ private fun EmulationSidebarMenu(
                         )
 
                         MenuButton(
+                            icon = Icons.Rounded.TouchApp,
+                            text = stringResource(R.string.settings_edit_controls),
+                            onClick = onOpenControlsEditor,
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+                        )
+
+                        MenuButton(
                             icon = if (uiState.controlsVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                             text = stringResource(if (uiState.controlsVisible) R.string.emulation_hide_controls else R.string.emulation_show_controls),
                             onClick = onToggleControls,
@@ -4447,13 +4560,6 @@ private fun EmulationSidebarMenu(
                             onResetToDefault = { onSetInvertRightStickHorizontal(overlayDefaults.invertRightStickHorizontal) }
                         )
 
-                        MenuButton(
-                            icon = Icons.Rounded.TouchApp,
-                            text = stringResource(R.string.settings_edit_controls),
-                            onClick = onOpenControlsEditor,
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
-                        )
-
                                     }
 
                                     GameMenuSectionId.CONTROLS_GAMEPAD -> {
@@ -4591,6 +4697,60 @@ private fun EmulationSidebarMenu(
                             helpText = stringResource(R.string.settings_help_gamepad_right_stick_down_to_l2),
                             onResetToDefault = { onSetGamepadRightStickDownToL2(globalDefaults.gamepadRightStickDownToL2) }
                         )
+
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_touchscreen_left_stick),
+                            checked = uiState.touchscreenLeftStick,
+                            onCheckedChange = onSetTouchscreenLeftStick,
+                            helpText = stringResource(R.string.settings_help_touchscreen_left_stick),
+                            onResetToDefault = { onSetTouchscreenLeftStick(globalDefaults.touchscreenLeftStick) }
+                        )
+
+                        if (uiState.touchscreenLeftStick) {
+                            LiveSliderRow(
+                                title = stringResource(R.string.settings_touchscreen_left_stick_sensitivity),
+                                valueLabelForValue = { "$it%" },
+                                value = uiState.touchscreenLeftStickSensitivity.toFloat(),
+                                range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                onValueChange = { onSetTouchscreenLeftStickSensitivity(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_touchscreen_left_stick_sensitivity),
+                                onResetToDefault = {
+                                    onSetTouchscreenLeftStickSensitivity(
+                                        globalDefaults.touchscreenLeftStickSensitivity
+                                    )
+                                }
+                            )
+                        }
+
+                        SettingsToggle(
+                            title = stringResource(R.string.settings_touchscreen_right_stick),
+                            checked = uiState.touchscreenRightStick,
+                            onCheckedChange = onSetTouchscreenRightStick,
+                            helpText = stringResource(R.string.settings_help_touchscreen_right_stick),
+                            onResetToDefault = { onSetTouchscreenRightStick(globalDefaults.touchscreenRightStick) }
+                        )
+
+                        if (uiState.touchscreenRightStick) {
+                            LiveSliderRow(
+                                title = stringResource(R.string.settings_touchscreen_right_stick_sensitivity),
+                                valueLabelForValue = { "$it%" },
+                                value = uiState.touchscreenRightStickSensitivity.toFloat(),
+                                range = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN.toFloat()..
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX.toFloat(),
+                                steps = AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MAX -
+                                    AppPreferences.TOUCHSCREEN_RIGHT_STICK_SENSITIVITY_MIN - 1,
+                                onValueChange = { onSetTouchscreenRightStickSensitivity(it.toInt()) },
+                                helpText = stringResource(R.string.settings_help_touchscreen_right_stick_sensitivity),
+                                onResetToDefault = {
+                                    onSetTouchscreenRightStickSensitivity(
+                                        globalDefaults.touchscreenRightStickSensitivity
+                                    )
+                                }
+                            )
+                        }
 
                         MenuButton(
                             icon = Icons.Rounded.Gamepad,

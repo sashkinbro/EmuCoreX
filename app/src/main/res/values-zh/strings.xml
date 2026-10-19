@@ -1984,6 +1984,11 @@
     <string name="settings_help_touchscreen_right_stick">将游戏画面未使用区域中的拖动手势映射到虚拟右摇杆轴，无需触碰可见摇杆即可移动镜头。触控按键和可见摇杆仍保持原有操作方式。</string>
     <string name="settings_touchscreen_right_stick_sensitivity">触屏右摇杆灵敏度</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">调整屏幕拖动距离对虚拟右摇杆的驱动强度。此设置不会改变可见右摇杆的灵敏度。</string>
+    <string name="settings_touchscreen_left_stick">触屏左摇杆</string>
+    <string name="settings_touchscreen_left_stick_desc">在屏幕空白区域滑动以控制虚拟左摇杆。</string>
+    <string name="settings_help_touchscreen_left_stick">将游戏屏幕未使用区域中的拖动手势映射到虚拟左摇杆轴，无需触摸可见摇杆即可移动。触摸按钮和可见摇杆保持正常行为。</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">触屏左摇杆灵敏度</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">调整屏幕拖动距离对虚拟左摇杆的驱动强度。不会改变可见左摇杆的灵敏度。</string>
     <string name="shell_cheat_manager">作弊管理器</string>
     <string name="content_select_game">从游戏库中选择游戏</string>
     <string name="content_library_empty">游戏库中没有找到兼容的游戏。</string>

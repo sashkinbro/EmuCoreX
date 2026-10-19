@@ -1983,6 +1983,11 @@
     <string name="settings_help_touchscreen_right_stick">Associa i gesti di trascinamento nelle aree libere della schermata di gioco agli assi dello stick destro virtuale, consentendo di muovere la visuale senza toccare lo stick visibile. I pulsanti touch e gli stick visibili mantengono il comportamento normale.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Sensibilità touch dello stick destro</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Regola quanto la distanza di trascinamento sullo schermo inclina lo stick destro virtuale. Non modifica la sensibilità dello stick destro visibile.</string>
+    <string name="settings_touchscreen_left_stick">Stick sinistro sul touchscreen</string>
+    <string name="settings_touchscreen_left_stick_desc">Scorri su uno spazio libero dello schermo per controllare lo stick sinistro virtuale.</string>
+    <string name="settings_help_touchscreen_left_stick">Mappa i gesti di trascinamento nelle aree inutilizzate dello schermo di gioco sugli assi dello stick sinistro virtuale, consentendo di muoversi senza toccare lo stick visibile. I pulsanti touch e gli stick visibili mantengono il comportamento normale.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Sensibilità touch dello stick sinistro</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Regola quanto la distanza di trascinamento sullo schermo controlla lo stick sinistro virtuale. Non modifica la sensibilità dello stick sinistro visibile.</string>
     <string name="shell_cheat_manager">Gestione trucchi</string>
     <string name="content_select_game">Seleziona un gioco dalla raccolta</string>
     <string name="content_library_empty">Nessun gioco compatibile trovato nella raccolta.</string>

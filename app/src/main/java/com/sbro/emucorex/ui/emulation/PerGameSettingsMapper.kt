@@ -267,6 +267,11 @@ import kotlin.time.Duration.Companion.milliseconds
                 "touchscreenRightStickSensitivity",
                 touchscreenRightStickSensitivity
             ) { touchscreenRightStickSensitivity },
+            touchscreenLeftStick = pick("touchscreenLeftStick", touchscreenLeftStick) { touchscreenLeftStick },
+            touchscreenLeftStickSensitivity = pick(
+                "touchscreenLeftStickSensitivity",
+                touchscreenLeftStickSensitivity
+            ) { touchscreenLeftStickSensitivity },
             touchHaptics = pick("touchHaptics", touchHaptics) { touchHaptics },
             stickToggleTarget = pick("stickToggleTarget", stickToggleTarget) { stickToggleTarget },
             touchHapticsPreset = pick("touchHapticsPreset", touchHapticsPreset) { touchHapticsPreset },
@@ -465,6 +470,8 @@ import kotlin.time.Duration.Companion.milliseconds
         stickyButtons = snapshot.stickyButtons,
         touchscreenRightStick = snapshot.touchscreenRightStick,
         touchscreenRightStickSensitivity = snapshot.touchscreenRightStickSensitivity,
+        touchscreenLeftStick = snapshot.touchscreenLeftStick,
+        touchscreenLeftStickSensitivity = snapshot.touchscreenLeftStickSensitivity,
         touchHaptics = snapshot.touchHaptics,
         stickToggleTarget = snapshot.stickToggleTarget,
         touchHapticsPreset = snapshot.touchHapticsPreset,
@@ -540,6 +547,8 @@ import kotlin.time.Duration.Companion.milliseconds
             stickyButtons = stickyButtons,
             touchscreenRightStick = touchscreenRightStick,
             touchscreenRightStickSensitivity = touchscreenRightStickSensitivity,
+            touchscreenLeftStick = touchscreenLeftStick,
+            touchscreenLeftStickSensitivity = touchscreenLeftStickSensitivity,
             touchHaptics = touchHaptics,
             stickToggleTarget = stickToggleTarget,
             touchHapticsPreset = touchHapticsPreset,
@@ -667,6 +676,10 @@ import kotlin.time.Duration.Companion.milliseconds
             if (touchscreenRightStick != settings.touchscreenRightStick) add("touchscreenRightStick")
             if (touchscreenRightStickSensitivity != settings.touchscreenRightStickSensitivity) {
                 add("touchscreenRightStickSensitivity")
+            }
+            if (touchscreenLeftStick != settings.touchscreenLeftStick) add("touchscreenLeftStick")
+            if (touchscreenLeftStickSensitivity != settings.touchscreenLeftStickSensitivity) {
+                add("touchscreenLeftStickSensitivity")
             }
             if (touchHaptics != settings.touchHaptics) add("touchHaptics")
             if (stickToggleTarget != settings.stickToggleTarget) add("stickToggleTarget")

@@ -1997,6 +1997,11 @@
     <string name="settings_help_touchscreen_right_stick">Memetakan gerakan seret di area layar permainan yang tidak terpakai ke sumbu stik kanan virtual, sehingga kamera dapat digerakkan tanpa menyentuh stik yang terlihat. Tombol sentuh dan stik yang terlihat tetap berfungsi seperti biasa.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Sensitivitas stik kanan layar sentuh</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Mengatur seberapa kuat jarak seretan di layar menggerakkan stik kanan virtual. Pengaturan ini tidak mengubah sensitivitas stik kanan yang terlihat.</string>
+    <string name="settings_touchscreen_left_stick">Stik kiri di layar sentuh</string>
+    <string name="settings_touchscreen_left_stick_desc">Geser di area kosong layar untuk mengontrol stik kiri virtual.</string>
+    <string name="settings_help_touchscreen_left_stick">Memetakan gerakan geser di area yang tidak terpakai pada layar game ke sumbu stik kiri virtual, sehingga dapat bergerak tanpa menyentuh stik yang terlihat. Tombol sentuh dan stik yang terlihat tetap berperilaku normal.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Sensitivitas stik kiri layar sentuh</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Mengatur seberapa kuat jarak geser di layar mengendalikan stik kiri virtual. Ini tidak mengubah sensitivitas stik kiri yang terlihat.</string>
     <string name="shell_cheat_manager">Pengelola cheat</string>
     <string name="content_select_game">Pilih game dari pustaka Anda</string>
     <string name="content_library_empty">Tidak ada game yang kompatibel di pustaka.</string>

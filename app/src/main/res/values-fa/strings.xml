@@ -1998,6 +1998,11 @@
     <string name="settings_help_touchscreen_right_stick">حرکت کشیدن انگشت در بخش‌های بدون استفاده صفحه بازی را به محورهای آنالوگ راست مجازی متصل می‌کند تا بدون لمس آنالوگ نمایان، دوربین را حرکت دهید. دکمه‌های لمسی و آنالوگ‌های نمایان مانند همیشه کار می‌کنند.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">حساسیت آنالوگ راست روی صفحه لمسی</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">میزان تأثیر فاصله کشیدن انگشت روی صفحه بر حرکت آنالوگ راست مجازی را تنظیم می‌کند. حساسیت آنالوگ راست نمایان تغییر نمی‌کند.</string>
+    <string name="settings_touchscreen_left_stick">آنالوگ چپ روی صفحه لمسی</string>
+    <string name="settings_touchscreen_left_stick_desc">برای کنترل استیک چپ مجازی، روی فضای خالی صفحه بکشید.</string>
+    <string name="settings_help_touchscreen_left_stick">ژست‌های کشیدن در نواحی بلااستفاده صفحه بازی را به محورهای استیک چپ مجازی نگاشت می‌کند و امکان حرکت بدون لمس استیک قابل مشاهده را فراهم می‌کند. دکمه‌های لمسی و استیک‌های قابل مشاهده رفتار عادی خود را حفظ می‌کنند.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">حساسیت آنالوگ چپ روی صفحه لمسی</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">میزان تأثیر فاصله کشیدن روی صفحه بر استیک چپ مجازی را تنظیم می‌کند. این تنظیم حساسیت استیک چپ قابل مشاهده را تغییر نمی‌دهد.</string>
     <string name="shell_cheat_manager">مدیریت تقلب‌ها</string>
     <string name="content_select_game">یک بازی از کتابخانه انتخاب کنید</string>
     <string name="content_library_empty">بازی سازگاری در کتابخانه پیدا نشد.</string>

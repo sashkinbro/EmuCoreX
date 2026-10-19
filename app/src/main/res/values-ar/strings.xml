@@ -1987,6 +1987,11 @@
     <string name="settings_help_touchscreen_right_stick">يربط إيماءات السحب في المناطق غير المستخدمة من شاشة اللعبة بمحاور العصا اليمنى الافتراضية، مما يتيح تحريك الكاميرا دون لمس العصا الظاهرة. تظل أزرار اللمس والعصي الظاهرة تعمل كالمعتاد.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">حساسية العصا اليمنى عبر شاشة اللمس</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">يضبط مدى تأثير مسافة السحب على الشاشة في تحريك العصا اليمنى الافتراضية. لا يغير حساسية العصا اليمنى الظاهرة.</string>
+    <string name="settings_touchscreen_left_stick">العصا اليسرى عبر شاشة اللمس</string>
+    <string name="settings_touchscreen_left_stick_desc">اسحب على مساحة فارغة من الشاشة للتحكم في العصا اليسرى الافتراضية.</string>
+    <string name="settings_help_touchscreen_left_stick">يحوّل إيماءات السحب في المناطق غير المستخدمة من شاشة اللعبة إلى محاور العصا اليسرى الافتراضية، مما يتيح الحركة دون لمس العصا الظاهرة. تحتفظ أزرار اللمس والعصي الظاهرة بسلوكها الطبيعي.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">حساسية العصا اليسرى عبر شاشة اللمس</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">يضبط مدى قوة تأثير مسافة السحب على الشاشة في العصا اليسرى الافتراضية. لا يغيّر حساسية العصا اليسرى الظاهرة.</string>
     <string name="shell_cheat_manager">مدير الغش</string>
     <string name="content_select_game">اختر لعبة من مكتبتك</string>
     <string name="content_library_empty">لم يتم العثور على ألعاب متوافقة في المكتبة.</string>

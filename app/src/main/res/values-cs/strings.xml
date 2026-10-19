@@ -2003,6 +2003,11 @@
     <string name="settings_help_touchscreen_right_stick">Mapuje gesta tažení v nevyužitých oblastech herní obrazovky na osy virtuální pravé páčky, což umožňuje pohyb kamery bez dotyku viditelné páčky. Dotyková tlačítka a viditelné páčky si zachovávají své normální chování.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Citlivost pravé páčky na dotykové obrazovce</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Upravuje, jak silně vzdálenost tažení po obrazovce ovládá virtuální pravou páčku. Toto nemění citlivost viditelné pravé páčky.</string>
+    <string name="settings_touchscreen_left_stick">Levá páčka na dotykové obrazovce</string>
+    <string name="settings_touchscreen_left_stick_desc">Přejeďte prstem po volném místě obrazovky pro ovládání virtuální levé páčky.</string>
+    <string name="settings_help_touchscreen_left_stick">Mapuje gesta tažení v nevyužitých oblastech herní obrazovky na osy virtuální levé páčky, takže se lze pohybovat bez dotyku viditelné páčky. Dotyková tlačítka a viditelné páčky si zachovávají běžné chování.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Citlivost levé páčky na dotykové obrazovce</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Nastavuje, jak silně vzdálenost tažení na obrazovce ovládá virtuální levou páčku. Nemění citlivost viditelné levé páčky.</string>
     <string name="shell_cheat_manager">Správce cheatů</string>
     <string name="content_select_game">Vyberte hru z vaší knihovny</string>
     <string name="content_library_empty">V knihovně nebyly nalezeny žádné kompatibilní hry.</string>

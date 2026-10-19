@@ -139,6 +139,8 @@ class EmulationSettingsResetTest {
         stickyButtons = setOf("triangle"),
         touchscreenRightStick = false,
         touchscreenRightStickSensitivity = 150,
+        touchscreenLeftStick = false,
+        touchscreenLeftStickSensitivity = 150,
         touchHaptics = true,
         stickToggleTarget = 1,
         touchHapticsPreset = 3,

@@ -1982,6 +1982,11 @@
     <string name="settings_help_touchscreen_right_stick">ゲーム画面の未使用領域でのドラッグ操作を仮想右スティックの軸に割り当て、表示中のスティックに触れずにカメラを動かせます。タッチボタンと表示中のスティックは通常どおり動作します。</string>
     <string name="settings_touchscreen_right_stick_sensitivity">タッチスクリーン右スティック感度</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">画面上のドラッグ距離が仮想右スティックをどの程度動かすかを調整します。表示中の右スティックの感度は変更されません。</string>
+    <string name="settings_touchscreen_left_stick">タッチスクリーン左スティック</string>
+    <string name="settings_touchscreen_left_stick_desc">画面の空き領域をスワイプして仮想左スティックを操作します。</string>
+    <string name="settings_help_touchscreen_left_stick">ゲーム画面の未使用領域でのドラッグ操作を仮想左スティックの軸に割り当て、表示されるスティックに触れずに移動できるようにします。タッチボタンと表示スティックは通常どおり動作します。</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">タッチスクリーン左スティック感度</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">画面のドラッグ距離が仮想左スティックをどれだけ強く操作するかを調整します。表示される左スティックの感度は変わりません。</string>
     <string name="shell_cheat_manager">チートマネージャー</string>
     <string name="content_select_game">ライブラリからゲームを選択</string>
     <string name="content_library_empty">ライブラリに対応ゲームがありません。</string>

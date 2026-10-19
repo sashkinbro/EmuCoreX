@@ -2003,6 +2003,11 @@
     <string name="settings_help_touchscreen_right_stick">Przypisuje gesty przeciągania na niewykorzystanej powierzchni gry do osi prawej gałki, co umożliwia poruszanie kamerą bez konieczności dotykania samej grafiki drążka na ekranie. Przyciski i sam drążek zachowują swoje normalne funkcje.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Czułość prawej gałki na ekranie dotykowym</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Reguluje intensywność działania przesunięcia palcem na wirtualną prawą gałkę. Opcja ta nie wpływa na czułość widocznej gałki.</string>
+    <string name="settings_touchscreen_left_stick">Lewa gałka na ekranie dotykowym</string>
+    <string name="settings_touchscreen_left_stick_desc">Przesuwaj palcem po wolnym obszarze ekranu, aby sterować wirtualnym lewym drążkiem.</string>
+    <string name="settings_help_touchscreen_left_stick">Przypisuje gesty przeciągania w nieużywanych obszarach ekranu gry do osi wirtualnego lewego drążka, umożliwiając ruch bez dotykania widocznego drążka. Przyciski dotykowe i widoczne drążki zachowują normalne działanie.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Czułość lewej gałki na ekranie dotykowym</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Określa, jak mocno odległość przeciągania na ekranie steruje wirtualnym lewym drążkiem. Nie zmienia czułości widocznego lewego drążka.</string>
     <string name="shell_cheat_manager">Menedżer kodów</string>
     <string name="content_select_game">Wybierz grę ze swojej biblioteki</string>
     <string name="content_library_empty">Nie znaleziono kompatybilnych gier w bibliotece.</string>

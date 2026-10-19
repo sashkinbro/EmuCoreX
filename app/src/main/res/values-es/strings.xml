@@ -1985,6 +1985,11 @@
     <string name="settings_help_touchscreen_right_stick">Asigna los gestos de arrastre en las zonas libres de la pantalla del juego a los ejes del stick derecho virtual, permitiendo mover la cámara sin tocar el stick visible. Los botones táctiles y los sticks visibles conservan su funcionamiento normal.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Sensibilidad táctil del stick derecho</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Ajusta cuánto desvía el stick derecho virtual la distancia recorrida al arrastrar por la pantalla. No cambia la sensibilidad del stick derecho visible.</string>
+    <string name="settings_touchscreen_left_stick">Stick izquierdo en pantalla táctil</string>
+    <string name="settings_touchscreen_left_stick_desc">Desliza por un espacio libre de la pantalla para controlar el stick izquierdo virtual.</string>
+    <string name="settings_help_touchscreen_left_stick">Asigna los gestos de arrastre en las zonas no utilizadas de la pantalla del juego a los ejes del stick izquierdo virtual, permitiendo moverse sin tocar el stick visible. Los botones táctiles y los sticks visibles mantienen su comportamiento normal.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Sensibilidad táctil del stick izquierdo</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Ajusta la fuerza con la que la distancia de arrastre en la pantalla controla el stick izquierdo virtual. No cambia la sensibilidad del stick izquierdo visible.</string>
     <string name="shell_cheat_manager">Gestor de trucos</string>
     <string name="content_select_game">Selecciona un juego de tu biblioteca</string>
     <string name="content_library_empty">No se encontraron juegos compatibles en la biblioteca.</string>

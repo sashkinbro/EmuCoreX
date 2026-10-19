@@ -1983,6 +1983,11 @@
     <string name="settings_help_touchscreen_right_stick">Oyun ekranının kullanılmayan alanlarındaki sürükleme hareketlerini sanal sağ çubuğun eksenlerine eşleyerek görünür çubuğa dokunmadan kamerayı hareket ettirmenizi sağlar. Dokunmatik düğmeler ve görünür çubuklar normal şekilde çalışmaya devam eder.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Dokunmatik sağ çubuk hassasiyeti</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Ekrandaki sürükleme mesafesinin sanal sağ çubuğu ne kadar hareket ettireceğini ayarlar. Görünür sağ çubuğun hassasiyetini değiştirmez.</string>
+    <string name="settings_touchscreen_left_stick">Dokunmatik ekranda sol çubuk</string>
+    <string name="settings_touchscreen_left_stick_desc">Sanal sol çubuğu kontrol etmek için ekranın boş bir alanında kaydırın.</string>
+    <string name="settings_help_touchscreen_left_stick">Oyun ekranının kullanılmayan alanlarındaki sürükleme hareketlerini sanal sol çubuk eksenlerine eşler; görünür çubuğa dokunmadan hareket etmeyi sağlar. Dokunmatik düğmeler ve görünür çubuklar normal davranışlarını korur.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Dokunmatik sol çubuk hassasiyeti</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Ekrandaki sürükleme mesafesinin sanal sol çubuğu ne kadar güçlü kontrol ettiğini ayarlar. Görünür sol çubuğun hassasiyetini değiştirmez.</string>
     <string name="shell_cheat_manager">Hile yöneticisi</string>
     <string name="content_select_game">Kütüphanenizden bir oyun seçin</string>
     <string name="content_library_empty">Kütüphanede uyumlu oyun bulunamadı.</string>

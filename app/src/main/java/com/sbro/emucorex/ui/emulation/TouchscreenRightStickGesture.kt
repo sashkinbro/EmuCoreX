@@ -7,6 +7,32 @@ internal data class RightStickGestureValue(
     val y: Float
 )
 
+internal enum class TouchscreenStickGestureTarget { NONE, LEFT, RIGHT }
+
+/**
+ * Picks the virtual stick controlled by a drag that started at [startX].
+ *
+ * When both gesture sticks are enabled, the free screen space is split in half so the
+ * left half drives the left stick and the right half drives the right stick. A single
+ * enabled stick keeps using the whole free area.
+ */
+internal fun resolveTouchscreenStickGestureTarget(
+    leftEnabled: Boolean,
+    rightEnabled: Boolean,
+    startX: Float,
+    widthPx: Float
+): TouchscreenStickGestureTarget {
+    if (!leftEnabled && !rightEnabled) return TouchscreenStickGestureTarget.NONE
+    if (leftEnabled && rightEnabled) {
+        return if (startX < widthPx / 2f) {
+            TouchscreenStickGestureTarget.LEFT
+        } else {
+            TouchscreenStickGestureTarget.RIGHT
+        }
+    }
+    return if (leftEnabled) TouchscreenStickGestureTarget.LEFT else TouchscreenStickGestureTarget.RIGHT
+}
+
 internal fun calculateRightStickGestureValue(
     deltaX: Float,
     deltaY: Float,

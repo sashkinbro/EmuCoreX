@@ -2012,6 +2012,11 @@
     <string name="settings_help_touchscreen_right_stick">Прив’язує жести перетягування у вільних ділянках ігрового екрана до осей віртуального правого стіка, щоб рухати камерою без торкання видимого стіка. Сенсорні кнопки та видимі стіки працюють як зазвичай.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Чутливість правого стіка на сенсорному екрані</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Визначає, наскільки сильно відстань перетягування по екрану відхиляє віртуальний правий стік. Не змінює чутливість видимого правого стіка.</string>
+    <string name="settings_touchscreen_left_stick">Лівий стік на сенсорному екрані</string>
+    <string name="settings_touchscreen_left_stick_desc">Проводьте пальцем по вільній частині екрана, щоб керувати віртуальним лівим стіком.</string>
+    <string name="settings_help_touchscreen_left_stick">Перетворює жести протягування у вільних зонах екрана гри на осі віртуального лівого стіка, дозволяючи рухатися, не торкаючись видимого стіка. Сенсорні кнопки та видимі стіки працюють як звичайно.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Чутливість лівого стіка на сенсорному екрані</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Регулює, наскільки сильно відстань протягування на екрані керує віртуальним лівим стіком. Це не змінює чутливість видимого лівого стіка.</string>
     <string name="shell_cheat_manager">Менеджер чітів</string>
     <string name="content_select_game">Виберіть гру з бібліотеки</string>
     <string name="content_library_empty">У бібліотеці не знайдено сумісних ігор.</string>

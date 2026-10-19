@@ -29,6 +29,8 @@ internal fun PerGameSettings.withOnlyOverridesComparedWith(
         if (stickyButtons != defaults.stickyButtons) add("stickyButtons")
         if (touchscreenRightStick != defaults.touchscreenRightStick) add("touchscreenRightStick")
         if (touchscreenRightStickSensitivity != defaults.touchscreenRightStickSensitivity) add("touchscreenRightStickSensitivity")
+        if (touchscreenLeftStick != defaults.touchscreenLeftStick) add("touchscreenLeftStick")
+        if (touchscreenLeftStickSensitivity != defaults.touchscreenLeftStickSensitivity) add("touchscreenLeftStickSensitivity")
         if (touchHaptics != defaults.touchHaptics) add("touchHaptics")
         if (stickToggleTarget != defaults.stickToggleTarget) add("stickToggleTarget")
         if (touchHapticsPreset != defaults.touchHapticsPreset) add("touchHapticsPreset")

@@ -1985,6 +1985,11 @@
     <string name="settings_help_touchscreen_right_stick">Associe les gestes de glissement dans les zones inutilisées de l’écran de jeu aux axes du stick droit virtuel, afin de déplacer la caméra sans toucher le stick visible. Les boutons tactiles et les sticks visibles conservent leur fonctionnement normal.</string>
     <string name="settings_touchscreen_right_stick_sensitivity">Sensibilité tactile du stick droit</string>
     <string name="settings_help_touchscreen_right_stick_sensitivity">Règle l’intensité avec laquelle la distance de glissement à l’écran déplace le stick droit virtuel. La sensibilité du stick droit visible reste inchangée.</string>
+    <string name="settings_touchscreen_left_stick">Stick gauche sur l’écran tactile</string>
+    <string name="settings_touchscreen_left_stick_desc">Balayez un espace libre de l’écran pour contrôler le stick gauche virtuel.</string>
+    <string name="settings_help_touchscreen_left_stick">Associe les gestes de glissement dans les zones inutilisées de l’écran de jeu aux axes du stick gauche virtuel, permettant de se déplacer sans toucher le stick visible. Les boutons tactiles et les sticks visibles gardent leur comportement normal.</string>
+    <string name="settings_touchscreen_left_stick_sensitivity">Sensibilité tactile du stick gauche</string>
+    <string name="settings_help_touchscreen_left_stick_sensitivity">Ajuste l’influence de la distance de glissement à l’écran sur le stick gauche virtuel. Cela ne modifie pas la sensibilité du stick gauche visible.</string>
     <string name="shell_cheat_manager">Gestionnaire de codes</string>
     <string name="content_select_game">Sélectionnez un jeu de votre bibliothèque</string>
     <string name="content_library_empty">Aucun jeu compatible trouvé dans la bibliothèque.</string>
