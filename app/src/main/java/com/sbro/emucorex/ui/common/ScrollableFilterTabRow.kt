@@ -43,6 +43,7 @@ fun <T> ScrollableFilterTabRow(
     icon: (T) -> ImageVector,
     selectedTabFocusRequester: FocusRequester? = null,
     horizontalContentPadding: Dp = ScreenHorizontalPadding,
+    verticalPadding: Dp = 6.dp,
     compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -68,7 +69,7 @@ fun <T> ScrollableFilterTabRow(
         state = listState,
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = verticalPadding)
             .tvFocusGroup(),
         contentPadding = PaddingValues(horizontal = horizontalContentPadding),
         horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)

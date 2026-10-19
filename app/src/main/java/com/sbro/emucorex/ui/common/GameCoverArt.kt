@@ -24,6 +24,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +58,14 @@ internal fun isGenerated3dCover(coverPath: String?): Boolean =
             (path.endsWith(".png") || path.endsWith(".jpg"))
         localCache3d || remote3d
     } == true
+
+/** 3D covers render with transparent padding, so rounding would cut their corners. */
+fun gameCoverShape(coverPath: String?, roundedShape: Shape): Shape =
+    if (isGenerated3dCover(coverPath)) RectangleShape else roundedShape
+
+/** 3D covers must be fitted whole; regular covers fill and crop their frame. */
+fun gameCoverContentScale(coverPath: String?, defaultScale: ContentScale): ContentScale =
+    if (isGenerated3dCover(coverPath)) ContentScale.Fit else defaultScale
 
 private val imageLoadingSemaphore = Semaphore(4)
 private const val DEFAULT_COVER_DECODE_WIDTH = 400

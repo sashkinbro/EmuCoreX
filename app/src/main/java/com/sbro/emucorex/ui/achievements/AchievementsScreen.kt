@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -107,7 +108,11 @@ import com.sbro.emucorex.data.LibraryUnlockedAchievement
 import com.sbro.emucorex.data.RetroAchievementEntry
 import com.sbro.emucorex.data.RetroAchievementGameData
 import com.sbro.emucorex.data.RetroAchievementsRepository
+import androidx.compose.ui.layout.ContentScale
 import com.sbro.emucorex.ui.common.BitmapPathImage
+import com.sbro.emucorex.ui.common.GameCoverAspectRatio
+import com.sbro.emucorex.ui.common.gameCoverContentScale
+import com.sbro.emucorex.ui.common.gameCoverShape
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
@@ -1691,10 +1696,12 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val coverShape = gameCoverShape(imagePath, neonShape(18.dp))
             Box(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(neonShape(18.dp))
+                    .height(84.dp)
+                    .aspectRatio(GameCoverAspectRatio)
+                    .clip(coverShape)
                     .background(
                         if (imagePath.isNullOrBlank()) {
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
@@ -1708,8 +1715,9 @@ private fun LibraryAchievementGameCard(item: LibraryAchievementGame, onClick: ()
                     imagePath = imagePath,
                     contentDescription = item.gameTitle,
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(neonShape(18.dp)),
+                        .fillMaxSize()
+                        .clip(coverShape),
+                    contentScale = gameCoverContentScale(imagePath, ContentScale.Crop),
                     fallback = {
                         Icon(
                             imageVector = Icons.Rounded.EmojiEvents,

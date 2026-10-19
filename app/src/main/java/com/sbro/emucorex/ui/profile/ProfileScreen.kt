@@ -146,6 +146,8 @@ import com.sbro.emucorex.data.ProfileFeedEvent
 import com.sbro.emucorex.data.PublicPlayerDevice
 import com.sbro.emucorex.ui.common.BitmapPathImage
 import com.sbro.emucorex.ui.common.GameCoverArt
+import com.sbro.emucorex.ui.common.gameCoverContentScale
+import com.sbro.emucorex.ui.common.gameCoverShape
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.shimmer
@@ -2036,8 +2038,8 @@ private fun FavoriteGamesShowcase(
                         decodeHeight = 320,
                         modifier = Modifier
                             .size(width = 56.dp, height = 82.dp)
-                            .clip(neonShape(6.dp)),
-                        contentScale = ContentScale.Crop
+                            .clip(gameCoverShape(game.coverArtPath, neonShape(6.dp))),
+                        contentScale = gameCoverContentScale(game.coverArtPath, ContentScale.Crop)
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -2387,8 +2389,8 @@ private fun ProShowcaseGameChoice(
                 decodeHeight = 260,
                 modifier = Modifier
                     .size(width = 42.dp, height = 58.dp)
-                    .clip(neonShape(6.dp)),
-                contentScale = ContentScale.Crop
+                    .clip(gameCoverShape(game.coverArtPath, neonShape(6.dp))),
+                contentScale = gameCoverContentScale(game.coverArtPath, ContentScale.Crop)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -2885,8 +2887,8 @@ private fun GamePlayStatRow(
                     decodeHeight = 450,
                     modifier = Modifier
                         .size(width = 84.dp, height = 118.dp)
-                        .clip(neonShape(6.dp)),
-                    contentScale = ContentScale.Crop
+                        .clip(gameCoverShape(game.coverArtPath, neonShape(6.dp))),
+                    contentScale = gameCoverContentScale(game.coverArtPath, ContentScale.Crop)
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -3199,8 +3201,8 @@ private fun RecentGamesCard(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(136.dp)
-                                    .clip(neonShape(5.dp)),
-                                contentScale = ContentScale.Crop
+                                    .clip(gameCoverShape(game.coverArtPath, neonShape(5.dp))),
+                                contentScale = gameCoverContentScale(game.coverArtPath, ContentScale.Crop)
                             )
                         }
                         Text(
