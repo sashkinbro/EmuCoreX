@@ -501,6 +501,9 @@
     <string name="settings_gamepad_mapping_auto_format">自動</string>
     <string name="settings_gamepad_mapping_reset_title">重設遊戲手把對應</string>
     <string name="settings_gamepad_mapping_reset_desc">還原預設的實體按鈕配置。</string>
+    <string name="settings_gamepad_mapping_configure">配置映射</string>
+    <string name="settings_gamepad_mapping_game_desc">此处的更改仅保存到本游戏。未覆盖的按键将使用全局布局。</string>
+    <string name="settings_gamepad_mapping_use_global">使用全局映射</string>
     <string name="settings_gamepad_mapping_listening_title">等待按下按鈕</string>
     <string name="settings_gamepad_mapping_listening_desc">按下連接的手把上的按鈕以綁定至 %1$s。</string>
     <string name="settings_gamepad_mapping_clear">清除</string>
@@ -520,6 +523,14 @@
     <string name="settings_gamepad_action_dpad_down">方向鍵 下</string>
     <string name="settings_gamepad_action_dpad_left">方向鍵 左</string>
     <string name="settings_gamepad_action_dpad_right">方向鍵 右</string>
+    <string name="settings_gamepad_action_left_stick_up">左摇杆上</string>
+    <string name="settings_gamepad_action_left_stick_down">左摇杆下</string>
+    <string name="settings_gamepad_action_left_stick_left">左摇杆左</string>
+    <string name="settings_gamepad_action_left_stick_right">左摇杆右</string>
+    <string name="settings_gamepad_action_right_stick_up">右摇杆上</string>
+    <string name="settings_gamepad_action_right_stick_down">右摇杆下</string>
+    <string name="settings_gamepad_action_right_stick_left">右摇杆左</string>
+    <string name="settings_gamepad_action_right_stick_right">右摇杆右</string>
 
     <string name="gamepad_connected">控制器已連線</string>
     <string name="emulation_target_fps_badge">上限 %1$d</string>

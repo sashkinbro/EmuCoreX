@@ -501,6 +501,9 @@
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Redefinir Mapeamento do Gamepad</string>
     <string name="settings_gamepad_mapping_reset_desc">Restaurar o layout padrão dos botões físicos.</string>
+    <string name="settings_gamepad_mapping_configure">Configurar mapeamento</string>
+    <string name="settings_gamepad_mapping_game_desc">As alterações aqui são salvas apenas para este jogo. Botões sem substituição usam o layout global.</string>
+    <string name="settings_gamepad_mapping_use_global">Usar mapeamento global</string>
     <string name="settings_gamepad_mapping_listening_title">Aguardando Botão</string>
     <string name="settings_gamepad_mapping_listening_desc">Pressione um botão no controle conectado para vinculá-lo a %1$s.</string>
     <string name="settings_gamepad_mapping_clear">Limpar</string>
@@ -520,6 +523,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Baixo</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Esquerda</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Direita</string>
+    <string name="settings_gamepad_action_left_stick_up">Analógico esquerdo para cima</string>
+    <string name="settings_gamepad_action_left_stick_down">Analógico esquerdo para baixo</string>
+    <string name="settings_gamepad_action_left_stick_left">Analógico esquerdo para a esquerda</string>
+    <string name="settings_gamepad_action_left_stick_right">Analógico esquerdo para a direita</string>
+    <string name="settings_gamepad_action_right_stick_up">Analógico direito para cima</string>
+    <string name="settings_gamepad_action_right_stick_down">Analógico direito para baixo</string>
+    <string name="settings_gamepad_action_right_stick_left">Analógico direito para a esquerda</string>
+    <string name="settings_gamepad_action_right_stick_right">Analógico direito para a direita</string>
 
     <string name="gamepad_connected">Controle conectado</string>
     <string name="emulation_target_fps_badge">CAP %1$d</string>

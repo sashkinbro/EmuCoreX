@@ -1200,6 +1200,9 @@
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Zresetuj mapowanie kontrolera</string>
     <string name="settings_gamepad_mapping_reset_desc">Przywraca domyślne funkcje z oryginalnej mapy przycisków fizycznych kontrolera wybranego jako źródłowe urządzenie dla powłoki systemowej.</string>
+    <string name="settings_gamepad_mapping_configure">Konfiguruj mapowanie</string>
+    <string name="settings_gamepad_mapping_game_desc">Zmiany tutaj są zapisywane tylko dla tej gry. Przyciski bez nadpisania używają układu globalnego.</string>
+    <string name="settings_gamepad_mapping_use_global">Użyj mapowania globalnego</string>
     <string name="settings_gamepad_mapping_listening_title">Oczekiwanie na naciśnięcie</string>
     <string name="settings_gamepad_mapping_listening_desc">Uderz w ten przycisk na padzie który dla portu przypisać by dla emulatora odpowiadał na funkcję dla przycisku: %1$s.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Kliknij kontrolkę odpowiedzialną by odpowiadała wybranemu %1$s podczas kiedy ma wywoływać przypisanie z funkcji przycisku pad\'u PS2 wybranego %2$s.</string>
@@ -1230,6 +1233,14 @@
     <string name="settings_gamepad_action_dpad_down">Krzyżak Dół</string>
     <string name="settings_gamepad_action_dpad_left">Krzyżak Lewo</string>
     <string name="settings_gamepad_action_dpad_right">Krzyżak Prawo</string>
+    <string name="settings_gamepad_action_left_stick_up">Lewy drążek w górę</string>
+    <string name="settings_gamepad_action_left_stick_down">Lewy drążek w dół</string>
+    <string name="settings_gamepad_action_left_stick_left">Lewy drążek w lewo</string>
+    <string name="settings_gamepad_action_left_stick_right">Lewy drążek w prawo</string>
+    <string name="settings_gamepad_action_right_stick_up">Prawy drążek w górę</string>
+    <string name="settings_gamepad_action_right_stick_down">Prawy drążek w dół</string>
+    <string name="settings_gamepad_action_right_stick_left">Prawy drążek w lewo</string>
+    <string name="settings_gamepad_action_right_stick_right">Prawy drążek w prawo</string>
 
     <!-- Gamepad -->
     <string name="gamepad_connected">Kontroler połączony</string>

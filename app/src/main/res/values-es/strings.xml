@@ -501,6 +501,9 @@
     <string name="settings_gamepad_mapping_auto_format">Automático</string>
     <string name="settings_gamepad_mapping_reset_title">Restablecer asignación del mando</string>
     <string name="settings_gamepad_mapping_reset_desc">Restaura la disposición predeterminada de los botones físicos.</string>
+    <string name="settings_gamepad_mapping_configure">Configurar asignación</string>
+    <string name="settings_gamepad_mapping_game_desc">Los cambios aquí se guardan solo para este juego. Los botones sin reasignación usan la distribución global.</string>
+    <string name="settings_gamepad_mapping_use_global">Usar asignación global</string>
     <string name="settings_gamepad_mapping_listening_title">Esperando botón</string>
     <string name="settings_gamepad_mapping_listening_desc">Pulsa un botón en el mando conectado para asignarlo a %1$s.</string>
     <string name="settings_gamepad_mapping_clear">Borrar</string>
@@ -520,6 +523,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Abajo</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Izquierda</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Derecha</string>
+    <string name="settings_gamepad_action_left_stick_up">Stick izquierdo arriba</string>
+    <string name="settings_gamepad_action_left_stick_down">Stick izquierdo abajo</string>
+    <string name="settings_gamepad_action_left_stick_left">Stick izquierdo izquierda</string>
+    <string name="settings_gamepad_action_left_stick_right">Stick izquierdo derecha</string>
+    <string name="settings_gamepad_action_right_stick_up">Stick derecho arriba</string>
+    <string name="settings_gamepad_action_right_stick_down">Stick derecho abajo</string>
+    <string name="settings_gamepad_action_right_stick_left">Stick derecho izquierda</string>
+    <string name="settings_gamepad_action_right_stick_right">Stick derecho derecha</string>
 
     <string name="gamepad_connected">Mando conectado</string>
     <string name="emulation_target_fps_badge">LÍMITE %1$d</string>

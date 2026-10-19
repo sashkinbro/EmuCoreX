@@ -812,6 +812,9 @@
     <string name="settings_gamepad_mapping_auto_format">تلقائي</string>
     <string name="settings_gamepad_mapping_reset_title">إعادة تعيين تعيين وحدة التحكم</string>
     <string name="settings_gamepad_mapping_reset_desc">استعادة تخطيط الأزرار الفعلية الافتراضي.</string>
+    <string name="settings_gamepad_mapping_configure">تكوين التعيين</string>
+    <string name="settings_gamepad_mapping_game_desc">يتم حفظ التغييرات هنا لهذه اللعبة فقط. الأزرار التي لم يتم تجاوزها تستخدم التخطيط العام.</string>
+    <string name="settings_gamepad_mapping_use_global">استخدام التعيين العام</string>
     <string name="settings_gamepad_mapping_listening_title">في انتظار الزر</string>
     <string name="settings_gamepad_mapping_listening_desc">اضغط على زر في وحدة التحكم المتصلة لربطه بـ %1$s.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">اضغط على زر لـ %1$s لربطه بـ %2$s.</string>
@@ -833,6 +836,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad أسفل</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad يسار</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad يمين</string>
+    <string name="settings_gamepad_action_left_stick_up">العصا اليسرى لأعلى</string>
+    <string name="settings_gamepad_action_left_stick_down">العصا اليسرى لأسفل</string>
+    <string name="settings_gamepad_action_left_stick_left">العصا اليسرى لليسار</string>
+    <string name="settings_gamepad_action_left_stick_right">العصا اليسرى لليمين</string>
+    <string name="settings_gamepad_action_right_stick_up">العصا اليمنى لأعلى</string>
+    <string name="settings_gamepad_action_right_stick_down">العصا اليمنى لأسفل</string>
+    <string name="settings_gamepad_action_right_stick_left">العصا اليمنى لليسار</string>
+    <string name="settings_gamepad_action_right_stick_right">العصا اليمنى لليمين</string>
 
     <string name="gamepad_connected">تم توصيل وحدة التحكم</string>
     <string name="emulation_target_fps_badge">الحد %1$d</string>

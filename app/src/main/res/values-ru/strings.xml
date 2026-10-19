@@ -507,6 +507,9 @@
     <string name="settings_gamepad_mapping_auto_format">Авто</string>
     <string name="settings_gamepad_mapping_reset_title">Сбросить раскладку геймпада</string>
     <string name="settings_gamepad_mapping_reset_desc">Восстановить стандартное расположение физических кнопок.</string>
+    <string name="settings_gamepad_mapping_configure">Настроить маппинг</string>
+    <string name="settings_gamepad_mapping_game_desc">Изменения здесь сохраняются только для этой игры. Кнопки без переопределения используют глобальную схему.</string>
+    <string name="settings_gamepad_mapping_use_global">Использовать глобальный маппинг</string>
     <string name="settings_gamepad_mapping_listening_title">Ожидание кнопки</string>
     <string name="settings_gamepad_mapping_listening_desc">Нажмите кнопку на подключенном геймпаде, чтобы назначить её на %1$s.</string>
     <string name="settings_gamepad_mapping_clear">Очистить</string>
@@ -526,6 +529,14 @@
     <string name="settings_gamepad_action_dpad_down">Крестовина вниз</string>
     <string name="settings_gamepad_action_dpad_left">Крестовина влево</string>
     <string name="settings_gamepad_action_dpad_right">Крестовина вправо</string>
+    <string name="settings_gamepad_action_left_stick_up">Левый стик вверх</string>
+    <string name="settings_gamepad_action_left_stick_down">Левый стик вниз</string>
+    <string name="settings_gamepad_action_left_stick_left">Левый стик влево</string>
+    <string name="settings_gamepad_action_left_stick_right">Левый стик вправо</string>
+    <string name="settings_gamepad_action_right_stick_up">Правый стик вверх</string>
+    <string name="settings_gamepad_action_right_stick_down">Правый стик вниз</string>
+    <string name="settings_gamepad_action_right_stick_left">Правый стик влево</string>
+    <string name="settings_gamepad_action_right_stick_right">Правый стик вправо</string>
 
     <string name="gamepad_connected">Контроллер подключен</string>
     <string name="emulation_target_fps_badge">ЛИМ %1$d</string>

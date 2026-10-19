@@ -1143,6 +1143,9 @@
     <string name="settings_gamepad_mapping_auto_format">خودکار</string>
     <string name="settings_gamepad_mapping_reset_title">بازنشانی نگاشت گیم‌پد</string>
     <string name="settings_gamepad_mapping_reset_desc">بازیابی طرح‌بندی دکمه فیزیکی پیش‌فرض.</string>
+    <string name="settings_gamepad_mapping_configure">پیکربندی نگاشت</string>
+    <string name="settings_gamepad_mapping_game_desc">تغییرات اینجا فقط برای این بازی ذخیره می‌شوند. دکمه‌هایی که بازنویسی نشده‌اند از چیدمان کلی استفاده می‌کنند.</string>
+    <string name="settings_gamepad_mapping_use_global">استفاده از نگاشت کلی</string>
     <string name="settings_gamepad_mapping_listening_title">در انتظار دکمه</string>
     <string name="settings_gamepad_mapping_listening_desc">برای اتصال به %1$s دکمه‌ای را روی کنترلر متصل فشار دهید.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">برای اتصال %1$s به %2$s دکمه‌ای را فشار دهید.</string>
@@ -1164,6 +1167,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad پایین</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad چپ</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad راست</string>
+    <string name="settings_gamepad_action_left_stick_up">استیک چپ بالا</string>
+    <string name="settings_gamepad_action_left_stick_down">استیک چپ پایین</string>
+    <string name="settings_gamepad_action_left_stick_left">استیک چپ چپ</string>
+    <string name="settings_gamepad_action_left_stick_right">استیک چپ راست</string>
+    <string name="settings_gamepad_action_right_stick_up">استیک راست بالا</string>
+    <string name="settings_gamepad_action_right_stick_down">استیک راست پایین</string>
+    <string name="settings_gamepad_action_right_stick_left">استیک راست چپ</string>
+    <string name="settings_gamepad_action_right_stick_right">استیک راست راست</string>
 
     <!-- Gamepad -->
     <string name="gamepad_connected">کنترلر متصل شد</string>

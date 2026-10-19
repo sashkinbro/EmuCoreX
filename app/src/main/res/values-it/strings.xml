@@ -725,6 +725,9 @@
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Ripristina mappatura Gamepad</string>
     <string name="settings_gamepad_mapping_reset_desc">Ripristina il layout predefinito dei pulsanti fisici.</string>
+    <string name="settings_gamepad_mapping_configure">Configura mappatura</string>
+    <string name="settings_gamepad_mapping_game_desc">Le modifiche qui vengono salvate solo per questo gioco. I pulsanti senza override usano la disposizione globale.</string>
+    <string name="settings_gamepad_mapping_use_global">Usa mappatura globale</string>
     <string name="settings_gamepad_mapping_listening_title">In attesa del pulsante</string>
     <string name="settings_gamepad_mapping_listening_desc">Premi un pulsante sul controller collegato per associarlo a %1$s.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Premi un pulsante per %1$s per associarlo a %2$s.</string>
@@ -746,6 +749,14 @@
     <string name="settings_gamepad_action_dpad_down">Croce direzionale Giù</string>
     <string name="settings_gamepad_action_dpad_left">Croce direzionale Sinistra</string>
     <string name="settings_gamepad_action_dpad_right">Croce direzionale Destra</string>
+    <string name="settings_gamepad_action_left_stick_up">Stick sinistro su</string>
+    <string name="settings_gamepad_action_left_stick_down">Stick sinistro giù</string>
+    <string name="settings_gamepad_action_left_stick_left">Stick sinistro sinistra</string>
+    <string name="settings_gamepad_action_left_stick_right">Stick sinistro destra</string>
+    <string name="settings_gamepad_action_right_stick_up">Stick destro su</string>
+    <string name="settings_gamepad_action_right_stick_down">Stick destro giù</string>
+    <string name="settings_gamepad_action_right_stick_left">Stick destro sinistra</string>
+    <string name="settings_gamepad_action_right_stick_right">Stick destro destra</string>
 
     <string name="gamepad_connected">Controller connesso</string>
     <string name="emulation_target_fps_badge">LIM %1$d</string>

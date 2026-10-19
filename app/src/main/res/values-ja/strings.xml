@@ -812,6 +812,9 @@
     <string name="settings_gamepad_mapping_auto_format">自動</string>
     <string name="settings_gamepad_mapping_reset_title">ゲームパッドマッピングのリセット</string>
     <string name="settings_gamepad_mapping_reset_desc">デフォルトの物理ボタンレイアウトを復元します。</string>
+    <string name="settings_gamepad_mapping_configure">マッピングを設定</string>
+    <string name="settings_gamepad_mapping_game_desc">ここでの変更はこのゲームにのみ保存されます。上書きされていないボタンはグローバルレイアウトを使用します。</string>
+    <string name="settings_gamepad_mapping_use_global">グローバルマッピングを使用</string>
     <string name="settings_gamepad_mapping_listening_title">ボタンを待機中</string>
     <string name="settings_gamepad_mapping_listening_desc">接続されたコントローラーのボタンを押して、それを %1$s に割り当てます。</string>
     <string name="settings_gamepad_mapping_listening_player_desc">%1$s のボタンを押して、%2$s に割り当てます。</string>
@@ -833,6 +836,14 @@
     <string name="settings_gamepad_action_dpad_down">方向キー 下</string>
     <string name="settings_gamepad_action_dpad_left">方向キー 左</string>
     <string name="settings_gamepad_action_dpad_right">方向キー 右</string>
+    <string name="settings_gamepad_action_left_stick_up">左スティック上</string>
+    <string name="settings_gamepad_action_left_stick_down">左スティック下</string>
+    <string name="settings_gamepad_action_left_stick_left">左スティック左</string>
+    <string name="settings_gamepad_action_left_stick_right">左スティック右</string>
+    <string name="settings_gamepad_action_right_stick_up">右スティック上</string>
+    <string name="settings_gamepad_action_right_stick_down">右スティック下</string>
+    <string name="settings_gamepad_action_right_stick_left">右スティック左</string>
+    <string name="settings_gamepad_action_right_stick_right">右スティック右</string>
 
     <string name="gamepad_connected">コントローラーが接続されました</string>
     <string name="emulation_target_fps_badge">上限 %1$d</string>

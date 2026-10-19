@@ -1143,6 +1143,9 @@
     <string name="settings_gamepad_mapping_auto_format">Otomatis</string>
     <string name="settings_gamepad_mapping_reset_title">Reset Pemetaan Gamepad</string>
     <string name="settings_gamepad_mapping_reset_desc">Kembalikan tata letak tombol fisik bawaan/default.</string>
+    <string name="settings_gamepad_mapping_configure">Konfigurasikan pemetaan</string>
+    <string name="settings_gamepad_mapping_game_desc">Perubahan di sini hanya disimpan untuk game ini. Tombol tanpa penimpaan menggunakan tata letak global.</string>
+    <string name="settings_gamepad_mapping_use_global">Gunakan pemetaan global</string>
     <string name="settings_gamepad_mapping_listening_title">Menunggu Tombol</string>
     <string name="settings_gamepad_mapping_listening_desc">Tekan tombol pada pengontrol yang tersambung untuk mengikatnya ke %1$s.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Tekan tombol untuk %1$s untuk mengikatnya ke %2$s.</string>
@@ -1164,6 +1167,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Bawah</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Kiri</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Kanan</string>
+    <string name="settings_gamepad_action_left_stick_up">Stik kiri atas</string>
+    <string name="settings_gamepad_action_left_stick_down">Stik kiri bawah</string>
+    <string name="settings_gamepad_action_left_stick_left">Stik kiri kiri</string>
+    <string name="settings_gamepad_action_left_stick_right">Stik kiri kanan</string>
+    <string name="settings_gamepad_action_right_stick_up">Stik kanan atas</string>
+    <string name="settings_gamepad_action_right_stick_down">Stik kanan bawah</string>
+    <string name="settings_gamepad_action_right_stick_left">Stik kanan kiri</string>
+    <string name="settings_gamepad_action_right_stick_right">Stik kanan kanan</string>
 
     <!-- Gamepad -->
     <string name="gamepad_connected">Pengontrol terhubung</string>

@@ -501,6 +501,9 @@
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Gamepad-Belegung zurücksetzen</string>
     <string name="settings_gamepad_mapping_reset_desc">Das standardmäßige physische Tastenlayout wiederherstellen.</string>
+    <string name="settings_gamepad_mapping_configure">Mapping konfigurieren</string>
+    <string name="settings_gamepad_mapping_game_desc">Änderungen hier gelten nur für dieses Spiel. Tasten ohne Überschreibung verwenden das globale Layout.</string>
+    <string name="settings_gamepad_mapping_use_global">Globales Mapping verwenden</string>
     <string name="settings_gamepad_mapping_listening_title">Warten auf Taste</string>
     <string name="settings_gamepad_mapping_listening_desc">Drücke eine Taste auf dem verbundenen Controller, um sie %1$s zuzuweisen.</string>
     <string name="settings_gamepad_mapping_clear">Löschen</string>
@@ -520,6 +523,14 @@
     <string name="settings_gamepad_action_dpad_down">Steuerkreuz Unten</string>
     <string name="settings_gamepad_action_dpad_left">Steuerkreuz Links</string>
     <string name="settings_gamepad_action_dpad_right">Steuerkreuz Rechts</string>
+    <string name="settings_gamepad_action_left_stick_up">Linker Stick hoch</string>
+    <string name="settings_gamepad_action_left_stick_down">Linker Stick runter</string>
+    <string name="settings_gamepad_action_left_stick_left">Linker Stick links</string>
+    <string name="settings_gamepad_action_left_stick_right">Linker Stick rechts</string>
+    <string name="settings_gamepad_action_right_stick_up">Rechter Stick hoch</string>
+    <string name="settings_gamepad_action_right_stick_down">Rechter Stick runter</string>
+    <string name="settings_gamepad_action_right_stick_left">Rechter Stick links</string>
+    <string name="settings_gamepad_action_right_stick_right">Rechter Stick rechts</string>
 
     <string name="gamepad_connected">Controller verbunden</string>
     <string name="emulation_target_fps_badge">CAP %1$d</string>

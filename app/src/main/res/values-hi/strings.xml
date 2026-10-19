@@ -725,6 +725,9 @@
     <string name="settings_gamepad_mapping_auto_format">स्वतः</string>
     <string name="settings_gamepad_mapping_reset_title">गेमपैड मैपिंग रीसेट करें</string>
     <string name="settings_gamepad_mapping_reset_desc">डिफ़ॉल्ट भौतिक बटन लेआउट को पुनर्स्थापित करें।</string>
+    <string name="settings_gamepad_mapping_configure">मैपिंग कॉन्फ़िगर करें</string>
+    <string name="settings_gamepad_mapping_game_desc">यहाँ किए गए बदलाव केवल इस गेम के लिए सहेजे जाते हैं। बिना ओवरराइड वाले बटन ग्लोबल लेआउट का उपयोग करते हैं।</string>
+    <string name="settings_gamepad_mapping_use_global">ग्लोबल मैपिंग का उपयोग करें</string>
     <string name="settings_gamepad_mapping_listening_title">बटन की प्रतीक्षा कर रहा है</string>
     <string name="settings_gamepad_mapping_listening_desc">इसे %1$s से बांधने के लिए कनेक्टेड नियंत्रक पर एक बटन दबाएं।</string>
     <string name="settings_gamepad_mapping_listening_player_desc">इसे %2$s से बांधने के लिए %1$s के लिए एक बटन दबाएं।</string>
@@ -746,6 +749,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Down</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Left</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Right</string>
+    <string name="settings_gamepad_action_left_stick_up">बायाँ स्टिक ऊपर</string>
+    <string name="settings_gamepad_action_left_stick_down">बायाँ स्टिक नीचे</string>
+    <string name="settings_gamepad_action_left_stick_left">बायाँ स्टिक बाएँ</string>
+    <string name="settings_gamepad_action_left_stick_right">बायाँ स्टिक दाएँ</string>
+    <string name="settings_gamepad_action_right_stick_up">दायाँ स्टिक ऊपर</string>
+    <string name="settings_gamepad_action_right_stick_down">दायाँ स्टिक नीचे</string>
+    <string name="settings_gamepad_action_right_stick_left">दायाँ स्टिक बाएँ</string>
+    <string name="settings_gamepad_action_right_stick_right">दायाँ स्टिक दाएँ</string>
 
     <string name="gamepad_connected">नियंत्रक कनेक्ट हो गया</string>
     <string name="emulation_target_fps_badge">CAP %1$d</string>

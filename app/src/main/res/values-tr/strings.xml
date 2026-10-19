@@ -812,6 +812,9 @@
     <string name="settings_gamepad_mapping_auto_format">Oto</string>
     <string name="settings_gamepad_mapping_reset_title">Gamepad Eşlemesini Sıfırla</string>
     <string name="settings_gamepad_mapping_reset_desc">Varsayılan fiziksel düğme düzenini geri yükle.</string>
+    <string name="settings_gamepad_mapping_configure">Eşlemeyi yapılandır</string>
+    <string name="settings_gamepad_mapping_game_desc">Buradaki değişiklikler yalnızca bu oyun için kaydedilir. Geçersiz kılınmayan düğmeler genel düzeni kullanır.</string>
+    <string name="settings_gamepad_mapping_use_global">Genel eşlemeyi kullan</string>
     <string name="settings_gamepad_mapping_listening_title">Düğme Bekleniyor</string>
     <string name="settings_gamepad_mapping_listening_desc">%1$s işlevine atamak için bağlı kontrolcüde bir düğmeye basın.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">%1$s için %2$s işlevine atamak üzere bir düğmeye basın.</string>
@@ -833,6 +836,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Aşağı</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Sol</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Sağ</string>
+    <string name="settings_gamepad_action_left_stick_up">Sol çubuk yukarı</string>
+    <string name="settings_gamepad_action_left_stick_down">Sol çubuk aşağı</string>
+    <string name="settings_gamepad_action_left_stick_left">Sol çubuk sol</string>
+    <string name="settings_gamepad_action_left_stick_right">Sol çubuk sağ</string>
+    <string name="settings_gamepad_action_right_stick_up">Sağ çubuk yukarı</string>
+    <string name="settings_gamepad_action_right_stick_down">Sağ çubuk aşağı</string>
+    <string name="settings_gamepad_action_right_stick_left">Sağ çubuk sol</string>
+    <string name="settings_gamepad_action_right_stick_right">Sağ çubuk sağ</string>
 
     <string name="gamepad_connected">Kontrolcü bağlandı</string>
     <string name="emulation_target_fps_badge">SINIR %1$d</string>

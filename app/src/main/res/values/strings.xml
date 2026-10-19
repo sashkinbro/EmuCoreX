@@ -1248,6 +1248,9 @@
     <string name="settings_gamepad_mapping_auto_format">Auto</string>
     <string name="settings_gamepad_mapping_reset_title">Reset Gamepad Mapping</string>
     <string name="settings_gamepad_mapping_reset_desc">Restore the default physical button layout.</string>
+    <string name="settings_gamepad_mapping_configure">Configure Mapping</string>
+    <string name="settings_gamepad_mapping_game_desc">Bindings changed here are saved for this game only. Buttons without an override keep the global layout.</string>
+    <string name="settings_gamepad_mapping_use_global">Use Global Mapping</string>
     <string name="settings_gamepad_mapping_listening_title">Waiting For Button</string>
     <string name="settings_gamepad_mapping_listening_desc">Press a button on the connected controller to bind it to %1$s.</string>
     <string name="settings_gamepad_mapping_listening_player_desc">Press a button for %1$s to bind it to %2$s.</string>
@@ -1278,6 +1281,14 @@
     <string name="settings_gamepad_action_dpad_down">D-Pad Down</string>
     <string name="settings_gamepad_action_dpad_left">D-Pad Left</string>
     <string name="settings_gamepad_action_dpad_right">D-Pad Right</string>
+    <string name="settings_gamepad_action_left_stick_up">Left Stick Up</string>
+    <string name="settings_gamepad_action_left_stick_down">Left Stick Down</string>
+    <string name="settings_gamepad_action_left_stick_left">Left Stick Left</string>
+    <string name="settings_gamepad_action_left_stick_right">Left Stick Right</string>
+    <string name="settings_gamepad_action_right_stick_up">Right Stick Up</string>
+    <string name="settings_gamepad_action_right_stick_down">Right Stick Down</string>
+    <string name="settings_gamepad_action_right_stick_left">Right Stick Left</string>
+    <string name="settings_gamepad_action_right_stick_right">Right Stick Right</string>
 
     <!-- Gamepad -->
     <string name="gamepad_connected">Controller connected</string>

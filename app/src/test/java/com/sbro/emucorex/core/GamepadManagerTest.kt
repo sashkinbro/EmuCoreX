@@ -396,6 +396,45 @@ class GamepadManagerTest {
     }
 
     @Test
+    fun stickDirectionActionsAreMappableToPhysicalButtons() {
+        val actions = GamepadManager.mappableButtonActions().associateBy { it.id }
+
+        assertEquals(110, actions.getValue("left_stick_up").padKey)
+        assertEquals(112, actions.getValue("left_stick_down").padKey)
+        assertEquals(113, actions.getValue("left_stick_left").padKey)
+        assertEquals(111, actions.getValue("left_stick_right").padKey)
+        assertEquals(120, actions.getValue("right_stick_up").padKey)
+        assertEquals(122, actions.getValue("right_stick_down").padKey)
+        assertEquals(123, actions.getValue("right_stick_left").padKey)
+        assertEquals(121, actions.getValue("right_stick_right").padKey)
+
+        val bindings = GamepadBindingRules.assign(
+            emptyMap(),
+            "left_stick_up",
+            KeyEvent.KEYCODE_DPAD_UP
+        )
+        assertEquals(
+            "left_stick_up",
+            GamepadManager.resolveMappedActionIdForKeyCode(KeyEvent.KEYCODE_DPAD_UP, bindings)
+        )
+    }
+
+    @Test
+    fun bindingAStickDirectionReplacesTheButtonOnItsOldAction() {
+        val bindings = GamepadBindingRules.assign(
+            mapOf("square" to KeyEvent.KEYCODE_BUTTON_X),
+            "right_stick_right",
+            KeyEvent.KEYCODE_BUTTON_X
+        )
+
+        assertNull(bindings["square"])
+        assertEquals(
+            "right_stick_right",
+            GamepadManager.resolveMappedActionIdForKeyCode(KeyEvent.KEYCODE_BUTTON_X, bindings)
+        )
+    }
+
+    @Test
     fun phoneFallbackAttenuatesDualShockSmallMotor() {
         assertEquals(
             0.35f,

@@ -233,6 +233,7 @@ import com.sbro.emucorex.ui.common.VectorAnalogStick
 import com.sbro.emucorex.ui.common.VectorOverlayButton
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.calculateSideArtworkPreviewLayout
+import com.sbro.emucorex.ui.common.gamepadActionLabel
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
@@ -7382,46 +7383,6 @@ private fun bilinearUpscaleOptions(): List<Pair<Int, String>> = listOf(
     1 to stringResource(R.string.settings_bilinear_upscale_force_bilinear),
     2 to stringResource(R.string.settings_bilinear_upscale_force_nearest)
 )
-
-@StringRes
-private fun gamepadActionLabelRes(actionId: String): Int = when (actionId) {
-    "cross" -> R.string.settings_gamepad_action_cross
-    "circle" -> R.string.settings_gamepad_action_circle
-    "square" -> R.string.settings_gamepad_action_square
-    "triangle" -> R.string.settings_gamepad_action_triangle
-    "l1" -> R.string.settings_gamepad_action_l1
-    "r1" -> R.string.settings_gamepad_action_r1
-    "l2" -> R.string.settings_gamepad_action_l2
-    "r2" -> R.string.settings_gamepad_action_r2
-    "l3" -> R.string.settings_gamepad_action_l3
-    "r3" -> R.string.settings_gamepad_action_r3
-    "select" -> R.string.settings_gamepad_action_select
-    "start" -> R.string.settings_gamepad_action_start
-    "pressure" -> R.string.settings_gamepad_action_pressure
-    "gun_trigger" -> R.string.settings_gamepad_action_gun_trigger
-    "gun_pedal" -> R.string.settings_gamepad_action_gun_pedal
-    "gun_reload" -> R.string.settings_gamepad_action_gun_reload
-    "gun_recalibrate" -> R.string.settings_gamepad_action_gun_recalibrate
-    "coin" -> R.string.settings_gamepad_action_coin
-    "service" -> R.string.settings_gamepad_action_service
-    GamepadManager.ACTION_QUICK_SAVE -> R.string.emulation_quick_save
-    GamepadManager.ACTION_QUICK_LOAD -> R.string.emulation_quick_load
-    "dpad_up" -> R.string.settings_gamepad_action_dpad_up
-    "dpad_down" -> R.string.settings_gamepad_action_dpad_down
-    "dpad_left" -> R.string.settings_gamepad_action_dpad_left
-    "dpad_right" -> R.string.settings_gamepad_action_dpad_right
-    else -> R.string.settings_gamepad_section
-}
-
-@Composable
-private fun gamepadActionLabel(actionId: String): String = when (actionId) {
-    "cross" -> "\u2715"
-    "circle" -> "\u25cb"
-    "square" -> "\u25a1"
-    "triangle" -> "\u25b3"
-    "pressure" -> stringResource(R.string.settings_gamepad_action_pressure)
-    else -> stringResource(gamepadActionLabelRes(actionId))
-}
 
 @Composable
 private fun gamepadPlayerLabel(padIndex: Int): String {
