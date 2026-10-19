@@ -4038,27 +4038,12 @@ private fun EmulationSidebarMenu(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = stringResource(R.string.detail_save_states),
-                                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = if (uiState.currentSlotLastModified > 0L) {
-                                                stringResource(
-                                                    R.string.emulation_save_slot_saved_at,
-                                                    formatSaveTimestamp(uiState.currentSlotLastModified)
-                                                )
-                                            } else {
-                                                stringResource(R.string.emulation_save_slot_empty)
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
+                                    Text(
+                                        text = stringResource(R.string.detail_save_states),
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                     androidx.compose.material3.IconButton(
                                         onClick = onPrevSlot,
                                         enabled = uiState.currentSlot > 1,
@@ -4085,6 +4070,14 @@ private fun EmulationSidebarMenu(
                                     }
                                 }
 
+                                SaveSlotPreview(
+                                    slot = uiState.currentSlot,
+                                    previewPath = uiState.currentSlotPreviewPath,
+                                    lastModified = uiState.currentSlotLastModified,
+                                    isSaving = uiState.actionLabel == "saving",
+                                    gameTitle = uiState.currentGameTitle
+                                )
+
                                 }
 
                                 if (includeFollowingAutoSave) {
@@ -4096,6 +4089,14 @@ private fun EmulationSidebarMenu(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
+                                    SaveSlotThumbnail(
+                                        previewPath = uiState.autoSavePreviewPath,
+                                        lastModified = uiState.autoSaveLastModified,
+                                        contentDescription = stringResource(R.string.emulation_auto_save_title),
+                                        modifier = Modifier
+                                            .width(74.dp)
+                                            .aspectRatio(16f / 9f)
+                                    )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = stringResource(R.string.emulation_auto_save_title),
@@ -4178,6 +4179,14 @@ private fun EmulationSidebarMenu(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
+                                SaveSlotThumbnail(
+                                    previewPath = uiState.autoSavePreviewPath,
+                                    lastModified = uiState.autoSaveLastModified,
+                                    contentDescription = stringResource(R.string.emulation_auto_save_restore_title),
+                                    modifier = Modifier
+                                        .width(64.dp)
+                                        .aspectRatio(16f / 9f)
+                                )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = stringResource(R.string.emulation_auto_save_restore_title),
@@ -7445,6 +7454,151 @@ private fun MenuButton(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SaveSlotPreview(
+    slot: Int,
+    previewPath: String?,
+    lastModified: Long,
+    isSaving: Boolean,
+    gameTitle: String,
+    modifier: Modifier = Modifier
+) {
+    val shape = neonShape(14.dp)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+                    )
+                )
+            )
+    ) {
+        if (previewPath != null) {
+            GameCoverArt(
+                coverPath = previewPath,
+                fallbackTitle = gameTitle,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                showTitleWhileLoading = false,
+                shimmerWhileLoading = false,
+                decodeWidth = 720,
+                decodeHeight = 405
+            )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Save,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.26f),
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = Color.Black.copy(alpha = 0.58f)
+        ) {
+            Text(
+                text = stringResource(R.string.detail_slot, slot),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
+                    )
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = if (lastModified > 0L) {
+                    stringResource(
+                        R.string.emulation_save_slot_saved_at,
+                        formatSaveTimestamp(lastModified)
+                    )
+                } else {
+                    stringResource(R.string.emulation_save_slot_empty)
+                },
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White.copy(alpha = 0.94f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        if (isSaving) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(26.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SaveSlotThumbnail(
+    previewPath: String?,
+    lastModified: Long,
+    contentDescription: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(neonShape(10.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (previewPath != null) {
+            GameCoverArt(
+                coverPath = previewPath,
+                fallbackTitle = contentDescription,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                showTitleWhileLoading = false,
+                shimmerWhileLoading = false,
+                decodeWidth = 240,
+                decodeHeight = 135
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Rounded.Save,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary.copy(
+                    alpha = if (lastModified > 0L) 0.8f else 0.35f
+                ),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

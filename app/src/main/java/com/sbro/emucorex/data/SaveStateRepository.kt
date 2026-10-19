@@ -532,22 +532,41 @@ class SaveStateRepository(private val context: Context) {
         val version: Int?
     )
 
-    fun getPreviewImagePath(entry: SaveStateEntryInfo): String? {
-        val saveFile = File(entry.absolutePath)
+    fun getPreviewImagePath(entry: SaveStateEntryInfo): String? =
+        getPreviewImagePath(File(entry.absolutePath))
+
+    fun getPreviewImagePath(saveFile: File): String? {
         if (!saveFile.exists()) return null
 
         val previewDir = File(context.cacheDir, "save-previews").apply { mkdirs() }
-        val previewFile = File(previewDir, "${entry.absolutePath.sha1()}.png")
-        if (previewFile.exists() && previewFile.lastModified() >= saveFile.lastModified()) {
+        val cacheKey = saveFile.absolutePath.sha1()
+        val previewFile = File(previewDir, "$cacheKey-${saveFile.lastModified()}.png")
+        if (previewFile.isFile && previewFile.length() > 0L) {
             return previewFile.absolutePath
         }
 
         return runCatching {
             val bytes = NativeApp.getSaveStateScreenshot(saveFile.absolutePath) ?: return@runCatching null
-            FileOutputStream(previewFile).use { output ->
-                output.write(bytes)
+            val temporary = File.createTempFile(".preview-", ".tmp", previewDir)
+            try {
+                FileOutputStream(temporary).use { output ->
+                    output.write(bytes)
+                }
+                if (!temporary.renameTo(previewFile)) {
+                    temporary.copyTo(previewFile, overwrite = true)
+                }
+            } finally {
+                temporary.delete()
             }
             previewFile.setLastModified(saveFile.lastModified())
+            // Keep a single cached preview per save-state file: older revisions become
+            // unreachable as soon as the state is overwritten.
+            previewDir.listFiles { file ->
+                file.isFile && file.name.startsWith("$cacheKey-") && file != previewFile
+            }?.forEach(File::delete)
+            previewDir.listFiles { file ->
+                file.isFile && file.name == "$cacheKey.png"
+            }?.forEach(File::delete)
             previewFile.absolutePath
         }.getOrNull()
     }
