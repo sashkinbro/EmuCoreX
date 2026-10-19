@@ -53,6 +53,7 @@ import com.sbro.emucorex.core.FrameGenerationSettings
 import com.sbro.emucorex.core.FrameGenerationSetup
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import kotlinx.coroutines.launch
 import com.sbro.emucorex.ui.theme.neon.neonShape
@@ -338,6 +339,7 @@ private fun OptionChips(
                     selected = value == selected,
                     onClick = { onSelect(value) },
                     enabled = enabled,
+                    colors = premiumFilterChipColors(),
                     label = { Text(label(value)) }
                 )
             }

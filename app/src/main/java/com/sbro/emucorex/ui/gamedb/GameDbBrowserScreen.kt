@@ -75,6 +75,7 @@ import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.gamepadFocusableCard
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.tvFocusGroup
@@ -179,6 +180,7 @@ fun GameDbBrowserScreen(
                             selected = uiState.filter == filter,
                             onClick = { viewModel.setFilter(filter) },
                             interactionSource = interactionSource,
+                            colors = premiumFilterChipColors(),
                             label = { Text(filter.label()) },
                             leadingIcon = if (uiState.filter == filter) {
                                 { Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(16.dp)) }

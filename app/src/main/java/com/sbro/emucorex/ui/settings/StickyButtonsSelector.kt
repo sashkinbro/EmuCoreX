@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.sbro.emucorex.R
 import com.sbro.emucorex.core.LocalTvUiEnvironment
 import com.sbro.emucorex.ui.common.SettingHelpButton
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.tvFocusGroup
 import com.sbro.emucorex.ui.common.tvGamepadFocusableCard
 import com.sbro.emucorex.ui.theme.neon.neonChipShape

@@ -87,6 +87,7 @@ import com.sbro.emucorex.core.SnapdragonGpuProfile
 import com.sbro.emucorex.core.vendor
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.common.rememberDebouncedClick
 import com.sbro.emucorex.ui.common.skipGamepadTextFieldFocus
 import com.sbro.emucorex.ui.common.tvFocusGroup
@@ -445,6 +446,7 @@ private fun FilterChipRow(
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
                 interactionSource = interactionSource,
+                colors = premiumFilterChipColors(),
                 label = { Text(if (filter == GPU_DRIVER_FILTER_ALL) stringResource(R.string.settings_gpu_driver_filter_all) else filter) }
             )
         }
@@ -556,6 +558,7 @@ private fun ActiveDriverCard(
                     shape = neonChipShape(),
                     selected = selectedDriver == null,
                     onClick = onUseSystem,
+                    colors = premiumFilterChipColors(),
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.settings_gpu_driver_system)) }
                 )

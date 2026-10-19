@@ -82,6 +82,7 @@ import com.sbro.emucorex.data.MemoryCardRepository
 import com.sbro.emucorex.ui.common.ScreenTopBar
 import com.sbro.emucorex.ui.common.appScreenTopPadding
 import com.sbro.emucorex.ui.common.navigationBarsHorizontalPaddingValues
+import com.sbro.emucorex.ui.common.premiumFilterChipColors
 import com.sbro.emucorex.ui.theme.ScreenHorizontalPadding
 import com.sbro.emucorex.ui.theme.neon.LocalNeonTheme
 import com.sbro.emucorex.ui.theme.neon.NeonSystemBanner
@@ -565,12 +566,14 @@ private fun MemoryCardItem(
                     shape = neonChipShape(),
                     selected = assignedSlot1,
                     onClick = { onToggleSlot(1) },
+                    colors = premiumFilterChipColors(),
                     label = { Text(stringResource(R.string.memory_card_slot_1)) }
                 )
                 FilterChip(
                     shape = neonChipShape(),
                     selected = assignedSlot2,
                     onClick = { onToggleSlot(2) },
+                    colors = premiumFilterChipColors(),
                     label = { Text(stringResource(R.string.memory_card_slot_2)) }
                 )
             }
@@ -794,6 +797,7 @@ private fun MemoryCardCreateDialog(
                                         shape = neonChipShape(),
                                         selected = selectedSize == size,
                                         onClick = { selectedSize = size },
+                                        colors = premiumFilterChipColors(),
                                         label = { Text(stringResource(R.string.memory_card_size_value, size)) }
                                     )
                                 }
@@ -935,6 +939,7 @@ private fun MemoryCardNameDialog(
                                 shape = neonChipShape(),
                                 selected = selectedSize == size,
                                 onClick = { selectedSize = size },
+                                colors = premiumFilterChipColors(),
                                 label = { Text(stringResource(R.string.memory_card_size_value, size)) }
                             )
                         }
