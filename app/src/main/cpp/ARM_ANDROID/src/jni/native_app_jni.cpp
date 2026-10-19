@@ -30,6 +30,8 @@
 #include "pcsx2/R5900OpcodeTables.h"
 #endif
 
+#include "libchdr/chd.h"
+
 #include <android/log.h>
 #include <android/native_window_jni.h>
 #include <jni.h>
@@ -953,6 +955,116 @@ extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_convertI
 {
 	LogUnsupported("native ISO to CHD conversion");
 	return -1;
+}
+
+// Writes the plain ISO image stored in a CHD file. libchdr decompresses every codec the
+// emulator itself supports, so this covers zlib/lzma/huffman/flac CD and DVD images.
+// The callback (if present) receives periodic byte progress and may return true to abort.
+extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_convertChdToIso(
+	JNIEnv* env, jclass, jstring source_path, jstring target_path, jobject progress_callback)
+{
+	if (source_path == nullptr || target_path == nullptr)
+		return -1;
+
+	const std::string source = JStringToString(env, source_path);
+	const std::string target = JStringToString(env, target_path);
+	if (source.empty() || target.empty())
+		return -1;
+
+	chd_file* chd = nullptr;
+	const chd_error open_error = chd_open(source.c_str(), CHD_OPEN_READ, nullptr, &chd);
+	if (open_error != CHDERR_NONE || chd == nullptr)
+	{
+		__android_log_print(ANDROID_LOG_WARN, LOG_TAG, "convertChdToIso: chd_open failed (%s)",
+			chd_error_string(open_error));
+		return open_error == CHDERR_REQUIRES_PARENT ? -10 : -2;
+	}
+
+	const chd_header* header = chd_get_header(chd);
+	if (header == nullptr || header->hunkbytes == 0)
+	{
+		chd_close(chd);
+		return -3;
+	}
+
+	const uint32_t hunk_bytes = header->hunkbytes;
+	const uint64_t logical_bytes = header->logicalbytes;
+	const uint64_t hunk_count = (logical_bytes + hunk_bytes - 1) / hunk_bytes;
+	if (logical_bytes == 0 || hunk_count > 0xffffffffull)
+	{
+		chd_close(chd);
+		return -4;
+	}
+
+	std::FILE* output = std::fopen(target.c_str(), "wb");
+	if (output == nullptr)
+	{
+		chd_close(chd);
+		return -5;
+	}
+
+	jmethodID progress_method = nullptr;
+	if (progress_callback != nullptr)
+	{
+		jclass callback_class = env->GetObjectClass(progress_callback);
+		if (callback_class != nullptr)
+		{
+			progress_method = env->GetMethodID(callback_class, "onProgress", "(JJ)Z");
+			env->DeleteLocalRef(callback_class);
+		}
+	}
+
+	std::vector<uint8_t> hunk(hunk_bytes);
+	int result = 0;
+	uint64_t written = 0;
+	for (uint64_t index = 0; index < hunk_count; ++index)
+	{
+		if (chd_read(chd, static_cast<uint32_t>(index), hunk.data()) != CHDERR_NONE)
+		{
+			result = -6;
+			break;
+		}
+
+		const uint64_t offset = index * hunk_bytes;
+		const size_t to_write = static_cast<size_t>(std::min<uint64_t>(hunk_bytes, logical_bytes - offset));
+		if (std::fwrite(hunk.data(), 1, to_write, output) != to_write)
+		{
+			result = -7;
+			break;
+		}
+		written += to_write;
+
+		if (progress_method != nullptr && progress_callback != nullptr && (index % 64) == 0)
+		{
+			const jboolean cancelled = env->CallBooleanMethod(
+				progress_callback, progress_method, static_cast<jlong>(written), static_cast<jlong>(logical_bytes));
+			if (env->ExceptionCheck())
+			{
+				env->ExceptionClear();
+				result = -8;
+				break;
+			}
+			if (cancelled == JNI_TRUE)
+			{
+				result = -9;
+				break;
+			}
+		}
+	}
+
+	if (result == 0 && progress_method != nullptr && progress_callback != nullptr)
+	{
+		env->CallBooleanMethod(progress_callback, progress_method,
+			static_cast<jlong>(logical_bytes), static_cast<jlong>(logical_bytes));
+		if (env->ExceptionCheck())
+			env->ExceptionClear();
+	}
+
+	std::fclose(output);
+	chd_close(chd);
+	if (result != 0)
+		std::remove(target.c_str());
+	return result;
 }
 
 // Debug tooling entry points. JitProfiler and HangTrace only exist in debug

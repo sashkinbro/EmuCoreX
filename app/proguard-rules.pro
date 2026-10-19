@@ -57,6 +57,9 @@
     public static int openContentUri(java.lang.String);
 }
 
+# Native image conversion reports progress and accepts cancellation through this callback.
+-keep,includedescriptorclasses class com.sbro.emucorex.core.ConversionProgressCallback { *; }
+
 -keepclassmembers,includedescriptorclasses class com.sbro.emucorex.core.utils.RetroAchievementsBridge {
     public static void notifyLoginRequested(int);
     public static void notifyLoginSuccess(java.lang.String, int, int, int);

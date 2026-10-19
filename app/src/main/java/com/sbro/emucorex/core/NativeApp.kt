@@ -398,6 +398,12 @@ object NativeApp {
     @JvmStatic external fun listMemoryCards(): String?
     @JvmStatic external fun createMemoryCard(name: String, type: Int, fileType: Int): Boolean
     @JvmStatic external fun convertIsoToChd(inputIsoPath: String): Int
+
+    @JvmStatic external fun convertChdToIso(
+        sourceChdPath: String,
+        targetIsoPath: String,
+        progress: ConversionProgressCallback?
+    ): Int
     @JvmStatic external fun setNativeCrashLogFilePath(path: String)
 
     @JvmStatic

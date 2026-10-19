@@ -347,6 +347,7 @@ target_include_directories(emucore
 		"${PCSX2_UPSTREAM_DIR}/pcsx2"
 		"${PCSX2_UPSTREAM_DIR}/common/include"
 		"${PCSX2_UPSTREAM_DIR}/3rdparty/fmt/include"
+		"${PCSX2_UPSTREAM_DIR}/3rdparty/libchdr/include"
 		"${EMUCOREX_PCSX2_THIRD_PARTY_DIR}/SDL3/include"
 )
 if(EMUCOREX_HAS_OAKNUT)
