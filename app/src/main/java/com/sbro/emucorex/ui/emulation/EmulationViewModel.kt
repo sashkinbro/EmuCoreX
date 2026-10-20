@@ -5055,7 +5055,14 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun setSlot(slot: Int) {
-        _uiState.value = _uiState.value.copy(currentSlot = normalizeManualSaveSlot(slot))
+        val state = _uiState.value
+        val normalized = normalizeManualSaveSlot(slot)
+        _uiState.value = if (normalized != state.currentSlot) {
+            // Do not show the previous slot's availability while its replacement loads.
+            state.copy(currentSlot = normalized, currentSlotLastModified = 0L, currentSlotPreviewPath = null)
+        } else {
+            state
+        }
         refreshSaveStateMetadata()
     }
 
@@ -5093,45 +5100,64 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    private data class SaveStatePreviewMetadata(
+        val currentFile: File?,
+        val currentModified: Long,
+        val autoFile: File?,
+        val autoModified: Long
+    )
+
     private fun refreshSaveStateMetadata() {
-        val path = currentGamePath
-        if (path.isNullOrBlank()) {
+        // Serialize refresh ownership on Main, including calls from save/load workers.
+        viewModelScope.launch(Dispatchers.Main.immediate) {
             savePreviewJob?.cancel()
-            _uiState.value = _uiState.value.copy(
-                currentSlotLastModified = 0L,
-                currentSlotPreviewPath = null,
-                autoSaveLastModified = 0L,
-                autoSavePreviewPath = null
-            )
-            return
-        }
-
-        val currentSlotFile = resolveSaveStateFile(path, _uiState.value.currentSlot)
-            ?.takeIf { it.exists() }
-        val autoSaveFile = resolveSaveStateFile(path, AUTO_SAVE_SLOT)
-            ?.takeIf { it.exists() }
-        _uiState.value = _uiState.value.copy(
-            currentSlotLastModified = currentSlotFile?.lastModified() ?: 0L,
-            autoSaveLastModified = autoSaveFile?.lastModified() ?: 0L
-        )
-        refreshSaveStatePreviews(currentSlotFile, autoSaveFile)
-    }
-
-    private fun refreshSaveStatePreviews(currentSlotFile: File?, autoSaveFile: File?) {
-        savePreviewJob?.cancel()
-        savePreviewJob = viewModelScope.launch(Dispatchers.IO) {
-            val currentPreview = currentSlotFile?.let { file ->
-                runCatching { saveStateRepository.getPreviewImagePath(file) }.getOrNull()
+            val path = currentGamePath
+            val slot = _uiState.value.currentSlot
+            val serial = currentGameSerial
+            val crc = currentGameCrc
+            fun isCurrentScope() = currentGamePath == path && _uiState.value.currentSlot == slot &&
+                currentGameSerial == serial && currentGameCrc == crc
+            if (path.isNullOrBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    currentSlotLastModified = 0L,
+                    currentSlotPreviewPath = null,
+                    autoSaveLastModified = 0L,
+                    autoSavePreviewPath = null
+                )
+                return@launch
             }
-            ensureActive()
-            val autoSavePreview = autoSaveFile?.let { file ->
-                runCatching { saveStateRepository.getPreviewImagePath(file) }.getOrNull()
+
+            savePreviewJob = viewModelScope.launch preview@{
+                val metadata = withContext(Dispatchers.IO) {
+                    val currentFile = resolveSaveStateFile(path, slot)?.takeIf { it.exists() }
+                    val autoFile = resolveSaveStateFile(path, AUTO_SAVE_SLOT)?.takeIf { it.exists() }
+                    SaveStatePreviewMetadata(
+                        currentFile, currentFile?.lastModified() ?: 0L,
+                        autoFile, autoFile?.lastModified() ?: 0L
+                    )
+                }
+                if (!isCurrentScope()) return@preview
+                _uiState.value = _uiState.value.copy(
+                    currentSlotLastModified = metadata.currentModified,
+                    autoSaveLastModified = metadata.autoModified
+                )
+                val previews = withContext(Dispatchers.IO) {
+                    val currentPreview = metadata.currentFile?.let { file ->
+                        runCatching { saveStateRepository.getPreviewImagePath(file) }.getOrNull()
+                    }
+                    ensureActive()
+                    val autoPreview = metadata.autoFile?.let { file ->
+                        runCatching { saveStateRepository.getPreviewImagePath(file) }.getOrNull()
+                    }
+                    currentPreview to autoPreview
+                }
+                // Cancellation and scope checks keep an old game/slot from publishing late.
+                if (!isCurrentScope()) return@preview
+                _uiState.value = _uiState.value.copy(
+                    currentSlotPreviewPath = previews.first,
+                    autoSavePreviewPath = previews.second
+                )
             }
-            ensureActive()
-            _uiState.value = _uiState.value.copy(
-                currentSlotPreviewPath = currentPreview,
-                autoSavePreviewPath = autoSavePreview
-            )
         }
     }
 
