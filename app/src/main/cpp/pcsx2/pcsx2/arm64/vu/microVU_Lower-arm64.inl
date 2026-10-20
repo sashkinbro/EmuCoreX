@@ -418,9 +418,9 @@ static __fi void mVU_EFUvuDoubleSS_oaknut(int reg)
 	oakAsm->l(done);
 }
 
-static __fi void mVU_EFUvuDoublePS_oaknut(int reg, int t1, int t2)
+static __fi void mVU_EFUvuDoublePS_oaknut(int reg, int t1)
 {
-	mVUClampVuDoubleVectorBits_oaknut(reg, t1, t2, CHECK_VU_OVERFLOW(1));
+	mVUClampVuDoubleVectorBits_oaknut(reg, t1, CHECK_VU_OVERFLOW(1));
 }
 
 static __fi void mVU_EFUreciprocalOrZero_oaknut(mV, int PQ, int one, int t1)
@@ -633,7 +633,7 @@ static void mVU_EATANxy_direct_emit_oaknut(mP)
 	const int t3 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	mVU_EFUvuDoublePS_oaknut(t1, Fs, t2);
+	mVU_EFUvuDoublePS_oaknut(t1, Fs);
 	mVU_pshufd_oaknut(Fs, t1, 0x01);
 	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_subScalar_oaknut(mVU, Fs, t1);
@@ -678,7 +678,7 @@ static void mVU_EATANxz_direct_emit_oaknut(mP)
 	const int t3 = mVU.regAlloc->allocRegId();
 	const int P = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	mVU_EFUvuDoublePS_oaknut(t1, Fs, t2);
+	mVU_EFUvuDoublePS_oaknut(t1, Fs);
 	mVU_pshufd_oaknut(Fs, t1, 0x02);
 	oakAsm->MOV(oakQRegister(P).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_subScalar_oaknut(mVU, Fs, t1);
@@ -795,9 +795,8 @@ static void mVU_ELENG_direct_emit_oaknut(mP)
 {
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, 0, _X_Y_Z_W);
 	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	mVU_EFUvuDoublePS_oaknut(Fs, t1, t2);
+	mVU_EFUvuDoublePS_oaknut(Fs, t1);
 	oakAsm->MOV(oakQRegister(t1).Selem()[0], oakQRegister(Fs).Selem()[1]);
 	oakAsm->FMUL(oakSRegister(t1), oakSRegister(t1), oakSRegister(t1));
 	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[0]);
@@ -811,7 +810,6 @@ static void mVU_ELENG_direct_emit_oaknut(mP)
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
 static void mVU_ELENG_emit(mP)
@@ -877,7 +875,7 @@ static void mVU_ERLENG_direct_emit_oaknut(mP)
 	// Keep the interpreter's x*x + y*y + z*z evaluation order. This matters
 	// under round-to-zero even when both additions are emitted as FMADDs.
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(FsRaw).B16());
-	mVU_EFUvuDoublePS_oaknut(Fs, len, t1);
+	mVU_EFUvuDoublePS_oaknut(Fs, len);
 	oakAsm->MOV(oakQRegister(len).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	oakAsm->FMUL(oakSRegister(len), oakSRegister(len), oakSRegister(len));
 	oakAsm->MOV(OAK_QSCRATCH.Selem()[0], oakQRegister(Fs).Selem()[1]);
@@ -1130,7 +1128,7 @@ static void mVU_ESUM_direct_emit_oaknut(mP)
 	const int t1 = mVU.regAlloc->allocRegId();
 	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	mVU_EFUvuDoublePS_oaknut(Fs, t1, t2);
+	mVU_EFUvuDoublePS_oaknut(Fs, t1);
 	oakAsm->MOV(oakQRegister(t2).Selem()[0], oakQRegister(Fs).Selem()[0]);
 	mVU_pshufd_oaknut(t1, Fs, 0x01);
 	oakAsm->FADD(oakSRegister(t2), oakSRegister(t2), oakSRegister(t1));

@@ -268,7 +268,7 @@ static __fi void mVULoadClampLimits_oaknut(const oak::QReg& min_dst, const oak::
 		oak::SOffset<11, 4>(static_cast<s64>(offsetof(mVU_Globals, minvals))));
 }
 
-static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg, int /*mask_reg*/,
+static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg,
 	bool clamp_overflow, bool bounds_ready = false)
 {
 	const oak::QReg reg_q = oakQRegister(reg);
@@ -378,7 +378,7 @@ extern "C" u32 EmuCoreXOracleEmitVectorClamp(bool overflow, bool reference)
 	if (reference)
 		mVUClampVuDoubleVectorReference_oaknut(1, 2, 3, overflow, true);
 	else
-		mVUClampVuDoubleVectorBits_oaknut(1, 2, 3, overflow, true);
+		mVUClampVuDoubleVectorBits_oaknut(1, 2, overflow, true);
 	recEndOaknutEmit();
 	return static_cast<u32>(oakGetCurrentCodePointer() - start);
 }

@@ -222,9 +222,9 @@ static __fi void mVUUpperPrepareVuDoubleBounds_oaknut(mV)
 		mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
 }
 
-static __fi void mVUUpperVuDoubleVector_oaknut(mV, int reg, int t1, int t2, bool bounds_ready = false)
+static __fi void mVUUpperVuDoubleVector_oaknut(mV, int reg, int t1, bool bounds_ready = false)
 {
-	mVUClampVuDoubleVectorBits_oaknut(reg, t1, t2, CHECK_VU_OVERFLOW(mVU.index), bounds_ready);
+	mVUClampVuDoubleVectorBits_oaknut(reg, t1, CHECK_VU_OVERFLOW(mVU.index), bounds_ready);
 }
 
 static __fi void mVUUpperMulPsLane_oaknut(int to, int from, int lane)
@@ -632,12 +632,10 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 		(isVU0 && isCOP2 && _X_Y_Z_W == 0xe);
 	int FtDouble = Ft;
 	int t1 = VU_HOST_NO_XMM;
-	int t2 = VU_HOST_NO_XMM;
 	if (needsOperandClamp)
 	{
 		FtDouble = mVU.regAlloc->allocRegId();
 		t1 = mVU.regAlloc->allocRegId();
-		t2 = mVU.regAlloc->allocRegId();
 	}
 
 	recBeginOaknutEmit();
@@ -645,8 +643,8 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 	{
 		oakAsm->MOV(oakQRegister(FtDouble).B16(), oakQRegister(Ft).B16());
 		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FtDouble, t1, t2, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, FtDouble, t1, true);
 	}
 	if (_XYZW_SS)
 		mVUUpperAddSs_oaknut(mVU, Fs, FtDouble);
@@ -659,7 +657,6 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	if (needsOperandClamp)
 	{
-		mVU.regAlloc->clearNeededXmmId(t2);
 		mVU.regAlloc->clearNeededXmmId(t1);
 		mVU.regAlloc->clearNeededXmmId(FtDouble);
 	}
@@ -1335,20 +1332,19 @@ static void mVU_MADD_cop2_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(Ft).B16(), oakQRegister(FtRaw).B16());
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
 	mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-	mVUUpperVuDoubleVector_oaknut(mVU, Ft, t1, t2, true);
-	mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
+	mVUUpperVuDoubleVector_oaknut(mVU, Ft, t1, true);
+	mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
 	oakAsm->MOV(oakQRegister(Fs).B16(), oakQRegister(ACC).B16());
 	if (_XYZW_SS2)
 		mVUUpperPshufd_oaknut(Fs, Fs, shuffleSS(_X_Y_Z_W));
 	// The SS2 shuffle above may clobber Q29 (negative bound); without it the values
 	// loaded by PrepareVuDoubleBounds are still live and must not be rebuilt.
-	mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, !_XYZW_SS2);
+	mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, !_XYZW_SS2);
 	if (_XYZW_SS)
 	{
 		oakAsm->FMUL(OAK_SSCRATCH, oakSRegister(tempFs), oakQRegister(Ft).Selem()[0]);
@@ -1364,7 +1360,6 @@ static void mVU_MADD_cop2_emit_oaknut(mP)
 	mVU.regAlloc->clearNeededXmmId(tempFs);
 	mVUupdateFlags_oaknut(mVU, Fs, Ft);
 
-	mVU.regAlloc->clearNeededXmmId(t2);
 	mVU.regAlloc->clearNeededXmmId(t1);
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Ft);
@@ -1397,7 +1392,6 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = needsVu0Exact ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
-	const int t2 = needsVu0Exact ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
@@ -1407,9 +1401,9 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 	if (needsVu0Exact)
 	{
 		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fi, t1, t2, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, Fi, t1, true);
 	}
 	if (_XYZW_SS)
 		mVUUpperFmlaSs_oaknut(mVU, Fs, tempFs, Fi);
@@ -1423,7 +1417,6 @@ static void mVU_MADDi_direct_emit_oaknut(mP)
 
 	if (needsVu0Exact)
 	{
-		mVU.regAlloc->clearNeededXmmId(t2);
 		mVU.regAlloc->clearNeededXmmId(t1);
 	}
 	mVU.regAlloc->clearNeededXmmId(Fs);
@@ -1532,7 +1525,6 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	const int tempFs = mVU.regAlloc->allocRegId();
 	const int t1 = needsVu1MaddLaneVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
-	const int t2 = needsVu1MaddLaneVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
@@ -1542,8 +1534,8 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	if (needsVu1MaddLaneVuDouble)
 	{
 		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, t2, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, Fs, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, tempFs, t1, true);
 	}
 	if (_XYZW_SS)
 	{
@@ -1569,7 +1561,6 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 
 	if (needsVu1MaddLaneVuDouble)
 	{
-		mVU.regAlloc->clearNeededXmmId(t2);
 		mVU.regAlloc->clearNeededXmmId(t1);
 	}
 	mVU.regAlloc->clearNeededXmmId(tempFs);
@@ -1644,7 +1635,6 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 	const int FsWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : Fs;
 	const int FtWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 	const int t1 = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
-	const int t2 = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	if (needsVu1XyzwVuDouble)
@@ -1652,9 +1642,9 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 		oakAsm->MOV(oakQRegister(FsWork).B16(), oakQRegister(Fs).B16());
 		oakAsm->MOV(oakQRegister(FtWork).B16(), oakQRegister(Ft).B16());
 		mVUUpperPrepareVuDoubleBounds_oaknut(mVU);
-		mVUUpperVuDoubleVector_oaknut(mVU, Fd, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FsWork, t1, t2, true);
-		mVUUpperVuDoubleVector_oaknut(mVU, FtWork, t1, t2, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, Fd, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, FsWork, t1, true);
+		mVUUpperVuDoubleVector_oaknut(mVU, FtWork, t1, true);
 	}
 	if (isCOP2)
 	{
@@ -1682,7 +1672,6 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 
 	if (needsVu1XyzwVuDouble)
 	{
-		mVU.regAlloc->clearNeededXmmId(t2);
 		mVU.regAlloc->clearNeededXmmId(t1);
 		mVU.regAlloc->clearNeededXmmId(FtWork);
 		mVU.regAlloc->clearNeededXmmId(FsWork);
@@ -4296,26 +4285,16 @@ static bool mVUTrySharedFTOI(mV, u32 fractional_bits)
 	return true;
 }
 
-static void mVU_FTOI_saturate_oaknut(int Fs, int t1, int t2)
+static void mVU_FTOI_saturate_oaknut(int Fs)
 {
 	const oak::QReg fs_q = oakQRegister(Fs);
-	const oak::QReg t1_q = oakQRegister(t1);
-	const oak::QReg t2_q = oakQRegister(t2);
-
-	oakAsm->MOV(t1_q.B16(), fs_q.B16());
-	oakAsm->MOV(t2_q.B16(), fs_q.B16());
-	mVUEmitAbsclipVector_oaknut(OAK_QSCRATCH3);
-	oakAsm->AND(t1_q.B16(), t1_q.B16(), OAK_QSCRATCH3.B16());
-	mVUEmitI32MaxFVector_oaknut(OAK_QSCRATCH3);
-	oakAsm->CMGT(t1_q.S4(), t1_q.S4(), OAK_QSCRATCH3.S4());
-	oakAsm->MOVI(OAK_QSCRATCH.B16(), 0);
-	oakAsm->CMGT(t2_q.S4(), OAK_QSCRATCH.S4(), t2_q.S4());
-	mVUEmitAbsclipVector_oaknut(OAK_QSCRATCH);
-	mVUEmitSignbitVector_oaknut(OAK_QSCRATCH2);
-	oakAsm->BSL(t2_q.B16(), OAK_QSCRATCH2.B16(), OAK_QSCRATCH.B16());
+	// FCVTZS already saturates every finite overflow and infinity. Cap NaN
+	// bit patterns to signed finite maxima first so their original sign also
+	// selects INT_MIN/INT_MAX, rather than ARM's NaN-to-zero conversion.
+	mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
+	oakAsm->SMIN(fs_q.S4(), fs_q.S4(), OAK_QSCRATCH2.S4());
+	oakAsm->UMIN(fs_q.S4(), fs_q.S4(), OAK_QSCRATCH3.S4());
 	oakAsm->FCVTZS(fs_q.S4(), fs_q.S4());
-	oakAsm->BSL(t1_q.B16(), t2_q.B16(), fs_q.B16());
-	oakAsm->MOV(fs_q.B16(), t1_q.B16());
 }
 
 static void mVU_FTOI0_direct_emit_oaknut(mP)
@@ -4323,14 +4302,10 @@ static void mVU_FTOI0_direct_emit_oaknut(mP)
 	if (!_Ft_ || mVUtrySkipNoLaneWrite_oaknut(mVU))
 		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
-	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
-	mVU_FTOI_saturate_oaknut(Fs, t1, t2);
+	mVU_FTOI_saturate_oaknut(Fs);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
-	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
 static void mVU_FTOI0_emit(mP)
@@ -4354,16 +4329,12 @@ static void mVU_FTOI4_direct_emit_oaknut(mP)
 	if (!_Ft_ || mVUtrySkipNoLaneWrite_oaknut(mVU))
 		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
-	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	oakLoad128(OAK_QSCRATCH3, mVUUpperOakGlobMem(offsetof(mVU_Globals, FTOI_4)));
 	oakAsm->FMUL(oakQRegister(Fs).S4(), oakQRegister(Fs).S4(), OAK_QSCRATCH3.S4());
-	mVU_FTOI_saturate_oaknut(Fs, t1, t2);
+	mVU_FTOI_saturate_oaknut(Fs);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
-	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
 static void mVU_FTOI4_emit(mP)
@@ -4387,16 +4358,12 @@ static void mVU_FTOI12_direct_emit_oaknut(mP)
 	if (!_Ft_ || mVUtrySkipNoLaneWrite_oaknut(mVU))
 		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
-	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	oakLoad128(OAK_QSCRATCH3, mVUUpperOakGlobMem(offsetof(mVU_Globals, FTOI_12)));
 	oakAsm->FMUL(oakQRegister(Fs).S4(), oakQRegister(Fs).S4(), OAK_QSCRATCH3.S4());
-	mVU_FTOI_saturate_oaknut(Fs, t1, t2);
+	mVU_FTOI_saturate_oaknut(Fs);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
-	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
 static void mVU_FTOI12_emit(mP)
@@ -4420,16 +4387,12 @@ static void mVU_FTOI15_direct_emit_oaknut(mP)
 	if (!_Ft_ || mVUtrySkipNoLaneWrite_oaknut(mVU))
 		return;
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Ft_, _X_Y_Z_W, !((_Fs_ == _Ft_) && (_X_Y_Z_W == 0xf)));
-	const int t1 = mVU.regAlloc->allocRegId();
-	const int t2 = mVU.regAlloc->allocRegId();
 	recBeginOaknutEmit();
 	oakLoad128(OAK_QSCRATCH3, mVUUpperOakGlobMem(offsetof(mVU_Globals, FTOI_15)));
 	oakAsm->FMUL(oakQRegister(Fs).S4(), oakQRegister(Fs).S4(), OAK_QSCRATCH3.S4());
-	mVU_FTOI_saturate_oaknut(Fs, t1, t2);
+	mVU_FTOI_saturate_oaknut(Fs);
 	recEndOaknutEmit();
 	mVU.regAlloc->clearNeededXmmId(Fs);
-	mVU.regAlloc->clearNeededXmmId(t1);
-	mVU.regAlloc->clearNeededXmmId(t2);
 }
 
 static void mVU_FTOI15_emit(mP)
