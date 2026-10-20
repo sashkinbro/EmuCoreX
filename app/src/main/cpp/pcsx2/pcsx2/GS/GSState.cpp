@@ -1630,19 +1630,34 @@ void GSState::GIFRegHandlerSCISSOR(const GIFReg* RESTRICT r)
 	UpdateScissor();
 }
 
+// A/B/C/D are two-bit selectors. Hardware treats 3 as 2; clear each low
+// selector bit when its high bit is set, preserving FIX and reserved bits.
+static __fi u64 GSNormalizeAlphaSelectors(u64 value)
+{
+	return value & ~((value >> 1) & 0x55ull);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" __noinline u64 EmuCoreXOracleNormalizeGSAlpha(u64 value, bool reference)
+{
+	if (!reference)
+		return GSNormalizeAlphaSelectors(value);
+	GIFRegALPHA alpha;
+	alpha.U64 = value;
+	alpha.A = std::clamp<u32>(alpha.A, 0, 2);
+	alpha.B = std::clamp<u32>(alpha.B, 0, 2);
+	alpha.C = std::clamp<u32>(alpha.C, 0, 2);
+	alpha.D = std::clamp<u32>(alpha.D, 0, 2);
+	return alpha.U64;
+}
+#endif
+
 template <int i>
 void GSState::GIFRegHandlerALPHA(const GIFReg* RESTRICT r)
 {
 	GL_REG("ALPHA = 0x%x_%x", r->U32[1], r->U32[0]);
 
-	m_env.CTXT[i].ALPHA = r->ALPHA;
-
-	// value of 3 is not allowed by the spec
-	// acts like 2 on real hw, so just clamp it
-	m_env.CTXT[i].ALPHA.A = std::clamp<u32>(r->ALPHA.A, 0, 2);
-	m_env.CTXT[i].ALPHA.B = std::clamp<u32>(r->ALPHA.B, 0, 2);
-	m_env.CTXT[i].ALPHA.C = std::clamp<u32>(r->ALPHA.C, 0, 2);
-	m_env.CTXT[i].ALPHA.D = std::clamp<u32>(r->ALPHA.D, 0, 2);
+	m_env.CTXT[i].ALPHA.U64 = GSNormalizeAlphaSelectors(r->ALPHA.U64);
 
 	if (i == m_prev_env.PRIM.CTXT)
 	{
