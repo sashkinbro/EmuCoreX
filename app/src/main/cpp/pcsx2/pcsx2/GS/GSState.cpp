@@ -1071,10 +1071,12 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u3
 		m_v.m[0] = GSPackSTQRGBA(r); // TODO: only store the last one
 
 #if defined(ARCH_ARM64)
-		m_v.XYZ.X = r[2].XYZF2.X;
-		m_v.XYZ.Y = r[2].XYZF2.Y;
-		m_v.XYZ.Z = r[2].XYZF2.Z;
-		m_v.FOG = r[2].XYZF2.F;
+		// A single complete XYZ/UV/FOG store avoids forwarding several narrow
+		// stores into the full vertex loads in VertexKick. UV is retained.
+		const uint8x16_t raw = vld1q_u8(reinterpret_cast<const u8*>(&r[2]));
+		const uint8x16x2_t table = {{raw, vreinterpretq_u8_u32(vshrq_n_u32(vreinterpretq_u32_u8(raw), 4))}};
+		const uint8x16_t indices = {0, 1, 4, 5, 24, 25, 26, 255, 255, 255, 255, 255, 28, 255, 255, 255};
+		m_v.m[1] = vreinterpretq_s32_u32(vsetq_lane_u32(m_v.UV, vreinterpretq_u32_u8(vqtbl2q_u8(table, indices)), 2));
 #else
 		GSVector4i xy = GSVector4i::loadl(&r[2].U64[0]);
 		GSVector4i zf = GSVector4i::loadl(&r[2].U64[1]);
@@ -5221,7 +5223,7 @@ __forceinline void GSState::VertexKick(u32 skip)
 	// The 2.8 rectangle culler expects all four lanes in GS fixed-point units:
 	// <X, Y, X, Y>. Mixing pixel coordinates into Z/W shrinks the upper bounds
 	// by 16 and incorrectly rejects almost every primitive. (AI-assisted)
-	const GSVector4i xy = GetVertexXY(m_v).sub32(m_xyof);
+	const GSVector4i xy = new_v1.upl16().xyxy().sub32(m_xyof);
 	m_vertex.xy[xy_tail & 3] = xy;
 
 	// Backup head for triangle fans so we can read it later, otherwise it'll get lost after the 4th vertex.
