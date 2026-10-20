@@ -2212,6 +2212,7 @@ void VUSharedTransferBenchmarks()
 #include "jit_oracle_ee_vu_sync.inl"
 #include "jit_oracle_ee_irq_events.inl"
 #include "jit_oracle_vu_operand_clamp.inl"
+#include "jit_oracle_vu_maxmin_select.inl"
 #include "jit_oracle_vu_scalar_clamp.inl"
 
 void VUTests(bool itof_codegen_only = false, bool ftoi_only = false, bool maxmin_only = false,

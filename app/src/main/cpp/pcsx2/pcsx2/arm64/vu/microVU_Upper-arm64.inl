@@ -375,89 +375,63 @@ static __fi void mVUUpperShufPsImm0_oaknut(int dest, int src)
 	oakAsm->MOV(dest_q.Selem()[3], OAK_QSCRATCH2.Selem()[0]);
 }
 
-static __fi void mVUUpperMaxScalar_oaknut(int dest, int src, [[maybe_unused]] int temp)
+static __fi void mVUUpperMaxMinSelect_oaknut(const oak::QReg& dest, const oak::QReg& src,
+	const oak::QReg& mask, const oak::QReg& negative, bool maximum)
 {
-	const oak::QReg dest_q = oakQRegister(dest);
-	const oak::QReg src_q = oakQRegister(src);
-	oakAsm->MOV(OAK_QSCRATCH.B16(), dest_q.B16());
-	oakAsm->SSHR(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), 31);
-	oakAsm->USHR(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), 1);
-	oakAsm->EOR(OAK_QSCRATCH.B16(), OAK_QSCRATCH.B16(), dest_q.B16());
-
-	oakAsm->MOV(OAK_QSCRATCH2.B16(), src_q.B16());
-	oakAsm->SSHR(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), 31);
-	oakAsm->USHR(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), 1);
-	oakAsm->EOR(OAK_QSCRATCH2.B16(), OAK_QSCRATCH2.B16(), src_q.B16());
-
-	oakAsm->CMGT(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), OAK_QSCRATCH2.S4());
-	oakAsm->AND(dest_q.B16(), dest_q.B16(), OAK_QSCRATCH.B16());
-	oakAsm->BIC(OAK_QSCRATCH.B16(), src_q.B16(), OAK_QSCRATCH.B16());
-	oakAsm->ORR(dest_q.B16(), dest_q.B16(), OAK_QSCRATCH.B16());
+	// Signed raw-bit comparison has the required order except when both values
+	// are negative. Invert that predicate in those lanes, then select the
+	// original bits. Equal negative inputs may choose either identical operand.
+	// Integer-only selection preserves signed zeros, denormals and NaN payloads.
+	oakAsm->AND(negative.B16(), dest.B16(), src.B16());
+	oakAsm->SSHR(negative.S4(), negative.S4(), 31);
+	if (maximum)
+		oakAsm->CMGT(mask.S4(), dest.S4(), src.S4());
+	else
+		oakAsm->CMGT(mask.S4(), src.S4(), dest.S4());
+	oakAsm->EOR(mask.B16(), mask.B16(), negative.B16());
+	oakAsm->BIF(dest.B16(), src.B16(), mask.B16());
 }
 
-static __fi void mVUUpperMaxVector_oaknut(int dest, int src, int temp1, int temp2)
+static __fi void mVUUpperMaxScalar_oaknut(int dest, int src)
 {
-	const oak::QReg dest_q = oakQRegister(dest);
-	const oak::QReg src_q = oakQRegister(src);
-	const oak::QReg temp1_q = oakQRegister(temp1);
-	const oak::QReg temp2_q = oakQRegister(temp2);
-	oakAsm->MOV(temp1_q.B16(), dest_q.B16());
-	oakAsm->SSHR(temp1_q.S4(), temp1_q.S4(), 31);
-	oakAsm->USHR(temp1_q.S4(), temp1_q.S4(), 1);
-	oakAsm->EOR(temp1_q.B16(), temp1_q.B16(), dest_q.B16());
-
-	oakAsm->MOV(temp2_q.B16(), src_q.B16());
-	oakAsm->SSHR(temp2_q.S4(), temp2_q.S4(), 31);
-	oakAsm->USHR(temp2_q.S4(), temp2_q.S4(), 1);
-	oakAsm->EOR(temp2_q.B16(), temp2_q.B16(), src_q.B16());
-
-	oakAsm->CMGT(temp1_q.S4(), temp1_q.S4(), temp2_q.S4());
-	oakAsm->AND(dest_q.B16(), dest_q.B16(), temp1_q.B16());
-	oakAsm->BIC(temp1_q.B16(), src_q.B16(), temp1_q.B16());
-	oakAsm->ORR(dest_q.B16(), dest_q.B16(), temp1_q.B16());
+	mVUUpperMaxMinSelect_oaknut(oakQRegister(dest), oakQRegister(src), OAK_QSCRATCH, OAK_QSCRATCH2, true);
 }
 
-static __fi void mVUUpperMiniScalar_oaknut(int dest, int src, [[maybe_unused]] int temp)
+static __fi void mVUUpperMaxVector_oaknut(int dest, int src)
 {
-	const oak::QReg dest_q = oakQRegister(dest);
-	const oak::QReg src_q = oakQRegister(src);
-	oakAsm->MOV(OAK_QSCRATCH.B16(), dest_q.B16());
-	oakAsm->SSHR(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), 31);
-	oakAsm->USHR(OAK_QSCRATCH.S4(), OAK_QSCRATCH.S4(), 1);
-	oakAsm->EOR(OAK_QSCRATCH.B16(), OAK_QSCRATCH.B16(), dest_q.B16());
-
-	oakAsm->MOV(OAK_QSCRATCH2.B16(), src_q.B16());
-	oakAsm->SSHR(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), 31);
-	oakAsm->USHR(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), 1);
-	oakAsm->EOR(OAK_QSCRATCH2.B16(), OAK_QSCRATCH2.B16(), src_q.B16());
-
-	oakAsm->CMGT(OAK_QSCRATCH2.S4(), OAK_QSCRATCH2.S4(), OAK_QSCRATCH.S4());
-	oakAsm->AND(dest_q.B16(), dest_q.B16(), OAK_QSCRATCH2.B16());
-	oakAsm->BIC(OAK_QSCRATCH2.B16(), src_q.B16(), OAK_QSCRATCH2.B16());
-	oakAsm->ORR(dest_q.B16(), dest_q.B16(), OAK_QSCRATCH2.B16());
+	mVUUpperMaxMinSelect_oaknut(oakQRegister(dest), oakQRegister(src), OAK_QSCRATCH, OAK_QSCRATCH2, true);
 }
 
-static __fi void mVUUpperMiniVector_oaknut(int dest, int src, int temp1, int temp2)
+static __fi void mVUUpperMiniScalar_oaknut(int dest, int src)
 {
-	const oak::QReg dest_q = oakQRegister(dest);
-	const oak::QReg src_q = oakQRegister(src);
-	const oak::QReg temp1_q = oakQRegister(temp1);
-	const oak::QReg temp2_q = oakQRegister(temp2);
-	oakAsm->MOV(temp1_q.B16(), dest_q.B16());
-	oakAsm->SSHR(temp1_q.S4(), temp1_q.S4(), 31);
-	oakAsm->USHR(temp1_q.S4(), temp1_q.S4(), 1);
-	oakAsm->EOR(temp1_q.B16(), temp1_q.B16(), dest_q.B16());
-
-	oakAsm->MOV(temp2_q.B16(), src_q.B16());
-	oakAsm->SSHR(temp2_q.S4(), temp2_q.S4(), 31);
-	oakAsm->USHR(temp2_q.S4(), temp2_q.S4(), 1);
-	oakAsm->EOR(temp2_q.B16(), temp2_q.B16(), src_q.B16());
-
-	oakAsm->CMGT(temp2_q.S4(), temp2_q.S4(), temp1_q.S4());
-	oakAsm->AND(dest_q.B16(), dest_q.B16(), temp2_q.B16());
-	oakAsm->BIC(temp2_q.B16(), src_q.B16(), temp2_q.B16());
-	oakAsm->ORR(dest_q.B16(), dest_q.B16(), temp2_q.B16());
+	mVUUpperMaxMinSelect_oaknut(oakQRegister(dest), oakQRegister(src), OAK_QSCRATCH, OAK_QSCRATCH2, false);
 }
+
+static __fi void mVUUpperMiniVector_oaknut(int dest, int src)
+{
+	mVUUpperMaxMinSelect_oaknut(oakQRegister(dest), oakQRegister(src), OAK_QSCRATCH, OAK_QSCRATCH2, false);
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitMaxMinSelect(bool maximum, bool scalar, bool alias)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	const int src = alias ? 0 : 1;
+	if (maximum)
+	{
+		if (scalar) mVUUpperMaxScalar_oaknut(0, src);
+		else mVUUpperMaxVector_oaknut(0, src);
+	}
+	else
+	{
+		if (scalar) mVUUpperMiniScalar_oaknut(0, src);
+		else mVUUpperMiniVector_oaknut(0, src);
+	}
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
 
 static __fi void mVUUpperGetQreg_oaknut(int dest, int qInstance)
 {
@@ -2299,24 +2273,12 @@ static void mVU_MAX_direct_emit_oaknut(mP)
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxScalar_oaknut(Fs, Ft, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMaxScalar_oaknut(Fs, Ft);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxVector_oaknut(Fs, Ft, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMaxVector_oaknut(Fs, Ft);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Ft);
@@ -2351,24 +2313,12 @@ static void mVU_MAXi_direct_emit_oaknut(mP)
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxScalar_oaknut(Fs, Fi, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMaxScalar_oaknut(Fs, Fi);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxVector_oaknut(Fs, Fi, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMaxVector_oaknut(Fs, Fi);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Fi);
@@ -2404,24 +2354,12 @@ static void mVU_MAX_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane)
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxScalar_oaknut(Fs, FtL, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMaxScalar_oaknut(Fs, FtL);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMaxVector_oaknut(Fs, FtL, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMaxVector_oaknut(Fs, FtL);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(FtL);
@@ -2485,24 +2423,12 @@ static void mVU_MINI_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniScalar_oaknut(Fs, FtL, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMiniScalar_oaknut(Fs, FtL);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniVector_oaknut(Fs, FtL, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMiniVector_oaknut(Fs, FtL);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(FtL);
@@ -2535,24 +2461,12 @@ static void mVU_MINI_direct_emit_oaknut(mP)
 
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniScalar_oaknut(Fs, Ft, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMiniScalar_oaknut(Fs, Ft);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniVector_oaknut(Fs, Ft, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMiniVector_oaknut(Fs, Ft);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Ft);
@@ -2587,24 +2501,12 @@ static void mVU_MINIi_direct_emit_oaknut(mP)
 	const int Fi = mVU.regAlloc->allocRegId(33, 0, _X_Y_Z_W);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 
+	recBeginOaknutEmit();
 	if (_XYZW_SS)
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniScalar_oaknut(Fs, Fi, t1);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-	}
+		mVUUpperMiniScalar_oaknut(Fs, Fi);
 	else
-	{
-		const int t1 = mVU.regAlloc->allocRegId();
-		const int t2 = mVU.regAlloc->allocRegId();
-		recBeginOaknutEmit();
-		mVUUpperMiniVector_oaknut(Fs, Fi, t1, t2);
-		recEndOaknutEmit();
-		mVU.regAlloc->clearNeededXmmId(t1);
-		mVU.regAlloc->clearNeededXmmId(t2);
-	}
+		mVUUpperMiniVector_oaknut(Fs, Fi);
+	recEndOaknutEmit();
 
 	mVU.regAlloc->clearNeededXmmId(Fs);
 	mVU.regAlloc->clearNeededXmmId(Fi);
