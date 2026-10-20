@@ -129,3 +129,84 @@ void VUOperandClampTests()
         }
     }
 }
+
+extern "C" u32 EmuCoreXOracleEmitUpperInputFlush(u32 index, bool overflow, bool reference, u32 lane = 4);
+
+void VUInputFlushCodegenTests()
+{
+    const auto savedCPU = EmuConfig.Cpu;
+    constexpr u32 count = 256;
+    std::array<u32, count * 8> input{};
+    std::array<u32, count * 4> actual{}, expected{};
+    constexpr u32 edges[] = {0u, 0x80000000u, 1u, 0x80000001u, 0x007fffffu, 0x807fffffu,
+        0x00800000u, 0x80800000u, 0x3f800000u, 0xbf800000u, 0x7f7fffffu, 0xff7fffffu,
+        0x7f800000u, 0xff800000u, 0x7f800001u, 0xff800001u};
+    for (u32 i = 0; i < count; ++i)
+        for (u32 lane = 0; lane < 4; ++lane)
+        {
+            input[i * 8 + lane] = edges[(i + lane) % std::size(edges)];
+            input[i * 8 + lane + 4] = edges[((i / std::size(edges)) + lane) % std::size(edges)];
+        }
+    for (u32 lane = 0; lane <= 4; ++lane)
+        for (u32 vu = 0; vu < 2; ++vu)
+            for (u64 fz : {0ull, 1ull << 24})
+                for (u64 dn : {0ull, 1ull << 25})
+                    for (u64 round = 0; round < 4; ++round)
+                        for (bool overflow : {false, true})
+                        {
+                            const u64 mode = fz | dn | (round << 22);
+                            EmuConfig.Cpu.VU0FPCR.bitmask = mode;
+                            EmuConfig.Cpu.VU1FPCR.bitmask = mode;
+                            using Kernel = void (*)(const u32*, u32*, u32);
+                            u32 sizes[2]{};
+                            Kernel kernels[2]{};
+                            for (u32 reference = 0; reference < 2; ++reference)
+                            {
+                                oakSetAsmPtr(SysMemory::GetEERec() + 0x2000000 + reference * 0x1000, 0x1000);
+                                u8* entry = oakStartBlock();
+                                oakAsm->SUB(oak::util::SP, oak::util::SP, 16);
+                                oakAsm->STR(oak::util::X26, oak::util::SP);
+                                oakMoveAddressToReg(OAK_XVUCLAMP, &g_cpuRegistersPack.mVUglob);
+                                oak::Label loop;
+                                oakAsm->l(loop);
+                                oakAsm->LDP(oak::util::Q0, oak::util::Q1, oak::util::X0);
+                                sizes[reference] = EmuCoreXOracleEmitUpperInputFlush(vu, overflow, reference != 0, lane);
+                                oakAsm->STR(oak::util::Q0, oak::util::X1);
+                                oakAsm->ADD(oak::util::X0, oak::util::X0, 32);
+                                oakAsm->ADD(oak::util::X1, oak::util::X1, 16);
+                                oakAsm->SUBS(oak::util::W2, oak::util::W2, 1);
+                                oakAsm->B(oak::Cond::NE, loop);
+                                oakAsm->LDR(oak::util::X26, oak::util::SP);
+                                oakAsm->ADD(oak::util::SP, oak::util::SP, 16);
+                                oakAsm->RET();
+                                oakEndBlock();
+                                kernels[reference] = reinterpret_cast<Kernel>(entry);
+                            }
+                            const u32 reduction = (vu == 1 && fz) ? (lane < 4 ? 12 : 20) : 0;
+                            Check(sizes[1] == sizes[0] + reduction,
+                                "VU input flushing specializes only VU1 FZ and removes redundant vector/broadcast normalization");
+                            const FPControlRegisterBackup fpcr(FPControlRegister{mode});
+                            kernels[0](input.data(), actual.data(), count);
+                            kernels[1](input.data(), expected.data(), count);
+                            Check(actual == expected, "VU emitted input-flush ADD preserves edge bits in every rounding/FZ/DN mode");
+                        }
+    // Do not execute trapping/alternative modes: only verify their emitted fallback.
+    constexpr u64 supported = (1ull << 24) | (1ull << 25) | (3ull << 22);
+    for (u32 bit = 0; bit < 64; ++bit)
+    {
+        if (supported & (1ull << bit))
+            continue;
+        EmuConfig.Cpu.VU1FPCR.bitmask = (1ull << 24) | (1ull << bit);
+        u32 sizes[2]{};
+        for (u32 reference = 0; reference < 2; ++reference)
+        {
+            oakSetAsmPtr(SysMemory::GetEERec() + 0x2000000 + reference * 0x1000, 0x1000);
+            oakStartBlock();
+            sizes[reference] = EmuCoreXOracleEmitUpperInputFlush(1, true, reference != 0);
+            oakAsm->RET();
+            oakEndBlock();
+        }
+        Check(sizes[0] == sizes[1], "VU input flushing retains explicit normalization for every unsupported FPCR bit");
+    }
+    EmuConfig.Cpu = savedCPU;
+}

@@ -10,6 +10,7 @@ void VUScalarClampTests()
     }
     using Kernel = void (*)(const u32*, u32*, u32);
     VUOperandClampTests();
+    VUInputFlushCodegenTests();
     for (u32 mode = 0; mode < 3; ++mode)
     {
         auto compile = [&](u32 offset, bool reference, u32 unroll, u32& body_bytes, bool reload = true) {

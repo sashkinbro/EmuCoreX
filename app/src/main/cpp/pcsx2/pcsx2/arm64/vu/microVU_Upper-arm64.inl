@@ -222,9 +222,41 @@ static __fi void mVUUpperPrepareVuDoubleBounds_oaknut(mV)
 		mVULoadClampLimits_oaknut(OAK_QSCRATCH3, OAK_QSCRATCH2);
 }
 
+static __fi bool mVUUpperUseHardwareInputFlush_oaknut(u32 index)
+{
+	if (index != 1)
+		return false;
+
+	// VU1's dispatcher installs this FPCR before entering compiled code. These
+	// private operands feed FP arithmetic immediately, so FZ performs the same
+	// signed input flush without changing cached source VFs or inactive lanes.
+	// Preserve explicit normalization for trapping or alternative FPCR modes.
+	constexpr u64 allowed = FPControlRegister::FZ_BIT | FPControlRegister::RMODE_BITS | (1ULL << 25);
+	const FPControlRegister fpcr = EmuConfig.Cpu.VU1FPCR;
+	return fpcr.GetDenormalsAreZero() && (fpcr.bitmask & ~allowed) == 0;
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" u32 EmuCoreXOracleEmitUpperInputFlush(u32 index, bool overflow, bool reference, u32 lane)
+{
+	const u8* start = oakGetCurrentCodePointer();
+	recBeginOaknutEmit();
+	if (lane < 4)
+		mVUClampVuDoubleBroadcastBits_oaknut(0, 0, lane, overflow,
+			reference || !mVUUpperUseHardwareInputFlush_oaknut(index));
+	else
+		mVUClampVuDoubleVectorBits_oaknut(0, 2, overflow, false,
+			reference || !mVUUpperUseHardwareInputFlush_oaknut(index));
+	oakAsm->FADD(oak::util::Q0.S4(), oak::util::Q0.S4(), oak::util::Q1.S4());
+	recEndOaknutEmit();
+	return static_cast<u32>(oakGetCurrentCodePointer() - start);
+}
+#endif
+
 static __fi void mVUUpperVuDoubleVector_oaknut(mV, int reg, int t1, bool bounds_ready = false)
 {
-	mVUClampVuDoubleVectorBits_oaknut(reg, t1, CHECK_VU_OVERFLOW(mVU.index), bounds_ready);
+	mVUClampVuDoubleVectorBits_oaknut(reg, t1, CHECK_VU_OVERFLOW(mVU.index), bounds_ready,
+		!mVUUpperUseHardwareInputFlush_oaknut(mVU.index));
 }
 
 static __fi void mVUUpperMulPsLane_oaknut(int to, int from, int lane)
@@ -635,7 +667,8 @@ static void mVU_ADD_direct_emit_oaknut(mP)
 	if (needsOperandClamp)
 	{
 		FtDouble = mVU.regAlloc->allocRegId();
-		t1 = mVU.regAlloc->allocRegId();
+		if (!mVUUpperUseHardwareInputFlush_oaknut(mVU.index))
+			t1 = mVU.regAlloc->allocRegId();
 	}
 
 	recBeginOaknutEmit();
@@ -1514,7 +1547,8 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 		FtL = mVU.regAlloc->allocRegId();
 		recBeginOaknutEmit();
 		if (needsVu1MaddLaneVuDouble)
-			mVUClampVuDoubleBroadcastBits_oaknut(FtL, FtRaw, lane, CHECK_VU_OVERFLOW(mVU.index));
+			mVUClampVuDoubleBroadcastBits_oaknut(FtL, FtRaw, lane, CHECK_VU_OVERFLOW(mVU.index),
+				!mVUUpperUseHardwareInputFlush_oaknut(mVU.index));
 		else
 			mVUUpperDupLane_oaknut(FtL, FtRaw, lane);
 		recEndOaknutEmit();
@@ -1524,7 +1558,8 @@ static void mVU_MADD_lane_direct_emit_oaknut(microVU& mVU, int recPass, int lane
 	const int ACC = mVU.regAlloc->allocRegId(32);
 	const int Fs = mVU.regAlloc->allocRegId(_Fs_, _Fd_, _X_Y_Z_W);
 	const int tempFs = mVU.regAlloc->allocRegId();
-	const int t1 = needsVu1MaddLaneVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
+	const int t1 = (needsVu1MaddLaneVuDouble && !mVUUpperUseHardwareInputFlush_oaknut(mVU.index)) ?
+		mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	oakAsm->MOV(oakQRegister(tempFs).B16(), oakQRegister(Fs).B16());
@@ -1634,7 +1669,8 @@ static void mVU_MSUB_direct_emit_oaknut(mP)
 	const int Fd = mVU.regAlloc->allocRegId(32, _Fd_, _X_Y_Z_W);
 	const int FsWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : Fs;
 	const int FtWork = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
-	const int t1 = needsVu1XyzwVuDouble ? mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
+	const int t1 = (needsVu1XyzwVuDouble && !mVUUpperUseHardwareInputFlush_oaknut(mVU.index)) ?
+		mVU.regAlloc->allocRegId() : VU_HOST_NO_XMM;
 
 	recBeginOaknutEmit();
 	if (needsVu1XyzwVuDouble)

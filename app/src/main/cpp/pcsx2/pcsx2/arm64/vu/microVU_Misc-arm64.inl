@@ -269,14 +269,17 @@ static __fi void mVULoadClampLimits_oaknut(const oak::QReg& min_dst, const oak::
 }
 
 static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg,
-	bool clamp_overflow, bool bounds_ready = false)
+	bool clamp_overflow, bool bounds_ready = false, bool flush_denormals = true)
 {
 	const oak::QReg reg_q = oakQRegister(reg);
-	const oak::QReg exponent_q = oakQRegister(exponent_reg);
 	// Extract the original exponent independently of the overflow clamps.
 	// This keeps their dependency chains parallel on Cortex-A76.
-	oakAsm->SHL(exponent_q.S4(), reg_q.S4(), 1);
-	oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 24);
+	if (flush_denormals)
+	{
+		const oak::QReg exponent_q = oakQRegister(exponent_reg);
+		oakAsm->SHL(exponent_q.S4(), reg_q.S4(), 1);
+		oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 24);
+	}
 	if (clamp_overflow)
 	{
 		if (!bounds_ready)
@@ -288,9 +291,13 @@ static __fi void mVUClampVuDoubleVectorBits_oaknut(int reg, int exponent_reg,
 	}
 	// Neither overflow clamp turns a nonzero exponent into zero, so the
 	// original exponent still identifies exactly the denormals and zeros.
-	oakAsm->CMEQ(exponent_q.S4(), exponent_q.S4(), 0);
-	oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 1);
-	oakAsm->BIC(reg_q.B16(), reg_q.B16(), exponent_q.B16());
+	if (flush_denormals)
+	{
+		const oak::QReg exponent_q = oakQRegister(exponent_reg);
+		oakAsm->CMEQ(exponent_q.S4(), exponent_q.S4(), 0);
+		oakAsm->USHR(exponent_q.S4(), exponent_q.S4(), 1);
+		oakAsm->BIC(reg_q.B16(), reg_q.B16(), exponent_q.B16());
+	}
 }
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
@@ -334,14 +341,18 @@ static __fi void mVUClampVuDoubleVectorReference_oaknut(int reg, int exponent_re
 
 #endif
 
-static __fi void mVUClampVuDoubleBroadcastBits_oaknut(int to, int from, int lane, bool clamp_overflow)
+static __fi void mVUClampVuDoubleBroadcastBits_oaknut(int to, int from, int lane, bool clamp_overflow,
+	bool flush_denormals = true)
 {
 	// Normalize the selected bits once before replicating identical SIMD lanes.
 	// AND (without S) preserves the exponent test for the first CSEL.
 	oakAsm->MOV(OAK_WSCRATCH, oakQRegister(from).Selem()[lane]);
-	oakAsm->ANDS(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7f800000u);
-	oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x80000000u);
-	oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH2, OAK_WSCRATCH, oak::Cond::EQ);
+	if (flush_denormals)
+	{
+		oakAsm->ANDS(OAK_WSCRATCH2, OAK_WSCRATCH, 0x7f800000u);
+		oakAsm->AND(OAK_WSCRATCH2, OAK_WSCRATCH, 0x80000000u);
+		oakAsm->CSEL(OAK_WSCRATCH, OAK_WSCRATCH2, OAK_WSCRATCH, oak::Cond::EQ);
+	}
 	if (clamp_overflow)
 	{
 		// Only exponent 255 makes this masked XOR zero. Form signed max
