@@ -305,6 +305,7 @@ void ClassifierTests()
     Check(GSDeviceVK::TestTFXPreparationIdentity(), "GS preparation identity binds source catalog, driver, device, and capability facts");
     Check(VKShaderCache::TestTFXPreparationReceipt("artifacts/tfx-receipt-cache.bin"), "GS preparation receipt survives valid cache growth and rejects stale or invalid caches");
     Check(GSDeviceVK::TestTFXWarmupOrdering(), "GS learned pipelines precede generic warmup without duplicates");
+    Check(GSDeviceVK::TestTFXPipelineCache(), "GS hot pipeline cache preserves alternating selectors, collisions, and resource invalidation");
     Check(JitProfiler::TestSampleRangeSelection(), "profiler nested opcode range selection");
     Check(ir::RunSelfTests(), "IR core self-tests");
     Check(EeIr::RunSelfTests(), "EE IR lifter self-tests");

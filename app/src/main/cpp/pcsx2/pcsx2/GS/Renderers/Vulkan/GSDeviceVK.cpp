@@ -5777,8 +5777,7 @@ void GSDeviceVK::DestroyResources()
 	if (m_tfx_ubo_descriptor_set != VK_NULL_HANDLE)
 		FreePersistentDescriptorSet(m_tfx_ubo_descriptor_set);
 
-	m_last_tfx_pipeline_valid = false;
-	m_last_tfx_pipeline = VK_NULL_HANDLE;
+	m_hot_tfx_pipelines.Clear();
 	for (auto& it : m_tfx_pipelines)
 		vkDestroyPipeline(m_device, it.second, nullptr);
 	for (auto& it : m_tfx_fragment_shaders)
@@ -6177,40 +6176,154 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 	return pipeline;
 }
 
+size_t GSDeviceVK::TFXPipelineCache::Index(const PipelineSelector& p)
+{
+	std::array<u32, sizeof(PipelineSelector) / sizeof(u32)> words;
+	std::memcpy(words.data(), &p, sizeof(p));
+	u32 hash = 0;
+	for (const u32 word : words)
+		hash ^= word;
+	hash ^= hash >> 16;
+	hash ^= hash >> 8;
+	hash ^= hash >> 4;
+	return hash & 63;
+}
+
+VkPipeline GSDeviceVK::TFXPipelineCache::Lookup(const PipelineSelector& p)
+{
+	if (last.pipeline != VK_NULL_HANDLE && last.selector == p)
+		return last.pipeline;
+
+	const Entry& entry = entries[Index(p)];
+	if (entry.pipeline == VK_NULL_HANDLE || entry.selector != p)
+		return VK_NULL_HANDLE;
+
+	std::memcpy(&last.selector, &p, sizeof(p));
+	last.pipeline = entry.pipeline;
+	return entry.pipeline;
+}
+
+void GSDeviceVK::TFXPipelineCache::Insert(const PipelineSelector& p, VkPipeline pipeline)
+{
+	if (pipeline == VK_NULL_HANDLE)
+		return;
+	// Equality includes the complete object representation, including tail padding.
+	// Copy bytes explicitly rather than creating an aggregate temporary with indeterminate padding.
+	std::memcpy(&last.selector, &p, sizeof(p));
+	last.pipeline = pipeline;
+	Entry& entry = entries[Index(p)];
+	std::memcpy(&entry.selector, &p, sizeof(p));
+	entry.pipeline = pipeline;
+}
+
+void GSDeviceVK::TFXPipelineCache::Clear()
+{
+	last.pipeline = VK_NULL_HANDLE;
+	for (Entry& entry : entries)
+		entry.pipeline = VK_NULL_HANDLE;
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+bool GSDeviceVK::TestTFXPipelineCache()
+{
+	TFXPipelineCache cache;
+	PipelineSelector a;
+	PipelineSelector b;
+	b.ps.key_lo = 1;
+	const auto first = reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(1));
+	const auto second = reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(2));
+	if (cache.Lookup(a) != VK_NULL_HANDLE)
+		return false;
+	cache.Insert(a, first);
+	cache.Insert(b, second);
+	if (cache.Lookup(a) != first || cache.Lookup(b) != second)
+		return false;
+	cache.Insert(a, VK_NULL_HANDLE);
+	if (cache.Lookup(a) != first)
+		return false;
+
+	PipelineSelector collision;
+	collision.ps.key_lo = 1;
+	collision.ps.key_hi = 1;
+	if (TFXPipelineCache::Index(a) != TFXPipelineCache::Index(collision))
+		return false;
+	cache.Insert(collision, second);
+	if (cache.Lookup(a) != VK_NULL_HANDLE || cache.Lookup(collision) != second)
+		return false;
+
+	// Every bit participates in exact comparison, even if the small index collides.
+	for (size_t bit = 0; bit < sizeof(PipelineSelector) * 8; ++bit)
+	{
+		std::array<u8, sizeof(PipelineSelector)> bytes{};
+		bytes[bit / 8] ^= static_cast<u8>(1u << (bit % 8));
+		PipelineSelector changed;
+		std::memcpy(&changed, bytes.data(), sizeof(changed));
+		cache.Clear();
+		cache.Insert(a, first);
+		if (cache.Lookup(changed) != VK_NULL_HANDLE)
+			return false;
+		cache.Insert(changed, second);
+		if (cache.Lookup(changed) != second || cache.Lookup(a) == second)
+			return false;
+	}
+
+	cache.Clear();
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		cache.Insert(key, reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(i + 1)));
+	}
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		if (cache.Lookup(key) != reinterpret_cast<VkPipeline>(static_cast<uintptr_t>(i + 1)))
+			return false;
+	}
+	cache.Clear();
+	for (u32 i = 0; i < 64; ++i)
+	{
+		PipelineSelector key;
+		key.ps.key_lo = i;
+		if (cache.Lookup(key) != VK_NULL_HANDLE)
+			return false;
+	}
+	return true;
+}
+#endif
+
 VkPipeline GSDeviceVK::GetTFXPipeline(const PipelineSelector& p)
 {
-	if (m_last_tfx_pipeline_valid && m_last_tfx_pipeline_selector == p)
-		return m_last_tfx_pipeline;
+	if (const VkPipeline cached = m_hot_tfx_pipelines.Lookup(p); cached != VK_NULL_HANDLE)
+		return cached;
 
 	{
 		std::lock_guard lock(m_tfx_pipelines_mutex);
 		const auto it = m_tfx_pipelines.find(p);
 		if (it != m_tfx_pipelines.end() && it->second != VK_NULL_HANDLE)
 		{
-			m_last_tfx_pipeline_selector = p;
-			m_last_tfx_pipeline = it->second;
-			m_last_tfx_pipeline_valid = true;
-			return m_last_tfx_pipeline;
+			m_hot_tfx_pipelines.Insert(p, it->second);
+			return it->second;
 		}
 	}
 
-	m_last_tfx_pipeline_selector = p;
-	m_last_tfx_pipeline =
+	const VkPipeline pipeline =
 		PublishTFXPipeline(p, CreateTFXPipelineWithCache(p, g_vulkan_shader_cache->GetPipelineCache(true), true));
-	m_last_tfx_pipeline_valid = (m_last_tfx_pipeline != VK_NULL_HANDLE);
+	m_hot_tfx_pipelines.Insert(p, pipeline);
 
 	// Persist the pipeline cache every N new compiles so an OOM-kill or crash mid-session does
 	// not throw the batch away. The flush is rate-limited internally, and it never runs while
 	// m_tfx_pipelines_mutex is held.
 	static constexpr u32 PIPELINE_CACHE_FLUSH_THRESHOLD = 256;
-	if (m_last_tfx_pipeline != VK_NULL_HANDLE &&
+	if (pipeline != VK_NULL_HANDLE &&
 		++m_tfx_pipeline_compile_counter >= PIPELINE_CACHE_FLUSH_THRESHOLD)
 	{
 		m_tfx_pipeline_compile_counter = 0;
 		g_vulkan_shader_cache->FlushPipelineCache();
 	}
 
-	return m_last_tfx_pipeline;
+	return pipeline;
 }
 
 namespace
@@ -7681,8 +7794,7 @@ void GSDeviceVK::DestroyTFXPreparationDevice()
 		}
 		m_tfx_vertex_shaders.clear();
 
-		m_last_tfx_pipeline_valid = false;
-		m_last_tfx_pipeline = VK_NULL_HANDLE;
+		m_hot_tfx_pipelines.Clear();
 		if (m_tfx_pipeline_layout != VK_NULL_HANDLE)
 		{
 			vkDestroyPipelineLayout(m_device, m_tfx_pipeline_layout, nullptr);

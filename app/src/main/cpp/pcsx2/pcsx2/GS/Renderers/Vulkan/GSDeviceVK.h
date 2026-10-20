@@ -646,9 +646,23 @@ private:
 	std::unordered_map<GSHWDrawConfig::PSSelector, VkShaderModule, GSHWDrawConfig::PSSelectorHash>
 		m_tfx_fragment_shaders;
 	std::unordered_map<PipelineSelector, VkPipeline, PipelineSelectorHash> m_tfx_pipelines;
-	PipelineSelector m_last_tfx_pipeline_selector = {};
-	VkPipeline m_last_tfx_pipeline = VK_NULL_HANDLE;
-	bool m_last_tfx_pipeline_valid = false;
+	// GS-thread cache only; the shared pipeline map remains protected for compile workers.
+	struct TFXPipelineCache
+	{
+		struct Entry
+		{
+			PipelineSelector selector;
+			VkPipeline pipeline = VK_NULL_HANDLE;
+		};
+
+		Entry last;
+		std::array<Entry, 64> entries{};
+		static size_t Index(const PipelineSelector& p);
+		VkPipeline Lookup(const PipelineSelector& p);
+		void Insert(const PipelineSelector& p, VkPipeline pipeline);
+		void Clear();
+	};
+	TFXPipelineCache m_hot_tfx_pipelines;
 	u32 m_tfx_pipeline_compile_counter = 0;
 
 	std::mutex m_tfx_shaders_mutex;
@@ -821,6 +835,7 @@ public:
 
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	static bool TestTFXWarmupOrdering();
+	static bool TestTFXPipelineCache();
 	static bool TestTFXShaderSourceBuilders();
 	static bool TestTFXShaderSourceCatalog();
 	static bool TestTFXAlphaFallbackClassifier();
