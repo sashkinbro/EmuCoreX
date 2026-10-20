@@ -978,7 +978,11 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBoolEx(PCRTCOffsets, "pcrtc_offsets");
 	SettingsWrapBitBoolEx(PCRTCOverscan, "pcrtc_overscan");
 	SettingsWrapBitBool(IntegerScaling);
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	UseDebugDevice = false;
+#else
 	SettingsWrapBitBool(UseDebugDevice);
+#endif
 	SettingsWrapBitBool(UseBlitSwapChain);
 	SettingsWrapBitBool(DisableShaderCache);
 	SettingsWrapBitBool(DisableAsyncTFXCompile);
@@ -1035,6 +1039,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBoolEx(UserHacks_DrawBuffering, "UserHacks_DrawBuffering");
 	SettingsWrapBitBoolEx(FXAA, "fxaa");
 	SettingsWrapBitBool(ShadeBoost);
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	SettingsWrapBitBoolEx(DumpGSData, "DumpGSData");
 	SettingsWrapBitBoolEx(SaveRT, "SaveRT");
 	SettingsWrapBitBoolEx(SaveFrame, "SaveFrame");
@@ -1051,6 +1056,9 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(DumpTexturesWithFMVActive);
 	SettingsWrapBitBool(DumpDirectTextures);
 	SettingsWrapBitBool(DumpPaletteTextures);
+#else
+	DumpGSData = SaveRT = SaveFrame = SaveTexture = SaveDepth = SaveAlpha = SaveInfo = SaveTransferImages = SaveDrawStats = SaveFrameStats = SaveHWConfig = DumpReplaceableTextures = DumpReplaceableMipmaps = DumpTexturesWithFMVActive = DumpDirectTextures = DumpPaletteTextures = false;
+#endif
 	SettingsWrapBitBool(LoadTextureReplacements);
 	SettingsWrapBitBool(LoadTextureReplacementsAsync);
 	SettingsWrapBitBool(PrecacheTextureReplacements);
@@ -1219,6 +1227,7 @@ bool Pcsx2Config::GSOptions::UseHardwareRenderer() const
 	return (Renderer != GSRendererType::Null && Renderer != GSRendererType::SW);
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 bool Pcsx2Config::GSOptions::ShouldDump(u64 draw, int frame) const
 {
 	int drawOffset = static_cast<int>(draw - static_cast<u64>(SaveDrawStart));
@@ -1227,6 +1236,8 @@ bool Pcsx2Config::GSOptions::ShouldDump(u64 draw, int frame) const
 		   (drawOffset >= 0) && ((SaveDrawCount < 0) || (drawOffset < SaveDrawCount)) && (drawOffset % SaveDrawBy == 0) &&
 		   (frameOffset >= 0) && ((SaveFrameCount < 0) || (frameOffset < SaveFrameCount)) && (frameOffset % SaveFrameBy == 0);
 }
+
+#endif
 
 static constexpr const std::array s_spu2_interpolation_mode_names = {
 	"Nearest",

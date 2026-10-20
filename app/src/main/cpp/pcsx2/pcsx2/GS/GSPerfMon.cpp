@@ -68,6 +68,7 @@ GSPerfMon GSPerfMon::operator-(const GSPerfMon& other)
 	return diff;
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSPerfMon::Dump(const std::string& filename, bool hw)
 {
 	FILE* fp = fopen(filename.c_str(), "w");
@@ -82,3 +83,4 @@ void GSPerfMon::Dump(const std::string& filename, bool hw)
 
 	fclose(fp);
 }
+#endif

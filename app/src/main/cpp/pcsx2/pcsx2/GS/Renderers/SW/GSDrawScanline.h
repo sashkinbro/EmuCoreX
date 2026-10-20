@@ -30,7 +30,11 @@ public:
 	~GSDrawScanline() override;
 
 	/// Debug override for disabling scanline JIT on a key basis.
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	static constexpr bool ShouldUseCDrawScanline(u64) { return false; }
+#else
 	static bool ShouldUseCDrawScanline(u64 key);
+#endif
 
 	/// Function pointer types which we call back into.
 	using SetupPrimPtr = void(*)(const GSVertexSW* vertex, const u16* index, const GSVertexSW& dscan, GSScanlineLocalData& local);

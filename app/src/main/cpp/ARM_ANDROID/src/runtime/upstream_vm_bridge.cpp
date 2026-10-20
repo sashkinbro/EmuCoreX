@@ -271,7 +271,11 @@ void ApplyAngleOpenGLLibraryHints(const VmLaunchConfig& config)
 
 void ApplyOldCoreJitSettings(SettingsInterface& si, const VmLaunchConfig& config, bool apply_vm_side_effects = true)
 {
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 	const bool autotest_mode = GetBoolSetting(config.settings, "EmuCoreX", "AutotestMode", false);
+#else
+	constexpr bool autotest_mode = false;
+#endif
 	const std::string data_root = config.paths.data_root.empty() ? EmuFolders::DataRoot : config.paths.data_root;
 
 	EmuFolders::AppRoot = data_root;

@@ -1557,6 +1557,7 @@ std::string GSHWDrawConfig::GetSetDATMName(u32 datm)
 	};
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 static constexpr const char* INDENT = "  ";
 
 void GSHWDrawConfig::DumpPSSelector(std::ostream& out, const PSSelector& ps, const std::string& indent)
@@ -1773,6 +1774,8 @@ void GSHWDrawConfig::DumpConfig(const std::string& fn, const GSHWDrawConfig& con
 	
 	DumpConfig(file, conf, ps, vs, bs, dss, ss, asp, bmp);
 }
+
+#endif
 
 static constexpr u32 NUM_REMAP_INPUTS = static_cast<u32>(ShaderConvert::Count) * 4;
 

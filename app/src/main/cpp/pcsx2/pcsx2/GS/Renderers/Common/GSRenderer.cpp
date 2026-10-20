@@ -966,6 +966,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				g_gs_device->Resize(internal_res.x, internal_res.y);
 		}
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 		if (!m_dump && m_dump_frames > 0)
 		{
 			if (GSConfig.UserHacks_ReadTCOnClose)
@@ -1014,6 +1015,8 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				Host::OSD_INFO_DURATION);
 		}
 
+#endif
+
 		const bool internal_resolution = (GSConfig.ScreenshotSize >= GSScreenshotSize::InternalResolution);
 		const bool aspect_correct = (GSConfig.ScreenshotSize != GSScreenshotSize::InternalResolutionUncorrected);
 
@@ -1034,6 +1037,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 		m_snapshot = {};
 	}
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	else if (m_dump)
 	{
 		const bool last = (m_dump_frames == 0);
@@ -1049,6 +1053,8 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			m_dump_frames--;
 		}
 	}
+
+#endif
 
 	// capture
 	if (GSCapture::IsCapturingVideo())
@@ -1098,7 +1104,11 @@ void GSRenderer::QueueSnapshot(const std::string& path, const u32 gsdump_frames)
 		m_snapshot = GSGetBaseSnapshotFilename();
 
 	// this is really gross, but wx we get the snapshot request after shift...
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	m_dump_frames = gsdump_frames;
+#else
+	(void)gsdump_frames;
+#endif
 }
 
 static std::string GSGetBaseFilename()
@@ -1173,11 +1183,14 @@ std::string GSGetBaseVideoFilename()
 	return Path::Combine(EmuFolders::Videos, GSGetBaseFilename());
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSRenderer::StopGSDump()
 {
 	m_snapshot = {};
 	m_dump_frames = 0;
 }
+
+#endif
 
 void GSRenderer::PresentCurrentFrame()
 {
@@ -1367,6 +1380,7 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 	return false;
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void DumpGSPrivRegs(const GSPrivRegSet& r, const std::string& filename)
 {
 	auto fp = FileSystem::OpenManagedCFile(filename.c_str(), "wt");
@@ -1474,3 +1488,4 @@ void DumpGSPrivRegs(const GSPrivRegSet& r, const std::string& filename)
 
 	std::fprintf(fp.get(), "EXTWRITE: { EN: %u }\n", r.EXTWRITE.WRITE);
 }
+#endif

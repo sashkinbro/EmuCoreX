@@ -335,7 +335,10 @@ object NativeApp {
     @JvmStatic external fun setDisplayRefreshRate(refreshRate: Float)
     @JvmStatic external fun getDisplayDrawRect(): FloatArray?
     @JvmStatic external fun getCoreVersion(): String?
-    @JvmStatic external fun queueGsDump(frames: Int)
+    @JvmStatic fun queueGsDump(frames: Int) {
+        if (BuildConfig.DEBUG) queueGsDumpNative(frames)
+    }
+    @JvmStatic private external fun queueGsDumpNative(frames: Int)
     @JvmStatic external fun setPadButton(padIndex: Int, index: Int, range: Int, pressed: Boolean)
     @JvmStatic external fun setInternetLinkTransportReady(ready: Boolean)
     @JvmStatic external fun resetInternetLinkTransport()
@@ -374,7 +377,9 @@ object NativeApp {
     @JvmStatic external fun getLastBootError(): String?
     /** Hot-swaps the mounted image on the CPU thread and leaves the VM paused for the caller to resume. */
     @JvmStatic external fun changeDisc(path: String): Boolean
-    @JvmStatic external fun runBootSmokeProbe(path: String, steps: Int): Int
+    @JvmStatic fun runBootSmokeProbe(path: String, steps: Int): Int =
+        if (BuildConfig.DEBUG) runBootSmokeProbeNative(path, steps) else 0
+    @JvmStatic private external fun runBootSmokeProbeNative(path: String, steps: Int): Int
     @JvmStatic external fun runJitExecutableMemorySmokeTest(): Boolean
     @JvmStatic external fun runEeFpuDivRoundingSelfTest(): String
     @JvmStatic external fun bootElf(path: String): Boolean

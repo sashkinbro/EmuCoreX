@@ -10,6 +10,7 @@
 
 namespace GSDumpReplayer
 {
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	bool IsReplayingDump();
 
 	/// If set, playback will repeat once it reaches the last frame.
@@ -28,4 +29,18 @@ namespace GSDumpReplayer
 	u32 GetFrameNumber();
 
 	void RenderUI();
+#else
+	inline bool IsReplayingDump() { return false; }
+	inline void SetLoopCount(s32 = 0) {}
+	inline int GetLoopCount() { return 0; }
+	inline bool IsRunner() { return false; }
+	inline void SetIsDumpRunner(bool) {}
+	inline bool Initialize(const char*, Error* = nullptr) { return false; }
+	inline bool ChangeDump(const char*) { return false; }
+	inline void Shutdown() {}
+	inline std::string GetDumpSerial() { return {}; }
+	inline u32 GetDumpCRC() { return 0; }
+	inline u32 GetFrameNumber() { return 0; }
+	inline void RenderUI() {}
+#endif
 } // namespace GSDumpReplayer

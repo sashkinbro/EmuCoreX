@@ -268,7 +268,9 @@ public:
 	const GSDrawingEnvironment* m_draw_env = &m_env;
 	GSDrawingContext* m_context = nullptr;
 	GSVector4i temp_draw_rect = {};
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	std::unique_ptr<GSDumpBase> m_dump;
+#endif
 	bool m_scissor_invalid = false;
 	bool m_quad_check_valid = false;
 	bool m_quad_check_valid_shuffle = false;

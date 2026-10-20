@@ -17,7 +17,9 @@ private:
 	u64 m_shader_time_start = 0;
 
 	std::string m_snapshot;
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	u32 m_dump_frames = 0;
+#endif
 	u32 m_skipped_duplicate_frames = 0;
 	u32 m_manual_frameskip_counter = 0;
 	u32 m_consecutive_blank_frames = 0;

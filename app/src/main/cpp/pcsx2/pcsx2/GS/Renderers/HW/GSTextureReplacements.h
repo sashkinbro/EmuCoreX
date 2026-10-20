@@ -45,10 +45,15 @@ namespace GSTextureReplacements
 
 	void DumpTexture(const GSTextureCache::HashCacheKey& hash, const GIFRegTEX0& TEX0, const GIFRegTEXA& TEXA,
 		GSTextureCache::SourceRegion region, GSLocalMemory& mem, u32 level);
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	inline void ClearDumpedTextureList() {}
+	inline u32 GetDumpedTextureCount() { return 0; }
+#else
 	void ClearDumpedTextureList();
 
 	/// Get the number of textures that have been dumped.
 	u32 GetDumpedTextureCount();
+#endif
 
 	/// Get the number of replacement textures that have been loaded/cached.
 	u32 GetLoadedTextureCount();

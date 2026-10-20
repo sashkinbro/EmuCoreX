@@ -2942,8 +2942,13 @@ bool VMManager::IsBlockDumpFileName(const std::string_view path)
 
 bool VMManager::IsGSDumpFileName(const std::string_view path)
 {
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	(void)path;
+	return false;
+#else
 	return (StringUtil::EndsWithNoCase(path, ".gs") || StringUtil::EndsWithNoCase(path, ".gs.xz") ||
 			StringUtil::EndsWithNoCase(path, ".gs.zst"));
+#endif
 }
 
 bool VMManager::IsSaveStateFileName(const std::string_view path)

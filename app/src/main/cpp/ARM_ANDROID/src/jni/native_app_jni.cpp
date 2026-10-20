@@ -289,6 +289,7 @@ jbyteArray ReadSaveStateScreenshot(JNIEnv* env, const std::string& path)
 	return result;
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 bool RunExecutableMemorySmokeTest()
 {
 #if defined(__aarch64__)
@@ -340,6 +341,7 @@ bool RunExecutableMemorySmokeTest()
 	return false;
 #endif
 }
+#endif
 }
 
 namespace emucorex::android
@@ -687,7 +689,8 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getCo
 {
 	return StringToJString(env, BuildVersion::GitRev ? BuildVersion::GitRev : "Unknown");
 }
-extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsDump(JNIEnv*, jclass, jint frames)
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsDumpNative(JNIEnv*, jclass, jint frames)
 {
 	const u32 dump_frames = frames > 0 ? static_cast<u32>(frames) : 0;
 	Host::RunOnGSThread([dump_frames]() {
@@ -695,6 +698,8 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsD
 		GSQueueSnapshot(std::string(), dump_frames);
 	});
 }
+#endif
+
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadButton(JNIEnv*, jclass, jint pad_index, jint index, jint range, jboolean pressed) { AndroidRuntime::Instance().SetPadButton(pad_index, index, range, pressed == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setInternetLinkTransportReady(JNIEnv*, jclass, jboolean ready) { InternetLinkBridge::SetTransportReady(ready == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_resetInternetLinkTransport(JNIEnv*, jclass) { InternetLinkBridge::Reset(); }
@@ -857,8 +862,12 @@ extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_getLa
 	return StringToJString(env, message);
 }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_changeDisc(JNIEnv* env, jclass, jstring path) { return AndroidRuntime::Instance().ChangeDisc(JStringToString(env, path)) ? JNI_TRUE : JNI_FALSE; }
-extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_runBootSmokeProbe(JNIEnv* env, jclass, jstring path, jint steps) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, steps) ? 1 : 0; }
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" JNIEXPORT jint JNICALL Java_com_sbro_emucorex_core_NativeApp_runBootSmokeProbeNative(JNIEnv* env, jclass, jstring path, jint steps) { return AndroidRuntime::Instance().StartVm(JStringToString(env, path), false, steps) ? 1 : 0; }
+#endif
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_runJitExecutableMemorySmokeTest(JNIEnv*, jclass) { return RunExecutableMemorySmokeTest() ? JNI_TRUE : JNI_FALSE; }
+#endif
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 extern "C" JNIEXPORT jstring JNICALL Java_com_sbro_emucorex_core_NativeApp_runEeFpuDivRoundingSelfTest(JNIEnv* env, jclass)
 {

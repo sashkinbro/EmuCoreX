@@ -1006,7 +1006,11 @@ struct Pcsx2Config
 		bool operator!=(const GSOptions& right) const;
 
 		// Should we dump this draw/frame?
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+		static constexpr bool ShouldDump(u64, int) { return false; }
+#else
 		bool ShouldDump(u64 draw, int frame) const;
+#endif
 	};
 
 	struct SPU2Options

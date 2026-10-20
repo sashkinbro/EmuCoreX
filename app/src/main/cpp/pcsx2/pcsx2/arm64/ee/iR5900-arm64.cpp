@@ -2525,17 +2525,6 @@ extern "C" bool EmuCoreXOracleGetEeCompiledBlock(u32 guest_pc, const void** host
 		*bytes = block->x86size;
 	return true;
 }
-#else
-extern "C" void EmuCoreXOracleSetEeIrMode(int mode) { (void)mode; }
-extern "C" void EmuCoreXOracleGetEeIrCop1Counts(u64* mfc1, u64* mtc1, u64* cfc1, u64* ctc1)
-{
-	if (mfc1) *mfc1 = 0;
-	if (mtc1) *mtc1 = 0;
-	if (cfc1) *cfc1 = 0;
-	if (ctc1) *ctc1 = 0;
-}
-extern "C" u64 EmuCoreXOracleGetEeIrMovCounts() { return 0; }
-extern "C" u64 EmuCoreXOracleGetEeIrDirectStoreCounts() { return 0; }
 #endif
 
 static bool EeIrEnabled()

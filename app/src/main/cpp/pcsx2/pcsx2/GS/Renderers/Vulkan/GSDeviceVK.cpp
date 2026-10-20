@@ -222,6 +222,10 @@ bool GSDeviceVK::IsMaliSX2() const
 VkInstance GSDeviceVK::CreateVulkanInstance(const WindowInfo& wi, OptionalExtensions* oe, bool enable_debug_utils,
 	bool enable_validation_layer)
 {
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	enable_debug_utils = false;
+	enable_validation_layer = false;
+#endif
 	ExtensionList enabled_extensions;
 	if (!SelectInstanceExtensions(&enabled_extensions, wi, oe, enable_debug_utils))
 		return VK_NULL_HANDLE;
@@ -610,6 +614,7 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		m_optional_extensions.vk_swapchain_maintenance1_is_khr = khr_swapchain_maintenance1;
 	}
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	// glslang generates debug info instructions before phi nodes at the beginning of blocks when non-semantic debug info
 	// is enabled, triggering errors by spirv-val. Gate it by an environment variable if you want source debugging until
 	// this is fixed.
@@ -618,6 +623,8 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		m_optional_extensions.vk_khr_shader_non_semantic_info =
 			SupportsExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, false);
 	}
+
+#endif
 
 #ifdef _WIN32
 	m_optional_extensions.vk_ext_full_screen_exclusive =
@@ -1941,6 +1948,7 @@ void GSDeviceVK::DeferImageViewDestruction(VkImageView object)
 	resources.cleanup_resources.push_back([device, object]() { vkDestroyImageView(device, object, nullptr); });
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 VKAPI_ATTR VkBool32 VKAPI_CALL DebugMessengerCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void* pUserData)
@@ -2008,6 +2016,8 @@ void GSDeviceVK::DisableDebugUtils()
 		m_debug_messenger_callback = VK_NULL_HANDLE;
 	}
 }
+
+#endif
 
 VkRenderPass GSDeviceVK::CreateCachedRenderPass(RenderPassCacheKey key)
 {

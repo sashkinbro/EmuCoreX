@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 #include "common/AlignedMalloc.h"
 #include "common/Console.h"
 #include "common/ScopedGuard.h"
@@ -639,3 +640,5 @@ std::unique_ptr<GSDumpFile> GSDumpFile::OpenGSDump(const char* filename, Error* 
 
 	return file;
 }
+
+#endif

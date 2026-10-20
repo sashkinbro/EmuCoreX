@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.sbro.emucorex.BuildConfig
 import com.sbro.emucorex.EmuCoreXApp
 import com.sbro.emucorex.discord.DiscordIntegration
 import com.sbro.emucorex.core.AndroidGamePerformance
@@ -2519,7 +2520,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             } else {
                 AppAnalytics.logEmulationStartFailed(analyticsLaunchType, "native_start")
             }
-            if (started && gsDumpFrames != null && gsDumpFrames > 0) {
+            if (BuildConfig.DEBUG && started && gsDumpFrames != null && gsDumpFrames > 0) {
                 val delayMs = gsDumpDelayMs?.coerceAtLeast(0) ?: 0
                 viewModelScope.launch(Dispatchers.IO) {
                     delay(delayMs.milliseconds)

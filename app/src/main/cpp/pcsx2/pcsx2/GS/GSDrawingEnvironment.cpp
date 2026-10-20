@@ -29,6 +29,7 @@ void GSDrawingEnvironment::Reset()
 	CTXT[1].Reset();
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSDrawingEnvironment::Dump(const std::string& filename) const
 {
 	FILE* fp = fopen(filename.c_str(), "wt");
@@ -135,3 +136,4 @@ void GSDrawingEnvironment::Dump(const std::string& filename) const
 
 	fclose(fp);
 }
+#endif

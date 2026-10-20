@@ -224,6 +224,7 @@ bool PNGLoader(const std::string& filename, GSTextureReplacements::ReplacementTe
 	return true;
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 bool GSTextureReplacements::SavePNGImage(const std::string& filename, u32 width, u32 height, const u8* buffer, u32 pitch)
 {
 	const int compression = GSConfig.PNGCompressionLevel;
@@ -266,6 +267,7 @@ bool GSTextureReplacements::SavePNGImage(const std::string& filename, u32 width,
 	png_write_end(png_ptr, nullptr);
 	return true;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DDS Handler

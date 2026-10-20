@@ -245,8 +245,13 @@ private:
 		bool enable_validation_layer);
 
 	// Enable/disable debug message runtime.
+#ifdef EMUCOREX_DISABLE_GS_DIAGNOSTICS
+	bool EnableDebugUtils() { return false; }
+	void DisableDebugUtils() {}
+#else
 	bool EnableDebugUtils();
 	void DisableDebugUtils();
+#endif
 
 	void SubmitCommandBuffer(VKSwapChain* present_swap_chain);
 	void MoveToNextCommandBuffer();

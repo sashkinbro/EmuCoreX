@@ -518,6 +518,7 @@ void oakStore128(oak::QReg src, OakMemOperand mem)
 	oakAsm->STR(src, scratch);
 }
 
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 void oakEmitSmokeReturn42()
 {
 	pxAssert(oakAsm);
@@ -525,6 +526,7 @@ void oakEmitSmokeReturn42()
 	oakAsm->MOV(W0, 42);
 	oakAsm->RET();
 }
+#endif
 
 void oakEmitSmokeFpAddReturn()
 {

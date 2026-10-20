@@ -38,6 +38,7 @@ GSDrawScanline::~GSDrawScanline()
 		DevCon.WriteLn("SW JIT generated %zu bytes of code", used);
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 bool GSDrawScanline::ShouldUseCDrawScanline(u64 key)
 {
 	static std::map<u64, bool> s_use_c_draw_scanline;
@@ -95,6 +96,7 @@ bool GSDrawScanline::ShouldUseCDrawScanline(u64 key)
 
 	return idx->second;
 }
+#endif
 
 void GSDrawScanline::BeginDraw(const GSRasterizerData& data, GSScanlineLocalData& local)
 {

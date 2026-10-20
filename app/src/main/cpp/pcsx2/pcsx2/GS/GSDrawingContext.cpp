@@ -162,6 +162,7 @@ GIFRegTEX0 GSDrawingContext::GetSizeFixedTEX0(const GSVector4& st, bool linear, 
 	return res;
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSDrawingContext::Dump(const std::string& filename)
 {
 	// Append on purpose so env + context are merged into a single file
@@ -290,3 +291,4 @@ void GSDrawingContext::Dump(const std::string& filename)
 
 	fclose(fp);
 }
+#endif

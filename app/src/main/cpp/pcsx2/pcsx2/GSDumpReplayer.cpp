@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 #include "GS.h"
 #include "GS/GSLzma.h"
 #include "GSDumpReplayer.h"
@@ -404,3 +405,5 @@ void GSDumpReplayer::RenderUI()
 
 #undef DRAW_LINE
 }
+
+#endif

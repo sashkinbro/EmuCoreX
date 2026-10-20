@@ -15,7 +15,9 @@
 #include <fstream>
 
 static u32 s_last_program_id = 0;
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 static GLuint s_next_bad_shader_id = 1;
+#endif
 
 GLProgram::GLProgram() = default;
 
@@ -67,6 +69,7 @@ GLuint GLProgram::CompileShader(GLenum type, const std::string_view source)
 		{
 			Console.Error("Shader failed to compile:\n%s", info_log.c_str());
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 			std::ofstream ofs(
 				Path::Combine(EmuFolders::Logs, fmt::format("pcsx2_bad_shader_{}.txt", s_next_bad_shader_id++)),
 				std::ofstream::out | std::ofstream::binary);
@@ -78,6 +81,7 @@ GLuint GLProgram::CompileShader(GLenum type, const std::string_view source)
 				ofs.close();
 			}
 
+#endif
 			glDeleteShader(id);
 			return 0;
 		}

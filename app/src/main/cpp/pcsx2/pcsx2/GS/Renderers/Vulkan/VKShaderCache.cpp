@@ -43,7 +43,9 @@
 
 std::unique_ptr<VKShaderCache> g_vulkan_shader_cache;
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 static std::atomic<u32> s_next_bad_shader_id{0};
+#endif
 #ifndef __ANDROID__
 static bool s_glslang_initialized = false;
 static bool s_shaderc_fallback_warning_emitted = false;
@@ -247,6 +249,7 @@ void dyn_shaderc::Close()
 #undef SHADERC_FUNCTIONS
 #undef SHADERC_INIT_FUNCTIONS
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 static void DumpBadShader(std::string_view code, std::string_view errors)
 {
 	const std::string filename = Path::Combine(EmuFolders::Logs, fmt::format("pcsx2_bad_shader_{}.txt", ++s_next_bad_shader_id));
@@ -260,6 +263,7 @@ static void DumpBadShader(std::string_view code, std::string_view errors)
 			std::fwrite(errors.data(), errors.size(), 1, fp.get());
 	}
 }
+#endif
 
 #ifndef __ANDROID__
 static bool InitializeGlslang()
@@ -330,7 +334,9 @@ static std::optional<std::vector<u32>> CompileShaderToSPVWithGlslang(u32 stage, 
 			errors.append("\nProgram Debug Log:\n");
 			errors.append(program->getInfoDebugLog());
 		}
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 		DumpBadShader(source, errors);
+#endif
 	};
 
 	if (!shader->parse(&glslang::DefaultTBuiltInResource, default_version, profile, false, true, messages, includer))
@@ -441,7 +447,9 @@ std::optional<VKShaderCache::SPIRVCodeVector> VKShaderCache::CompileShaderToSPV(
 		const std::string_view errors(result ? dyn_shaderc::shaderc_result_get_error_message(result)
 		                                     : "null result object");
 		ERROR_LOG("Failed to compile shader to SPIR-V: {}\n{}", compilation_status_to_string(status), errors);
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 		DumpBadShader(source, errors);
+#endif
 	}
 	else
 	{

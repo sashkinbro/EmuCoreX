@@ -129,8 +129,10 @@ namespace GSTextureReplacements
 	static std::string s_current_serial;
 
 	/// Textures that have been dumped, to save stat() calls.
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	static std::unordered_set<TextureName> s_dumped_textures;
 	static std::mutex s_dumped_textures_mutex;
+#endif
 
 	/// Lookup map of texture names to replacements, if they exist.
 	static std::unordered_map<TextureName, std::string> s_replacement_texture_filenames;
@@ -902,6 +904,7 @@ void GSTextureReplacements::ProcessAsyncLoadedTextures()
 	TrimReplacementTextureCache();
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSTextureReplacements::DumpTexture(const GSTextureCache::HashCacheKey& hash, const GIFRegTEX0& TEX0,
 	const GIFRegTEXA& TEXA, GSTextureCache::SourceRegion region, GSLocalMemory& mem, u32 level)
 {
@@ -959,6 +962,8 @@ u32 GSTextureReplacements::GetDumpedTextureCount()
 	std::unique_lock<std::mutex> lock(s_dumped_textures_mutex);
 	return static_cast<u32>(s_dumped_textures.size());
 }
+
+#endif
 
 u32 GSTextureReplacements::GetLoadedTextureCount()
 {

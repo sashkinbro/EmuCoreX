@@ -650,11 +650,14 @@ void GSQueueSnapshot(const std::string& path, u32 gsdump_frames)
 		g_gs_renderer->QueueSnapshot(path, gsdump_frames);
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSStopGSDump()
 {
 	if (g_gs_renderer)
 		g_gs_renderer->StopGSDump();
 }
+
+#endif
 
 bool GSBeginCapture(std::string filename)
 {
@@ -1438,6 +1441,7 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 				MTGS::WaitGS(false, false, false);
 			}
 		}},
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	{"GSDumpSingleFrame", TRANSLATE_NOOP("Hotkeys", "Graphics"), TRANSLATE_NOOP("Hotkeys", "Save Single Frame GS Dump"),
 		[](s32 pressed) {
 			if (!pressed)
@@ -1454,6 +1458,8 @@ BEGIN_HOTKEY_LIST(g_gs_hotkeys){"Screenshot", TRANSLATE_NOOP("Hotkeys", "Graphic
 					GSStopGSDump();
 			});
 		}},
+#endif
+
 	{"ToggleSoftwareRendering", TRANSLATE_NOOP("Hotkeys", "Graphics"),
 		TRANSLATE_NOOP("Hotkeys", "Toggle Software Rendering"),
 		[](s32 pressed) {

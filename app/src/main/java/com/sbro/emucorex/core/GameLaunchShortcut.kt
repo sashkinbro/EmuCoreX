@@ -98,10 +98,10 @@ object GameLaunchShortcut {
         }
         val bootBios = intent.getBooleanExtra(EXTRA_BOOT_BIOS, false) ||
             (data?.scheme == SCHEME && data.host == HOST && data.getQueryParameter("bootBios") == "true")
-        val bootSmokeProbe = intent.getBooleanExtra(EXTRA_BOOT_SMOKE_PROBE, false) ||
-            (data?.scheme == SCHEME && data.host == HOST && data.getQueryParameter("bootSmoke") == "true")
-        val autotestMode = intent.getBooleanExtra(EXTRA_AUTOTEST_MODE, false) ||
-            (data?.scheme == SCHEME && data.host == HOST && data.getQueryParameter("autotest") == "true")
+        val bootSmokeProbe = BuildConfig.DEBUG && (intent.getBooleanExtra(EXTRA_BOOT_SMOKE_PROBE, false) ||
+            (data?.scheme == SCHEME && data.host == HOST && data.getQueryParameter("bootSmoke") == "true"))
+        val autotestMode = BuildConfig.DEBUG && (intent.getBooleanExtra(EXTRA_AUTOTEST_MODE, false) ||
+            (data?.scheme == SCHEME && data.host == HOST && data.getQueryParameter("autotest") == "true"))
         if (gamePath.isNullOrBlank() && !bootBios) return null
         return LaunchRequest(
             gamePath = gamePath,
@@ -123,10 +123,10 @@ object GameLaunchShortcut {
                 ?: optionalBooleanQuery(data, "enableMtvu"),
             renderer = optionalIntExtra(intent, EXTRA_RENDERER)
                 ?: optionalIntQuery(data, "renderer"),
-            gsDumpFrames = optionalIntExtra(intent, EXTRA_GS_DUMP_FRAMES)
-                ?: optionalIntQuery(data, "gsDumpFrames"),
-            gsDumpDelayMs = optionalIntExtra(intent, EXTRA_GS_DUMP_DELAY_MS)
-                ?: optionalIntQuery(data, "gsDumpDelayMs"),
+            gsDumpFrames = if (BuildConfig.DEBUG) (optionalIntExtra(intent, EXTRA_GS_DUMP_FRAMES)
+                ?: optionalIntQuery(data, "gsDumpFrames")) else null,
+            gsDumpDelayMs = if (BuildConfig.DEBUG) (optionalIntExtra(intent, EXTRA_GS_DUMP_DELAY_MS)
+                ?: optionalIntQuery(data, "gsDumpDelayMs")) else null,
             vu0FamilyMask = debugFamilyMask(intent, EXTRA_VU0_FAMILY_MASK),
             vu1FamilyMask = debugFamilyMask(intent, EXTRA_VU1_FAMILY_MASK)
         )

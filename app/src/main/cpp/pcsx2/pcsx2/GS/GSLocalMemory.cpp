@@ -651,6 +651,7 @@ void GSLocalMemory::ReadTexture(const GSOffset& off, const GSVector4i& r, u8* ds
 
 //
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSLocalMemory::SaveBMP(const std::string& fn, u32 bp, u32 bw, u32 psm, int w, int h, int x, int y)
 {
 	int pitch = w * 4;
@@ -679,6 +680,7 @@ void GSLocalMemory::SaveBMP(const std::string& fn, u32 bp, u32 bw, u32 psm, int 
 
 	_aligned_free(bits);
 }
+#endif
 
 // GSOffset
 

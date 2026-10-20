@@ -137,6 +137,7 @@ GSState::~GSState()
 		_aligned_free(m_draw_index.buff);
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 std::string GSState::GetDrawDumpPath(const char* format, ...)
 {
 	std::va_list ap;
@@ -146,6 +147,8 @@ std::string GSState::GetDrawDumpPath(const char* format, ...)
 	va_end(ap);
 	return ret;
 }
+
+#endif
 
 void GSState::Reset(bool hardware_reset)
 {
@@ -453,6 +456,7 @@ const char* GSState::GetFlushReasonString(GSFlushReason reason)
 	}
 }
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 void GSState::DumpDrawInfo(bool dump_regs, bool dump_verts, bool dump_transfers)
 {
 	std::string s;
@@ -893,6 +897,8 @@ void GSState::DumpTransferImages()
 			transfer.rect.width(), transfer.rect.height(), transfer.rect.x, transfer.rect.y);
 	}
 }
+
+#endif
 
 __inline void GSState::CheckFlushes()
 {
@@ -2878,8 +2884,10 @@ void GSState::ReadFIFO(u8* mem, int size)
 
 	Read(mem, size);
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	if (m_dump)
 		m_dump->ReadFIFO(size / 16);
+#endif
 }
 
 void GSState::ReadLocalMemoryUnsync(u8* mem, int qwc, GIFRegBITBLTBUF BITBLTBUF, GIFRegTRXPOS TRXPOS, GIFRegTRXREG TRXREG)
@@ -3164,8 +3172,10 @@ void GSState::Transfer(const u8* mem, u32 size)
 		}
 	}
 
+#ifndef EMUCOREX_DISABLE_GS_DIAGNOSTICS
 	if (m_dump && mem > start)
 		m_dump->Transfer(index, start, mem - start);
+#endif
 
 	if (index == 0)
 	{
