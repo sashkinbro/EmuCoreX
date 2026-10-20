@@ -1025,6 +1025,38 @@ void GSState::GIFPackedRegHandlerNOP(const GIFPackedReg* RESTRICT r)
 {
 }
 
+// Build ST/RGBA/Q without floating-point operations: only raw +0 Q becomes FLT_MIN.
+template <bool reference = false>
+static __fi GSVector4i GSPackSTQRGBA(const GIFPackedReg* RESTRICT r)
+{
+#if defined(__ANDROID__) && defined(ARCH_ARM64)
+	if constexpr (!reference)
+	{
+		uint32x4_t stq = vld1q_u32(r[0].U32);
+		const uint32x4_t q_min = {0, 0, 0x00800000, 0};
+		stq = vorrq_u32(stq, vandq_u32(vceqq_u32(stq, vdupq_n_u32(0)), q_min));
+		const uint8x16x2_t table = {{vreinterpretq_u8_u32(stq), vreinterpretq_u8_u32(vld1q_u32(r[1].U32))}};
+		const uint8x16_t indices = {0, 1, 2, 3, 4, 5, 6, 7, 16, 20, 24, 28, 8, 9, 10, 11};
+		return GSVector4i(vreinterpretq_s32_u8(vqtbl2q_u8(table, indices)));
+	}
+#endif
+	const GSVector4i st = GSVector4i::loadl(&r[0].U64[0]);
+	GSVector4i q = GSVector4i::loadl(&r[0].U64[1]);
+	const GSVector4i rgba = (GSVector4i::load<false>(&r[1]) & GSVector4i::x000000ff()).ps32().pu16();
+	q = q.blend8(GSVector4i::cast(GSVector4(FLT_MIN)), q == GSVector4i::zero());
+	return st.upl64(rgba.upl32(q));
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+extern "C" void EmuCoreXOraclePackSTQRGBA(const GIFPackedReg* input, GSVector4i* output, u32 vertices, bool reference)
+{
+	if (reference)
+		for (u32 i = 0; i < vertices; ++i) output[i] = GSPackSTQRGBA<true>(input + i * 3);
+	else
+		for (u32 i = 0; i < vertices; ++i) output[i] = GSPackSTQRGBA(input + i * 3);
+}
+#endif
+
 template <u32 prim, bool auto_flush>
 void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u32 size)
 {
@@ -1036,13 +1068,7 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZF2(const GIFPackedReg* RESTRICT r, u3
 
 	while (r < r_end)
 	{
-		const GSVector4i st = GSVector4i::loadl(&r[0].U64[0]);
-		GSVector4i q = GSVector4i::loadl(&r[0].U64[1]);
-		const GSVector4i rgba = (GSVector4i::load<false>(&r[1]) & GSVector4i::x000000ff()).ps32().pu16();
-
-		q = q.blend8(GSVector4i::cast(GSVector4(FLT_MIN)), q == GSVector4i::zero()); // see GIFPackedRegHandlerSTQ
-
-		m_v.m[0] = st.upl64(rgba.upl32(q)); // TODO: only store the last one
+		m_v.m[0] = GSPackSTQRGBA(r); // TODO: only store the last one
 
 #if defined(ARCH_ARM64)
 		m_v.XYZ.X = r[2].XYZF2.X;
@@ -1077,13 +1103,7 @@ void GSState::GIFPackedRegHandlerSTQRGBAXYZ2(const GIFPackedReg* RESTRICT r, u32
 
 	while (r < r_end)
 	{
-		const GSVector4i st = GSVector4i::loadl(&r[0].U64[0]);
-		GSVector4i q = GSVector4i::loadl(&r[0].U64[1]);
-		const GSVector4i rgba = (GSVector4i::load<false>(&r[1]) & GSVector4i::x000000ff()).ps32().pu16();
-
-		q = q.blend8(GSVector4i::cast(GSVector4(FLT_MIN)), q == GSVector4i::zero()); // see GIFPackedRegHandlerSTQ
-
-		m_v.m[0] = st.upl64(rgba.upl32(q)); // TODO: only store the last one
+		m_v.m[0] = GSPackSTQRGBA(r); // TODO: only store the last one
 
 #if defined(ARCH_ARM64)
 		m_v.XYZ.X = r[2].XYZ2.X;

@@ -186,9 +186,11 @@ void CheckBits(bool pass, u32 actual, u32 expected, const char* name)
 }
 
 #include "jit_oracle_gs_masked_fill.inl"
+#include "jit_oracle_gs_stq_pack.inl"
 
 void GSPreparationDeviceTests()
 {
+    GSSTQPackTests();
     GSMaskedFillTests();
     Check(!g_gs_device && !g_vulkan_shader_cache && !Vulkan::IsVulkanLibraryLoaded(),
         "GS preparation oracle starts without a VM graphics device");
@@ -12348,6 +12350,8 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const
         IOPTests(false, false, true);
     else if (std::strcmp(suite, "iop-avsz") == 0)
         IOPTests(false, false, false, true);
+    else if (std::strcmp(suite, "gs-stq-pack") == 0)
+        GSSTQPackTests();
     else if (std::strcmp(suite, "gs-masked-fill") == 0)
         GSMaskedFillTests();
     else if (std::strcmp(suite, "gs-prepare") == 0)
