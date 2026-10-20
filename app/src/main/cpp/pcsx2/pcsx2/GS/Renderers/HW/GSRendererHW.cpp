@@ -101,6 +101,41 @@ __ri static constexpr std::size_t GSMediumBlendSpriteSWLimit(const GSDevice::Fea
 __noinline static void GSMaskedFill(GSVector4i* RESTRICT ptr, const GSVector4i* ptr_end,
 	const GSVector4i& mask, const GSVector4i& color)
 {
+#if defined(__ANDROID__) && defined(ARCH_ARM64)
+	// Bits forced on by color need not be preserved from memory. This makes
+	// bit selection identical to (old & mask) | color even if mask/color overlap.
+	const GSVector4i keep_mask = mask & ~color;
+	const auto fill = [&](GSVector4i value) {
+		// Clang expands the intrinsic back to AND/OR in this loop. Keep the
+		// single ARM64 bit-select explicit; its only effect is the output value.
+		__asm__("bif %0.16b, %1.16b, %2.16b"
+			: "+w"(value.v4s) : "w"(color.v4s), "w"(keep_mask.v4s));
+		return value;
+	};
+#else
+	const auto fill = [&](const GSVector4i& value) { return (value & mask) | color; };
+#endif
+	while ((ptr_end - ptr) >= 4)
+	{
+		ptr[0] = fill(ptr[0]);
+		ptr[1] = fill(ptr[1]);
+		ptr[2] = fill(ptr[2]);
+		ptr[3] = fill(ptr[3]);
+		ptr += 4;
+	}
+
+	while (ptr != ptr_end)
+	{
+		*ptr = fill(*ptr);
+		ptr++;
+	}
+}
+}
+
+#if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
+__noinline static void GSReferenceMaskedFill(GSVector4i* RESTRICT ptr, const GSVector4i* ptr_end,
+	const GSVector4i& mask, const GSVector4i& color)
+{
 	while ((ptr_end - ptr) >= 4)
 	{
 		ptr[0] = (ptr[0] & mask) | color;
@@ -109,14 +144,21 @@ __noinline static void GSMaskedFill(GSVector4i* RESTRICT ptr, const GSVector4i* 
 		ptr[3] = (ptr[3] & mask) | color;
 		ptr += 4;
 	}
-
 	while (ptr != ptr_end)
 	{
 		*ptr = (*ptr & mask) | color;
 		ptr++;
 	}
 }
+
+extern "C" void EmuCoreXOracleMaskedFill(GSVector4i* data, u32 vectors, u32 mask, u32 color, bool reference)
+{
+	if (reference)
+		GSReferenceMaskedFill(data, data + vectors, GSVector4i(mask), GSVector4i(color));
+	else
+		GSMaskedFill(data, data + vectors, GSVector4i(mask), GSVector4i(color));
 }
+#endif
 
 GSRendererHW::GSRendererHW()
 	: GSRenderer()
