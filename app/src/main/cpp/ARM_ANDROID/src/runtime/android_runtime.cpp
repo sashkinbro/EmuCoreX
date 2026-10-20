@@ -657,6 +657,16 @@ void AndroidRuntime::SetNativeSurface(void* window, int width, int height, float
 	{
 		std::lock_guard lock(mutex_);
 		old_window = static_cast<ANativeWindow*>(native_window_);
+		if (native_window_ == window && surface_width_ == width && surface_height_ == height &&
+			surface_refresh_rate_ == safe_refresh_rate)
+		{
+			// Resume rebinds the current Surface even when it has not changed. Avoid
+			// destroying its swapchain and waiting for GPU idle on every menu close.
+			// JNI acquired a new reference for this notification; retain our existing one.
+			if (window)
+				ANativeWindow_release(static_cast<ANativeWindow*>(window));
+			return;
+		}
 		native_window_ = window;
 		surface_width_ = width;
 		surface_height_ = height;
