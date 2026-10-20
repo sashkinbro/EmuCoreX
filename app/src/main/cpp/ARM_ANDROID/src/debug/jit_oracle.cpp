@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0+
 #include "Common.h"
+#include "DebugTools/Breakpoints.h"
 #include "IopMem.h"
 #include "IopHw.h"
 #include "Memory.h"
@@ -3124,6 +3125,8 @@ void RunEECase(const char* name, const std::vector<u32>& code, bool multiBlock =
     const EESnapshot jit = RunEEProgram(true, code, multiBlock);
     CompareEE(interp, jit, name);
 }
+
+#include "jit_oracle_breakpoint_probes.inl"
 
 std::vector<u32> EEValueSetup()
 {
@@ -12233,7 +12236,9 @@ extern "C" __attribute__((visibility("default"))) int EmuCoreXReplayVU1Fallback(
 extern "C" __attribute__((visibility("default"))) int EmuCoreXRunJitOracle(const char* suite)
 {
     failures = checks = 0;
-    if (std::strcmp(suite, "ee-irq-events") == 0)
+    if (std::strcmp(suite, "breakpoint-probes") == 0)
+        BreakpointProbeTests();
+    else if (std::strcmp(suite, "ee-irq-events") == 0)
         EeIRQEventTests();
     else if (std::strcmp(suite, "ee-vu-sync") == 0)
         EeVUSyncTests();

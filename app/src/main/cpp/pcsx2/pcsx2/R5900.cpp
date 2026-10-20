@@ -763,6 +763,9 @@ inline bool isBranchOrJump(u32 addr)
 
 int isBreakpointNeeded(u32 addr)
 {
+	if (!CBreakPoints::HasBreakpoints())
+		return 0;
+
 	int bpFlags = 0;
 	if (CBreakPoints::IsAddressBreakPoint(BREAKPOINT_EE, addr))
 		bpFlags += 1;

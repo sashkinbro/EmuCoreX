@@ -291,6 +291,9 @@ inline bool psxIsBranchOrJump(u32 addr)
 
 int psxIsBreakpointNeeded(u32 addr)
 {
+	if (!CBreakPoints::HasBreakpoints())
+		return 0;
+
 	int bpFlags = 0;
 	if (CBreakPoints::IsAddressBreakPoint(BREAKPOINT_IOP, addr))
 		bpFlags += 1;
