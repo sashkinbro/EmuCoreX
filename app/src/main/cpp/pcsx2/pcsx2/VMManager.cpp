@@ -331,6 +331,9 @@ void VMManager::SetState(VMState state)
 		const bool paused = (state == VMState::Paused);
 		if (paused)
 		{
+			// Stop consuming audio before the CPU waits for VU/GS to drain. Otherwise
+			// the producer gap can underrun the output and disturb the stretcher on resume.
+			SPU2::SetOutputPaused(true);
 			if (THREAD_VU1)
 				vu1Thread.WaitVU();
 			MTGS::WaitGS(false);
@@ -340,9 +343,9 @@ void VMManager::SetState(VMState state)
 		{
 			PerformanceMetrics::Reset();
 			ResetFrameLimiter();
+			SPU2::SetOutputPaused(false);
 		}
 
-		SPU2::SetOutputPaused(paused);
 		Achievements::OnVMPaused(paused);
 
 		UpdateInhibitScreensaver(!paused && EmuConfig.InhibitScreensaver);
