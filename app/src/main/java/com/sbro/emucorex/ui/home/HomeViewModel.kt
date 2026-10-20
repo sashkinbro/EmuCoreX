@@ -346,6 +346,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         viewModelScope.launch {
+            preferences.homeLibrarySortOption.distinctUntilChanged().collect { value ->
+                _uiState.value = _uiState.value.copy(sortOption = HomeSortOption.fromPreferenceValue(value))
+                publishVisibleGames()
+            }
+        }
+        viewModelScope.launch {
             preferences.homeLibraryViewMode.distinctUntilChanged().collect { mode ->
                 val resolvedMode = when (mode) {
                     1 -> HomeLibraryViewMode.LIST
@@ -546,8 +552,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateSortOption(option: HomeSortOption) {
-        _uiState.value = _uiState.value.copy(sortOption = option)
-        publishVisibleGames()
+        viewModelScope.launch {
+            preferences.setHomeLibrarySortOption(option.name)
+        }
     }
 
     fun toggleLibraryViewMode() {

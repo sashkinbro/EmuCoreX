@@ -13,7 +13,12 @@ enum class HomeSortOption {
     RECENT_ASC,
     SIZE_DESC,
     SIZE_ASC,
-    PLATFORM
+    PLATFORM;
+
+    companion object {
+        fun fromPreferenceValue(value: String?): HomeSortOption =
+            entries.firstOrNull { it.name == value } ?: TITLE_ASC
+    }
 }
 
 data class HomeLibrarySection(val platform: LibraryPlatform?, val games: List<GameItem>)

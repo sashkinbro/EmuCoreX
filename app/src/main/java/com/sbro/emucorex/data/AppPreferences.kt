@@ -681,6 +681,7 @@ class AppPreferences(private val context: Context) {
         private val GAME_SERIAL_OVERRIDES = stringPreferencesKey("game_serial_overrides")
         private val RECENT_GAMES = stringPreferencesKey("recent_games")
         private val HOME_LIBRARY_VIEW_MODE = intPreferencesKey("home_library_view_mode")
+        private val HOME_LIBRARY_SORT_OPTION = stringPreferencesKey("home_library_sort_option")
         private val HIDDEN_GAME_PATHS = stringSetPreferencesKey("hidden_game_paths")
         private const val MAX_RECENT_GAMES = 8
         // Overlay customization
@@ -2554,6 +2555,14 @@ class AppPreferences(private val context: Context) {
         decodeRecentGames(prefs[RECENT_GAMES])
     }
 
+    val homeLibrarySortOption: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[HOME_LIBRARY_SORT_OPTION] ?: "TITLE_ASC"
+    }
+
+    suspend fun setHomeLibrarySortOption(option: String) {
+        context.dataStore.edit { prefs -> prefs[HOME_LIBRARY_SORT_OPTION] = option }
+    }
+
     val homeLibraryViewMode: Flow<Int> = context.dataStore.data.map { prefs ->
         prefs[HOME_LIBRARY_VIEW_MODE] ?: 0
     }
@@ -4329,6 +4338,7 @@ class AppPreferences(private val context: Context) {
             )
             put("recentGames", prefs[RECENT_GAMES] ?: "[]")
             put("homeLibraryViewMode", prefs[HOME_LIBRARY_VIEW_MODE] ?: 0)
+            put("homeLibrarySortOption", prefs[HOME_LIBRARY_SORT_OPTION] ?: "TITLE_ASC")
             put("hiddenGamePaths", JSONArray(prefs[HIDDEN_GAME_PATHS].orEmpty().sorted()))
             put("overlayScale", prefs[OVERLAY_SCALE] ?: 100)
             put(
@@ -4796,6 +4806,10 @@ class AppPreferences(private val context: Context) {
             }
             prefs[RECENT_GAMES] = json.optString("recentGames", "[]")
             prefs[HOME_LIBRARY_VIEW_MODE] = json.optInt("homeLibraryViewMode", 0).coerceIn(0, 2)
+            // Older backups have no saved sort choice; preserve the local selection.
+            if (json.has("homeLibrarySortOption")) {
+                prefs[HOME_LIBRARY_SORT_OPTION] = json.optString("homeLibrarySortOption", "TITLE_ASC")
+            }
             // Older backups do not contain this preference; keep the current local choices.
             json.optJSONArray("hiddenGamePaths")?.let { paths ->
                 prefs[HIDDEN_GAME_PATHS] = (0 until paths.length()).mapNotNull { index ->
