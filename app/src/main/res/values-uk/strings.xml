@@ -90,6 +90,7 @@
     <string name="emulation_patches_user_count">Користувацькі патчі: %1$d</string>
     <string name="emulation_launch_failed">Неможливо відкрити цю гру.</string>
     <string name="emulation_launch_path_error">Неможливо відкрити цей файл.</string>
+    <string name="emulation_vulkan_fallback_opengl">Vulkan впав під час попереднього запуску. Для цього запуску використовується OpenGL; збережене налаштування не змінено.</string>
     <string name="emulation_show_controls">Показати керування</string>
     <string name="emulation_hide_controls">Приховати керування</string>
     <string name="emulation_show_quick_actions">Показати дії</string>

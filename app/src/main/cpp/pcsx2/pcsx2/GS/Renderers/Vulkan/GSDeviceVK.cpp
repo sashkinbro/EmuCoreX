@@ -59,6 +59,11 @@
 #if defined(EMUCOREX_ENABLE_NATIVE_SELF_TESTS)
 #include <sys/system_properties.h>
 #endif
+
+// Implemented by android_crash_diagnostics.cpp. Weak so other platforms and the
+// standalone native tools do not need to link the Android runtime.
+extern "C" void EmuCoreXRecordTFXCompileSelector(u32 vs, u64 ps_hi, u64 ps_lo) __attribute__((weak));
+extern "C" void EmuCoreXClearTFXCompileSelector() __attribute__((weak));
 #endif
 
 // Tweakables
@@ -2676,10 +2681,21 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		return false;
 
 #ifdef __ANDROID__
-	if (GSConfig.DisableAsyncTFXCompile)
+	if (IsDevicePowerVR())
+	{
+		// PowerVR's Vulkan compiler aborts inside vkCreateGraphicsPipelines while the
+		// background TFX warmup compiles its 168 selectors (Pixel 10 / DXT). Compile
+		// pipelines on demand from the GS thread instead of precompiling them.
+		Console.WriteLn("VK: PowerVR detected, skipping background TFX warmup.");
+	}
+	else if (GSConfig.DisableAsyncTFXCompile)
+	{
 		WarmupCommonTFXPipelines();
+	}
 	else
+	{
 		StartAsyncTFXCompilation();
+	}
 #endif
 
 	InitializeState();
@@ -6151,6 +6167,13 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 	if (m_features.framebuffer_fetch && p.IsRTFeedbackLoop())
 		gpb.AddBlendFlags(VK_PIPELINE_COLOR_BLEND_STATE_CREATE_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_BIT_EXT);
 
+#if defined(__ANDROID__)
+	// If the PowerVR driver aborts inside vkCreateGraphicsPipelines, the crash handler
+	// reports this selector so the exact failing variant can be identified.
+	if (IsDevicePowerVR() && EmuCoreXRecordTFXCompileSelector)
+		EmuCoreXRecordTFXCompileSelector(p.vs.key, p.ps.key_hi, p.ps.key_lo);
+#endif
+
 	VkPipeline pipeline;
 	if (lock_pipeline_cache)
 	{
@@ -6173,6 +6196,11 @@ VkPipeline GSDeviceVK::CreateTFXPipelineWithCache(
 		if (trace_compile) driver_ms = std::chrono::duration<double, std::milli>(CompileClock::now() - driver_start).count();
 #endif
 	}
+
+#if defined(__ANDROID__)
+	if (IsDevicePowerVR() && EmuCoreXClearTFXCompileSelector)
+		EmuCoreXClearTFXCompileSelector();
+#endif
 
 	if (pipeline)
 	{
@@ -7727,6 +7755,14 @@ bool GSDeviceVK::CreateTFXPreparationDevice(std::string tfx_source)
 #endif
 			if (!CheckFeatures())
 				return false;
+
+			// The preparation job uses the same PowerVR compiler path that aborts during
+			// the automatic warmup. Keep the feature unavailable instead of crashing.
+			if (IsDevicePowerVR())
+			{
+				Console.Warning("VK: TFX preparation is disabled on PowerVR.");
+				return false;
+			}
 
 			VKShaderCache::Create();
 			m_tfx_preparation_cache_created = static_cast<bool>(g_vulkan_shader_cache);

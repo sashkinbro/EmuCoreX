@@ -133,6 +133,7 @@
     <string name="emulation_patches_user_count">User patches: %1$d</string>
     <string name="emulation_launch_failed">Unable to open this game.</string>
     <string name="emulation_launch_path_error">Unable to open this file.</string>
+    <string name="emulation_vulkan_fallback_opengl">Vulkan crashed during the previous launch. Using OpenGL for this launch; your saved setting is unchanged.</string>
     <string name="emulation_session_restored_unavailable">The previous emulation session was closed in the background. Launch the game again from your library.</string>
     <string name="emulation_show_controls">Show controls</string>
     <string name="emulation_hide_controls">Hide controls</string>

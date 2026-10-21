@@ -1638,6 +1638,7 @@ fun EmulationScreen(
                 "bios_missing" -> stringResource(R.string.emulation_bios_missing)
                 "launch_failed" -> stringResource(R.string.emulation_launch_failed)
                 "launch_path_error" -> stringResource(R.string.emulation_launch_path_error)
+                "vulkan_fallback_opengl" -> stringResource(R.string.emulation_vulkan_fallback_opengl)
                 "disc_swap_success" -> stringResource(R.string.emulation_swap_disc_success)
                 "disc_swap_failed" -> stringResource(R.string.emulation_swap_disc_failed)
                 "disc_swap_invalid" -> stringResource(R.string.emulation_swap_disc_invalid)

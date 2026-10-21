@@ -19,6 +19,7 @@ import com.sbro.emucorex.core.DocumentPathResolver
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.RendererDefaults
 import com.sbro.emucorex.core.SetupValidator
+import com.sbro.emucorex.core.VulkanStartupGuard
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
 import com.sbro.emucorex.core.KeyboardMouseManager
@@ -2101,6 +2102,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         val normalizedSlotToLoad = slotToLoad?.let { normalizeSaveSlot(it) }
         val hasPendingStateLoad = !bootToBios && !bootSmokeProbe && normalizedSlotToLoad != null
         var analyticsPerformanceProfile = PerformanceProfiles.SAFE
+        var launchRenderer = RendererDefaults.defaultForHardware()
         cancelPendingStart = false
         currentLaunchRequest = launchRequest
         pausedForBackground = false
@@ -2166,10 +2168,28 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 val config = loadLaunchConfig()
                 analyticsPerformanceProfile = config.performanceProfile
                 currentAnalyticsAudioBackend = config.audioBackend
-                val renderer = rendererOverride ?: config.renderer
+                val requestedRenderer = rendererOverride ?: config.renderer
+                val fallbackRenderer = VulkanStartupGuard.consumeFallbackRenderer(
+                    getApplication(),
+                    requestedRenderer
+                )
+                val renderer = fallbackRenderer ?: requestedRenderer
+                launchRenderer = renderer
+                if (fallbackRenderer != null) {
+                    _uiState.value = _uiState.value.copy(
+                        renderer = renderer,
+                        toastMessage = "vulkan_fallback_opengl"
+                    )
+                    viewModelScope.launch {
+                        delay(6000.milliseconds)
+                        if (_uiState.value.toastMessage == "vulkan_fallback_opengl") {
+                            _uiState.value = _uiState.value.copy(toastMessage = null)
+                        }
+                    }
+                }
                 Log.i(
                     TAG,
-                    "Launch config loaded bios=${config.biosPath} renderer=$renderer override=${rendererOverride != null} eeJit=${config.enableEeRecompiler} iopJit=${config.enableIopRecompiler}"
+                    "Launch config loaded bios=${config.biosPath} renderer=$renderer requested=$requestedRenderer fallback=${fallbackRenderer != null} override=${rendererOverride != null} eeJit=${config.enableEeRecompiler} iopJit=${config.enableIopRecompiler}"
                 )
                 val enableEeRecompiler = enableEeRecompilerOverride ?: config.enableEeRecompiler
                 val enableIopRecompiler = enableIopRecompilerOverride ?: config.enableIopRecompiler
@@ -2518,6 +2538,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
             val started = try {
                 EmulatorBridge.startEmulation(
                     pathToLaunch,
+                    renderer = launchRenderer,
                     bootSmokeProbe = bootSmokeProbe,
                     allowBiosBoot = bootToBios
                 )

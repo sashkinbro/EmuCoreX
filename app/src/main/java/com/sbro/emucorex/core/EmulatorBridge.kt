@@ -825,6 +825,7 @@ object EmulatorBridge {
 
     suspend fun startEmulation(
         path: String,
+        renderer: Int,
         bootSmokeProbe: Boolean = false,
         allowBiosBoot: Boolean = false
     ): Boolean {
@@ -859,6 +860,7 @@ object EmulatorBridge {
             path.isBlank() -> "bios"
             else -> "file"
         }
+        val startupRenderer = normalizeRenderer(renderer)
         NativeApp.logCrashBreadcrumb("startEmulation requested pathType=$pathType vmActive=$isVmActive")
         Log.i(TAG, "startEmulation requested pathType=$pathType bootSmoke=$bootSmokeProbe vmActive=$isVmActive")
         val shouldAutoProgressiveScanHold = shouldStartAutoProgressiveScanHold(path, bootSmokeProbe, allowBiosBoot)
@@ -868,6 +870,8 @@ object EmulatorBridge {
             runSerial {
             isVmActive = true
             shutdownRequested = false
+            val startupContext = getContext()
+            val startupToken = VulkanStartupGuard.beginLaunch(startupContext, startupRenderer)
             val result = try {
                 NativeApp.logCrashBreadcrumb(
                     "startEmulation entering native ${
@@ -889,6 +893,13 @@ object EmulatorBridge {
                 NativeApp.logCrashBreadcrumb("startEmulation exception before native start returned")
                 Log.e(TAG, "startEmulation native call failed", error)
                 false
+            }
+            if (result) {
+                // Keep the marker armed briefly so an on-demand TFX pipeline crash during
+                // the first frames still triggers the one-shot fallback next time.
+                VulkanStartupGuard.scheduleFinish(startupContext, startupRenderer, startupToken)
+            } else {
+                VulkanStartupGuard.finishLaunch(startupContext, startupRenderer, startupToken)
             }
             if (result) {
                 startAutoProgressiveScanHoldIfEnabled(shouldAutoProgressiveScanHold)
@@ -1211,6 +1222,8 @@ object EmulatorBridge {
     }
 
     suspend fun setRenderer(gpuType: Int) {
+        // An explicit renderer choice from the user overrides any pending crash fallback.
+        VulkanStartupGuard.clearPendingFallback(getContext())
         val resolvedRenderer = normalizeRenderer(gpuType)
         settingsCache["EmuCore/GS:Renderer"] = resolvedRenderer.toString()
         NativeApp.logCrashBreadcrumb(

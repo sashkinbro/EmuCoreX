@@ -6,6 +6,7 @@ import com.sbro.emucorex.core.AppIconManager
 import com.sbro.emucorex.core.CrashLogger
 import com.sbro.emucorex.core.DeviceGpuInfoProvider
 import com.sbro.emucorex.core.EmulatorBridge
+import com.sbro.emucorex.core.VulkanStartupGuard
 import com.sbro.emucorex.core.utils.RetroAchievementsStateManager
 import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.discord.DiscordIntegration
@@ -27,6 +28,9 @@ class EmuCoreXApp : Application() {
         if (getProcessName().endsWith(":discord")) return
         // CrashLogger must be the very first thing — it catches crashes in all subsequent init steps
         CrashLogger.init(this)
+        // If the previous process died with a native Vulkan crash, arm a one-shot OpenGL
+        // launch. The saved renderer setting is not modified.
+        runCatching { VulkanStartupGuard.consumeStartupCrash(this) }
         if (DriveBackupArchive.hasPendingRecovery(this)) applicationScope.launch {
             try { BackupSessionGate.whileStopped { DriveBackupArchive(this@EmuCoreXApp).recoverPending() } }
             catch (cancelled: CancellationException) { throw cancelled }

@@ -90,6 +90,7 @@
     <string name="emulation_patches_user_count">Пользовательские патчи: %1$d</string>
     <string name="emulation_launch_failed">Невозможно открыть эту игру.</string>
     <string name="emulation_launch_path_error">Невозможно открыть этот файл.</string>
+    <string name="emulation_vulkan_fallback_opengl">Vulkan упал во время предыдущего запуска. Для этого запуска используется OpenGL; сохранённая настройка не изменена.</string>
     <string name="emulation_show_controls">Показать управление</string>
     <string name="emulation_hide_controls">Скрыть управление</string>
     <string name="emulation_show_quick_actions">Показать действия</string>

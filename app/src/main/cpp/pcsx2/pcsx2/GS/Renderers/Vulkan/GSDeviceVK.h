@@ -171,6 +171,9 @@ public:
 	/// Returns true if running on an AMD GPU.
 	__fi bool IsDeviceAMD() const { return (m_device_properties.vendorID == 0x1002); }
 
+	/// Returns true if running on an Imagination PowerVR GPU.
+	__fi bool IsDevicePowerVR() const { return (m_device_properties.vendorID == 0x1010); }
+
 	bool IsMaliSX2() const;
 
 	// Creates a simple render pass.

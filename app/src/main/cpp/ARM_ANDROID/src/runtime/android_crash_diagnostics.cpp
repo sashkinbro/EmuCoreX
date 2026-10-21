@@ -50,6 +50,12 @@ char s_game_title[160] = {};
 char s_game_serial[64] = {};
 std::atomic<u32> s_disc_crc{0};
 std::atomic<u32> s_current_crc{0};
+// The TFX selector currently being compiled. If the PowerVR driver aborts inside
+// vkCreateGraphicsPipelines, this identifies the exact pipeline variant.
+std::atomic_bool s_tfx_selector_valid{false};
+std::atomic<u32> s_tfx_vs_key{0};
+std::atomic<u64> s_tfx_ps_key_hi{0};
+std::atomic<u64> s_tfx_ps_key_lo{0};
 
 // ─── Native crash log file ─────────────────────────────────────────────────
 char s_log_file_path[512] = {};
@@ -192,6 +198,14 @@ void NativeCrashSignalHandler(int sig, siginfo_t* info, void* /*ctx*/)
 		s_execute_phase,
 		s_game_title[0] ? s_game_title : "<unknown>",
 		s_game_serial[0] ? s_game_serial : "<unknown>");
+
+	if (s_tfx_selector_valid.load(std::memory_order_relaxed))
+	{
+		WriteToLogFileFmt("NATIVE_CRASH", "tfx_compile vs=%08x ps=%016llx_%016llx",
+			s_tfx_vs_key.load(std::memory_order_relaxed),
+			static_cast<unsigned long long>(s_tfx_ps_key_hi.load(std::memory_order_relaxed)),
+			static_cast<unsigned long long>(s_tfx_ps_key_lo.load(std::memory_order_relaxed)));
+	}
 
 	// Write module info for fault address
 	if (fault_addr)
@@ -495,6 +509,22 @@ void InstallNativeCrashSignalHandler()
 
 	EMUCOREX_DIAGNOSTIC_LOG_WRITE(ANDROID_LOG_INFO, LOG_TAG,
 		"Native crash signal handler installed (SIGSEGV/SIGABRT/SIGBUS/SIGFPE)");
+}
+} // namespace emucorex::android
+
+namespace emucorex::android
+{
+extern "C" void EmuCoreXRecordTFXCompileSelector(u32 vs, u64 ps_hi, u64 ps_lo)
+{
+	s_tfx_vs_key.store(vs, std::memory_order_relaxed);
+	s_tfx_ps_key_hi.store(ps_hi, std::memory_order_relaxed);
+	s_tfx_ps_key_lo.store(ps_lo, std::memory_order_relaxed);
+	s_tfx_selector_valid.store(true, std::memory_order_release);
+}
+
+extern "C" void EmuCoreXClearTFXCompileSelector()
+{
+	s_tfx_selector_valid.store(false, std::memory_order_release);
 }
 } // namespace emucorex::android
 
