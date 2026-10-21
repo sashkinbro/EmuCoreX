@@ -799,7 +799,7 @@ bool VKSwapChain::RecreateSurface(const WindowInfo& new_wi)
 	}
 	if (!present_supported)
 	{
-		pxFailRel("Recreated surface does not support presenting.");
+		ERROR_LOG("Recreated surface does not support presenting.");
 		return false;
 	}
 

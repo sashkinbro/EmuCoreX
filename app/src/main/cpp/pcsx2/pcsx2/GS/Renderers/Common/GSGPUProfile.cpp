@@ -43,7 +43,7 @@ bool LooksLikeAdreno(std::string_view lowered)
 
 bool LooksLikeMobileTileGpu(std::string_view lowered)
 {
-	return ContainsAny(lowered, {"mali", "immortalis", "powervr", "imgtec", "imagination technologies"});
+	return ContainsAny(lowered, {"mali", "immortalis", "powervr", "imgtec", "imagination technologies", "tensor"});
 }
 } // namespace
 

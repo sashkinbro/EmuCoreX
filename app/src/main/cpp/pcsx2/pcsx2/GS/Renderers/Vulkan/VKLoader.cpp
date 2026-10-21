@@ -195,7 +195,8 @@ bool Vulkan::IsVulkanLibraryLoaded()
 
 bool Vulkan::LoadVulkanLibrary(Error* error)
 {
-	pxAssertRel(!s_vulkan_library.IsOpen(), "Vulkan module is not loaded.");
+	if (s_vulkan_library.IsOpen())
+		return true;
 
 	std::string custom_driver_path;
 #if defined(__ANDROID__)
