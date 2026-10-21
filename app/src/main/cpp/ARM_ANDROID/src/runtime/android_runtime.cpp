@@ -130,6 +130,21 @@ static_assert(PadDualshock2::LENGTH <= 32);
 using PendingPadValues = std::array<std::atomic<u32>, PadDualshock2::LENGTH>;
 std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_values{};
 std::array<PendingPadValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_press_values{};
+// Keyboard and mouse publish into separate source slots. The CPU poll merges those
+// values with the legacy gamepad/touch/network slot, so releasing one physical source
+// can never clear a button that another source is still holding.
+constexpr int PAD_INPUT_SOURCE_LEGACY = 0;
+constexpr int PAD_INPUT_SOURCE_KEYBOARD = 1;
+constexpr int PAD_INPUT_SOURCE_MOUSE = 2;
+constexpr int PAD_INPUT_SOURCE_COUNT = 3;
+static_assert(PAD_INPUT_SOURCE_COUNT <= 32);
+using PendingPadSourceValues =
+	std::array<std::array<std::atomic<u32>, PadDualshock2::LENGTH>, PAD_INPUT_SOURCE_COUNT>;
+std::array<PendingPadSourceValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_source_values{};
+std::array<PendingPadSourceValues, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_source_press_values{};
+// Per-bind bitmask of source slots with a pending press edge.
+std::array<std::array<std::atomic<u32>, PadDualshock2::LENGTH>, Pad::NUM_CONTROLLER_PORTS>
+	s_pending_pad_source_latches{};
 // Lower 32 bits mark changed bindings; upper 32 bits latch a press edge. Publishing both
 // in one atomic word prevents the CPU poll from observing/clearing only half an event.
 std::array<std::atomic<u64>, Pad::NUM_CONTROLLER_PORTS> s_pending_pad_events{};
@@ -158,6 +173,9 @@ bool IsArcadePadKey(int index)
 }
 
 std::array<std::atomic<u32>, Pad::NUM_CONTROLLER_PORTS> s_pending_arcade_buttons{};
+// Source-isolated held bits for keyboard/mouse gun and cabinet buttons.
+std::array<std::array<std::atomic<u32>, PAD_INPUT_SOURCE_COUNT>, Pad::NUM_CONTROLLER_PORTS>
+	s_pending_arcade_source_buttons{};
 // Coin and service are momentary cabinet actions: latch each press as a counter so a
 // tap that starts and ends between two CPU polls is still delivered exactly once.
 std::array<std::atomic<u32>, Pad::NUM_CONTROLLER_PORTS> s_pending_coin_edges{};
@@ -190,6 +208,24 @@ void PublishPadValue(u32 controller, u32 bind, float value, bool latch_press = f
 		event |= u64{1} << (bind + 32);
 	}
 	s_pending_pad_values[controller][bind].store(FloatToBits(value), std::memory_order_relaxed);
+	s_pending_pad_events[controller].fetch_or(event, std::memory_order_release);
+}
+
+void PublishPadValueFromSource(u32 controller, u32 bind, float value, bool latch_press, int source)
+{
+	const int source_index = std::clamp(source, PAD_INPUT_SOURCE_KEYBOARD, PAD_INPUT_SOURCE_MOUSE);
+	const u32 bits = FloatToBits(value);
+	s_pending_pad_source_values[controller][source_index][bind].store(bits, std::memory_order_relaxed);
+
+	u64 event = u64{1} << bind;
+	if (latch_press)
+	{
+		s_pending_pad_source_press_values[controller][source_index][bind].store(
+			bits, std::memory_order_relaxed);
+		s_pending_pad_source_latches[controller][bind].fetch_or(
+			static_cast<u32>(1) << source_index, std::memory_order_relaxed);
+		event |= u64{1} << (bind + 32);
+	}
 	s_pending_pad_events[controller].fetch_or(event, std::memory_order_release);
 }
 
@@ -1636,6 +1672,51 @@ void AndroidRuntime::SetPadButton(int pad_index, int index, int range, bool pres
 	PublishPadValue(controller, bind.value(), value, pressed);
 }
 
+void AndroidRuntime::SetPadButtonFromSource(int pad_index, int index, int range, bool pressed, int source)
+{
+	if (!VMManager::HasValidVM())
+		return;
+
+	if (source != PAD_INPUT_SOURCE_KEYBOARD && source != PAD_INPUT_SOURCE_MOUSE)
+	{
+		SetPadButton(pad_index, index, range, pressed);
+		return;
+	}
+
+	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
+	if (IsArcadePadKey(index))
+	{
+		if (index == ANDROID_KEY_COIN)
+		{
+			if (pressed)
+				s_pending_coin_edges[controller].fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+		if (index == ANDROID_KEY_SERVICE)
+		{
+			if (pressed)
+				s_pending_service_edges[controller].fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+
+		const u32 bit = ArcadeKeyBit(index);
+		u32 current = s_pending_arcade_source_buttons[controller][source].load(std::memory_order_relaxed);
+		if (pressed)
+			current |= bit;
+		else
+			current &= ~bit;
+		s_pending_arcade_source_buttons[controller][source].store(current, std::memory_order_release);
+		return;
+	}
+
+	const std::optional<u32> bind = MapAndroidPadKeyToDualShock2Input(index);
+	if (!bind.has_value())
+		return;
+
+	const float value = PadValueFromAndroidRange(range, pressed);
+	PublishPadValueFromSource(controller, bind.value(), value, pressed, source);
+}
+
 void AndroidRuntime::SetPadPressureModifierAmount(int amount_percent)
 {
 	if (!VMManager::HasValidVM())
@@ -1654,13 +1735,23 @@ void AndroidRuntime::ResetPadState(int pad_index)
 	const u32 controller = static_cast<u32>(std::clamp(pad_index, 0, static_cast<int>(Pad::NUM_CONTROLLER_PORTS - 1)));
 	s_pending_pad_events[controller].store(0, std::memory_order_release);
 	s_pending_arcade_buttons[controller].store(0, std::memory_order_release);
+	for (int source = 0; source < PAD_INPUT_SOURCE_COUNT; source++)
+		s_pending_arcade_source_buttons[controller][source].store(0, std::memory_order_release);
 	// The CPU-thread mirror must be cleared too, or the next press of an arcade/gun button
 	// looks unchanged to the poll and is swallowed until the button is released again.
 	s_applied_arcade_buttons[controller] = 0;
 	s_pending_coin_edges[controller].store(0, std::memory_order_release);
 	s_pending_service_edges[controller].store(0, std::memory_order_release);
 	for (u32 i = 0; i < PadDualshock2::LENGTH; i++)
+	{
+		for (int source = 0; source < PAD_INPUT_SOURCE_COUNT; source++)
+		{
+			s_pending_pad_source_values[controller][source][i].store(0, std::memory_order_relaxed);
+			s_pending_pad_source_press_values[controller][source][i].store(0, std::memory_order_relaxed);
+		}
+		s_pending_pad_source_latches[controller][i].store(0, std::memory_order_relaxed);
 		PublishPadValue(controller, i, 0.0f);
+	}
 }
 
 void AndroidRuntime::ResetKeyStatus()
@@ -1684,7 +1775,9 @@ void ApplyPendingArcadeButtonsOnCPUThread()
 				ACJV::ToggleDIPSwitchState(0);
 		}
 
-		const u32 current = s_pending_arcade_buttons[controller].load(std::memory_order_acquire);
+		u32 current = s_pending_arcade_buttons[controller].load(std::memory_order_acquire);
+		for (int source = PAD_INPUT_SOURCE_KEYBOARD; source < PAD_INPUT_SOURCE_COUNT; source++)
+			current |= s_pending_arcade_source_buttons[controller][source].load(std::memory_order_acquire);
 		const u32 changed = current ^ s_applied_arcade_buttons[controller];
 		if (changed == 0)
 			continue;
@@ -1718,10 +1811,24 @@ void PollPendingPadUpdatesOnCPUThread()
 			events.store(0, std::memory_order_relaxed);
 		for (std::atomic<u32>& buttons : s_pending_arcade_buttons)
 			buttons.store(0, std::memory_order_relaxed);
+		for (auto& ports : s_pending_arcade_source_buttons)
+			for (std::atomic<u32>& buttons : ports)
+				buttons.store(0, std::memory_order_relaxed);
 		for (std::atomic<u32>& edges : s_pending_coin_edges)
 			edges.store(0, std::memory_order_relaxed);
 		for (std::atomic<u32>& edges : s_pending_service_edges)
 			edges.store(0, std::memory_order_relaxed);
+		for (auto& ports : s_pending_pad_source_values)
+			for (auto& sources : ports)
+				for (std::atomic<u32>& value : sources)
+					value.store(0, std::memory_order_relaxed);
+		for (auto& ports : s_pending_pad_source_press_values)
+			for (auto& sources : ports)
+				for (std::atomic<u32>& value : sources)
+					value.store(0, std::memory_order_relaxed);
+		for (auto& ports : s_pending_pad_source_latches)
+			for (std::atomic<u32>& latches : ports)
+				latches.store(0, std::memory_order_relaxed);
 		s_applied_arcade_buttons.fill(0);
 		s_pending_pressure_modifier_dirty.store(false, std::memory_order_relaxed);
 		return;
@@ -1736,20 +1843,44 @@ void PollPendingPadUpdatesOnCPUThread()
 		{
 			const u32 bind = static_cast<u32>(std::countr_zero(dirty));
 			dirty &= dirty - 1;
-			const u32 value = s_pending_pad_values[controller][bind].load(std::memory_order_relaxed);
-			if ((pressed & (1u << bind)) != 0 && value == FloatToBits(0.0f))
+
+			const u32 legacy_value = s_pending_pad_values[controller][bind].load(std::memory_order_relaxed);
+			float value = BitsToFloat(legacy_value);
+			for (int source = PAD_INPUT_SOURCE_KEYBOARD; source < PAD_INPUT_SOURCE_COUNT; source++)
 			{
-				// A complete press/release arrived between CPU polls. Expose the press for
-				// this frame and republish the already-recorded release for the next poll.
+				const float source_value = BitsToFloat(
+					s_pending_pad_source_values[controller][source][bind].load(std::memory_order_relaxed));
+				value = std::max(value, source_value);
+			}
+
+			bool republish_release = false;
+			const u32 source_latches =
+				s_pending_pad_source_latches[controller][bind].exchange(0, std::memory_order_relaxed);
+			for (int source = PAD_INPUT_SOURCE_KEYBOARD; source < PAD_INPUT_SOURCE_COUNT; source++)
+			{
+				if ((source_latches & (static_cast<u32>(1) << source)) == 0)
+					continue;
+
+				// A complete keyboard/mouse press/release arrived between CPU polls. Expose
+				// the press for this frame and republish the release for the next poll.
+				const float press_value = BitsToFloat(
+					s_pending_pad_source_press_values[controller][source][bind].load(
+						std::memory_order_relaxed));
+				value = std::max(value, press_value);
+				republish_release = true;
+			}
+
+			if ((pressed & (1u << bind)) != 0 && legacy_value == FloatToBits(0.0f))
+			{
 				const u32 press_value =
 					s_pending_pad_press_values[controller][bind].load(std::memory_order_relaxed);
-				Pad::SetControllerState(controller, bind, BitsToFloat(press_value));
+				value = std::max(value, BitsToFloat(press_value));
+				republish_release = true;
+			}
+
+			Pad::SetControllerState(controller, bind, value);
+			if (republish_release)
 				s_pending_pad_events[controller].fetch_or(u64{1} << bind, std::memory_order_release);
-			}
-			else
-			{
-				Pad::SetControllerState(controller, bind, BitsToFloat(value));
-			}
 		}
 	}
 

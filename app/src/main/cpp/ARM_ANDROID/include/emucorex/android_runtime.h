@@ -75,6 +75,7 @@ public:
 	bool CreateMemoryCard(const std::string& name, int type, int file_type);
 
 	void SetPadButton(int pad_index, int index, int range, bool pressed);
+	void SetPadButtonFromSource(int pad_index, int index, int range, bool pressed, int source);
 	void SetPadPressureModifierAmount(int amount_percent);
 	void ResetPadState(int pad_index);
 	void ResetKeyStatus();

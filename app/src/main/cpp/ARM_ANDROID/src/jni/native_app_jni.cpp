@@ -701,6 +701,7 @@ extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_queueGsD
 #endif
 
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadButton(JNIEnv*, jclass, jint pad_index, jint index, jint range, jboolean pressed) { AndroidRuntime::Instance().SetPadButton(pad_index, index, range, pressed == JNI_TRUE); }
+extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setPadButtonFromSource(JNIEnv*, jclass, jint pad_index, jint index, jint range, jboolean pressed, jint source) { AndroidRuntime::Instance().SetPadButtonFromSource(pad_index, index, range, pressed == JNI_TRUE, source); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_setInternetLinkTransportReady(JNIEnv*, jclass, jboolean ready) { InternetLinkBridge::SetTransportReady(ready == JNI_TRUE); }
 extern "C" JNIEXPORT void JNICALL Java_com_sbro_emucorex_core_NativeApp_resetInternetLinkTransport(JNIEnv*, jclass) { InternetLinkBridge::Reset(); }
 extern "C" JNIEXPORT jboolean JNICALL Java_com_sbro_emucorex_core_NativeApp_pushInternetLinkFrame(JNIEnv* env, jclass, jbyteArray frame)

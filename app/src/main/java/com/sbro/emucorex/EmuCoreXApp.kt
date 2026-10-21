@@ -24,7 +24,7 @@ class EmuCoreXApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // The Discord SDK helper must not initialize the emulator-side application graph.
-        if (Application.getProcessName().endsWith(":discord")) return
+        if (getProcessName().endsWith(":discord")) return
         // CrashLogger must be the very first thing — it catches crashes in all subsequent init steps
         CrashLogger.init(this)
         if (DriveBackupArchive.hasPendingRecovery(this)) applicationScope.launch {

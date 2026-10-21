@@ -340,6 +340,13 @@ object NativeApp {
     }
     @JvmStatic private external fun queueGsDumpNative(frames: Int)
     @JvmStatic external fun setPadButton(padIndex: Int, index: Int, range: Int, pressed: Boolean)
+    @JvmStatic external fun setPadButtonFromSource(
+        padIndex: Int,
+        index: Int,
+        range: Int,
+        pressed: Boolean,
+        source: Int
+    )
     @JvmStatic external fun setInternetLinkTransportReady(ready: Boolean)
     @JvmStatic external fun resetInternetLinkTransport()
     @JvmStatic external fun pushInternetLinkFrame(frame: ByteArray): Boolean

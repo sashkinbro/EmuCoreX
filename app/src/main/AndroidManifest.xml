@@ -90,7 +90,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation"
             android:theme="@style/Theme.EmuCoreX.Splash">
             <intent-filter>
                 <action android:name="com.sbro.emucorex.action.LAUNCH_GAME" />
@@ -106,7 +106,7 @@
         <activity
             android:name=".TvActivity"
             android:banner="@drawable/tv_banner"
-            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.EmuCoreX.Splash"

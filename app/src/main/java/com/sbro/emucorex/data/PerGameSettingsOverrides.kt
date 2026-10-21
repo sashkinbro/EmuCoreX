@@ -55,6 +55,7 @@ internal fun PerGameSettings.withOnlyOverridesComparedWith(
         if (gamepadLeftStickCurve != defaults.gamepadLeftStickCurve) add("gamepadLeftStickCurve")
         if (gamepadRightStickCurve != defaults.gamepadRightStickCurve) add("gamepadRightStickCurve")
         if (gamepadBindingsByPad != defaults.gamepadBindingsByPad) add("gamepadBindingsByPad")
+        if (keyboardMouse != defaults.keyboardMouse) add("keyboardMouse")
         if (pressureModifierAmount != defaults.pressureModifierAmount) add("pressureModifierAmount")
         if (autoSaveOnExit != defaults.autoSaveOnExit) add("autoSaveOnExit")
         if (autoLoadOnStart != defaults.autoLoadOnStart) add("autoLoadOnStart")

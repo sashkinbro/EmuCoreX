@@ -17,6 +17,7 @@ import com.sbro.emucorex.core.AudioDefaults
 import com.sbro.emucorex.core.EmulatorBridge
 import com.sbro.emucorex.core.GpuHardwareProfiles
 import com.sbro.emucorex.core.GsHackDefaults
+import com.sbro.emucorex.core.KeyboardMouseBindings
 import com.sbro.emucorex.core.PerformanceProfiles
 import com.sbro.emucorex.core.PerformancePresets
 import com.sbro.emucorex.core.RendererDefaults
@@ -488,6 +489,34 @@ class AppPreferences(private val context: Context) {
         const val GAMEPAD_STICK_CURVE_MIN = 50
         const val GAMEPAD_STICK_CURVE_MAX = 200
         const val DEFAULT_GAMEPAD_STICK_CURVE = 100
+        const val DEFAULT_MOUSE_SENSITIVITY = KeyboardMouseBindings.DEFAULT_MOUSE_SENSITIVITY
+        const val MOUSE_SENSITIVITY_MIN = KeyboardMouseBindings.MOUSE_SENSITIVITY_MIN
+        const val MOUSE_SENSITIVITY_MAX = KeyboardMouseBindings.MOUSE_SENSITIVITY_MAX
+        const val DEFAULT_MOUSE_VERTICAL_SENSITIVITY =
+            KeyboardMouseBindings.DEFAULT_MOUSE_VERTICAL_SENSITIVITY
+        const val MOUSE_VERTICAL_SENSITIVITY_MIN =
+            KeyboardMouseBindings.MOUSE_VERTICAL_SENSITIVITY_MIN
+        const val MOUSE_VERTICAL_SENSITIVITY_MAX =
+            KeyboardMouseBindings.MOUSE_VERTICAL_SENSITIVITY_MAX
+        const val DEFAULT_MOUSE_SMOOTHING = 0
+        const val MOUSE_SMOOTHING_MIN = 0
+        const val MOUSE_SMOOTHING_MAX = 90
+        const val DEFAULT_MOUSE_DEADZONE = KeyboardMouseBindings.DEFAULT_MOUSE_DEADZONE
+        const val MOUSE_DEADZONE_MIN = KeyboardMouseBindings.MOUSE_DEADZONE_MIN
+        const val MOUSE_DEADZONE_MAX = KeyboardMouseBindings.MOUSE_DEADZONE_MAX
+        const val DEFAULT_MOUSE_WHEEL_PULSE_MS =
+            KeyboardMouseBindings.DEFAULT_MOUSE_WHEEL_PULSE_MS
+        const val MOUSE_WHEEL_PULSE_MIN_MS = KeyboardMouseBindings.MOUSE_WHEEL_PULSE_MIN_MS
+        const val MOUSE_WHEEL_PULSE_MAX_MS = KeyboardMouseBindings.MOUSE_WHEEL_PULSE_MAX_MS
+        const val MOUSE_AIM_OFF = KeyboardMouseBindings.MOUSE_AIM_OFF
+        const val MOUSE_AIM_RIGHT_STICK = KeyboardMouseBindings.MOUSE_AIM_RIGHT_STICK
+        const val MOUSE_AIM_LEFT_STICK = KeyboardMouseBindings.MOUSE_AIM_LEFT_STICK
+        const val MOUSE_WHEEL_OFF = KeyboardMouseBindings.MOUSE_WHEEL_OFF
+        const val MOUSE_WHEEL_DPAD = KeyboardMouseBindings.MOUSE_WHEEL_DPAD
+        const val MOUSE_WHEEL_TRIGGERS = KeyboardMouseBindings.MOUSE_WHEEL_TRIGGERS
+        const val MOUSE_WHEEL_LEFT_STICK = KeyboardMouseBindings.MOUSE_WHEEL_LEFT_STICK
+        const val MOUSE_WHEEL_RIGHT_STICK = KeyboardMouseBindings.MOUSE_WHEEL_RIGHT_STICK
+        const val MOUSE_WHEEL_SHOULDERS = KeyboardMouseBindings.MOUSE_WHEEL_SHOULDERS
         const val DEFAULT_PREFER_EXTERNAL_GAMEPAD_PLAYER_ONE = true
         const val DEFAULT_FLOATING_QUICK_SAVE_POSITION_X = 0.88f
         const val DEFAULT_FLOATING_QUICK_SAVE_POSITION_Y = 0.42f
@@ -824,6 +853,23 @@ class AppPreferences(private val context: Context) {
         private val GAMEPAD_RIGHT_STICK_UP_TO_R2 = booleanPreferencesKey("gamepad_right_stick_up_to_r2")
         private val GAMEPAD_RIGHT_STICK_DOWN_TO_L2 = booleanPreferencesKey("gamepad_right_stick_down_to_l2")
         private val GAMEPAD_BINDINGS = stringPreferencesKey("gamepad_bindings")
+        private val KEYBOARD_ENABLED = booleanPreferencesKey("keyboard_enabled")
+        private val MOUSE_ENABLED = booleanPreferencesKey("mouse_enabled")
+        private val KEYBOARD_BINDINGS = stringPreferencesKey("keyboard_bindings")
+        private val MOUSE_BINDINGS = stringPreferencesKey("mouse_bindings")
+        private val KEYBOARD_TARGET_PAD = intPreferencesKey("keyboard_target_pad")
+        private val MOUSE_TARGET_PAD = intPreferencesKey("mouse_target_pad")
+        private val MOUSE_AIM_MODE = intPreferencesKey("mouse_aim_mode")
+        private val MOUSE_SENSITIVITY = intPreferencesKey("mouse_sensitivity")
+        private val MOUSE_VERTICAL_SENSITIVITY = intPreferencesKey("mouse_vertical_sensitivity")
+        private val MOUSE_SMOOTHING = intPreferencesKey("mouse_smoothing")
+        private val MOUSE_AIM_DEADZONE = intPreferencesKey("mouse_aim_deadzone")
+        private val MOUSE_WHEEL_PULSE_MS = intPreferencesKey("mouse_wheel_pulse_ms")
+        private val MOUSE_INVERT_X = booleanPreferencesKey("mouse_invert_x")
+        private val MOUSE_INVERT_Y = booleanPreferencesKey("mouse_invert_y")
+        private val MOUSE_CAPTURE_CURSOR = booleanPreferencesKey("mouse_capture_cursor")
+        private val MOUSE_LEFT_HANDED = booleanPreferencesKey("mouse_left_handed")
+        private val MOUSE_WHEEL_MODE = intPreferencesKey("mouse_wheel_mode")
         private val GAMEPAD_DEVICE_ASSIGNMENTS = stringPreferencesKey("gamepad_device_assignments")
         private val GAMEPAD_IGNORED_DEVICES = stringPreferencesKey("gamepad_ignored_devices")
         private val GPU_DRIVER_TYPE = intPreferencesKey("gpu_driver_type")
@@ -2766,6 +2812,30 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    private fun updateKeyboardMouseBindingsForPad(
+        prefs: MutablePreferences,
+        key: Preferences.Key<String>,
+        padIndex: Int,
+        transform: (MutableMap<String, Int>) -> Unit
+    ) {
+        val normalizedPadIndex = normalizeGamepadPadIndex(padIndex)
+        val updated = decodeGamepadBindingsByPad(prefs[key])
+            .mapValues { (_, bindings) -> bindings.toMutableMap() }
+            .toMutableMap()
+        val padBindings = updated[normalizedPadIndex]?.toMutableMap() ?: mutableMapOf()
+        transform(padBindings)
+        if (padBindings.isEmpty()) {
+            updated.remove(normalizedPadIndex)
+        } else {
+            updated[normalizedPadIndex] = padBindings
+        }
+        if (updated.isEmpty()) {
+            prefs.remove(key)
+        } else {
+            prefs[key] = encodeGamepadBindingsByPad(updated)
+        }
+    }
+
     // Overlay customization
     val overlayScale: Flow<Int> = context.dataStore.data.map { prefs ->
         prefs[OVERLAY_SCALE] ?: 100
@@ -3780,6 +3850,282 @@ class AppPreferences(private val context: Context) {
         }
     }
 
+    val keyboardMouseSettings: Flow<KeyboardMouseSettings> = context.dataStore.data.map { prefs ->
+        KeyboardMouseSettings(
+            keyboardEnabled = prefs[KEYBOARD_ENABLED] ?: true,
+            mouseEnabled = prefs[MOUSE_ENABLED] ?: true,
+            keyboardTargetPad = (prefs[KEYBOARD_TARGET_PAD] ?: 0).coerceIn(0, 1),
+            mouseTargetPad = (prefs[MOUSE_TARGET_PAD] ?: 0).coerceIn(0, 1),
+            keyboardBindingsByPad = decodeGamepadBindingsByPad(prefs[KEYBOARD_BINDINGS]),
+            mouseBindingsByPad = decodeGamepadBindingsByPad(prefs[MOUSE_BINDINGS]),
+            mouseAimMode = (prefs[MOUSE_AIM_MODE] ?: MOUSE_AIM_OFF)
+                .coerceIn(MOUSE_AIM_OFF, MOUSE_AIM_LEFT_STICK),
+            mouseSensitivity = (prefs[MOUSE_SENSITIVITY] ?: DEFAULT_MOUSE_SENSITIVITY)
+                .coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX),
+            mouseVerticalSensitivity =
+                (prefs[MOUSE_VERTICAL_SENSITIVITY] ?: DEFAULT_MOUSE_VERTICAL_SENSITIVITY)
+                    .coerceIn(MOUSE_VERTICAL_SENSITIVITY_MIN, MOUSE_VERTICAL_SENSITIVITY_MAX),
+            mouseSmoothing = (prefs[MOUSE_SMOOTHING] ?: DEFAULT_MOUSE_SMOOTHING)
+                .coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX),
+            mouseAimDeadzone = (prefs[MOUSE_AIM_DEADZONE] ?: DEFAULT_MOUSE_DEADZONE)
+                .coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX),
+            mouseInvertX = prefs[MOUSE_INVERT_X] ?: false,
+            mouseInvertY = prefs[MOUSE_INVERT_Y] ?: false,
+            mouseCaptureCursor = prefs[MOUSE_CAPTURE_CURSOR] ?: true,
+            mouseLeftHanded = prefs[MOUSE_LEFT_HANDED] ?: false,
+            mouseWheelMode = (prefs[MOUSE_WHEEL_MODE] ?: MOUSE_WHEEL_OFF)
+                .coerceIn(MOUSE_WHEEL_OFF, MOUSE_WHEEL_SHOULDERS),
+            mouseWheelPulseMs = (prefs[MOUSE_WHEEL_PULSE_MS] ?: DEFAULT_MOUSE_WHEEL_PULSE_MS)
+                .coerceIn(MOUSE_WHEEL_PULSE_MIN_MS, MOUSE_WHEEL_PULSE_MAX_MS)
+        )
+    }
+
+    suspend fun setKeyboardMouseSettings(settings: KeyboardMouseSettings) {
+        context.dataStore.edit { prefs ->
+            prefs[KEYBOARD_ENABLED] = settings.keyboardEnabled
+            prefs[MOUSE_ENABLED] = settings.mouseEnabled
+            prefs[KEYBOARD_TARGET_PAD] = settings.keyboardTargetPad.coerceIn(0, 1)
+            prefs[MOUSE_TARGET_PAD] = settings.mouseTargetPad.coerceIn(0, 1)
+            if (settings.keyboardBindingsByPad.isEmpty()) {
+                prefs.remove(KEYBOARD_BINDINGS)
+            } else {
+                prefs[KEYBOARD_BINDINGS] = encodeGamepadBindingsByPad(settings.keyboardBindingsByPad)
+            }
+            if (settings.mouseBindingsByPad.isEmpty()) {
+                prefs.remove(MOUSE_BINDINGS)
+            } else {
+                prefs[MOUSE_BINDINGS] = encodeGamepadBindingsByPad(settings.mouseBindingsByPad)
+            }
+            prefs[MOUSE_AIM_MODE] = settings.mouseAimMode.coerceIn(MOUSE_AIM_OFF, MOUSE_AIM_LEFT_STICK)
+            prefs[MOUSE_SENSITIVITY] = settings.mouseSensitivity
+                .coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX)
+            prefs[MOUSE_VERTICAL_SENSITIVITY] = settings.mouseVerticalSensitivity
+                .coerceIn(MOUSE_VERTICAL_SENSITIVITY_MIN, MOUSE_VERTICAL_SENSITIVITY_MAX)
+            prefs[MOUSE_SMOOTHING] = settings.mouseSmoothing
+                .coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX)
+            prefs[MOUSE_AIM_DEADZONE] = settings.mouseAimDeadzone
+                .coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX)
+            prefs[MOUSE_INVERT_X] = settings.mouseInvertX
+            prefs[MOUSE_INVERT_Y] = settings.mouseInvertY
+            prefs[MOUSE_CAPTURE_CURSOR] = settings.mouseCaptureCursor
+            prefs[MOUSE_LEFT_HANDED] = settings.mouseLeftHanded
+            prefs[MOUSE_WHEEL_MODE] = settings.mouseWheelMode
+                .coerceIn(MOUSE_WHEEL_OFF, MOUSE_WHEEL_SHOULDERS)
+            prefs[MOUSE_WHEEL_PULSE_MS] = settings.mouseWheelPulseMs
+                .coerceIn(MOUSE_WHEEL_PULSE_MIN_MS, MOUSE_WHEEL_PULSE_MAX_MS)
+        }
+    }
+
+    val keyboardEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[KEYBOARD_ENABLED] ?: true
+    }
+
+    suspend fun setKeyboardEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEYBOARD_ENABLED] = enabled }
+    }
+
+    val mouseEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MOUSE_ENABLED] ?: true
+    }
+
+    suspend fun setMouseEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[MOUSE_ENABLED] = enabled }
+    }
+
+    val keyboardTargetPad: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[KEYBOARD_TARGET_PAD] ?: 0).coerceIn(0, 1)
+    }
+
+    suspend fun setKeyboardTargetPad(padIndex: Int) {
+        context.dataStore.edit { it[KEYBOARD_TARGET_PAD] = padIndex.coerceIn(0, 1) }
+    }
+
+    val mouseTargetPad: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_TARGET_PAD] ?: 0).coerceIn(0, 1)
+    }
+
+    suspend fun setMouseTargetPad(padIndex: Int) {
+        context.dataStore.edit { it[MOUSE_TARGET_PAD] = padIndex.coerceIn(0, 1) }
+    }
+
+    val keyboardBindingsByPad: Flow<Map<Int, Map<String, Int>>> = context.dataStore.data.map { prefs ->
+        decodeGamepadBindingsByPad(prefs[KEYBOARD_BINDINGS])
+    }
+
+    suspend fun setKeyboardBinding(padIndex: Int, actionId: String, keyCode: Int) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, KEYBOARD_BINDINGS, padIndex) { updated ->
+                val assigned = KeyboardMouseBindings.assign(updated, actionId, keyCode)
+                updated.clear()
+                updated.putAll(assigned)
+            }
+        }
+    }
+
+    suspend fun clearKeyboardBinding(padIndex: Int, actionId: String) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, KEYBOARD_BINDINGS, padIndex) { updated ->
+                val cleared = KeyboardMouseBindings.clear(updated, actionId)
+                updated.clear()
+                updated.putAll(cleared)
+            }
+        }
+    }
+
+    suspend fun resetKeyboardBindingsForPad(padIndex: Int) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, KEYBOARD_BINDINGS, padIndex) { updated ->
+                updated.clear()
+            }
+        }
+    }
+
+    val mouseBindingsByPad: Flow<Map<Int, Map<String, Int>>> = context.dataStore.data.map { prefs ->
+        decodeGamepadBindingsByPad(prefs[MOUSE_BINDINGS])
+    }
+
+    suspend fun setMouseBinding(padIndex: Int, actionId: String, button: Int) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, MOUSE_BINDINGS, padIndex) { updated ->
+                val assigned = KeyboardMouseBindings.assign(updated, actionId, button)
+                updated.clear()
+                updated.putAll(assigned)
+            }
+        }
+    }
+
+    suspend fun clearMouseBinding(padIndex: Int, actionId: String) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, MOUSE_BINDINGS, padIndex) { updated ->
+                val cleared = KeyboardMouseBindings.clear(updated, actionId)
+                updated.clear()
+                updated.putAll(cleared)
+            }
+        }
+    }
+
+    suspend fun resetMouseBindingsForPad(padIndex: Int) {
+        context.dataStore.edit { prefs ->
+            updateKeyboardMouseBindingsForPad(prefs, MOUSE_BINDINGS, padIndex) { updated ->
+                updated.clear()
+            }
+        }
+    }
+
+    val mouseAimMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_AIM_MODE] ?: MOUSE_AIM_OFF).coerceIn(MOUSE_AIM_OFF, MOUSE_AIM_LEFT_STICK)
+    }
+
+    suspend fun setMouseAimMode(mode: Int) {
+        context.dataStore.edit {
+            it[MOUSE_AIM_MODE] = mode.coerceIn(MOUSE_AIM_OFF, MOUSE_AIM_LEFT_STICK)
+        }
+    }
+
+    val mouseSensitivity: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_SENSITIVITY] ?: DEFAULT_MOUSE_SENSITIVITY)
+            .coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX)
+    }
+
+    suspend fun setMouseSensitivity(value: Int) {
+        context.dataStore.edit {
+            it[MOUSE_SENSITIVITY] = value.coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX)
+        }
+    }
+
+    val mouseVerticalSensitivity: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_VERTICAL_SENSITIVITY] ?: DEFAULT_MOUSE_VERTICAL_SENSITIVITY)
+            .coerceIn(MOUSE_VERTICAL_SENSITIVITY_MIN, MOUSE_VERTICAL_SENSITIVITY_MAX)
+    }
+
+    suspend fun setMouseVerticalSensitivity(value: Int) {
+        context.dataStore.edit {
+            it[MOUSE_VERTICAL_SENSITIVITY] = value.coerceIn(
+                MOUSE_VERTICAL_SENSITIVITY_MIN,
+                MOUSE_VERTICAL_SENSITIVITY_MAX
+            )
+        }
+    }
+
+    val mouseSmoothing: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_SMOOTHING] ?: DEFAULT_MOUSE_SMOOTHING)
+            .coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX)
+    }
+
+    suspend fun setMouseSmoothing(value: Int) {
+        context.dataStore.edit {
+            it[MOUSE_SMOOTHING] = value.coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX)
+        }
+    }
+
+    val mouseAimDeadzone: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_AIM_DEADZONE] ?: DEFAULT_MOUSE_DEADZONE)
+            .coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX)
+    }
+
+    suspend fun setMouseAimDeadzone(value: Int) {
+        context.dataStore.edit {
+            it[MOUSE_AIM_DEADZONE] = value.coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX)
+        }
+    }
+
+    val mouseWheelPulseMs: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_WHEEL_PULSE_MS] ?: DEFAULT_MOUSE_WHEEL_PULSE_MS)
+            .coerceIn(MOUSE_WHEEL_PULSE_MIN_MS, MOUSE_WHEEL_PULSE_MAX_MS)
+    }
+
+    suspend fun setMouseWheelPulseMs(value: Int) {
+        context.dataStore.edit {
+            it[MOUSE_WHEEL_PULSE_MS] = value.coerceIn(
+                MOUSE_WHEEL_PULSE_MIN_MS,
+                MOUSE_WHEEL_PULSE_MAX_MS
+            )
+        }
+    }
+
+    val mouseInvertX: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MOUSE_INVERT_X] ?: false
+    }
+
+    suspend fun setMouseInvertX(enabled: Boolean) {
+        context.dataStore.edit { it[MOUSE_INVERT_X] = enabled }
+    }
+
+    val mouseInvertY: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MOUSE_INVERT_Y] ?: false
+    }
+
+    suspend fun setMouseInvertY(enabled: Boolean) {
+        context.dataStore.edit { it[MOUSE_INVERT_Y] = enabled }
+    }
+
+    val mouseCaptureCursor: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MOUSE_CAPTURE_CURSOR] ?: true
+    }
+
+    suspend fun setMouseCaptureCursor(enabled: Boolean) {
+        context.dataStore.edit { it[MOUSE_CAPTURE_CURSOR] = enabled }
+    }
+
+    val mouseLeftHanded: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[MOUSE_LEFT_HANDED] ?: false
+    }
+
+    suspend fun setMouseLeftHanded(enabled: Boolean) {
+        context.dataStore.edit { it[MOUSE_LEFT_HANDED] = enabled }
+    }
+
+    val mouseWheelMode: Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[MOUSE_WHEEL_MODE] ?: MOUSE_WHEEL_OFF)
+            .coerceIn(MOUSE_WHEEL_OFF, MOUSE_WHEEL_SHOULDERS)
+    }
+
+    suspend fun setMouseWheelMode(mode: Int) {
+        context.dataStore.edit {
+            it[MOUSE_WHEEL_MODE] = mode.coerceIn(MOUSE_WHEEL_OFF, MOUSE_WHEEL_SHOULDERS)
+        }
+    }
+
     val gamepadDeviceAssignments: Flow<Map<Int, String>> = context.dataStore.data.map { prefs ->
         decodeGamepadDeviceAssignments(prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
     }
@@ -4545,6 +4891,46 @@ class AppPreferences(private val context: Context) {
             put("orientationLock", normalizeOrientationLock(prefs[ORIENTATION_LOCK]))
             put("emulationAllowsBothOrientations", prefs[EMULATION_ALLOWS_BOTH_ORIENTATIONS] ?: false)
             put("gamepadBindings", prefs[GAMEPAD_BINDINGS])
+            put("keyboardEnabled", prefs[KEYBOARD_ENABLED] ?: true)
+            put("keyboardBindings", prefs[KEYBOARD_BINDINGS])
+            put("keyboardTargetPad", (prefs[KEYBOARD_TARGET_PAD] ?: 0).coerceIn(0, 1))
+            put("mouseEnabled", prefs[MOUSE_ENABLED] ?: true)
+            put("mouseBindings", prefs[MOUSE_BINDINGS])
+            put("mouseTargetPad", (prefs[MOUSE_TARGET_PAD] ?: 0).coerceIn(0, 1))
+            put("mouseAimMode", prefs[MOUSE_AIM_MODE] ?: MOUSE_AIM_OFF)
+            put(
+                "mouseSensitivity",
+                (prefs[MOUSE_SENSITIVITY] ?: DEFAULT_MOUSE_SENSITIVITY)
+                    .coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX)
+            )
+            put(
+                "mouseVerticalSensitivity",
+                (prefs[MOUSE_VERTICAL_SENSITIVITY] ?: DEFAULT_MOUSE_VERTICAL_SENSITIVITY)
+                    .coerceIn(
+                        MOUSE_VERTICAL_SENSITIVITY_MIN,
+                        MOUSE_VERTICAL_SENSITIVITY_MAX
+                    )
+            )
+            put(
+                "mouseSmoothing",
+                (prefs[MOUSE_SMOOTHING] ?: DEFAULT_MOUSE_SMOOTHING)
+                    .coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX)
+            )
+            put(
+                "mouseAimDeadzone",
+                (prefs[MOUSE_AIM_DEADZONE] ?: DEFAULT_MOUSE_DEADZONE)
+                    .coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX)
+            )
+            put("mouseInvertX", prefs[MOUSE_INVERT_X] ?: false)
+            put("mouseInvertY", prefs[MOUSE_INVERT_Y] ?: false)
+            put("mouseCaptureCursor", prefs[MOUSE_CAPTURE_CURSOR] ?: true)
+            put("mouseLeftHanded", prefs[MOUSE_LEFT_HANDED] ?: false)
+            put("mouseWheelMode", prefs[MOUSE_WHEEL_MODE] ?: MOUSE_WHEEL_OFF)
+            put(
+                "mouseWheelPulseMs",
+                (prefs[MOUSE_WHEEL_PULSE_MS] ?: DEFAULT_MOUSE_WHEEL_PULSE_MS)
+                    .coerceIn(MOUSE_WHEEL_PULSE_MIN_MS, MOUSE_WHEEL_PULSE_MAX_MS)
+            )
             put("gamepadDeviceAssignments", prefs[GAMEPAD_DEVICE_ASSIGNMENTS])
             put("gamepadIgnoredDevices", prefs[GAMEPAD_IGNORED_DEVICES])
             put("gpuDriverType", prefs[GPU_DRIVER_TYPE] ?: 0)
@@ -5028,6 +5414,34 @@ class AppPreferences(private val context: Context) {
             prefs[ORIENTATION_LOCK] = normalizeOrientationLock(json.optInt("orientationLock", ORIENTATION_LOCK_AUTO))
             prefs[EMULATION_ALLOWS_BOTH_ORIENTATIONS] = json.optBoolean("emulationAllowsBothOrientations", false)
             json.optString("gamepadBindings").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_BINDINGS] = it } ?: prefs.remove(GAMEPAD_BINDINGS)
+            prefs[KEYBOARD_ENABLED] = json.optBoolean("keyboardEnabled", true)
+            json.optString("keyboardBindings").takeIf { it.isNotBlank() }?.let { prefs[KEYBOARD_BINDINGS] = it } ?: prefs.remove(KEYBOARD_BINDINGS)
+            prefs[KEYBOARD_TARGET_PAD] = json.optInt("keyboardTargetPad", 0).coerceIn(0, 1)
+            prefs[MOUSE_ENABLED] = json.optBoolean("mouseEnabled", true)
+            json.optString("mouseBindings").takeIf { it.isNotBlank() }?.let { prefs[MOUSE_BINDINGS] = it } ?: prefs.remove(MOUSE_BINDINGS)
+            prefs[MOUSE_TARGET_PAD] = json.optInt("mouseTargetPad", 0).coerceIn(0, 1)
+            prefs[MOUSE_AIM_MODE] = json.optInt("mouseAimMode", MOUSE_AIM_OFF)
+                .coerceIn(MOUSE_AIM_OFF, MOUSE_AIM_LEFT_STICK)
+            prefs[MOUSE_SENSITIVITY] = json.optInt("mouseSensitivity", DEFAULT_MOUSE_SENSITIVITY)
+                .coerceIn(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX)
+            prefs[MOUSE_VERTICAL_SENSITIVITY] = json.optInt(
+                "mouseVerticalSensitivity",
+                DEFAULT_MOUSE_VERTICAL_SENSITIVITY
+            ).coerceIn(MOUSE_VERTICAL_SENSITIVITY_MIN, MOUSE_VERTICAL_SENSITIVITY_MAX)
+            prefs[MOUSE_SMOOTHING] = json.optInt("mouseSmoothing", DEFAULT_MOUSE_SMOOTHING)
+                .coerceIn(MOUSE_SMOOTHING_MIN, MOUSE_SMOOTHING_MAX)
+            prefs[MOUSE_AIM_DEADZONE] = json.optInt("mouseAimDeadzone", DEFAULT_MOUSE_DEADZONE)
+                .coerceIn(MOUSE_DEADZONE_MIN, MOUSE_DEADZONE_MAX)
+            prefs[MOUSE_INVERT_X] = json.optBoolean("mouseInvertX", false)
+            prefs[MOUSE_INVERT_Y] = json.optBoolean("mouseInvertY", false)
+            prefs[MOUSE_CAPTURE_CURSOR] = json.optBoolean("mouseCaptureCursor", true)
+            prefs[MOUSE_LEFT_HANDED] = json.optBoolean("mouseLeftHanded", false)
+            prefs[MOUSE_WHEEL_MODE] = json.optInt("mouseWheelMode", MOUSE_WHEEL_OFF)
+                .coerceIn(MOUSE_WHEEL_OFF, MOUSE_WHEEL_SHOULDERS)
+            prefs[MOUSE_WHEEL_PULSE_MS] = json.optInt(
+                "mouseWheelPulseMs",
+                DEFAULT_MOUSE_WHEEL_PULSE_MS
+            ).coerceIn(MOUSE_WHEEL_PULSE_MIN_MS, MOUSE_WHEEL_PULSE_MAX_MS)
             json.optString("gamepadDeviceAssignments").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_DEVICE_ASSIGNMENTS] = it } ?: prefs.remove(GAMEPAD_DEVICE_ASSIGNMENTS)
             json.optString("gamepadIgnoredDevices").takeIf { it.isNotBlank() }?.let { prefs[GAMEPAD_IGNORED_DEVICES] = it } ?: prefs.remove(GAMEPAD_IGNORED_DEVICES)
             prefs[GPU_DRIVER_TYPE] = json.optInt("gpuDriverType", 0)

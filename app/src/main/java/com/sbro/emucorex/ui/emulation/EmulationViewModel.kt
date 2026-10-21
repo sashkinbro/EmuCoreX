@@ -21,6 +21,7 @@ import com.sbro.emucorex.core.RendererDefaults
 import com.sbro.emucorex.core.SetupValidator
 import com.sbro.emucorex.core.EmulatorStorage
 import com.sbro.emucorex.core.GamepadManager
+import com.sbro.emucorex.core.KeyboardMouseManager
 import com.sbro.emucorex.core.GpuDriverManager
 import com.sbro.emucorex.core.FrameGenerationManager
 import com.sbro.emucorex.core.FrameGenerationSettings
@@ -37,6 +38,7 @@ import com.sbro.emucorex.data.AppPreferences
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_SIMPLE
 import com.sbro.emucorex.data.AppPreferences.Companion.FPS_OVERLAY_MODE_DETAILED
 import com.sbro.emucorex.data.CheatBlock
+import com.sbro.emucorex.data.KeyboardMouseSettings
 import com.sbro.emucorex.data.PatchRepository
 import com.sbro.emucorex.data.DisplayCrop
 import com.sbro.emucorex.data.OverlayControlLayout
@@ -56,6 +58,7 @@ import com.sbro.emucorex.data.PER_GAME_TOUCH_CONTROLS_LAYOUT_KEY
 import com.sbro.emucorex.data.saveTouchControlsLayout
 import com.sbro.emucorex.data.withCustomTouchControls
 import com.sbro.emucorex.data.withGamepadBindingsByPad
+import com.sbro.emucorex.data.withKeyboardMouseSettings
 import com.sbro.emucorex.data.withTouchControlsLayout
 import com.sbro.emucorex.data.TouchControlVisualStyle
 import com.sbro.emucorex.data.TouchControlPressEffect
@@ -621,6 +624,8 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
     // Kept outside EmulationUiState: that data class is near the JVM 255-argument limit.
     private val _activePatchNotice = MutableStateFlow<ActivePatchNotice?>(null)
     val activePatchNotice: StateFlow<ActivePatchNotice?> = _activePatchNotice.asStateFlow()
+    private val _keyboardMouseOverride = MutableStateFlow<KeyboardMouseSettings?>(null)
+    val keyboardMouseOverride: StateFlow<KeyboardMouseSettings?> = _keyboardMouseOverride.asStateFlow()
     private val lifecycleMutex = Mutex()
     private val transportMutex = Mutex()
     private val shaderPreparationLifecycleGate = ShaderPreparationLifecycleGate()
@@ -730,6 +735,31 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = finalState
         syncNativePerformanceOverlayState(finalState)
         syncGamepadAnalogSettings(finalState)
+        refreshKeyboardMouseOverride()
+    }
+
+    private fun refreshKeyboardMouseOverride() {
+        val override = activePerGameKey()
+            ?.let(perGameSettingsRepository::get)
+            ?.keyboardMouse
+        _keyboardMouseOverride.value = override
+        KeyboardMouseManager.setPerGameOverride(override)
+    }
+
+    fun setKeyboardMouseSettings(settings: KeyboardMouseSettings?) {
+        viewModelScope.launch {
+            val gameKey = activePerGameKey() ?: return@launch
+            val existing = withContext(Dispatchers.IO) { perGameSettingsRepository.get(gameKey) }
+            val base = existing ?: PerGameSettings(
+                gameKey = gameKey,
+                gameTitle = resolvePerGameTitle(_uiState.value),
+                gameSerial = currentGameSerial.takeIf { it.isNotBlank() }
+            )
+            withContext(Dispatchers.IO) {
+                perGameSettingsRepository.save(base.withKeyboardMouseSettings(settings))
+            }
+            refreshKeyboardMouseOverride()
+        }
     }
 
     private fun syncGamepadAnalogSettings(state: EmulationUiState) {
@@ -2284,6 +2314,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                     val safePath = path.orEmpty()
                     val existingProfile = currentGamePath?.let(perGameSettingsRepository::get)
                     hasPerGameProfile = existingProfile != null
+                    refreshKeyboardMouseOverride()
                     currentInterfaceSettingsProfile = existingProfile?.interfaceSettings
                     currentTouchControlsLayoutProfile = existingProfile?.touchControlsLayout
                     currentCustomTouchControlsProfile = existingProfile?.customTouchControls
@@ -4469,6 +4500,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
         currentTouchControlsLayoutProfile = null
         currentCustomTouchControlsProfile = null
         GamepadManager.clearPerGameOverrides()
+        refreshKeyboardMouseOverride()
         _uiState.value = _uiState.value.copy(
             gameSettingsProfileActive = false,
             ps2GunProfileActive = false
@@ -5448,6 +5480,10 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 } catch (_: Exception) { }
                 try {
                     GamepadManager.clearPerGameOverrides()
+                } catch (_: Exception) { }
+                try {
+                    _keyboardMouseOverride.value = null
+                    KeyboardMouseManager.setPerGameOverride(null)
                 } catch (_: Exception) { }
                 try {
                     EmulatorBridge.shutdown()

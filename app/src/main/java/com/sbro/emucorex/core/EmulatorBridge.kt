@@ -1328,6 +1328,21 @@ object EmulatorBridge {
         } catch (_: Exception) { }
     }
 
+    fun setPadButtonFromSource(
+        padIndex: Int,
+        index: Int,
+        range: Int,
+        pressed: Boolean,
+        source: Int
+    ) {
+        if (!isNativeLoaded) return
+        try {
+            if (RemotePlaySession.forwardGuestButton(index, range, pressed)) return
+            val mappedPadIndex = NetPlaySession.mapAndSendLocalButton(padIndex, index, range, pressed)
+            NativeApp.setPadButtonFromSource(mappedPadIndex, index, range, pressed, source)
+        } catch (_: Exception) { }
+    }
+
     fun resetKeyStatus() {
         if (!isNativeLoaded || !isVmActive) return
         launchSerial {
