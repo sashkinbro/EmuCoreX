@@ -83,6 +83,7 @@ import com.sbro.emucorex.core.GpuDriverRecommendations
 import com.sbro.emucorex.core.GpuDriverMatch
 import com.sbro.emucorex.core.GpuDriverVendor
 import com.sbro.emucorex.core.RemoteGpuDriver
+import com.sbro.emucorex.core.SocGpuCatalog
 import com.sbro.emucorex.core.SnapdragonGpuProfile
 import com.sbro.emucorex.core.vendor
 import com.sbro.emucorex.ui.common.ScreenTopBar
@@ -130,12 +131,21 @@ fun GpuDriverScreen(
     var variantFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
     var sourceFilter by rememberSaveable { mutableStateOf(GPU_DRIVER_FILTER_ALL) }
     var expandedDriverId by rememberSaveable { mutableStateOf<String?>(null) }
-    val deviceProfile = remember { GpuDriverRecommendations.currentDeviceProfile() }
-    val deviceVendor = remember { GpuDriverCompatibility.deviceVendor() }
+    val deviceSummary = remember { GpuDriverCompatibility.currentDevice() }
     val initialDeviceGpu = remember(context) { DeviceGpuInfoProvider.get(context) }
     val deviceGpuSnapshot by DeviceGpuInfoProvider.snapshot.collectAsState()
     val deviceGpu = deviceGpuSnapshot ?: initialDeviceGpu
-    val deviceSummary = remember { GpuDriverCompatibility.currentDevice() }
+    val buildDeviceVendor = remember { GpuDriverCompatibility.deviceVendor() }
+    val deviceVendor = GpuDriverCompatibility.vendorOfGpu(deviceGpu.model)
+        .takeIf { it != GpuDriverVendor.UNKNOWN }
+        ?: buildDeviceVendor
+    val deviceProfile = remember(deviceSummary.socName, deviceGpu) {
+        GpuDriverRecommendations.profileForGpu(deviceSummary.socName, deviceGpu.model)
+    }
+    val detectedGpuName = deviceGpu.model?.displayName?.takeIf { it.isNotBlank() }
+    val deviceGpuName = SocGpuCatalog.forSoc(deviceSummary.socName)?.displayName
+        ?: detectedGpuName
+        ?: deviceSummary.gpuName
     val isAdrenoDevice = deviceVendor == GpuDriverVendor.ADRENO
     val deviceHintRes = if (isAdrenoDevice) {
         R.string.settings_gpu_driver_device_hint
@@ -227,7 +237,7 @@ fun GpuDriverScreen(
         item {
             DeviceCompatibilityCard(
                 socName = deviceSummary.socName,
-                gpuName = deviceSummary.gpuName,
+                gpuName = deviceGpuName,
                 hintRes = deviceHintRes
             )
         }

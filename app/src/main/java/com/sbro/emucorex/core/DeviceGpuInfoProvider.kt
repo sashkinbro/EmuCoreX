@@ -47,7 +47,7 @@ internal object DeviceGpuInfoResolver {
 }
 
 object DeviceGpuInfoProvider {
-    const val CLASSIFIER_VERSION = 1
+    const val CLASSIFIER_VERSION = 2
 
     private const val PREFS_NAME = "device_gpu_profile"
     private const val KEY_VERSION = "classifier_version"

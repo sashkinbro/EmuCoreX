@@ -22,6 +22,8 @@ class GpuModelParserTest {
         assertEquals("Mali-450", GpuModelParser.parse("Mali-450MP")?.displayName)
         assertEquals("Mali-T880 MP12", GpuModelParser.parse("Mali-T880 MP12")?.displayName)
         assertEquals("Immortalis-G715 MC11", GpuModelParser.parse("Immortalis-G715 MC11")?.displayName)
+        assertEquals("Mali-G1 Ultra MC12", GpuModelParser.parse("Mali-G1 Ultra MC12")?.displayName)
+        assertEquals("Mali-G2 Ultra NX MP12", GpuModelParser.parse("Mali-G2 Ultra NX MP12")?.displayName)
         assertEquals(GpuVendor.MALI, GpuModelParser.parse("Mali-G68")?.vendor)
     }
 
@@ -31,7 +33,10 @@ class GpuModelParserTest {
         assertEquals(GpuVendor.XCLIPSE, GpuModelParser.parse("Xclipse 940")?.vendor)
         assertEquals("PowerVR GE8320", GpuModelParser.parse("PowerVR Rogue GE8320")?.displayName)
         assertEquals("PowerVR DXT-48-1536", GpuModelParser.parse("PowerVR DXT-48-1536")?.displayName)
+        assertEquals("PowerVR CXTP-48-1536", GpuModelParser.parse("PowerVR CXTP-48-1536")?.displayName)
+        assertEquals("PowerVR CXTP-48-1536", GpuModelParser.parse("IMG CXTP-48-1536")?.displayName)
         assertEquals("PowerVR", GpuModelParser.parse("Imagination Technologies PowerVR")?.displayName)
+        assertEquals("Maleoon 910", GpuModelParser.parse("Maleoon 910")?.displayName)
     }
 
     @Test

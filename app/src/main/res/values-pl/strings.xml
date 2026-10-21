@@ -2004,8 +2004,8 @@
     <string name="settings_gpu_driver_compatible">Kompatybilne</string>
     <string name="settings_gpu_driver_other_family">Inna rodzina Adreno</string>
     <string name="settings_gpu_driver_compatibility_a6xx">Adreno 6xx: Snapdragon 845/855/865/888 i wiele serii Snapdragon 6/7</string>
-    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, nowsze z serii Snapdragon 7 oraz 6 Gen 1/3</string>
-    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Gen 5, 8 Gen 5, 8 Elite, 8s Gen 4 oraz 6 Gen 4</string>
+    <string name="settings_gpu_driver_compatibility_a7xx">Adreno 7xx: Snapdragon 8 Gen 1/2/3, 8s Gen 3, 7 Gen 3/4, 7+ Gen 2/3 oraz 6 Gen 1/3</string>
+    <string name="settings_gpu_driver_compatibility_a8xx">Adreno 8xx: Snapdragon 8 Elite Extreme Gen 6, 8 Elite Gen 6, 8 Gen 6, 8 Elite Gen 5, 8 Gen 5, 8s Gen 4, 7s Gen 3/4 oraz 6 Gen 4</string>
     <string name="settings_stick_toggle_target">Drążek środkowego przycisku</string>
     <string name="settings_stick_toggle_right">Prawy drążek</string>
     <string name="settings_stick_toggle_left">Lewy drążek</string>

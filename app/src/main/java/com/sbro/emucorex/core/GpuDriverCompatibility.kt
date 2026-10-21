@@ -55,18 +55,29 @@ object GpuDriverRecommendations {
     fun currentDeviceProfile(): SnapdragonGpuProfile? =
         profileForSoc(MobileSocNameMapper.currentDeviceName())
 
-    internal fun profileForSoc(socName: String): SnapdragonGpuProfile? {
-        val normalized = socName.lowercase(Locale.US)
-        if (!normalized.contains("snapdragon")) return null
+    internal fun profileForSoc(socName: String): SnapdragonGpuProfile? =
+        profileForGpu(socName, null)
 
-        val mapping = SOC_GPU_MAPPINGS.firstOrNull { (socTokens, _) ->
-            socTokens.any(normalized::contains)
-        }?.second ?: return null
+    internal fun profileForGpu(socName: String, gpu: GpuModelInfo?): SnapdragonGpuProfile? {
+        val model = SocGpuCatalog.forSoc(socName) ?: gpu ?: return null
+        if (model.vendor != GpuVendor.ADRENO) return null
+        val family = model.adrenoFamily ?: adrenoFamilyOf(model.displayName) ?: return null
         return SnapdragonGpuProfile(
             socName = socName,
-            adrenoName = "Adreno ${mapping.first}",
-            family = mapping.second
+            adrenoName = model.displayName,
+            family = family
         )
+    }
+
+    private fun adrenoFamilyOf(modelName: String): AdrenoFamily? {
+        val value = ADRENO_MODEL.find(modelName)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: return null
+        return when {
+            value >= 800 -> AdrenoFamily.A8XX
+            value >= 700 -> AdrenoFamily.A7XX
+            value >= 600 -> AdrenoFamily.A6XX
+            else -> null
+        }
     }
 
     fun match(
@@ -116,46 +127,8 @@ object GpuDriverRecommendations {
         }
     }
 
-    private val SOC_GPU_MAPPINGS = listOf(
-        listOf("8 elite gen 5") to ("840" to AdrenoFamily.A8XX),
-        listOf("8 gen 5") to ("829" to AdrenoFamily.A8XX),
-        listOf("8 elite") to ("830" to AdrenoFamily.A8XX),
-        listOf("8s gen 4") to ("825" to AdrenoFamily.A8XX),
-        listOf("8 gen 3") to ("750" to AdrenoFamily.A7XX),
-        listOf("8s gen 3") to ("735" to AdrenoFamily.A7XX),
-        listOf("8 gen 2") to ("740" to AdrenoFamily.A7XX),
-        listOf("8+ gen 1", "8 gen 1") to ("730" to AdrenoFamily.A7XX),
-        listOf("7 gen 4") to ("722" to AdrenoFamily.A7XX),
-        listOf("7+ gen 3") to ("732" to AdrenoFamily.A7XX),
-        listOf("7s gen 3") to ("710" to AdrenoFamily.A7XX),
-        listOf("7 gen 3") to ("720" to AdrenoFamily.A7XX),
-        listOf("7+ gen 2") to ("725" to AdrenoFamily.A7XX),
-        listOf("7s gen 2") to ("710" to AdrenoFamily.A7XX),
-        listOf("6 gen 4") to ("810" to AdrenoFamily.A8XX),
-        listOf("6 gen 3", "6 gen 1") to ("710" to AdrenoFamily.A7XX),
-        listOf("888") to ("660" to AdrenoFamily.A6XX),
-        listOf("865") to ("650" to AdrenoFamily.A6XX),
-        listOf("855") to ("640" to AdrenoFamily.A6XX),
-        listOf("845") to ("630" to AdrenoFamily.A6XX),
-        listOf("7 gen 1") to ("644" to AdrenoFamily.A6XX),
-        listOf("780g") to ("642" to AdrenoFamily.A6XX),
-        listOf("778g") to ("642L" to AdrenoFamily.A6XX),
-        listOf("765") to ("620" to AdrenoFamily.A6XX),
-        listOf("750g") to ("619" to AdrenoFamily.A6XX),
-        listOf("730", "720g") to ("618" to AdrenoFamily.A6XX),
-        listOf("4s gen 2", "4 gen 2") to ("613" to AdrenoFamily.A6XX),
-        listOf("4 gen 1", "695") to ("619" to AdrenoFamily.A6XX),
-        listOf("690") to ("619L" to AdrenoFamily.A6XX),
-        listOf("480") to ("619" to AdrenoFamily.A6XX),
-        listOf("460") to ("610" to AdrenoFamily.A6XX),
-        listOf("685", "680", "665", "662") to ("610" to AdrenoFamily.A6XX),
-        listOf("675", "678") to ("612" to AdrenoFamily.A6XX),
-        listOf("670") to ("615" to AdrenoFamily.A6XX),
-        listOf("660") to ("512" to AdrenoFamily.A6XX),
-        listOf("636") to ("509" to AdrenoFamily.A6XX)
-    )
-
     private val EXPLICIT_ADRENO_MODEL = Regex("8xx\\s*\\(([^)]+)\\)", RegexOption.IGNORE_CASE)
+    private val ADRENO_MODEL = Regex("""adreno\s*(\d{3})""", RegexOption.IGNORE_CASE)
 }
 
 /**
@@ -179,6 +152,9 @@ object GpuDriverCompatibility {
         "sm8",
         "sm7",
         "sm6",
+        "sm4",
+        "qcs",
+        "qcm",
         "kalama",
         "lahaina",
         "taro",
@@ -187,10 +163,20 @@ object GpuDriverCompatibility {
 
     private val XCLIPSE_SIGNALS = listOf(
         "xclipse",
+        "exynos 1480",
+        "exynos 1580",
+        "exynos 1680",
         "exynos 2200",
         "exynos 2400",
         "exynos 2500",
-        "exynos 2600"
+        "exynos 2600",
+        "s5e8845",
+        "s5e8855",
+        "s5e8865",
+        "s5e9925",
+        "s5e9945",
+        "s5e9955",
+        "s5e9965"
     )
 
     private val MALI_SIGNALS = listOf(
@@ -210,7 +196,8 @@ object GpuDriverCompatibility {
 
     private val POWERVR_SIGNALS = listOf("powervr", "imgtec", "imagination")
 
-    private val SNAPDRAGON_SOC_PATTERN = Regex("""\bsm[0-9]{3,4}\b""")
+    private val SNAPDRAGON_SOC_PATTERN = Regex("""\bsm[0-9]{3,4}[a-z]*\b""", RegexOption.IGNORE_CASE)
+    private val EXYNOS_SOC_PATTERN = Regex("""\bs5e[0-9]{4}[a-z]*\b""", RegexOption.IGNORE_CASE)
 
     private const val DRIVER_VENDOR_METADATA = "driver_vendor.txt"
     private const val MALI_SX2_CATALOG_ID_PREFIX = "mali-sx2-"
@@ -222,12 +209,22 @@ object GpuDriverCompatibility {
 
     fun deviceVendor(): GpuDriverVendor = deviceVendor(currentDeviceInfo())
 
+    fun vendorOfGpu(model: GpuModelInfo?): GpuDriverVendor = when (model?.vendor) {
+        GpuVendor.ADRENO -> GpuDriverVendor.ADRENO
+        GpuVendor.MALI -> GpuDriverVendor.MALI
+        GpuVendor.XCLIPSE -> GpuDriverVendor.XCLIPSE
+        GpuVendor.POWERVR -> GpuDriverVendor.POWERVR
+        else -> GpuDriverVendor.UNKNOWN
+    }
+
     internal fun deviceVendor(deviceInfo: String): GpuDriverVendor {
         val info = deviceInfo.lowercase(Locale.US)
         if (QUALCOMM_SIGNALS.any { it in info }) return GpuDriverVendor.ADRENO
         if (XCLIPSE_SIGNALS.any { it in info }) return GpuDriverVendor.XCLIPSE
         if (POWERVR_SIGNALS.any { it in info }) return GpuDriverVendor.POWERVR
         if (MALI_SIGNALS.any { it in info }) return GpuDriverVendor.MALI
+        if (GpuHardwareProfiles.hasMediaTekSocHints(info)) return GpuDriverVendor.MALI
+        if (EXYNOS_SOC_PATTERN.containsMatchIn(info)) return GpuDriverVendor.MALI
         if (SNAPDRAGON_SOC_PATTERN.containsMatchIn(info)) return GpuDriverVendor.ADRENO
         return GpuDriverVendor.UNKNOWN
     }

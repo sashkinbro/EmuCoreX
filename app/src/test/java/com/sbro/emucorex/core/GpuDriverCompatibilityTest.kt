@@ -15,6 +15,33 @@ class GpuDriverCompatibilityTest {
         assertEquals(AdrenoFamily.A6XX, GpuDriverRecommendations.profileForSoc("Snapdragon 865 series")?.family)
         assertEquals(AdrenoFamily.A8XX, GpuDriverRecommendations.profileForSoc("Snapdragon 6 Gen 4")?.family)
         assertEquals(AdrenoFamily.A7XX, GpuDriverRecommendations.profileForSoc("Snapdragon 6 Gen 1")?.family)
+        assertEquals("Adreno 810", GpuDriverRecommendations.profileForSoc("Snapdragon 7s Gen 4")?.adrenoName)
+        assertEquals(AdrenoFamily.A8XX, GpuDriverRecommendations.profileForSoc("Snapdragon 7s Gen 3")?.family)
+        assertEquals("Adreno 845", GpuDriverRecommendations.profileForSoc("Snapdragon 8 Elite Gen 6")?.adrenoName)
+        assertEquals("Adreno 850", GpuDriverRecommendations.profileForSoc("Snapdragon 8 Elite Extreme Gen 6")?.adrenoName)
+    }
+
+    @Test
+    fun `prefers the catalog mapping over a stale renderer string`() {
+        val staleRenderer = GpuModelInfo(GpuVendor.ADRENO, "Adreno 710")
+        assertEquals(
+            "Adreno 810",
+            GpuDriverRecommendations.profileForGpu("Snapdragon 7s Gen 3", staleRenderer)?.adrenoName
+        )
+    }
+
+    @Test
+    fun `falls back to the detected GPU when the SoC name is unknown`() {
+        val detected = GpuModelInfo(GpuVendor.ADRENO, "Adreno 810")
+        assertEquals(
+            "Adreno 810",
+            GpuDriverRecommendations.profileForGpu("Unknown SoC", detected)?.adrenoName
+        )
+        assertEquals(
+            AdrenoFamily.A8XX,
+            GpuDriverRecommendations.profileForGpu("Unknown SoC", detected)?.family
+        )
+        assertEquals(null, GpuDriverRecommendations.profileForGpu("Unknown SoC", null))
     }
 
     @Test
@@ -56,14 +83,41 @@ class GpuDriverCompatibilityTest {
             GpuDriverVendor.ADRENO,
             GpuDriverCompatibility.deviceVendor("Qualcomm Technologies, Inc SM8650 for arm64")
         )
+        assertEquals(GpuDriverVendor.ADRENO, GpuDriverCompatibility.deviceVendor("sm7635-ac volcano"))
+        assertEquals(GpuDriverVendor.ADRENO, GpuDriverCompatibility.deviceVendor("SM4450"))
         assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("MediaTek MT6989"))
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("mt6993"))
+        assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("s5e8835"))
         assertEquals(GpuDriverVendor.MALI, GpuDriverCompatibility.deviceVendor("samsung exynos 1380 mali-g68"))
         assertEquals(
             GpuDriverVendor.XCLIPSE,
             GpuDriverCompatibility.deviceVendor("samsung exynos 2400 xclipse 940")
         )
+        assertEquals(GpuDriverVendor.XCLIPSE, GpuDriverCompatibility.deviceVendor("Samsung Exynos 1680"))
+        assertEquals(GpuDriverVendor.XCLIPSE, GpuDriverCompatibility.deviceVendor("s5e8865"))
         assertEquals(GpuDriverVendor.POWERVR, GpuDriverCompatibility.deviceVendor("IMG PowerVR GE8320"))
         assertEquals(GpuDriverVendor.UNKNOWN, GpuDriverCompatibility.deviceVendor("generic board"))
+    }
+
+    @Test
+    fun `classifies detected GPU vendors`() {
+        assertEquals(
+            GpuDriverVendor.ADRENO,
+            GpuDriverCompatibility.vendorOfGpu(GpuModelInfo(GpuVendor.ADRENO, "Adreno 810"))
+        )
+        assertEquals(
+            GpuDriverVendor.MALI,
+            GpuDriverCompatibility.vendorOfGpu(GpuModelInfo(GpuVendor.MALI, "Immortalis-G925 MC12"))
+        )
+        assertEquals(
+            GpuDriverVendor.XCLIPSE,
+            GpuDriverCompatibility.vendorOfGpu(GpuModelInfo(GpuVendor.XCLIPSE, "Xclipse 960"))
+        )
+        assertEquals(
+            GpuDriverVendor.POWERVR,
+            GpuDriverCompatibility.vendorOfGpu(GpuModelInfo(GpuVendor.POWERVR, "PowerVR CXTP-48-1536"))
+        )
+        assertEquals(GpuDriverVendor.UNKNOWN, GpuDriverCompatibility.vendorOfGpu(null))
     }
 
     @Test

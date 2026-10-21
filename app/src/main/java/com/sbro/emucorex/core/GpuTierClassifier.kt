@@ -7,6 +7,7 @@ object GpuTierClassifier {
         Regex("""mali-g(\d{2,4})(?:\s*((?:mc|mp)\s*\d{1,2}))?""", RegexOption.IGNORE_CASE)
     private val MALI_CORE_COUNT = Regex("""(?:mc|mp)\s*(\d{1,2})""", RegexOption.IGNORE_CASE)
     private val IMMORTALIS_MODEL = Regex("""immortalis-g(\d{3})""", RegexOption.IGNORE_CASE)
+    private val MALI_NEXT_GEN = Regex("""mali-g[12](?!\d)""", RegexOption.IGNORE_CASE)
     private val XCLIPSE_MODEL = Regex("""xclipse\s*(\d{3})""", RegexOption.IGNORE_CASE)
 
     private val ADRENO_RED_6XX = setOf(605, 608, 610, 612, 613, 615, 616)
@@ -37,6 +38,7 @@ object GpuTierClassifier {
 
     private fun classifyMali(displayName: String): GpuTier {
         if (IMMORTALIS_MODEL.containsMatchIn(displayName)) return GpuTier.GREEN
+        if (MALI_NEXT_GEN.containsMatchIn(displayName)) return GpuTier.GREEN
         val valhall = MALI_VALHALL_MODEL.find(displayName)
         if (valhall != null) {
             val generation = valhall.groupValues[1].toIntOrNull() ?: return GpuTier.UNKNOWN
@@ -68,5 +70,11 @@ object GpuTierClassifier {
     }
 
     private fun classifyPowerVr(displayName: String): GpuTier =
-        if (displayName.contains("dxt", ignoreCase = true)) GpuTier.GREEN else GpuTier.RED
+        if (displayName.contains("dxt", ignoreCase = true) ||
+            displayName.contains("cxt", ignoreCase = true)
+        ) {
+            GpuTier.GREEN
+        } else {
+            GpuTier.RED
+        }
 }

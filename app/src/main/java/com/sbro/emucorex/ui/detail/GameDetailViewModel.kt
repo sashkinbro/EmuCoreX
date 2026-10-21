@@ -12,6 +12,7 @@ import com.sbro.emucorex.data.GameComment
 import com.sbro.emucorex.data.GameCommentDeviceInfo
 import com.sbro.emucorex.data.GameCommentsRepository
 import com.sbro.emucorex.data.PlayerAccount
+import com.sbro.emucorex.core.MobileSocNameMapper
 import com.sbro.emucorex.data.ps2.Ps2CatalogDetails
 import com.sbro.emucorex.data.ps2.Ps2CatalogRepository
 import kotlinx.coroutines.Dispatchers
@@ -158,7 +159,7 @@ class GameDetailViewModel(application: Application) : AndroidViewModel(applicati
             phoneId = Build.DEVICE.orEmpty().ifBlank { Build.ID.orEmpty() },
             phoneModel = model,
             phoneName = listOf(brand, model).filter { it.isNotBlank() }.joinToString(" "),
-            phoneCpu = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else Build.HARDWARE,
+            phoneCpu = MobileSocNameMapper.currentDeviceName(),
             phoneRam = totalRamGb
         )
     }

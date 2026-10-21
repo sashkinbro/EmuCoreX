@@ -47,6 +47,8 @@ class GpuTierClassifierTest {
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(mali("Mali-G715 MP7")))
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(mali("Immortalis-G715 MC11")))
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(mali("Immortalis-G925")))
+        assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(mali("Mali-G1 Ultra MC12")))
+        assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(mali("Mali-G2 Ultra NX MP12")))
     }
 
     @Test
@@ -54,6 +56,7 @@ class GpuTierClassifierTest {
         assertEquals(GpuTier.RED, GpuTierClassifier.classify(powerVr("PowerVR GE8320")))
         assertEquals(GpuTier.RED, GpuTierClassifier.classify(powerVr("PowerVR GM9446")))
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(powerVr("PowerVR DXT-48-1536")))
+        assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(powerVr("PowerVR CXTP-48-1536")))
         assertEquals(GpuTier.YELLOW, GpuTierClassifier.classify(xclipse("Xclipse 530")))
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(xclipse("Xclipse 920")))
         assertEquals(GpuTier.GREEN, GpuTierClassifier.classify(xclipse("Xclipse 940")))
