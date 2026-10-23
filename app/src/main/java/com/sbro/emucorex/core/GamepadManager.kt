@@ -648,10 +648,6 @@ private const val MAX_PAD_SLOTS = 2
         if (device == null) return false
         if (device.isVirtual) return false
         if (isFingerprintUinputDevice(device)) return false
-        val deviceName = device.name.lowercase()
-        if (deviceName.contains("system control") || deviceName.contains("consumer control")) {
-            return false
-        }
         val sources = device.sources
         val hasControllerSource =
             (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
