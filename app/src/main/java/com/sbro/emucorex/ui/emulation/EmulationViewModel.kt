@@ -2169,7 +2169,7 @@ class EmulationViewModel(application: Application) : AndroidViewModel(applicatio
                 analyticsPerformanceProfile = config.performanceProfile
                 currentAnalyticsAudioBackend = config.audioBackend
                 val requestedRenderer = rendererOverride ?: config.renderer
-                val fallbackRenderer = VulkanStartupGuard.consumeFallbackRenderer(
+                val fallbackRenderer = VulkanStartupGuard.resolveFallbackRenderer(
                     getApplication(),
                     requestedRenderer
                 )

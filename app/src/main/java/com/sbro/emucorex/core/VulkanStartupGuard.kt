@@ -38,8 +38,12 @@ internal object VulkanStartupGuard {
         nowMillis: Long = System.currentTimeMillis()
     ): Long {
         val appContext = context?.applicationContext ?: return 0L
-        if (renderer != RendererDefaults.VULKAN)
+        if (renderer != RendererDefaults.VULKAN) {
+            // Spend recovery only when the bridge reaches an actual native launch.
+            // BIOS/path validation and cancellation can stop the UI preflight earlier.
+            clearPendingFallback(appContext)
             return 0L
+        }
 
         appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
@@ -94,18 +98,21 @@ internal object VulkanStartupGuard {
     }
 
     /**
-     * Consumes the one-shot fallback. Returns [RendererDefaults.OPENGL] only when the
-     * caller was about to launch Vulkan. Any other renderer choice clears the pending
-     * fallback, so a manual selection always wins.
+     * Resolves crash recovery during launch preflight. The one-shot fallback remains
+     * pending until [beginLaunch] reaches the native OpenGL launch, so failed BIOS/path
+     * validation cannot discard recovery. Any other renderer choice clears it.
      */
-    fun consumeFallbackRenderer(context: Context?, requestedRenderer: Int): Int? {
+    fun resolveFallbackRenderer(context: Context?, requestedRenderer: Int): Int? {
         val appContext = context?.applicationContext ?: return null
         val preferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (!preferences.getBoolean(KEY_PENDING_FALLBACK, false))
             return null
 
-        preferences.edit().remove(KEY_PENDING_FALLBACK).commit()
-        return if (requestedRenderer == RendererDefaults.VULKAN) RendererDefaults.OPENGL else null
+        if (requestedRenderer == RendererDefaults.VULKAN)
+            return RendererDefaults.OPENGL
+
+        clearPendingFallback(appContext)
+        return null
     }
 
     fun clearPendingFallback(context: Context?) {
