@@ -3014,4 +3014,8 @@
     <string name="settings_mouse_vertical_sensitivity">Vertikální citlivost</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Odstraní přepisy tlačítek ovladače pro tuto hru.</string>
+    <string name="settings_shader_presets_manage">Spravovat předvolby</string>
+    <string name="settings_shader_presets_remove_title">Odebrat vybrané předvolby?</string>
+    <string name="settings_shader_presets_remove_body">Vybrané předvolby: %1$d. Odebrat je ze seznamu?</string>
+    <string name="settings_shader_presets_remove_failed">Vybrané předvolby se nepodařilo odebrat.</string>
 </resources>

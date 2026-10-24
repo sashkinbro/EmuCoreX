@@ -3016,4 +3016,8 @@
     <string name="settings_mouse_vertical_sensitivity">Czułość pionowa</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Usuwa przypisania przycisków pada dla tej gry.</string>
+    <string name="settings_shader_presets_manage">Zarządzaj ustawieniami shaderów</string>
+    <string name="settings_shader_presets_remove_title">Usunąć wybrane ustawienia shaderów?</string>
+    <string name="settings_shader_presets_remove_body">Wybrane ustawienia: %1$d. Usunąć je z listy?</string>
+    <string name="settings_shader_presets_remove_failed">Nie udało się usunąć wybranych ustawień shaderów.</string>
 </resources>

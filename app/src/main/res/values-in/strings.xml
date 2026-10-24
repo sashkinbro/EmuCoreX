@@ -3008,4 +3008,8 @@
     <string name="settings_mouse_vertical_sensitivity">Sensitivitas vertikal</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Hapus penggantian tombol gamepad untuk game ini.</string>
+    <string name="settings_shader_presets_manage">Kelola preset</string>
+    <string name="settings_shader_presets_remove_title">Hapus preset yang dipilih?</string>
+    <string name="settings_shader_presets_remove_body">Preset yang dipilih: %1$d. Hapus dari daftar?</string>
+    <string name="settings_shader_presets_remove_failed">Tidak dapat menghapus preset yang dipilih.</string>
 </resources>

@@ -2994,4 +2994,8 @@
     <string name="settings_mouse_vertical_sensitivity">Sensibilità verticale</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Rimuove le assegnazioni dei pulsanti del controller per questo gioco.</string>
+    <string name="settings_shader_presets_manage">Gestisci preimpostazioni</string>
+    <string name="settings_shader_presets_remove_title">Rimuovere le preimpostazioni selezionate?</string>
+    <string name="settings_shader_presets_remove_body">Preimpostazioni selezionate: %1$d. Rimuoverle dall’elenco?</string>
+    <string name="settings_shader_presets_remove_failed">Impossibile rimuovere le preimpostazioni selezionate.</string>
 </resources>

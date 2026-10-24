@@ -7,7 +7,6 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
-import java.util.zip.ZipFile
 
 data class RetroArchShaderPreset(val label: String, val absolutePath: String)
 
@@ -33,8 +32,6 @@ class RetroArchShaderRepository(private val context: Context) {
         const val OFFICIAL_PACK_URL =
             "https://buildbot.libretro.com/assets/frontend/shaders_slang.zip"
         private const val MAX_ARCHIVE_BYTES = 256L * 1024L * 1024L
-        private const val MAX_EXTRACTED_BYTES = 768L * 1024L * 1024L
-        private const val MAX_ENTRIES = 20_000
         private const val PROGRESS_UPDATE_INTERVAL_NANOS = 100_000_000L
 
         internal fun commonArchiveRoot(paths: List<String>): String {
@@ -50,29 +47,18 @@ class RetroArchShaderRepository(private val context: Context) {
         }
 
         internal fun containsPresetFiles(directory: File): Boolean =
-            directory.exists() && directory.walkTopDown().any {
-                it.isFile && it.extension.equals("slangp", ignoreCase = true)
-            }
+            ShaderPackStore.usablePresetFiles(directory).isNotEmpty()
+
     }
 
     private val root: File
-        get() = File(context.filesDir, "retroarch-shaders").apply { mkdirs() }
+        get() = File(context.filesDir, "retroarch-shaders")
 
-    fun listPresets(): List<RetroArchShaderPreset> {
-        val base = root.canonicalFile
-        return base.walkTopDown()
-            .filter { it.isFile && it.extension.equals("slangp", ignoreCase = true) }
-            .map { file ->
-                RetroArchShaderPreset(
-                    label = file.relativeTo(base).invariantSeparatorsPath.removeSuffix(".slangp"),
-                    absolutePath = file.absolutePath
-                )
-            }
-            .sortedBy { it.label.lowercase() }
-            .toList()
-    }
+    private val store: ShaderPackStore get() = ShaderPackStore(root, context.cacheDir)
 
-    fun hasInstalledPack(): Boolean = containsPresetFiles(root)
+    fun listPresets(): List<RetroArchShaderPreset> = store.listPresets()
+    fun hasInstalledPack(): Boolean = store.hasInstalledPack()
+    fun removePresets(paths: Set<String>): Result<Int> = store.removePresets(paths)
 
     fun downloadOfficialPack(
         onProgress: (ShaderPackInstallProgress) -> Unit = {}
@@ -120,6 +106,7 @@ class RetroArchShaderRepository(private val context: Context) {
                                 lastReportedAtNanos = now
                             }
                         }
+                        require(totalBytes == 0L || total == totalBytes) { "Shader download is incomplete" }
                         output.fd.sync()
                         onProgress(
                             ShaderPackInstallProgress(
@@ -134,7 +121,7 @@ class RetroArchShaderRepository(private val context: Context) {
                 connection.disconnect()
             }
             onProgress(ShaderPackInstallProgress(stage = ShaderPackInstallStage.INSTALLING))
-            installArchive(archive)
+            store.installArchive(archive, official = true)
         } finally {
             archive.delete()
         }
@@ -157,70 +144,9 @@ class RetroArchShaderRepository(private val context: Context) {
                     output.fd.sync()
                 }
             } ?: error("Unable to open shader archive")
-            installArchive(archive)
+            store.installArchive(archive, official = false)
         } finally {
             archive.delete()
-        }
-    }
-
-    private fun installArchive(archive: File): Int {
-        val staging = File(context.cacheDir, "shader-stage-${UUID.randomUUID()}")
-        val target = root
-        val backup = File(context.filesDir, "retroarch-shaders.backup")
-        staging.mkdirs()
-        try {
-            extractSafely(archive, staging)
-            val presets = staging.walkTopDown()
-                .count { it.isFile && it.extension.equals("slangp", ignoreCase = true) }
-            require(presets > 0) { "No .slangp presets in archive" }
-            backup.deleteRecursively()
-            if (target.exists()) require(target.renameTo(backup)) { "Unable to stage old shader pack" }
-            if (!staging.renameTo(target)) {
-                backup.renameTo(target)
-                error("Unable to install shader pack")
-            }
-            backup.deleteRecursively()
-            return presets
-        } finally {
-            staging.deleteRecursively()
-        }
-    }
-
-    private fun extractSafely(archive: File, destination: File) {
-        val rootPath = destination.canonicalPath + File.separator
-        ZipFile(archive).use { zip ->
-            val entries = zip.entries().toList()
-                .filterNot { it.name.startsWith("__MACOSX/") || it.name.substringAfterLast('/').startsWith(".") }
-            require(entries.size <= MAX_ENTRIES) { "Too many files in shader archive" }
-            val commonRoot = commonArchiveRoot(entries.map { it.name })
-            var extracted = 0L
-            entries.forEach { entry ->
-                val relative = entry.name.removePrefix(commonRoot)
-                if (relative.isBlank()) return@forEach
-                val output = File(destination, relative)
-                require(output.canonicalPath.startsWith(rootPath) && isSafeArchiveEntry(destination, relative)) {
-                    "Unsafe archive path"
-                }
-                if (entry.isDirectory) {
-                    output.mkdirs()
-                } else {
-                    output.parentFile?.mkdirs()
-                    zip.getInputStream(entry).use { input ->
-                        output.outputStream().use { sink ->
-                            val buffer = ByteArray(64 * 1024)
-                            while (true) {
-                                val read = input.read(buffer)
-                                if (read < 0) break
-                                extracted += read
-                                require(extracted <= MAX_EXTRACTED_BYTES) {
-                                    "Expanded shader pack is too large"
-                                }
-                                sink.write(buffer, 0, read)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 

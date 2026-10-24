@@ -920,8 +920,56 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainPreset", "string", path)
     }
 
+    suspend fun removeShaderPresets(paths: Set<String>): Boolean {
+        if (_uiState.value.isShaderPackBusy) return false
+        _uiState.value = _uiState.value.copy(isShaderPackBusy = true)
+        var removalCommitted = false
+        val removed = com.sbro.emucorex.data.RemovedShaderPresetPaths(paths)
+        val activePreset = _uiState.value.shaderChainPreset
+        return try {
+            withContext(Dispatchers.IO) {
+                retroArchShaderRepository.removePresets(paths).getOrThrow()
+                removalCommitted = true
+                com.sbro.emucorex.data.ShaderPresetSelectionCleanup.clearRemovedSelections(
+                    preferences, com.sbro.emucorex.data.PerGameSettingsRepository(getApplication()), paths
+                )
+            }
+            true
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            false
+        } finally {
+            try {
+                if (removalCommitted) withContext(kotlinx.coroutines.NonCancellable) {
+                    // A committed tombstone must clear the live selection even if persistence failed.
+                    val runtimePreset = withContext(Dispatchers.IO) {
+                        EmulatorBridge.getSetting("EmuCore/GS", "ShaderChainPreset", "string")
+                    }
+                    if (removed.contains(runtimePreset)) runCatching {
+                        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainEnabled", "bool", "false")
+                        EmulatorBridge.setSetting("EmuCore/GS", "ShaderChainPreset", "string", "")
+                    }
+                    val remaining = runCatching {
+                        withContext(Dispatchers.IO) { retroArchShaderRepository.listPresets() }
+                    }.getOrElse { _uiState.value.shaderPresets.filterNot { removed.contains(it.absolutePath) } }
+                    val installed = runCatching {
+                        withContext(Dispatchers.IO) { retroArchShaderRepository.hasInstalledPack() }
+                    }.getOrDefault(_uiState.value.isShaderPackInstalled)
+                    _uiState.value = _uiState.value.copy(
+                        shaderPresets = remaining,
+                        isShaderPackInstalled = installed,
+                        shaderChainEnabled = if (removed.contains(activePreset)) false else _uiState.value.shaderChainEnabled,
+                        shaderChainPreset = if (removed.contains(activePreset)) "" else _uiState.value.shaderChainPreset
+                    )
+                }
+            } finally {
+                _uiState.value = _uiState.value.copy(isShaderPackBusy = false)
+            }
+        }
+    }
+
     fun downloadOfficialShaderPack() {
-        if (_uiState.value.isShaderPackInstalled) return
         installShaderPack(
             initialProgress = ShaderPackInstallProgress(ShaderPackInstallStage.DOWNLOADING)
         ) { onProgress ->

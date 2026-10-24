@@ -2994,4 +2994,8 @@
     <string name="settings_mouse_vertical_sensitivity">Dikey hassasiyet</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Bu oyun için denetleyici düğmesi atamalarını kaldırır.</string>
+    <string name="settings_shader_presets_manage">Ön ayarları yönet</string>
+    <string name="settings_shader_presets_remove_title">Seçilen ön ayarlar kaldırılsın mı?</string>
+    <string name="settings_shader_presets_remove_body">Seçilen ön ayarlar: %1$d. Listeden kaldırılsın mı?</string>
+    <string name="settings_shader_presets_remove_failed">Seçilen ön ayarlar kaldırılamadı.</string>
 </resources>

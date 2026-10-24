@@ -2993,4 +2993,8 @@
     <string name="settings_mouse_vertical_sensitivity">세로 민감도</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">이 게임의 게임패드 버튼 재정의를 제거합니다.</string>
+    <string name="settings_shader_presets_manage">프리셋 관리</string>
+    <string name="settings_shader_presets_remove_title">선택한 프리셋을 삭제할까요?</string>
+    <string name="settings_shader_presets_remove_body">선택한 프리셋: %1$d개. 목록에서 삭제할까요?</string>
+    <string name="settings_shader_presets_remove_failed">선택한 프리셋을 삭제하지 못했습니다.</string>
 </resources>

@@ -3009,4 +3009,8 @@
     <string name="settings_mouse_vertical_sensitivity">حساسیت عمودی</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">بازنویسی‌های دکمه‌های دسته بازی برای این بازی حذف می‌شود.</string>
+    <string name="settings_shader_presets_manage">مدیریت پیش‌تنظیم‌ها</string>
+    <string name="settings_shader_presets_remove_title">پیش‌تنظیم‌های انتخاب‌شده حذف شوند؟</string>
+    <string name="settings_shader_presets_remove_body">پیش‌تنظیم‌های انتخاب‌شده: %1$d. از فهرست حذف شوند؟</string>
+    <string name="settings_shader_presets_remove_failed">پیش‌تنظیم‌های انتخاب‌شده حذف نشدند.</string>
 </resources>

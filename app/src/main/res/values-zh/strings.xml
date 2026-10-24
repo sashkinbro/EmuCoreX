@@ -2995,4 +2995,8 @@
     <string name="settings_mouse_vertical_sensitivity">垂直灵敏度</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">移除此游戏的游戏手柄按键覆盖。</string>
+    <string name="settings_shader_presets_manage">管理预设</string>
+    <string name="settings_shader_presets_remove_title">移除所选预设？</string>
+    <string name="settings_shader_presets_remove_body">已选预设：%1$d。是否从列表中移除？</string>
+    <string name="settings_shader_presets_remove_failed">无法移除所选预设。</string>
 </resources>

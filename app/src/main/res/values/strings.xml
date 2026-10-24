@@ -3012,4 +3012,8 @@
     <string name="settings_mouse_vertical_sensitivity">Vertical sensitivity</string>
     <string name="settings_mouse_wheel_shoulders">L1 / R1</string>
     <string name="settings_gamepad_mapping_use_global_desc">Remove this game\'s gamepad button overrides.</string>
+    <string name="settings_shader_presets_manage">Manage presets</string>
+    <string name="settings_shader_presets_remove_title">Remove selected presets?</string>
+    <string name="settings_shader_presets_remove_body">Selected presets: %1$d. Remove them from the list?</string>
+    <string name="settings_shader_presets_remove_failed">Could not remove the selected presets.</string>
 </resources>
