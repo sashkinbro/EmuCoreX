@@ -71,6 +71,25 @@ private val imageLoadingSemaphore = Semaphore(4)
 private const val DEFAULT_COVER_DECODE_WIDTH = 400
 private const val DEFAULT_COVER_DECODE_HEIGHT = 600
 
+private val imagePrefetchSemaphore = Semaphore(1)
+
+/** Warms only the exact size/key used by ordinary library cards, with one speculative decoder. */
+internal suspend fun prefetchGameCoverArt(context: android.content.Context, coverPath: String) {
+    if (coverPath.isBlank()) return
+    val cacheKey = "$coverPath@${DEFAULT_COVER_DECODE_WIDTH}x$DEFAULT_COVER_DECODE_HEIGHT"
+    if (getCachedBitmap(cacheKey) != null) return
+    imagePrefetchSemaphore.withPermit {
+        withContext(Dispatchers.IO) {
+            imageLoadingSemaphore.withPermit {
+                if (getCachedBitmap(cacheKey) == null) {
+                    loadBitmap(context, coverPath, DEFAULT_COVER_DECODE_WIDTH, DEFAULT_COVER_DECODE_HEIGHT)
+                        ?.let { putCachedBitmap(cacheKey, it) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun GameCoverArt(
     coverPath: String?,
@@ -136,7 +155,7 @@ fun GameCoverArt(
         for (candidate in candidates) {
             val candidateBitmap = withContext(Dispatchers.IO) {
                 imageLoadingSemaphore.withPermit {
-                    loadBitmap(context, candidate, decodeWidth, decodeHeight)
+                    getCachedBitmap(cacheKey(candidate)) ?: loadBitmap(context, candidate, decodeWidth, decodeHeight)
                 }
             }
             if (candidateBitmap != null) {
