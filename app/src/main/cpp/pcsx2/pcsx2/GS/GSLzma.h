@@ -295,7 +295,8 @@ public:
 	__fi const ByteArray& GetStateData() const { return m_state_data; }
 	__fi const GSDataArray& GetPackets() const { return m_dump_packets; }
 
-	bool ReadFile(Error* error);
+	// Strict consumers must not silently accept a truncated final packet.
+	bool ReadFile(Error* error, bool strict = false);
 
 protected:
 	GSDumpFile();

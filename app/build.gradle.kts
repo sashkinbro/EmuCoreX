@@ -113,7 +113,7 @@ android {
         debug {
             externalNativeBuild {
                 cmake {
-                    arguments("-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON")
+                    arguments("-DEMUCOREX_ENABLE_NATIVE_SELF_TESTS=ON", "-DEMUCOREX_ENABLE_GS_ORACLE=ON")
                 }
             }
         }

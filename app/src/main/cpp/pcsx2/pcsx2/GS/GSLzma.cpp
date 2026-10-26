@@ -71,7 +71,7 @@ bool GSDumpFile::GetPreviewImageFromDump(const char* filename, u32* width, u32* 
 	return true;
 }
 
-bool GSDumpFile::ReadFile(Error* error)
+bool GSDumpFile::ReadFile(Error* error, bool strict)
 {
 	u32 ss;
 	if (Read(&m_crc, sizeof(m_crc)) != sizeof(m_crc) || Read(&ss, sizeof(ss)) != sizeof(ss))
@@ -211,6 +211,11 @@ bool GSDumpFile::ReadFile(Error* error)
 		{
 			if (remaining < packet.length)
 			{
+				if (strict)
+				{
+					Error::SetStringView(error, "Truncated GS dump packet");
+					return false;
+				}
 				// There's apparently some "bad" dumps out there that are missing bytes on the end..
 				// The "safest" option here is to discard the last packet, since that has less risk
 				// of leaving the GS in the middle of a command.

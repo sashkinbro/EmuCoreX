@@ -36,6 +36,10 @@ app/.cxx/
 .externalNativeBuild/
 .angle-build/
 scripts/
+!/scripts/
+/scripts/*
+!/scripts/gs-oracle/
+/scripts/gs-oracle/results/
 captures/
 out/
 dist/

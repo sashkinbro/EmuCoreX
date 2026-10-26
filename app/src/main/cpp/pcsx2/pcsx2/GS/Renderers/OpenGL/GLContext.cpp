@@ -53,7 +53,11 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, Error* error)
 std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<const Version> versions_to_try, Error* error)
 {
 	std::array<Version, 16> reordered_versions = {};
-	if (wi.type == WindowInfo::Type::Android || ShouldPreferESContext())
+	if (wi.type == WindowInfo::Type::Android || ShouldPreferESContext()
+#ifdef __ANDROID__
+		|| wi.type == WindowInfo::Type::Surfaceless
+#endif
+	)
 	{
 		size_t count = 0;
 		for (const Version& version : versions_to_try)
@@ -75,7 +79,10 @@ std::unique_ptr<GLContext> GLContext::Create(const WindowInfo& wi, std::span<con
 	context = GLContextWGL::Create(wi, versions_to_try, error);
 #else // Linux
 #if defined(__ANDROID__)
-	if (wi.type == WindowInfo::Type::Android)
+	// The Android host can open GS before its SurfaceView is attached. EGL
+	// already supports surfaceless contexts (and pbuffer fallback); select the
+	// Android display implementation for that initial state as well.
+	if (wi.type == WindowInfo::Type::Android || wi.type == WindowInfo::Type::Surfaceless)
 		context = GLContextEGLAndroid::Create(wi, versions_to_try, error);
 #endif
 #if defined(X11_API)
