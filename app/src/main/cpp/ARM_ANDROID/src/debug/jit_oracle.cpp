@@ -11854,6 +11854,7 @@ void IOPSharedStateTests()
 #include "jit_oracle_iop_cop2_memory.inl"
 #include "jit_oracle_iop_avsz.inl"
 #include "jit_oracle_iop_avsz_fusion.inl"
+#include "jit_oracle_iop_address.inl"
 
 void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_only = false,
     bool avsz_only = false, bool direct_only = false)
@@ -11961,6 +11962,7 @@ void IOPTests(bool cop2_only = false, bool cop2_memory_only = false, bool nclip_
     IOPCoverageGte();
     if (direct_only)
     {
+        IOPLegacyAddressTests();
         std::printf("DIRECT IOP: interpreter/direct coverage only; experimental IR integration omitted\n");
         return;
     }

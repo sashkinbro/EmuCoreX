@@ -1238,6 +1238,14 @@ static int rpsxPrepareAddressOperand_emit_oaknut()
 
 static void rpsxCalcAddressOperand_emit_oaknut(int rs)
 {
+	// Small signed offsets need no scratch register or intermediate base copy.
+	// Keep the existing copy-first path for larger offsets and memory sources.
+	if (rs >= 0 && _Imm_ >= -4095 && _Imm_ <= 4095)
+	{
+		oakAddSignedImm(OAK_WARG1, oakWRegister(rs), _Imm_, OAK_WSCRATCH);
+		return;
+	}
+
 	if (rs >= 0)
 		oakAsm->MOV(OAK_WARG1, oakWRegister(rs));
 	else

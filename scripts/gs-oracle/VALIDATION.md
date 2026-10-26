@@ -94,6 +94,13 @@ whenever a depth-as-color MRT is active.
   direct EE stores 726, direct EE 3,132, direct IOP 379, direct VU 441, SPU2 volume
   9, classifier 53, JIT cache 11, VU cache 18. Output reports compiled IR runtime
   capability 0. The earlier SPU2 timing gate passes with optimized Debug.
+- Direct IOP cached-base addresses now fold signed offsets within ±4095 into
+  ARM64 ADD/SUB immediates. The real emitter passes 972 host code-generation
+  cases (378 failures before the change). The expanded direct IOP oracle passes
+  2,380 checks, including 687 RAM/mirror/alias/zero-register/MMIO fixtures.
+  All eight direct/runtime guard suites pass 6,770 checks on Lenovo with IR
+  runtime capability 0: `tests/results/jit-oracle/20261026-121415-312/`.
+  This reduces emitted host instructions; no game-FPS improvement is claimed.
 - NFS Most Wanted gameplay reached a Sprint on Seaside & Power Station in the
   Golf GTI. Saved state 7 permits starting both hardware backends from the same
   playable state. Screenshots show the car moving and race progress; startup
